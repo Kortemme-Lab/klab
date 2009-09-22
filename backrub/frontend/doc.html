@@ -1,0 +1,205 @@
+<a name="top">
+<H1 class="title">Documentation</H1>
+
+<UL>
+<LI><a href="#description">Description</a></LI>
+<LI><a href="#tutorials">Tutorials</a></LI>
+<LI><a href="#parameter">Parameter</a></LI>
+<LI><a href="#data_formats">Data Formats</a></LI>
+<LI><a href="#Rosetta">Rosetta</a></LI>
+<LI><a href="#Backrub">Backrub</a></LI>
+</UL>
+
+<br><br><br>
+
+
+
+
+<a name="description">
+<H1 class="title">Description&nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H1>
+<P>
+This server is a frontend for Rosetta, a software that focuses on the prediction and design of protein structures, protein folding mechanisms, and protein-protein interactions. We provide access to different applications in protein design that utilize backrub, a method for modeling of backbone flexibility [<a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09">Smith and Kortemme, 2008</a>].
+
+There are four applications implemented at this time:
+<UL>
+<LI>Model Flexibility: Creates an ensemble of structures by applying backrub to all residues.</LI>
+<LI>Point Mutation: Creates an ensemble of structures with one or more mutations of specific residues and applies backrub to the neighborhood of the mutations. This method is described in [<a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09">Smith and Kortemme, 2008</a>].</LI>
+<LI>Upload Mutation: Allows for a flexible definition of the residues subject to mutations and backrub. Instructions for creating a mutations file can be found in <a href="#mutations">Data Formats</a>.</LI>
+<LI>Backrub ensemble: Creates a backrub ensemble according to <i>"A correspondence between solution-state dynamics of an individual protein and the sequence and conformational diversity of its family"</i> (submitted) [<a href="http://kortemmelab.ucsf.edu/people.html">Friedland et al. 2009</a>] </LI>
+</UL>
+</P>
+
+<br><br>
+
+
+<a name="tutorials">
+<H1 class="title">Tutorial &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H1>
+<P>
+<table border=0 cellpadding=2 cellspacing=0 style="text-align:justify;">
+<tr><td>
+To submit a new job log in and click on <font color="#365A79">Submit</font> in the second row of the menu at the top of the site. This opens the submission form, which is divided in three parts. <br><br>
+<b>Top</b> <br>
+Enter a name for your job that helps you finding it later and the structure that you want to model. <br><br>
+<b>Middle</b> - <font style="background-color:#B7FFE0; ">&nbsp;General Settings&nbsp;</font><br>
+Choose the <a href="#Rosetta">version of Rosetta</a>, the number of structures and whether the raw output should be stored or not. <br><br>
+<b>Bottom</b> - <font style="background-color:#B7FFE0; ">&nbsp;Application Specific Settings&nbsp;</font><br>
+Choose the application you want to use and enter the application specific parameters. An explanation of each parameter is shown when hovering the mouse over its name. <br><br>
+Once your done click the 'Sumbit' button on the bottom left. If a value is missing a popup window will notify you.
+</td><td style="padding-left:10pt; vertical-align:top;">
+<img src="../images/submit_form.png" border=1>
+</td></tr>
+</table>
+<br>
+
+For each uploaded structure a number of independent simulations are made in order to create an ensemble of structures. Click on <font color="#365A79">Queue</font> in the menu to see the job queue. The table shows basic information about the jobs as their status (<font color="orange">in queue</font>, <font color="green">active</font>, <font color="darkblue">done</font>, or <font color="FF0000">error</font>), who submited them, when they were submited, the job name, the kind of Rosetta used, the number of structures created and an error message for the highly unlikely case the simulation fails. Your username is highlighted in green to make it easier to indentify your jobs. To view more detailed information about a specific job, click on its entry in the table. <br><br>
+
+<table border=0 cellpadding=2 cellspacing=0 style="text-align:justify;">
+<tr><td style="padding-right:10pt; vertical-align:top;">
+<img src="../images/job_view.png" border=1>
+</td><td>
+Depending on the status not all of the information described below is shown.<br><br>
+<font style="background-color:#EEEEFF; border-style:solid; border-width:thin;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font> <b>Simulation data</b>
+<UL>
+<LI>The upper part shows the job name, its status and possible actions. If the job hasn't started yet it is possible to delete it from the queue by clicking on the delete link in the 'Actions' field. </LI>
+<LI>In the middle following information is shown: computer that submitted the job, when it was submitted, started, and finished, it's computation time, the date when the data will be deleted from our database, and which kind of Rosetta was used. </LI>
+<LI>The lower part of the table shows details about the simulation as for instance the application and the parameters of the simulation. In the green row, links for accessing the output are provided.  </LI>
+</UL>
+<font style="background-color:#B7FFE0; border-style:solid; border-width:thin;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font> <b>Downloadable files</b><br><br>
+Files can be viewed individually or can be downloaded as a zip archive.<br><br>
+
+<font style="background-color:#FFFCD8; border-style:solid; border-width:thin;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</font> <b>Results</b><br><br>
+For certain applications an analysis of the raw output is automatically carried out. For these cases the results are visualized here. All the files shown are also included in the zip archive.
+</td></tr>
+</table>
+<br>
+
+
+
+
+</P>
+
+
+
+
+
+
+
+
+<a name="parameter">
+<H1 class="title">Parameter&nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H1>
+
+<a name="NOS">
+<H2 class="title">Number of structures &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H2>
+<P>
+The number of individual simulations that are carried out.
+</P>
+
+<a name="keep_output">
+<H2 class="title">ROSETTA output &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H2>
+<P>
+This option allows the user to keep the raw Rosetta output as well as the resfile. 
+Otherwise only the resulting pdb structures will be provided for download.
+</P>
+<br>
+
+<a name="data_formats">
+<H1 class="title">Data Formats &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H1>
+
+<P>
+User data must have the following formats.Please follow these formats and check your input before submitting to the server to avoid errors and wasting processor time.
+</P>
+
+<a name="pdbcomplex">
+<H2 class="title">PDB Complex &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H2>
+
+<P>
+Multi-chain protein complex using RCSB's <a href="http://www.wwpdb.org/docs.html" target="_blank">PDB File Format</a>.
+<br><br>
+If you submit a job that is using mini and it finishes with an "Rosetta Error", please make sure that the residue-ID's in the PDB-file are &lt;1000.
+</P>
+
+<a name="mutations">
+<H2 class="title">Mutations List  &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H2>
+ 
+<P>
+If this file is not given backrub is applied to all residues. This file contains a list of mutations to be made and residues that should be subject to the backrub move of a <a href="#pdbcomplex">PDB Complex</a>. If the residue is not given in this file it will be fixed. 
+<br><br>
+4 space delimited columns representing:
+<br>
+<UL>
+   <LI>Column 1. The Chain ID as in the PDB complex (case sensitive).
+   <LI>Column 2. The residue number as in the PDB complex.
+   <LI>Column 3. The backrub tag: B: use backrub, F: keep fixed
+   <LI>Column 4. The residue that should be used at this postition (one letter code). If more than one residue is given rosetta will pick the one with the lowest energy. 
+</UL>
+This means that three cases can be defined in this file. Case 0 is the default for all other residues (need not to be defined):
+<center>
+<table border=0 width="400" cellpadding=2px>
+    <tr><td>0.</td><td>no backrub, no mutation</td><td>A 111 F    </td><td><b>default</b></td></tr>      
+    <tr><td>1.</td><td>backrub w mutation     </td><td>A 111 B AFI</td></tr>
+    <tr><td>2.</td><td>backrub w/o mutation   </td><td>A 111 B    </td></tr>
+    <tr><td>3.</td><td>mutation w/o backrub   </td><td>A 111 F AFI</td></tr>
+</table>
+</center>
+</P>
+Example File:
+<PRE>
+A 10 B
+A 11 B
+A 12 B
+A 13 B
+A 14 B AFI
+A 20 B
+A 21 B
+A 22 B
+A 23 B
+A 24 B
+A 31 F AFI
+</PRE>
+<P>
+Residues 10 to 14 and 20 to 24 are subject to the backbone move. For residues 14 and 31 a mutation with either Alanine (A), Phenylalanine (F) or Isoleucine (I) is allowed. Rosetta is going to pick the energetically most favorable amino acid for this position. For residue 31 the backrub move is not allowed.
+</P>
+
+<br><br>
+
+
+
+<a name="Rosetta">
+<H1 class="title">Rosetta &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H1>
+
+<P>
+The Rosetta software focuses on the prediction and design of protein structures, protein folding mechanisms, and protein-protein interactions. Rosetta codes consistently exhibit repeated success in the Critical Assessment of Techniques for Protein Structure Prediction (<A class="link" href="http://predictioncenter.llnl.gov/" title="CASP">CASP</A>) competition as well as the <A class="link" href="http://capri.ebi.ac.uk/" title="CAPRI">CAPRI</A> competition. Rosetta codes also address aspects of protein design, docking and structure. The software is the foundation for the Human Proteome Folding Project on the World Community Grid.
+</P>
+<P>
+ROSETTA++ is the software suite that implements the algorithms used in folding, design and interaction modeling. It is currently licensed for free to users at academic and nonprofit institutions. Over 2000 academic users in more than 32 countries use Rosetta. Commercial entities can use Rosetta by paying a license fee. Revenue from licensing is reinvested in supporting continued software development.
+</P>
+<P>
+miniRosetta is the new version of Rosetta that is currently developed and will be officially released soon. It takes full advantage of C++ and it's concepts.
+</P>
+
+<br><br>
+
+<a name="Backrub">
+<H1 class="title">Backrub &nbsp; <a href="#top"><img src="../images/top.gif" border=0></a> </H1>
+<P>
+For more information on Backrub see [ <a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09">Smith and Kortemme, 2008</a> ]
+</P>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,28 @@
+
+TD { font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; }
+
+PRE { font-family: Courier; font-size: 12pt; border:1px solid black; background-color:#F6F6F6; padding:10px; }
+PRE.sequence { font-family:'courier new'; font-size:8pt; color:black};
+
+H1 { font-family: Arial, Helvetica; font-weight: bold; font-size: 11pt;}
+H2 { font-family: Arial, Helvetica; font-weight: bold; font-size: 11pt;} 
+H1.pdb { font-family: Arial, Helvetica; font-weight: bold; font-size: 12pt;}
+H1.title { font-family: Arial, Helvetica; font-weight: bold; font-size: 12pt; margin-left:60px; margin-right:50px;}
+
+A:link { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A:visited { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A:active { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A:hover { color:#4b7ca7; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+
+A.nav:link { text-decoration: none; color:#0000aa; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
+A.nav:visited { text-decoration: none; color:#0000aa; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
+A.nav:active { text-decoration: none; color:#000077; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
+A.nav:hover { text-decoration: none; color:#000077; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
+
+P { text-align: justify; }
+
+.header { background: #cccccc; font-size: 12px; font-family: verdana, arial; font-weight: bold; }
+.results { background: #eeeeee; font-size: 11px; font-family: verdana, arial; font-weight: none; }
+.nav { text-decoration: none; color:#0000aa; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; }
+
+missing { background: #FF0000; }

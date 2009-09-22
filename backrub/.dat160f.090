@@ -1,0 +1,297 @@
+
+
+            <!-- *********************************************************
+                 * Rosetta Web Server - Python - BACKRUB                 *
+                 * Kortemme Lab, University of California, San Francisco *
+                 * Tanja Kortemme, Florian Lauck, 2009                   *
+                 ********************************************************* -->
+            <html>
+            <head>
+                <title>Structure Prediction Backrub - Submission Form</title>
+                <META name="description" content="Structure Prediction using Backrub.">
+                <META name="keywords" content="rosetta baker kortemme protein structure prediction backrub protein design point mutation">
+                <script src="../javascripts/prototype.js" type="text/javascript"></script>
+                <script src="../javascripts/scriptaculous.js?load=effects" type="text/javascript"></script>
+                <script src="../jmol/Jmol.js" type="text/javascript"></script>
+                <script src="jscripts.js" type="text/javascript"></script>
+                <link rel=STYLESHEET type="text/css" href="style.css">
+            </head>
+
+            <body bgcolor="#ffffff">
+            <center>
+ 
+            <table width=700 border=0 cellpadding=0 cellspacing=0>
+            <tr>
+                <td align=center style="border-bottom:1px solid gray;"> <A href="../"><img src="images/logo.png" border="0" usemap="#links"></A> </td>
+            </tr>
+
+<!-- Login Status --> <tr> <td align=right><small>[ <font color=green>flo</font> | <a href="rosettaweb2.py?query=logout"><small>Logout</small></a> ]</small></td> </tr>
+        <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Menu --> <tr> 
+                <tr><td align=center>
+                    [&nbsp;<A href="rosettaweb2.py?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A href="rosettaweb2.py?query=doc">Documentation</A>&nbsp;]
+                </td></tr>
+                <tr><td align=center>
+                    [&nbsp;<A href="rosettaweb2.py?query=submit">Submit</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A href="rosettaweb2.py?query=queue">Queue</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A href="rosettaweb2.py?query=update">My Account</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    
+</td></tr> </tr>
+        <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Content --> <tr> <td align="center">
+        <H1 class="title">Submit a new job</H1>
+    <br>
+    Please enter the required information and upload a structure. For help move your mouse to the parameter.
+    <br><br>
+
+    <!-- Start Submit Form -->
+    <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
+    
+    <table border=0 cellpadding=0 cellspacing=0>
+      <colgroup>
+        <col width="200">
+        <col width="500">
+      </colgroup>
+    <tr><td style="vertical-align:top;">
+    <table style=""  border=0 cellpadding=0 cellspacing=0 >
+                <tr id="app_alascan" style="background-color:#DCE9F4; "><td style="padding:3pt;">
+                    <A href="/alascan/">Interface Alanine Scanning</A>
+                </td></tr>
+                <tr id="app_Colin" style="background-color:#DCE9F4; "><td style="padding:3pt;">
+                    <A href="javascript:void(0)" onclick="changeAPP('');">Point Mutant</A>
+                </td></tr>
+                <tr id="app_Greg" style="background-color:#DCE9F4; "><td style="padding:3pt;">
+                    <A href="javascript:void(0)" onclick="changeAPP('');">Backrub Ensemble Design</A>
+                </td></tr>
+                <tr id="app_Elisabeth" style="background-color:#DCE9F4; "><td style="padding:3pt;">
+                    <A href="javascript:void(0)" onclick="changeAPP('');">Flexible Backbone Design</A>
+                </td></tr>
+    </table>
+    </td>
+    <td style="background-color:#DCE9F4; padding:10px;">
+    <TABLE border=0 cellpadding=0 cellspacing=0 >
+      <TR>
+        <TD align=right onmouseover="popUp('tt_UserName');" onmouseout="popUp('tt_UserName');">User Name </TD>
+        <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=30 SIZE=31 NAME="UserName" VALUE="flo" disabled>
+        </TD>
+      </TR>
+      <TR></td></TR>
+      <TR>
+        <TD align=right onmouseover="popUp('tt_JobName');" onmouseout="popUp('tt_JobName');">Job Name </TD>
+        <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE=""> *</TD>
+      </TR>
+      <TR><TD align=left><br></TD></TR>
+      <TR>
+        <TD align=right onmouseover="popUp('tt_Structure');" onmouseout="popUp('tt_Structure');"> Structure </TD>
+        <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20"> *</TD>
+      </TR>
+      <TR><TD colspan=2><br></TD></TR>
+      <TR>
+        <TD align="center" colspan=2 bgcolor="#B7FFE0">General Settings</TD>
+      </TR>
+      <TR>
+        <TD align=right onmouseover="popUp('tt_RVersion');" onmouseout="popUp('tt_RVersion');">Rosetta Version </TD>
+        <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">
+            <input type="radio" checked name="Mini" value="classic"> Rosetta 2.3 (classic)<br>
+            <input type="radio" name="Mini" value="mini"> Rosetta 3.0 (mini)
+        </TD>
+      </TR>
+      <TR>
+        <TD align=right onmouseover="popUp('tt_NStruct');" onmouseout="popUp('tt_NStruct');">Number of structures </TD>
+        <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE=""> (max 100) </TD>
+      </TR>
+      <TR>
+        <TD align=right onmouseover="popUp('tt_ROutput');" onmouseout="popUp('tt_ROutput');">ROSETTA output </TD>
+        <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1"> keep files</TD>
+      </TR>
+      <TR><TD align=left><br></TD></TR>
+      <TR>
+        <TD align="center" colspan=2 bgcolor="#B7FFE0">Application Specific Settings</TD>
+      </TR>
+      <TR><TD align=left><br></TD></TR>
+      <TR>
+        <TD align=right style="vertical-align:top; padding:0pt; margin:0pt;">
+		  <!-- application table -->
+          <table border="0" cellspacing=0 cellpadding=0 >
+            <tr id="field_init" style="background-color:#DCE9F4; padding:3pt;">
+                <td style="padding:3pt; margin:0pt;" > Select Application </td>
+            </tr>
+            <tr id="field_no_mutation"><td style="padding:3pt;">
+                    <a href="javascript:void(0)" onclick="changeApplication('no_mutation');" >Model Flexibility</a><br>
+            </td></tr>
+            <tr id="field_point_mutation"><td style="padding:3pt;">
+                    <a href="javascript:void(0)" onclick="changeApplication('point_mutation');">Point Mutation</a><br>
+            </td></tr>
+            <tr id="field_upload_mutation"><td style="padding:3pt;">
+                    <a href="javascript:void(0)" onclick="changeApplication('upload_mutation');">Upload Mutation</a><br>
+            </td></tr>
+            <tr id="field_ensemble"><td style="padding:3pt;">
+                    <a href="javascript:void(0)" onclick="changeApplication('ensemble');">Backrub ensemble</a><br>
+            </td></tr>
+          </table>
+
+        </TD>
+        <TD id="field_right" align=left width="290px" style="padding:5pt; background:#DCE9F4;">
+
+            <p id="task_init" style="text-align:justify;">  Click left to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.
+            </p>
+
+            <p id="task_no_mutation" style="display:none; text-align:center;"><b>Apply backrub to all residues.</b><br><br>no options
+            </p>
+
+            <p id="task_point_mutation" style="display:none; text-align:center;"><b>Mutation of one or more residues.</b> <br><br>
+
+            [ <a href="javascript:void(0)" onclick="setTask('point_mutation'); Effect.Fade('task_multiple_mutation', { duration: 0.0 }); Effect.Appear('task_one_mutation'); return false;">One mutation</a> ]
+            [ <a href="javascript:void(0)" onclick="setTask('multiple_mutation'); Effect.Fade('task_one_mutation', { duration: 0.0 }); Effect.Appear('task_multiple_mutation'); return false;">More mutations</a> ]
+
+                <p id="task_one_mutation" style="display:none; text-align:justify;">
+
+                Backrub is applied to residues that have at least one atom within a radius of 6.0 &#197; near the mutation. [ <a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09">Smith and Kortemme, 2008</a> ]<br>
+                    <table align=center>
+                    <tr>
+                        <td align="right" onmouseover="popUp('tt_ChainId');" onmouseout="popUp('tt_ChainId');">Chain ID </td><td><input type="text" name="PM_chain"  maxlength=1 SIZE=5 VALUE=""></td>
+                    </tr>
+                    <tr>
+                        <td align="right" onmouseover="popUp('tt_ResId');" onmouseout="popUp('tt_ResId');">Residue ID </td><td><input type="text" name="PM_resid"  maxlength=4 SIZE=5 VALUE=""></td>
+                    </tr>
+                    <tr>
+                        <td align="right" onmouseover="popUp('tt_NewAA');" onmouseout="popUp('tt_NewAA');">New Amino Acid </td><td><input type="text" name="PM_newres" maxlength=1 SIZE=5 VALUE=""></td>
+                    </tr>
+                    <tr>
+                        <!-- td align="right" onmouseover="popUp('tt_Radius');" onmouseout="popUp('tt_Radius');">Radius </td><td><input type="text" name="PM_radius" maxlength=4 SIZE=5 VALUE="6.0"> &#197;</td -->
+                        <td><INPUT TYPE="hidden" NAME="PM_radius" VALUE="6.0"></td>
+                    </tr>
+                    </table>
+                    <br>
+                </p>
+
+                <p id="task_multiple_mutation" style="display:none; text-align:justify;">
+
+                Choose up to 100 residues for mutations. Backrub is applied to neighboring residues in a given radius. <br>
+                    <table bgcolor="#EEEEEE" align="center">
+                    <tr bgcolor="#828282" style="color:white;">
+                        <td align="center">#</td>
+                        <td align="center" onmouseover="popUp('tt_ChainId');" onmouseout="popUp('tt_ChainId');">Chain ID</td>
+                        <td align="center" onmouseover="popUp('tt_ResId');" onmouseout="popUp('tt_ResId');">Res ID</td>
+                        <td align="center" onmouseover="popUp('tt_NewAA');" onmouseout="popUp('tt_NewAA');">AA</td>
+                        <td align="center" onmouseover="popUp('tt_Radius');" onmouseout="popUp('tt_Radius');">Radius [&#197;]</td>
+                    </tr>
+                    <tr><SCRIPT>writeRow(0)</SCRIPT></tr>
+                    <!-- up to 31 point mutations are possible -->
+                    <tr id="row_PM1" style="display:none"><SCRIPT>writeRow(1)</SCRIPT></tr>    <tr id="row_PM2" style="display:none"><SCRIPT>writeRow(2)</SCRIPT></tr>
+                    <tr id="row_PM3" style="display:none"><SCRIPT>writeRow(3)</SCRIPT></tr>    <tr id="row_PM4" style="display:none"><SCRIPT>writeRow(4)</SCRIPT></tr>
+                    <tr id="row_PM5" style="display:none"><SCRIPT>writeRow(5)</SCRIPT></tr>    <tr id="row_PM6" style="display:none"><SCRIPT>writeRow(6)</SCRIPT></tr>
+                    <tr id="row_PM7" style="display:none"><SCRIPT>writeRow(7)</SCRIPT></tr>    <tr id="row_PM8" style="display:none"><SCRIPT>writeRow(8)</SCRIPT></tr>
+                    <tr id="row_PM9" style="display:none"><SCRIPT>writeRow(9)</SCRIPT></tr>    <tr id="row_PM10" style="display:none"><SCRIPT>writeRow(10)</SCRIPT></tr>
+                    <tr id="row_PM11" style="display:none"><SCRIPT>writeRow(11)</SCRIPT></tr>  <tr id="row_PM12" style="display:none"><SCRIPT>writeRow(12)</SCRIPT></tr>
+                    <tr id="row_PM13" style="display:none"><SCRIPT>writeRow(13)</SCRIPT></tr>  <tr id="row_PM14" style="display:none"><SCRIPT>writeRow(14)</SCRIPT></tr>
+                    <tr id="row_PM15" style="display:none"><SCRIPT>writeRow(15)</SCRIPT></tr>  <tr id="row_PM16" style="display:none"><SCRIPT>writeRow(16)</SCRIPT></tr>
+                    <tr id="row_PM17" style="display:none"><SCRIPT>writeRow(17)</SCRIPT></tr>  <tr id="row_PM18" style="display:none"><SCRIPT>writeRow(18)</SCRIPT></tr>
+                    <tr id="row_PM19" style="display:none"><SCRIPT>writeRow(19)</SCRIPT></tr>  <tr id="row_PM20" style="display:none"><SCRIPT>writeRow(20)</SCRIPT></tr>
+                    <tr id="row_PM21" style="display:none"><SCRIPT>writeRow(21)</SCRIPT></tr>  <tr id="row_PM22" style="display:none"><SCRIPT>writeRow(22)</SCRIPT></tr>
+                    <tr id="row_PM23" style="display:none"><SCRIPT>writeRow(23)</SCRIPT></tr>  <tr id="row_PM24" style="display:none"><SCRIPT>writeRow(24)</SCRIPT></tr>
+                    <tr id="row_PM25" style="display:none"><SCRIPT>writeRow(25)</SCRIPT></tr>  <tr id="row_PM26" style="display:none"><SCRIPT>writeRow(26)</SCRIPT></tr>
+                    <tr id="row_PM27" style="display:none"><SCRIPT>writeRow(27)</SCRIPT></tr>  <tr id="row_PM28" style="display:none"><SCRIPT>writeRow(28)</SCRIPT></tr>
+                    <tr id="row_PM29" style="display:none"><SCRIPT>writeRow(29)</SCRIPT></tr>  <tr id="row_PM30" style="display:none"><SCRIPT>writeRow(30)</SCRIPT></tr>
+                    </table>
+                    <a href="javascript:void(0)" onclick="addOneMore();">Click here to add a mutation</a>
+                </p>
+            </p>
+
+
+            <p id="task_upload_mutation" style="display:none; text-align:justify;"><b>Custom mutation.</b><br><br>
+                This allows for a more flexible definition of mutations. Detailed information about the format of the file can be found in the <A style="color:#365a79; "href="rosettaweb2.py?query=doc#mutations">documentation</A>. <br>
+                <font style="text-align:left;">Upload file <INPUT TYPE="file" NAME="Mutations" size="13"></font>
+            </p>
+
+            <p id="task_ensemble" style="display:none; text-align:center;"><b>Create a backrub ensemble.</b><br> [ <a href="http://kortemmelab.ucsf.edu/people.html">Friedland et al. 2009</a> ]<br><br>
+                <table>
+                <tr>
+                    <td align="right" onmouseover="popUp('tt_Temp');" onmouseout="popUp('tt_Temp');">Temperature [kT]</td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="0.3"></td>
+                </tr>
+                <tr>
+                    <td align="right" onmouseover="popUp('tt_NSeq');" onmouseout="popUp('tt_NSeq');">No. of sequences</td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20"></td>
+                </tr>
+                <tr>
+                    <td align="right" onmouseover="popUp('tt_SegLength');" onmouseout="popUp('tt_SegLength');">Max. segment length</td><td><input type="text" name="ENS_segment_length" maxlength=1 SIZE=5 VALUE="12"></td>
+                </tr>
+                </table>
+            </p>
+        </TD>
+      </TR>
+      <TR><TD align=left colspan=2><br></TD></TR>
+      <TR>
+        <TD align=right>* required fields</TD>
+        <TD align=right><INPUT TYPE="Submit" VALUE="Submit"></TD>
+      </TR>
+    </TABLE>
+    </td></tr>
+    <table>
+    <INPUT TYPE="hidden" NAME="task"  VALUE="init">
+    <INPUT TYPE="hidden" NAME="query" VALUE="submitted">
+    <INPUT TYPE="hidden" NAME="mode"  VALUE="check">
+    </FORM>
+    <br>
+    </td>
+  <!-- End Submit Form -->
+
+        <!-- these divs are used for the help tooltips -->
+<div id="tt_UserName" class="tooltip"><b>Your username</b></div>
+<div id="tt_JobName" class="tooltip"><b>Name for your job</b><br>Enter a name that helps you identifying your job later.</div>
+<div id="tt_Structure" class="tooltip"><b>Structure File</b><br>Enter the path to a protein structure file in PDB format. <br></div>
+<div id="tt_RVersion" class="tooltip"><b>Rosetta Version</b><br>Choose the version of Rosetta, either the 'classic' Rosetta++ or the new MiniRosetta. Does not apply to all applications.</div>
+<div id="tt_NStruct" class="tooltip"><b>Number of Structures</b><br>Number of generated structures or size of ensemble.</div>
+<div id="tt_ROutput" class="tooltip"><b>Rosetta output</b><br>If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.</div>
+<div id="tt_SelApp" class="tooltip"><b>Select Application</b><br>Click to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.</div>
+<div id="tt_ChainId" class="tooltip"><b>Chain ID</b><br>The chain in which the residue is located.</div>
+<div id="tt_ResId" class="tooltip"><b>Residue ID</b><br>The position (residue ID according to the PDB file) that is going to be mutated.</div>
+<div id="tt_NewAA" class="tooltip"><b>New Amino Acid</b><br>The Amino Acid to which the position is going to be mutated.</div>
+<div id="tt_Radius" class="tooltip"><b>Radius</b><br>This radius determines the area around the mutation that is subject to backrub. For detailed information see the referenced paper. </div>
+<div id="tt_Temp" class="tooltip"><b>Temperature</b><br>at which backrub is carried out.</div>
+<div id="tt_NSeq" class="tooltip"><b>Number of Sequences</b><br>The number of designed sequences for each ensemble structure.</div>
+<div id="tt_SegLength" class="tooltip"><b>Maximal segment length for backrub</b><br>Limit the length of the segment to which the bachrub move is applied to.</div>
+<div id="tt_error" class="tooltip"><font color=red><b>Rosetta Error:</b></font><br>
+                Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues.
+                If an error occures for your structure please check the correctness of the PDB file.
+                If the PDB file is correct and Rosetta still fails, please <a href="mailto:lauck@cgl.ucsf.edu">contact us</a>.</div>
+ </tr>
+        <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Legal Info --> <tr> 
+            <td>
+                 <table style="border:1px solid black; padding:10px" bgcolor="#FFFFE0">
+                    <tr><td>
+                        <p style="text-align:left; font-size: 10pt">
+                        If you are using the data, please cite:
+                        </p>
+                        <p style="text-align:left; font-size: 10pt">
+                        Colin A. Smith, Tanja Kortemme, Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction,<br>
+                        <a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09"> Journal of Molecular Biology Volume 380, 742-756</a>
+                        </p>
+                        <p style="text-align:left; font-size: 10pt" >
+                        For questions, please contact <A href="mailto:kortemme@cgl.ucsf.edu" style="font-size: 10pt">Tanja Kortemme</A>
+                        </p>
+                    </td></tr>
+                 </table>
+            </td> </tr>
+            <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Footer --> <tr> 
+               <td align=center style="border-top:1px solid gray; ">
+                 <table width="720" style="border-width:0pt">
+                    <tr>
+                    <td align="center"><img src="../images/ucsf_only_tiny.png" width="65%" height="65%" alt="UCSF" border=0></td>
+                    <td align="left">
+                    "Structure prediction using backrub" is available for NON-COMMERCIAL USE ONLY at this time<br>
+                    <font color=#666688><b>[</b></font>
+                    <A href="rosettaweb2.py?query=terms_of_service" class="nav">Terms of Service</A>
+                    <font color=#666688><b>]</b></font><br>
+                    <font style="font-size: 9pt">Copyright &copy; 2009 University of California San Francisco, <A href="mailto:kortemme@cgl.ucsf.edu" style="font-size: 9pt">Tanja Kortemme</a>, <A href="mailto:lauck@cgl.ucsf.edu" style="font-size: 9pt">Florian Lauck</A></font>
+                    </td>
+                    </tr>
+                 </table>
+               </td> </tr>
+
+           </table>
+           </center>
+           </body>
+           </html>

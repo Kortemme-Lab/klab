@@ -1,0 +1,671 @@
+<H1 class="title" align="center">Documentation</H1>
+
+<br><p align="center">
+This is an updated copy of the complete Robetta documentation. Services that are not provided on this website are linked to the main <A href="http://robetta.bakerlab.org">Robetta</A> website.
+</p> 
+<br>
+<P>
+<table border=0 cellpadding=3 cellspacing=0>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#description"><b>Description</b></A> </td></tr>
+
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#funding"><b>Funding</b></A> </td></tr>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#resources"><b>Resources</b></A> </td></tr>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#references"><b>References</b></A> </td></tr>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#glossary"><b>Glossary and Software References and Credits</b></A> </td></tr>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#data_formats"><b>Data Formats</b></A> </td></tr>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#terms"><b>Terms of Service</b></A> </td></tr>
+
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#contacts"><b>Whom to Contact</b></A> </td></tr>
+<tr bgcolor="#eeeeee"><td><LI> <A  href="#trivia"><b>Trivia</b></A> </td></tr>
+</table>
+</P>
+
+<BR>
+<BR>
+<A  name="description">
+<H1 class="title">DESCRIPTION</H1>
+
+  <UL>
+
+  <P>
+ROBETTA provides both <i>ab initio</i> and
+comparative models of protein domains. It
+uses the ROSETTA fragment insertion method
+(<A  href="http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&cmd=Retrieve&dopt=AbstractPlus&list_uids=9149153&query_hl=29&itool=pubmed_docsum" target="pubmed">Simons et al. (1997) J Mol Biol. 268:209-225</A> ).
+Domains without a detectable PDB homolog are
+modeled with the Rosetta de novo protocol
+(<A  href="http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&cmd=Retrieve&dopt=AbstractPlus&list_uids=12215415&query_hl=24&itool=pubmed_docsum" target="pubmed">Bonneau et al. (2002) J Mol Biol. 322:65-78</A> ).
+Comparative models are built from Parent PDBs
+detected by UW-PDB-BLAST or 3DJury-A1 and
+aligned by the K*SYNC alignment method
+(<A  href="http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&cmd=Retrieve&dopt=AbstractPlus&list_uids=16971460&query_hl=24&itool=pubmed_docsum" target="pubmed">Chivian and Baker (2006) Nucleic Acids Res. 34(17):e112</A> ).
+Loop regions are assembled from fragments and
+optimized to fit the aligned template structure
+(<A  href="http://www.ncbi.nlm.nih.gov/entrez/query.fcgi?db=pubmed&cmd=Retrieve&dopt=AbstractPlus&list_uids=15103629&query_hl=24&itool=pubmed_docsum" target="pubmed">Rohl et al. (2004) Proteins 55:656-677</A> ).
+The procedure is fully automated.
+  </P>
+  <P>
+
+ROBETTA is evaluated in the continuous server benchmarking experiment <A  href="http://bioinfo.pl/livebench/" target="_blank">LIVEBENCH</A> , and in the blind benchmarking experiment <A  href="http://predictioncenter.org">CASP</A> .
+  </P>
+  </UL>
+
+<br>
+<br>
+<A  name="funding">
+<H1 class="title">FUNDING</H1>
+<UL>
+  <P>
+
+Robetta is supported by funds from the <A  href="http://www.hhmi.org" target="_blank">Howard Hughes Medical Institute</A>  and
+the <A  href="http://www.sgpp.org" target="_blank">Structural Genomics of Pathogenic Protozoa Consortium</A>  (SGPP). SGPP is supported by the <A  href="http://www.nigms.nih.gov/" target="_blank">National Institute of General Medical Sciences (NIGMS)</A>  Protein Structure Initiative (PSI).
+
+  </P>
+</UL>
+
+<br>
+<br>
+<A  name="resources">
+<H1 class="title">RESOURCES</H1>
+
+<UL>
+  <P>
+Robetta uses hardware resources generously provided by 
+David Baker of the <A  href="http://www.washington.edu/">University of Washington</A> , 
+Charlie Strauss of the <A  href="http://www.lanl.gov/">Los Alamos National Laboratory</A> ,
+<!--  Richard Bonneau of the <A  href="http://www.systemsbiology.org/">Institute for Systems Biology</A> , -->
+John Towns of the <A  href="http://www.ncsa.uiuc.edu/">National Center for Supercomputing Applications (NCSA)</A> , 
+and Miron Livny of the <A  href="http://www.wisc.edu/">University of Wisconsin</A> .
+<p>
+<A  href="http://www.washington.edu/"><img src="../images/washington_logo.jpg" border=0 height=40></A>  &nbsp; &nbsp; &nbsp;  
+
+<A  href="http://www.lanl.gov/"><img src="../images/lanl_logo.gif" border=0></A>  &nbsp; &nbsp; &nbsp;  
+<!-- <A  href="http://www.systemsbiology.org/"><img src="../images/isb_logo.gif" border=0 height=32"></A>  &nbsp; &nbsp; &nbsp; -->
+<A  href="http://www.ncsa.uiuc.edu/"><img src="../images/ncsa_logo.jpg" border=0></A>   &nbsp;  &nbsp;  &nbsp;  
+<A  href="http://www.wisc.edu/"><img src="../images/wisc_logo.gif" border=0 height=40></A>  &nbsp; &nbsp; &nbsp;  
+
+  </P>
+</UL>
+
+
+<br>
+<br>
+<A  name="references">
+<H1 class="title">REFERENCES</H1>
+
+  <UL>
+  <P>
+  <b>Robetta</b>
+  <br>
+  The Robetta server was primarily developed by David Kim and Dylan Chivian.
+  </P>
+
+    <UL>
+    <LI type="disc">Chivian D<sup><font size=-1>*</font></sup>, Kim DE<sup><font size=-1>*</font></sup>, Malmstrom L, Schonbrun J, Rohl CA, Baker D. (2005) Prediction of CASP6 structures using automated Robetta protocols. <A  href="http://robetta.bakerlab.org/articles/proteins.61_suppl7_157-66.pdf">Proteins 61 Suppl 7:157-66</A>  (<A  href="http://robetta.bakerlab.org/articles/proteins.61_suppl7_157-66_suppl_material.pdf">Supplementary Material</A> )
+    <LI type="disc">Kim DE<sup><font size=-1>*</font></sup>, Chivian D<sup><font size=-1>*</font></sup>, Baker D. (2004) Protein structure prediction and analysis using the Robetta server. <A  href="http://robetta.bakerlab.org/articles/nar.32-2_W526-31.pdf">Nucleic Acids Res. 32 Suppl 2:W526-31</A> 
+
+    <LI type="disc">Chivian D, Kim DE, Malmstrom L, Bradley P, Robertson T, Murphy P, Strauss CEM, Bonneau R, Rohl CA, Baker D. (2003) Automated prediction of CASP-5 structures using the Robetta server. <A  href="http://robetta.bakerlab.org/articles/proteins.53_524-33.pdf">Proteins 53 Suppl 6:524-33</A> 
+    </UL>
+
+    <p><blockquote><font size=-1>*</font><font size=-1> contributed equally</font></blockquote>
+
+<br>
+
+  <P>If you use any of the following components of Robetta, please additionally cite:</P>
+
+  <P>
+  <b>Ginzu</b>
+  <br>
+The Ginzu domain parsing and fold detection method was developed by Dylan Chivian, David Kim, Lars Malmstrom, and David Baker.
+  </P>
+
+    <UL>
+    <LI type="disc">Kim DE<sup><font size=-1>*</font></sup>, Chivian D<sup><font size=-1>*</font></sup>, Malmstrom L, Baker D. (2005) Automated prediction of domain boundaries in CASP6 targets using Ginzu and RosettaDOM. <A  href="http://robetta.bakerlab.org/articles/proteins.61_suppl7_193-200.pdf">Proteins 61 Suppl 7:193-200</A> 
+
+    <LI type="disc">Chivian D, Kim DE, Malmstrom L, Bradley P, Robertson T, Murphy P, Strauss CEM, Bonneau R, Rohl CA, Baker D. (2003) Automated prediction of CASP-5 structures using the Robetta server. <A  href="http://robetta.bakerlab.org/articles/proteins.53_524-33.pdf">Proteins 53 Suppl 6:524-33</A> 
+
+    </UL>
+
+    <p><blockquote><font size=-1>*</font><font size=-1> contributed equally</font></blockquote>
+
+  <P>
+  <b>Rosetta Comparative Modeling (a.k.a. Homology Modeling)</b>
+
+  <br>
+The Rosetta Comparative Modeling protocol was developed by Dylan Chivian, Carol Rohl, Charlie Strauss, and David Baker.
+  </P>
+
+    <UL>
+    <LI type="disc">Chivian D and Baker D. (2006) Homology modeling using parametric alignment ensemble generation with consensus and energy-based model selection. <A  href="http://nar.oxfordjournals.org/cgi/content/cull/34/17/e112">Nucleic Acids Res. 34(17):e112</A>  [<A  href="http://robetta.bakerlab.org/articles/nar.34-17_e112_print.pdf">print PDF</A> ] [<A  href="http://robetta.bakerlab.org/articles/nar.34-17_e112_screen.pdf">screen PDF</A> ] [<A  href="http://robetta.bakerlab.org/articles/nar.34-17_e112_suppl_1.pdf">supplement 1</A> ] [<A  href="http://robetta.bakerlab.org/articles/nar.34-17_e112_suppl_2.pdf">supplement 2</A> ]
+    <LI type="disc">Rohl CA, Strauss CE, Chivian D, Baker D. (2004) Modeling structurally variable regions in homologous proteins with Rosetta. <A  href="http://robetta.bakerlab.org/articles/proteins.55_656-77.pdf">Proteins 55:656-77</A> 
+
+    <LI type="disc">Chivian D, Kim DE, Malmstrom L, Bradley P, Robertson T, Murphy P, Strauss CEM, Bonneau R, Rohl CA, Baker D. (2003) Automated prediction of CASP-5 structures using the Robetta server. <A  href="http://robetta.bakerlab.org/articles/proteins.53_524-33.pdf">Proteins 53 Suppl 6:524-33</A> 
+    </UL>
+
+  <P>
+  <b>Rosetta Ab Initio Modeling (a.k.a. De Novo Modeling)</b>
+  <br>
+  The Rosetta Ab Initio protocol was developed by Richard Bonneau, Kim Simons, Charlie Strauss, Philip Bradley, Jerry Tsai, Ingo Ruczinski, Chris Bystroff, Charles Kooperberg, and David Baker, based on the program originally written by Kim Simons and David Baker.
+  </P>
+
+    <UL>
+    <LI type="disc">Bonneau R, Strauss CE, Rohl CA, Chivian D, Bradley P, Malmstrom L, Robertson T, Baker D. (2002) De novo prediction of three-dimensional structures for major protein families. <A  href="http://robetta.bakerlab.org/articles/jmb.322_65-78.pdf">J Mol Biol 322(1):65-78</A> 
+
+    <LI type="disc">Bonneau R, Tsai J, Ruczinski I, Chivian D, Rohl C, Strauss CE, Baker D. (2001) Rosetta in CASP4: progress in ab initio protein structure prediction. <A  href="http://robetta.bakerlab.org/articles/proteins.suppl5_119-26.pdf">Proteins Suppl 5:119-26</A> 
+
+    <LI type="disc">Simons KT, Ruczinski I, Kooperberg C, Fox B, Bystroff C, Baker D. (1999) Improved recognition of native-like protein structures using a combination of sequence-dependent and sequence-independent features of proteins. <A  href="http://robetta.bakerlab.org/articles/proteins.34_82-95.pdf">Proteins 34(1) 82-95</A> 
+
+    <LI type="disc">Simons KT, Kooperberg C, Huang E, Baker, D. (1997) Assembly of protein tertiary structures from fragments with similar local sequences using simulate anealing and Bayesian scoring functions. <A  href="http://robetta.bakerlab.org/articles/jmb.268_209-25.pdf">J Mol Biol 268:209-25</A> 
+    </UL>
+
+  <P>
+  <A  name="rosettanmr">
+  <b>Rosetta NMR</b>
+  <br>
+
+  Rosetta NMR was developed by Carol Rohl, Charlie Strauss, Peter Bowers, and David Baker.
+  </P>
+
+    <UL>
+    <LI type="disc">Rohl CA and Baker D. (2002) De novo determination of protein backbone structure from residual dipolar couplings using Rosetta. <A  href="http://robetta.bakerlab.org/articles/jacs.124_2723-9.pdf">J Am Chem Soc 124:2723-9</A> 
+    <LI type="disc">Bowers PM, Strauss CE, Baker D. (2000) De novo protein structure determination using sparse NMR data. <A  href="http://depts.washington.edu/bakerpg/abstracts/Bowers-JBN-v18-p311.html">J Biomol NMR 18(4):311-8</A> 
+    </UL>
+
+  <P>
+  <b>Rosetta Side-chain Packing</b>
+  <br>
+Rosetta Side-chain Packing was developed by Brian Kuhlman and David Baker.
+  </P>
+
+    <UL>
+    <LI type="disc">Kuhlman B and Baker D. (2000) Native protein sequences are close to optimal for their structures. <A  href="http://robetta.bakerlab.org/articles/pnas.97_10383-8.pdf">Proc Natl Acad Sci USA. 97(19):10383-8</A> 
+    </UL>
+
+  <P>
+  <b>Interface Alanine Scanning</b>
+  <br>
+  Interface Alanine Scanning was developed by Tanja Kortemme and David Baker.
+  </P>
+
+    <UL>
+    <LI type="disc">Kortemme T, Kim DE, Baker D. (2004) Computational Alanine Scanning of Protein-Protein Interfaces. <A  href="http://robetta.bakerlab.org/articles/scienceSTKE.2004_pl2.pdf">Science STKE. 2004(219):pl2</A> 
+
+    <LI type="disc">Kortemme T and Baker D. (2002) A simple physical model for binding energy hot spots in protein-protein complexes. <A  href="http://robetta.bakerlab.org/articles/pnas.99_14116-21.pdf">Proc Natl Acad Sci USA. 99(22):14116-21</A> 
+    </UL>
+
+
+  <P>
+  <b>Robetta Server Software Infrastructure and Web Interface</b>
+  <br>
+The Robetta server software infrastructure was developed by David Kim and Dylan Chivian.
+  </P>
+
+  <P>
+  <b>Robetta Server Hardware Infrastructure and IT Guy</b>
+  <br>
+The Robetta server cluster architecture was designed and implemented by Keith Laidig of the <A  href="http://www.formix.com/">Formix Rangers</A> 
+  </P>
+
+  <P>
+  <b>Robetta Logo</b>
+
+  <br>
+The Robetta logo was designed by Thanya Suwansawad @ <A  href="http://www.tablethree.com/">tablethree.com</A>  
+  </P>
+
+</UL>
+
+
+<BR><BR>
+
+<A  name="glossary">
+<H1 class="title">GLOSSARY AND SOFTWARE REFERENCES AND CREDITS</H1>
+
+<UL>
+
+  <P>
+  <A  name="3djury"><b><i>3D-JURY</i></b>
+  <br>
+<!--<font color="green">Note: 3D-JURY search now enabled (2004-05-05)</font><p>-->
+<font color="red">Note: 3D-JURY search disabled (2006-12-18)</font><p>
+  Robetta uses a variant of <A  href="http://bioinfo.pl/meta/" target="_blank">3D-Jury-A1</A> , a consensus fold recognition method that uses 8 servers:
+<A  href="http://grdb.bioinfo.pl/" target="_blank">ORFeus</A> ,
+
+<A  href="http://ffas.ljcrf.edu/ffas-cgi/cgi/ffas.pl" target="_blank">FFAS03</A> ,
+<A  href="http://bioinf.cs.ucl.ac.uk/psiform.html" target="_blank">mGenTHREADER</A> ,
+<A  href="http://www.sbg.bio.ic.ac.uk/~3dpssm/" target="_blank">3D-PSSM</A> ,
+<A  href="http://fischerlab.bioinformatics.buffalo.edu/inub/" target="_blank">INUB</A> ,
+<A  href="http://www-cryst.bioc.cam.ac.uk/~fugue/prfsearch.html" target="_blank">FUGUE2</A> ,
+and <A  href="http://grdb.bioinfo.pl/" target="_blank">BASIC (dist)</A> .
+
+<!-- <A  href="http://www.bioinformaticssolutions.com/products/raptor.php" target="_blank">RAPTOR</A> , and <A  href="http://www.cse.ucsc.edu/research/compbio/HMM-apps/T02-query.html" target="_blank">SAM-T02</A>  -->
+A consensus is derived from a single model per server. The procedure selects models only from the servers used for consensus building.  3D-JURY is run remotely on the server provided by Leszek Rychlewski. Putative parent PDBs (but not their alignments) that are detected by this 3D-Jury-A1 variant with sufficient confidence are used as starting points for modeling with Robetta's Comparative Modeling protocol.  If your model is based on a 3D-Jury detection, it is recommended to cite the 3D-Jury method as well as the servers listed above on which it depends.
+  </P>
+
+    <UL>
+
+    <LI type="disc"> Ginalski K, Elofsson A, Fischer D, Rychlewski L. (2003) 3D-Jury: a simple approach to improve protein structure predictions.  Bioinformatics. 19(8):1015-8.
+    </UL>
+
+
+  <P>
+  <A  name="3dpair"><b><i>3D-Pair</i></b>
+  <br>
+  <A  href="http://bioinfo.pl/3D-Hit/" target="_blank">3D-Pair</A>  is a structure-structure alignment program that is used by Robetta in generating StrAD-Stack multiple structural alignments.
+  </P>
+
+    <UL>
+    <LI type="disc">
+Plewczynski D, Pas J, von Grotthuss M, Rychlewski L. (2002) 3D-Hit: fast structural comparison of proteins. Appl. Bioinformatics 1(4):223-5
+    </UL>
+
+  <P>
+  <A  name="condor"><b><i>Condor</i></b>
+  <br>
+  <A  href="http://www.condorproject.org/" target="_blank">Condor</A>  is used to run jobs on the hardware.  This product includes software from the Condor Project (<A  href="http://www.condorproject.org/">http://www.condorproject.org/</A> )
+  </P>
+
+  <P>
+  <A  name="coils"><b><i>Coiled-coil Regions</i></b>
+  <br>
+  <A  href="http://www.ch.embnet.org/software/COILS_form.html" target="_blank">COILS</A>  is used to identify coiled-coil regions.
+  </P>
+
+    <UL>
+    <LI type="disc">
+
+Lupas, A., Van Dyke, M., and Stock, J. (1991)
+Predicting Coled Coils from Protein Sequences,
+Science 252:1162-1164.
+    </UL>
+
+  <P>  
+  <A  name="disordered"><b><i>Disordered Regions</i></b>
+  <br>
+  <A  href="http://bioinf.cs.ucl.ac.uk/" target="_blank">DISOPRED</A>  is used to identify disordered regions.
+  </P>
+
+    <UL>
+
+    <LI type="disc">
+Jones, D.T. & Ward, J.J. (2003) Prediction of Disordered Regions in Proteins
+from Position Specific Score Matrices. Proteins, 53 Suppl 6, 573-578.</LI>
+    </UL>
+
+  <P>
+  <A  name="domainrepeats"><b><i>Domain Repeats</i></b>
+  <br>
+  <A  href="http://ibivu.cs.vu.nl/programs/reprowww/" target="_blank">REPRO</A>  is used to identify distant sequence repeats within a single query sequence likely to represent domain repeats.
+  </P>
+
+    <UL>
+    <LI type="disc">
+George RA. and Heringa J. (2000) The REPRO server: finding protein internal sequence repeats through the web. Trends Biochem. Sci. 25, 515-517.</LI>
+    </UL>
+
+  <P>
+  <A  name="dssp"><b><i>DSSP</i></b>
+  <br>
+
+  <A  href="http://www.cmbi.kun.nl/gv/dssp/" target="_blank">DSSP</A>  defines secondary structure given atomic coordinates.
+  </P>
+
+    <UL>
+    <LI type="disc">Kabsch,W. and Sander,C. (1983) Biopolymers 22, 2577-2637.</LI>
+    </UL>
+
+  <P>
+  <A  name="nohoms"><b><i>Exclude Homologues</i></b>
+
+  <br>
+  Excludes fragments from homologues for the purpose of testing on non-blind targets. 
+  </P>
+
+  <P>
+  <A  name="ffas"><b><i>FFAS03</i></b>
+  <br>
+<font color="red">Note: FFAS03 search disabled (2006-12-18)</font><p>
+  <A  href="http://ffas.ljcrf.edu/ffas-cgi/cgi/ffas.pl" target="_blank">FFAS03</A>  is a fast remote fold-recognition method that uses residue substitution profile-profile comparison. FFAS03 is run remotely using the server provided by Adam Godzik.  Putative parent PDBs (but not their alignments) that are detected by FFAS03 with sufficient confidence are used as starting points for modeling with Robetta's Comparative Modeling protocol.  If your model is based on an FFAS03 detection, it is recommended that you cite the FFAS03 server.
+  </P>
+
+    <UL>
+    <LI type="disc">Jaroszewski L, Rychlewski L, Li Z, Li W, Godzik A. (2005). FFAS03: a server for profile--profile sequence alignments. Nucleic Acids Res. 33(Web Server issue):W284-8.
+    <LI type="disc">Rychlewski L, Jaroszewski L, Li W, Godzik A. (2000). Comparison of sequence profiles. Strategies for structural predictions using sequence information. Protein Science 9:232-41
+    <LI type="disc">Jaroszewski L, Rychlewski L,  Godzik A. (2000). Improving the quality of twilight-zone alignments. Protein Science 9:1487-96
+    </UL>
+
+  <P>
+  <A  name="hhsearch"><b><i>HHSEARCH</i></b>
+<br>
+<font color="red">Note: HHSEARCH is now used for remote template detection and is run locally (2008-05-05)</font>
+
+  <p>
+  HHSEARCH is a profile HMM based homology detection and alignment method.
+  Putative parent PDBs (but not their alignments) that are detected by HHSEARCH with sufficient confidence are used as starting points for modeling with Robetta's Comparative Modeling protocol.
+  <p>
+    <UL>
+      <LI type="disc">Soding, J. "Protein homology detection by HMM-HMM comparison." Bioinformatics. 2005 Apr 1;21(7):951-60.
+    </UL>
+  </P>
+
+
+  <P>
+  <A  name="hmm-pfam"><b><i>HMM-PFAM</i></b>
+
+  <br>
+  <A  href="http://www.sanger.ac.uk/Software/Pfam/index.shtml">Pfam</A>  is a set of families of protein sequences that are represented as hidden Markov models, and may be searched with <A  href="http://hmmer.wustl.edu/">HMMER</A> .
+  <p>
+    <UL>
+    <LI type="disc">Bateman A, Birney E, Cerruti L, Durbin R, Etwiller L, Eddy SR, Griffiths-Jones S, Howe KL, Marshall M, Sonnhammer EL (2002). The Pfam protein families database. Nucleic Acids Res. 30(1):276-280
+    <LI type="disc">Eddy, SR (1998) Profile hidden Markov models.  Bioinformatics 14:755-63
+    <p>
+    HMMER is governed by the <A  href="http://robetta.bakerlab.org/articles/gpl.txt">GNU Public License</A> 
+
+    </UL>
+  </P>
+
+  <P>
+  <A  name="identifier"><b><i>Identifier</i></b>
+  <br>
+An optional four or five character alphanumeric identifier like a PDB ID.
+  </P>
+
+  <P>
+
+  <A  name="jufo"><b><i>Jufo</i></b>
+  <br>
+  <A  href="http://www.jens-meiler.de/jufo.html" target="_blank">Jufo</A>  is a protein secondary structure prediction method
+that uses primary sequence only.
+  </P>
+
+    <UL>
+    <LI type="disc"> Meiler J, Mueller M, Zeidler A, Schmaeschke F. (2002) JUFO: Secondary Structure Prediction for Proteins, http://www.jens-meiler.de/</LI>
+
+    </UL>
+ 
+  <P>
+  <A  name="jufo_3d"><b><i>Jufo3D</i></b>
+  <br>
+  <A  href="http://www.jens-meiler.de/jufo3D.html" target="_blank">Jufo3D</A>  is a protein secondary structure prediction method that uses primary sequence and one or more three dimensional models.
+  </P>
+
+    <UL>
+
+    <LI type="disc">Meiler J. (2003) JUFO3D: Secondary Structure Prediction for Proteins from low Resolution Tertiary Structure. http://www.jens-meiler.de/</LI>
+    </UL>
+
+  <P>
+  <A  name="ksync"><b><i>K*Sync</i></b>
+  <br>
+  <A  href="/pub/dylan/" target="_blank">K*Sync</A>  is a method for aligning a protein sequence onto the sequence/structure of a homolog with an experimentally determined structure for the purpose of homology modeling.  The method was developed by Dylan Chivian and David Baker for use in Robetta's Comparative Modeling.
+  </P>
+
+    <UL>
+    <LI type="disc">Chivian D and Baker D. (2006) Homology modeling using parametric alignment ensemble generation with consensus and energy-based model selection. Nucleic Acids Res. 34(17):e112</LI>
+    </UL>
+
+  <P>
+  <A  name="lowcomplexity"><b><i>Low Complexity</i></b>
+  <br>
+  <A  href="http://www.ncbi.nlm.nih.gov/BLAST/Blast.cgi?CMD=Web&LAYOUT=TwoWindows&AUTO_FORMAT=Semiauto&ALIGNMENTS=50&ALIGNMENT_VIEW=Pairwise&CDD_SEARCH=on&CLIENT=web&COMPOSITION_BASED_STATISTICS=on&DATABASE=nr&DESCRIPTIONS=100&ENTREZ_QUERY=%28none%29&EXPECT=10&FILTER=L&FORMAT_OBJECT=Alignment&FORMAT_TYPE=HTML&I_THRESH=0.005&MATRIX_NAME=BLOSUM62&NCBI_GI=on&PAGE=Proteins&PROGRAM=blastp&SERVICE=plain&SET_DEFAULTS.x=41&SET_DEFAULTS.y=5&SHOW_OVERVIEW=on&END_OF_HTTPGET=Yes&SHOW_LINKOUT=yes&GET_SEQUENCE=yes" target="_blank">SEG</A>  is used to identify regions of low complexity.
+  </P>
+
+    <UL>
+    <LI type="disc"> Wootton JC, Federhen S. (1996) Analysis of compositionally biased regions in sequence databases. Methods Enzymol. 266:554-71.</LI>
+    <LI type="disc"> Wootton JC, Federhen S. (1993) Statistics of local complexity in amino acid sequences and sequence databases. Comput. Chem. 17:149-63.</LI>
+    </UL>
+
+  <P>
+  <A  name="mammoth"><b><i>MAMMOTH</i></b>
+
+  <br>
+  <A  href="http://fulcrum.physbio.mssm.edu:8083/mammoth/" target="_blank">MAMMOTH</A>  is used to detect structural similarities between de novo models and expermentally determined structures from the PDB. 
+  Significant matches (mammoth z-score >= 4.5) are listed on domain result pages. Rasmol scripts of the structural alignments can be downloaded by clicking on the z-scores. Once downloaded, the structural alignments
+  can be viewed with rasmol using the following command 'rasmol -script robetta.MammothRasmol.' For more information about Mammoth, please refer to the following publication:
+  </P>
+
+    <UL>
+    <LI type="disc"> Ortiz AR, Strauss CE, Olmea O. (2002) MAMMOTH (Matching molecular models obtained from theory): An automated method for model comparison.  Protein Sci. 11:2606-21
+    </UL>
+
+  <P>
+
+  <A  name="notes"><b><i>Notes</i></b>
+  <br>
+  Optional text to describe your target.
+  </P>
+
+  <P>
+  <A  name="parent"><b><i>Parent</i></b>
+  <br>
+  PDB structure (PDB ID) to use for comparative modeling. Only applies to the structure server for 3-D models.
+  The PDB ID must include the Chain ID or '_' (5 characters are required).
+  </P>
+
+ 
+  <P>
+  <A  name="parentrange"><b><i>Parent Range</i></b>
+  <br>
+  Residue number range of the parent to consider.  Use sequence numbering for the full parent chain sequence (not the numbering from the coordinates in the parent PDB).  Only applies to the structure server for 3-D models.
+  </P>
+
+  <P>
+  <A  name="partnerdefs"><b><i>Partner Definitions</i></b>
+  <br>
+
+For computational alanine scanning. All relevant chains of the <A  href="alascan2.py?query=data_formats#pdbcomplex">protein complex</A> , and the parter in the complex to which they belong.
+  </P>
+
+
+  <P>
+  <A  name="pdb"><b><i>PDB</i></b>
+  <br>
+  <A  href="http://www.rcsb.org/pdb/" target="_blank">Protein Data Bank</A>  is the world's protein structure data repository.  We also refer to the file format from the Protein Data Bank used to describe a protein structure as a PDB.
+  </P>
+
+  <P>
+  <A  name="pfam"><b><i>Pfam</i></b>
+  <br>
+  <A  href="http://www.sanger.ac.uk/Software/Pfam/index.shtml">Pfam</A>  is a set of families of protein sequences that are represented as hidden Markov models, and may be searched with <A  href="http://hmmer.wustl.edu/">HMMER</A> .
+  <p>
+    <UL>
+
+    <LI type="disc">Bateman A, Birney E, Cerruti L, Durbin R, Etwiller L, Eddy SR, Griffiths-Jones S, Howe KL, Marshall M, Sonnhammer EL (2002). The Pfam protein families database. Nucleic Acids Res. 30(1):276-280
+    <LI type="disc">Eddy, SR (1998) Profile hidden Markov models.  Bioinformatics 14:755-63
+    <p>
+    HMMER is governed by the <A  href="http://robetta.bakerlab.org/articles/gpl.txt">GNU Public License</A> 
+    </UL>
+  </P>
+
+  <P>
+  <A  name="psiblast"><b><i>PSI-BLAST</i></b>
+
+  <br>
+<A  href="http://www.ncbi.nlm.nih.gov/BLAST/">PSI-BLAST</A>  is a method for
+detecting sequence homologs of a given protein.  It
+uses the concept of searching with a position-specific residue substitution
+profile appropriate to the family in which the query belongs.  This allows for
+more sensitive detection of remote homologous sequences.  Robetta runs
+PSI-BLAST 2.2.6 locally.
+  </P>
+
+    <UL>
+    <LI type="disc"> Schaffer AA, Aravind L, Madden TL, Shavirin S, Spouge JL, Wolf YI, Koonin EV, Altschul SF. (2001) Improving the accuracy of PSI-BLAST protein database searches with composition-based statistics and other refinements. Nucleic Acids Res. 29(14):2994-3005.
+    <LI type="disc"> Altschul SF, Madden TL, Schaffer AA, Zhang J, Zhang Z, Miller W, Lipman DJ. (1997) Gapped BLAST and PSI-BLAST: a new generation of protein database search programs. Nucleic Acids Res. 25(17):3389-402
+    </UL>
+
+
+  <P>
+  <A  name="psipred"><b><i>PsiPred</i></b>
+  <br>
+  <A  href="http://bioinf.cs.ucl.ac.uk/psipred/" target="_blank">PsiPred</A>  is a secondary structure prediction method that uses feed-forward neural networks and <A  href="#psiblast">PSI-BLAST</A> .
+  </P>
+
+    <UL>
+
+    <LI type="disc">Jones DT. (1999) Protein secondary structure prediction based
+on position-specific scoring matrices. J. Mol. Biol. 292: 195-202.</LI>
+    </UL>
+
+  <P>
+  <A  name="replyemail"><b><i>Reply Email</i></b>
+  <br>
+An optional email address that your results will be mailed to.
+  </P>
+
+  <P>
+
+  <A  name="sam"><b><i>SAM-T99</i></b>
+  <br>
+  <A  href="http://www.cse.ucsc.edu/research/compbio/HMM-apps/T99-query.html" target="_blank">Target99</A>  is a secondary structure prediction method that is part of the <A  href="http://www.cse.ucsc.edu/research/compbio/sam.html">SAM</A>  package.
+  </P>
+
+    <UL>
+    <LI type="disc">Karplus K, Barrett C, Hughey R. (1998) Hidden Markov Models for detecting Remote Protein Homologies. Bioinformatics 14(10):846-56
+    <LI type="disc">Park J, Karplus K, Barrett C, Hughey R, Haussler D, Hubbard T, Chothia C. (1998) Sequence Comparisons Using Multiple Sequences Detect Three Times as Many Remote Homologues As Pairwise Methods. J Mol Biol 284(4):1201-10
+    </UL>
+
+<!--
+<p>
+<A  name="solubility"><b><i>Solubility</i></b>
+<br>
+<A  href="http://www.biotech.ou.edu/" target="_blank">Recombinant Protein Solubility Prediction</A>  that uses a statistical model to predict protein solubility assuming the protein is being overexpressed in <i>Escherichia coli</i>.
+Positive and negative values predict the percent chance of solubility and insolubility, respectively.
+
+<UL>
+<LI type="disc">R.G. Harrison. 2000.  Expression of soluble heterologous proteins via fusion with NusA protein. inNovations. 11:4-7.</LI>
+<LI type="disc">Davis, G.D., Elisee, C., Newham, D.M. and R.G. Harrison. 1999. New fusion protein systems designed to give soluble expression in <i>Escherichia coli</i>. Biotechnol. Bioeng. 65(4):382-8.</LI>
+<LI type="disc">Wilkinson, D.L. and R.G. Harrison. 1991. Predicting the solubility of recombinant proteins in Escherichia coli. Bio/Technology. 9: 443-448.</LI>
+</UL>
+</p>
+-->
+
+
+  <P>
+  <A  name="stradstack"><b><i>StrAD-Stack</i></b>
+  <br>
+  StrAD-Stack (STRuctural Alignment of Domains, Stacked) a multiple structural alignment method.  It parses the target into its domains structurally using a consensus variant of <A  href="#taylors">Taylor's method</A>  for structure-based domain parsing, followed by scanning those domains against a domain database (that have been similarly consensus Taylor parsed) using the structure-structure alignment program <A  href=#3dpair">3D-Pair</A> .  Statistics for each domain are therefore based solely on domains of similar length and secondary structure composition.  The method was developed by Dylan Chivian for use with <A  href="#ksync">K*Sync</A> .
+
+    <UL>
+
+    <LI type="disc">Chivian D and Baker D. (2006) Homology modeling using parametric alignment ensemble generation with consensus and energy-based model selection. Nucleic Acids Res. 34(17):e112</LI>
+    </UL>
+
+  </P>
+
+
+  <P>
+  <A  name="taylors"><b><i>Taylor's Structure-based Domain Parsing</i></b>
+  <br>
+
+  <A  href="http://mathbio.nimr.mrc.ac.uk/taylor/" target="_blank">Taylor's method</A>  for structure-based domain parsing is a fast Ising model based technique and is quite good at discriminating domain-insertion events.
+  <p>
+  <UL>
+  <LI type="disc">Taylor WR. (1999) Protein structural domain identification. Protein Engineering. 12(3):203-16
+  </UL>
+  </P>
+
+
+  <P>
+  <A  name="tmhmm"><b><i>TMHMM</i></b>
+
+  <br>
+  <A  href="http://www.cbs.dtu.dk/services/TMHMM-2.0/" target="_blank">TMHMM</A>  is used to identify transmembrane regions.
+Note: Rosetta is not developed for transmembrane proteins.
+  </P>
+
+    <UL>
+    <LI type="disc"> A. Krogh, B. Larsson, G. von Heijne, and E. L. L. Sonnhammer.
+"Predicting transmembrane protein topology with a hidden Markov model: Application to complete genomes."
+JMB, 305(3):567-580, January 2001.</LI>
+    <LI type="disc"> E. L.L. Sonnhammer, G. von Heijne, and A. Krogh.
+A hidden Markov model for predicting transmembrane helices in protein sequences.
+In J. Glasgow, T. Littlejohn, F. Major, R. Lathrop, D. Sankoff, and C. Sensen, editors, Proceedings of the Sixth International Conference on Intelligent Systems for Molecular Biology, pages 175-182, Menlo Park, CA, 1998. AAAI Press.]</LI>
+
+    </UL>
+
+
+  <P>
+  <A  name="pdbblast"><b><i>UW-PDB-BLAST</i></b>
+  <br>
+UW-PDB-BLAST is a method for detecting homologs with structures in the <A  href="#pdb">PDB</A>  by running <A  href="#psiblast">PSI-BLAST</A>  agains the non-redundant protein sequence database for 5 rounds to obtain a residue substitution profile for the target that is then used to detect homologs in the PDB sequence database.  Perference is given to PDBs detected directly with a single BLAST round or PDBs detected by an "iterative-loosening" approach with PSI-BLAST. Our version of PDB-BLAST is run interally on the Robetta server.  Putative parent PDBs (but not their alignments) that are detected by PDB-BLAST with sufficient confidence are used as starting points for modeling with Robetta's Comparative Modeling protocol.
+  </P>
+
+    <UL>
+    <LI type="disc"> Schaffer AA, Aravind L, Madden TL, Shavirin S, Spouge JL, Wolf YI, Koonin EV, Altschul SF. (2001) Improving the accuracy of PSI-BLAST protein database searches with composition-based statistics and other refinements. Nucleic Acids Res. 29(14):2994-3005.
+    <LI type="disc"> Altschul SF, Madden TL, Schaffer AA, Zhang J, Zhang Z, Miller W, Lipman DJ. (1997) Gapped BLAST and PSI-BLAST: a new generation of protein database search programs. Nucleic Acids Res. 25(17):3389-402
+    </UL>
+
+
+
+  </UL>
+
+
+<br>
+
+<A  name="data_formats">
+<H1 class="title">DATA FORMATS</H1>
+
+  <UL>
+  <P>
+Detailed description of input and output data formats available <A href="alascan2.py?query=data_formats">here</A>.
+  </P>
+  </UL>
+
+<br>
+
+<A  name="terms">
+<H1 class="title">TERMS OF SERVICE</H1>
+
+  <UL>
+  <P>
+Detailed description of the Terms of Service available <A href="alascan2.py?query=terms_of_service">here</A>.
+  </P>
+  </UL>
+
+
+<br>
+
+<A  name="contacts">
+<H1 class="title">WHOM TO CONTACT</H1>
+
+<UL>
+<P>If you have a general question about Robetta, send an email to <A  href="mailto:robetta_admin@robetta.bakerlab.org">robetta_admin@robetta.bakerlab.org</A> .  Questions about the Terms of Service or licensing should be addressed to <A  href="mailto:alanyen@u.washington.edu">Alan Yen</A> .  General questions about Rosetta should go to <A  href="mailto:dabaker@u.washington.edu">David Baker</A> .
+<p>
+If you have a question about a specific part of Robetta, you may receive a faster answer by contacting the primary developer directly, as follows:
+  <p>
+  <UL>
+
+  <LI> Registration, Queuing System, Web Interface, Ab Initio Protocol, Fragment Server: <A  href="mailto:dekim@u.washington.edu">David Kim</A> 
+  <LI> Ginzu Domain Parsing, Homology Modeling Protocol, K*Sync alignments: <A  href="mailto:chivian@u.washington.edu">Dylan Chivian</A> 
+  <LI> Interface Alanine Scanning: <A  href="mailto:kortemme@u.washington.edu">Tanja Kortemme</A> 
+  </UL>
+
+   <p>
+    (Note: please include the word "ROBETTA" in the Subject of your message, to insure that it will get read)
+</P>
+</UL>
+
+
+<br>
+<A  name="trivia">
+<H1 class="title">TRIVIA</H1>
+<UL>
+According to Veronica Morea and Anna Tramontano, "Robetta" in Italian means "little useless things", like small pieces of trash.  Somewhat ironic, considering how useful these fragments have turned out to be.  The server name was meant to be a combination of "Robot" and "Rosetta", but clearly I don't speak Italian!
+<p>
+Turns out there's another accidental Italian connection with the name: the Florentine engraver Cristofano di Michele Martini Robetta (1462-after 1534) did this piece depicting <A  href="http://www.metmuseum.org/toah/hd/hero/hod_27.20.2.htm">Hercules and the Hydra of Lerna</A> , housed at the Metropolitan Museum of Art in New York.  He also created the works "Adoration of the Magi" and the "Allegory on the Power of Love".
+
+<br>
+<br>
+<A  href="/images/robetta_hercules_and_the_hydra_of_lerna.jpg"><img src="../images/herc-th.jpg" border=0></A> 
+&nbsp;&nbsp;&nbsp;
+<A  href="/images/robetta_adoration_of_the_magi.jpg"><img src="../images/magi-th.jpg" border=0></A> 
+&nbsp;&nbsp;&nbsp;
+<A  href="/images/robetta_allegorie_sur_la_puissance_de_lamour.jpg"><img src="../images/lamour-th.jpg" border=0></A> 
+</UL>
+
+
+
+
+
+

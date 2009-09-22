@@ -1,0 +1,250 @@
+<H1 class="title" align="center">Data Formats</H1>
+
+<P>
+User data must have the following formats. <i>Please follow these formats and check your input before submitting to the server to avoid errors and wasting processor time</i>.
+</P>
+
+<br><br>
+
+<a name="fasta">
+<H1 class="title">Fasta &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+ 
+<P>
+<PRE>
+Optional single-line description (line starts with ">"), followed by
+lines of amino acid sequence data. 
+
+Example:
+ 
+>1UBQ:_ UBIQUITIN - CHAIN _
+MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYN
+IQKESTLHLVLRLRGG
+ 
+ 
+Accepted amino acid codes are:
+ 
+    A  alanine                         P  proline
+    B  TREATED AS asparagine           Q  glutamine
+    C  cystine                         R  arginine
+    D  aspartate                       S  serine
+    E  glutamate                       T  threonine
+    F  phenylalanine                   V  valine
+    G  glycine                         W  tryptophan
+    H  histidine                       Y  tyrosine
+    I  isoleucine                      Z  TREATED AS glutamine
+    K  lysine
+    L  leucine              ALL OTHER ALPHABETIC CHARACTERS ARE
+    M  methionine           TREATED AS alanine. NON-ALPHABETIC
+    N  asparagine           CHARACTERS ARE IGNORED.
+</PRE>
+</P>
+ 
+<BR><BR><BR>
+
+<a name="batchfasta">
+<H1 class="title">Batch Fasta (not available to public) &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+ 
+<P>
+<PRE>
+Concatenated fasta sequences each requiring single-line target information 
+(line starts with ">" followed by Target Name and Optional Notes), followed 
+by lines of amino acid sequence data. Target Names cannot have spaces.
+
+Example:
+ 
+>1UBQ_ Sequence one
+MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYN
+IQKESTLHLVLRLRGG
+>PFAM00240 Sequence two consensus ubiquitin family
+MKIFVKTLDGKTITLEVDPSDTVLELKEKIEDKEGIPPEQQRLIYKGKVLEDDTTLAEYNIQDGSTLHLVLRLR
+
+See <a href="#fasta">Fasta</a> above for accepted amino acid codes.
+</PRE>
+</P>
+ 
+<BR><BR><BR>
+
+
+<a name="chsft">
+<H1 class="title">Chemical Shifts &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+ 
+<P>
+<PRE>
+1 line per residue
+ 
+format(a3,1x,i4,7(1x,f7.2))
+AA (1 letter or 3 letter), residue number, chem shifts (C,CA,CB,HA,N)
+any unknown shifts should be '9999.00'
+ 
+The sample file below also has the actual phi and psi as the
+last two fields on the line. These aren't read in; they can be
+present or absent
+ 
+------- 1d3z_.chsft_in -----------
+  M    1  170.54   54.45   33.27    4.23 9999.00  180.00 -180.00
+  Q    2  175.92   55.08   30.76    5.25  123.22  -91.02  138.26
+  I    3  172.45   59.57   42.21    4.21  115.34 -131.09  163.04
+  F    4  175.32   55.21   41.48    5.63  118.11 -115.99  140.22
+  V    5  174.87   60.62   34.23    4.72  121.00 -118.03  114.22
+(etc)
+----------------------------------
+</PRE>
+</P>
+ 
+<BR><BR><BR>
+
+
+<a name="cst">
+<H1 class="title">NOE Constraints &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+ 
+<P>
+<PRE>
+current format 'NMR_v3.0'  :
+NMR_v3.0                   (first line)
+comment
+comment
+n_pairLines                 (# of lines of constraints to read)
+tag,res1,atom1,res2,atom2,upperbound,lowerbound,{true distance}
+ 
+format(a1,2x,i4,1x,a4,1x,i4,1x,a4,1x,f10.2,1x,f10.2)
+tag: '#':ignore, ' ':score
+true distance is optional and not read, any characters after lowerbound is treated
+as a comment
+atom1 and atom2 should follow pdb-style atom names
+also allowed: ' CEN' for centroid constraints
+protons: only 'HN  ' and 'HA  ' are currently recognized
+         for others, use heavy atom and pad bounds appropiately
+ 
+res1 and res2 are residue numbers
+atom names should be in the pdb format ie ' CA ', ' CG ' etc.
+left justified names okay; Protons other than HA or HN not recognized
+so use the heavy atoms and pad your bounds; 'CEN' is also a valid
+atom name. This is a constraint between sidechain centroids for
+use in early rosetta phases before fullatom representation of sidechains.
+ 
+Also, the lower bound is specified in the input file, but
+rosetta doesn't do anything with it yet. So they're all effectively zero.
+ 
+ 
+-------1d3z_.cst------------------------------
+NMR_v3.0
+HA-HN csts, subset from 1d3z.mr PDB deposition
+data set used in Bowers et al., (2000) J Biomol NMR 18:311
+55
+      6 HN     68 HA         3.71       0.00       2.23
+      5 HA     67 HN         3.79       0.00       2.27
+      3 HA     64 HN         3.92       0.00       2.35
+      4 HN     66 HA         3.94       0.00       2.36
+     22 HA     56 HN         4.31       0.00       2.58
+      3 HA     65 HN         4.31       0.00       2.59
+(etc)
+--------------------------------------------
+</PRE>
+</P>
+ 
+<BR><BR><BR>
+
+
+<a name="dpl">
+<H1 class="title">Dipolar Constraints &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+ 
+<P>
+<PRE>
+file format:
+line1: version?    (not yet in use)
+line2: parameters?  (not yet in use)
+line3: comments
+line4: # of lines to read   (<=physical number of lines)
+line5 -> beginning in 1st column
+   tag      res1     atom1    res2    atom2      J
+    a1  2x   i4   1x  a4   ix  a4  1x  4x    1x f10.2
+ 
+200  format(a1,2x,i4,1x,a4,1x,i4,1x,a4,1x,f10.2)
+ 
+   If the first character of a line is '#', the line is read, but
+   the data is ignored. Otherwise, the first column of each line
+   contains a tag identifying the set to which the measurement belongs.
+   (ie different experimental conditions with different alignment
+   tensor) tags may be any single character other than '#'.
+ 
+   Also, only bb atoms (including H) are included at present.
+ 
+   Also, HA# for glycine not dealt with, just ignored.
+ 
+-------------------------------------------------------------------------------
+sample data file                   > everything over here is just my comments
+                                   > and shouldn't be in the file
+------------------------------------------------------------------------
+1d3z    (662 total)                             comments
+JACS 1998 120:12334                             comments
+Ottiger & Bax, HN & HA only (134)               comments
+134                                  lines to read (include '#' lines)
+a  2    N    2     H        -8.17
+a  3    N    3     H         8.27               HN-N data, a is a tag
+a  4    N    4     H        10.49
+#  5    N    5     H         9.87               commented out line
+a  6    N    6     H         9.15
+a  7    N    7     H         3.70
+        ....                                    (lots more lines)
+a  2    CA   2    HA         5.60
+a  3    CA   3    HA         8.98               HA-CA data, same conditions
+a  4    CA   4    HA        24.27               (ie alignment tensor) as
+a  5    CA   5    HA        21.73               HN data above
+a  6    CA   6    HA        16.15
+(etc)
+---------------------------------------------------------------------
+</PRE>
+</P>
+
+<BR><BR><BR>
+
+<a name="pdbcomplex">
+<H1 class="title">PDB Complex &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+
+<P>
+Multi-chain protein complex using RCSB's <a href="http://www.wwpdb.org/docs.html" target="_blank">PDB File Format</a>.
+</P>
+ 
+<BR><BR><BR>
+
+<a name="mutations">
+<H1 class="title">Mutations List &nbsp; <a href="#top"><img src="/images/top.gif" alt="Top" border=0></a></H1>
+ 
+<P>
+List of alanine scan mutations to be made in a given <a href="#pdbcomplex">PDB Complex</a>.
+<br><br>
+3 space delimited columns representing:
+<br>
+<UL>
+   <LI>Column 1. The residue number as in the PDB complex.
+   <LI>Column 2. Chain ID as in the PDB complex (case sensitive).
+   <LI>Column 3. Experimental delta delta G values (for future use).
+</UL>
+
+
+If there are any format errors, all possible interface mutations will be considered.
+
+<PRE>
+------------------------------------------------------------------------
+sample data file                  
+
+------------------------------------------------------------------------
+  15 A  0.00
+  16 A  0.00
+  17 A  0.00
+  18 A  0.00
+  74 A  0.00
+ 143 B  0.00
+ 145 B  0.00
+ 148 B  0.00
+ 150 B  0.00
+ 189 B  0.00
+ 191 B  0.00
+ 196 B  0.00
+(etc)
+------------------------------------------------------------------------
+</PRE>
+
+</P>
+ 
+<BR><BR><BR>
