@@ -32,9 +32,9 @@ class Session(object):
       except OSError, e:
           errmsg =  """%s when trying to create the session directory. Create it as '%s'""" % (e.strerror, os.path.abspath(session_dir))
           raise OSError, errmsg
+    self.data = shelve.open(session_dir + '/sess_' + sid, writeback=True) # this ads an additional '.db' to the filename ... weird!
     try:
-      self.data = shelve.open(session_dir + '/sess_' + sid, writeback=True) # this ads an additional '.db' to the filename ... weird!
-      # os.chmod(session_dir + '/sess_' + sid , 0660)
+      os.chmod(session_dir + '/sess_' + sid , 0660)
     except OSError:
       # this is specific to the python version or the database used by shelve
       os.chmod(session_dir + '/sess_' + sid + '.db', 0660)
