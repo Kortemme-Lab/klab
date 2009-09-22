@@ -63,7 +63,7 @@ from cgi import escape
 # Setup: Change these values according to your settings and usage of the server               #
 ###############################################################################################
 
-parameter = read_config_file('/Applications/XAMPP/etc/rosettaweb/parameter.conf')
+parameter = read_config_file('/etc/rosettaweb/parameter.conf')
 
 ROSETTAWEB_db_host   = parameter['db_host']
 ROSETTAWEB_db_db     = parameter['db_name']
@@ -78,7 +78,7 @@ ROSETTAWEB_contact_email = parameter['email_contact']
 ROSETTAWEB_admin_email   = parameter['email_admin']
 
 ROSETTAWEB_server_name   = parameter['server_name']
-ROSETTAWEB_server_script = 'rosettaweb2.py'
+ROSETTAWEB_server_script = os.environ['SCRIPT_NAME']
 
 ROSETTAWEB_store_time         = parameter['store_time']
 ROSETTAWEB_max_point_mutation = 31

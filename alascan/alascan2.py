@@ -28,8 +28,21 @@ from datetime import datetime
 from string import *
 from cStringIO import StringIO
 from cgi import escape
+from rwebhelper import *
 
 EMAIL_FROM = "lauck@cgl.ucsf.edu"
+
+parameter = read_config_file('/etc/rosettaweb/parameter.conf')
+
+ROSETTAWEB_db_host   = parameter['db_host']
+ROSETTAWEB_db_db     = parameter['db_name']
+ROSETTAWEB_db_user   = parameter['db_user']
+ROSETTAWEB_db_passwd = parameter['db_pw']
+ROSETTAWEB_db_port   = int(parameter['db_port'])
+ROSETTAWEB_db_socket = parameter['db_socket']
+
+ROSETTAWEB_servername = os.environ['SERVER_NAME']
+ROSETTAWEB_scriptname = os.environ['SCRIPT_NAME']
 
 ###############################################################################################
 #                                                                                             #
@@ -98,7 +111,7 @@ def ws():
     
     #s.write(str(my_session.cookie)+'\n')
     #s.write("Content-type: text/html\n")
-    s.write( "Location: http://albana.ucsf.edu/alascan/cgi-bin/alascan2.py\n\n" )
+    s.write( "Location: http://%s/alascan/cgi-bin/%s\n\n" % (ROSETTAWEB_servername, ROSETTAWEB_scriptname) )
     ## close session object
     my_session.close()
     return
@@ -420,13 +433,13 @@ def register(form, SID):
     This is the <A href="http://kortemmelab.ucsf.edu">Kortemme Lab</A>  - Interface Alanine Scanning Server at <A href="http://www.ucsf.edu">UCSF</A> . Alinine Scanning is part of <A href="http://robetta.bakerlab.org">Robetta</A> . At this time, Robetta is only available for use by the academic community and other not-for-profit entities.
     </p>
     <P>
-    This account will also valid for <A href="http://albana.ucsf.edu/backrub/">Structure Prediction with backrub</A>. 
+    This account will also valid for <A href="http://%s/backrub/">Structure Prediction with backrub</A>. 
     </P>
     <br>
     <form name="myForm" method="post" onsubmit="return ValidateForm();">
       <table border=0 cellpadding=2 cellspacing=0>
         <tr><td colspan=2><b>Required Items</b></td></tr>
-    """)
+    """ % (ROSETTAWEB_servername))
     
     # for the required fields we have 3 options: 
     # - form has no such key => empty form
@@ -803,7 +816,7 @@ def submit(form, SID):
     if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
       s = sys.stdout
       s.write( "Content-type: text/html\n" )
-      s.write( "Location: http://albana.ucsf.edu/alascan/cgi-bin/alascan2.py?query=submit&mode=error\n\n" )
+      s.write( "Location: http://%s/alascan/cgi-bin/%s?query=submit&mode=error\n\n" % (ROSETTAWEB_servername, ROSETTAWEB_scriptname))
       return
     else:
       # if we're good to go, create new job
@@ -1095,10 +1108,10 @@ def dummy():
            Please proceed to <A href="alascan2.py?query=register">Registration</A> or <A href="alascan2.py?query=login">login</A>.
            </P>
            <P> 
-           Other services [&nbsp;<A href="http://albana.ucsf.edu/backrub/">Structure Prediction with backrub</A>&nbsp;]
+           Other services [&nbsp;<A href="http://%s/backrub/">Structure Prediction with backrub</A>&nbsp;]
            </P>      
            <br>
-  \n""")
+  \n""" % (ROSETTAWEB_servername))
   html = output.getvalue()
   output.close()
   return html
@@ -1251,7 +1264,7 @@ def help(mode):
 
 def execQuery(sql):
   
-  connection = MySQLdb.Connection(host='localhost', db='alascan', user='alascan', passwd='h4UjX!', port=3306, unix_socket='/opt/lampp/var/mysql/mysql.sock' )
+  connection = MySQLdb.Connection(host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket )
   cursor = connection.cursor()
   cursor.execute(sql)
   results = cursor.fetchall()

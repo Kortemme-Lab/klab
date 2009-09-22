@@ -1,5 +1,8 @@
 import sha, shelve, time, Cookie, os
 
+# This class takes care of the cookie management
+# It utilizes pythons basic cookie class
+
 class Session(object):
 
   def __init__(self, expires=None, cookie_path=None):
@@ -29,8 +32,11 @@ class Session(object):
       except OSError, e:
           errmsg =  """%s when trying to create the session directory. Create it as '%s'""" % (e.strerror, os.path.abspath(session_dir))
           raise OSError, errmsg
-    self.data = shelve.open(session_dir + '/sess_' + sid, writeback=True)
-    os.chmod(session_dir + '/sess_' + sid, 0660)
+    self.data = shelve.open(session_dir + '/sess_' + sid, writeback=True) # this ads an additional '.db' to the filename ... weird!
+    # os.chmod(session_dir + '/sess_' + sid , 0660)
+    # this is specific to the python version or the database used by shelve
+    os.chmod(session_dir + '/sess_' + sid + '.db', 0660)
+    
     
     # Initializes the expires data
     if not self.data.get('cookie'):
