@@ -688,9 +688,14 @@ def submit(form, SID):
     if form.has_key("keep_output") and int(form["keep_output"].value) == 1:
       keep_output = 1
     else:
-      keep_output = 0
+      keep_output = 1 # ALWAYS KEEP OUTPUT FOR NOW
+    
+    PM_chain  = ''
+    PM_resid  = ''
+    PM_newres = ''
+    PM_radius = ''
         
-    if modus == point_mutation:
+    if modus == 'point_mutation':
       # submit_point_mutation(self,database,form)
       if form.has_key("PM_chain") and form["PM_chain"].value != '':
         PM_chain = form["PM_chain"].value
@@ -705,7 +710,7 @@ def submit(form, SID):
         PM_radius = form["PM_radius"].value
     
     # Multiple PointMutations
-    if modus == 3 or modus == 'multiple_mutation':
+    elif modus == 'multiple_mutation':
       PM_chain  = []
       PM_resid  = []
       PM_newres = []
@@ -733,21 +738,21 @@ def submit(form, SID):
       PM_radius = str(PM_radius).strip('[]').replace(', ','-')
       
 # gregs ensemble
-#    if modus == 4:
-    if form.has_key("ENS_temperature") and form["ENS_temperature"].value != '':
-      ENS_temperature = form["ENS_temperature"].value
-    else:
-      ENS_temperature = ""
-    if form.has_key("ENS_num_designs_per_struct") and form["ENS_num_designs_per_struct"].value != '':
-      ENS_num_designs_per_struct = form["ENS_num_designs_per_struct"].value
-    else:
-      ENS_num_designs_per_struct = ""
-    if form.has_key("ENS_segment_length") and form["ENS_segment_length"].value != '':
-      ENS_segment_length = form["ENS_segment_length"].value
-    else:
-      ENS_segment_length = ""
-#    else:
-#      (ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) = ('','','')
+    elif modus == 4:
+      if form.has_key("ENS_temperature") and form["ENS_temperature"].value != '':
+        ENS_temperature = form["ENS_temperature"].value
+      else:
+        ENS_temperature = ""
+      if form.has_key("ENS_num_designs_per_struct") and form["ENS_num_designs_per_struct"].value != '':
+        ENS_num_designs_per_struct = form["ENS_num_designs_per_struct"].value
+      else:
+        ENS_num_designs_per_struct = ""
+      if form.has_key("ENS_segment_length") and form["ENS_segment_length"].value != '':
+        ENS_segment_length = form["ENS_segment_length"].value
+      else:
+        ENS_segment_length = ""
+  #    else:
+  #      (ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) = ('','','')
 
 
     if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
@@ -755,7 +760,7 @@ def submit(form, SID):
       sys.stderr = s
       s.write( "Content-type: text/html\n")
       s.write( "Location: http://%s/backrub/cgi-bin/%s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_name, ROSETTAWEB_server_script, error) )
-      return
+      return False
     else:
       # if we're good to go, create new job
       # get ip addr hostname
@@ -767,7 +772,8 @@ def submit(form, SID):
       sql = "LOCK TABLES backrub WRITE, Users READ"
       execQuery(connection, sql)
       # write information to database
-      sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdbfile.filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length )
+      sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) 
+                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdbfile.filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length )
       try: 
         import random
         execQuery(connection, sql)

@@ -127,22 +127,22 @@ function updateCellSize2() {
     document.getElementById('empty_box').style.height = high ;
 }
 
-function changeApplication( task ) {
+function changeApplication( app, task ) {
 
 	// change these two arrays if you change the table in rosettahtml.py
 	//myFields = new Array("field_init","field_no_mutation","field_point_mutation","field_upload_mutation","field_ensemble");
-	myTasks = new Array("task_init","text_1","text_2","task_2_no_mutation","task_upload_mutation","task_2_ensemble","task_1_multiple_mutation","task_1_one_mutation");
+	myTasks = new Array("text0","text1","text2","text3","parameter1_1","parameter1_2","parameter1_3","parameter2_1","parameter2_2","parameter3");
     
-    // hide text
-    new Effect.Fade( "text_1", { duration: 0.0, queue: { scope: 'menu' } } );
-    new Effect.Fade( "text_2", { duration: 0.0, queue: { scope: 'menu' } } );
+  // hide text
+  new Effect.Fade( "text_1", { duration: 0.0, queue: { scope: 'menu' } } );
+  new Effect.Fade( "text_2", { duration: 0.0, queue: { scope: 'menu' } } );
     
     
 	setTask(task);
 	mytask  = task ;
-    new Effect.Appear( 'common_form', { duration: 0.5, queue: { scope: 'task' } } ) ;
+  new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
 	new Effect.Appear( mytask, { duration: 0.5 } )
-    new Effect.Appear( 'submit_button', { duration: 0.5, queue: { scope: 'task' } } ) ;
+  new Effect.Appear( 'parameter_submit', { duration: 0.5, queue: { scope: 'task' } } ) ;
 	for ( var key in myTasks) {
 		if ( myTasks[key] != mytask ) {
 			new Effect.Fade( myTasks[key], { duration: 0.0, queue: { scope: 'task' } } );
@@ -156,84 +156,48 @@ function changeApplication( task ) {
 function showMenu( menu_id ) {
     /* This function extends or hides the menu on the left */
     
-    myTasks = new Array("menu_1","menu_2",
-                        "pic_1","pic_2",
-                        "text_1","text_2",
-                        "task_init","common_form",
-                        "task_2_no_mutation","task_upload_mutation","task_2_ensemble","task_1_multiple_mutation","task_1_one_mutation",
-                        "ref_1","ref_2","submit_button" );
+    myTasks = new Array("pic1","pic2","pic3",
+                        "text0","text1","text2","text3",
+                        "parameter_common","parameter_submit",
+                        "parameter1_1","parameter1_2","parameter1_3","parameter2_1","parameter2_2","parameter3",
+                        "ref1","ref2","ref3" );
     
-//    if menu_1
-//    show: menu_1, pic_1, text_1, ref_1
-//    hide: everything else
+    myFields = new Array("pic","text","parameter","ref");
     
-    if (menu_id == "menu_1") 
-    {   
-        new Effect.Fade( "menu_2", { duration: 0.0 } );
-        new Effect.Appear( menu_id, { queue: { position: '0', scope: 'menu' } } );
-        
-
-        
-        new Effect.Appear( "text_1" );
-        new Effect.Appear( "pic_1"  );
-        new Effect.Appear( "ref_1"  );
-        
-        // hide stuff
-        new Effect.Fade( "pic_2", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "text_2", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_init", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "common_form", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_2_no_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_upload_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_2_ensemble", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_1_multiple_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_1_one_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "ref_2", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "submit_button", { duration: 0.0, queue: { scope: 'menu' } } );
-        
-        
-        mycolor = "#DCE9F4" ;
-        document.getElementById("box").style.background = mycolor;
-        document.getElementById("box").style.minHeight = document.getElementById("columnLeft").style.offsetHeight;
-        Nifty("div#box","big transparent fixed-height");
-        
-        
-        
-        
+    mycolor = "";    
+    if (menu_id == "1") {
+      mycolor = "#DCE9F4" ;
+      new Effect.Appear( "menu_1", { queue: { position: '0', scope: 'menu' } } );
+      new Effect.Fade( "menu_2", { duration: 0.0 } );
+      new Effect.Fade( "menu_3", { duration: 0.0 } );
+    } else {
+    if (menu_id == "2") {
+      mycolor = "#B7FFE0" ;
+      new Effect.Fade( "menu_1", { duration: 0.0 } );
+      new Effect.Appear( "menu_2", { queue: { position: '0', scope: 'menu' } } );
+      new Effect.Fade( "menu_3", { duration: 0.0 } );
+    } else {
+    if (menu_id = "3"){
+      mycolor = "#FFE2E2" ;
+      new Effect.Fade( "menu_1", { duration: 0.0 } );
+      new Effect.Fade( "menu_2", { duration: 0.0 } );
+      new Effect.Appear( "menu_3", { queue: { position: '0', scope: 'menu' } } );
+    } } }
+    
+    for ( var key in myTasks) {
+      for ( var key2 in myFields ) {
+        str = myFields[key2] + menu_id ;
+        if ( myTasks[key] == str ) {
+          new Effect.Appear( str );
+        } else {
+          new Effect.Fade( str, { duration: 0.0, queue: { scope: 'task' } } );
+        }
+      }
     }
-//    if menu_2
-//    show: menu_1, pic_2, text_2, ref_2
-    else if ( menu_id == "menu_2" )
-    {   
-        new Effect.Fade( "menu_1", { duration: 0.0 } );
-        new Effect.Appear( menu_id, { queue: { position: '0', scope: 'menu' } } );
-
-        
-        new Effect.Appear( "text_2" );
-        new Effect.Appear( "pic_2"  );
-        new Effect.Appear( "ref_2"  );
-        
-        // hide stuff
-        new Effect.Fade( "pic_1", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "text_1", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_init", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "common_form", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_2_no_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_upload_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_2_ensemble", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_1_multiple_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "task_1_one_mutation", { duration: 0.0, queue: { scope: 'menu' } } );
-        new Effect.Fade( "ref_1", { duration: 0.0, queue: { scope: 'menu' } } );        
-        new Effect.Fade( "submit_button", { duration: 0.0, queue: { scope: 'menu' } } );
-        mycolor = "#B7FFE0" ;
-        document.getElementById("box").style.background = mycolor;
-        document.getElementById("box").style.minHeight = document.getElementById("columnLeft").style.offsetHeight;
-        Nifty("div#box","big transparent fixed-height");
-    }
-
-
     
-//    else if ( menu_name == "menu_3" ) { mycolor = "#FFE2E2" ; }
+    document.getElementById("box").style.background = mycolor;
+    document.getElementById("box").style.minHeight = document.getElementById("columnLeft").style.offsetHeight;
+    Nifty("div#box","big transparent fixed-height");
 
     return true;
 }
