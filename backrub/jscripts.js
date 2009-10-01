@@ -131,7 +131,7 @@ function changeApplication( app, task ) {
 
 	// change these two arrays if you change the table in rosettahtml.py
 	//myFields = new Array("field_init","field_no_mutation","field_point_mutation","field_upload_mutation","field_ensemble");
-	myTasks = new Array("text0","text1","text2","text3","parameter1_1","parameter1_2","parameter1_3","parameter2_1","parameter2_2","parameter3");
+	myTasks = new Array("text0","text1","text2","text3","parameter1_1","parameter1_2","parameter1_3","parameter2_1","parameter2_2","parameter3_1");
     
   // hide text
   new Effect.Fade( "text_1", { duration: 0.0, queue: { scope: 'menu' } } );
@@ -152,52 +152,61 @@ function changeApplication( app, task ) {
 
 }
 
+function oc(a, n)
+{
+  var o = {};
+  for(var i=0;i<a.length;i++)
+  {
+    o[a[i]+n]='';
+  }
+  return o;
+}
 
 function showMenu( menu_id ) {
     /* This function extends or hides the menu on the left */
     
     myTasks = new Array("pic1","pic2","pic3",
-                        "text0","text1","text2","text3",
-                        "parameter_common","parameter_submit",
-                        "parameter1_1","parameter1_2","parameter1_3","parameter2_1","parameter2_2","parameter3",
+                        "text1","text2","text3",
                         "ref1","ref2","ref3" );
     
-    myFields = new Array("pic","text","parameter","ref");
+    myFields = new Array("pic","text","ref");
     
-    mycolor = "";    
+    mycolor = "";     
     if (menu_id == "1") {
       mycolor = "#DCE9F4" ;
       new Effect.Appear( "menu_1", { queue: { position: '0', scope: 'menu' } } );
       new Effect.Fade( "menu_2", { duration: 0.0 } );
       new Effect.Fade( "menu_3", { duration: 0.0 } );
-    } else {
-    if (menu_id == "2") {
+    } else if (menu_id == "2") {
       mycolor = "#B7FFE0" ;
       new Effect.Fade( "menu_1", { duration: 0.0 } );
       new Effect.Appear( "menu_2", { queue: { position: '0', scope: 'menu' } } );
       new Effect.Fade( "menu_3", { duration: 0.0 } );
-    } else {
-    if (menu_id = "3"){
+    } else if (menu_id = "3"){
       mycolor = "#FFE2E2" ;
       new Effect.Fade( "menu_1", { duration: 0.0 } );
       new Effect.Fade( "menu_2", { duration: 0.0 } );
       new Effect.Appear( "menu_3", { queue: { position: '0', scope: 'menu' } } );
-    } } }
-    
-    for ( var key in myTasks) {
-      for ( var key2 in myFields ) {
-        str = myFields[key2] + menu_id ;
-        if ( myTasks[key] == str ) {
-          new Effect.Appear( str );
-        } else {
-          new Effect.Fade( str, { duration: 0.0, queue: { scope: 'task' } } );
-        }
-      }
     }
     
     document.getElementById("box").style.background = mycolor;
     document.getElementById("box").style.minHeight = document.getElementById("columnLeft").style.offsetHeight;
     Nifty("div#box","big transparent fixed-height");
+            
+    new Effect.Fade( "text0", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+    
+    // new Effect.Appear( "parameter_common", { queue: { position: '0', scope: 'task' } } );
+    // new Effect.Appear( "parameter_submit", { queue: { position: '0', scope: 'task' } } );
+    
+    for ( var key1 in myFields ) {
+      if ( myFields[key1] in oc(myTasks) ) {
+          new Effect.Appear( myTasks[key2] );
+        } else {
+          new Effect.Fade( myTasks[key2], { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+        }
+    }
+    
+
 
     return true;
 }

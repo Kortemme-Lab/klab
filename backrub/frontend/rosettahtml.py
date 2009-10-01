@@ -246,14 +246,18 @@ class RosettaHTML:
               <A href="javascript:void(0)" onclick="showMenu('2'); ">Backrub Ensemble Design</A>
               <p id="menu_2" style="display:none; text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); " >Model Flexibility</a></td></tr>
+                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); ">Model Flexibility</a></td></tr>
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','2'); ">Backrub ensemble</a></td></tr>
                   </table>
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" onclick="showMenu('3'); changeApplication('3'); ">Flexible Backbone Design</A>
-              <!-- p id="menu_3" style="display:none; text-align:right;"></p -->
+              <A href="javascript:void(0)" onclick="showMenu('3'); ">Flexible Backbone Design</A>
+              <p id="menu_3" style="display:none; text-align:right;">
+                  <table style="border:0px; padding:0px; margin:0px;">
+                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1'); ">Interface Library Design</a></td></tr>
+                  </table>
+              </p>
             </li>
           </ul>
           </td>
@@ -263,14 +267,17 @@ class RosettaHTML:
           <div id="box">
           <!-- pictures for the different applications -->
             <p id="pic1" style="display:none; text-align:center;">
+              logo1
               <img src="../images/logo1.png" width="85%%" height="85%%" alt="Rosetta" border=0>
             </p>
 
             <p id="pic2" style="display:none; text-align:center;">
+              logo2
               <!-- img src="../images/logo2.png" width="85%%" alt="Rosetta" border=0 -->
             </p>
             
             <p id="pic3" style="display:none; text-align:center;">
+              logo3
               <!-- img src="../images/logo2.png" width="85%%" alt="Rosetta" border=0 -->
             </p>
 
@@ -303,8 +310,8 @@ class RosettaHTML:
                 This function utilizes backrub and design protocols implemented in ROSETTA.<br>
                 It designs energetically more stable sequences for protein interfaces.
             </div>
-            
           <!-- end description -->
+          
           <!-- parameter form -->
             <TABLE id="parameter_common" align="center" style="display:none;">
               <TR>
@@ -426,7 +433,7 @@ class RosettaHTML:
             </p>
             
             <!-- Library Design -->
-            <p id="parameter2_2" style="display:none; text-align:center;">
+            <p id="parameter3_1" style="display:none; text-align:center;">
             <table align="center">
               <tr>
                   <td onmouseover="popUp('tt_1');" onmouseout="popUp('tt_1');">1</td><td><input type="text" name="1" maxlength=3 SIZE=5 VALUE="0.3"></td>

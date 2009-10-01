@@ -694,6 +694,9 @@ def submit(form, SID):
     PM_resid  = ''
     PM_newres = ''
     PM_radius = ''
+    ENS_temperature = ''
+    ENS_num_designs_per_struct = ''
+    ENS_segment_length = ''
         
     if modus == 'point_mutation':
       # submit_point_mutation(self,database,form)
