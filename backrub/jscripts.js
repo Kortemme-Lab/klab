@@ -128,28 +128,31 @@ function updateCellSize2() {
 }
 
 function changeApplication( app, task ) {
-
 	// change these two arrays if you change the table in rosettahtml.py
-	//myFields = new Array("field_init","field_no_mutation","field_point_mutation","field_upload_mutation","field_ensemble");
-	myTasks = new Array("text0","text1","text2","text3","parameter1_1","parameter1_2","parameter1_3","parameter2_1","parameter2_2","parameter3_1");
-    
-  // hide text
-  new Effect.Fade( "text_1", { duration: 0.0, queue: { scope: 'menu' } } );
-  new Effect.Fade( "text_2", { duration: 0.0, queue: { scope: 'menu' } } );
-    
-    
-	setTask(task);
-	mytask  = task ;
-  new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
-	new Effect.Appear( mytask, { duration: 0.5 } )
-  new Effect.Appear( 'parameter_submit', { duration: 0.5, queue: { scope: 'task' } } ) ;
-	for ( var key in myTasks) {
-		if ( myTasks[key] != mytask ) {
-			new Effect.Fade( myTasks[key], { duration: 0.0, queue: { scope: 'task' } } );
-		}
-		if ( myTasks[key] == myTasks.last() ) { break; }
-	}
+	myParameter = new Array("parameter1_1","parameter1_2","parameter1_3",
+	                        "parameter2_1","parameter2_2",
+	                        "parameter3_1");
+  
+  myFields = new Array( "logo1","logo2","logo3",
+                        "text1","text2","text3",
+                        "ref1","ref2","ref3" );
 
+  // hide text 
+  new Effect.Fade( "text" + app , { duration: 0.0 } );
+  //new Effect.Fade( "ref" + app, { duration: 0.0 } );
+
+  task = "parameter" + app + "_" + task;
+	setTask(task);
+	
+  new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
+	new Effect.Appear( task, { duration: 0.5 } )
+  new Effect.Appear( 'parameter_submit', { duration: 0.5, queue: { scope: 'task' } } ) ;
+  
+	for ( i = 0; i < myParameter.length; i++ ) {
+		if ( myParameter[i] != task ) {
+			new Effect.Fade( myParameter[i], { duration: 0.0 } );
+		}
+	}
 }
 
 function oc(a, n)
@@ -168,9 +171,14 @@ function showMenu( menu_id ) {
     myTasks = new Array("pic1","pic2","pic3",
                         "text1","text2","text3",
                         "ref1","ref2","ref3" );
+    myParameter = new Array("parameter_common", "parameter_submit",
+                            "parameter1_1","parameter1_2","parameter1_3",
+  	                        "parameter2_1","parameter2_2",
+  	                        "parameter3_1");
     
-    myFields = new Array("pic","text","ref");
-    
+    // this builds an dictionary that supports the in operator
+    myFields = oc(['pic', 'text','ref'], menu_id);
+
     mycolor = "";     
     if (menu_id == "1") {
       mycolor = "#DCE9F4" ;
@@ -198,16 +206,17 @@ function showMenu( menu_id ) {
     // new Effect.Appear( "parameter_common", { queue: { position: '0', scope: 'task' } } );
     // new Effect.Appear( "parameter_submit", { queue: { position: '0', scope: 'task' } } );
     
-    for ( var key1 in myFields ) {
-      if ( myFields[key1] in oc(myTasks) ) {
-          new Effect.Appear( myTasks[key2] );
+    for ( i=0; i < myTasks.length; i++ ) {
+      if ( myTasks[i] in myFields ) {
+          new Effect.Appear( myTasks[i] );
         } else {
-          new Effect.Fade( myTasks[key2], { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+          new Effect.Fade( myTasks[i], { duration: 0.0, queue: { position: '0', scope: 'task' } } );
         }
     }
-    
-
-
+    // hide parameter fields
+    for ( i = 0; i < myParameter.length; i++ ) {
+      new Effect.Fade( myParameter[i], {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
+    }
     return true;
 }
 
