@@ -5,7 +5,6 @@
 # and calling the appropriate functions from the lower levels to
 # produce web pages.
 
-# (.)(.) LINE 798 
 
 ########################################
 # functions                            
@@ -667,7 +666,18 @@ def submit(form, SID):
     
     # tasks are: no_mutation, point_mutation, multiple_mutation, upload_mutation, ensemble
     if form.has_key('task') and form['task'].value != '':
-      modus = form['task'].value
+      if form['task'].value == 'parameter1_1':
+        modus = 'point_mutation'
+      elif form['task'].value == 'parameter1_2':
+        modus = 'multiple_mutation'
+      elif form['task'].value == 'parameter1_3':
+        modus = 'upload_mutation'
+      elif form['task'].value == 'parameter2_1':
+        modus = 'no_mutation'
+      elif form['task'].value == 'parameter2_2':
+        modus = 'ensemble'
+      elif form['task'].value == 'parameter3_1':
+        modus = 'library_design'
     else:
       modus = None
       error += " No Task selected. "

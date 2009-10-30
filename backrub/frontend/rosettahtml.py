@@ -52,7 +52,7 @@ class RosettaHTML:
                 <link rel="STYLESHEET" type="text/css" href="../style.css">
                 
                 <script src="/javascripts/prototype.js" type="text/javascript"></script>
-                <script src="/javascripts/scriptaculous.js?load=effects" type="text/javascript"></script>
+                <script src="/javascripts/scriptaculous.js" type="text/javascript"></script>
                 <script src="/javascripts/niftycube.js" type="text/javascript"></script>
                 <script src="/jmol/Jmol.js" type="text/javascript"></script>
                 <script src="/backrub/jscripts.js" type="text/javascript"></script>
@@ -234,7 +234,7 @@ class RosettaHTML:
             </li>
             <li id="ab2">
               <A href="javascript:void(0)" onclick="showMenu('1'); ">Point Mutation</A>            
-              <p id="menu_1" style="display:none; text-align:right; margin:0px;">
+              <p id="menu_1" style="display:none; opacity:0.0; text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('1','1'); ">One mutation</a></td></tr>
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('1','2'); ">Multiple mutations</a></td></tr>
@@ -244,7 +244,7 @@ class RosettaHTML:
             </li>
             <li id="ab3">
               <A href="javascript:void(0)" onclick="showMenu('2'); ">Backrub Ensemble Design</A>
-              <p id="menu_2" style="display:none; text-align:right; margin:0px;">
+              <p id="menu_2" style="display:none; opacity:0.0; text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); ">Model Flexibility</a></td></tr>
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','2'); ">Backrub ensemble</a></td></tr>
@@ -253,7 +253,7 @@ class RosettaHTML:
             </li>
             <li id="ab4">
               <A href="javascript:void(0)" onclick="showMenu('3'); ">Flexible Backbone Design</A>
-              <p id="menu_3" style="display:none; text-align:right;">
+              <p id="menu_3" style="display:none; opacity:0.0; text-align:right;">
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1'); ">Interface Library Design</a></td></tr>
                   </table>
@@ -267,8 +267,7 @@ class RosettaHTML:
           <div id="box">
           <!-- pictures for the different applications -->
             <p id="pic1" style="display:none; text-align:center;">
-              logo1
-              <img src="../images/logo1.png" width="85%%" height="85%%" alt="Rosetta" border=0>
+              <img src="../images/logo1.png" width="85%%" alt="Rosetta" border=0>
             </p>
 
             <p id="pic2" style="display:none; text-align:center;">
@@ -287,7 +286,7 @@ class RosettaHTML:
               Click left to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.
             </p>
           
-            <div id="text1" style="display:none; text-align:justify;"> 
+            <div id="text1" style="display:none; opacity:0.0; text-align:justify;"> 
                 This function utilizes the backrub protocol implemented in ROSETTA.<br>
                 There are three options:
                 <ul style=" text-align:left;">
@@ -297,7 +296,7 @@ class RosettaHTML:
                 </ul>
             </div>
 
-            <div id="text2" style="display:none; text-align:justify;"> 
+            <div id="text2" style="display:none; opacity:0.0; text-align:justify;"> 
                 This function utilizes backrub and design protocols implemented in ROSETTA.<br>
                 There are two options:
                 <ul style="text-align:left;">
@@ -306,14 +305,14 @@ class RosettaHTML:
                 </ul>
             </div>
             
-            <div id="text3" style="display:none; text-align:justify;"> 
+            <div id="text3" style="display:none; opacity:0.0; text-align:justify;"> 
                 This function utilizes backrub and design protocols implemented in ROSETTA.<br>
                 It designs energetically more stable sequences for protein interfaces.
             </div>
           <!-- end description -->
           
           <!-- parameter form -->
-            <TABLE id="parameter_common" align="center" style="display:none;">
+            <TABLE id="parameter_common" align="center" style="display:none; opacity:0.0;">
               <TR>
                 <TD align=right onmouseover="popUp('tt_UserName');" onmouseout="popUp('tt_UserName');">User Name </TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=30 SIZE=31 NAME="UserName" VALUE="%s" disabled>
@@ -355,7 +354,7 @@ class RosettaHTML:
             </TABLE>
             
             <!-- Backrub - Point Mutation -->
-            <p id="parameter1_1" style="display:none; text-align:justify;">
+            <p id="parameter1_1" style="display:none; opacity:0.0; text-align:justify;">
             Backrub is applied to residues that have at least one atom within a radius of 6.0 &#197; near the mutation. [ <a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09">Smith and Kortemme, 2008</a> ]<br>
                 <table align=center>
                 <tr>
@@ -375,7 +374,7 @@ class RosettaHTML:
             </p>
             
             <!-- Backrub - Multiple Point Mutation -->
-            <p id="parameter1_2" style="display:none; text-align:justify;">
+            <p id="parameter1_2" style="display:none; opacity:0.0; text-align:justify;">
             Choose up to 30 residues for mutations. Backrub is applied to neighboring residues in a given radius. <br>
                 <table bgcolor="#EEEEEE" align="center">
                 <tr bgcolor="#828282" style="color:white;">
@@ -407,17 +406,17 @@ class RosettaHTML:
             </p>
             
             <!-- Backrub - Costum Mutation -->
-            <p id="parameter1_3" style="display:none; text-align:justify;"><b>Custom mutation.</b><br><br>
+            <p id="parameter1_3" style="display:none; opacity:0.0; text-align:justify;"><b>Custom mutation.</b><br><br>
                 This allows for a more flexible definition of mutations. Detailed information about the format of the file can be found in the <A style="color:#365a79; "href="%s?query=doc#mutations">documentation</A>. <br>
                 <font style="text-align:left;">Upload file <INPUT TYPE="file" NAME="Mutations" size="13"></font>
             </p>
             
             <!-- Ensemble - simple -->
-            <p id="parameter2_1" style="display:none; text-align:center;"><b>Apply backrub to all residues.</b><br><br>no options
+            <p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;"><b>Apply backrub to all residues.</b><br><br>no options
             </p>
             
             <!-- Ensemble - design -->
-            <p id="parameter2_2" style="display:none; text-align:center;">
+            <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
                 <b>Create a backrub ensemble.</b><br> [ <a href="http://www.pubmedcentral.nih.gov/articlerender.fcgi?artid=2682763">Friedland et al. 2009</a> ]<br><br>
                 <table align="center">
                 <tr>
@@ -433,7 +432,7 @@ class RosettaHTML:
             </p>
             
             <!-- Library Design -->
-            <p id="parameter3_1" style="display:none; text-align:center;">
+            <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
               <tr>
                   <td onmouseover="popUp('tt_1');" onmouseout="popUp('tt_1');">1</td><td><input type="text" name="1" maxlength=3 SIZE=5 VALUE="0.3"></td>
@@ -447,26 +446,26 @@ class RosettaHTML:
             </table>
             </p>
             
-            <p id="parameter_submit" style="display:none; text-align:center;">
+            <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
             * required fields &nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit">
             </p>
             <!-- end parameter form -->
             
             <!-- references -->
-            <p id="ref1" style="display:none; text-align:justify; border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
+            <p id="ref1" style="display:none; opacity:0.0; text-align:justify; border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
                 If you are using the data, please cite:<br><br>
                 Colin A. Smith, Tanja Kortemme, <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br>
                 <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology Volume 380, 742-756</a>
                 </p>
             </p>
 
-            <p id="ref2" style="display:none; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
+            <p id="ref2" style="display:none; opacity:0.0; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
                 If you are using the data, please cite:<br><br>
                 Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T., <i>A correspondence between solution-state dynamics of an individual protein and the sequence and conformational diversity of its family.</i>,<br>
                 <a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. 2009 May</a>
             </p>   
             
-            <p id="ref3" style="display:none; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
+            <p id="ref3" style="display:none; opacity:0.0; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
                 If you are using the data, please cite:<br><br>
                 TBA
             </p>     
