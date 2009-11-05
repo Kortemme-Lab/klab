@@ -652,7 +652,10 @@ def submit(form, SID):
       JobName = escape(form["JobName"].value)
     
     if form.has_key("PDBComplex"):
-      pdbfile = form["PDBComplex"]
+      if form["PDBComplex"][-4:-1] not in ['.pdb','.PDB' ]:
+        pdbfile = form["PDBComplex"] + '.pdb'
+      else:  
+        pdbfile = form["PDBComplex"]
       if not pdbfile.file:
          error += " PDB data is not a file. "
         
