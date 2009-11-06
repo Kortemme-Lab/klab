@@ -657,7 +657,7 @@ def submit(form, SID):
          error += " PDB data is not a file. "
       pdb_filename = form["PDBComplex"].filename
       if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
-        pdb_filename = form["PDBComplex"] + '.pdb'
+        pdb_filename = pdb_filename + '.pdb'
         
         
     if form.has_key("Mutations"):
