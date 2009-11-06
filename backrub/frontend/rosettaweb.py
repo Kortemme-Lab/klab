@@ -652,12 +652,13 @@ def submit(form, SID):
       JobName = escape(form["JobName"].value)
     
     if form.has_key("PDBComplex"):
-      if form["PDBComplex"][-4:] not in ['.pdb','.PDB' ]:
-        pdbfile = form["PDBComplex"] + '.pdb'
-      else:  
-        pdbfile = form["PDBComplex"]
+      pdbfile = form["PDBComplex"]
       if not pdbfile.file:
          error += " PDB data is not a file. "
+      pdb_filename = form["PDBComplex"].filename
+      if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
+        pdb_filename = form["PDBComplex"] + '.pdb'
+        
         
     if form.has_key("Mutations"):
       mutationsfile = form["Mutations"]
@@ -789,7 +790,7 @@ def submit(form, SID):
       execQuery(connection, sql)
       # write information to database
       sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) 
-                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdbfile.filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length )
+                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length )
       try: 
         import random
         execQuery(connection, sql)
