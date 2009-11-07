@@ -81,15 +81,15 @@ function setMini( disable ) {
     if ( disable == 1 ) {
     document.submitform.Mini[0].disabled=true;
     document.submitform.Mini[1].disabled=true;
-    document.submitform.keep_output.disabled=true;
+    //document.submitform.keep_output.disabled=true;
     document.getElementById('rosetta1').style.color='#D8D8D8';
-    document.getElementById('rosetta2').style.color='#D8D8D8';
+    //document.getElementById('rosetta2').style.color='#D8D8D8';
     } else {
     document.submitform.Mini[0].disabled=false;
     document.submitform.Mini[1].disabled=false;
-    document.submitform.keep_output.disabled=false;
+    //document.submitform.keep_output.disabled=false;
     document.getElementById('rosetta1').style.color='#000000';
-    document.getElementById('rosetta2').style.color='#000000';
+    //document.getElementById('rosetta2').style.color='#000000';
     }
     return true;
 }
@@ -127,7 +127,7 @@ function updateCellSize2() {
     document.getElementById('empty_box').style.height = high ;
 }
 
-function changeApplication( app, task ) {
+function changeApplication( app, _task ) {
 	// change these two arrays if you change the table in rosettahtml.py
 	myParameter = new Array("parameter1_1","parameter1_2","parameter1_3",
 	                        "parameter2_1","parameter2_2",
@@ -141,7 +141,7 @@ function changeApplication( app, task ) {
   new Effect.Fade( "text" + app , { duration: 0.0 } );
   //new Effect.Fade( "ref" + app, { duration: 0.0 } );
 
-  task = "parameter" + app + "_" + task;
+  task = "parameter" + app + "_" + _task;
 	setTask(task);
 	
   new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
@@ -153,6 +153,13 @@ function changeApplication( app, task ) {
 			new Effect.Fade( myParameter[i], { duration: 0.0 } );
 		}
 	}
+	if ( task == 'parameter2_2') {
+	  setMini(1);
+	} else {
+	  setMini(0);
+	}
+	
+	
 }
 
 function oc(a, n)

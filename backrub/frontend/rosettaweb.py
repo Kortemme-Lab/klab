@@ -58,6 +58,7 @@ from string import *
 from cStringIO import StringIO
 from cgi import escape
 
+import pickle
 ###############################################################################################
 # Setup: Change these values according to your settings and usage of the server               #
 ###############################################################################################
@@ -681,7 +682,7 @@ def submit(form, SID):
       elif form['task'].value == 'parameter2_2':
         modus = 'ensemble'
       elif form['task'].value == 'parameter3_1':
-        modus = 'library_design'
+        modus = 'sequence_tolerance'
     else:
       modus = None
       error += " No Task selected. "
@@ -689,7 +690,7 @@ def submit(form, SID):
     if form.has_key("Mini"):
       mini = form["Mini"].value # this is either 'mini' or 'classic'
     elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
-      mini = " "
+      mini = "classic"
     else:
       error += " No Rosetta binary selected. " # this is preselected in HTML code, so this case should never occur, we still make sure!
 
@@ -711,7 +712,8 @@ def submit(form, SID):
     ENS_temperature = ''
     ENS_num_designs_per_struct = ''
     ENS_segment_length = ''
-        
+    seqtol_parameter = {}    
+ 
     if modus == 'point_mutation':
       # submit_point_mutation(self,database,form)
       if form.has_key("PM_chain") and form["PM_chain"].value != '':
@@ -755,7 +757,7 @@ def submit(form, SID):
       PM_radius = str(PM_radius).strip('[]').replace(', ','-')
       
 # gregs ensemble
-    elif modus == 4:
+    elif modus == 4 or modus == 'ensemble':
       if form.has_key("ENS_temperature") and form["ENS_temperature"].value != '':
         ENS_temperature = form["ENS_temperature"].value
       else:
@@ -771,6 +773,27 @@ def submit(form, SID):
   #    else:
   #      (ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) = ('','','')
 
+# sequence tolerance aka library design
+    elif modus == 'sequence_tolerance':
+      if form.has_key("seqtol_chain1") and form["seqtol_chain1"].value != '':
+        seqtol_parameter["seqtol_chain1"] = str(form["seqtol_chain1"].value)
+      else:
+        seqtol_parameter["seqtol_chain1"] = ""
+      if form.has_key("seqtol_chain2") and form["seqtol_chain2"].value != '':
+        seqtol_parameter["seqtol_chain2"] = str(form["seqtol_chain2"].value)
+      else:
+        seqtol_parameter["seqtol_chain2"] = ""
+      if form.has_key("seqtol_list") and form["seqtol_list"].value != '':
+        seqtol_parameter["seqtol_list"] = str(form["seqtol_list"].value)
+      else:
+        seqtol_parameter["seqtol_list"] = ""
+      if form.has_key("seqtol_radius") and form["seqtol_radius"].value != '':
+        seqtol_parameter["seqtol_radius"] = str(form["seqtol_radius"].value)
+      else:
+        seqtol_parameter["seqtol_radius"] = ""
+      
+    seqtol_string = pickle.dumps(seqtol_parameter)
+      
 
     if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
       s = sys.stdout
@@ -789,8 +812,8 @@ def submit(form, SID):
       sql = "LOCK TABLES backrub WRITE, Users READ"
       execQuery(connection, sql)
       # write information to database
-      sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) 
-                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length )
+      sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter) 
+                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_string )
       try: 
         import random
         execQuery(connection, sql)
@@ -799,7 +822,7 @@ def submit(form, SID):
         ID      = result[0][0]
         # create a unique key as name for directories from the ID, for the case we need to hide the results
         # do not just use the ID but also a random sequence
-        tgb = str(ID) + 'flo' + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '')
+        tgb = str(ID) + 'flo' + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
         cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
         sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
         result  = execQuery(connection, sql)

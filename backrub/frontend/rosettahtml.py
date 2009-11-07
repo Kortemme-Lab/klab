@@ -345,7 +345,7 @@ class RosettaHTML:
               </TR>
               <TR>
                 <TD align=right onmouseover="popUp('tt_ROutput');" onmouseout="popUp('tt_ROutput');">ROSETTA output </TD>
-                <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1"> keep files</TD>
+                <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1" disabled checked> keep files</TD>
               </TR>
               <TR><TD align=left><br></TD></TR>
               <TR>
@@ -435,13 +435,18 @@ class RosettaHTML:
             <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
               <tr>
-                  <td onmouseover="popUp('tt_1');" onmouseout="popUp('tt_1');">1</td><td><input type="text" name="1" maxlength=3 SIZE=5 VALUE="0.3"></td>
+                  <td align="right" onmouseover="popUp('tt_seqtol_chains');" onmouseout="popUp('tt_seqtol_chains');">Chain 1</td><td><input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
               </tr>
               <tr>
-                  <td onmouseover="popUp('tt_2');" onmouseout="popUp('tt_2');">2</td><td><input type="text" name="2" maxlength=4 SIZE=5 VALUE="20"></td>
+                  <td align="right" onmouseover="popUp('tt_seqtol_chains');" onmouseout="popUp('tt_seqtol_chains');">Chain 2</td><td><input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
+                  </td>
               </tr>
               <tr>
-                  <td onmouseover="popUp('tt_3');" onmouseout="popUp('tt_3');">3</td><td><input type="text" name="3" maxlength=1 SIZE=5 VALUE="12"></td>
+                  <td align="right" onmouseover="popUp('tt_seqtol_list');" onmouseout="popUp('tt_seqtol_list');">Residues of Chain 2</td>
+                  <td><input type="text" name="seqtol_res" maxlength=120 SIZE=10 VALUE="">
+                  </td>
+              <tr>
+                  <td align="right" onmouseover="popUp('tt_seqtol_radius');" onmouseout="popUp('tt_seqtol_radius');">Radius [&#197;]</td><td><input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="10.0"></td>
               </tr>
             </table>
             </p>
@@ -520,6 +525,10 @@ class RosettaHTML:
                 Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues.
                 If an error occures for your structure please check the correctness of the PDB file.
                 If the PDB file is correct and Rosetta still fails, please <a href="mailto:lauck@cgl.ucsf.edu">contact us</a>.</div>\n"""
+        html += '<div id="tt_seqtol_chains" class="tooltip"><b>Chain:</b><br>The two chains in the PDB file that form an interface. Chain 2 will be mutated to find an energetically more stable sequence.</div>\n'
+        html += '<div id="tt_seqtol_list" class="tooltip"><b>List:</b><br>List of residue ids that are subject to mutations.</div>\n'
+        html += '<div id="tt_seqtol_radius" class="tooltip"><b>Radius:</b><br>Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.</div>\n'
+          
         return html
 
 ###############################################################################################
