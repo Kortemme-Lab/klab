@@ -174,7 +174,7 @@ def ws():
     # the next few lines create HTTP header which includes the cooki and MUST NOT be removed
     s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
     s.write("Content-type: text/html\n")
-    s.write("Location: ./%s?query=%s\n\n" % ( ROSETTAWEB_server_name, ROSETTAWEB_server_script, query_type ) ) # this line reloads the page, remember to CHANGE THIS URL
+    s.write("Location: %s?query=%s\n\n" % ( ROSETTAWEB_server_script, query_type ) ) # this line reloads the page, remember to CHANGE THIS URL
     # close session object
     my_session.close()
     return
@@ -799,7 +799,7 @@ def submit(form, SID):
       s = sys.stdout
       sys.stderr = s
       s.write( "Content-type: text/html\n")
-      s.write( "Location: http://%s/backrub/cgi-bin/%s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_name, ROSETTAWEB_server_script, error) )
+      s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
       return False
     else:
       # if we're good to go, create new job
