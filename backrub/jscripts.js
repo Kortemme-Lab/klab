@@ -153,11 +153,11 @@ function changeApplication( app, _task ) {
 			new Effect.Fade( myParameter[i], { duration: 0.0 } );
 		}
 	}
-	if ( task == 'parameter2_2') {
+	if ( task == 'parameter2_2' || task == 'parameter3_1') {
 	  setMini(1);
 	} else {
-	  setMini(0);
-	}
+   setMini(0);
+  }
 	
 	
 }

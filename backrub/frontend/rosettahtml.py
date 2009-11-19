@@ -11,6 +11,7 @@ import sys, os
 import cgi
 import cgitb; cgitb.enable()
 from string import join
+import pickle
 
 class RosettaHTML:
 
@@ -252,7 +253,7 @@ class RosettaHTML:
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" onclick="showMenu('3'); ">Flexible Backbone Design</A>
+              <A href="javascript:void(0)" onclick="showMenu('3'); ">Flexible Backbone Library Design</A>
               <p id="menu_3" style="display:none; opacity:0.0; text-align:right;">
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1'); ">Interface Library Design</a></td></tr>
@@ -291,8 +292,8 @@ class RosettaHTML:
                 There are three options:
                 <ul style=" text-align:left;">
                     <li>One Mutation: A single residue will be substituted. (see reference below)</li>
-                    <li>Multiple Mutations: Up to 30 residues can be mutated. (not thoroughly tested)</li>
-                    <li>Upload List: Upload a list with single residue mutations</li>
+                    <li>Multiple Mutations: Up to 30 residues can be mutated. (not published)</li>
+                    <!-- li>Upload List: Upload a list with single residue mutations.</li -->
                 </ul>
             </div>
 
@@ -443,7 +444,7 @@ class RosettaHTML:
               </tr>
               <tr>
                   <td align="right" onmouseover="popUp('tt_seqtol_list');" onmouseout="popUp('tt_seqtol_list');">Residues of Chain 2</td>
-                  <td><input type="text" name="seqtol_res" maxlength=120 SIZE=10 VALUE="">
+                  <td><input type="text" name="seqtol_list" maxlength=120 SIZE=10 VALUE="">
                   </td>
               <tr>
                   <td align="right" onmouseover="popUp('tt_seqtol_radius');" onmouseout="popUp('tt_seqtol_radius');">Radius [&#197;]</td><td><input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="10.0"></td>
@@ -526,7 +527,7 @@ class RosettaHTML:
                 If an error occures for your structure please check the correctness of the PDB file.
                 If the PDB file is correct and Rosetta still fails, please <a href="mailto:lauck@cgl.ucsf.edu">contact us</a>.</div>\n"""
         html += '<div id="tt_seqtol_chains" class="tooltip"><b>Chain:</b><br>The two chains in the PDB file that form an interface. Chain 2 will be mutated to find an energetically more stable sequence.</div>\n'
-        html += '<div id="tt_seqtol_list" class="tooltip"><b>List:</b><br>List of residue ids that are subject to mutations.</div>\n'
+        html += '<div id="tt_seqtol_list" class="tooltip"><b>List:</b><br>List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.</div>\n'
         html += '<div id="tt_seqtol_radius" class="tooltip"><b>Radius:</b><br>Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.</div>\n'
           
         return html
@@ -674,6 +675,20 @@ class RosettaHTML:
                    <td > Error </td></tr>\n"""
                    
         for line in job_list:
+            task = ''
+            if line[9] == '0' or line[9] == 'no_mutation':
+                task = "Model Flexibility"
+            elif line[9] == '1' or line[9] == 'point_mutation':
+                task = "Point Mutation"
+            elif line[9] == '3' or line[9] == 'multiple_mutation':
+                task = "Multiple Point Mutations"
+            elif line[9] == '2' or line[9] == 'upload_mutation':
+                task = "Custom Mutation"
+            elif line[9] == '4' or line[9] == 'ensemble':
+                task = "Backrub ensemble"
+            elif line[9] == 'sequence_tolerance':
+                task = "Sequence Tolerance"
+          
             html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF'" onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000'" onclick="window.location.href='%s?query=jobinfo&jobnumber=%s'">""" % ( self.script_filename, line[1] )
             # write ID
             html += '<td>%s </td>' % (str(line[0]))
@@ -698,9 +713,9 @@ class RosettaHTML:
                 html += '<td>%s</td>' % (str(line[5])[0:23] + "...")
             # Rosetta version
             if line[6] == '1' or line[6] == 'mini':
-                html += '<td>mini</td>'
+                html += '<td style="font-size:small;">mini<br>%s</td>' % task
             elif line[6] == '0' or line[6] == 'classic':
-                html += '<td>classic</td>'
+                html += '<td style="font-size:small;">classic<br>%s</td>' % task
             # write size of ensemble
             html += '<td>%s</td>' % str(line[7])
             # write error
@@ -777,7 +792,7 @@ class RosettaHTML:
 
         return html
 
-    def _showNoMutation(self, input_filename, size_of_ensemble, cryptID):
+    def _showNoMutation(self, status, input_filename, size_of_ensemble, cryptID):
 
         html = """
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">No Mutation</td></tr>
@@ -789,7 +804,7 @@ class RosettaHTML:
 
 
     
-    def _showPointMutation(self, cryptID, input_filename, size_of_ensemble, chain, resid, newaa):
+    def _showPointMutation(self, status, cryptID, input_filename, size_of_ensemble, chain, resid, newaa):
         
         html = """
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Point Mutation</td></tr>
@@ -797,16 +812,17 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain: %s<br>Residue: %s<br>Mutation: %s</td></tr>
                 """ % ( input_filename, size_of_ensemble, chain, resid, newaa )
+                
+        if status == 'done':
+          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += self._show_scores_file(cryptID)
+          comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure. The point mutated residue is shown as sticks representation'
         
-        html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
-        html += self._show_scores_file(cryptID)
-        comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure. The point mutated residue is shown as sticks representation'
-        
-        html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=resid )
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=resid, mutation_chain=chain )
         
         return html
     
-    def _showMultiplePointMutations(self, cryptID, input_filename, size_of_ensemble, chain, resid, newres, radius):
+    def _showMultiplePointMutations(self, status, cryptID, input_filename, size_of_ensemble, chain, resid, newres, radius):
     
         list_chains = chain.split('-')
         list_resids = [ int(x.strip('\'')) for x in resid.split('-') ]
@@ -832,16 +848,16 @@ class RosettaHTML:
                                                 </table>
                           </td></tr>
                     """ % ( input_filename, size_of_ensemble, multiple_mutations_html )
+        if status == 'done':
+          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += self._show_scores_file(cryptID)
+          comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure. The point mutated residues are shown as sticks representation'
         
-        html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
-        html += self._show_scores_file(cryptID)
-        comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure. The point mutated residues are shown as sticks representation'
-        
-        html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=list_resids )
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=list_resids, mutation_chain=chain )
         
         return html
     
-    def _showComplexMutation(self, cryptID, input_filename, size_of_ensemble, mutation_file):
+    def _showComplexMutation(self, status, cryptID, input_filename, size_of_ensemble, mutation_file):
     
         html = """
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Complex Mutation</td></tr>
@@ -849,16 +865,18 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF"><pre>%s</pre></td></tr>
                 """ % ( input_filename, size_of_ensemble, mutation_file )
+                
+        if status == 'done':
+          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += self._show_scores_file(cryptID)
+          comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure.'
         
-        html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
-        html += self._show_scores_file(cryptID)
-        comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure.'
-        
-        html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))        
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))        
         
         return html
     
-    def _showEnsemble(self, cryptID, input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg):
+    
+    def _showEnsemble(self, status, cryptID, input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg):
         
         html = """
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Ensemble</td></tr>
@@ -867,53 +885,84 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Temperature: %s<br>Sequences per Structure: %s<br>Length of Segment: %s</td></tr>
                 """ % ( input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg )
         
-        html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+        if status == 'done':
+          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
 
-        html += """
-              <tr><td align="right" bgcolor="#FFFCD8">Average C&alpha; distances</td>                 
-                  <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_1D_plot.png">
-                                        <img src="../downloads/%s/ca_dist_difference_1D_plot.png" alt="Sorry, picture missing." width="400"></a></td></tr>
+          html += """
+                <tr><td align="right" bgcolor="#FFFCD8">Average C&alpha; distances</td>                 
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_1D_plot.png">
+                                          <img src="../downloads/%s/ca_dist_difference_1D_plot.png" alt="image missing." width="400"></a></td></tr>
               
-              <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; distances [ <a href="../downloads/%s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
-                  <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_2D_plot.png">
-                                        <img src="../downloads/%s/ca_dist_difference_2D_plot.png" alt="Sorry, picture missing." width="400"></a></td></tr>
+                <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; distances [ <a href="../downloads/%s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_2D_plot.png">
+                                          <img src="../downloads/%s/ca_dist_difference_2D_plot.png" alt="image missing." width="400"></a></td></tr>
               
-              <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for core residues<br><br>
-                                                      Sequences [ <a href="../downloads/%s/designs_core.fasta">fasta formated file</a> ]<br>
-                                                      Sequence population matrix [ <a href="../downloads/%s/seq_pop_core.txt">matrix file</a> ]</td> 
-                  <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo_core.png"><img src="../downloads/%s/logo_core.png" alt="Sorry, picture missing." width="400"></a><br>
-                                        <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
-                                        <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
-                                        <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]</td></tr>
+                <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for core residues<br><br>
+                                                        Sequences [ <a href="../downloads/%s/designs_core.fasta">fasta formated file</a> ]<br>
+                                                        Sequence population matrix [ <a href="../downloads/%s/seq_pop_core.txt">matrix file</a> ]</td> 
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo_core.png"><img src="../downloads/%s/logo_core.png" alt="image missing." width="400"></a><br>
+                                          <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
+                                          <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
+                                          <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]</td></tr>
               
-              <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for all residues<br><br>
-                                                      Sequences [ <a href="../downloads/%s/designs.fasta">fasta formated file</a> ]<br>
-                                                      Sequence population matrix [ <a href="../downloads/%s/seq_pop.txt">matrix file</a> ]</td>
-                  <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo.png"><img src="../downloads/%s/logo.png" alt="Sorry, picture missing." width="400"></a><br>
-                                        <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, <a href="Crooks-2004-GR-WebLogo.pdf">
-                                        <small>WebLogo: A sequence <br>logo generator</small></a>, <em>Genome Research</em>, 14:1188-1190, (2004)</small> 
-                                        [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
-                  </td></tr>
+                <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for all residues<br><br>
+                                                        Sequences [ <a href="../downloads/%s/designs.fasta">fasta formated file</a> ]<br>
+                                                        Sequence population matrix [ <a href="../downloads/%s/seq_pop.txt">matrix file</a> ]</td>
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo.png"><img src="../downloads/%s/logo.png" alt="image missing." width="400"></a><br>
+                                          <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, <a href="Crooks-2004-GR-WebLogo.pdf">
+                                          <small>WebLogo: A sequence <br>logo generator</small></a>, <em>Genome Research</em>, 14:1188-1190, (2004)</small> 
+                                          [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
+                    </td></tr>
               
-              <tr><td align="right" bgcolor="#FFFCD8">RMSD for individual residues</td>               
-                  <td bgcolor="#FFFCD8"><a href="../downloads/%s/rmsd_plot.png"><img src="../downloads/%s/rmsd_plot.png" alt="Sorry, picture missing." width="400"></a></td></tr>
+                <tr><td align="right" bgcolor="#FFFCD8">RMSD for individual residues</td>               
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/rmsd_plot.png"><img src="../downloads/%s/rmsd_plot.png" alt="image missing." width="400"></a></td></tr>
               
-              """ % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
+                """ % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
         
-        html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
         
-        comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure.<br>
-         [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]""" % cryptID
+          comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure.<br>
+           [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]""" % cryptID
         
-        html += self._showApplet4EnsembleFile( comment1, '../downloads/%s/ca_dist_difference_bfactors.pdb' % cryptID, style='cartoon' )
+          html += self._showApplet4EnsembleFile( comment1, '../downloads/%s/ca_dist_difference_bfactors.pdb' % cryptID, style='cartoon' )
 
-        comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
+          comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
           [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]""" % cryptID
         
-        html += self._showApplet4EnsembleFile( comment2, '../downloads/%s/ensemble.pdb' % cryptID, style='backbone' )
-
+          html += self._showApplet4EnsembleFile( comment2, '../downloads/%s/ensemble.pdb' % cryptID, style='backbone' )
 
         return html
+    
+    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list, seqtol_radius ):
+        
+        html = """
+              <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Ensemble</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
+              <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain 1: %s<br>Chain 2: %s<br>Residues of Chain 2: %s<br>Radius of interface: %s [&#197;]</td></tr>
+              """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list, seqtol_radius )
+              
+        if status == 'done':
+            html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+            
+            list_pdb_files = ['../downloads/%s/backrub/input_0.pdb' % (cryptID) ]
+            list_pdb_files.extend( [ '../downloads/%s/backrub/input_0_%04.i_low.pdb' % (cryptID, i) for i in range(1,size_of_ensemble+1) ] )
+            
+            comment1 = """Backbone representation of the <a href="../downloads/%s/backrub/">ensemble created by backrub</a>. Query structure is shown in red.<br>""" % cryptID
+            
+            html += self._showApplet4MultipleFiles(comment1, list_pdb_files, mutation=None)
+            
+            for i in range(1,size_of_ensemble+1):
+              li = '%04.i' % i
+              html += '''
+                    <tr><td align="right" bgcolor="#FFFCD8"></td>
+                        <td bgcolor="#FFFCD8"><a href="../downloads/%s/seqtol_%s/input_0_%s_low_profile.png">
+                                              <img src="../downloads/%s/seqtol_%s/input_0_%s_low_profile.png" alt="image missing." height="150"></a></td></tr>
+                    ''' % ( cryptID, i, li, cryptID, i, li )
+              
+        
+        return html      
+    
     
     def _showDownloadLinks(self, status, extended, cryptID, jobnumber):
     
@@ -989,39 +1038,46 @@ class RosettaHTML:
         html += self._defaultParameters( parameter['ID'], parameter['Notes'], status, parameter['Host'], parameter['Date'], parameter['StartDate'], 
                                     parameter['EndDate'], parameter['time_computation'], parameter['date_expiration'], parameter['time_expiration'], parameter['Mini'], parameter['Errors'], delete=False, restart=False )
         
-        if parameter['Errors'] == '' or parameter['Errors'] == 'None':
+        if parameter['Errors'] == '' or parameter['Errors'] == None:
             
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
             if parameter['task'] == '0' or parameter['task'] == 'no_mutation':
                 task = "Model Flexibility"
-                html += self._showNoMutation( parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['cryptID'] )            
+                html += self._showNoMutation( status, parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['cryptID'] )            
                 
             elif parameter['task'] == '1' or parameter['task'] == 'point_mutation':
                 task = "Point Mutation"
-                html += self._showPointMutation( parameter['cryptID'],  parameter['PDBComplexFile'], parameter['EnsembleSize'], 
+                html += self._showPointMutation( status, parameter['cryptID'],  parameter['PDBComplexFile'], parameter['EnsembleSize'], 
                                                  parameter['PM_chain'], parameter['PM_resid'], parameter['PM_newres'])
                 
             elif parameter['task'] == '3' or parameter['task'] == 'multiple_mutation':
                 task = "Multiple Point Mutations"
-                html += self._showMultiplePointMutations( parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['PM_chain'], 
+                html += self._showMultiplePointMutations( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['PM_chain'], 
                                                           parameter['PM_resid'], parameter['PM_newres'], parameter['PM_radius'])
                 
             elif parameter['task'] == '2' or parameter['task'] == 'upload_mutation':
                 task = "Custom Mutation"
-                html += self._showComplexMutation( parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mutations'])
+                html += self._showComplexMutation( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mutations'])
                 
             elif parameter['task'] == '4' or parameter['task'] == 'ensemble':
                 task = "Backrub ensemble"
-                html += self._showEnsemble( parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['ENS_temperature'], 
+                html += self._showEnsemble( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['ENS_temperature'], 
                                             parameter['ENS_num_designs_per_struct'], parameter['ENS_segment_length'] )
-
+                                            
+            elif parameter['task'] == 'sequence_tolerance':
+                task = "Sequence Tolerance"
+                seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
+                html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], 
+                                                     seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
+                                                     seqtol_parameter['seqtol_list'], seqtol_parameter['seqtol_radius'] )
+                
         html += '</table><br></td>\n'
         
         return html
 
 
-    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutation=None):
+    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutation=None, mutation_chain=None):
         """This shows the Jmol applet for an ensemble of structures with their point mutation(s)"""
         
         # jmol command to load files
@@ -1032,12 +1088,12 @@ class RosettaHTML:
             
             # jmol command to show mutation as balls'n'stick
             jmol_cmd_mutation = ''
-            if mutation != None: 
+            if mutation != None and mutation_chain != None: 
                 if type(mutation) == type(''):
-                    jmol_cmd_mutation = 'select %s; cartoon off; backbone on; wireframe 0.3; ' % mutation
+                    jmol_cmd_mutation = 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( mutation, mutation_chain )
                 elif type(mutation) == type([]):
-                    for x in mutation:
-                        jmol_cmd_mutation += 'select %s; cartoon off; backbone on; wireframe 0.3; ' % x
+                    for i in range(len(mutation)):
+                        jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % (mutation[i], mutation_chain[i])
             
             # html code
             html = """

@@ -59,6 +59,7 @@ from cStringIO import StringIO
 from cgi import escape
 
 import pickle
+
 ###############################################################################################
 # Setup: Change these values according to your settings and usage of the server               #
 ###############################################################################################
@@ -171,7 +172,7 @@ def ws():
     else:
       query_type = "index"
     
-    # the next few lines create HTTP header which includes the cooki and MUST NOT be removed
+    # the next few lines create HTTP header which includes the cookie and MUST NOT be removed
     s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
     s.write("Content-type: text/html\n")
     s.write("Location: %s?query=%s\n\n" % ( ROSETTAWEB_server_script, query_type ) ) # this line reloads the page, remember to CHANGE THIS URL
@@ -229,7 +230,7 @@ def ws():
       html_content = rosettaHTML.index()
     title = 'Logout'
 
-  elif query_type   == "submitted":
+  elif query_type == "submitted":
     if submit(form, SID): # data was submitted and written to the database
       html_content = rosettaHTML.submited(jobname='')
       title = 'New Job submitted'
@@ -628,7 +629,7 @@ def getUserData(form, SID):
 ###############################################################################################
 
 def submit(form, SID):
-  ''' This function processes the general parameters and calls the specific functions for the individual applications'''
+  ''' This function processes the general parameters and writes them to the database'''
   s = StringIO()
   
   # get information from the database
@@ -691,6 +692,8 @@ def submit(form, SID):
       mini = form["Mini"].value # this is either 'mini' or 'classic'
     elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
       mini = "classic"
+    elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
+      mini = 'mini'
     else:
       error += " No Rosetta binary selected. " # this is preselected in HTML code, so this case should never occur, we still make sure!
 
@@ -783,6 +786,7 @@ def submit(form, SID):
         seqtol_parameter["seqtol_chain2"] = str(form["seqtol_chain2"].value)
       else:
         seqtol_parameter["seqtol_chain2"] = ""
+        
       if form.has_key("seqtol_list") and form["seqtol_list"].value != '':
         seqtol_parameter["seqtol_list"] = str(form["seqtol_list"].value)
       else:
@@ -882,7 +886,7 @@ def queue(form, SID):
   
   output = StringIO()
   output.write('<TD align="center">')
-  sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors FROM backrub ORDER BY backrub.ID DESC"
+  sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub ORDER BY backrub.ID DESC"
   result1 = execQuery(connection, sql)
   # get user id of logged in user
   sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
