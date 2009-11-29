@@ -231,8 +231,9 @@ def ws():
     title = 'Logout'
 
   elif query_type == "submitted":
-    if submit(form, SID): # data was submitted and written to the database
-      html_content = rosettaHTML.submited(jobname='')
+    return_val = submit(form, SID)
+    if return_val[0]: # data was submitted and written to the database
+      html_content = rosettaHTML.submited(jobname='',cryptID=return_val[1])
       title = 'New Job submitted'
     else: # no data was submitted/there is an error
       html_content = "<br>Error<br><br>%s<br>" % form['error_msg']
@@ -643,7 +644,8 @@ def submit(form, SID):
   JobName  = ""
   Partner  = ""
   error    = ""  # is used to check if something went wrong
-
+  cryptID  = ''
+  
   # 2 modes: check and show form
   if form.has_key("mode") and form["mode"].value == "check":
   
@@ -804,7 +806,7 @@ def submit(form, SID):
       sys.stderr = s
       s.write( "Content-type: text/html\n")
       s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
-      return False
+      return (False, cryptID)
     else:
       # if we're good to go, create new job
       # get ip addr hostname
@@ -845,12 +847,12 @@ def submit(form, SID):
       execQuery(connection, sql)
       
   elif form.has_key("error_msg"):
-    return False # we haven't processed any data
+    return (False, cryptID) # we haven't processed any data
   else:
     form['error_msg'] = 'wrong mode for submit()'
-    return False
+    return (False, cryptID)
     
-  return True # true we processed the data
+  return (True, cryptID) # true we processed the data
 
 ########################################## end of submit() ####################################
 

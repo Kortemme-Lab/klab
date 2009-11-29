@@ -336,8 +336,8 @@ class RosettaHTML:
               <TR>
                 <TD align=right onmouseover="popUp('tt_RVersion');" onmouseout="popUp('tt_RVersion');">Rosetta Version </TD>
                 <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">
-                    <input type="radio" checked name="Mini" value="classic"> Rosetta 2.3 (classic)<br>
-                    <input type="radio" name="Mini" value="mini"> Rosetta 3.0 (mini)
+                    <input type="radio" name="Mini" value="classic" checked> Rosetta v.2 (classic)<br>
+                    <input type="radio" name="Mini" value="mini"> Rosetta v.3 (mini)
                 </TD>
               </TR>
               <TR>
@@ -492,13 +492,20 @@ class RosettaHTML:
 
         return html
 
+
     def submited(self, jobname='', cryptID=''):
         html = """<td align="center"><H1 class="title">New Job successfully submitted</H1> 
-                 <A href="%s?query=jobinfo&jobnumber=%s">Go to job info</a>. 
-                 <A href="%s?query=submit">Submit another job</A> or <A href="%s?query=queue">check the queue</A>.<br><br></td>\n"""  % ( self.script_filename, cryptID, self.script_filename, self.script_filename )
+                  <P>Once your request has been processed the results are accessible via the following URL. 
+                  If you <b>are not</b> registered please bookmark this link, if you are registered and logged in we will send you an email with this information once the job is finished. 
+                  You can also access your data via the <A href="%s?query=queue">job queue</A> at any time.<br>
+                  </P>
+                  <table width="550"><tr><td class="linkbox"><a class="blacklink" href="https://%s/backrub/downloads/%s">https://%s/backrub/downloads/%s</a></td></tr></table><br>
+                  Proceed to <a href="%s?query=jobinfo&jobnumber=%s">Job info</a>, 
+                  <a HREF="javascript:history.go(-1)">resubmit and/or change parameters of last job</a>, or 
+                  <a href="%s?query=submit">submit a new job</a>.<br><br>
+                  </td>\n"""  % ( self.script_filename, self.server_url, cryptID, self.server_url, cryptID, self.script_filename, cryptID, self.script_filename )
                      #% (UserName, JobName, pdbfile.filename) )
         return html
-
 
 
     def _helpButtons(self):
@@ -655,14 +662,14 @@ class RosettaHTML:
         html = """<td align=center><H1 class="title"> Job queue </H1> <br>
                   <table border=0 cellpadding=2 cellspacing=1 width=700 >
                    <colgroup>
-                     <col width="30">
-                     <col width="70">
-                     <col width="100">
-                     <col width="100">
-                     <col width="200">
-                     <col width="100">
                      <col width="25">
-                     <col width="75">
+                     <col width="60">
+                     <col width="90">
+                     <col width="90">
+                     <col width="200">
+                     <col width="140">
+                     <col width="25">
+                     <col width="70">
                    </colgroup>
                   <tr align=center bgcolor="#828282" style="color:white;"> 
                    <td > ID </td> 
@@ -670,7 +677,7 @@ class RosettaHTML:
                    <td > User Name </td>
                    <td > Date (PST) </td>
                    <td > Job Name </td>
-                   <td > Rosetta </td>
+                   <td > Rosetta Application </td>
                    <td > Structures </td>
                    <td > Error </td></tr>\n"""
                    
@@ -713,9 +720,9 @@ class RosettaHTML:
                 html += '<td>%s</td>' % (str(line[5])[0:23] + "...")
             # Rosetta version
             if line[6] == '1' or line[6] == 'mini':
-                html += '<td style="font-size:small;">mini<br>%s</td>' % task
+                html += '<td style="font-size:small;"><i>mini</i><br>%s</td>' % task
             elif line[6] == '0' or line[6] == 'classic':
-                html += '<td style="font-size:small;">classic<br>%s</td>' % task
+                html += '<td style="font-size:small;"><i>classic</i><br>%s</td>' % task
             # write size of ensemble
             html += '<td>%s</td>' % str(line[7])
             # write error
@@ -735,7 +742,7 @@ class RosettaHTML:
 
 
     def _defaultParameters(self, ID, jobname, status, hostname, date_submit, date_start, date_end, time_computation, date_expiration, time_expiration, rosetta, error, delete=False, restart=False ):
-        # print the first part of the result table
+        # print the first part of the result table  
         
         html = ''
         
@@ -781,13 +788,20 @@ class RosettaHTML:
         
     
     def _show_scores_file(self, cryptID):
-        score_file = '../downloads/%s/scores.dat' % cryptID
+        score_file     = '../downloads/%s/scores_overall.txt' % cryptID
+        score_file_res = '../downloads/%s/scores_residues.txt' % cryptID
         html = ''
         if os.path.exists( score_file ):
           handle = open(score_file,'r')
-          html = '''<tr><td align="right" bgcolor="#FFFCD8">Individual scores for structures in the ensemble</td>              
-                      <td bgcolor="#FFFCD8"><pre style="font-size:10pt">%s</pre></td></tr>
-              ''' % ( join(handle.readlines(), '') )
+          html = '''<tr><td align="left" bgcolor="#FFFCD8">Overall scores for the generated structures. Download files:<br>
+                                                            <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
+                                                                <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>''' % (cryptID, cryptID)
+          if os.path.exists( score_file_res ):
+            html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
+          html += '''                                      </ul>
+                        </td>
+                      <td bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre><a></td></tr>
+              ''' % ( score_file, join(handle.readlines(), '') )
           handle.close()
 
         return html
@@ -799,7 +813,13 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 """ % ( input_filename, size_of_ensemble )
-        html += self._show_scores_file(cryptID)
+        if status == 'done':
+          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += self._show_scores_file(cryptID)        
+        
+          comment = 'Ensemble of structures.<br>Red denotes the query structure.'
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))
+            
         return html
 
 
@@ -808,15 +828,15 @@ class RosettaHTML:
         
         html = """
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Point Mutation</td></tr>
-                <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
+                <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF"><a href="../downloads/%s/%s">%s</a></td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain: %s<br>Residue: %s<br>Mutation: %s</td></tr>
-                """ % ( input_filename, size_of_ensemble, chain, resid, newaa )
+                """ % ( cryptID, input_filename, input_filename, size_of_ensemble, chain, resid, newaa )
                 
         if status == 'done':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)
-          comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure. The point mutated residue is shown as sticks representation'
+          comment = 'Ensemble of structures.<br>Red denotes the query structure. The point mutated residue is shown as sticks representation'
         
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=resid, mutation_chain=chain )
         
@@ -851,7 +871,7 @@ class RosettaHTML:
         if status == 'done':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)
-          comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure. The point mutated residues are shown as sticks representation'
+          comment = 'Ensemble of structures.<br>Red denotes the query structure. The point mutated residues are shown as sticks representation'
         
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=list_resids, mutation_chain=chain )
         
@@ -869,7 +889,7 @@ class RosettaHTML:
         if status == 'done':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)
-          comment = 'Ensemble of structures with lowest energies.<br>Red denotes the query structure.'
+          comment = 'Ensemble of structures.<br>Red denotes the query structure.'
         
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))        
         
@@ -941,26 +961,32 @@ class RosettaHTML:
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain 1: %s<br>Chain 2: %s<br>Residues of Chain 2: %s<br>Radius of interface: %s [&#197;]</td></tr>
               """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list, seqtol_radius )
-              
+        
+        input_id = input_filename[:-4] # filename without suffix
         if status == 'done':
             html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
             
-            list_pdb_files = ['../downloads/%s/backrub/input_0.pdb' % (cryptID) ]
-            list_pdb_files.extend( [ '../downloads/%s/backrub/input_0_%04.i_low.pdb' % (cryptID, i) for i in range(1,size_of_ensemble+1) ] )
+            list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
+            list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation of the <a href="../downloads/%s/backrub/">ensemble created by backrub</a>. Query structure is shown in red.<br>""" % cryptID
+            comment1 = """Backbone representation of the ensemble created by backrub. Query structure is shown in red.<br>"""
             
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files, mutation=None)
+                        
+            html += '''<tr><td align="right" bgcolor="#FFFCD8">Motif of the mutated residues.<br>Download corresponding <a href="../downloads/%s/specificity_sequences.fasta">FASTA file</a>.</td>
+                           <td bgcolor="#FFFCD8"><a href="../downloads/%s/specificity_motif.png">
+                                                 <img src="../downloads/%s/specificity_motif.png" alt="image missing." width="400"></a></td></tr> 
+                       <tr><td align="right" bgcolor="#FFFCD8">Individual boxplots of the frequencey of amino acids at the mutated site.<br>
+                              Download <a href="../downloads/%s/specificity_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="../downloads/%s/specificity_boxplot.png">PNG</a>, <a href="../downloads/%s/specificity_boxplot.pdf">PDF</a>.</td>
+                           <td bgcolor="#FFFCD8">
+                    ''' % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
             
-            for i in range(1,size_of_ensemble+1):
-              li = '%04.i' % i
-              html += '''
-                    <tr><td align="right" bgcolor="#FFFCD8"></td>
-                        <td bgcolor="#FFFCD8"><a href="../downloads/%s/seqtol_%s/input_0_%s_low_profile.png">
-                                              <img src="../downloads/%s/seqtol_%s/input_0_%s_low_profile.png" alt="image missing." height="150"></a></td></tr>
-                    ''' % ( cryptID, i, li, cryptID, i, li )
+            for resid in seqtol_list.split(' '):
+              html += '''<a href="../downloads/%s/specificity_boxplot_%s%s.png"><img src="../downloads/%s/specificity_boxplot_%s%s.png" alt="image missing." width="400"></a><br>
+                    ''' % ( cryptID, seqtol_chain2, resid, cryptID, seqtol_chain2, resid )
               
-        
+            html +="</td></tr>"
         return html      
     
     
@@ -969,12 +995,13 @@ class RosettaHTML:
         html = ''
 
         if status == "done":
-            html += '<tr><td align=right bgcolor="#B7FFE0">Download results:</td><td bgcolor="#B7FFE0">'
+            html += '<tr><td align=right bgcolor="#B7FFE0"><b>Results</b>:</td><td bgcolor="#B7FFE0">'
             
             if os.path.exists( '%s%s/' % (self.download_dir, cryptID) ):
-                html += '<A href="../downloads/%s/">view all files</A>, <A href="../downloads/%s/data_%s.zip">download all files</A>' % ( cryptID, cryptID, jobnumber )
-                if extended:
-                    html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
+                html += '''<A href="../downloads/%s/"><b>View</b></A> individual files.<br>
+                         <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( cryptID, cryptID, jobnumber )
+                # if extended:
+                #     html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
             else:
                 html += 'no data'
         html += '</td>\n</tr><tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
@@ -1021,9 +1048,9 @@ class RosettaHTML:
             status = 'done'
         
         if parameter['Mini'] == 'mini' or parameter['Mini'] == '1':
-            parameter['Mini'] = 'Rosetta 3.0 (mini)'
+            parameter['Mini'] = 'Rosetta v.3 (mini)'
         elif parameter['Mini'] == 'classic' or parameter['Mini'] == '0':
-            parameter['Mini'] = 'Rosetta 2.3 (classic)'
+            parameter['Mini'] = 'Rosetta v.2 (classic)'
         else:
             parameter['Mini'] = '???'            
         
