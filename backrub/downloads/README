@@ -1,0 +1,2 @@
+to delete all directories except/.svn use:
+rm -rf $(find . -type d -print | grep -v .svn)
