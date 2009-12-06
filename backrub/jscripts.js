@@ -8,7 +8,7 @@ function startup(query) {
           Nifty("ul#about li","big fixed-height");
           Nifty("div#box","big transparent fixed-height");
       }
-      if (query == "index") {
+      if (query == "index" || query = 'login') {
           Nifty("div#login_box","big transparent fixed-height");
       }
       //updateCellSize2();
@@ -176,6 +176,12 @@ function changeApplication( app, _task ) {
 			new Effect.Fade( myParameter[i], { duration: 0.0 } );
 		}
 	}
+	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) { new Effect.Appear( "ref1" ); } 
+	  else { new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
+	  
+	if ( task == 'parameter2_2' ) { new Effect.Appear( "ref2" ); } else { new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
+	if ( task == 'parameter3_1' ) { new Effect.Appear( "ref3" ); } else { new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
+		
 	if ( task == 'parameter2_2' || task == 'parameter3_1') {
 	  setMini(1);
 	} else {
@@ -199,8 +205,8 @@ function showMenu( menu_id ) {
     /* This function extends or hides the menu on the left */
     
     myTasks = new Array("pic1","pic2","pic3",
-                        "text1","text2","text3",
-                        "ref1","ref2","ref3" );
+                        "text1","text2","text3"); // ,
+                        //"ref1","ref2","ref3" );
     myParameter = new Array("parameter_common", "parameter_submit",
                             "parameter1_1","parameter1_2","parameter1_3",
   	                        "parameter2_1","parameter2_2",
@@ -352,7 +358,7 @@ function set_demo_values() {
       document.submitform.nos.value = "10";
       document.submitform.seqtol_chain1.value = "A";
       document.submitform.seqtol_chain2.value = "B";
-      document.submitform.seqtol_radius.value = "10.0";
+      document.submitform.seqtol_radius.value = "4.0";
       document.submitform.seqtol_weight_chain1.value = "1";
       document.submitform.seqtol_weight_chain2.value = "1";      
       document.submitform.seqtol_weight_interface.value = "2";
