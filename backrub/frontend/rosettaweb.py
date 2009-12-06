@@ -115,6 +115,7 @@ def ws():
   query_type   = 'dftba'
   SID          = ''
   username     = ''
+  userid       = ''
   title        = ''
 
   comment = ''#'TEST MODE: Data might not be processed correctely.'
@@ -158,11 +159,8 @@ def ws():
     lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
     sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % ( SID, lv_strftime, "login", "0" )
     result = execQuery( connection, sql )
-    
-    if form.has_key("query"):
-     query_type = form["query"].value
-    else:
-     query_type = "index"
+    # redirect user to the index page
+    query_type = "index"
      
     # then create the HTTP header which includes the cookie. THESE LINES MUST NOT BE REMOVED!
     # s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
@@ -183,10 +181,11 @@ def ws():
     if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register","login","loggedin","logout","index","jobinfo","terms_of_service","submit","submitted","queue", "update","doc","delete"]:
       query_type = form["query"].value
     
-      sql = "SELECT u.UserName FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
+      sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
       result = execQuery(connection, sql)
-      if result[0][0] != ():
+      if result[0][0] != () and result[0][0] != ():
         username = result[0][0]
+        userid   = int(result[0][1])
 
     elif form.has_key("query") and form['query'].value in ["register","index","login","terms_of_service","oops","doc"]:
       query_type = form["query"].value
@@ -255,7 +254,7 @@ def ws():
     title = 'Submission Form'
 
   elif query_type   == "queue":
-    job_list = queue(form, SID)
+    job_list = queue(form, userid)
     html_content = rosettaHTML.printQueue(job_list)
     title = 'Job Queue'
 
@@ -959,15 +958,15 @@ def submit(form, SID):
 ###############################################################################################
 
 
-def queue(form, SID):
+def queue(form, userid):
   
   output = StringIO()
   output.write('<TD align="center">')
   sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub ORDER BY backrub.ID DESC"
   result1 = execQuery(connection, sql)
   # get user id of logged in user
-  sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
-  userID1 = execQuery(connection, sql)[0][0]
+  # sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
+  #   userID1 = execQuery(connection, sql)[0][0]
   
   results = []
   for line in result1:
@@ -975,7 +974,7 @@ def queue(form, SID):
     sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
     result2 = execQuery(connection, sql)
     new_lst.extend(line)
-    if int(line[3]) == int(userID1):
+    if int(line[3]) == int(userid):
         new_lst[3] = '<b><font color="green">' + result2[0][0] + '</font></b>'
     else:
         new_lst[3] = result2[0][0]
