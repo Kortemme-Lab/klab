@@ -1,11 +1,18 @@
 
 var numMPM = 0; // Multiple Point Mutations
+var numSeqTol = 0; // Mutation SeqTol
 
-function startup(){
-                Nifty("ul#about li","big fixed-height");
-                Nifty("div#box","big transparent fixed-height");
-                //updateCellSize2();
-                }
+
+function startup(query) {
+      if (query == "submit") {
+          Nifty("ul#about li","big fixed-height");
+          Nifty("div#box","big transparent fixed-height");
+      }
+      if (query == "index") {
+          Nifty("div#login_box","big transparent fixed-height");
+      }
+      //updateCellSize2();
+}
 
 
 function ValidateFormRegister() {
@@ -35,7 +42,7 @@ function ValidateFormRegister() {
 
 function ValidateForm() {
     if ( document.submitform.JobName.value == "" ||
-        document.submitform.PDBComplex.value == "" ||
+        ( document.submitform.PDBComplex.value == "" && document.submitform.PDBComplexURL.value == "" ) ||
         document.submitform.Mini.value == "" ||
         document.submitform.task.value == "" ||
         document.submitform.nos.value == "" ) {
@@ -55,6 +62,16 @@ function ValidateForm() {
                     alert("Please complete all required fields.");
                     return false;
     }
+    if ( document.submitform.task.value == "sequence_tolerance" &&
+          (  document.submitform.seqtol_chain1.value == "" ||
+             document.submitform.seqtol_chain2.value == "" ||
+             document.submitform.seqtol_weight_chain1.value == "" ||
+             document.submitform.seqtol_weight_chain2.value == "" ||
+             document.submitform.seqtol_weight_interface.value == "" ||
+             ( document.submitform.seqtol_seqtol_mut_c_0.value == "" && document.submitform.seqtol_seqtol_mut_r_0.value == "" ) ) ) {
+                    alert("Please complete all required fields.");
+                    return false;
+    }
     return true;
 }
 
@@ -70,6 +87,9 @@ function ValidateFormEmail() {
     return true;
 }
 
+function getTask() {
+  return document.submitform.task.value
+}
 
 function setTask(mode){
     document.submitform.task.value = mode;
@@ -108,7 +128,10 @@ function setMini( disable ) {
 
 function popUp( obj ) {
     my_obj = document.getElementById(obj).style;
+    offset=10
     if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
+        my_obj.top  = e.clientY + offset;
+        my_obj.left = e.clientX + offset*2;
         my_obj.visibility = "hidden";
     }
     else {
@@ -237,6 +260,13 @@ function addOneMore() {
     return true;
 }
 
+function addOneMoreSeqtol() {
+    numSeqTol = numSeqTol + 1;
+    new Effect.Appear("seqtol_row_" + "" + numSeqTol);
+    return true;
+}
+
+
 function writeRow( numbr ) {
     x = numbr + 1
     var s = '<td align="center">' + '' + x + '</td>';
@@ -245,6 +275,18 @@ function writeRow( numbr ) {
     s = s + '<td align="center"><input type="text" name="PM_newres' + '' + numbr + '" maxlength=1 SIZE=2 VALUE=""></td>';
     s = s + '<td align="center"><input type="text" name="PM_radius' + '' + numbr + '" maxlength=4 SIZE=7 VALUE=""></td>';
     document.write(s);
+    return true;
+}
+
+function writeRowDEMO( numbr, chain, resid, newres, radius ) {
+    x = numbr + 1
+    var s = '<td align="center">' + '' + x + '</td>';
+    s = s + '<td align="center"><input type="text" name="PM_chain'  + '' + numbr + '" maxlength=1 SIZE=5 VALUE="' + '' + chain + '"></td>';
+    s = s + '<td align="center"><input type="text" name="PM_resid'  + '' + numbr + '" maxlength=4 SIZE=5 VALUE="' + '' + resid + '"></td>';
+    s = s + '<td align="center"><input type="text" name="PM_newres' + '' + numbr + '" maxlength=1 SIZE=2 VALUE="' + '' + newres + '"></td>';
+    s = s + '<td align="center"><input type="text" name="PM_radius' + '' + numbr + '" maxlength=4 SIZE=7 VALUE="' + '' + radius + '"></td>';
+    document.write(s);
+    addOneMore();
     return true;
 }
 
@@ -258,4 +300,94 @@ function confirm_delete(jobID)
 //  else {
 //    window.location.href = "rosettaweb.py?query=queue" ; }
 }
+
+
+function set_demo_values() {
+  actual_task = getTask();
+
+ if ( actual_task == 'parameter1_1') {
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1CV1.pdb"
+      document.submitform.nos.value = "10";
+      document.submitform.PM_chain.value = "A";
+      document.submitform.PM_resid.value = "111";
+      document.submitform.PM_newres.value = "I";
+
+  } else if ( actual_task == 'parameter1_2') {
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb"
+      document.submitform.nos.value = "10";
+      document.submitform.PM_chain0.value = "A";
+      document.submitform.PM_resid0.value = "17";
+      document.submitform.PM_newres0.value = "A";
+      document.submitform.PM_radius0.value = "4.0";
+      addOneMore();
+      document.submitform.PM_chain1.value = "A";
+      document.submitform.PM_resid1.value = "32";
+      document.submitform.PM_newres1.value = "A";
+      document.submitform.PM_radius1.value = "4.0";
+      addOneMore();
+      document.submitform.PM_chain2.value = "A";
+      document.submitform.PM_resid2.value = "65";
+      document.submitform.PM_newres2.value = "A";
+      document.submitform.PM_radius2.value = "4.0";
+      addOneMore();
+      document.submitform.PM_chain3.value = "A";
+      document.submitform.PM_resid3.value = "72";
+      document.submitform.PM_newres3.value = "A";
+      document.submitform.PM_radius3.value = "4.0";
+      addOneMore();
+
+  } else if ( actual_task == "parameter2_1") {
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb"
+      document.submitform.nos.value = "10";  
+
+  } else if ( actual_task == 'parameter2_2') {
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb"
+      document.submitform.nos.value = "10";
+      document.submitform.ENS_temperature.value = "0.3";
+      document.submitform.ENS_num_designs_per_struct.value = "20";
+      document.submitform.ENS_segment_length.value = "12";
+
+  } else if ( actual_task == 'parameter3_1') {
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb"
+      document.submitform.nos.value = "10";
+      document.submitform.seqtol_chain1.value = "A";
+      document.submitform.seqtol_chain2.value = "B";
+      document.submitform.seqtol_radius.value = "10.0";
+      document.submitform.seqtol_weight_chain1.value = "1";
+      document.submitform.seqtol_weight_chain2.value = "1";      
+      document.submitform.seqtol_weight_interface.value = "2";
+      document.submitform.seqtol_mut_c_0.value = "B";
+      document.submitform.seqtol_mut_r_0.value = "3";
+      addOneMoreSeqtol();
+      document.submitform.seqtol_mut_c_1.value = "B";
+      document.submitform.seqtol_mut_r_1.value = "4";
+      addOneMoreSeqtol();
+      document.submitform.seqtol_mut_c_2.value = "B";
+      document.submitform.seqtol_mut_r_2.value = "5";
+      addOneMoreSeqtol();
+      document.submitform.seqtol_mut_c_3.value = "B";
+      document.submitform.seqtol_mut_r_3.value = "6";
+      addOneMoreSeqtol();
+  }
+  return true;
+}
+
+
+
+/* disabled 
+else if ( actual_task == 'upload_mutation') {
+    document.submitform.nos.value = "10"
+    
+    document.submitform..value = "";
+    document.submitform..value = "";
+    document.submitform..value = "";
+
+} */
+
+
+
+
+
+
+
 

@@ -48,6 +48,8 @@ import _mysql_exceptions
 import socket
 import md5
 
+import urllib2
+
 import session
 from rosettahtml import RosettaHTML
 import rosettadb
@@ -83,6 +85,7 @@ ROSETTAWEB_server_script = os.environ['SCRIPT_NAME']
 
 ROSETTAWEB_store_time         = parameter['store_time']
 ROSETTAWEB_max_point_mutation = 31
+ROSETTAWEB_max_seqtol_design  = 10
 ROSETTAWEB_cookie_expiration  = 60*60
 
 ROSETTAWEB_bin_sendmail = parameter['bin_sendmail']
@@ -114,7 +117,7 @@ def ws():
   username     = ''
   title        = ''
 
-  comment = 'TEST MODE: Data might not be processed correctely.'
+  comment = ''#'TEST MODE: Data might not be processed correctely.'
   warning = ''
   
   # get the POST data from the webserver
@@ -130,7 +133,7 @@ def ws():
   ####################################### 
   # cookie check 
   ####################################### 
-  
+
   # create session object
   my_session = session.Session(expires=ROSETTAWEB_cookie_expiration, cookie_path='/')
   # get time of last visit
@@ -139,17 +142,47 @@ def ws():
   SID = my_session.cookie['sid'].value
   # get present time as datetime object
   t = datetime.now()
-  # set cookie to the present time with time() function
-  my_session.data['lastvisit'] = repr(time.time())
+  
+  # s.write(str(my_session.cookie)+'\n')
+  # s.write("Content-type: text/html\n\n")
+  # s.write("%s\n" % (lastvisit))
+  # s.write("%s\n" % (SID))
+  # my_session.close()
+  # s.close() 
+  # return
 
-  if lastvisit:  # lastvisit != 0 means that this cookie set to a time, hence the session should be known
+  if lastvisit == None:  # lastvisit == None means that the user doesn't have a cookie
+  
+    # set the session object to the actual time and also write the time to the database
+    my_session.data['lastvisit'] = repr(time.time())
+    lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
+    sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % ( SID, lv_strftime, "login", "0" )
+    result = execQuery( connection, sql )
+    
+    if form.has_key("query"):
+     query_type = form["query"].value
+    else:
+     query_type = "index"
+     
+    # then create the HTTP header which includes the cookie. THESE LINES MUST NOT BE REMOVED!
+    # s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
+    # s.write("Content-type: text/html\n\n")
+    # s.write("Location: %s?query=%s\n\n" % ( ROSETTAWEB_server_script, query_type ) ) # this line reloads the page
+    # close session object
+    # my_session.close()
+    # s.close() 
+    # return
+
+  else: # we have a cookie already, let's look it up in the database and check whether the user is logged in
+    # set cookie to the present time with time() function
+    my_session.data['lastvisit'] = repr(time.time())
     # get infos about session
-    sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID
+    sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
     result = execQuery( connection, sql )
     # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
     if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register","login","loggedin","logout","index","jobinfo","terms_of_service","submit","submitted","queue", "update","doc","delete"]:
       query_type = form["query"].value
-      
+    
       sql = "SELECT u.UserName FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
       result = execQuery(connection, sql)
       if result[0][0] != ():
@@ -158,36 +191,15 @@ def ws():
     elif form.has_key("query") and form['query'].value in ["register","index","login","terms_of_service","oops","doc"]:
       query_type = form["query"].value
     else:
-      query_type = "index"
-
-  else: # new sessionID -> put it in DB and reload page with cookie
-    # put actual time in the database
-    lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
-    
-    sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % ( SID, lv_strftime, "login", "0" )
-    result = execQuery( connection, sql )
-    
-    if form.has_key("query"):
-      query_type = form["query"].value
-    else:
-      query_type = "index"
-    
-    # the next few lines create HTTP header which includes the cookie and MUST NOT be removed
-    s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
-    s.write("Content-type: text/html\n")
-    s.write("Location: %s?query=%s\n\n" % ( ROSETTAWEB_server_script, query_type ) ) # this line reloads the page, remember to CHANGE THIS URL
-    # close session object
-    my_session.close()
-    return
-  
-  
+      query_type = "index" # fallback, shouldn't occur
+   
   ###############################
   # HTML CODE GENERATION
   ###############################
 
   # send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
   s.write(str(my_session.cookie)+'\n')
-  s.write("Content-type: text/html\n\n\n")
+  s.write("Content-type: text/html\n\n")
   s.write(debug)
   my_session.close()
     
@@ -200,7 +212,7 @@ def ws():
   if not os.path.exists('/tmp/daemon-example.pid'):
     warning = 'Backend not running. Jobs will not be processed immediately.'
 
-  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'Structure Prediction Backrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_email='kortemme@cgl.ucsf.edu' , contact_name='Tanja Kortemme')
+  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_email='kortemme@cgl.ucsf.edu' , contact_name='Tanja Kortemme')
 
   # session is now active, execute function
   if query_type == "index":
@@ -236,7 +248,7 @@ def ws():
       html_content = rosettaHTML.submited(jobname='',cryptID=return_val[1])
       title = 'New Job submitted'
     else: # no data was submitted/there is an error
-      html_content = "<br>Error<br><br>%s<br>" % form['error_msg']
+      html_content = "<br>Error<br><br>%s<br>" % return_val[1]
 
   elif query_type  == "submit":
     html_content = rosettaHTML.submit(jobname='')
@@ -304,7 +316,7 @@ def ws():
   else:
     html = "this is impossible" # should never happen since we only allow states from list above 
 
-  s.write( rosettaHTML.main(html_content, title) )
+  s.write( rosettaHTML.main(html_content, title, query_type) )
 
   s.close() 
 
@@ -325,14 +337,19 @@ def login(form, my_session, t):
   lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
     
   ## we first check if the user can login
-  if form.has_key('login') and form['login'].value == "login" and form.has_key('myPassword'):
+  if form.has_key('login') and form['login'].value == "login":
+    # this is for the guest user
+    if not form.has_key('myPassword') and form["myUserName"].value == "guest":
+      password_entered = ''
+    else:
+      password_entered = form["myPassword"].value
     # check for userID and password
     sql = 'SELECT ID,Password  FROM Users WHERE UserName = "%s"' % form["myUserName"].value
     result = execQuery(connection, sql)
     try:
       UserID = result[0][0]
       PW     = result[0][1]
-      if form["myPassword"].value == PW: 
+      if password_entered == PW: 
         # all clear ... go!
         sql = "UPDATE Sessions SET UserID = \"%s\", Date = \"%s\", loggedin = \"%s\" WHERE SessionID = \"%s\" " % ( UserID, lv_strftime, "1", SID)
         result = execQuery(connection, sql)
@@ -645,6 +662,7 @@ def submit(form, SID):
   Partner  = ""
   error    = ""  # is used to check if something went wrong
   cryptID  = ''
+  pdbfile  = ''
   
   # 2 modes: check and show form
   if form.has_key("mode") and form["mode"].value == "check":
@@ -655,14 +673,42 @@ def submit(form, SID):
     if form.has_key("JobName"):
       JobName = escape(form["JobName"].value)
     
-    if form.has_key("PDBComplex"):
-      pdbfile = form["PDBComplex"]
-      if not pdbfile.file:
-         error += " PDB data is not a file. "
+    if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
+      pdbfile = form["PDBComplex"].value
+      if not form["PDBComplex"].file:
+        error += " PDB data is not a file. "
       pdb_filename = form["PDBComplex"].filename
       if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
         pdb_filename = pdb_filename + '.pdb'
-        
+    
+    elif form.has_key("PDBComplexURL") and form["PDBComplexURL"].value != '':
+      try:
+        url = form["PDBComplexURL"].value
+        req = urllib2.Request(url)
+        response = urllib2.urlopen(req)
+        pdbfile = response.read()
+        pdb_filename = url.split('/')[-1]          # last entry should be the filename
+        if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
+          pdb_filename = pdb_filename + '.pdb'
+      except:
+        error = "invalid URL"
+    else:
+      error = "Invalid structure file."
+
+    # clean up pdbfile, this only affects comments that are deleted by the pdb class anyways
+    pdbfile = pdbfile.replace('"',' ')
+    
+    # check if structer is NMR or X-RAY. Problem: if headerinfo and EXPDTA line are missing there is no way of telling.
+    # Consider only the first model. Copy everything until the first ENDMDL entry.
+    new_pdbfile = ''
+    for line in pdbfile.split('\n'):
+      new_pdbfile += line + '\n'
+      if line.rstrip() == 'ENDMDL':
+        new_pdbfile += 'END\n'
+        break
+    pdbfile = new_pdbfile
+
+
         
     if form.has_key("Mutations"):
       mutationsfile = form["Mutations"]
@@ -789,24 +835,49 @@ def submit(form, SID):
       else:
         seqtol_parameter["seqtol_chain2"] = ""
         
-      if form.has_key("seqtol_list") and form["seqtol_list"].value != '':
-        seqtol_parameter["seqtol_list"] = str(form["seqtol_list"].value)
-      else:
-        seqtol_parameter["seqtol_list"] = ""
       if form.has_key("seqtol_radius") and form["seqtol_radius"].value != '':
         seqtol_parameter["seqtol_radius"] = str(form["seqtol_radius"].value)
       else:
         seqtol_parameter["seqtol_radius"] = ""
       
+      if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
+        seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
+      else:
+        seqtol_parameter["seqtol_weight_chain1"] = ""
+        
+      if form.has_key("seqtol_weight_chain2") and form["seqtol_weight_chain2"].value != '':
+        seqtol_parameter["seqtol_weight_chain2"] = form["seqtol_weight_chain2"].value
+      else:
+        seqtol_parameter["seqtol_weight_chain2"] = ""
+        
+      if form.has_key("seqtol_weight_interface") and form["seqtol_weight_interface"].value != '':
+        seqtol_parameter["seqtol_weight_interface"] = form["seqtol_weight_interface"].value
+      else:
+        seqtol_parameter["seqtol_weight_interface"] = ""
+      
+      seqtol_parameter["seqtol_list_1"] = []
+      seqtol_parameter["seqtol_list_2"] = []
+      
+      for x in range(ROSETTAWEB_max_seqtol_design):
+        key1 = "seqtol_mut_c_" + str(x)
+        key2 = "seqtol_mut_r_" + str(x)
+        if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
+          if form[key1].value == seqtol_parameter["seqtol_chain1"]:
+            seqtol_parameter["seqtol_list_1"].append(str(form[key2].value))
+          elif form[key1].value == seqtol_parameter["seqtol_chain2"]:
+            seqtol_parameter["seqtol_list_2"].append(str(form[key2].value))
+        else:
+          break
+                
     seqtol_string = pickle.dumps(seqtol_parameter)
       
 
     if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
-      s = sys.stdout
-      sys.stderr = s
-      s.write( "Content-type: text/html\n")
-      s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
-      return (False, cryptID)
+      # s = sys.stdout
+      #  sys.stderr = s
+      #  s.write( "Content-type: text/html\n")
+      #  s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
+      return (False, error)
     else:
       # if we're good to go, create new job
       # get ip addr hostname
@@ -819,7 +890,8 @@ def submit(form, SID):
       execQuery(connection, sql)
       # write information to database
       sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter) 
-                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile.value.replace('"',' '), pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_string )
+                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_string )
+                      
       try: 
         import random
         execQuery(connection, sql)
@@ -842,15 +914,18 @@ def submit(form, SID):
         else:
           html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please <A href="mailto:%s?subject=[%s] - Upload Error" style="font-size: 10pt">contact us</A>.</P>""" % ( ROSETTAWEB_contact_email, ROSETTAWEB_server_title )
       
+      # # check if the entry we just made is already in the database!! this way we can avoid the computation
+      # sql1 = '''SELECT br1.Mutations,br1.PDBComplexFile,br1.Mini,br1.EnsembleSize,br1.PM_chain,br1.PM_resid,br1.PM_newres,br1.PM_radius,br1.task,br1.ENS_temperature,br1.ENS_num_designs_per_struct,br1.ENS_segment_length,br1.seqtol_parameter FROM backrub 
+      #            WHERE '''
+      
+      
       # unlock tables
       sql = "UNLOCK TABLES"
       execQuery(connection, sql)
-      
-  elif form.has_key("error_msg"):
-    return (False, cryptID) # we haven't processed any data
+
   else:
     form['error_msg'] = 'wrong mode for submit()'
-    return (False, cryptID)
+    return (False, error)
     
   return (True, cryptID) # true we processed the data
 

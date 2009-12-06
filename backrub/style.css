@@ -9,15 +9,15 @@ H2 { font-family: Arial, Helvetica; font-weight: bold; font-size: 11pt;}
 H1.pdb { font-family: Arial, Helvetica; font-weight: bold; font-size: 12pt;}
 H1.title { font-family: Arial, Helvetica; font-weight: bold; font-size: 12pt; margin-left:60px; margin-right:50px;}
 
-A:link { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
-A:visited { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
-A:active { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
-A:hover { color:#4b7ca7; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A:link { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 10pt; text-decoration: none; }
+A:visited { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 10pt; text-decoration: none; }
+A:active { color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 10pt; text-decoration: none; }
+A:hover { color:#4b7ca7; font-family: Arial, Helvetica, Sans-Serif; font-size: 10pt; text-decoration: none; }
 
-A.nav:link { text-decoration: none; color:#0000aa; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
-A.nav:visited { text-decoration: none; color:#0000aa; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
-A.nav:active { text-decoration: none; color:#000077; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
-A.nav:hover { text-decoration: none; color:#000077; font-weight: bold; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; text-decoration: none; }
+A.nav:link { text-decoration: none; color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A.nav:visited { text-decoration: none; color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A.nav:active { text-decoration: none; color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
+A.nav:hover { text-decoration: none; color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
 
 P { text-align: justify; }
 
@@ -37,18 +37,21 @@ a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size:
           border-color:black; 
           border-style:solid; 
           border-width:1px;
-          background-color:#E9E9E9; }
+          background-color:#F0454B; }
+
+.tth {  font:12px/14px Arial,Helvetica,sans-serif; 
+            border:solid 1px #666666; 
+            width:180px; 
+            padding:3px;
+            color:#FFFFFF; 
+            background-color:#6A6A6A;
+            text-align:justify; } /*header*/
 
 .tooltip {  font:12px/14px Arial,Helvetica,sans-serif; 
             border:solid 1px #666666; 
             width:180px; 
-            padding:1px;
-            position:fixed; 
-            z-index:100; 
-            visibility:hidden; 
+            padding:3px; 
             color:#000000; 
-            top:200px; 
-            left:90px; 
             background-color:#ffffcc; 
             /*layer-background-color:#FFFFE0;*/
             text-align:justify; }
@@ -60,6 +63,7 @@ a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size:
 .inactiveRT { border-left:1px solid black; }
 
 div#box{float:right; width: 440px; padding: 20px; margin:0px auto; color:#000; }
+div#login_box{float:center; width: 600px; padding: 20px; margin:0px auto; color:#000; background-color:#DCE9F4; }
 
 ul#about,ul#about li{float:left;list-style-type:none;margin:0;padding:0; }
 ul#about{width: 190px;margin:0px auto 0;text-align:left; }

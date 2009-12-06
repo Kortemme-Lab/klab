@@ -37,7 +37,7 @@ class RosettaHTML:
     def setUsername(self, username):
         self.username = username
 
-    def main(self, CONTENT='This server is made of awesome.', site='' ):
+    def main(self, CONTENT='This server is made of awesome.', site='', query='' ):
         html = """
             <!-- *********************************************************
                  * Rosetta Web Server - Python - BACKRUB                 *
@@ -55,11 +55,12 @@ class RosettaHTML:
                 <script src="/javascripts/prototype.js" type="text/javascript"></script>
                 <script src="/javascripts/scriptaculous.js" type="text/javascript"></script>
                 <script src="/javascripts/niftycube.js" type="text/javascript"></script>
+                <script src="/javascripts/boxover.js" type="text/javascript"></script>
                 <script src="/jmol/Jmol.js" type="text/javascript"></script>
                 <script src="/backrub/jscripts.js" type="text/javascript"></script>
             </head>
 
-            <body bgcolor="#ffffff" onload=startup()>
+            <body bgcolor="#ffffff" onload="startup( \'%s\' );">
             <center>
             <table border=0 width="700" cellpadding=0 cellspacing=0>
 
@@ -81,6 +82,7 @@ class RosettaHTML:
            </center>
            </body>
            </html>\n""" % ( self.server_title, site,
+                            query,
                             self._showHeader(),
                             self._showWarning(),
                             self._showLoginStatus(),
@@ -123,7 +125,7 @@ class RosettaHTML:
 
         if self.comment != '':
             html += '''<td align="center" style="padding:10px;">
-                                <table width="500"><tr><td style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; padding-left:10px; border-color:orange; border-style:dashed; border-width:2px;">
+                                <table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; padding-left:10px; border-color:orange; border-style:dashed; border-width:2px;">
                                     <font color="red">%s</font></td></tr>
                                 </table>
                       </td>''' % self.comment
@@ -132,20 +134,24 @@ class RosettaHTML:
     def _showMenu(self):
         html = """
                 <tr><td align=center>
-                    [&nbsp;<A href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A href="%s?query=doc">Documentation</A>&nbsp;]
+                    [&nbsp;<A class="nav" href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A class="nav" href="../wiki/">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;]
                 </td></tr>
                 <tr><td align=center>""" % (self.script_filename,self.script_filename)
         
         if self.username != '':
             html += """
-                    [&nbsp;<A href="%s?query=submit">Submit</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A href="%s?query=queue">Queue</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A href="%s?query=update">My Account</A>&nbsp;] &nbsp;&nbsp;&nbsp;""" % (self.script_filename,self.script_filename,self.script_filename)
-        else:
-            html += """
-                    [&nbsp;<A href="%s?query=login">Login</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A href="%s?query=register">Register</A>&nbsp;]""" % (self.script_filename,self.script_filename)
+                    [&nbsp;<A class="nav" href="%s?query=submit">Submit</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A class="nav" href="%s?query=queue">Queue</A>&nbsp;] &nbsp;&nbsp;&nbsp;""" % (self.script_filename,self.script_filename)
+            if self.username != "guest":
+                html += """[&nbsp;<A class="nav" href="%s?query=update">My Account</A>&nbsp;]""" % (self.script_filename)
+
+        
+        # else:
+        #     html += """
+        #               [&nbsp;<A class="nav" href="%s?query=login">Login</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+        #               [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;]""" % (self.script_filename,self.script_filename)
         html += "\n</td></tr>"
 
         return html
@@ -159,19 +165,31 @@ class RosettaHTML:
         return html
 
     def _showFooter(self):
+        SSL = ''
+        if self.server_url == 'kortemmelab.ucsf.edu':
+          SSL = '''
+          <script language="javascript" src="https://seal.entrust.net/seal.js?domain=kortemmelab.ucsf.edu&img=16"></script>
+          <a href="http://www.entrust.net">SSL</a>
+          <script language="javascript" type="text/javascript">goEntrust();</script>
+          '''
+      
+      
         html = """<td align=center style="border-top:1px solid gray; ">
                  <table width="720" style="border-width:0pt">
                     <tr>
                     <td align="center"><img src="../images/ucsf_only_tiny.png" width="65%%" height="65%%" alt="UCSF" border=0></td>
-                    <td align="left">
-                    "Structure prediction using backrub" is available for NON-COMMERCIAL USE ONLY at this time<br>
+                    <td align="left" width="520">
+                    "RosettaBackrub" is available for NON-COMMERCIAL USE ONLY at this time.<br>
                     <font color=#666688><b>[</b></font>
                     <A href="%s?query=terms_of_service" class="nav">Terms of Service</A>
                     <font color=#666688><b>]</b></font><br>
                     <font style="font-size: 9pt">Copyright &copy; 2009 University of California San Francisco, <A href="mailto:kortemme@cgl.ucsf.edu" style="font-size: 9pt">Tanja Kortemme</a>, <A href="mailto:lauck@cgl.ucsf.edu" style="font-size: 9pt">Florian Lauck</A></font>
                     </td>
+                    <td align="center">
+                    %s
+                    </td>
                     </tr>
-                 </table></td>""" % ( self.script_filename )
+                 </table></td>""" % ( self.script_filename , SSL)
         return html
 
 
@@ -185,24 +203,8 @@ class RosettaHTML:
 # index()                                                                                     #
 ###############################################################################################
 
-    def index(self):
-        html = """<td align="center">
-               <H1 class="title">Welcome to the Kortemme Lab Server</A> </H1> 
-               <P>
-               This is the structure prediction web server of the Kortemme Lab. This server utilizes the backrub method implemented in 
-               <a href="%s?query=doc#Rosetta">Rosetta</a>
-               for protein design and applies it to a structure uploaded by the user. For an explanation of how the server works see the
-               <a href="%s?query=doc#instructions">instructions</a>. 
-               </P>
-               
-               <P>
-               You can choose a link from the menu above to proceed. Please <A href="%s?query=login">log in</A> or 
-               <A href="%s?query=register">create an account</A> first. 
-               </P>
-               <br>         
-               <br>
-              """ % ( self.script_filename, self.script_filename, self.script_filename, self.script_filename ) 
-        return html
+    def index(self, message='', username='', login_disabled=False):
+        return self.login(message=message, username=username, login_disabled=login_disabled)
 
 ###############################################################################################
 # submit()                                                                                    #
@@ -231,32 +233,33 @@ class RosettaHTML:
           <td id="columnLeft" align="right" style="vertical-align:top; margin:0px;">
           <ul id="about">
             <li id="ab1">
-              [ <A href="/alascan/" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
+              [ <A href="/alascan/" class="nav" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
             </li>
             <li id="ab2">
-              <A href="javascript:void(0)" onclick="showMenu('1'); ">Point Mutation</A>            
-              <p id="menu_1" style="display:none; opacity:0.0; text-align:right; margin:0px;">
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); ">Point Mutation</A>            
+              <p id="menu_1" style="display:none; opacity:0.0; text-align:left; margin:0px;">
+                <font style="font-size:8pt">[ Smith and Kortemme, 2008 ]</font>
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('1','1'); ">One mutation</a></td></tr>
-                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('1','2'); ">Multiple mutations</a></td></tr>
-                  <tr><td width="25" style="text-align:right;">-</td><td><!-- a href="javascript:void(0)" onclick="changeApplication('1','3'); " -->Upload List</td></tr>
+                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','1'); ">One mutation</a></td></tr>
+                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','2'); ">Multiple mutations</a></td></tr>
+                  <!-- tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','3'); ">Upload List</td></tr -->
                   </table>
               </p>
             </li>
             <li id="ab3">
-              <A href="javascript:void(0)" onclick="showMenu('2'); ">Backrub Ensemble Design</A>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('2'); ">Backrub Ensembles</A>
               <p id="menu_2" style="display:none; opacity:0.0; text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); ">Model Flexibility</a></td></tr>
-                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('2','2'); ">Backrub ensemble</a></td></tr>
+                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); "><font style="font-size:10pt">Generate Backrub Ensemble</font></a><br><font style="font-size:8pt">[ Smith and Kortemme, 2008 ]</font></td></tr>
+                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('2','2'); "><font style="font-size:10pt">Backrub Ensemble Design</font></a><br><font style="font-size:8pt">[ Friedland et. al., 2008 ]</font></td></tr>
                   </table>
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" onclick="showMenu('3'); ">Flexible Backbone Library Design</A>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');">Sequence Plasticity Prediciton</A>
               <p id="menu_3" style="display:none; opacity:0.0; text-align:right;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="25" style="text-align:right;">-</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1'); ">Interface Library Design</a></td></tr>
+                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1');">Enter Data</a></td></tr>
                   </table>
               </p>
             </li>
@@ -290,7 +293,7 @@ class RosettaHTML:
             <div id="text1" style="display:none; opacity:0.0; text-align:justify;"> 
                 This function utilizes the backrub protocol implemented in ROSETTA.<br>
                 There are three options:
-                <ul style=" text-align:left;">
+                <ul style="text-align:left;">
                     <li>One Mutation: A single residue will be substituted. (see reference below)</li>
                     <li>Multiple Mutations: Up to 30 residues can be mutated. (not published)</li>
                     <!-- li>Upload List: Upload a list with single residue mutations.</li -->
@@ -322,12 +325,16 @@ class RosettaHTML:
               <TR></td></TR>
               <TR>
                 <TD align=right onmouseover="popUp('tt_JobName');" onmouseout="popUp('tt_JobName');">Job Name </TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%s"> *</TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%s"></TD>
               </TR>
-              <TR><TD align=left><br></TD></TR>
               <TR>
                 <TD align=right onmouseover="popUp('tt_Structure');" onmouseout="popUp('tt_Structure');"> Structure </TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20"> *</TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20"></TD>
+              </TR>
+              <TR>
+                <TD align=right onmouseover="popUp('tt_Structure');" onmouseout="popUp('tt_Structure');"> URL to structure file </TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBComplexURL" size="31">
+              </TD>
               </TR>
               <TR><TD colspan=2><br></TD></TR>
               <TR>
@@ -344,10 +351,10 @@ class RosettaHTML:
                 <TD align=right onmouseover="popUp('tt_NStruct');" onmouseout="popUp('tt_NStruct');">Number of structures </TD>
                 <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE=""> (max 100) </TD>
               </TR>
-              <TR>
+              <!-- TR>
                 <TD align=right onmouseover="popUp('tt_ROutput');" onmouseout="popUp('tt_ROutput');">ROSETTA output </TD>
                 <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1" disabled checked> keep files</TD>
-              </TR>
+              </TR -->
               <TR><TD align=left><br></TD></TR>
               <TR>
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">Application Specific Settings</TD>
@@ -385,25 +392,41 @@ class RosettaHTML:
                     <td align="center" onmouseover="popUp('tt_NewAA');"   onmouseout="popUp('tt_NewAA');">AA</td>
                     <td align="center" onmouseover="popUp('tt_Radius');"  onmouseout="popUp('tt_Radius');">Radius [&#197;]</td>
                 </tr>
-                <tr><SCRIPT>writeRow(0)</SCRIPT></tr>
                 <!-- up to 31 point mutations are possible -->
-                <tr id="row_PM1"  style="display:none"><SCRIPT>writeRow(1)</SCRIPT></tr>   <tr id="row_PM2"  style="display:none"><SCRIPT>writeRow(2)</SCRIPT></tr>
-                <tr id="row_PM3"  style="display:none"><SCRIPT>writeRow(3)</SCRIPT></tr>   <tr id="row_PM4"  style="display:none"><SCRIPT>writeRow(4)</SCRIPT></tr>
-                <tr id="row_PM5"  style="display:none"><SCRIPT>writeRow(5)</SCRIPT></tr>   <tr id="row_PM6"  style="display:none"><SCRIPT>writeRow(6)</SCRIPT></tr>
-                <tr id="row_PM7"  style="display:none"><SCRIPT>writeRow(7)</SCRIPT></tr>   <tr id="row_PM8"  style="display:none"><SCRIPT>writeRow(8)</SCRIPT></tr>
-                <tr id="row_PM9"  style="display:none"><SCRIPT>writeRow(9)</SCRIPT></tr>   <tr id="row_PM10" style="display:none"><SCRIPT>writeRow(10)</SCRIPT></tr>
-                <tr id="row_PM11" style="display:none"><SCRIPT>writeRow(11)</SCRIPT></tr>  <tr id="row_PM12" style="display:none"><SCRIPT>writeRow(12)</SCRIPT></tr>
-                <tr id="row_PM13" style="display:none"><SCRIPT>writeRow(13)</SCRIPT></tr>  <tr id="row_PM14" style="display:none"><SCRIPT>writeRow(14)</SCRIPT></tr>
-                <tr id="row_PM15" style="display:none"><SCRIPT>writeRow(15)</SCRIPT></tr>  <tr id="row_PM16" style="display:none"><SCRIPT>writeRow(16)</SCRIPT></tr>
-                <tr id="row_PM17" style="display:none"><SCRIPT>writeRow(17)</SCRIPT></tr>  <tr id="row_PM18" style="display:none"><SCRIPT>writeRow(18)</SCRIPT></tr>
-                <tr id="row_PM19" style="display:none"><SCRIPT>writeRow(19)</SCRIPT></tr>  <tr id="row_PM20" style="display:none"><SCRIPT>writeRow(20)</SCRIPT></tr>
-                <tr id="row_PM21" style="display:none"><SCRIPT>writeRow(21)</SCRIPT></tr>  <tr id="row_PM22" style="display:none"><SCRIPT>writeRow(22)</SCRIPT></tr>
-                <tr id="row_PM23" style="display:none"><SCRIPT>writeRow(23)</SCRIPT></tr>  <tr id="row_PM24" style="display:none"><SCRIPT>writeRow(24)</SCRIPT></tr>
-                <tr id="row_PM25" style="display:none"><SCRIPT>writeRow(25)</SCRIPT></tr>  <tr id="row_PM26" style="display:none"><SCRIPT>writeRow(26)</SCRIPT></tr>
-                <tr id="row_PM27" style="display:none"><SCRIPT>writeRow(27)</SCRIPT></tr>  <tr id="row_PM28" style="display:none"><SCRIPT>writeRow(28)</SCRIPT></tr>
-                <tr id="row_PM29" style="display:none"><SCRIPT>writeRow(29)</SCRIPT></tr>  <tr id="row_PM30" style="display:none"><SCRIPT>writeRow(30)</SCRIPT></tr>
+                <tr id="row_PM0" style=""><td align="center">1</td><td align="center"><input name="PM_chain0" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid0" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres0" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius0" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM1" style="display:none"><td align="center">2</td><td align="center"><input name="PM_chain1" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid1" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres1" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius1" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM2" style="display:none"><td align="center">3</td><td align="center"><input name="PM_chain2" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid2" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres2" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius2" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM3" style="display:none"><td align="center">4</td><td align="center"><input name="PM_chain3" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid3" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres3" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius3" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM4" style="display:none"><td align="center">5</td><td align="center"><input name="PM_chain4" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid4" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres4" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius4" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM5" style="display:none"><td align="center">6</td><td align="center"><input name="PM_chain5" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid5" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres5" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius5" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM6" style="display:none"><td align="center">7</td><td align="center"><input name="PM_chain6" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid6" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres6" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius6" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM7" style="display:none"><td align="center">8</td><td align="center"><input name="PM_chain7" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid7" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres7" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius7" maxlength="4" size="7" type="text"></td></tr>  
+                <tr id="row_PM8" style="display:none"><td align="center">9</td><td align="center"><input name="PM_chain8" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid8" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres8" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius8" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM9" style="display:none"><td align="center">10</td><td align="center"><input name="PM_chain9" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid9" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres9" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius9" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM10" style="display:none"><td align="center">11</td><td align="center"><input name="PM_chain10" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid10" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres10" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius10" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM11" style="display:none"><td align="center">12</td><td align="center"><input name="PM_chain11" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid11" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres11" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius11" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM12" style="display:none"><td align="center">13</td><td align="center"><input name="PM_chain12" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid12" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres12" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius12" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM13" style="display:none"><td align="center">14</td><td align="center"><input name="PM_chain13" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid13" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres13" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius13" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM14" style="display:none"><td align="center">15</td><td align="center"><input name="PM_chain14" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid14" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres14" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius14" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM15" style="display:none"><td align="center">16</td><td align="center"><input name="PM_chain15" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid15" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres15" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius15" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM16" style="display:none"><td align="center">17</td><td align="center"><input name="PM_chain16" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid16" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres16" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius16" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM17" style="display:none"><td align="center">18</td><td align="center"><input name="PM_chain17" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid17" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres17" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius17" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM18" style="display:none"><td align="center">19</td><td align="center"><input name="PM_chain18" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid18" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres18" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius18" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM19" style="display:none"><td align="center">20</td><td align="center"><input name="PM_chain19" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid19" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres19" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius19" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM20" style="display:none"><td align="center">21</td><td align="center"><input name="PM_chain20" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid20" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres20" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius20" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM21" style="display:none"><td align="center">22</td><td align="center"><input name="PM_chain21" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid21" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres21" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius21" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM22" style="display:none"><td align="center">23</td><td align="center"><input name="PM_chain22" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid22" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres22" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius22" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM23" style="display:none"><td align="center">24</td><td align="center"><input name="PM_chain23" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid23" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres23" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius23" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM24" style="display:none"><td align="center">25</td><td align="center"><input name="PM_chain24" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid24" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres24" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius24" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM25" style="display:none"><td align="center">26</td><td align="center"><input name="PM_chain25" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid25" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres25" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius25" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM26" style="display:none"><td align="center">27</td><td align="center"><input name="PM_chain26" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid26" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres26" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius26" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM27" style="display:none"><td align="center">28</td><td align="center"><input name="PM_chain27" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid27" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres27" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius27" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM28" style="display:none"><td align="center">29</td><td align="center"><input name="PM_chain28" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid28" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres28" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius28" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM29" style="display:none"><td align="center">30</td><td align="center"><input name="PM_chain29" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid29" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres29" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius29" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM30" style="display:none"><td align="center">31</td><td align="center"><input name="PM_chain30" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid30" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres30" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius30" maxlength="4" size="7" type="text"></td></tr>
+                <tr><td align="center" colspan="4"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a mutation</a></td></tr>
                 </table>
-                <a href="javascript:void(0)" onclick="addOneMore();">Click here to add a mutation</a>
+                
             </p>
             
             <!-- Backrub - Costum Mutation -->
@@ -436,24 +459,64 @@ class RosettaHTML:
             <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
               <tr>
-                  <td align="right" onmouseover="popUp('tt_seqtol_chains');" onmouseout="popUp('tt_seqtol_chains');">Chain 1</td><td><input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
+                  <td align="right" onmouseover="popUp('tt_seqtol_chains');" onmouseout="popUp('tt_seqtol_chains');">Partner 1:</td>
+                  <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
               </tr>
               <tr>
-                  <td align="right" onmouseover="popUp('tt_seqtol_chains');" onmouseout="popUp('tt_seqtol_chains');">Chain 2</td><td><input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
+                  <td align="right" onmouseover="popUp('tt_seqtol_chains');" onmouseout="popUp('tt_seqtol_chains');">Partner 2:</td>
+                  <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
                   </td>
               </tr>
-              <tr>
-                  <td align="right" onmouseover="popUp('tt_seqtol_list');" onmouseout="popUp('tt_seqtol_list');">Residues of Chain 2</td>
+              <!-- tr>
+                  <td align="right" onmouseover="popUp('tt_seqtol_list');" onmouseout="popUp('tt_seqtol_list');">Residues of Partner 2</td>
                   <td><input type="text" name="seqtol_list" maxlength=120 SIZE=10 VALUE="">
                   </td>
+              </tr -->
               <tr>
-                  <td align="right" onmouseover="popUp('tt_seqtol_radius');" onmouseout="popUp('tt_seqtol_radius');">Radius [&#197;]</td><td><input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="10.0"></td>
+                  <td align="right" onmouseover="popUp('tt_seqtol_radius');" onmouseout="popUp('tt_seqtol_radius');">Size of the Interface:</td>
+                  <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="10.0"> &#197;</td>
               </tr>
+              <tr>
+                  <td align="right" onmouseover="popUp('tt_seqtol_weights');" onmouseout="popUp('tt_seqtol_weights');">Weight for Partner</td>
+                  <td>
+                    <table >
+                      <tr >
+                        <td align="center">1:</td><td align="center"><input type="text" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1"></td>
+                        <td align="center">2:</td><td align="center"><input type="text" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1"></td>
+                        <td align="center">interface:</td><td align="center"><input type="text" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2"></td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                <tr>
+                  <td align="right" title="header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]">
+                    Residues for design</td>
+                  <td>
+                    <table bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td>#</td<td>Chain ID</td><td>Residue ID</td>
+                      </tr>
+                      <tr align="center" id="seqtol_row_0" >                    <td>1</td><td><input type="text" name="seqtol_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_0" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_1" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_2" style="display:none"><td>3</td><td><input type="text" name="seqtol_mut_c_2" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_2" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_3" style="display:none"><td>4</td><td><input type="text" name="seqtol_mut_c_3" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_3" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_4" style="display:none"><td>5</td><td><input type="text" name="seqtol_mut_c_4" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_4" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_5" style="display:none"><td>6</td><td><input type="text" name="seqtol_mut_c_5" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_5" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_6" style="display:none"><td>7</td><td><input type="text" name="seqtol_mut_c_6" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_6" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_7" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_8" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_9" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a mutation</a></td></tr>
+                      </table>
+                  </td>
+                </tr>
             </table>
             </p>
             
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
-            * required fields &nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit">
+              <input type="button" value="Load sample data" onClick="set_demo_values();">
+              &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="this.form.reset()">
+              &nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit">
             </p>
             <!-- end parameter form -->
             
@@ -474,7 +537,7 @@ class RosettaHTML:
             <p id="ref3" style="display:none; opacity:0.0; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
                 If you are using the data, please cite:<br><br>
                 TBA
-            </p>     
+            </p> 
 
           </div> <!-- id=box -->  
           </td>
@@ -495,22 +558,25 @@ class RosettaHTML:
 
     def submited(self, jobname='', cryptID=''):
         html = """<td align="center"><H1 class="title">New Job successfully submitted</H1> 
-                  <P>Once your request has been processed the results are accessible via the following URL. 
-                  If you <b>are not</b> registered please bookmark this link, if you are registered and logged in we will send you an email with this information once the job is finished. 
-                  You can also access your data via the <A href="%s?query=queue">job queue</A> at any time.<br>
+                  <table width="550"><tr><td class="linkbox" align="center">
+                    <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link!</font><br>
+                    <a class="blacklink" href="https://%s/backrub/downloads/%s" target="_blank">https://%s/backrub/downloads/%s</a>
+                    </td></tr></table><br>
+                  <P>Once your request has been processed the results are accessible via the above URL. You can also access your data via the <A href="%s?query=queue">job queue</A> at any time.<br>
+                  If you <b>are not</b> registered and use the guest access please bookmark this link, your data will be stored for 10 days.<br>
+                  If you are registered and logged in we will send you an email with this information once the job is finished, in this case you will be able to access your data for 60 days.<br>
                   </P>
-                  <table width="550"><tr><td class="linkbox"><a class="blacklink" href="https://%s/backrub/downloads/%s">https://%s/backrub/downloads/%s</a></td></tr></table><br>
-                  Proceed to <a href="%s?query=jobinfo&jobnumber=%s">Job info</a>, 
-                  <a HREF="javascript:history.go(-1)">resubmit and/or change parameters of last job</a>, or 
+                  From here you can proceed to the <a href="%s?query=jobinfo&jobnumber=%s">job info page</a>, 
+                  <a HREF="javascript:history.go(-1)"><b>resubmit this job</b></a>, or 
                   <a href="%s?query=submit">submit a new job</a>.<br><br>
-                  </td>\n"""  % ( self.script_filename, self.server_url, cryptID, self.server_url, cryptID, self.script_filename, cryptID, self.script_filename )
+                  </td>\n"""  % ( self.server_url, cryptID, self.server_url, cryptID, self.script_filename, self.script_filename, cryptID, self.script_filename )
                      #% (UserName, JobName, pdbfile.filename) )
         return html
 
 
     def _helpButtons(self):
         html = '<!-- these divs are used for the help tooltips -->\n'
-        html += '<div id="tt_UserName" class="tooltip"><b>Your username</b></div>\n'
+        html += '<!-- div id="tt_UserName" class="tooltip"><b>Your username</b></div>\n'
         html += '<div id="tt_JobName" class="tooltip"><b>Name for your job</b><br>Enter a name that helps you identifying your job later.</div>\n'
         html += """<div id="tt_Structure" class="tooltip"><b>Structure File</b><br>Enter the path to a protein structure file in PDB format. <br></div>\n"""
         #          <br> <font color=red><b>Important note:</b></font><br> This server renumbers the residues of the individual chains in a consecutive manner if the numbering in the PDB file does not start at 1 <b>AND</b> Rosetta++ is used.
@@ -536,7 +602,9 @@ class RosettaHTML:
         html += '<div id="tt_seqtol_chains" class="tooltip"><b>Chain:</b><br>The two chains in the PDB file that form an interface. Chain 2 will be mutated to find an energetically more stable sequence.</div>\n'
         html += '<div id="tt_seqtol_list" class="tooltip"><b>List:</b><br>List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.</div>\n'
         html += '<div id="tt_seqtol_radius" class="tooltip"><b>Radius:</b><br>Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.</div>\n'
-          
+        html += '<div id="tt_seqtol_weights" class="tooltip"><b>Weights:</b><br>Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 multiplies the energetic terms of residues of the interface by 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.</div>\n'
+        html += '<div id="tt_seqtol_design" class="tooltip"><b>Residues for design:</b><br>Rosetta is going to substitute these residues in order to find energetically stable sequences.</div -->\n'
+        
         return html
 
 ###############################################################################################
@@ -707,8 +775,11 @@ class RosettaHTML:
                 html += '<td><font color="green">active</font></td>'
             elif status == 2:
                 html += '<td><font color="darkblue">done</font></td>'
+            elif status == 5:
+                html += '<td><font color="darkblue">demo</font></td>'
             else:
                 html += '<td><font color="FF0000">error</font></td>'
+                
             # write username
             html += '<td>%s</td>' % str(line[3])
             # write date
@@ -793,7 +864,7 @@ class RosettaHTML:
         html = ''
         if os.path.exists( score_file ):
           handle = open(score_file,'r')
-          html = '''<tr><td align="left" bgcolor="#FFFCD8">Overall scores for the generated structures. Download files:<br>
+          html = '''<tr><td align="left" bgcolor="#FFFCD8">Total scores for the generated structures. Download files:<br>
                                                             <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
                                                                 <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>''' % (cryptID, cryptID)
           if os.path.exists( score_file_res ):
@@ -801,11 +872,23 @@ class RosettaHTML:
           html += '''                                      </ul>
                         </td>
                       <td bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre><a></td></tr>
-              ''' % ( score_file, join(handle.readlines(), '') )
+              ''' % ( score_file, join(handle.readlines()[:7], '') + '...\n' )
           handle.close()
 
         return html
-
+    
+    def _show_molprobity(self,cryptID):
+      
+      html = '''<tr><td align="left" bgcolor="#FFFCD8">Analysis of the generated ensemble with Molprobity.
+                                                       The red circle denotes the mean, the blue diamond the value from the input structure.
+                              <ul><li><a href="../downloads/%s/molprobity_data.txt">Data shown in Plot</a></li>
+                                  <li><a href="../downloads/%s/molprobity_raw_output.txt">raw output</a></li></ul></td>
+                <td bgcolor="#FFFCD8"><a href="../downloads/%s/molprobity_plot.png">
+                                      <img src="../downloads/%s/molprobity_plot.png" alt="image missing." width="400"></a>
+                                      </td></tr>''' % ( cryptID,cryptID,cryptID,cryptID)
+      return html
+    
+    
     def _showNoMutation(self, status, input_filename, size_of_ensemble, cryptID):
 
         html = """
@@ -819,7 +902,8 @@ class RosettaHTML:
         
           comment = 'Ensemble of structures.<br>Red denotes the query structure.'
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))
-            
+          html += self._show_molprobity( cryptID )
+          
         return html
 
 
@@ -838,8 +922,9 @@ class RosettaHTML:
           html += self._show_scores_file(cryptID)
           comment = 'Ensemble of structures.<br>Red denotes the query structure. The point mutated residue is shown as sticks representation'
         
-          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=resid, mutation_chain=chain )
-        
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation_res=resid, mutation_chain=chain )
+          html += self._show_molprobity( cryptID )
+          
         return html
     
     def _showMultiplePointMutations(self, status, cryptID, input_filename, size_of_ensemble, chain, resid, newres, radius):
@@ -873,8 +958,9 @@ class RosettaHTML:
           html += self._show_scores_file(cryptID)
           comment = 'Ensemble of structures.<br>Red denotes the query structure. The point mutated residues are shown as sticks representation'
         
-          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation=list_resids, mutation_chain=chain )
-        
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation_res=list_resids, mutation_chain=chain )
+          html += self._show_molprobity( cryptID )
+          
         return html
     
     def _showComplexMutation(self, status, cryptID, input_filename, size_of_ensemble, mutation_file):
@@ -891,7 +977,8 @@ class RosettaHTML:
           html += self._show_scores_file(cryptID)
           comment = 'Ensemble of structures.<br>Red denotes the query structure.'
         
-          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))        
+          html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))
+          html += self._show_molprobity( cryptID )       
         
         return html
     
@@ -953,39 +1040,58 @@ class RosettaHTML:
 
         return html
     
-    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list, seqtol_radius ):
+    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, seqtol_radius, w1, w2, w3 ):
         
         html = """
               <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Ensemble</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
-              <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain 1: %s<br>Chain 2: %s<br>Residues of Chain 2: %s<br>Radius of interface: %s [&#197;]</td></tr>
-              """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list, seqtol_radius )
+              <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td>
+                  <td bgcolor="#EEEEFF">
+                      Partner 1: Chain %s<br>
+                      Partner 2: Chain %s<br>
+                      Designed residues of Partner 1: %s<br>
+                      Designed residues of Partner 2: %s<br>
+                      Radius of interface: %s [&#197;]<br>
+                      Weights (Partner1:Partner2:Interface): (%s:%s:%s)
+                  </td></tr>
+              """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' '), seqtol_radius, w1, w2, w3 )
         
         input_id = input_filename[:-4] # filename without suffix
         if status == 'done':
             html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
             
             list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
-            list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
+            list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low_ms_0000.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation of the ensemble created by backrub. Query structure is shown in red.<br>"""
+            comment1 = """Backbone representation the best scoring structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
-            html += self._showApplet4MultipleFiles(comment1, list_pdb_files, mutation=None)
+            mutated_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
+            
+            html += self._showApplet4MultipleFiles(comment1, list_pdb_files, mutation_res=[seqtol_list_1,seqtol_list_2], mutation_chain=mutated_chains)
                         
-            html += '''<tr><td align="right" bgcolor="#FFFCD8">Motif of the mutated residues.<br>Download corresponding <a href="../downloads/%s/specificity_sequences.fasta">FASTA file</a>.</td>
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Motif of the mutated residues.<br>Download corresponding <a href="../downloads/%s/specificity_sequences.fasta">FASTA file</a>.</td>
                            <td bgcolor="#FFFCD8"><a href="../downloads/%s/specificity_motif.png">
                                                  <img src="../downloads/%s/specificity_motif.png" alt="image missing." width="400"></a></td></tr> 
-                       <tr><td align="right" bgcolor="#FFFCD8">Individual boxplots of the frequencey of amino acids at the mutated site.<br>
+                       <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the frequencey of amino acids at the mutated site.<br>
                               Download <a href="../downloads/%s/specificity_pwm.txt">weight matrix</a> or file with all plots as 
-                              <a href="../downloads/%s/specificity_boxplot.png">PNG</a>, <a href="../downloads/%s/specificity_boxplot.pdf">PDF</a>.</td>
+                              <a href="../downloads/%s/specificity_boxplot.png">PNG</a>, <a href="../downloads/%s/specificity_boxplot.pdf">PDF</a>.<br>
+                              To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
+                              A <a href="../wiki/SequencePlasticityPrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                              the <a href="../wiki/" target="_blank">wiki</a>.
+                              </td>
                            <td bgcolor="#FFFCD8">
                     ''' % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
             
-            for resid in seqtol_list.split(' '):
+            for resid in seqtol_list_1:
+              html += '''<a href="../downloads/%s/specificity_boxplot_%s%s.png"><img src="../downloads/%s/specificity_boxplot_%s%s.png" alt="image missing." width="400"></a><br>
+                    ''' % ( cryptID, seqtol_chain1, resid, cryptID, seqtol_chain1, resid )
+            for resid in seqtol_list_2:
               html += '''<a href="../downloads/%s/specificity_boxplot_%s%s.png"><img src="../downloads/%s/specificity_boxplot_%s%s.png" alt="image missing." width="400"></a><br>
                     ''' % ( cryptID, seqtol_chain2, resid, cryptID, seqtol_chain2, resid )
-              
+            
+            html += self._show_molprobity( cryptID )
+            
             html +="</td></tr>"
         return html      
     
@@ -1046,7 +1152,9 @@ class RosettaHTML:
             status = 'active'
         elif int(parameter['Status']) == 2:
             status = 'done'
-        
+        elif int(parameter['Status']) == 5:
+            status = 'demo'
+                        
         if parameter['Mini'] == 'mini' or parameter['Mini'] == '1':
             parameter['Mini'] = 'Rosetta v.3 (mini)'
         elif parameter['Mini'] == 'classic' or parameter['Mini'] == '0':
@@ -1097,14 +1205,16 @@ class RosettaHTML:
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], 
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
-                                                     seqtol_parameter['seqtol_list'], seqtol_parameter['seqtol_radius'] )
+                                                     seqtol_parameter['seqtol_list_1'], seqtol_parameter['seqtol_list_2'],
+                                                     seqtol_parameter['seqtol_radius'], 
+                                                     seqtol_parameter['seqtol_weight_chain1'], seqtol_parameter['seqtol_weight_chain2'], seqtol_parameter['seqtol_weight_interface'] )
                 
         html += '</table><br></td>\n'
         
         return html
 
 
-    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutation=None, mutation_chain=None):
+    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutation_res=None, mutation_chain=None):
         """This shows the Jmol applet for an ensemble of structures with their point mutation(s)"""
         
         # jmol command to load files
@@ -1115,12 +1225,12 @@ class RosettaHTML:
             
             # jmol command to show mutation as balls'n'stick
             jmol_cmd_mutation = ''
-            if mutation != None and mutation_chain != None: 
-                if type(mutation) == type(''):
-                    jmol_cmd_mutation = 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( mutation, mutation_chain )
-                elif type(mutation) == type([]):
-                    for i in range(len(mutation)):
-                        jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % (mutation[i], mutation_chain[i])
+            if mutation_res != None and mutation_chain != None: 
+                if type(mutation_res) == type(''):
+                    jmol_cmd_mutation = 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( mutation_res, mutation_chain )
+                elif type(mutation_res) == type([]):
+                    for i in range(len(mutation_res)):
+                        jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % (mutation_res[i], mutation_chain[i])
             
             # html code
             html = """
@@ -1180,24 +1290,42 @@ class RosettaHTML:
             disabled = 'disabled'
 
         html = """<td align="center">
-                  <H1 class="title">Login</H1>
-                    <P style="text-align:center;">If you do not have an account, please <A href="%s?query=register">register</A> .</P>
+                  <H1 class="title">Welcome to RosettaBackrub</A> </H1> 
+                    <P>
+                      This is the structure prediction web server of the Kortemme Lab. This server utilizes the backrub method implemented in 
+                      <a href="%s?query=doc#Rosetta">Rosetta</a>
+                      for protein design and applies it to a structure uploaded by the user. For an explanation of how the server works see the
+                      <a href="%s?query=doc#instructions">instructions</a>. 
+                    </P>
+
+                  <div id="login_box">
+                    <form name="loginform" method="post" action="%s">
+                    <P style="text-align:justify;">
                     %s
-                    <form method=post action="%s">
+                    You are not required to register for this service, but you can choose to do so. 
+                    If you want to proceed without registering click on \"Guest access\", otherwise enter your login and password.
+                    <A href="%s?query=register">Click here</A>, if you wish to register.</P>
                     <table border=0 cellpadding=5 cellspacing=0>
-                        <tr><td align=right>Username: </td><td><input type=text name=myUserName value="%s">    </td></tr>
-                        <tr><td align=right>Password: </td><td><input type=password name=myPassword value="" %s></td></tr>
-                        <tr><td></td>
-                    <td align=left>
-                    <input type=hidden name=query  value="login">
-                    <input type=hidden name=login  value="login">
-                    <input type=submit name=submit value="Login" %s>
-                    </td></tr>
-                    </table>
+                    <tr><td valign="middle" align="center" style="color:red;">
+                          <input type="button" name="guest_access" value="Guest Access" onClick="document.loginform.myUserName.value='guest';  document.loginform.myPassword.value=''; document.loginform.submit(); return true;"><br><br>
+                          No password required.
+                    </td><td width="100"></td><td>
+                      <table border=0 cellpadding=5 cellspacing=0>
+                          <tr><td align="right">Username: </td><td><input type=text name=myUserName value="%s">    </td></tr>
+                          <tr><td align="right">Password: </td><td><input type=password name=myPassword value="" %s></td></tr>
+                          <tr><td></td>
+                      <td align="center">
+                      <input type=hidden name=query  value="login">
+                      <input type=hidden name=login  value="login">
+                      <input type=submit name=Submit value="Login" %s>
+                      </td></tr>
+                      </table>
+                    </td></tr></table>
                     </form>                    
                     Forgot your password? <A href="%s?query=oops">Click here</A> .
                     <br>
-                   <td>""" % ( self.script_filename, message_html, self.script_filename, username, disabled, disabled, self.script_filename )
+                    </div>
+                   <td>""" % ( self.script_filename, self.script_filename, self.script_filename, message_html, self.script_filename, username, disabled, disabled, self.script_filename )
 
         return html
 
