@@ -33,27 +33,31 @@ class RosettaHTML:
                         #'Interface Alanine Scanning' : 'http://%s/alascan/' % self.server_url,
                         #'more server soon' : 'http://kortemmelab.ucsf.edu/' }
                         # THIS gets to complicated
+        tooltip_parameter = "offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[250]"
         self.tooltips = { 
-                        "tt_JobName":       "header=[Name for your job] body=[Enter a name that helps you identifying your job later.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_Structure":     "header=[Structure File] body=[Enter the path to a protein structure file in PDB format. <br>] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. <br>] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_RVersion":      "header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or the new Rosetta 3 (\'mini\'). Some applications only work with one version.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_NStruct":       "header=[Number of Structures] body=[Number of generated structures or size of ensemble.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_ROutput":       "header=[Rosetta output] body=[If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_SelApp":        "header=[Select Application] body=[Click to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_ChainId":       "header=[Chain ID] body=[The chain in which the residue is located.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_ResId":         "header=[Residue ID] body=[The position (residue ID according to the PDB file) that is going to be mutated.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_NewAA":         "header=[New Amino Acid] body=[The Amino Acid to which the position is going to be mutated.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_Radius":        "header=[Radius] body=[This radius determines the area around the mutation that is subject to backrub. For detailed information see the referenced paper. ] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_Temp":          "header=[Temperature] body=[at which backrub is carried out.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_NSeq":          "header=[Number of Sequences] body=[The number of designed sequences for each ensemble structure.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_SegLength":     "header=[Maximal segment length for backrub] body=[Limit the length of the segment to which the bachrub move is applied to.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_error":         "header=[Rosetta Error</b></font><br>Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occures for your structure please check the correctness of the PDB file.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_seqtol_chains": "header=[Chain] body=[The two chains in the PDB file that form an interface. Chain 2 will be mutated to find an energetically more stable sequence.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 multiplies the energetic terms of residues of the interface by 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
-                        "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[500]",
+                        "tt_empty":         "header=[] body=[] %s" % tooltip_parameter,
+                        "tt_general":       "header=[General Settings] body=[These settings are common for all applications.] %s" % tooltip_parameter,
+                        "tt_specific":      "header=[Application Specific Settings] body=[These settings are dependent on the applications. If you are not sure use the standard values.] %s" % tooltip_parameter,
+                        "tt_JobName":       "header=[Name for your job] body=[Enter a name that helps you identifying your job later.] %s" % tooltip_parameter,
+                        "tt_Structure":     "header=[Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in teh file is considered.] %s" % tooltip_parameter,
+                        "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in teh file is considered.] %s" % tooltip_parameter,
+                        "tt_RVersion":      "header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or the new Rosetta 3 (\'mini\'). Some applications only work with one version.] %s" % tooltip_parameter,
+                        "tt_NStruct":       "header=[Number of Structures] body=[Number of generated structures or size of ensemble.] %s" % tooltip_parameter,
+                        "tt_ROutput":       "header=[Rosetta output] body=[If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.] %s" % tooltip_parameter,
+                        "tt_SelApp":        "header=[Select Application] body=[Click to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.] %s" % tooltip_parameter,
+                        "tt_ChainId":       "header=[Chain ID] body=[The chain in which the residue is located.] %s" % tooltip_parameter,
+                        "tt_ResId":         "header=[Residue ID] body=[The position (residue ID according to the PDB file) that is going to be mutated.] %s" % tooltip_parameter,
+                        "tt_NewAA":         "header=[New Amino Acid] body=[The Amino Acid to which the position is going to be mutated.] %s" % tooltip_parameter,
+                        "tt_Radius":        "header=[Radius] body=[This radius determines the area around the mutation that is subject to backrub. For detailed information see the referenced paper.] %s" % tooltip_parameter,
+                        "tt_Temp":          "header=[Temperature] body=[at which backrub is carried out.] %s" % tooltip_parameter,
+                        "tt_NSeq":          "header=[Number of Sequences] body=[The number of designed sequences for each ensemble structure.] %s" % tooltip_parameter,
+                        "tt_SegLength":     "header=[Maximal segment length for backrub] body=[Limit the length of the segment to which the bachrub move is applied to.] %s" % tooltip_parameter,
+                        "tt_error":         "header=[Rosetta Error</b></font><br>Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occures for your structure please check the correctness of the PDB file.] %s" % tooltip_parameter,
+                        "tt_seqtol_partner":"header=[Partner] body=[The two chains in the PDB file that form an interface.] %s" % tooltip_parameter,
+                        "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] %s" % tooltip_parameter,
+                        "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
+                        "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
+                        "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
                         }
         
         
@@ -183,7 +187,7 @@ class RosettaHTML:
     def _showLegalInfo(self):
         html = """<td style="border:1px solid black; padding:10px" bgcolor="#FFFFE0">
                     <p style="text-align:left; font-size: 10pt" >
-                      For questions, please contact <A href="mailto:%s" style="font-size: 10pt">%s</A>
+                      For questions, please read our <A href="../wiki/">documentation</A> or contact <A href="mailto:%s" style="font-size: 10pt">%s</A>
                     </p>
                   </td>""" % ( self.contact_email, self.contact_name )
         return html
@@ -201,21 +205,18 @@ class RosettaHTML:
         html = """<td align=center style="border-top:1px solid gray; ">
                  <table width="720" style="border-width:0pt">
                     <tr>
-                    <td align="center"><img src="../images/ucsf_only_tiny.png" width="65%%" height="65%%" alt="UCSF" border=0></td>
-                    <td align="left" width="520">
-                    "RosettaBackrub" is available for NON-COMMERCIAL USE ONLY at this time.<br>
-                    <font color=#666688><b>[</b></font>
-                    <A href="%s?query=terms_of_service" class="nav">Terms of Service</A>
-                    <font color=#666688><b>]</b></font><br>
-                    <font style="font-size: 9pt">Copyright &copy; 2009 University of California San Francisco, <A href="mailto:kortemme@cgl.ucsf.edu" style="font-size: 9pt">Tanja Kortemme</a>, <A href="mailto:lauck@cgl.ucsf.edu" style="font-size: 9pt">Florian Lauck</A></font>
+                    <td align="left">
+                    "RosettaBackrub" is available for NON-COMMERCIAL USE ONLY at this time. 
+                    [&nbsp;<A class="nav" href="/backrub/wiki/TermsOfService" >Terms of Service</A>&nbsp;]<br>
+                    <font style="font-size: 9pt">Copyright &copy; 2009 Tanja Kortemme, Florian Lauck and the Regents of the University of California San Francisco</font>
                     </td>
                     <td align="center">
                     %s
                     </td>
                     </tr>
-                 </table></td>""" % ( self.script_filename , SSL)
+                 </table></td>""" % (SSL)
         return html
-
+# <td align="center"><img src="../images/ucsf_only_tiny.png" width="65%%" height="65%%" alt="UCSF" border=0></td>
 
 ##############################################
 # The following functions are accessed from  #
@@ -243,8 +244,6 @@ class RosettaHTML:
         html = '''<td align="center">
     <H1 class="title">Submit a new job</H1>
     <br>
-    Please enter the required information and upload a structure. For help move your mouse to the parameter.
-    <br><br>
 <!-- Start Submit Form -->
     <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
 
@@ -311,34 +310,40 @@ class RosettaHTML:
 
           <!-- end pictures -->
           <!-- description -->
-            <p id="text0" style="text-align:justify;"> 
-              Click left to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.
+            <p id="text0" style="text-align:justify;">
+              Choose one of the applications on the left. Each application will give you a short explanation and a set of parameters that can be adjusted.<br><br>
+              For a brief explanation hover your mouse over the parameter.
             </p>
           
             <div id="text1" style="display:none; opacity:0.0; text-align:justify;"> 
-                This function utilizes the backrub protocol implemented in ROSETTA.<br>
-                There are two options:
-                <ul style="text-align:left;">
-                    <li>One Mutation: A single residue will be substituted. (see reference below)</li>
-                    <li>Multiple Mutations: Up to 30 residues can be mutated. (not published)</li>
-                    <!-- li>Upload List: Upload a list with single residue mutations.</li -->
-                </ul>
+                This function utilizes the backrub protocol implemented in Rosetta and applies it to the neighborhood 
+                of a mutated residue to account for the conformational changes in this region. 
+                There are two options.
+                <dl style="text-align:left;">
+                    <dt><b>One Mutation</b></dt><dd>A single residue will be substituted and the neigboring residue in a radius of 6&#197; will be repacked. This value was empirically determined (see reference).</dd>
+                    <dt><b>Multiple Mutations</b></dt><dd>Up to 30 residues can be mutated and their neighborhoods repacked. This method has not been benchmarked yet.</dd>
+                    <!-- dt>Upload List</dt><dd>Upload a list with single residue mutations.</dd -->
+                </dl>
             </div>
 
             <div id="text2" style="display:none; opacity:0.0; text-align:justify;"> 
-                This function utilizes backrub and design protocols implemented in ROSETTA.<br>
-                There are two options:
-                <ul style="text-align:left;">
-                    <li>Generate Backrub Ensemble: The backrub protocol is applied to the whole structure without changing any residues.</li>
-                    <li>Backrub Ensemble Design: This method creates an ensemble of structures that model the flexibility in solution. (see reference below)</li>
-                </ul>
+                This function utilizes backrub and design protocols implemented in ROSETTA. 
+                There are two options.
+                <dl style="text-align:left;">
+                    <dt><b>Generate Backrub Ensemble</b></dt><dd>Backrub is applied to the input structure in order to model backbone flexibility.</dd>
+                    <dt><b>Backrub Ensemble Design</b></dt>
+                      <dd>This method first creates an ensemble of structures that resembles the flexibility in solution. 
+                          These ensembles are similar to the ensembles detected by the NMR method.<br> 
+                          In a second step the generated protein structures are used to design an ensemble that has similar properties as the natural occuring protein family.
+                          The output is a sequence profile of this family of structures.</dd>
+                </dl>
             </div>
             
             <div id="text3" style="display:none; opacity:0.0; text-align:justify;"> 
-                This function utilizes backrub and design protocols implemented in ROSETTA.<br>
-                First, the backrub algorithm is applied to the uploaded complex and an ensemble is generated. 
-                Then, the structures of this ensemble are subject to the design protocol. 
-                This generates and scores sequences by utilizing a genetic algorithm.
+                This function utilizes backrub and design protocols implemented in Rosetta.<br><br>
+                First, the backrub algorithm is applied to the uploaded complex in order to generate an ensemble.
+                Then, for each of the resulting structure the given residues are mutated by an genetic algorithm. 
+                All generated sequences are ranked by their score and used to build a sequence profile.
             </div>
           <!-- end description -->
           
@@ -355,17 +360,18 @@ class RosettaHTML:
                 <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%(jobname)s"></TD>
               </TR>
               <TR>
-                <TD align=right title="%(tt_Structure)s"> Structure </TD>
+                <TD align=right title="%(tt_Structure)s">Upload Structure </TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20"></TD>
               </TR>
+              <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR>
-                <TD align=right title="%(tt_StructureURL)s"> URL to structure file </TD>
+                <TD align=right title="%(tt_StructureURL)s"> Enter URL to structure file </TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBComplexURL" size="31">
               </TD>
               </TR>
               <TR><TD colspan=2><br></TD></TR>
               <TR>
-                <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
+                <TD align="center" colspan=2 style="border-bottom:1pt dashed black" title="%(tt_general)s">General Settings</TD>
               </TR>
               <TR>
                 <TD align=right title="%(tt_RVersion)s">Rosetta Version </TD>
@@ -384,13 +390,12 @@ class RosettaHTML:
               </TR -->
               <TR><TD align=left><br></TD></TR>
               <TR>
-                <TD align="center" colspan=2 style="border-bottom:1pt dashed black">Application Specific Settings</TD>
+                <TD align="center" colspan=2 style="border-bottom:1pt dashed black" title="%(tt_specific)s">Application Specific Settings</TD>
               </TR>
             </TABLE>
             
             <!-- Backrub - Point Mutation -->
             <p id="parameter1_1" style="display:none; opacity:0.0; text-align:justify;">
-            Backrub is applied to residues that have at least one atom within a radius of 6.0 &#197; near the mutation. [ <a href="http://www.sciencedirect.com/science/article/B6WK7-4SHVT2K-7/2/7bb4ba6dcb946d7e39662232433bbb09">Smith and Kortemme, 2008</a> ]<br>
                 <table align=center>
                 <tr>
                     <td align="right" title="%(tt_ChainId)s">Chain ID </td><td><input type="text" name="PM_chain"  maxlength=1 SIZE=5 VALUE=""></td>
@@ -410,7 +415,6 @@ class RosettaHTML:
             
             <!-- Backrub - Multiple Point Mutation -->
             <p id="parameter1_2" style="display:none; opacity:0.0; text-align:justify;">
-            Choose up to 30 residues for mutations. Backrub is applied to neighboring residues in a given radius. <br>
                 <table bgcolor="#EEEEEE" align="center">
                 <tr bgcolor="#828282" style="color:white;">
                     <td align="center">#</td>
@@ -463,12 +467,10 @@ class RosettaHTML:
             </p>
             
             <!-- Ensemble - simple -->
-            <p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;"><b>Apply backrub to all residues.</b><br><br>no options
-            </p>
+            <p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;">no options</p>
             
             <!-- Ensemble - design -->
             <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
-                <b>Create a backrub ensemble.</b><br> [ <a href="http://www.pubmedcentral.nih.gov/articlerender.fcgi?artid=2682763">Friedland et al. 2009</a> ]<br><br>
                 <table align="center">
                 <tr>
                     <td title="%(tt_Temp)s">Temperature [kT]</td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="0.3"></td>
@@ -486,11 +488,11 @@ class RosettaHTML:
             <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
               <tr>
-                  <td align="right" title="%(tt_seqtol_chains)s">Partner 1:</td>
+                  <td align="right" title="%(tt_seqtol_partner)s">Partner 1:</td>
                   <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
               </tr>
               <tr>
-                  <td align="right" title="%(tt_seqtol_chains)s">Partner 2:</td>
+                  <td align="right" title="%(tt_seqtol_partner)s">Partner 2:</td>
                   <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
                   </td>
               </tr>
@@ -500,11 +502,11 @@ class RosettaHTML:
                   </td>
               </tr -->
               <tr>
-                  <td align="right" title"%(tt_seqtol_radius)s">Repacking of neighboring residues.</td>
+                  <td align="right" title="%(tt_Radius)s">Area for repacking.</td>
                   <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197;</td>
               </tr>
               <tr>
-                  <td align="right" title"%(tt_seqtol_weights)s">Weight for Partner</td>
+                  <td align="right" title="%(tt_seqtol_weights)s">Weight for Partner</td>
                   <td>
                     <table >
                       <tr >
@@ -745,7 +747,7 @@ class RosettaHTML:
         for line in job_list:
             task = ''
             if line[9] == '0' or line[9] == 'no_mutation':
-                task = "Model Flexibility"
+                task = "Backrub Ensemble"
             elif line[9] == '1' or line[9] == 'point_mutation':
                 task = "Point Mutation"
             elif line[9] == '3' or line[9] == 'multiple_mutation':
@@ -753,9 +755,9 @@ class RosettaHTML:
             elif line[9] == '2' or line[9] == 'upload_mutation':
                 task = "Custom Mutation"
             elif line[9] == '4' or line[9] == 'ensemble':
-                task = "Backrub ensemble"
+                task = "Backrub Ensemble Design"
             elif line[9] == 'sequence_tolerance':
-                task = "Sequence Tolerance"
+                task = "Sequence Plasticity"
           
             html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF'" onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000'" onclick="window.location.href='%s?query=jobinfo&jobnumber=%s'">""" % ( self.script_filename, line[1] )
             # write ID
@@ -1171,7 +1173,7 @@ class RosettaHTML:
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
             if parameter['task'] == '0' or parameter['task'] == 'no_mutation':
-                task = "Model Flexibility"
+                task = "Backrub Ensemble"
                 html += self._showNoMutation( status, parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['cryptID'] )            
                 
             elif parameter['task'] == '1' or parameter['task'] == 'point_mutation':
@@ -1189,12 +1191,12 @@ class RosettaHTML:
                 html += self._showComplexMutation( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mutations'])
                 
             elif parameter['task'] == '4' or parameter['task'] == 'ensemble':
-                task = "Backrub ensemble"
+                task = "Backrub Ensemble Design"
                 html += self._showEnsemble( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['ENS_temperature'], 
                                             parameter['ENS_num_designs_per_struct'], parameter['ENS_segment_length'] )
                                             
             elif parameter['task'] == 'sequence_tolerance':
-                task = "Sequence Tolerance"
+                task = "Sequence Plasticity Prediciton"
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], 
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
@@ -1277,7 +1279,7 @@ class RosettaHTML:
         
         message_html = ''
         if message != '':
-            message_html = '<P style="text-align:center; color:red;">%s</P>' % ( message )
+            message_html = '<tr><td colspan="3" align="right"><P style="text-align:center; color:red;">%s</P></td></tr>' % ( message )
         disabled = ''
         if login_disabled:
             disabled = 'disabled'
@@ -1285,20 +1287,20 @@ class RosettaHTML:
         html = """<td align="center">
                   <H1 class="title">Welcome to RosettaBackrub</A> </H1> 
                     <P>
-                      This is the structure prediction web server of the Kortemme Lab. This server utilizes the backrub method implemented in 
-                      <a href="%s?query=doc#Rosetta">Rosetta</a>
-                      for protein design and applies it to a structure uploaded by the user. For an explanation of how the server works see the
-                      <a href="%s?query=doc#instructions">instructions</a>. 
+                      This is the structure prediction web server of the Kortemme Lab. This server utilizes the backrub method for flexible protein backbone modeling implemented in 
+                      <a href="/backrub/wiki/Rosetta">Rosetta</a>. 
+                      This server allows the user to upload a protein structure and choose an algorithm that is applied to this structure. 
+                      For a tutorial on how to submit a job see the <a href="/backrub/wiki/">documentation</a>. 
                     </P>
 
                   <div id="login_box">
                     <form name="loginform" method="post" action="%s">
                     <P style="text-align:justify;">
-                    %s
                     You are not required to register for this service, but you can choose to do so. 
                     If you want to proceed without registering click on \"Guest access\", otherwise enter your login and password.
                     <A href="%s?query=register">Click here</A>, if you wish to register.</P>
                     <table border=0 cellpadding=5 cellspacing=0>
+                    %s
                     <tr><td valign="middle" align="center" style="color:red;">
                           <input type="button" name="guest_access" value="Guest Access" onClick="document.loginform.myUserName.value='guest';  document.loginform.myPassword.value=''; document.loginform.submit(); return true;"><br><br>
                           No password required.
@@ -1318,15 +1320,16 @@ class RosettaHTML:
                     Forgot your password? <A href="%s?query=oops">Click here</A> .
                     <br>
                     </div>
-                   <td>""" % ( self.script_filename, self.script_filename, self.script_filename, message_html, self.script_filename, username, disabled, disabled, self.script_filename )
+                   <td>""" % ( self.script_filename, self.script_filename, message_html, username, disabled, disabled, self.script_filename )
 
         return html
 
     def loggedIn(self, username):
         self.username = username
         html = """ <td align="center">You have successfully logged in as %s. <br> <br> \n 
-                   Proceed to <A href="%s?query=submit">Simulation Form</A>  or \n
-                   <A href="%s?query=queue">Queue</A> . <br><br> </td>\n""" % ( username, self.script_filename, self.script_filename )
+                   From here you can proceed to the <A href="%s?query=submit">submission page</A> to <A href="%s?query=submit">submit a new job</A> <br>
+                   or navigate to the <A href="%s?query=queue">queue</A> to check for submitted, running or finished jobs. <br><br> </td>
+                   """ % ( username, self.script_filename, self.script_filename, self.script_filename )
         return html
 
 

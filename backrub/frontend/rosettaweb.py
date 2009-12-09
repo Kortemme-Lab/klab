@@ -214,11 +214,11 @@ def ws():
   rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_email='kortemme@cgl.ucsf.edu' , contact_name='Tanja Kortemme')
 
   # session is now active, execute function
-  if query_type == "index":
-    html_content = rosettaHTML.index()
-    title = 'Home'
+  # if query_type == "index":
+  #   html_content = rosettaHTML.index()
+  #   title = 'Home'
 
-  elif query_type == "login":
+  if query_type == "login" or query_type == "index":
     login_return = login(form, my_session, t)
     if login_return == True:
       username = form["myUserName"].value
@@ -229,7 +229,7 @@ def ws():
       html_content = rosettaHTML.login( message='You\'re already logged in.', login_disabled=True )
     else:
       html_content = rosettaHTML.login() 
-    title = 'Login'
+    title = 'Home'
 
   elif query_type  == "loggedin":
     html_content = rosettaHTML.loggedIn(username) 

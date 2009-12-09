@@ -8,7 +8,7 @@ function startup(query) {
           Nifty("ul#about li","big fixed-height");
           Nifty("div#box","big transparent fixed-height");
       }
-      if (query == "index" || query = 'login') {
+      if (query == "index" || query == "login") {
           Nifty("div#login_box","big transparent fixed-height");
       }
       //updateCellSize2();
