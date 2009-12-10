@@ -218,19 +218,19 @@ function showMenu( menu_id ) {
     mycolor = "";     
     if (menu_id == "1") {
       mycolor = "#DCE9F4" ;
-      new Effect.Appear( "menu_1", { queue: { position: '0', scope: 'menu' } } );
-      new Effect.Fade( "menu_2", { duration: 0.0 } );
-      new Effect.Fade( "menu_3", { duration: 0.0 } );
+      // new Effect.Appear( "menu_1", { queue: { position: '0', scope: 'menu' } } );
+      // new Effect.Fade( "menu_2", { duration: 0.0 } );
+      // new Effect.Fade( "menu_3", { duration: 0.0 } );
     } else if (menu_id == "2") {
       mycolor = "#B7FFE0" ;
-      new Effect.Fade( "menu_1", { duration: 0.0 } );
-      new Effect.Appear( "menu_2", { queue: { position: '0', scope: 'menu' } } );
-      new Effect.Fade( "menu_3", { duration: 0.0 } );
+      // new Effect.Fade( "menu_1", { duration: 0.0 } );
+      // new Effect.Appear( "menu_2", { queue: { position: '0', scope: 'menu' } } );
+      // new Effect.Fade( "menu_3", { duration: 0.0 } );
     } else if (menu_id = "3"){
       mycolor = "#FFE2E2" ;
-      new Effect.Fade( "menu_1", { duration: 0.0 } );
-      new Effect.Fade( "menu_2", { duration: 0.0 } );
-      new Effect.Appear( "menu_3", { queue: { position: '0', scope: 'menu' } } );
+      // new Effect.Fade( "menu_1", { duration: 0.0 } );
+      // new Effect.Fade( "menu_2", { duration: 0.0 } );
+      // new Effect.Appear( "menu_3", { queue: { position: '0', scope: 'menu' } } );
     }
     
     document.getElementById("box").style.background = mycolor;
@@ -324,22 +324,22 @@ function set_demo_values() {
       document.submitform.PM_chain0.value = "A";
       document.submitform.PM_resid0.value = "17";
       document.submitform.PM_newres0.value = "A";
-      document.submitform.PM_radius0.value = "4.0";
+      document.submitform.PM_radius0.value = "6.0";
       addOneMore();
       document.submitform.PM_chain1.value = "A";
       document.submitform.PM_resid1.value = "32";
       document.submitform.PM_newres1.value = "A";
-      document.submitform.PM_radius1.value = "4.0";
+      document.submitform.PM_radius1.value = "6.0";
       addOneMore();
       document.submitform.PM_chain2.value = "A";
       document.submitform.PM_resid2.value = "65";
       document.submitform.PM_newres2.value = "A";
-      document.submitform.PM_radius2.value = "4.0";
+      document.submitform.PM_radius2.value = "6.0";
       addOneMore();
       document.submitform.PM_chain3.value = "A";
       document.submitform.PM_resid3.value = "72";
       document.submitform.PM_newres3.value = "A";
-      document.submitform.PM_radius3.value = "4.0";
+      document.submitform.PM_radius3.value = "6.0";
       addOneMore();
 
   } else if ( actual_task == "parameter2_1") {
