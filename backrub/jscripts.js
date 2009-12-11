@@ -87,68 +87,6 @@ function ValidateFormEmail() {
     return true;
 }
 
-function getTask() {
-  return document.submitform.task.value
-}
-
-function setTask(mode){
-    document.submitform.task.value = mode;
-    //alert(mode);
-    return true;
-}
-
-function setMini( disable ) {
-    if ( disable == 1 ) {
-    document.submitform.Mini[0].disabled=true;
-    document.submitform.Mini[1].disabled=true;
-    //document.submitform.keep_output.disabled=true;
-    document.getElementById('rosetta1').style.color='#D8D8D8';
-    //document.getElementById('rosetta2').style.color='#D8D8D8';
-    } else {
-    document.submitform.Mini[0].disabled=false;
-    document.submitform.Mini[1].disabled=false;
-    //document.submitform.keep_output.disabled=false;
-    document.getElementById('rosetta1').style.color='#000000';
-    //document.getElementById('rosetta2').style.color='#000000';
-    }
-    return true;
-}
-
-
-// function popUp( obj ) {
-//     my_obj = document.getElementById(obj).style;
-//     if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
-//         my_obj.visibility = "hidden";
-//     }
-//     else { if ( my_obj.visibility == "hidden" ) {
-//         my_obj.visibility = "visible";
-//     }
-//     }
-// }
-
-function popUp( obj ) {
-    my_obj = document.getElementById(obj).style;
-    offset=10
-    if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
-        my_obj.top  = e.clientY + offset;
-        my_obj.left = e.clientX + offset*2;
-        my_obj.visibility = "hidden";
-    }
-    else {
-        my_obj.visibility = "visible";
-    }
-}
-
-
-function updateCellSize1( task ) {
-    var high = document.getElementById( 'pic' ).offsetHeight + document.getElementById( 'common_form' ).offsetHeight + document.getElementById( 'submit_button' ).offsetHeight + document.getElementById( task ).offsetHeight ;
-    document.getElementById('empty_box').style.height = high ;
-}
-
-function updateCellSize2() {
-    var high = document.getElementById( 'pic' ).offsetHeight + document.getElementById( 'task_init' ).offsetHeight;
-    document.getElementById('empty_box').style.height = high ;
-}
 
 function changeApplication( app, _task ) {
 	// change these two arrays if you change the table in rosettahtml.py
@@ -178,28 +116,29 @@ function changeApplication( app, _task ) {
 	}
 	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) { new Effect.Appear( "ref1" ); } 
 	  else { new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
-	  
+	
 	if ( task == 'parameter2_2' ) { new Effect.Appear( "ref2" ); } else { new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
 	if ( task == 'parameter3_1' ) { new Effect.Appear( "ref3" ); } else { new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
-		
+	
 	if ( task == 'parameter2_2' || task == 'parameter3_1') {
 	  setMini(1);
 	} else {
    setMini(0);
   }
-	
-	
+  
+  mycolor = "";     
+  if (task == 'parameter1_1' || task == 'parameter1_2') {
+    mycolor = "#DCE9F4" ;
+  } else if (task == 'parameter2_1' || task == 'parameter2_2') {
+    mycolor = "#B7FFE0" ;
+  } else if (task == 'parameter3_1'){
+    mycolor = "#FFE2E2" ;
+  }
+  
+  document.getElementById("box").style.background = mycolor;
+
 }
 
-function oc(a, n)
-{
-  var o = {};
-  for(var i=0;i<a.length;i++)
-  {
-    o[a[i]+n]='';
-  }
-  return o;
-}
 
 function showMenu( menu_id ) {
     /* This function extends or hides the menu on the left */
@@ -253,7 +192,63 @@ function showMenu( menu_id ) {
     for ( i = 0; i < myParameter.length; i++ ) {
       new Effect.Fade( myParameter[i], {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
     }
+    
+    new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+  	new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+  	new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+        
     return true;
+}
+
+/************************************
+ * helper functions 
+ ************************************/
+
+function oc(a, n)
+ {
+   var o = {};
+   for(var i=0;i<a.length;i++)
+   {
+     o[a[i]+n]='';
+   }
+   return o;
+ }
+
+function getTask() {
+  return document.submitform.task.value
+}
+
+function setTask(mode){
+    document.submitform.task.value = mode;
+    //alert(mode);
+    return true;
+}
+
+function setMini( disable ) {
+    if ( disable == 1 ) {
+    document.submitform.Mini[0].disabled=true;
+    document.submitform.Mini[1].disabled=true;
+    //document.submitform.keep_output.disabled=true;
+    document.getElementById('rosetta1').style.color='#D8D8D8';
+    //document.getElementById('rosetta2').style.color='#D8D8D8';
+    } else {
+    document.submitform.Mini[0].disabled=false;
+    document.submitform.Mini[1].disabled=false;
+    //document.submitform.keep_output.disabled=false;
+    document.getElementById('rosetta1').style.color='#000000';
+    //document.getElementById('rosetta2').style.color='#000000';
+    }
+    return true;
+}
+
+function updateCellSize1( task ) {
+    var high = document.getElementById( 'pic' ).offsetHeight + document.getElementById( 'common_form' ).offsetHeight + document.getElementById( 'submit_button' ).offsetHeight + document.getElementById( task ).offsetHeight ;
+    document.getElementById('empty_box').style.height = high ;
+}
+
+function updateCellSize2() {
+    var high = document.getElementById( 'pic' ).offsetHeight + document.getElementById( 'task_init' ).offsetHeight;
+    document.getElementById('empty_box').style.height = high ;
 }
 
 function addOneMore() {
@@ -271,7 +266,6 @@ function addOneMoreSeqtol() {
     new Effect.Appear("seqtol_row_" + "" + numSeqTol);
     return true;
 }
-
 
 function writeRow( numbr ) {
     x = numbr + 1
@@ -296,6 +290,9 @@ function writeRowDEMO( numbr, chain, resid, newres, radius ) {
     return true;
 }
 
+/************************************
+ * helper functions  END
+ ************************************/
 
 function confirm_delete(jobID)
 {
@@ -306,6 +303,8 @@ function confirm_delete(jobID)
 //  else {
 //    window.location.href = "rosettaweb.py?query=queue" ; }
 }
+
+
 
 
 function set_demo_values() {
@@ -391,7 +390,31 @@ else if ( actual_task == 'upload_mutation') {
 } */
 
 
+// obsolete:
 
+// function popUp( obj ) {
+//     my_obj = document.getElementById(obj).style;
+//     if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
+//         my_obj.visibility = "hidden";
+//     }
+//     else { if ( my_obj.visibility == "hidden" ) {
+//         my_obj.visibility = "visible";
+//     }
+//     }
+// }
+
+function popUp( obj ) {
+    my_obj = document.getElementById(obj).style;
+    offset=10
+    if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
+        my_obj.top  = e.clientY + offset;
+        my_obj.left = e.clientX + offset*2;
+        my_obj.visibility = "hidden";
+    }
+    else {
+        my_obj.visibility = "visible";
+    }
+}
 
 
 

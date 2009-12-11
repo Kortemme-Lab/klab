@@ -746,7 +746,7 @@ def submit(form, SID):
 
     
     if form.has_key("nos"):
-      nos = min( int(form["nos"].value), 100)
+      nos = min( int(form["nos"].value), 50)
     else:
       nos = 10
         

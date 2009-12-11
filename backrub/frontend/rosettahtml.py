@@ -75,8 +75,8 @@ class RosettaHTML:
             <html>
             <head>
                 <title>%s - %s</title>
-                <META name="description" content="Structure Prediction using Backrub.">
-                <META name="keywords" content="rosetta baker kortemme protein structure prediction backrub protein design point mutation">
+                <META name="description" content="Structure Modeling using Backrub">
+                <META name="keywords" content="rosetta kortemme protein structure modeling prediction backrub design point mutation baker">
                 
                 <link rel="STYLESHEET" type="text/css" href="../style.css">
                 
@@ -253,7 +253,7 @@ class RosettaHTML:
 
       <table border=0 cellpadding=0 cellspacing=0>
         <colgroup>
-          <col width="210">
+          <col width="230">
           <col width="500">
         </colgroup>
         <tr>
@@ -261,30 +261,31 @@ class RosettaHTML:
           <td id="columnLeft" align="right" style="vertical-align:top; margin:0px;">
           <ul id="about">
             <li id="ab2">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); ">Point Mutation</A>            
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0"> Point Mutation</A><br>
+              <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>            
               <p id="menu_1" style="text-align:left; margin:0px;">
-                <font style="font-size:8pt">[ Smith and Kortemme, 2008 ]</font>
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','1'); ">One mutation</a></td></tr>
-                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','2'); ">Multiple mutations</a></td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','1'); ">One mutation</a></td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','2'); ">Multiple mutations</a></td></tr>
                   <!-- tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('1','3'); ">Upload List</td></tr -->
                   </table>
               </p>
             </li>
             <li id="ab3">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('2'); ">Backrub Ensembles</A>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('2'); "><img src="../images/qm_s.png" border="0"> Backrub Ensembles</A>
               <p id="menu_2" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); "><font style="font-size:10pt">Generate Backrub Ensemble</font></a><br><font style="font-size:8pt">[ Smith and Kortemme, 2008 ]</font></td></tr>
-                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('2','2'); "><font style="font-size:10pt">Backrub Ensemble Design</font></a><br><font style="font-size:8pt">[ Friedland et. al., 2008 ]</font></td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('2','1'); "><font style="font-size:10pt">Generate Backrub Ensemble</font></a><br><font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font></td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('2','2'); "><font style="font-size:10pt">Backrub Ensemble Design</font></a><br><font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 8pt">Friedland et. al., 2008</a> ]</font></td></tr>
                   </table>
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');">Sequence Plasticity Prediction</A>
-              <p id="menu_3" style="text-align:right;">
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0"> Sequence Plasticity Prediction</A><br>
+              <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme</a> ]</font>
+              <p id="menu_3" style="text-align:right;">                  
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1');">Enter Data</a></td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1');">Enter Data</a></td></tr>
                   </table>
               </p>
             </li>
@@ -313,7 +314,7 @@ class RosettaHTML:
           <!-- description -->
             <p id="text0" style="text-align:justify;">
               Choose one of the applications on the left. Each application will give you a short explanation and a set of parameters that can be adjusted.<br><br>
-              For a brief explanation hover your mouse over the parameter.
+              A tutorial on how to submit a job can be found <a href="../wiki/Tutorial">here</a>. For a brief explanation of each parameter move your mouse to the question mark symbol.
             </p>
           
             <div id="text1" style="display:none; opacity:0.0; text-align:justify;"> 
@@ -357,36 +358,36 @@ class RosettaHTML:
               </TR>
               <TR></td></TR>
               <TR>
-                <TD align=right title="%(tt_JobName)s">Job Name </TD>
+                <TD align=right>Job Name <img src="../images/qm_s.png" title="%(tt_JobName)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%(jobname)s"></TD>
               </TR>
               <TR>
-                <TD align=right title="%(tt_Structure)s">Upload Structure </TD>
+                <TD align=right>Upload Structure <img src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20"></TD>
               </TR>
               <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR>
-                <TD align=right title="%(tt_StructureURL)s"> Enter URL to structure file </TD>
+                <TD align=right>Enter URL to structure file <img src="../images/qm_s.png" title="%(tt_StructureURL)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBComplexURL" size="31">
               </TD>
               </TR>
               <TR><TD colspan=2><br></TD></TR>
               <TR>
-                <TD align="center" colspan=2 style="border-bottom:1pt dashed black" title="%(tt_general)s">General Settings</TD>
+                <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
               </TR>
               <TR>
-                <TD align=right title="%(tt_RVersion)s">Rosetta Version </TD>
+                <TD align=right>Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
                 <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">
-                    <input type="radio" name="Mini" value="classic" checked> Rosetta v.2 (classic)<br>
-                    <input type="radio" name="Mini" value="mini"> Rosetta v.3 (mini)
+                    <input type="radio" name="Mini" value="classic" checked> Rosetta v.2 (classic, as published)<br>
+                    <input type="radio" name="Mini" value="mini"> Rosetta v.3 (mini, new)
                 </TD>
               </TR>
               <TR>
-                <TD align=right title="%(tt_NStruct)s">Number of structures </TD>
-                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="10"> (max 100) </TD>
+                <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
+                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="10"> (max 50) </TD>
               </TR>
               <!-- TR>
-                <TD align=right title="%(tt_ROutput)s">ROSETTA output </TD>
+                <TD align=right>ROSETTA output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
                 <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1" disabled checked> keep files</TD>
               </TR -->
               <TR><TD align=left><br></TD></TR>
@@ -399,13 +400,13 @@ class RosettaHTML:
             <p id="parameter1_1" style="display:none; opacity:0.0; text-align:justify;">
                 <table align=center>
                 <tr>
-                    <td align="right" title="%(tt_ChainId)s">Chain ID </td><td><input type="text" name="PM_chain"  maxlength=1 SIZE=5 VALUE=""></td>
+                    <td align="right">Chain ID <img src="../images/qm_s.png" title="%(tt_ChainId)s"></td><td><input type="text" name="PM_chain"  maxlength=1 SIZE=5 VALUE=""></td>
                 </tr>
                 <tr>
-                    <td align="right" title="%(tt_ResId)s">Residue Number </td><td><input type="text" name="PM_resid"  maxlength=4 SIZE=5 VALUE=""></td>
+                    <td align="right">Residue Number <img src="../images/qm_s.png" title="%(tt_ResId)s"></td><td><input type="text" name="PM_resid"  maxlength=4 SIZE=5 VALUE=""></td>
                 </tr>
                 <tr>
-                    <td align="right" title="%(tt_NewAA)s">New Amino Acid </td><td><input type="text" name="PM_newres" maxlength=1 SIZE=5 VALUE=""></td>
+                    <td align="right">New Amino Acid <img src="../images/qm_s.png" title="%(tt_NewAA)s"></td><td><input type="text" name="PM_newres" maxlength=1 SIZE=5 VALUE=""></td>
                 </tr>
                 <tr>
                     <td><INPUT TYPE="hidden" NAME="PM_radius" VALUE="6.0"></td>
@@ -456,14 +457,14 @@ class RosettaHTML:
                 <tr id="row_PM28" style="display:none"><td align="center">29</td><td align="center"><input name="PM_chain28" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid28" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres28" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius28" maxlength="4" size="7" type="text"></td></tr>
                 <tr id="row_PM29" style="display:none"><td align="center">30</td><td align="center"><input name="PM_chain29" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid29" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres29" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius29" maxlength="4" size="7" type="text"></td></tr> 
                 <tr id="row_PM30" style="display:none"><td align="center">31</td><td align="center"><input name="PM_chain30" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid30" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres30" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius30" maxlength="4" size="7" type="text"></td></tr>
-                <tr><td align="center" colspan="4"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a mutation</a></td></tr>
+                <tr><td align="center" colspan="4"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a residue</a></td></tr>
                 </table>
                 
             </p>
             
             <!-- Backrub - Costum Mutation -->
             <p id="parameter1_3" style="display:none; opacity:0.0; text-align:justify;"><b>Custom mutation.</b><br><br>
-                This allows for a more flexible definition of mutations. Detailed information about the format of the file can be found in the <A style="color:#365a79; "href="%(script)s?query=doc#mutations">documentation</A>. <br>
+                This allows for a more flexible definition of mutations. Detailed information about the format of the file can be found in the <A style="color:#365a79; "href="../wiki/Mutations">documentation</A>. <br>
                 <font style="text-align:left;">Upload file <INPUT TYPE="file" NAME="Mutations" size="13"></font>
             </p>
             
@@ -474,13 +475,13 @@ class RosettaHTML:
             <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
                 <table align="center">
                 <tr>
-                    <td title="%(tt_Temp)s">Temperature [kT]</td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2"></td>
+                    <td align="right">Temperature [kT]<img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2"></td>
                 </tr>
                 <tr>
-                    <td title="%(tt_NSeq)s">No. of sequences</td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20"></td>
+                    <td align="right">No. of sequences<img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20"></td>
                 </tr>
                 <tr>
-                    <td title="%(tt_SegLength)s">Max. segment length</td><td><input type="text" name="ENS_segment_length" maxlength=1 SIZE=5 VALUE="12"></td>
+                    <td align="right">Max. segment length<img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=1 SIZE=5 VALUE="12"></td>
                 </tr>
                 </table>
             </p>
@@ -489,37 +490,30 @@ class RosettaHTML:
             <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
               <tr>
-                  <td align="right" title="%(tt_seqtol_partner)s">Partner 1:</td>
+                  <td  align="right">Partner 1 <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
                   <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
               </tr>
               <tr>
-                  <td align="right" title="%(tt_seqtol_partner)s">Partner 2:</td>
+                  <td  align="right">Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
                   <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
                   </td>
               </tr>
               <!-- tr>
-                  <td align="right" title="%(tt_seqtol_list)s">Residues of Partner 2</td>
+                  <td  align="right">Residues of Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_list)s"></td>
                   <td><input type="text" name="seqtol_list" maxlength=120 SIZE=10 VALUE="">
                   </td>
               </tr -->
               <tr>
-                  <td align="right" title="%(tt_Radius)s">Area for repacking.</td>
+                  <td  align="right">Area for repacking <img src="../images/qm_s.png" title="%(tt_Radius)s"></td>
                   <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197;</td>
               </tr>
-              <tr>
-                  <td align="right" title="%(tt_seqtol_weights)s">Weight for Partner</td>
-                  <td>
-                    <table >
-                      <tr >
-                        <td align="center">1:</td><td align="center"><input type="text" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1"></td>
-                        <td align="center">2:</td><td align="center"><input type="text" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1"></td>
-                        <td align="center">interface:</td><td align="center"><input type="text" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2"></td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
+              <!-- weights ? -->
+                <input type="hidden" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1">
+                <input type="hidden" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1">
+                <input type="hidden" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2">
+                
                 <tr>
-                  <td align="right" title="%(tt_seqtol_design)s">Residues for design</td>
+                  <td align="right">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
                   <td>
                     <table bgcolor="#EEEEEE">
                       <tr bgcolor="#828282" style="color:white;">
@@ -535,7 +529,7 @@ class RosettaHTML:
                       <tr align="center" id="seqtol_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_7" maxlength=4 SIZE=4></td></tr>
                       <tr align="center" id="seqtol_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_8" maxlength=4 SIZE=4></td></tr>
                       <tr align="center" id="seqtol_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_9" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a mutation</a></td></tr>
+                      <tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a residue</a></td></tr>
                       </table>
                   </td>
                 </tr>
@@ -582,6 +576,20 @@ class RosettaHTML:
         </td>''' % self.tooltips
 
         return html
+
+        # <tr>
+        #     <td  align="right"><img src="../images/qm_s.png" title="%(ttseqtol_weights)s">Weight for Partner</td>
+        #     <td>
+        #       <table >
+        #         <tr >
+        #           <td align="center">1:</td><td align="center"><input type="text" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1"></td>
+        #           <td align="center">2:</td><td align="center"><input type="text" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1"></td>
+        #           <td align="center">interface:</td><td align="center"><input type="text" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2"></td>
+        #         </tr>
+        #       </table>
+        #     </td>
+        #   </tr>
+
 
 
     def submited(self, jobname='', cryptID=''):
@@ -1290,7 +1298,7 @@ class RosettaHTML:
         html = """<td align="center">
                   <H1 class="title">Welcome to RosettaBackrub</A> </H1> 
                     <P>
-                      This is the structure prediction web server of the Kortemme Lab. This server utilizes the backrub method for flexible protein backbone modeling implemented in 
+                      This is the structure modeling web server of the Kortemme Lab. This server utilizes the backrub method for flexible protein backbone modeling implemented in 
                       <a href="/backrub/wiki/Rosetta">Rosetta</a>. 
                       This server allows the user to upload a protein structure and choose an algorithm that is applied to this structure. 
                       For a tutorial on how to submit a job see the <a href="/backrub/wiki/">documentation</a>. 
@@ -1388,7 +1396,7 @@ class RosettaHTML:
 
     def help(self):
         html = '<td>'
-        html += open("doc.html", 'r').read()
+        html += open("doc.html", 'r').read() # '<a href="../wiki/">doc</a>' #
         html += '</td>'     
         return html
         
