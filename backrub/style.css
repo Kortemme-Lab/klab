@@ -25,6 +25,8 @@ P { text-align: justify; }
 .results { background: #eeeeee; font-size: 11px; font-family: verdana, arial; }
 .nav { text-decoration: none; color:#0000aa; font-family: Arial, Helvetica, Sans-Serif; font-size: 12pt; }
 
+sup#ref { font-size:66%; }
+
 missing { background: #FF0000; }
 
 a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size: 10pt; text-decoration: none; }
@@ -36,8 +38,7 @@ a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size:
           padding-left:10px; 
           border-color:black; 
           border-style:solid; 
-          border-width:1px;
-          background-color:#F0454B; }
+          border-width:1px; }
 
 .tth {  font:12px/14px Arial,Helvetica,sans-serif; 
             border:solid 1px #666666; 

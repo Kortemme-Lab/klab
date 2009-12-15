@@ -114,17 +114,41 @@ function changeApplication( app, _task ) {
 			new Effect.Fade( myParameter[i], { duration: 0.0 } );
 		}
 	}
-	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) { new Effect.Appear( "ref1" ); } 
-	  else { new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
-	
-	if ( task == 'parameter2_2' ) { new Effect.Appear( "ref2" ); } else { new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
-	if ( task == 'parameter3_1' ) { new Effect.Appear( "ref3" ); } else { new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); }
-	
-	if ( task == 'parameter2_2' || task == 'parameter3_1') {
-	  setMini(1);
-	} else {
-   setMini(0);
+	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) { 
+	  new Effect.Appear( "ref1" );
+	  document.submitform.Mini[0].checked=true;
+	  document.submitform.Mini[0].disabled=false;
+    document.submitform.Mini[1].disabled=false;
+    document.getElementById('rv0').style.color='#000000';
+    document.getElementById('rv1').style.color='#000000';
+  } else { 
+    new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
   }
+	
+	if ( task == 'parameter2_2' ) { 
+	  new Effect.Appear( "ref2" ); 
+	  new Effect.Appear( "rosetta_remark" );
+	  document.submitform.Mini[0].checked=true;
+    document.submitform.Mini[1].disabled=true;
+    document.getElementById('rv1').style.color='#D8D8D8';
+	
+	} else { 
+	  new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
+    new Effect.Fade( "rosetta_remark", { duration: 0.0, queue: { position: '20', scope: 'task' } } );
+  
+  }
+	
+	if ( task == 'parameter3_1' ) { 
+	  new Effect.Appear( "ref3" ); 
+	  document.submitform.Mini[0].disabled=true;
+    document.submitform.Mini[1].checked=true;
+    document.getElementById('rv0').style.color='#D8D8D8';
+	  
+	} else { 
+	  new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
+
+	}
+
   
   mycolor = "";     
   if (task == 'parameter1_1' || task == 'parameter1_2') {
@@ -348,7 +372,7 @@ function set_demo_values() {
   } else if ( actual_task == 'parameter2_2') {
       document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb"
       document.submitform.nos.value = "10";
-      document.submitform.ENS_temperature.value = "0.3";
+      document.submitform.ENS_temperature.value = "1.2";
       document.submitform.ENS_num_designs_per_struct.value = "20";
       document.submitform.ENS_segment_length.value = "12";
 

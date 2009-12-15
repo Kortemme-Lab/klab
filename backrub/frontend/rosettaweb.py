@@ -36,6 +36,7 @@ import sys, os
 # Append document_root to sys.path to be able to find user modulesface
 #sys.path.append(os.environ['DOCUMENT_ROOT'])
 
+import shutil
 import sha, time
 import cgi
 import cgitb; cgitb.enable()
@@ -59,6 +60,7 @@ from datetime import datetime
 from string import *
 from cStringIO import StringIO
 from cgi import escape
+
 
 import pickle
 
@@ -228,7 +230,7 @@ def ws():
     elif login_return == 'logged_in':
       html_content = rosettaHTML.login( message='You\'re already logged in.', login_disabled=True )
     else:
-      html_content = rosettaHTML.login() 
+      html_content = rosettaHTML.login()
     title = 'Home'
 
   elif query_type  == "loggedin":
@@ -244,8 +246,8 @@ def ws():
   elif query_type == "submitted":
     return_val = submit(form, SID)
     if return_val[0]: # data was submitted and written to the database
-      html_content = rosettaHTML.submited(jobname='',cryptID=return_val[1])
-      title = 'New Job submitted'
+      html_content = rosettaHTML.submited( jobname='',cryptID=return_val[1], remark=return_val[2] )
+      title = 'Job submitted'
     else: # no data was submitted/there is an error
       html_content = "<br>Error<br><br>%s<br>" % return_val[1]
 
@@ -904,19 +906,42 @@ def submit(form, SID):
         sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
         result  = execQuery(connection, sql)
         # success
+        
+        # create a hash key for the entry we just made
+        sql = '''SELECT Mutations, PDBComplex, PDBComplexFile, Mini, EnsembleSize, PM_chain, PM_resid, PM_newres, PM_radius, task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter 
+                   FROM backrub 
+                  WHERE ID="%s" ''' % ID # get data
+        result = execQuery(connection, sql)
+        value_string = "" 
+        for value in result[0]: # combine it to a string
+          value_string += str(value)
+        hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
+        sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
+        result = execQuery(connection, sql)
+        # success
+
+        # now find if there's a key like that already:
+        sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE hashkey="%s" AND Status="2" ''' % hash_key
+        result = execQuery(connection, sql)
+        
+        for r in result:
+          if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
+            shutil.copytree( os.path.join( ROSETTAWEB_download_dir, r[1] ), os.path.join( ROSETTAWEB_download_dir, cryptID ) ) # copy the data to a new directory
+            sql = 'UPDATE backrub SET Status="2", EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
+            result = execQuery(connection, sql)
+            sql = "UNLOCK TABLES"
+            execQuery(connection, sql)            
+            return (True, cryptID, "old")
+        
+                
       except _mysql_exceptions.OperationalError, e:
         html = '<H1 class="title">New Job not submitted</H1>'
         if e[0] == 1153:
           html += """<P>We are sorry but the size of the PDB file exceeds the upload limit. 
-          Please revise your file and delete unneccessary entries (e.g. copies of chains).</P>
+          Please revise your file and delete unneccessary entries (e.g. copies of chains, MODELS, etc.).</P>
           <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>"""
         else:
-          html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please <A href="mailto:%s?subject=[%s] - Upload Error" style="font-size: 10pt">contact us</A>.</P>""" % ( ROSETTAWEB_contact_email, ROSETTAWEB_server_title )
-      
-      # # check if the entry we just made is already in the database!! this way we can avoid the computation
-      # sql1 = '''SELECT br1.Mutations,br1.PDBComplexFile,br1.Mini,br1.EnsembleSize,br1.PM_chain,br1.PM_resid,br1.PM_newres,br1.PM_radius,br1.task,br1.ENS_temperature,br1.ENS_num_designs_per_struct,br1.ENS_segment_length,br1.seqtol_parameter FROM backrub 
-      #            WHERE '''
-      
+          html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" height="15">.</P>"""
       
       # unlock tables
       sql = "UNLOCK TABLES"
@@ -926,7 +951,7 @@ def submit(form, SID):
     form['error_msg'] = 'wrong mode for submit()'
     return (False, error)
     
-  return (True, cryptID) # true we processed the data
+  return (True, cryptID, "new") # true we processed the data
 
 ########################################## end of submit() ####################################
 
