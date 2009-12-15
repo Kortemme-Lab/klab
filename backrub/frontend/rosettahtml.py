@@ -1378,13 +1378,13 @@ class RosettaHTML:
                     <P>
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
                     The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al<a href="#ref1"><sup id="ref">1</sup></a>, 
-                    for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3,</sup></a><a href="#ref4"><sup id="ref">4</sup></a>.<br>
-                    The server \"<b>input</b>\" is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
-                    prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.<br>
+                    for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3,</sup></a><a href="#ref4"><sup id="ref">4</sup></a>.</P>
+                    <P>The server \"<b>input</b>\" is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
+                    prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.
                     The server \"<b>output</b>\", dependent on the application, consists of: structures of point mutants<a href="#ref2"><sup id="ref">2</sup></a> and their Rosetta force field scores, 
                     near-native structural ensembles of protein backbone conformations<a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3</sup></a> 
-                    and designed sequences using flexible backbone computational protein design<a href="#ref4"><sup id="ref">4</sup></a>.<br>
-                    For a \"<b>tutorial</b>\" on how to submit a job and interpret the results see the <a href="/backrub/wiki/">documentation</a>.
+                    and designed sequences using flexible backbone computational protein design<a href="#ref4"><sup id="ref">4</sup></a>.</P>
+                    <P>For a \"<b>tutorial</b>\" on how to submit a job and interpret the results see the <a href="/backrub/wiki/">documentation</a>.
                     </P>
 
                   <div id="login_box">
