@@ -56,6 +56,13 @@ function ValidateForm() {
                     alert("Please complete all required fields.");
                     return false;
     }
+    if ( document.submitform.task.value == "ensemble" &&
+        ( document.submitform.ENS_temperature.value == "" ||
+          document.submitform.ENS_num_designs_per_struct.value == "" ||
+          document.submitform.ENS_segment_length.value == "" ) ) {
+                    alert("Please complete all required fields.");
+                    return false;
+    }
     if ( document.submitform.task.value == "upload_mutation" &&
             document.submitform.Mutations.value == "" ) {
                     alert("Please complete all required fields.");
@@ -129,6 +136,7 @@ function changeApplication( app, _task ) {
 	  new Effect.Appear( "rosetta_remark" );
 	  document.submitform.Mini[0].checked=true;
     document.submitform.Mini[1].disabled=true;
+    document.getElementById('rv0').style.color='#000000';
     document.getElementById('rv1').style.color='#D8D8D8';
 	
 	} else { 
@@ -141,7 +149,9 @@ function changeApplication( app, _task ) {
 	  new Effect.Appear( "ref3" ); 
 	  document.submitform.Mini[0].disabled=true;
     document.submitform.Mini[1].checked=true;
+    document.submitform.Mini[1].disabled=false;
     document.getElementById('rv0').style.color='#D8D8D8';
+    document.getElementById('rv1').style.color='#000000';
 	  
 	} else { 
 	  new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
@@ -334,11 +344,11 @@ function set_demo_values() {
   actual_task = getTask();
 
  if ( actual_task == 'parameter1_1') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1CV1.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1KYO.pdb"
       document.submitform.nos.value = "10";
       document.submitform.PM_chain.value = "A";
-      document.submitform.PM_resid.value = "111";
-      document.submitform.PM_newres.value = "I";
+      document.submitform.PM_resid.value = "153";
+      document.submitform.PM_newres.value = "F";
 
   } else if ( actual_task == 'parameter1_2') {
       document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb"

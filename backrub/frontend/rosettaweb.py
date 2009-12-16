@@ -815,11 +815,11 @@ def submit(form, SID):
       else:
         ENS_temperature = ""
       if form.has_key("ENS_num_designs_per_struct") and form["ENS_num_designs_per_struct"].value != '':
-        ENS_num_designs_per_struct = form["ENS_num_designs_per_struct"].value
+        ENS_num_designs_per_struct = str( min(int(form["ENS_num_designs_per_struct"].value), 20 ))
       else:
         ENS_num_designs_per_struct = ""
       if form.has_key("ENS_segment_length") and form["ENS_segment_length"].value != '':
-        ENS_segment_length = form["ENS_segment_length"].value
+        ENS_segment_length = str( min( int(form["ENS_segment_length"].value), 12))
       else:
         ENS_segment_length = ""
   #    else:

@@ -37,7 +37,7 @@ class RosettaHTML:
         self.tooltips = { 
                         "tt_empty":         "header=[] body=[] %s" % tooltip_parameter,
                         "tt_general":       "header=[General Settings] body=[These settings are common for all applications.] %s" % tooltip_parameter,
-                        "tt_specific":      "header=[Application Specific Settings] body=[These settings are dependent on the applications. If you are not sure use the standard values.] %s" % tooltip_parameter,
+                        "tt_specific":      "header=[Application Specific Settings] body=[These settings are dependent on the applications. If you are not sure use the standard values. For a more detailed explanation of the parameters and their influence on simulation results see the according reference.] %s" % tooltip_parameter,
                         "tt_JobName":       "header=[Name for your job] body=[Enter a name that helps you identify your job later on the job queue page.] %s" % tooltip_parameter,
                         "tt_Structure":     "header=[Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
@@ -53,11 +53,12 @@ class RosettaHTML:
                         "tt_NSeq":          "header=[Number of Sequences] body=[The number of designed sequences for each ensemble structure.] %s" % tooltip_parameter,
                         "tt_SegLength":     "header=[Maximal segment length for backrub] body=[Limit the length of the segment to which the backrub move is applied to. (3-12)] %s" % tooltip_parameter,
                         "tt_error":         "header=[Rosetta Error</b></font><br>Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occures for your structure please check the correctness of the PDB file.] %s" % tooltip_parameter,
-                        "tt_seqtol_partner":"header=[Partner] body=[The two chains in the PDB file that form an interface.] %s" % tooltip_parameter,
+                        "tt_seqtol_partner":"header=[Partner] body=[Define the two chains that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] %s" % tooltip_parameter,
                         "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
                         "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
                         "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
+                        "tt_click":         "body=[Click on the link to read the description.] %s" % tooltip_parameter,
                         }
         
         self.refs = { "Davis": 'Davis IW, Arendall III WB, Richardson DC, Richardson JS. <i>The Backrub Motion: How Protein Backbone Shrugs When a Sidechain Dances</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2005.10.007" style="font-size: 10pt">Structure, Volume 14, Issue 2, 2 February 2006, Pages 265-274</a>',
@@ -262,9 +263,9 @@ class RosettaHTML:
         #   [ <A href="/alascan/" class="nav" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
         # </li>
         
-        self.html_refs = '''<P>(<a name="ref1">1</a>) %(Smith)s</P>
-                            <P>(<a name="ref2">2</a>) %(Friedland)s</P>
-                            <P>(<a name="ref3">3</a>) %(Humphris)s</P>
+        self.html_refs = '''<P>[<a name="ref1">1</a>] %(Smith)s</P>
+                            <P>[<a name="ref2">2</a>] %(Friedland)s</P>
+                            <P>[<a name="ref3">3</a>] %(Humphris)s</P>
                          ''' % self.refs
                 
         html = '''<td align="center">
@@ -283,7 +284,7 @@ class RosettaHTML:
           <td id="columnLeft" align="right" style="vertical-align:top; margin:0px;">
           <ul id="about">
             <li id="ab2">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0"> Point Mutation</A><br>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Point Mutation</A><br>
               <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>            
               <p id="menu_1" style="text-align:left; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
@@ -294,7 +295,7 @@ class RosettaHTML:
               </p>
             </li>
             <li id="ab3">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('2'); "><img src="../images/qm_s.png" border="0"> Backrub Ensembles</A>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('2'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Backrub Ensembles</A>
               <p id="menu_2" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="30" style="text-align:right;">&#8680;</td>
@@ -311,7 +312,7 @@ class RosettaHTML:
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0"> Sequence Plasticity Prediction</A><br>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Sequence Plasticity Prediction</A><br>
               <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme</a> ]</font>
               <p id="menu_3" style="text-align:right;">                  
                   <table style="border:0px; padding:0px; margin:0px;">
@@ -335,7 +336,7 @@ class RosettaHTML:
             </p>
             
             <p id="pic3" style="display:none; text-align:center;">
-              <img src="../images/logo2.png" width="85%%" alt="logo3" border=0>
+              <img src="../images/logo3.png" width="85%%" alt="logo3" border=0>
             </p>
 
           <!-- end pictures -->
@@ -360,7 +361,7 @@ class RosettaHTML:
             </div>
 
             <div id="text2" style="display:none; opacity:0.0; text-align:justify;"> 
-                This function utilizes backrub and design protocols implemented in ROSETTA. 
+                This function utilizes backrub and design protocols implemented in Rosetta. 
                 There are two options.
                 <dl style="text-align:left;">
                     <dt><b>Generate Backrub Ensemble</b></dt>
@@ -418,19 +419,19 @@ class RosettaHTML:
                 </TD>
               </TR>
               <TR>
-                <TD colspan="2" id="rosetta_remark" style="display:none;" align="right">Rosetta version in this applications is as published below.</TD>
+                <TD colspan="2" id="rosetta_remark" style="display:none;" align="right">The Rosetta version in this applications is as published [2].</TD>
               </TR>
               <TR>
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
-                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="10"> (max 50) </TD>
+                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="10"> (max 50, recommended 10) </TD>
               </TR>
               <!-- TR>
-                <TD align=right>ROSETTA output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
+                <TD align=right>Rosetta output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
                 <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1" disabled checked> keep files</TD>
               </TR -->
               <TR><TD align=left><br></TD></TR>
               <TR>
-                <TD align="center" colspan=2 style="border-bottom:1pt dashed black" title="%(tt_specific)s">Application Specific Settings</TD>
+                <TD align="center" colspan=2 style="border-bottom:1pt dashed black">Application Specific Settings <img src="../images/qm_s.png" border="0" title="%(tt_specific)s"></TD>
               </TR>
             </TABLE>
             
@@ -513,13 +514,13 @@ class RosettaHTML:
             <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
                 <table align="center">
                 <tr>
-                    <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2"></td>
+                    <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2">(recommended 1.2)</td>
                 </tr>
                 <tr>
-                    <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20"></td>
+                    <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20">(max 20, recommended 20)</td>
                 </tr>
                 <tr>
-                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=1 SIZE=5 VALUE="12"></td>
+                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=1 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
                 </tr>
                 </table>
             </p>
@@ -543,7 +544,7 @@ class RosettaHTML:
               </tr -->
               <tr>
                   <td  align="right">Area for repacking <img src="../images/qm_s.png" title="%(tt_Radius)s"></td>
-                  <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197;</td>
+                  <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197; (recommended 4.0&#197;)</td>
               </tr>
               <!-- weights ? -->
                 <input type="hidden" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1">
@@ -1062,12 +1063,14 @@ class RosettaHTML:
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           
           comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
-          [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]""" % cryptID
+          [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]
+          <br><br>Please wait, it may take a few moments to load the Ca trace representation.""" % cryptID
         
           html += self._showApplet4EnsembleFile( comment2, '../downloads/%s/ensemble.pdb' % cryptID, style='backbone' )        
           
           comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure.<br>
-           [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]""" % cryptID
+           [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]
+           <br><br>Please wait, it may take a few moments to load cartoon representation.""" % cryptID
         
           html += self._showApplet4EnsembleFile( comment1, '../downloads/%s/ca_dist_difference_bfactors.pdb' % cryptID, style='cartoon' )
           
@@ -1311,7 +1314,7 @@ class RosettaHTML:
             # html code
             html = """
                     <form>
-                     <tr><td align="justify" bgcolor="#FFFCD8">%s</td>
+                     <tr><td align="justify" bgcolor="#FFFCD8">%s<br><br>Please wait, it may take a few moments to load the Ca trace representation.</td>
                          <td bgcolor="#FFFCD8">
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
@@ -1365,10 +1368,10 @@ class RosettaHTML:
         if login_disabled:
             disabled = 'disabled'
         
-        self.html_refs = '''<P>(<a name="ref1">1</a>) %(Davis)s</P>
-                            <P>(<a name="ref2">2</a>) %(Smith)s</P>
-                            <P>(<a name="ref3">3</a>) %(Friedland)s</P>
-                            <P>(<a name="ref4">4</a>) %(Humphris)s</P>
+        self.html_refs = '''<P>[<a name="ref1">1</a>] %(Davis)s</P>
+                            <P>[<a name="ref2">2</a>] %(Smith)s</P>
+                            <P>[<a name="ref3">3</a>] %(Friedland)s</P>
+                            <P>[<a name="ref4">4</a>] %(Humphris)s</P>
                          ''' % self.refs
         
         html = """<td align="center">
