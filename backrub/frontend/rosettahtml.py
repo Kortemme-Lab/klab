@@ -638,16 +638,16 @@ class RosettaHTML:
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#F0454B;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
                     Raw data files:<br><a class="blacklink" href="https://%s/backrub/downloads/%s" target="_blank">https://%s/backrub/downloads/%s</a>
-                    </td></tr></table>''' % ( self.server_url, cryptID, self.server_url, cryptID, self.server_url, cryptID )                
-#                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, )
+                    </td></tr></table>''' % ( self.server_url, cryptID, self.server_url, cryptID )                
+#                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
       elif remark == 'old':
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#53D04F;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">A job with the same parameters has already been processed. 
                                                                                           Please use one of the following links to go to the results:</font><br>
-                     <br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">Job Info page</a> or
-                    Raw data files:<br><a class="blacklink" href="https://%s/backrub/downloads/%s" target="_blank">https://%s/backrub/downloads/%s</a>
-                    </td></tr></table>''' % ( self.script_filename, cryptID, self.server_url, cryptID, self.server_url, cryptID, self.server_url, cryptID )
+                     <br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">Job Info page</a> or Raw data files:<br>
+                         <a class="blacklink" href="https://%s/backrub/downloads/%s" target="_blank">https://%s/backrub/downloads/%s</a>
+                    </td></tr></table>''' % ( self.script_filename, cryptID, self.server_url, cryptID, self.server_url, cryptID)
       else:
         box = '<font color="red">An error occured, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
