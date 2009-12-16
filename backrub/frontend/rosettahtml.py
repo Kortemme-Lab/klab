@@ -60,10 +60,10 @@ class RosettaHTML:
                         "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
                         }
         
-        self.refs = { "Davis": 'Davis IW, Arendall III WB, Richardson DC and Richardson JS <i>The Backrub Motion: How Protein Backbone Shrugs When a Sidechain Dances </i>,<br><a href="http://dx.doi.org/10.1016/j.str.2005.10.007" style="font-size: 10pt">Structure. (2006), Feb 2;14(2):265274</a>',
-                      "Smith": 'Smith CA, Kortemme T, <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology Volume 380, 742-756</a>',
-                      "Humphris": 'Humphris EL, Kortemme T, <i>Prediction of protein-protein interface sequence diversity using flexible backbone computational protein design.</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure. (2008). Dec 12;16(12):1777-88</a>',
-                      "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T, <i>A correspondence between solution-state dynamics of an individual protein and the sequence and conformational diversity of its family.</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. 2009 May</a>',
+        self.refs = { "Davis": 'Davis IW, Arendall III WB, Richardson DC, Richardson JS. <i>The Backrub Motion: How Protein Backbone Shrugs When a Sidechain Dances</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2005.10.007" style="font-size: 10pt">Structure, Volume 14, Issue 2, 2 February 2006, Pages 265-274</a>',
+                      "Smith": 'Smith CA, Kortemme T. <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology, Volume 380, Issue 4, 18 July 2008, Pages 742-756 </a>',
+                      "Humphris": 'Humphris EL, Kortemme T. <i>Prediction of Protein-Protein Interface Sequence Diversity using Flexible Backbone Computational Protein Design</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure, Volume 16, Issue 12, 12 December 2008, Pages 1777-1788</a>',
+                      "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. May;5(5):e1000393</a>',
                       "2": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "3": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "4": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
@@ -327,17 +327,15 @@ class RosettaHTML:
           <div id="box">
           <!-- pictures for the different applications -->
             <p id="pic1" style="display:none; text-align:center;">
-              <img src="../images/logo1.png" width="85%%" alt="Rosetta" border=0>
+              <img src="../images/logo1.png" width="85%%" alt="logo1" border=0>
             </p>
 
             <p id="pic2" style="display:none; text-align:center;">
-              logo2
-              <!-- img src="../images/logo2.png" width="85%%" alt="Rosetta" border=0 -->
+              <img src="../images/logo2.png" width="85%%" alt="logo2" border=0>
             </p>
             
             <p id="pic3" style="display:none; text-align:center;">
-              logo3
-              <!-- img src="../images/logo2.png" width="85%%" alt="Rosetta" border=0 -->
+              <img src="../images/logo2.png" width="85%%" alt="logo3" border=0>
             </p>
 
           <!-- end pictures -->
@@ -1379,12 +1377,12 @@ class RosettaHTML:
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
                     The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al<a href="#ref1"><sup id="ref">1</sup></a>, 
                     for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3,</sup></a><a href="#ref4"><sup id="ref">4</sup></a>.</P>
-                    <P>The server \"<b>input</b>\" is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
+                    <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
                     prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.
-                    The server \"<b>output</b>\", dependent on the application, consists of: structures of point mutants<a href="#ref2"><sup id="ref">2</sup></a> and their Rosetta force field scores, 
+                    The server <b>output</b>, dependent on the application, consists of: structures of point mutants<a href="#ref2"><sup id="ref">2</sup></a> and their Rosetta force field scores, 
                     near-native structural ensembles of protein backbone conformations<a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3</sup></a> 
                     and designed sequences using flexible backbone computational protein design<a href="#ref4"><sup id="ref">4</sup></a>.</P>
-                    <P>For a \"<b>tutorial</b>\" on how to submit a job and interpret the results see the <a href="/backrub/wiki/">documentation</a>.
+                    <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="/backrub/wiki/">documentation</a>.
                     </P>
 
                   <div id="login_box">
