@@ -687,7 +687,7 @@ class RosettaHTML:
         <H1 class="title" align=center>Registration</H1>
     
         <P style="text-align:center;">
-        Please enter all required (*) information.  
+        Please enter all required information.  
         This account will also be valid for <A href="http://albana.ucsf.edu/alascan/">Alanine Scanning</A>. 
         </P>
         %s
@@ -704,9 +704,6 @@ class RosettaHTML:
             <tr><td align=right class="register">Last Name: </td>
                 <td><input type=text size=20 maxlength=50 name="lastname" value="%s"></td>
             </tr>
-            <tr><td align=right class="register">Institution: </td>
-                <td><input type=text size=20 maxlength=50 name="institution" value="%s"></td>
-            </tr>
             <tr><td align=right class="register">Email: </td>
                 <td><input type=text size=20 maxlength=50 name="email" value="%s" %s></td>
             </tr>
@@ -718,6 +715,9 @@ class RosettaHTML:
             </tr>                                                                
             <tr><td colspan=2>&nbsp;</td></tr>                                                  
             <tr><td colspan=2><b>Optional Fields</b></td></tr>
+            <tr><td align=right class="register">Institution: </td>
+                <td><input type=text size=20 maxlength=50 name="institution" value="%s"></td>
+            </tr>
             <tr><td align=right class="register">Address: </td>
                 <td><input type=text size=20 maxlength=50 name="address" value="%s"></td>
             </tr>

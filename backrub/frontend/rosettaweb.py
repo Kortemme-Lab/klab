@@ -39,7 +39,7 @@ import sys, os
 import shutil
 import sha, time
 import cgi
-import cgitb; cgitb.enable()
+# import cgitb; cgitb.enable()
 import Cookie
 # set Python egg dir MscOSX only
 if os.uname()[0] == 'Darwin':
@@ -109,7 +109,7 @@ connection = MySQLdb.Connection( host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, u
 def ws():
   
   s = sys.stdout
-  sys.stderr = s # should be removed later
+  # sys.stderr = s # should be removed later
 
   debug = ''
 

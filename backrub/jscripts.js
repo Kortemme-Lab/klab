@@ -19,7 +19,6 @@ function ValidateFormRegister() {
         if ( document.myForm.username.value == "" ||
             document.myForm.firstname.value == "" ||
             document.myForm.lastname.value == "" ||
-            document.myForm.institution.value == "" ||
             document.myForm.password.value == "" ||
             document.myForm.confirmpassword.value == "") {
                       alert("Please complete all required fields.");
