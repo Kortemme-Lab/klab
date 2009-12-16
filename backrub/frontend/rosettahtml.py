@@ -17,7 +17,7 @@ class RosettaHTML:
 
     server = {}
 
-    def __init__(self, server_url, server_title, script_filename, download_dir, username='', comment='', warning='', contact_email='lauck@cgl.ucsf.edu' , contact_name='FLO'):
+    def __init__(self, server_url, server_title, script_filename, download_dir, username='', comment='', warning='', contact_email='support@cgl.ucsf.edu' , contact_name='FLO'):
         self.server_url      = server_url
         self.server_title    = server_title
         self.script_filename = script_filename
@@ -60,10 +60,10 @@ class RosettaHTML:
                         "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
                         }
         
-        self.refs = { "Davis": '<i>Davis IW, Arendall III WB, Richardson DC and Richardson JS</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2005.10.007" style="font-size: 10pt">Structure. (2006), Feb 2;14(2):265274</a>',
-                      "Smith": 'Colin A. Smith, Tanja Kortemme, <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology Volume 380, 742-756</a>',
-                      "Humphris": 'Humphris EL, Kortemme T. <i>Prediction of protein-protein interface sequence diversity using flexible backbone computational protein design.</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure. (2008). Dec 12;16(12):1777-88</a>',
-                      "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T., <i>A correspondence between solution-state dynamics of an individual protein and the sequence and conformational diversity of its family.</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. 2009 May</a>',
+        self.refs = { "Davis": 'Davis IW, Arendall III WB, Richardson DC and Richardson JS <i>The Backrub Motion: How Protein Backbone Shrugs When a Sidechain Dances </i>,<br><a href="http://dx.doi.org/10.1016/j.str.2005.10.007" style="font-size: 10pt">Structure. (2006), Feb 2;14(2):265274</a>',
+                      "Smith": 'Smith CA, Kortemme T, <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology Volume 380, 742-756</a>',
+                      "Humphris": 'Humphris EL, Kortemme T, <i>Prediction of protein-protein interface sequence diversity using flexible backbone computational protein design.</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure. (2008). Dec 12;16(12):1777-88</a>',
+                      "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T, <i>A correspondence between solution-state dynamics of an individual protein and the sequence and conformational diversity of its family.</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. 2009 May</a>',
                       "2": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "3": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "4": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',

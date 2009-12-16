@@ -213,7 +213,7 @@ def ws():
   if not os.path.exists('/tmp/daemon-example.pid'):
     warning = 'Backend not running. Jobs will not be processed immediately.'
 
-  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_email='kortemme@cgl.ucsf.edu' , contact_name='Tanja Kortemme')
+  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_email='support@kortemmelab.ucsf.edu' , contact_name='Tanja Kortemme')
 
   # session is now active, execute function
   # if query_type == "index":
@@ -424,7 +424,7 @@ generated upon request to send you a new password. Please login and change
 your password.
 
 If you DID NOT request to reset your password, please let us know.
-mailto:lauck@cgl.ucsf.edu 
+mailto:support@kortemmelab.ucsf.edu 
   
 -----------------------
 LOGIN NAME AND PASSWORD
