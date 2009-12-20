@@ -37,7 +37,7 @@ class RosettaHTML:
         self.tooltips = { 
                         "tt_empty":         "header=[] body=[] %s" % tooltip_parameter,
                         "tt_general":       "header=[General Settings] body=[These settings are common for all applications.] %s" % tooltip_parameter,
-                        "tt_specific":      "header=[Application Specific Settings] body=[These settings are dependent on the applications. If you are not sure use the standard values. For a more detailed explanation of the parameters and their influence on simulation results see the according reference.] %s" % tooltip_parameter,
+                        "tt_specific":      "header=[Application Specific Settings] body=[These settings are dependent on the applications. If you are not sure use the recommended values. For a more detailed explanation of the parameters and their influence on simulation results see the reference below.] %s" % tooltip_parameter,
                         "tt_JobName":       "header=[Name for your job] body=[Enter a name that helps you identify your job later on the job queue page.] %s" % tooltip_parameter,
                         "tt_Structure":     "header=[Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
@@ -204,7 +204,7 @@ class RosettaHTML:
     def _showLegalInfo(self):
         html = """<td style="border:1px solid black; padding:10px" bgcolor="#FFFFE0">
                     <p style="text-align:left; font-size: 10pt">
-                      For questions, please read our <A href="../wiki/">documentation</A> or contact <img src="../images/support_email.png" height="15">
+                      For questions, please read our <A href="../wiki/">documentation</A>, see the reference below, or contact <img src="../images/support_email.png" height="15">
                     </p>
                     %s
                   </td>""" % self.html_refs
@@ -313,7 +313,7 @@ class RosettaHTML:
             </li>
             <li id="ab4">
               <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Sequence Plasticity Prediction</A><br>
-              <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme</a> ]</font>
+              <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
               <p id="menu_3" style="text-align:right;">                  
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1');">Enter Data</a></td></tr>
@@ -353,7 +353,7 @@ class RosettaHTML:
                     <dt><b>One Mutation</b></dt><dd>
                         A single amino acid residue will be substituted and the neighboring residues within a radius of 6&#197; of the mutated residues 
                         will be allowed to change their side-chain conformations (\"repacked\"). 
-                        The method, choice of parameters and benchmarking are described in (<a href="#ref1">1</a>).</dd>
+                        The method, choice of parameters and benchmarking are described in [<a href="#ref1">1</a>].</dd>
                     <dt><b>Multiple Mutations</b></dt><dd>Up to 30 residues can be mutated and their neighborhoods repacked.
                                                           The modeling protocol is as described above for single mutations (but has not been benchmarked yet).</dd>
                     <!-- dt>Upload List</dt><dd>Upload a list with single residue mutations.</dd -->
@@ -367,12 +367,12 @@ class RosettaHTML:
                     <dt><b>Generate Backrub Ensemble</b></dt>
                         <dd>Backrub is applied to the entire input structure to generate a flexible backbone ensemble of modeled protein conformations. 
                         Near-native ensembles made using this method have been shown to be consistent with measures of protein dynamics by 
-                        Residual Dipolar Coupling measurements on Ubiquitin (<a href="#ref2">2</a>).</dd>
+                        Residual Dipolar Coupling measurements on Ubiquitin [<a href="#ref2">2</a>].</dd>
                     <dt><b>Backrub Ensemble Design</b></dt>
                       <dd>This method first creates an ensemble of structures to model protein flexibility. 
                           In a second step, the generated protein structures are used to predict an ensemble of low-energy sequences consistent with the input structures, 
                           using computational design implemented in Rosetta. The output is a sequence profile of this family of structures. 
-                          For ubiquitin, the predicted conformational and sequence ensembles resemble those of the natural occurring protein family (<a href="#ref2">2</a>).</dd>
+                          For ubiquitin, the predicted conformational and sequence ensembles resemble those of the natural occurring protein family [<a href="#ref2">2</a>].</dd>
                 </dl>
             </div>
             
@@ -381,7 +381,7 @@ class RosettaHTML:
                 First, the backrub algorithm is applied to the uploaded protein-protein complex to generate a flexible backbone conformational ensemble of the entire complex. 
                 Then, for each of the resulting structure, residue positions given by the user (up to 10) are subjected to protein design, using a genetic algorithm implemented in Rosetta. 
                 All generated sequences are ranked by their Rosetta force field score. 
-                Sequences with favorable scores both for the total protein complex and the interaction interface are used to build a sequence profile, as described and benchmarked in (<a href="#ref3">3</a>).
+                Sequences with favorable scores both for the total protein complex and the interaction interface are used to build a sequence profile, as described and benchmarked in [<a href="#ref3">3</a>].
             </div>
           <!-- end description -->
           
@@ -419,7 +419,7 @@ class RosettaHTML:
                 </TD>
               </TR>
               <TR>
-                <TD colspan="2" id="rosetta_remark" style="display:none;" align="right">The Rosetta version in this applications is as published [2].</TD>
+                <TD colspan="2" id="rosetta_remark" style="display:none;" align="right">The Rosetta version in this application is as published [2].</TD>
               </TR>
               <TR>
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
@@ -520,7 +520,7 @@ class RosettaHTML:
                     <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20">(max 20, recommended 20)</td>
                 </tr>
                 <tr>
-                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=1 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
+                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
                 </tr>
                 </table>
             </p>
@@ -1064,26 +1064,27 @@ class RosettaHTML:
           
           comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
           [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]
-          <br><br>Please wait, it may take a few moments to load the Ca trace representation.""" % cryptID
+          <br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.""" % cryptID
         
           html += self._showApplet4EnsembleFile( comment2, '../downloads/%s/ensemble.pdb' % cryptID, style='backbone' )        
           
-          comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure.<br>
+          comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure. 
+                        The gradient from red to white to blue corresponds to flexible, intermediate and rigid regions, respectively.<br>
            [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]
            <br><br>Please wait, it may take a few moments to load cartoon representation.""" % cryptID
         
           html += self._showApplet4EnsembleFile( comment1, '../downloads/%s/ca_dist_difference_bfactors.pdb' % cryptID, style='cartoon' )
           
           html += """
-                <tr><td align="right" bgcolor="#FFFCD8">Average C&alpha; distances</td>                 
+                <tr><td align="right" bgcolor="#FFFCD8">Mean C&alpha; difference distance values</td>                 
                     <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_1D_plot.png">
                                           <img src="../downloads/%s/ca_dist_difference_1D_plot.png" alt="image missing." width="400"></a></td></tr>
               
-                <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; distances [ <a href="../downloads/%s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
+                <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; difference distance values [ <a href="../downloads/%s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
                     <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_2D_plot.png">
                                           <img src="../downloads/%s/ca_dist_difference_2D_plot.png" alt="image missing." width="400"></a></td></tr>
                 
-                <tr><td align="right" bgcolor="#FFFCD8">RMSD for individual residues</td>               
+                <tr><td align="right" bgcolor="#FFFCD8">Mean RMSD of C&alpha; atoms for individual residues</td>
                     <td bgcolor="#FFFCD8"><a href="../downloads/%s/rmsd_plot.png"><img src="../downloads/%s/rmsd_plot.png" alt="image missing." width="400"></a></td></tr>                          
                                           
                 <tr><td align="center" colspan="2" bgcolor="#FFFCD8">Design results:</td></tr>
@@ -1123,7 +1124,7 @@ class RosettaHTML:
                       Partner 2: Chain %s<br>
                       Designed residues of Partner 1: %s<br>
                       Designed residues of Partner 2: %s<br>
-                      Radius of interface: %s [&#197;]<br>
+                      Radius of repacking: %s [&#197;]<br>
                       Weights (Partner1:Partner2:Interface): (%s:%s:%s)
                   </td></tr>
               """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' '), seqtol_radius, w1, w2, w3 )
@@ -1135,7 +1136,7 @@ class RosettaHTML:
             list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
             list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low_ms_0000.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation the best scoring structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """Backbone representation of the best scoring structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
             mutated_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
             
@@ -1148,7 +1149,7 @@ class RosettaHTML:
                                                  <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
                                                  <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
                            </td></tr> 
-                       <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencey at each mutated site.<br>
+                       <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequency at each mutated site.<br>
                               Download <a href="../downloads/%s/plasticity_pwm.txt">weight matrix</a> or file with all plots as 
                               <a href="../downloads/%s/plasticity_boxplot.png">PNG</a>, <a href="../downloads/%s/plasticity_boxplot.pdf">PDF</a>.<br>
                               To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
@@ -1214,6 +1215,11 @@ class RosettaHTML:
     
     def jobinfo(self, parameter):
         """this function decides what _showFunction to pick"""
+        
+        self.html_refs = '''<P>[<a name="ref1">1</a>] %(Smith)s</P>
+                            <P>[<a name="ref2">2</a>] %(Friedland)s</P>
+                            <P>[<a name="ref3">3</a>] %(Humphris)s</P>
+                         ''' % self.refs
         
         # SELECT ID, Status, Email, Date, StartDate, EndDate, Notes, Errors, Mini, PDBComplexFile, EnsembleSize, Host, KeepOutput, task, UserID, 
         # PM_chain, PM_resid, PM_newres, PM_radius, ENS_temperature, ENS_num_design_per_struct, ENS_segment_length
@@ -1314,7 +1320,7 @@ class RosettaHTML:
             # html code
             html = """
                     <form>
-                     <tr><td align="justify" bgcolor="#FFFCD8">%s<br><br>Please wait, it may take a few moments to load the Ca trace representation.</td>
+                     <tr><td align="justify" bgcolor="#FFFCD8">%s<br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.</td>
                          <td bgcolor="#FFFCD8">
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
