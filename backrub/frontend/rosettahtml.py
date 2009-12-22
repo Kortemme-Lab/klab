@@ -895,7 +895,7 @@ class RosettaHTML:
         if status == 'active':
             html += '<tr><td align=right bgcolor="#EEEEFF">Started:        </td><td bgcolor="#EEEEFF">%s</td></tr>\n' % ( date_start )
         
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
             html +="""
                 <tr><td align=right bgcolor="#EEEEFF">Started:        </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Ended:          </td><td bgcolor="#EEEEFF">%s</td></tr>
@@ -961,7 +961,7 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 """ % ( input_filename, size_of_ensemble )
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)        
         
@@ -982,7 +982,7 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain: %s<br>Residue: %s<br>Mutation: %s</td></tr>
                 """ % ( cryptID, input_filename, input_filename, size_of_ensemble, chain, resid, newaa )
                 
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
@@ -1018,7 +1018,7 @@ class RosettaHTML:
                                                 </table>
                           </td></tr>
                     """ % ( input_filename, size_of_ensemble, multiple_mutations_html )
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
@@ -1037,7 +1037,7 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF"><pre>%s</pre></td></tr>
                 """ % ( input_filename, size_of_ensemble, mutation_file )
                 
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           html += self._show_scores_file(cryptID)
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
@@ -1057,7 +1057,7 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Temperature: %s<br>Sequences per Structure: %s<br>Length of Segment: %s</td></tr>
                 """ % ( input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg )
         
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
           html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
           
           comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
@@ -1128,7 +1128,7 @@ class RosettaHTML:
               """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' '), seqtol_radius, w1, w2, w3 )
         
         input_id = input_filename[:-4] # filename without suffix
-        if status == 'done' || status == 'sample':
+        if status == 'done' or status == 'sample':
             html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
             
             list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
@@ -1174,7 +1174,7 @@ class RosettaHTML:
     
         html = ''
 
-        if status == "done" || status == 'sample':
+        if status == "done" or status == 'sample':
             html += '<tr><td align=right bgcolor="#B7FFE0"><b>Results</b>:</td><td bgcolor="#B7FFE0">'
             
             if os.path.exists( '%s%s/' % (self.download_dir, cryptID) ):
