@@ -1248,7 +1248,7 @@ class RosettaHTML:
         html += """<td align="center"><H1 class="title">Job %s</H1> """ % ( parameter['ID'] )
         if int(parameter['Status']) == 4:
             html += """ <P><font color=red><b>Rosetta Error:</b></font><br>
-                            We are sorry but your simulation failed. Please check the uploaded structure file for non consecutive numbering or missing residues. 
+                            We are sorry but your simulation failed. <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Tutorial#PDB_Files">Please check your pdb file.</a>
                             If the PDB file is correct and Rosetta still fails, please contact us via <img src="../images/support_email.png" height="15">.</P> <br>"""
         
         html += '<table border=0 cellpadding=2 cellspacing=1>\n'
