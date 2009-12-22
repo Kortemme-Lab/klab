@@ -344,14 +344,14 @@ function set_demo_values() {
   actual_task = getTask();
 
  if ( actual_task == 'parameter1_1') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1KYO_A.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1KYO_A.pdb";
       document.submitform.nos.value = "10";
       document.submitform.PM_chain.value = "A";
       document.submitform.PM_resid.value = "153";
       document.submitform.PM_newres.value = "F";
 
   } else if ( actual_task == 'parameter1_2') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb";
       document.submitform.nos.value = "10";
       document.submitform.PM_chain0.value = "A";
       document.submitform.PM_resid0.value = "17";
@@ -375,18 +375,18 @@ function set_demo_values() {
       addOneMore();
 
   } else if ( actual_task == "parameter2_1") {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb";
       document.submitform.nos.value = "10";  
 
   } else if ( actual_task == 'parameter2_2') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb";
       document.submitform.nos.value = "10";
       document.submitform.ENS_temperature.value = "1.2";
       document.submitform.ENS_num_designs_per_struct.value = "20";
       document.submitform.ENS_segment_length.value = "12";
 
   } else if ( actual_task == 'parameter3_1') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb";
       document.submitform.nos.value = "10";
       document.submitform.seqtol_chain1.value = "A";
       document.submitform.seqtol_chain2.value = "B";
