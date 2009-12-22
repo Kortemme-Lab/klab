@@ -841,20 +841,25 @@ def submit(form, SID):
       else:
         seqtol_parameter["seqtol_radius"] = ""
       
-      if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
-        seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
-      else:
-        seqtol_parameter["seqtol_weight_chain1"] = ""
+      # if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
+      #   seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
+      # else:
+      seqtol_parameter["seqtol_weight_chain1"] = "1"
         
-      if form.has_key("seqtol_weight_chain2") and form["seqtol_weight_chain2"].value != '':
-        seqtol_parameter["seqtol_weight_chain2"] = form["seqtol_weight_chain2"].value
-      else:
-        seqtol_parameter["seqtol_weight_chain2"] = ""
+      # if form.has_key("seqtol_weight_chain2") and form["seqtol_weight_chain2"].value != '':
+      #   seqtol_parameter["seqtol_weight_chain2"] = form["seqtol_weight_chain2"].value
+      # else:
+      seqtol_parameter["seqtol_weight_chain2"] = "1"
         
-      if form.has_key("seqtol_weight_interface") and form["seqtol_weight_interface"].value != '':
-        seqtol_parameter["seqtol_weight_interface"] = form["seqtol_weight_interface"].value
-      else:
-        seqtol_parameter["seqtol_weight_interface"] = ""
+      # if form.has_key("seqtol_weight_interface") and form["seqtol_weight_interface"].value != '':
+      #   seqtol_parameter["seqtol_weight_interface"] = form["seqtol_weight_interface"].value
+      # else:
+      seqtol_parameter["seqtol_weight_interface"] = "2"
+
+# <!-- weights ? -->
+#   <input type="hidden" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1">
+#   <input type="hidden" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1">
+#   <input type="hidden" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2">      
       
       seqtol_parameter["seqtol_list_1"] = []
       seqtol_parameter["seqtol_list_2"] = []

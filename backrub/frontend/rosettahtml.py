@@ -546,10 +546,6 @@ class RosettaHTML:
                   <td  align="right">Area for repacking <img src="../images/qm_s.png" title="%(tt_Radius)s"></td>
                   <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197; (recommended 4.0&#197;)</td>
               </tr>
-              <!-- weights ? -->
-                <input type="hidden" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1">
-                <input type="hidden" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1">
-                <input type="hidden" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2">
                 
                 <tr>
                   <td align="right">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
@@ -827,7 +823,7 @@ class RosettaHTML:
             # write ID
             html += '<td>%s </td>' % (str(line[0]))
             # write status 
-            status = int(line[2])  
+            status = int(line[2])
             if status == 0:
                 html += '<td><font color="orange">in queue</font></td>'
             elif status == 1:
@@ -835,7 +831,7 @@ class RosettaHTML:
             elif status == 2:
                 html += '<td><font color="darkblue">done</font></td>'
             elif status == 5:
-                html += '<td><font color="darkblue" style="background-color: #AFE2C2;">sample</font></td>'
+                html += '<td style="background-color: #AFE2C2;"><font color="darkblue">sample</font></td>'
             else:
                 html += '<td><font color="FF0000">error</font></td>'
                 
@@ -882,6 +878,8 @@ class RosettaHTML:
         elif status == 'active':
             status_html = '<font color="green">active</font>'
         elif status == 'done':
+            status_html = '<font color="darkblue">done</font>'
+        elif status == 'sample':
             status_html = '<font color="darkblue">done</font>'
         else:
             status_html = '<font color="FF0000">error:</font> %s' % error

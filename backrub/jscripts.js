@@ -344,7 +344,7 @@ function set_demo_values() {
   actual_task = getTask();
 
  if ( actual_task == 'parameter1_1') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1KYO.pdb"
+      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1KYO_A.pdb"
       document.submitform.nos.value = "10";
       document.submitform.PM_chain.value = "A";
       document.submitform.PM_resid.value = "153";
