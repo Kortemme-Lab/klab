@@ -880,7 +880,7 @@ class RosettaHTML:
         elif status == 'done':
             status_html = '<font color="darkblue">done</font>'
         elif status == 'sample':
-            status_html = '<font color="darkblue">done</font>'
+            status_html = '<font color="darkblue">sample results</font>'
         else:
             status_html = '<font color="FF0000">error:</font> %s' % error
         
@@ -1236,7 +1236,7 @@ class RosettaHTML:
         elif int(parameter['Status']) == 2:
             status = 'done'
         elif int(parameter['Status']) == 5:
-            status = 'sample results'
+            status = 'sample'
                         
         if parameter['Mini'] == 'mini' or parameter['Mini'] == '1':
             parameter['Mini'] = 'Rosetta v.3 (mini)'
