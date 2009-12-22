@@ -161,13 +161,10 @@ function changeApplication( app, _task ) {
   
   mycolor = "";     
   if (task == 'parameter1_1' || task == 'parameter1_2') {
-    showMenu('1');
     mycolor = "#DCE9F4" ;
   } else if (task == 'parameter2_1' || task == 'parameter2_2') {
-    showMenu('2');
     mycolor = "#B7FFE0" ;
   } else if (task == 'parameter3_1'){
-    showMenu('3');
     mycolor = "#FFE2E2" ;
   }
   
