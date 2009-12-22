@@ -880,7 +880,8 @@ class RosettaHTML:
         elif status == 'done':
             status_html = '<font color="darkblue">done</font>'
         elif status == 'sample':
-            status_html = '<font color="darkblue">sample results</font>'
+            status_html = '<font color="darkblue">done</font>'
+            status = 'done'
         else:
             status_html = '<font color="FF0000">error:</font> %s' % error
         
