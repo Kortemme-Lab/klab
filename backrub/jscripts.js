@@ -11,6 +11,9 @@ function startup(query) {
       if (query == "index" || query == "login") {
           Nifty("div#login_box","big transparent fixed-height");
       }
+      if (query == "queue") {
+          Nifty("div#queue_bg","big transparent fixed-height");
+      }
       //updateCellSize2();
 }
 
@@ -131,7 +134,7 @@ function changeApplication( app, _task ) {
     new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
   }
 	
-	if ( task == 'parameter2_2' ) { 
+	if ( task == 'parameter2_2' ) {  
 	  new Effect.Appear( "ref2" ); 
 	  new Effect.Appear( "rosetta_remark" );
 	  document.submitform.Mini[0].checked=true;
@@ -147,10 +150,11 @@ function changeApplication( app, _task ) {
 	
 	if ( task == 'parameter3_1' ) { 
 	  new Effect.Appear( "ref3" ); 
-	  document.submitform.Mini[0].disabled=true;
-    document.submitform.Mini[1].checked=true;
-    document.submitform.Mini[1].disabled=false;
-    document.getElementById('rv0').style.color='#D8D8D8';
+	  document.submitform.Mini[0].disabled=false;
+    document.submitform.Mini[0].checked=true;
+    document.submitform.Mini[1].disabled=true;
+    document.getElementById('rv1').style.color='#D8D8D8';
+    document.getElementById('rv0').style.color='#000000';
     document.getElementById('rv1').style.color='#000000';
 	  
 	} else { 
@@ -162,10 +166,19 @@ function changeApplication( app, _task ) {
   mycolor = "";     
   if (task == 'parameter1_1' || task == 'parameter1_2') {
     mycolor = "#DCE9F4" ;
+    new Effect.Appear("pic1");
+    new Effect.Fade( "pic2", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
+    new Effect.Fade( "pic3", { duration: 0.0, queue: { position: '0', scope: 'img' } } );   
   } else if (task == 'parameter2_1' || task == 'parameter2_2') {
     mycolor = "#B7FFE0" ;
+    new Effect.Appear("pic2");
+    new Effect.Fade( "pic1", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
+    new Effect.Fade( "pic3", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
   } else if (task == 'parameter3_1'){
     mycolor = "#FFE2E2" ;
+    new Effect.Appear("pic3");
+    new Effect.Fade( "pic1", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
+    new Effect.Fade( "pic2", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
   }
   
   document.getElementById("box").style.background = mycolor;

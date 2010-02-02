@@ -13,18 +13,20 @@ import cgitb; cgitb.enable()
 from string import join
 import pickle
 
+from rwebhelper import *
+
 class RosettaHTML:
 
     server = {}
 
-    def __init__(self, server_url, server_title, script_filename, download_dir, username='', comment='', warning='', contact_email='support@cgl.ucsf.edu' , contact_name='FLO'):
+    def __init__(self, server_url, server_title, script_filename, download_dir, 
+                  username='', comment='', warning='', contact_name='FLO'):
         self.server_url      = server_url
         self.server_title    = server_title
         self.script_filename = script_filename
         self.username        = username
         self.comment         = comment
         self.warning         = warning
-        self.contact_email   = contact_email
         self.contact_name    = contact_name
         self.download_dir    = download_dir
         self.lowest_structs  = []
@@ -71,7 +73,6 @@ class RosettaHTML:
                       "5": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "6": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "7": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
-        
         }
         
 
@@ -85,15 +86,15 @@ class RosettaHTML:
     def main(self, CONTENT='This server is made of awesome.', site='', query='' ):
         html = """
             <!-- *********************************************************
-                 * Rosetta Web Server - Python - BACKRUB                 *
+                 * RosettaBackrub                                        *
                  * Kortemme Lab, University of California, San Francisco *
-                 * Tanja Kortemme, Florian Lauck, 2009                   *
+                 * Tanja Kortemme, Florian Lauck, 2009-2010              *
                  ********************************************************* -->
             <html>
             <head>
                 <title>%s - %s</title>
-                <META name="description" content="Structure Modeling using Backrub">
-                <META name="keywords" content="rosetta kortemme protein structure modeling prediction backrub design point mutation baker">
+                <META name="description" content="RosettaBackrub a webserver for flexible backbone modeling">
+                <META name="keywords" content="RosettaBackrub RosettaFlexibleBackbone Rosetta Kortemme protein structure modeling prediction backrub flexible backbone design point mutation">
                 
                 <link rel="STYLESHEET" type="text/css" href="../style.css">
                 
@@ -107,6 +108,12 @@ class RosettaHTML:
 
             <body bgcolor="#ffffff" onload="startup( \'%s\' );">
             <center>
+            <NOSCRIPT>
+              <font style="color:red; font-weight:bold;">This page uses Javascript. Your browser either
+              doesn't support Javascript or you have it turned off.
+              To see this page as it is meant to appear please use
+              a Javascript enabled browser.</font>
+            </NOSCRIPT>
             <table border=0 width="700" cellpadding=0 cellspacing=0>
 
 <!-- Header --> <tr> %s </tr>
@@ -300,7 +307,7 @@ class RosettaHTML:
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="30" style="text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication('2','1'); ">
-                          <font style="font-size:10pt">Generate Backrub Ensemble</font></a><br>
+                          <font style="font-size:10pt">Backrub Conformational Ensemble</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>
                       </td></tr>
                   <tr><td width="30" style="text-align:right;">&#8680;</td>
@@ -364,7 +371,7 @@ class RosettaHTML:
                 This function utilizes backrub and design protocols implemented in Rosetta. 
                 There are two options.
                 <dl style="text-align:left;">
-                    <dt><b>Generate Backrub Ensemble</b></dt>
+                    <dt><b>Backrub Conformational Ensemble</b></dt>
                         <dd>Backrub is applied to the entire input structure to generate a flexible backbone ensemble of modeled protein conformations. 
                         Near-native ensembles made using this method have been shown to be consistent with measures of protein dynamics by 
                         Residual Dipolar Coupling measurements on Ubiquitin [<a href="#ref2">2</a>].</dd>
@@ -632,8 +639,8 @@ class RosettaHTML:
       if remark == 'new':
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#F0454B;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
-                    Raw data files:<br><a class="blacklink" href="https://%s/backrub/downloads/%s" target="_blank">https://%s/backrub/downloads/%s</a>
-                    </td></tr></table>''' % ( self.server_url, cryptID, self.server_url, cryptID )                
+                    Raw data files:<br><a class="blacklink" href="https://%s%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
+                    </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )                
 #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
       elif remark == 'old':
@@ -641,8 +648,8 @@ class RosettaHTML:
                     <font color="black" style="font-weight: bold; text-decoration:blink;">A job with the same parameters has already been processed. 
                                                                                           Please use one of the following links to go to the results:</font><br>
                      <br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">Job Info page</a> or Raw data files:<br>
-                         <a class="blacklink" href="https://%s/backrub/downloads/%s" target="_blank">https://%s/backrub/downloads/%s</a>
-                    </td></tr></table>''' % ( self.script_filename, cryptID, self.server_url, cryptID, self.server_url, cryptID)
+                         <a class="blacklink" href="%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
+                    </td></tr></table>''' % ( self.script_filename, cryptID, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
       else:
         box = '<font color="red">An error occured, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
@@ -781,9 +788,10 @@ class RosettaHTML:
 
 
     def printQueue(self,job_list):
-    
+      
         html = """<td align=center><H1 class="title"> Job queue </H1> <br>
-                  <table border=0 cellpadding=2 cellspacing=1 width=700 >
+                  <div id="queue_bg">
+                  <table border=0 cellpadding=2 cellspacing=0 width=700 >
                    <colgroup>
                      <col width="25">
                      <col width="60">
@@ -806,57 +814,69 @@ class RosettaHTML:
                    
         for line in job_list:
             task = ''
+            task_color = '#EEEEEE'
             if line[9] == '0' or line[9] == 'no_mutation':
                 task = "Backrub Ensemble"
+                task_color = '#B7FFE0'
             elif line[9] == '1' or line[9] == 'point_mutation':
                 task = "Point Mutation"
+                task_color = '#DCE9F4'
             elif line[9] == '3' or line[9] == 'multiple_mutation':
                 task = "Multiple Point Mutations"
+                task_color = '#DCE9F4'
             elif line[9] == '2' or line[9] == 'upload_mutation':
                 task = "Custom Mutation"
+                task_color = '#DCE9F4'
             elif line[9] == '4' or line[9] == 'ensemble':
                 task = "Backrub Ensemble Design"
+                task_color = '#B7FFE0'
             elif line[9] == 'sequence_tolerance':
                 task = "Sequence Plasticity"
+                task_color = '#FFE2E2'
           
-            html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF'" onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000'" onclick="window.location.href='%s?query=jobinfo&jobnumber=%s'">""" % ( self.script_filename, line[1] )
+            html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF'" 
+                                                          onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000'" 
+                                                          onclick="window.location.href='%s?query=jobinfo&jobnumber=%s'">""" % ( self.script_filename, line[1] )
             # write ID
-            html += '<td>%s </td>' % (str(line[0]))
+            html += '<td id="lw">%s </td>' % (str(line[0]))
             # write status 
             status = int(line[2])
             if status == 0:
-                html += '<td><font color="orange">in queue</font></td>'
+                html += '<td id="lw"><font color="orange">in queue</font></td>'
             elif status == 1:
-                html += '<td><font color="green">active</font></td>'
+                html += '<td id="lw"><font color="green">active</font></td>'
             elif status == 2:
-                html += '<td><font color="darkblue">done</font></td>'
+                html += '<td id="lw"><font color="darkblue">done</font></td>'
             elif status == 5:
-                html += '<td style="background-color: #AFE2C2;"><font color="darkblue">sample</font></td>'
+                html += '<td id="lw" style="background-color: #AFE2C2;"><font color="darkblue">sample</font></td>'
             else:
-                html += '<td><font color="FF0000">error</font></td>'
+                html += '<td id="lw"><font color="FF0000">error</font></td>'
                 
             # write username
-            html += '<td>%s</td>' % str(line[3])
+            html += '<td id="lw">%s</td>' % str(line[3])
             # write date
-            html += '<td style="font-size:small;">%s</td>' % str(line[4])
+            html += '<td id="lw" style="font-size:small;">%s</td>' % str(line[4])
             # write jobname or "notes"
             if len(str(line[5])) < 26:
-                html += '<td>%s</td>' % str(line[5])
+                html += '<td id="lw">%s</td>' % str(line[5])
             else:
-                html += '<td>%s</td>' % (str(line[5])[0:23] + "...")
+                html += '<td id="lw">%s</td>' % (str(line[5])[0:23] + "...")
             # Rosetta version
             if line[6] == '1' or line[6] == 'mini':
-                html += '<td style="font-size:small;"><i>mini</i><br>%s</td>' % task
+                html += '<td id="lw" style="font-size:small;" bgcolor="%s"><i>mini</i><br>%s</td>' % (task_color, task)
             elif line[6] == '0' or line[6] == 'classic':
-                html += '<td style="font-size:small;"><i>classic</i><br>%s</td>' % task
+                html += '<td id="lw" style="font-size:small;" bgcolor="%s"><i>classic</i><br>%s</td>' % (task_color, task)
             # write size of ensemble
-            html += '<td>%s</td>' % str(line[7])
+            html += '<td id="lw">%s</td>' % str(line[7])
             # write error
-            html += '<td>%s</td>' % str(line[8])
+            if  str(line[8]) == '':
+              html += '<td id="lw">&nbsp;</td>'
+            else:
+              html += '<td id="lw">%s</td>' % str(line[8])
         
             html += '</tr>\n'
         
-        html += '</table> <br> </td>'
+        html += '</table> </div><br> </td>'
         
         return html
 
@@ -957,7 +977,7 @@ class RosettaHTML:
     def _showNoMutation(self, status, input_filename, size_of_ensemble, cryptID):
 
         html = """
-                <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">No Mutation</td></tr>
+                <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Backrub Conformational Ensemble</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 """ % ( input_filename, size_of_ensemble )
@@ -1051,7 +1071,7 @@ class RosettaHTML:
     def _showEnsemble(self, status, cryptID, input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg):
         
         html = """
-                <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Ensemble</td></tr>
+                <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Backrub Ensemble Design</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Temperature: %s<br>Sequences per Structure: %s<br>Length of Segment: %s</td></tr>
@@ -1110,35 +1130,48 @@ class RosettaHTML:
 
         return html
     
-    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, seqtol_radius, w1, w2, w3 ):
+    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, seqtol_radius, w1, w2, w3 ):
         
         html = """
-              <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Ensemble</td></tr>
-              <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Sequence Plasticity Prediction</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
-              <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td>
+              <tr><td align=right bgcolor="#EEEEFF">Parameters:   </td>
                   <td bgcolor="#EEEEFF">
                       Partner 1: Chain %s<br>
                       Partner 2: Chain %s<br>
                       Designed residues of Partner 1: %s<br>
                       Designed residues of Partner 2: %s<br>
-                      Radius of repacking: %s [&#197;]<br>
-                      Weights (Partner1:Partner2:Interface): (%s:%s:%s)
-                  </td></tr>
-              """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' '), seqtol_radius, w1, w2, w3 )
+                      Radius of repacking: %s [&#197;]<br>""" % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' '), seqtol_radius )
+                      
+        # this needs to be ennables IF Colins paper is released
+        # if mini == 'mini' or mini == '1':
+        #   html += """
+        #               Weights (Partner1:Partner2:Interface): (%s:%s:%s)
+        #       """ %  (w1, w2, w3 )
+              
+        html += '</td></tr>'
+              
         
         input_id = input_filename[:-4] # filename without suffix
         if status == 'done' or status == 'sample':
             html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
             
-            list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
-            list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low_ms_0000.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
-            
+            if mini == 'mini' or mini == '1':
+              list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
+              list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low_ms_0000.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
+            else:
+              list_pdb_files = ['../downloads/%s/%s.pdb' % (cryptID, input_id) ]
+              list_files = os.listdir( self.download_dir+'/'+cryptID )
+              list_files.sort()
+              list_pdb_files.extend( [ '../downloads/%s/%s' % ( cryptID, fn_pdb ) for fn_pdb in grep('BR%slow_[0-9][0-9][0-9][0-9]_[A-Z]*\.pdb' % (input_id) ,list_files) ] )
+              
             comment1 = """Backbone representation of the best scoring structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
-            mutated_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
+            designed_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
+            designed_res    = seqtol_list_1 + seqtol_list_2
             
-            html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=[seqtol_list_1,seqtol_list_2], mutation_chain=mutated_chains) # only the first 10 structures are shown
+            html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
                         
             html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
                            <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
@@ -1177,9 +1210,9 @@ class RosettaHTML:
         if status == "done" or status == 'sample':
             html += '<tr><td align=right bgcolor="#B7FFE0"><b>Results</b>:</td><td bgcolor="#B7FFE0">'
             
-            if os.path.exists( '%s%s/' % (self.download_dir, cryptID) ):
-                html += '''<A href="../downloads/%s/"><b>View</b></A> individual files.<br>
-                         <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( cryptID, cryptID, jobnumber )
+            if os.path.exists( '%s%s/' % (self.download_dir, cryptID) ): # I could also remove this since rosettadatadir.py is taking care of this
+                html += '''<A href="%s?query=datadir&job=%s"><b>View</b></A> individual files.
+                         <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, cryptID, cryptID, jobnumber )
                 # if extended:
                 #     html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
             else:
@@ -1261,7 +1294,7 @@ class RosettaHTML:
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
             if parameter['task'] == '0' or parameter['task'] == 'no_mutation':
-                task = "Backrub Ensemble"
+                task = "Backrub Conformational Ensemble"
                 html += self._showNoMutation( status, parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['cryptID'] )            
                 
             elif parameter['task'] == '1' or parameter['task'] == 'point_mutation':
@@ -1286,7 +1319,7 @@ class RosettaHTML:
             elif parameter['task'] == 'sequence_tolerance':
                 task = "Sequence Plasticity Prediciton"
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
-                html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], 
+                html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'],
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
                                                      seqtol_parameter['seqtol_list_1'], seqtol_parameter['seqtol_list_2'],
                                                      seqtol_parameter['seqtol_radius'], 
@@ -1513,7 +1546,7 @@ if __name__ == "__main__":
 
     s.write("Content-type: text/html\n\n\n")
 
-    test_html = RosettaHTML('albana.ucsf.edu', 'Structure Prediction Backrub', 'rosettahtml.py', 'DFTBA', comment='this is just a test', contact_email='support@kortemmelab.ucsf.edu' , contact_name='Tanja Kortemme')
+    test_html = RosettaHTML('albana.ucsf.edu', 'Structure Prediction Backrub', 'rosettahtml.py', 'DFTBA', comment='this is just a test', contact_name='Tanja Kortemme')
 
     #html_content = test_html.index() 
     html_content = test_html.submit()

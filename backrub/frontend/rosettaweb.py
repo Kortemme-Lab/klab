@@ -55,6 +55,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
+from rosettadatadir import RosettaDataDir
 
 from datetime import datetime
 from string import *
@@ -109,7 +110,8 @@ connection = MySQLdb.Connection( host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, u
 def ws():
   
   s = sys.stdout
-  # sys.stderr = s # should be removed later
+  if ROSETTAWEB_server_name == 'albana.ucsf.edu':
+    sys.stderr = s # should be removed later
 
   debug = ''
 
@@ -133,8 +135,64 @@ def ws():
       tgb = str(form[key].value)
       form[key].value = md5.new(tgb.encode('utf-8')).hexdigest()
 
+  #######################################
+  # show the result files, no login     #
+  #######################################
+  if form.has_key("query") and form["query"].value == "datadir":
+    s.write("Content-type: text/html\n\n")
+    
+    cryptID = ''
+    status = ''
+    task = ''
+    html_content = ''
+    mini = False
+
+    if form.has_key("job"):
+      cryptID = form["job"].value
+      sql     = 'SELECT ID,Status,task,mini,PDBComplexFile FROM backrub WHERE cryptID="%s"' % ( cryptID )
+      result  = execQuery(connection, sql)
+      jobid   = result[0][0]
+      status  = result[0][1]
+      task    = result[0][2]
+      if result[0][3] == 'mini':
+        mini = True
+      pdb_filename = result[0][4]
+    else:
+      html_content = "Invalid link. No JobID given."
+      
+    if status == 1: # running
+      html_content = '<br>Job is Running. Please check again later.'
+    elif status == 0:
+      html_content = '<br>Job in queue. Please check again later.'
+    elif status in [3,4]:
+      html_content = '<br>No data.'
+    
+    rosettaDD = RosettaDataDir(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, contact_name='Tanja Kortemme')
+    
+    if html_content == '':
+      # here goes the decision making
+      if task == 'point_mutation':
+        rosettaDD.point_mutation( cryptID, jobid, mini, pdb_filename )
+      elif task == 'multiple_mutation':
+        rosettaDD.multiple_mutation( cryptID, jobid, mini, pdb_filename )
+      # elif task == 'upload_mutation':
+      #   html_content = rosettaDD.upload_mutation( cryptID, jobid, mini, pdb_filename )
+      elif task == 'no_mutation':
+        rosettaDD.no_mutation( cryptID, jobid, mini, pdb_filename )
+      elif task == 'ensemble':
+        rosettaDD.ensemble_design( cryptID, jobid, mini, pdb_filename )
+      elif task == 'sequence_tolerance':
+        rosettaDD.sequence_tolerance( cryptID, jobid, mini, pdb_filename )
+      else:
+        html_content = "No data."
+
+    s.write( rosettaDD.main( html_content ) )
+
+    s.close()
+    return
+    
   ####################################### 
-  # cookie check 
+  # cookie check                        #
   ####################################### 
 
   # create session object
@@ -213,7 +271,7 @@ def ws():
   if not os.path.exists('/tmp/daemon-example.pid'):
     warning = 'Backend not running. Jobs will not be processed immediately.'
 
-  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_email='support@kortemmelab.ucsf.edu' , contact_name='Tanja Kortemme')
+  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_name='Tanja Kortemme')
 
   # session is now active, execute function
   # if query_type == "index":
@@ -340,8 +398,12 @@ def login(form, my_session, t):
   ## we first check if the user can login
   if form.has_key('login') and form['login'].value == "login":
     # this is for the guest user
-    if not form.has_key('myPassword') and form["myUserName"].value == "guest":
+    if not form.has_key('myUserName'):
+      return 'wrong_username'
+    elif form["myUserName"].value == "guest" and not form.has_key('myPassword'):
       password_entered = ''
+    elif not form.has_key('myPassword'):
+      return 'wrong_password'
     else:
       password_entered = form["myPassword"].value
     # check for userID and password
@@ -741,8 +803,8 @@ def submit(form, SID):
       mini = form["Mini"].value # this is either 'mini' or 'classic'
     elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
       mini = "classic"
-    elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
-      mini = 'mini'
+    # elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
+    #   mini = 'mini'
     else:
       error += " No Rosetta binary selected. " # this is preselected in HTML code, so this case should never occur, we still make sure!
 

@@ -65,6 +65,7 @@ a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size:
 
 div#box{float:right; width: 440px; padding: 20px; margin:0px auto; color:#000; }
 div#login_box{float:center; width: 600px; padding: 20px; margin:0px auto; color:#000; background-color:#DCE9F4; }
+div#queue_bg{float:center; width: 700px; padding: 20px; margin:0px auto; color:#000; background-color:#EEEEEE; }
 
 ul#about,ul#about li{float:left;list-style-type:none;margin:0;padding:0; }
 ul#about{width: 190px;margin:0px auto 0;text-align:left; }
@@ -74,6 +75,6 @@ li#ab2{background: #DCE9F4; }
 li#ab3{background: #B7FFE0; }
 li#ab4{background: #FFE2E2; }
 
-
+td#lw{border-bottom:1px solid #828282;}
 
 

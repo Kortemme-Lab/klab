@@ -4,6 +4,7 @@
 # This module contains some helper functions that are accesed by rosettaweb2.py and ???
 
 import sys, os
+import re
 import MySQLdb
 import _mysql_exceptions
 
@@ -43,6 +44,11 @@ def sendMail(bin_sendmail, mailTO, mailFROM, mailSUBJECT, mailTXT):
     return 1
 
 ##################################### end of sendMail() ######################################
+
+def grep(string,list):
+  expr = re.compile(string)
+  results = filter(expr.search,[str(line) for line in list])
+  return results
 
 #############################################################################################
 # read_config_file()                                                                        #
