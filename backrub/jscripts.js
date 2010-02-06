@@ -403,7 +403,7 @@ function set_demo_values() {
       document.submitform.nos.value = "10";
       document.submitform.seqtol_chain1.value = "A";
       document.submitform.seqtol_chain2.value = "B";
-      document.submitform.seqtol_radius.value = "4.0";
+      // document.submitform.seqtol_radius.value = "4.0";
       // document.submitform.seqtol_weight_chain1.value = "1";
       // document.submitform.seqtol_weight_chain2.value = "1";      
       // document.submitform.seqtol_weight_interface.value = "2";

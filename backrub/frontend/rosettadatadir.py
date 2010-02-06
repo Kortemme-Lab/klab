@@ -201,7 +201,7 @@ class RosettaDataDir(RosettaHTML):
         <ul>
           <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Detailed Scores for the backrub structures</li>
           <li><a href="../downloads/%s/plasticity_sequences.fasta">plasticity_sequences.fasta</a> - 10 best scoring sequences for each backrub structure</li>
-          <li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li>
+          <!-- li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li -->
           <li><a href="../downloads/%s/plasticity_pwm.txt">plasticity_pwm.txt</a> - Matrix with amino acid frequencies</li>
           <li><a href="../downloads/%s/plasticity_boxplot.png">plasticity_boxplot.png</a>, 
               <a href="../downloads/%s/plasticity_boxplot.pdf">plasticity_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>

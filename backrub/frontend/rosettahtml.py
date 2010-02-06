@@ -187,7 +187,7 @@ class RosettaHTML:
         html = """
                 <tr><td align=center>
                     [&nbsp;<A class="nav" href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A class="nav" href="../wiki/">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A class="nav" href="../wiki/" target="_blank">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;]
                 </td></tr>
                 <tr><td align=center>""" % (self.script_filename,self.script_filename)
@@ -524,10 +524,10 @@ class RosettaHTML:
                     <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2">(recommended 1.2)</td>
                 </tr>
                 <tr>
-                    <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20">(max 20, recommended 20)</td>
+                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
                 </tr>
                 <tr>
-                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
+                    <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20">(max 20, recommended 20)</td>
                 </tr>
                 </table>
             </p>
@@ -548,11 +548,11 @@ class RosettaHTML:
                   <td  align="right">Residues of Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_list)s"></td>
                   <td><input type="text" name="seqtol_list" maxlength=120 SIZE=10 VALUE="">
                   </td>
-              </tr -->
+              </tr>
               <tr>
                   <td  align="right">Area for repacking <img src="../images/qm_s.png" title="%(tt_Radius)s"></td>
                   <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197; (recommended 4.0&#197;)</td>
-              </tr>
+              </tr -->
                 
                 <tr>
                   <td align="right">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
@@ -1142,7 +1142,7 @@ class RosettaHTML:
                       Partner 2: Chain %s<br>
                       Designed residues of Partner 1: %s<br>
                       Designed residues of Partner 2: %s<br>
-                      Radius of repacking: %s [&#197;]<br>""" % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' '), seqtol_radius )
+                      """ % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' ') )
                       
         # this needs to be ennables IF Colins paper is released
         # if mini == 'mini' or mini == '1':
@@ -1172,15 +1172,17 @@ class RosettaHTML:
             designed_res    = seqtol_list_1 + seqtol_list_2
             
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
-                        
-            html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
-                           <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
-                                                 <img src="../downloads/%s/plasticity_motif.png" alt="image missing." width="400"></a><br>
-                                                 <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
-                                                 <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
-                                                 <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
-                           </td></tr> 
-                       <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequency at each mutated site.<br>
+            
+            if mini == 'mini' or mini == '1':        
+              html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
+                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
+                                                   <img src="../downloads/%s/plasticity_motif.png" alt="image missing." width="400"></a><br>
+                                                   <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
+                                                   <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
+                                                   <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
+                             </td></tr> ''' % (cryptID, cryptID, cryptID)
+                           
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequency at each mutated site.<br>
                               Download <a href="../downloads/%s/plasticity_pwm.txt">weight matrix</a> or file with all plots as 
                               <a href="../downloads/%s/plasticity_boxplot.png">PNG</a>, <a href="../downloads/%s/plasticity_boxplot.pdf">PDF</a>.<br>
                               To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
@@ -1188,7 +1190,7 @@ class RosettaHTML:
                               the <a href="../wiki/" target="_blank">wiki</a>.
                               </td>
                            <td bgcolor="#FFFCD8">
-                    ''' % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
+                    ''' % ( cryptID, cryptID, cryptID )
             
             for resid in seqtol_list_1:
               html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image missing." width="400"></a><br>
