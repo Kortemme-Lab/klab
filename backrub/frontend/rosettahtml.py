@@ -319,7 +319,7 @@ class RosettaHTML:
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Sequence Plasticity Prediction</A><br>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s">Interface Sequence Plasticity Prediction</A><br>
               <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
               <p id="menu_3" style="text-align:right;">                  
                   <table style="border:0px; padding:0px; margin:0px;">
@@ -831,7 +831,7 @@ class RosettaHTML:
                 task = "Backrub Ensemble Design"
                 task_color = '#B7FFE0'
             elif line[9] == 'sequence_tolerance':
-                task = "Sequence Plasticity"
+                task = "Interface Sequence Plasticity"
                 task_color = '#FFE2E2'
           
             html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF'" 
@@ -1133,7 +1133,7 @@ class RosettaHTML:
     def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, seqtol_radius, w1, w2, w3 ):
         
         html = """
-              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Sequence Plasticity Prediction</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Parameters:   </td>
@@ -1319,7 +1319,7 @@ class RosettaHTML:
                                             parameter['ENS_num_designs_per_struct'], parameter['ENS_segment_length'] )
                                             
             elif parameter['task'] == 'sequence_tolerance':
-                task = "Sequence Plasticity Prediciton"
+                task = "Interface Sequence Plasticity Prediciton"
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'],
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 

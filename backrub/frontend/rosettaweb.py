@@ -988,7 +988,7 @@ def submit(form, SID):
         # success
 
         # now find if there's a key like that already:
-        sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE hashkey="%s" AND Status="2" ''' % hash_key
+        sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE hashkey="%s" AND Status="2" OR Status="5" ''' % hash_key
         result = execQuery(connection, sql)
         
         for r in result:
