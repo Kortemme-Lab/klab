@@ -214,7 +214,7 @@ class RosettaDataDir(RosettaHTML):
     self.content += '<li> Boxplot for each position: <BR>'
 
     for png_fn in grep('plasticity_boxplot_[A-Z][0-9]*\.png',list_files):
-      self.content += '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="../downloads/%s/%s">%s</a><br>' % ( cryptID, cryptID, png_fn )
+      self.content += '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="../downloads/%s/%s">%s</a><br>' % ( cryptID, png_fn, png_fn )
     
     self.content += '</li></ul>'
     
