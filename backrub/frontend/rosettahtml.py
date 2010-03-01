@@ -169,7 +169,7 @@ class RosettaHTML:
         html = ''
         if self.warning != '':
             html += '''<td align="center">
-                            <table width="500"><tr><td style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; border-color:red; border-style:dashed; border-width:2px;">
+                            <table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; border-color:red; border-style:dashed; border-width:2px;">
                                 <font color="black" >%s</font></td></tr>
                             </table>
                      </td></tr><tr>''' % self.warning #style="text-decoration:blink;"
@@ -1424,7 +1424,8 @@ class RosettaHTML:
                     The server <b>output</b>, dependent on the application, consists of: structures of point mutants<a href="#ref2"><sup id="ref">2</sup></a> and their Rosetta force field scores, 
                     near-native structural ensembles of protein backbone conformations<a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3</sup></a> 
                     and designed sequences using flexible backbone computational protein design<a href="#ref4"><sup id="ref">4</sup></a>.</P>
-                    <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="/backrub/wiki/">documentation</a>.
+                    <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="/backrub/wiki/" target="_blank">documentation</a>.
+			Please also check for <a href="/backrub/wiki/" target="_blank">current announcements</a>. 
                     </P>
 
                   <div id="login_box">
