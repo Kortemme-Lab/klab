@@ -761,7 +761,7 @@ def submit(form, SID):
     # clean up pdbfile, this only affects comments that are deleted by the pdb class anyways
     pdbfile = pdbfile.replace('"',' ')
     
-    # check if structer is NMR or X-RAY. Problem: if headerinfo and EXPDTA line are missing there is no way of telling.
+    # check if structure is NMR or X-RAY. Problem: if headerinfo and EXPDTA line are missing there is no way of telling.
     # Consider only the first model. Copy everything until the first ENDMDL entry.
     new_pdbfile = ''
     for line in pdbfile.split('\n'):
@@ -988,9 +988,9 @@ def submit(form, SID):
         # success
 
         # now find if there's a key like that already:
-        sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE hashkey="%s" AND Status="2" OR Status="5" ''' % hash_key
+        sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
         result = execQuery(connection, sql)
-        
+        print sql, result
         for r in result:
           if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
             shutil.copytree( os.path.join( ROSETTAWEB_download_dir, r[1] ), os.path.join( ROSETTAWEB_download_dir, cryptID ) ) # copy the data to a new directory
