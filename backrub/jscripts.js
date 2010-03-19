@@ -98,6 +98,9 @@ function ValidateFormEmail() {
 
 
 function changeApplication( app, _task ) {
+
+	document.submitform.reset();
+	
 	// change these two arrays if you change the table in rosettahtml.py
 	myParameter = new Array("parameter1_1","parameter1_2","parameter1_3",
 	                        "parameter2_1","parameter2_2",
@@ -187,6 +190,9 @@ function changeApplication( app, _task ) {
 
 
 function showMenu( menu_id ) {
+
+	
+    document.submitform.reset();
     /* This function extends or hides the menu on the left */
     
     myTasks = new Array("pic1","pic2","pic3",
