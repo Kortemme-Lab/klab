@@ -1338,7 +1338,7 @@ class RosettaHTML:
         # jmol command to load files
         if list_pdb_files != None:
             jmol_cmd = 'load %s; color red; ' % list_pdb_files[0]
-            for pdb in list_pdb_files[1:10]:
+            for pdb in list_pdb_files[1:11]:
                 jmol_cmd += 'load APPEND %s; ' % pdb
             
             # jmol command to show mutation as balls'n'stick
