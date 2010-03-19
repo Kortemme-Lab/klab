@@ -1,4 +1,4 @@
-/* Jmol 11.7 script library Jmol.js  15:32 06.12.2008 Bob Hanson
+/* Jmol 11.7 script library Jmol.js  12:17 AM 4/20/2009 Bob Hanson
 
  checkbox heirarchy -- see http://chemapps.stolaf.edu/jmol/docs/examples-11/check.htm
 
@@ -32,6 +32,7 @@ try{if(typeof(_jmol)!="undefined")exit()
 // place "?JMOLJAR=xxxxx" to use a specific jar file
 
 // bob hanson -- jmolResize(w,h) -- resizes absolutely or by percent (w or h 0.5 means 50%)
+//    angel herraez -- update of jmolResize(w,h,targetSuffix) so it is not tied to first applet
 // bob hanson -- jmolEvaluate -- evaluates molecular math 8:37 AM 2/23/2007
 // bob hanson -- jmolScriptMessage -- returns all "scriptStatus" messages 8:37 AM 2/23/2007
 // bob hanson -- jmolScriptEcho -- returns all "scriptEcho" messages 8:37 AM 2/23/2007
@@ -64,6 +65,9 @@ try{if(typeof(_jmol)!="undefined")exit()
 // bh 7/2008  -- code fix "for(i..." not "for(var i..."
 // bh 12/2008 -- jmolLoadInline, jmolLoadInlineArray, jmolLoadInlineScript, jmolAppendInlineScript, jmolAppendInlineArray all return error message or null (Jmol 11.7.16)
 // bh 12/2008 -- jmolScriptWaitOutput() -- waits for script to complete and delivers output normally sent to console
+
+// bh 5/2009  -- Support for XHTML using jmolSetXHTML(id)
+// ah & bh 6/2009 -- New jmolResizeApplet() more flexible, similar to jmolApplet() size syntax
 
 var defaultdir = "."
 var defaultjar = "JmolApplet.jar"
@@ -172,12 +176,12 @@ function jmolButton(script, label, id, title) {
     label = script.substring(0, 32);
   ++_jmol.buttonCount;
   var scriptIndex = _jmolAddScript(script);
-  var t = "<span id=\"span_"+id+"\""+(title ? " title =\"" + title + "\"":"")+"><input type='button' name='" + id + "' id='" + id +
+  var t = "<span id=\"span_"+id+"\""+(title ? " title=\"" + title + "\"":"")+"><input type='button' name='" + id + "' id='" + id +
           "' value='" + label +
-          "' onClick='_jmolClick(" + scriptIndex + _jmol.targetText +
-          ")' onMouseover='_jmolMouseOver(" + scriptIndex +
-          ");return true' onMouseout='_jmolMouseOut()' " +
-          _jmol.buttonCssText + "/></span>";
+          "' onclick='_jmolClick(" + scriptIndex + _jmol.targetText +
+          ")' onmouseover='_jmolMouseOver(" + scriptIndex +
+          ");return true' onmouseout='_jmolMouseOut()' " +
+          _jmol.buttonCssText + " /></span>";
   if (_jmol.debugAlert)
     alert(t);
   return _jmolDocumentWrite(t);
@@ -201,13 +205,13 @@ function jmolCheckbox(scriptWhenChecked, scriptWhenUnchecked,
   var indexChecked = _jmolAddScript(scriptWhenChecked);
   var indexUnchecked = _jmolAddScript(scriptWhenUnchecked);
   var eospan = "</span>"
-  var t = "<span id=\"span_"+id+"\""+(title ? " title =\"" + title + "\"":"")+"><input type='checkbox' name='" + id + "' id='" + id +
-          "' onClick='_jmolCbClick(this," +
+  var t = "<span id=\"span_"+id+"\""+(title ? " title=\"" + title + "\"":"")+"><input type='checkbox' name='" + id + "' id='" + id +
+          "' onclick='_jmolCbClick(this," +
           indexChecked + "," + indexUnchecked + _jmol.targetText +
-          ")' onMouseover='_jmolCbOver(this," + indexChecked + "," +
+          ")' onmouseover='_jmolCbOver(this," + indexChecked + "," +
           indexUnchecked +
-          ");return true' onMouseout='_jmolMouseOut()' " +
-	  (isChecked ? "checked " : "") + _jmol.checkboxCssText + "/>" 
+          ");return true' onmouseout='_jmolMouseOut()' " +
+	  (isChecked ? "checked='true' " : "")+ _jmol.checkboxCssText + " />" 
   if (labelHtml.toLowerCase().indexOf("<td>")>=0) {
 	t += eospan
 	eospan = "";
@@ -279,9 +283,9 @@ function jmolLink(script, label, id, title) {
     label = script.substring(0, 32);
   ++_jmol.linkCount;
   var scriptIndex = _jmolAddScript(script);
-  var t = "<span id=\"span_"+id+"\""+(title ? " title =\"" + title + "\"":"")+"><a name='" + id + "' id='" + id + 
-          "' href='javascript:_jmolClick(" + scriptIndex + _jmol.targetText + ");' onMouseover='_jmolMouseOver(" + scriptIndex +
-          ");return true;' onMouseout='_jmolMouseOut()' " +
+  var t = "<span id=\"span_"+id+"\""+(title ? " title=\"" + title + "\"":"")+"><a name='" + id + "' id='" + id + 
+          "' href='javascript:_jmolClick(" + scriptIndex + _jmol.targetText + ");' onmouseover='_jmolMouseOver(" + scriptIndex +
+          ");return true;' onmouseout='_jmolMouseOut()' " +
           _jmol.linkCssText + ">" + label + "</a></span>";
   if (_jmol.debugAlert)
     alert(t);
@@ -297,12 +301,21 @@ function jmolCommandInput(label, size, id, title) {
   if (size == undefined || isNaN(size))
     size = 60;
   ++_jmol.cmdCount;
-  var t = "<span id=\"span_"+id+"\""+(title ? " title =\"" + title + "\"":"")+"><input name='" + id + "' id='" + id + 
-          "' size='"+size+"'><input type=button value = '"+label+"' onClick='jmolScript(document.getElementById(\""+id+"\").value" + _jmol.targetText + ")'/></span>";
+  var t = "<span id=\"span_"+id+"\""+(title ? " title=\"" + title + "\"":"")+"><input name='" + id + "' id='" + id + 
+          "' size='"+size+"' onkeypress='_jmolCommandKeyPress(event,\""+id+"\"" + _jmol.targetText + ")'><input type=button value = '"+label+"' onclick='jmolScript(document.getElementById(\""+id+"\").value" + _jmol.targetText + ")' /></span>";
   if (_jmol.debugAlert)
     alert(t);
   return _jmolDocumentWrite(t);
 }
+
+function _jmolCommandKeyPress(e, id, target) {
+	var keycode = (window.event ? window.event.keyCode : e ? e.which : 0);
+	if (keycode == 13) {
+		jmolScript(document.getElementById(id).value, target)
+	}
+}
+
+
 
 function jmolMenu(arrayOfMenuItems, size, id, title) {
   _jmolInitCheck();
@@ -317,7 +330,7 @@ function jmolMenu(arrayOfMenuItems, size, id, title) {
     else if (size < 0)
       size = len;
     var sizeText = size ? " size='" + size + "' " : "";
-    var t = "<span id=\"span_"+id+"\""+(title ? " title =\"" + title + "\"":"")+"><select name='" + id + "' id='" + id +
+    var t = "<span id=\"span_"+id+"\""+(title ? " title=\"" + title + "\"":"")+"><select name='" + id + "' id='" + id +
             "' onChange='_jmolMenuSelected(this" + _jmol.targetText + ")'" +
             sizeText + _jmol.menuCssText + ">";
     for (var i = 0; i < len; ++i) {
@@ -340,7 +353,7 @@ function jmolMenu(arrayOfMenuItems, size, id, title) {
         t += "</optgroup>";	  
 	  } else {		
         var scriptIndex = _jmolAddScript(script);
-        var selectedText = isSelected ? "' selected>" : "'>";
+        var selectedText = isSelected ? "' selected='true'>" : "'>";
         t += "<option value='" + scriptIndex + selectedText + text + "</option>";
 	  }
     }
@@ -530,7 +543,11 @@ var _jmol = {
   appletCount: 0,
   appletSuffixes: [],
   appletWindow: null,
-  
+  allowedJmolSize: [25, 2048, 300],   // min, max, default (pixels)
+	  /*  By setting the _jmol.allowedJmolSize[] variable in the webpage 
+	      before calling jmolApplet(), limits for applet size can be overriden.
+		    2048 standard for GeoWall (http://geowall.geo.lsa.umich.edu/home.html)
+	  */  
   buttonCount: 0,
   checkboxCount: 0,
   linkCount: 0,
@@ -789,7 +806,7 @@ function _jmolApplet(size, inlineModel, script, nameSuffix) {
 
 function _jmolParams() {
  var t = "";
- for (i in _jmol.params)
+ for (var i in _jmol.params)
 	if(_jmol.params[i]!="")
 		 t+="  <param name='"+i+"' value='"+_jmol.params[i]+"' />\n";
  return t
@@ -822,6 +839,8 @@ function _jmolCheckBrowser() {
               "browser: " + browser +
               "   version: " + browserVersion +
               "   os: " + os +
+              "   isBrowserCompliant: " + isBrowserCompliant +
+              "   isJavaCompliant: " + isJavaCompliant +
               "\n\n" + ua;
       alert(msg);
     }
@@ -829,10 +848,101 @@ function _jmolCheckBrowser() {
   return false;
 }
 
+function jmolSetXHTML(id) {
+	_jmol.isXHTML = true
+	_jmol.XhtmlElement = null
+	_jmol.XhtmlAppendChild = false
+	if (id){
+		_jmol.XhtmlElement = document.getElementById(id)
+		_jmol.XhtmlAppendChild = true
+	}
+}
+
 function _jmolDocumentWrite(text) {
-  if (_jmol.currentDocument)
-    _jmol.currentDocument.write(text);
-  return text;
+	if (_jmol.currentDocument) {
+		if (_jmol.isXHTML && !_jmol.XhtmlElement) {
+			var s = document.getElementsByTagName("script")
+			_jmol.XhtmlElement = s.item(s.length - 1)
+			_jmol.XhtmlAppendChild = false
+		}
+		if (_jmol.XhtmlElement) {
+			_jmolDomDocumentWrite(text)
+		} else {
+			_jmol.currentDocument.write(text);
+		}
+	}
+	return text;
+}
+
+function _jmolDomDocumentWrite(data) {
+	var pt = 0
+	var Ptr = []
+	Ptr[0] = 0
+	while (Ptr[0] < data.length) {
+		var child = _jmolGetDomElement(data, Ptr)
+		if (!child)break
+		if (_jmol.XhtmlAppendChild)
+			_jmol.XhtmlElement.appendChild(child)
+		else
+			_jmol.XhtmlElement.parentNode.insertBefore(child, _jmol.XhtmlElement); 
+	}
+}
+function _jmolGetDomElement(data, Ptr, closetag, lvel) {
+	var e = document.createElement("span")
+	e.innerHTML = data
+	Ptr[0] = data.length
+	return e
+
+//unnecessary?
+
+	if (!closetag)closetag = ""
+	if (!lvel) lvel = 0
+	var pt0 = Ptr[0]
+	var pt = pt0
+	while (pt < data.length && data.charAt(pt) != "<") pt++
+	if (pt != pt0) {
+		var text = data.substring(pt0, pt)
+		Ptr[0] = pt
+		return document.createTextNode(text)
+	}	
+	pt0 = ++pt
+	var ch
+	while (pt < data.length && "\n\r\t >".indexOf(ch = data.charAt(pt)) < 0) pt++
+	var tagname = data.substring(pt0, pt)
+	var e = (tagname == closetag  || tagname == "/" ? "" 
+		: document.createElementNS ? document.createElementNS('http://www.w3.org/1999/xhtml', tagname)
+		: document.createElement(tagname));
+	if (ch == ">") {
+		Ptr[0] = ++pt
+		return e
+	}
+	while (pt < data.length && (ch = data.charAt(pt)) != ">") {
+		while (pt < data.length && "\n\r\t ".indexOf(ch = data.charAt(pt)) >= 0) pt++
+		pt0 = pt
+		while (pt < data.length && "\n\r\t =/>".indexOf(ch = data.charAt(pt)) < 0) pt++
+		var attrname = data.substring(pt0, pt).toLowerCase()
+		if (attrname && ch != "=") 
+			e.setAttribute(attrname, "true")
+		while (pt < data.length && "\n\r\t ".indexOf(ch = data.charAt(pt)) >= 0) pt++
+		if (ch == "/") {
+			Ptr[0] = pt + 2
+			return e
+		} else if (ch == "=") {
+			var quote = data.charAt(++pt)
+			pt0 = ++pt
+			while (pt < data.length && (ch = data.charAt(pt)) != quote) pt++
+			var attrvalue = data.substring(pt0, pt)
+			e.setAttribute(attrname, attrvalue)
+			pt++
+		}
+	}
+	Ptr[0] = ++pt
+	while (Ptr[0] < data.length) {
+		var child = _jmolGetDomElement(data, Ptr, "/" + tagname, lvel+1)
+		if (!child)break
+		e.appendChild(child)
+	}
+	return e
 }
 
 function _jmolPopup(url) {
@@ -866,43 +976,6 @@ function _jmolSterilizeInline(model) {
   return inlineModel;
 }
 
-	/*  AngelH, mar2007:
-		By (re)setting this variable in the webpage before calling jmolApplet(), limits for applet size can be overriden.
-	*/
-
-	/* hansonr, jun2007:
-		2048 standard for GeoWall (http://geowall.geo.lsa.umich.edu/home.html)
-	*/
-
-if (allowedJmolSize==undefined) var allowedJmolSize = [1, 2048, 300]   // min, max, default (pixels)
-function _jmolGetAppletSize(size) {
-	/*  AngelH, mar2007
-		Accepts single number or 2-value array, each one can be either:
-	   percent (text string ending %), decimal 0 to 1 (percent/100), number, or text string (interpreted as nr.)
-	   Size is now returned as string or number, no "px".
-	*/
-  var width, height;
-  if ( (typeof size) == "object" && size != null ) {
-    width = size[0]; height = size[1];
-  } else {
-    width = height = size;
-  }
-  // if percent, leave it as it is:
-  if ( width.toString().charAt(width.toString().length-1) != "%" ) {
-    width = parseFloat(width);	// convert to nr., or strip text, or make zero
-	if ( width <= 1 && width > 0 ) { width = (width*100)+"%" }	// decimal: convert to percent and quit
-	else if ( width >= allowedJmolSize[0] && width <= allowedJmolSize[1] ) { width = parseInt(width) }	// accept only that range (pixels)
-	else { width = allowedJmolSize[2] }	// default size 300 pixels
-  }
-  if ( height.toString().charAt(height.toString().length-1) != "%" ) {
-    height = parseFloat(height);
-	if ( height <= 1 && height > 0 ) { height = (height*100)+"%" }
-	else if ( height >= allowedJmolSize[0] && height <= allowedJmolSize[1] ) { height = parseInt(height) }
-	else { height = allowedJmolSize[2] }
-  }
-  return [width, height];
-}
-
 function _jmolRadio(script, labelHtml, isChecked, separatorHtml, groupName, id, title) {
   ++_jmol.radioCount;
   if (groupName == undefined || groupName == null)
@@ -915,11 +988,11 @@ function _jmolRadio(script, labelHtml, isChecked, separatorHtml, groupName, id, 
     separatorHtml = "";
   var scriptIndex = _jmolAddScript(script);
   var eospan = "</span>"
-  var t = "<span id=\"span_"+id+"\""+(title ? " title =\"" + title + "\"":"")+"><input name='" 
-	+ groupName + "' id='"+id+"' type='radio' onClick='_jmolClick(" +
-         scriptIndex + _jmol.targetText + ");return true;' onMouseover='_jmolMouseOver(" +
-         scriptIndex + ");return true;' onMouseout='_jmolMouseOut()' " +
-	 (isChecked ? "checked " : "") + _jmol.radioCssText + "/>"
+  var t = "<span id=\"span_"+id+"\""+(title ? " title=\"" + title + "\"":"")+"><input name='" 
+	+ groupName + "' id='"+id+"' type='radio' onclick='_jmolClick(" +
+         scriptIndex + _jmol.targetText + ");return true;' onmouseover='_jmolMouseOver(" +
+         scriptIndex + ");return true;' onmouseout='_jmolMouseOut()' " +
+	 (isChecked ? "checked='true' " : "") + _jmol.radioCssText + " />"
   if (labelHtml.toLowerCase().indexOf("<td>")>=0) {
 	t += eospan
 	eospan = "";
@@ -1503,15 +1576,20 @@ if(document.location.search.indexOf("NOAPPLET")>=0){
 
 ///////////////////////////////////////////
 
-//new 9:49 AM 3/6/2007:
-
-//both w and h are optional. 
-//if either is between 0 and 1, then it is taken as percent/100.
-//if either is greater than 1, then it is taken as a size. 
-function jmolResize(w,h) {
+  //  This should no longer be needed, jmolResizeApplet() is better; kept for backwards compatibility
+  /*
+	Resizes absolutely (pixels) or by percent of window (w or h 0.5 means 50%).
+	targetSuffix is optional and defaults to zero (first applet in page).
+	Both w and h are optional, but needed if you want to use targetSuffix.
+		h defaults to w
+		w defaults to 100% of window
+	If either w or h is between 0 and 1, then it is taken as percent/100.
+	If either w or h is greater than 1, then it is taken as a size (pixels). 
+	*/
+function jmolResize(w,h,targetSuffix) {
  _jmol.alerted = true;
- var percentW = (!w ? 100 : w <= 1  && w > 0 ? w * 100 : 0)
- var percentH = (!h ? percentW : h <= 1 && h > 0 ? h * 100 : 0)
+ var percentW = (!w ? 100 : w <= 1  && w > 0 ? w * 100 : 0);
+ var percentH = (!h ? percentW : h <= 1 && h > 0 ? h * 100 : 0);
  if (_jmol.browser=="msie") {
    var width=document.body.clientWidth;
    var height=document.body.clientHeight;
@@ -1520,10 +1598,51 @@ function jmolResize(w,h) {
    var width=window.innerWidth - netscapeScrollWidth;
    var height=window.innerHeight-netscapeScrollWidth;
  }
- var applet = _jmolGetApplet(0);
+ var applet = _jmolGetApplet(targetSuffix);
  if(!applet)return;
- applet.style.width = (percentW ? width * percentW/100 : w)+"px"
- applet.style.height = (percentH ? height * percentH/100 : h)+"px"
- title=width +  " " + height + " " + (new Date())
+ applet.style.width = (percentW ? width * percentW/100 : w)+"px";
+ applet.style.height = (percentH ? height * percentH/100 : (h ? h : w))+"px";
+ //title=width +  " " + height + " " + (new Date());
 }
+
+// 13 Jun 09 -- makes jmolResize() obsolete  (kept for backwards compatibility)
+function jmolResizeApplet(size,targetSuffix) {
+ // See _jmolGetAppletSize() for the formats accepted as size [same used by jmolApplet()]
+ //  Special case: an empty value for width or height is accepted, meaning no change in that dimension.
+ _jmol.alerted = true;
+ var applet = _jmolGetApplet(targetSuffix);
+ if(!applet)return;
+ var sz = _jmolGetAppletSize(size, "px");
+ sz[0] && (applet.style.width = sz[0]);
+ sz[1] && (applet.style.height = sz[1]);
+}
+
+function _jmolGetAppletSize(size, units) {
+	/* Accepts single number or 2-value array, each one can be one of:
+	   percent (text string ending %), decimal 0 to 1 (percent/100), number, or text string (interpreted as nr.)
+	   [width, height] array of strings is returned, with units added if specified.
+	   Percent is relative to container div or element (which should have explicitly set size).
+	*/
+  var width, height;
+  if ( (typeof size) == "object" && size != null ) {
+    width = size[0]; height = size[1];
+  } else {
+    width = height = size;
+  }
+  return [_jmolFixDim(width, units), _jmolFixDim(height, units)];
+}
+
+function _jmolFixDim(x, units) {
+  var sx = "" + x;
+  return (sx.length == 0 ? (units ? "" : _jmol.allowedJmolSize[2])
+	: sx.indexOf("%") == sx.length-1 ? sx 
+  	: (x = parseFloat(x)) <= 1 && x > 0 ? x * 100 + "%"
+  	: (isNaN(x = Math.floor(x)) ? _jmol.allowedJmolSize[2]
+  		: x < _jmol.allowedJmolSize[0] ? _jmol.allowedJmolSize[0]
+  	    : x > _jmol.allowedJmolSize[1] ? _jmol.allowedJmolSize[1] 
+        : x) + (units ? units : ""));
+}
+
+
+
 
