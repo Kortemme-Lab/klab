@@ -577,8 +577,8 @@ def _updateUserInfo(form,SID):
 def register(form, SID):
   
   # define allowed fields 
-  value_list   = ["username", "firstname", "lastname", "institution", "email", "password"]
-  value_list_o = ["address","city","zip","state","country"]  
+  value_list   = ["username", "firstname", "lastname", "email", "password"]
+  value_list_o = ["address","institution","city","zip","state","country"]  
   value_names  = {"username" : "UserName", "firstname" : "FirstName", "lastname" : "LastName", "email" : "Email", "institution" : "Institution", "address":"Address1", "city":"City", "state" : "State", "zip" : "Zip", "country" : "Country", "password" : "Password"}
   process_data = True
   error        = ''
@@ -617,13 +617,12 @@ Thank you for creating an account at the %s. If you have questions or if you did
 -----------------------
 login:       %s
 Name:        %s %s
-Institution: %s
 
 Have a nice day!
 
 The Kortemme Lab Server Daemon
       
-      """ % ( form["firstname"].value, ROSETTAWEB_server_title, ROSETTAWEB_admin_email, form["username"].value, form["firstname"].value, form["lastname"].value, form["institution"].value )
+      """ % ( form["firstname"].value, ROSETTAWEB_server_title, ROSETTAWEB_admin_email, form["username"].value, form["firstname"].value, form["lastname"].value )
     
     sendMail(ROSETTAWEB_bin_sendmail, form["email"].value, ROSETTAWEB_admin_email, "[Kortemme Lab Server] New Account", text)
     
@@ -633,13 +632,12 @@ A new user account for %s was created:
 
 login:       %s
 Name:        %s %s
-Institution: %s          
 
 Have a nice day!
 
 The Kortemme Lab Server Daemon
 
-    """ % ( ROSETTAWEB_server_title, form["username"].value, form["firstname"].value, form["lastname"].value, form["institution"].value )
+    """ % ( ROSETTAWEB_server_title, form["username"].value, form["firstname"].value, form["lastname"].value )
 
     sendMail( ROSETTAWEB_bin_sendmail, ROSETTAWEB_admin_email, ROSETTAWEB_admin_email, "[Kortemme Lab Server] New Account created", text_to_admin)
 
