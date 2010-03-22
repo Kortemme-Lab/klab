@@ -277,7 +277,9 @@ class RosettaHTML:
                 
         html = '''<td align="center">
     <H1 class="title">Submit a new job</H1>
-    <br>
+    <p style="color: red; text-align: center;">
+	Please read the <a href="../wiki/Tutorial" target="_blank">Tutorial</a> before submitting a job.
+    </p>
 <!-- Start Submit Form -->
     <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
 
