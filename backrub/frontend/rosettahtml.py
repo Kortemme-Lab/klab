@@ -43,6 +43,7 @@ class RosettaHTML:
                         "tt_JobName":       "header=[Name for your job] body=[Enter a name that helps you identify your job later on the job queue page.] %s" % tooltip_parameter,
                         "tt_Structure":     "header=[Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
+                        "tt_PDBID":         "header=[PDB identifier] body=[Enter the 4-digit PDB identifier of the structure file. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_RVersion":      "header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or the new Rosetta 3 (\'mini\'). Some applications only work with one version.] %s" % tooltip_parameter,
                         "tt_NStruct":       "header=[Number of Structures] body=[Number of generated structures or size of ensemble. We recommend to create 10 structures at a time.] %s" % tooltip_parameter,
                         "tt_ROutput":       "header=[Rosetta output] body=[If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.] %s" % tooltip_parameter,
@@ -260,11 +261,18 @@ class RosettaHTML:
 # submit()                                                                                    #
 ###############################################################################################
 
-    def submit(self, jobname='' ):
+    def submit(self, jobname='', error='' ):
     	  # this function uses javascript functions from jscript.js
 		    # if you change the application tabler here, please make sure to change jscript.js accordingly
 		    # calling the function with parameters will load those into the form. #not implemented yet
-        self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename})
+
+        if error != '':
+            error = '''<div align="center" style="width:300pt; background:lightgrey; margin:15pt; padding:15px; border-color:black; border-style:solid; border-width:2px;">
+                          Your job could not be submitted: <font style="color:red;"><b>%s</b></font><br>
+                          <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error" target="_blank">More Information</a>. <a HREF="javascript:history.go(-1)">Return</a> to the form. 
+                       </div>''' % error           
+		    
+        self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename, 'error':error})
         
         # <li id="ab1">
         #   [ <A href="/alascan/" class="nav" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
@@ -277,9 +285,7 @@ class RosettaHTML:
                 
         html = '''<td align="center">
     <H1 class="title">Submit a new job</H1>
-    <p style="color: red; text-align: center;">
-	Please read the <a href="../wiki/Tutorial" target="_blank">Tutorial</a> before submitting a job.
-    </p>
+    %(error)s
 <!-- Start Submit Form -->
     <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
 
@@ -352,7 +358,7 @@ class RosettaHTML:
           <!-- description -->
             <p id="text0" style="text-align:justify;">
               Choose one of the applications on the left. Each application will give you a short explanation and a set of parameters that can be adjusted.<br><br>
-              A tutorial on how to submit a job can be found <a href="../wiki/Tutorial">here</a>. For a brief explanation of each parameter move your mouse to the question mark symbol.
+              A <a href="../wiki/Tutorial">tutorial</a> on how to submit a job can be found in the <a href="../wiki">documentation</a>. For a brief explanation of each parameter move your mouse to the question mark symbol. The button "Check form" can be used to highlight fields with invalid entries in red; this is also shown when "Submit" is clicked.
             </p>
           
             <div id="text1" style="display:none; opacity:0.0; text-align:justify;"> 
@@ -412,8 +418,8 @@ class RosettaHTML:
               </TR>
               <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR>
-                <TD align=right>Enter URL to structure file <img src="../images/qm_s.png" title="%(tt_StructureURL)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBComplexURL" size="31">
+                <TD align=right>4-digit PDB identifier <img src="../images/qm_s.png" title="%(tt_PDBID)s"></TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="4">
               </TD>
               </TR>
               <TR><TD colspan=2><br></TD></TR>
@@ -432,7 +438,7 @@ class RosettaHTML:
               </TR>
               <TR>
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
-                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="10"> (max 50, recommended 10) </TD>
+                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=2 SIZE=5 VALUE="10"> (max 50, recommended 10) </TD>
               </TR>
               <!-- TR>
                 <TD align=right>Rosetta output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
@@ -523,7 +529,7 @@ class RosettaHTML:
             <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
                 <table align="center">
                 <tr>
-                    <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2">(recommended 1.2)</td>
+                    <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2">(max 4.8, recommended 1.2)</td>
                 </tr>
                 <tr>
                     <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
@@ -582,7 +588,8 @@ class RosettaHTML:
             
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values();">
-              &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="this.form.reset()">
+              &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="ValidateForm();">
+              &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="allWhite();this.form.reset();">
               &nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit">
             </p>
             <!-- end parameter form -->
@@ -871,7 +878,7 @@ class RosettaHTML:
             # write size of ensemble
             html += '<td id="lw">%s</td>' % str(line[7])
             # write error
-            if  str(line[8]) == '':
+            if  str(line[8]) == '' or line[8] == None:
               html += '<td id="lw">&nbsp;</td>'
             else:
               html += '<td id="lw">%s</td>' % str(line[8])
@@ -909,7 +916,7 @@ class RosettaHTML:
         html += """
                 <tr><td align=right bgcolor="#EEEEFF">Job Name:       </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Status:         </td><td bgcolor="#EEEEFF">%s</td></tr>
-                <tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>
+                <tr><td align=right></td><td></td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Submitted from: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Date Submitted: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 """ % ( jobname, status_html, hostname, date_submit )
@@ -924,11 +931,11 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">Computing time: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Expires:        </td><td bgcolor="#EEEEFF">%s (%s)</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Binary:         </td><td bgcolor="#EEEEFF">%s</td></tr>
-                <tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>
+                <tr><td align=right></td><td></td></tr>
                 """ % ( date_start, date_end, time_computation, date_expiration, time_expiration, rosetta )
         
         if delete or restart:
-            html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+            html += '<tr><td align=right></td><td></td></tr>'
             if delete and status == 'in queue':
                 html += '<a href="#" onclick="confirm_delete(%s); return false;"><font color="red">DELETE</font></a>' % ID
             if restart and status == 'done':
@@ -970,7 +977,7 @@ class RosettaHTML:
                               <ul><li><a href="../downloads/%s/molprobity_data.txt">Data shown in Plot</a></li>
                                   <li><a href="../downloads/%s/molprobity_raw_output.txt">raw output</a></li></ul></td>
                 <td bgcolor="#FFFCD8"><a href="../downloads/%s/molprobity_plot.png">
-                                      <img src="../downloads/%s/molprobity_plot.png" alt="image missing." width="400"></a>
+                                      <img src="../downloads/%s/molprobity_plot.png" alt="image file not available" width="400"></a>
                                       </td></tr>''' % ( cryptID,cryptID,cryptID,cryptID)
       html = ''
       return html
@@ -984,7 +991,7 @@ class RosettaHTML:
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 """ % ( input_filename, size_of_ensemble )
         if status == 'done' or status == 'sample':
-          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)        
         
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
@@ -1005,7 +1012,7 @@ class RosettaHTML:
                 """ % ( cryptID, input_filename, input_filename, size_of_ensemble, chain, resid, newaa )
                 
         if status == 'done' or status == 'sample':
-          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
         
@@ -1041,7 +1048,7 @@ class RosettaHTML:
                           </td></tr>
                     """ % ( input_filename, size_of_ensemble, multiple_mutations_html )
         if status == 'done' or status == 'sample':
-          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
@@ -1060,7 +1067,7 @@ class RosettaHTML:
                 """ % ( input_filename, size_of_ensemble, mutation_file )
                 
         if status == 'done' or status == 'sample':
-          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)
           comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
         
@@ -1080,7 +1087,7 @@ class RosettaHTML:
                 """ % ( input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg )
         
         if status == 'done' or status == 'sample':
-          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right></td><td></td></tr>'
           
           comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
           [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]
@@ -1098,20 +1105,20 @@ class RosettaHTML:
           html += """
                 <tr><td align="right" bgcolor="#FFFCD8">Mean C&alpha; difference distance values</td>                 
                     <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_1D_plot.png">
-                                          <img src="../downloads/%s/ca_dist_difference_1D_plot.png" alt="image missing." width="400"></a></td></tr>
+                                          <img src="../downloads/%s/ca_dist_difference_1D_plot.png" alt="image file not available" width="400"></a></td></tr>
               
                 <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; difference distance values [ <a href="../downloads/%s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
                     <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_2D_plot.png">
-                                          <img src="../downloads/%s/ca_dist_difference_2D_plot.png" alt="image missing." width="400"></a></td></tr>
+                                          <img src="../downloads/%s/ca_dist_difference_2D_plot.png" alt="image file not available" width="400"></a></td></tr>
                 
                 <tr><td align="right" bgcolor="#FFFCD8">Mean RMSD of C&alpha; atoms for individual residues</td>
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/rmsd_plot.png"><img src="../downloads/%s/rmsd_plot.png" alt="image missing." width="400"></a></td></tr>                          
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/rmsd_plot.png"><img src="../downloads/%s/rmsd_plot.png" alt="image file not available" width="400"></a></td></tr>                          
                                           
                 <tr><td align="center" colspan="2" bgcolor="#FFFCD8">Design results:</td></tr>
                 <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for core residues<br><br>
                                                         Sequences [ <a href="../downloads/%s/designs_core.fasta">fasta formated file</a> ]<br>
                                                         Sequence population matrix [ <a href="../downloads/%s/seq_pop_core.txt">matrix file</a> ]</td> 
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo_core.png"><img src="../downloads/%s/logo_core.png" alt="image missing." width="400"></a><br>
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo_core.png"><img src="../downloads/%s/logo_core.png" alt="image file not available" width="400"></a><br>
                                           <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
                                           <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
                                           <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]</td></tr>
@@ -1119,7 +1126,7 @@ class RosettaHTML:
                 <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for all residues<br><br>
                                                         Sequences [ <a href="../downloads/%s/designs.fasta">fasta formated file</a> ]<br>
                                                         Sequence population matrix [ <a href="../downloads/%s/seq_pop.txt">matrix file</a> ]</td>
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo.png"><img src="../downloads/%s/logo.png" alt="image missing." width="400"></a><br>
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo.png"><img src="../downloads/%s/logo.png" alt="image file not available" width="400"></a><br>
                                           <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, <a href="Crooks-2004-GR-WebLogo.pdf">
                                           <small>WebLogo: A sequence <br>logo generator</small></a>, <em>Genome Research</em>, 14:1188-1190, (2004)</small> 
                                           [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
@@ -1128,7 +1135,7 @@ class RosettaHTML:
               
                 """ % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
         
-          html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+          html += '<tr><td align=right></td><td></td></tr>'
 
         return html
     
@@ -1157,7 +1164,7 @@ class RosettaHTML:
         
         input_id = input_filename[:-4] # filename without suffix
         if status == 'done' or status == 'sample':
-            html += '<tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+            html += '<tr><td align=right></td><td></td></tr>'
             
             if mini == 'mini' or mini == '1':
               list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
@@ -1178,7 +1185,7 @@ class RosettaHTML:
             if mini == 'mini' or mini == '1':        
               html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
                              <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
-                                                   <img src="../downloads/%s/plasticity_motif.png" alt="image missing." width="400"></a><br>
+                                                   <img src="../downloads/%s/plasticity_motif.png" alt="image file not available" width="400"></a><br>
                                                    <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
                                                    <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
                                                    <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
@@ -1195,10 +1202,10 @@ class RosettaHTML:
                     ''' % ( cryptID, cryptID, cryptID )
             
             for resid in seqtol_list_1:
-              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image missing." width="400"></a><br>
+              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( cryptID, seqtol_chain1, resid, cryptID, seqtol_chain1, resid )
             for resid in seqtol_list_2:
-              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image missing." width="400"></a><br>
+              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( cryptID, seqtol_chain2, resid, cryptID, seqtol_chain2, resid )
             
             html += self._show_molprobity( cryptID )
@@ -1221,7 +1228,7 @@ class RosettaHTML:
                 #     html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
             else:
                 html += 'no data'
-        html += '</td>\n</tr><tr><td align=right bgcolor="#FFFFFF"></td><td bgcolor="#FFFFFF"></td></tr>'
+        html += '</td>\n</tr><tr><td align=right></td><td></td></tr>'
         
         return html
     
@@ -1285,15 +1292,19 @@ class RosettaHTML:
         html += """<td align="center"><H1 class="title">Job %s</H1> """ % ( parameter['ID'] )
         if int(parameter['Status']) == 4:
             html += """ <P><font color=red><b>Rosetta Error:</b></font><br>
-                            We are sorry but your simulation failed. <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Tutorial#PDB_Files">Please check your pdb file.</a>
-                            If the PDB file is correct and Rosetta still fails, please contact us via <img src="../images/support_email.png" height="15">.</P> <br>"""
+                            We are sorry but your simulation failed. Please referr to the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error">Error messages section</a>
+                            of the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/">Documentation</a> and contact us via <img src="../images/support_email.png" height="15">if necessary.
+                        </P> 
+                    <br>"""
         
+        html += '<div id="jobinfo">'
         html += '<table border=0 cellpadding=2 cellspacing=1>\n'
         
         html += self._defaultParameters( parameter['ID'], parameter['Notes'], status, parameter['Host'], parameter['Date'], parameter['StartDate'], 
                                     parameter['EndDate'], parameter['time_computation'], parameter['date_expiration'], parameter['time_expiration'], parameter['Mini'], parameter['Errors'], delete=False, restart=False )
         
-        if parameter['Errors'] == '' or parameter['Errors'] == None:
+        
+        if str(parameter['Errors']).strip() in ['', 'Postprocessing'] or parameter['Errors'] == None:
             
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
@@ -1329,7 +1340,7 @@ class RosettaHTML:
                                                      seqtol_parameter['seqtol_radius'], 
                                                      seqtol_parameter['seqtol_weight_chain1'], seqtol_parameter['seqtol_weight_chain2'], seqtol_parameter['seqtol_weight_interface'] )
                 
-        html += '</table><br></td>\n'
+        html += '</table><br></div></td>\n'
         
         return html
 

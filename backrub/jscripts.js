@@ -4,19 +4,21 @@ var numSeqTol = 0; // Mutation SeqTol
 
 
 function startup(query) {
-      if (query == "submit") {
+      if (query == "submit" || query == "submitted") {
           Nifty("ul#about li","big fixed-height");
           Nifty("div#box","big transparent fixed-height");
       }
       if (query == "index" || query == "login") {
           Nifty("div#login_box","big transparent fixed-height");
       }
-      if (query == "queue") {
+      if (query == "queue" ) {
           Nifty("div#queue_bg","big transparent fixed-height");
+      }
+      if (query == "jobinfo") {
+          Nifty("div#jobinfo","big transparent fixed-height");
       }
       //updateCellSize2();
 }
-
 
 function ValidateFormRegister() {
         if ( document.myForm.username.value == "" ||
@@ -41,45 +43,199 @@ function ValidateFormRegister() {
         return true;
     }
 
+function isNumeric(elem){
+	var numericExpression = /^[0-9\.]+$/;
+	if(elem.value.match(numericExpression)){
+	  elem.style.background="white";
+		return true;
+	}else{
+    // alert(helperMsg);
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+}
+
+function isAlpha(elem){
+	var numericExpression = /^[A-Za-z]+$/;
+	if(elem.value.match(numericExpression)){
+	  elem.style.background="white";
+		return true;
+	}else{
+    // alert(helperMsg);
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+}
+
+function isAA(elem){
+	var numericExpression = /^[ACDEFGHIKLMNOPQRSTUVWY]+$/;
+	if(elem.value.match(numericExpression)){
+	  elem.style.background="white";
+		return true;
+	}else{
+    // alert(helperMsg);
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+}
+
+function isCYS(elem){
+	if(elem.value == "C"){
+		alert("We're sorry, but mutation to Cystein is not allowed.");
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}else{
+	  elem.style.background="white";
+		return true;
+	}
+}
+
+
+function isPDB(elem){
+	var numericExpression = /^[A-Za-z0-9]+$/;
+	if(elem.value.match(numericExpression)){
+	  elem.style.background="white";
+		return true;
+	}else{
+    // alert(helperMsg);
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+}
+
+
+function notEmpty(elem){
+	if(elem.value.length == 0){
+    // alert(helperMsg);
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+	elem.style.background="white";
+	return true;
+}
+
+function allWhite(){
+  for(i=0; i<document.submitform.elements.length; i++)
+  {
+    document.submitform.elements[i].style.background="white";
+  }
+}
 
 function ValidateForm() {
-    if ( document.submitform.JobName.value == "" ||
-        ( document.submitform.PDBComplex.value == "" && document.submitform.PDBComplexURL.value == "" ) ||
-        document.submitform.Mini.value == "" ||
-        document.submitform.task.value == "" ||
-        document.submitform.nos.value == "" ) {
-                    alert("Please complete all required fields.");
-                    return false;
+    var returnvalue = new Array(); // we collect all the return values, if only one is "false" in the end, we return false
+    returnvalue.push( notEmpty(document.submitform.JobName) );
+    if (document.submitform.PDBComplex.value == "" && document.submitform.PDBID.value == "" ) {
+      document.submitform.PDBComplex.style.background="red";
+      document.submitform.PDBID.style.background="red";
+      // alert("Please upload a structure or enter a PDB identifier.");
+      returnvalue.push(false);
+    } else {
+      document.submitform.PDBComplex.style.background="white";
+      document.submitform.PDBID.style.background="white";
+      returnvalue.push(true);
     }
-    if ( document.submitform.task.value == "point_mutation" &&
-        ( document.submitform.PM_chain.value == "" ||
-            document.submitform.PM_resid.value == "" ||
-            document.submitform.PM_newres.value == "" ||
-            document.submitform.PM_radius.value == "" ) ) {
-                    alert("Please complete all required fields.");
-                    return false;
+    if ( document.submitform.PDBComplex.value == "" ) {
+      if ( document.submitform.PDBID.value.length < 4 ) {
+        document.submitform.PDBID.style.background="red";
+        returnvalue.push(false);
+      } else {
+        returnvalue.push(isPDB(document.submitform.PDBID));
+      }
     }
-    if ( document.submitform.task.value == "ensemble" &&
-        ( document.submitform.ENS_temperature.value == "" ||
-          document.submitform.ENS_num_designs_per_struct.value == "" ||
-          document.submitform.ENS_segment_length.value == "" ) ) {
-                    alert("Please complete all required fields.");
-                    return false;
+
+    if ( notEmpty(document.submitform.nos) && isNumeric(document.submitform.nos) ) {
+        if ( document.submitform.nos.value <= 0 || document.submitform.nos.value > 50 ) {
+            document.submitform.nos.style.background="red";
+            returnvalue.push(false);
+        }
+    } else { returnvalue.push(false); }
+
+    if ( document.submitform.task.value == "parameter1_1" ) {
+      returnvalue.push(notEmpty(document.submitform.PM_chain)); 
+      returnvalue.push(isAlpha(document.submitform.PM_chain));
+      returnvalue.push(notEmpty(document.submitform.PM_resid)); 
+      returnvalue.push(isNumeric(document.submitform.PM_resid));
+      returnvalue.push(notEmpty(document.submitform.PM_newres));
+      returnvalue.push(isAA(document.submitform.PM_newres));
+      returnvalue.push(notEmpty(document.submitform.PM_radius));
+      returnvalue.push(isNumeric(document.submitform.PM_radius));
+      if ( document.submitform.Mini.value == 'mini') {
+          returnvalue.push(isCys(document.submitform.PM_newres));          
+      }
     }
-    if ( document.submitform.task.value == "upload_mutation" &&
-            document.submitform.Mutations.value == "" ) {
-                    alert("Please complete all required fields.");
-                    return false;
+    
+    if ( document.submitform.task.value == "parameter1_2" ) {
+      var i=0;
+      for (i=0;i<=30;i=i+1) {
+        // check if row is empty
+        if ( document.submitform.elements['PM_chain' + '' + i].value.length == 0 && 
+             document.submitform.elements['PM_resid' + '' + i].value.length == 0 && 
+             document.submitform.elements['PM_newres'+ '' + i].value.length == 0 && 
+             document.submitform.elements['PM_radius'+ '' + i].value.length == 0 ) {
+           // break the loop
+           break;
+        }
+        // if not empty, check if ALL values are entered correctly.
+        returnvalue.push( notEmpty(document.submitform.elements['PM_chain' + '' + i]));
+        returnvalue.push( isAlpha(document.submitform.elements['PM_chain' + '' + i]));
+        returnvalue.push( notEmpty(document.submitform.elements['PM_resid' + '' + i]));
+        returnvalue.push( isNumeric(document.submitform.elements['PM_resid' + '' + i]));
+        returnvalue.push( notEmpty(document.submitform.elements['PM_newres'+ '' + i]));
+        returnvalue.push( isAlpha(document.submitform.elements['PM_newres'+ '' + i]));
+        if ( document.submitform.Mini.value == 'mini' ) { returnvalue.push(isCys(document.submitform.elements['PM_newres' + '' + i])); }
+        returnvalue.push( notEmpty(document.submitform.elements['PM_radius'+ '' + i]));
+        returnvalue.push( isNumeric(document.submitform.elements['PM_radius'+ '' + i]));
+      }
     }
-    if ( document.submitform.task.value == "sequence_tolerance" &&
-          (  document.submitform.seqtol_chain1.value == "" ||
-             document.submitform.seqtol_chain2.value == "" ||
-             document.submitform.seqtol_weight_chain1.value == "" ||
-             document.submitform.seqtol_weight_chain2.value == "" ||
-             document.submitform.seqtol_weight_interface.value == "" ||
-             ( document.submitform.seqtol_seqtol_mut_c_0.value == "" && document.submitform.seqtol_seqtol_mut_r_0.value == "" ) ) ) {
-                    alert("Please complete all required fields.");
-                    return false;
+    
+    if ( document.submitform.task.value == "parameter2_2" ) {
+      returnvalue.push( notEmpty(document.submitform.ENS_temperature) ); 
+      returnvalue.push( isNumeric(document.submitform.ENS_temperature) );
+      if ( parseFloat(document.submitform.ENS_temperature.value) < 0.0 || parseFloat(document.submitform.ENS_temperature.value) > 4.8) { 
+          returnvalue.push(false);  
+          document.submitform.ENS_temperature.style.background="red";
+          }
+      returnvalue.push( notEmpty(document.submitform.ENS_num_designs_per_struct) ); 
+      returnvalue.push( isNumeric(document.submitform.ENS_num_designs_per_struct) );
+      returnvalue.push( notEmpty(document.submitform.ENS_segment_length) ); 
+      returnvalue.push( isNumeric(document.submitform.ENS_segment_length) );
+    }
+    
+    if ( document.submitform.task.value == "parameter1_3" ) {
+            returnvalue.push( notEmpty(document.submitform.Mutations) );
+    }
+    
+    if ( document.submitform.task.value == "parameter3_1" ) {
+        returnvalue.push( notEmpty( document.submitform.seqtol_chain1) );
+        returnvalue.push( isAlpha( document.submitform.seqtol_chain1) );
+        returnvalue.push( notEmpty( document.submitform.seqtol_chain2) );
+        returnvalue.push( isAlpha( document.submitform.seqtol_chain2) );
+        // notEmpty( document.submitform.seqtol_weight_chain1, "Please enter a weight for Partner 1");
+        // notEmpty( document.submitform.seqtol_weight_chain2, "Please enter a weight for Partner 2");
+        // notEmpty( document.submitform.seqtol_weight_interface, "Please enter a weight for the interface") ;
+        var i=0;
+        for (i=0;i<=10;i=i+1) {
+          // check if row is empty
+          if ( document.submitform.elements['seqtol_mut_c_' + '' + i].value.length == 0 && 
+               document.submitform.elements['seqtol_mut_r_' + '' + i].value.length == 0 ) {
+            break
+          }
+          returnvalue.push( notEmpty(document.submitform.elements['seqtol_mut_c_' + '' + i]));
+          returnvalue.push( isAlpha(document.submitform.elements['seqtol_mut_c_' + '' + i]));
+          returnvalue.push( notEmpty(document.submitform.elements['seqtol_mut_r_' + '' + i]));
+          returnvalue.push( isNumeric(document.submitform.elements['seqtol_mut_r_' + '' + i]));
+        }
+    }
+    // if there's only one false, return false
+    var j=0;
+    for (j=0;j<=returnvalue.length;j=j+1) {
+      if (returnvalue[j] == false ) { return false; }
     }
     return true;
 }
@@ -100,6 +256,7 @@ function ValidateFormEmail() {
 function changeApplication( app, _task ) {
 
 	document.submitform.reset();
+	allWhite();
 	
 	// change these two arrays if you change the table in rosettahtml.py
 	myParameter = new Array("parameter1_1","parameter1_2","parameter1_3",
@@ -363,14 +520,14 @@ function set_demo_values() {
   actual_task = getTask();
 
  if ( actual_task == 'parameter1_1') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1KYO_A.pdb";
+      document.submitform.PDBID.value = "1KYO";
       document.submitform.nos.value = "10";
       document.submitform.PM_chain.value = "A";
       document.submitform.PM_resid.value = "153";
       document.submitform.PM_newres.value = "F";
 
   } else if ( actual_task == 'parameter1_2') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb";
+      document.submitform.PDBID.value = "2PDZ";
       document.submitform.nos.value = "10";
       document.submitform.PM_chain0.value = "A";
       document.submitform.PM_resid0.value = "17";
@@ -394,18 +551,18 @@ function set_demo_values() {
       addOneMore();
 
   } else if ( actual_task == "parameter2_1") {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb";
+      document.submitform.PDBID.value = "1UBQ";
       document.submitform.nos.value = "10";  
 
   } else if ( actual_task == 'parameter2_2') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/1UBQ.pdb";
+      document.submitform.PDBID.value = "1UBQ";
       document.submitform.nos.value = "10";
       document.submitform.ENS_temperature.value = "1.2";
       document.submitform.ENS_num_designs_per_struct.value = "20";
       document.submitform.ENS_segment_length.value = "12";
 
   } else if ( actual_task == 'parameter3_1') {
-      document.submitform.PDBComplexURL.value = "https://kortemmelab.ucsf.edu/backrub/downloads/2PDZ_M01.pdb";
+      document.submitform.PDBID.value = "2PDZ";
       document.submitform.nos.value = "10";
       document.submitform.seqtol_chain1.value = "A";
       document.submitform.seqtol_chain2.value = "B";

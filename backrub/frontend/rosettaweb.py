@@ -62,7 +62,6 @@ from string import *
 from cStringIO import StringIO
 from cgi import escape
 
-
 import pickle
 
 ###############################################################################################
@@ -94,10 +93,15 @@ ROSETTAWEB_cookie_expiration  = 60*60
 ROSETTAWEB_bin_sendmail = parameter['bin_sendmail']
 ROSETTAWEB_download_dir = parameter['rosetta_dl']
 
+ROSETTAWEB_base_dir     = parameter["base_dir"]
+
 # open connection to MySQL
 connection = MySQLdb.Connection( host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket )
 ########################################## Setup End ##########################################
 
+# this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
+sys.path.insert(0, "%sdaemon/" % ROSETTAWEB_base_dir)
+from pdb import PDB
 
 
 ###############################################################################################
@@ -269,7 +273,7 @@ def ws():
   ########## DEBUG Cookies ##########
 
   if not os.path.exists('/tmp/daemon-example.pid'):
-    warning = 'Backend not running. Jobs will not be processed immediately.'
+    warning = ''#'Backend not running. Jobs will not be processed immediately.'
 
   rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_name='Tanja Kortemme')
 
@@ -307,7 +311,8 @@ def ws():
       html_content = rosettaHTML.submited( jobname='',cryptID=return_val[1], remark=return_val[2] )
       title = 'Job submitted'
     else: # no data was submitted/there is an error
-      html_content = "<br>Error<br><br>%s<br>" % return_val[1]
+      html_content = rosettaHTML.submit(jobname='', error=return_val[1])
+      title = 'Submission Form'
 
   elif query_type  == "submit":
     html_content = rosettaHTML.submit(jobname='')
@@ -701,6 +706,37 @@ def getUserData(form, SID):
 
 ################################### end update() ##############################################
 
+def check_pdb(pdb_object):
+    '''checks pdb file for errors'''
+    
+    # check the formatting of the file
+    if not pdb_object.check_format():
+      return (False, "PDB format incorrect<br>")
+    
+    # check the number of atoms/residues/chains;
+    # numbers are derived from 1KYO wich is huge: {'models': 0, 'chains': 23, 'residues': 4459, 'atoms': 35248}
+    counts = pdb_object.get_stats()
+    if counts["atoms"] > 10000:
+      return (False, "Max. number of atoms exceeded<br>")
+    if counts["residues"] > 1500:
+      return (False, "Max. number of residues exceeded<br>")
+    if counts["chains"] > 9:
+      return (False, "Max. number of chains exceeded<br>")
+    
+    return (True, "everything is fine")
+
+
+def extract_1stmodel(pdbfile):
+    # check if structure is NMR or X-RAY. Problem: if headerinfo and EXPDTA line are missing there is no way of telling.
+    # Consider only the first model. Copy everything until the first ENDMDL entry.
+    new_pdbfile = ''
+    for line in pdbfile.split('\n'):
+      new_pdbfile += line + '\n'
+      if line.rstrip() == 'ENDMDL':
+        new_pdbfile += 'END\n'
+        break
+    return new_pdbfile
+
 
 ###############################################################################################
 # submit()                                                                                    #
@@ -724,6 +760,7 @@ def submit(form, SID):
   error    = ""  # is used to check if something went wrong
   cryptID  = ''
   pdbfile  = ''
+  pdb_object = None
   
   # 2 modes: check and show form
   if form.has_key("mode") and form["mode"].value == "check":
@@ -734,48 +771,57 @@ def submit(form, SID):
     if form.has_key("JobName"):
       JobName = escape(form["JobName"].value)
     
+    ############## PDB STUFF ###################
+    pdb_error = False
     if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
-      pdbfile = form["PDBComplex"].value
-      if not form["PDBComplex"].file:
-        error += " PDB data is not a file. "
-      pdb_filename = form["PDBComplex"].filename
-      if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
-        pdb_filename = pdb_filename + '.pdb'
-    
-    elif form.has_key("PDBComplexURL") and form["PDBComplexURL"].value != '':
       try:
-        url = form["PDBComplexURL"].value
-        req = urllib2.Request(url)
-        response = urllib2.urlopen(req)
-        pdbfile = response.read()
-        pdb_filename = url.split('/')[-1]          # last entry should be the filename
+        pdbfile = form["PDBComplex"].value
+        if not form["PDBComplex"].file:
+          error += " PDB data is not a file. "
+        pdb_filename = form["PDBComplex"].filename
         if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
           pdb_filename = pdb_filename + '.pdb'
       except:
-        error = "invalid URL"
-    else:
-      error = "Invalid structure file."
-
-    # clean up pdbfile, this only affects comments that are deleted by the pdb class anyways
-    pdbfile = pdbfile.replace('"',' ')
+        error = "invalid PDB file"
+        pdb_error = True
     
-    # check if structure is NMR or X-RAY. Problem: if headerinfo and EXPDTA line are missing there is no way of telling.
-    # Consider only the first model. Copy everything until the first ENDMDL entry.
-    new_pdbfile = ''
-    for line in pdbfile.split('\n'):
-      new_pdbfile += line + '\n'
-      if line.rstrip() == 'ENDMDL':
-        new_pdbfile += 'END\n'
-        break
-    pdbfile = new_pdbfile
+    elif form.has_key("PDBID") and form["PDBID"].value != '':
+      try:
+        pdb_filename = form["PDBID"].value.upper() + '.pdb'
+        url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
+        req = urllib2.Request(url)
+        response = urllib2.urlopen(req)
+        pdbfile = response.read()
+        if len(pdbfile) <= 2:
+          error = "Invalid PDB identifier<br>"
+          pdb_error = True
+      except:
+        error = "Invalid PDB identifier (URL)<br>"
+        pdb_error = True
+    else:
+      error = "Invalid structure file<br>"
+      pdb_error = True
 
-
+    if pdb_error:
+      return (False, error)
+    else:
+      pdbfile = pdbfile.replace('"',' ')  # removes \" that mislead python. not needed anyway
+      pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
+      
+      pdb_object = PDB(pdbfile.split('\n'))
+      pdb_check_result = check_pdb(pdb_object)
+      if not pdb_check_result[0]:
+        return pdb_check_result
         
+      
+        
+    ############## PDB STUFF END ###############
+            
     if form.has_key("Mutations"):
       mutationsfile = form["Mutations"]
       mutations_data = str(mutationsfile.value)
       if not mutationsfile.file:
-         error += " Mutations list data is not a file. "
+         return (False, "Mutations list data is not a file.<br>")
     else:
       mutations_data = ""
     
@@ -795,7 +841,7 @@ def submit(form, SID):
         modus = 'sequence_tolerance'
     else:
       modus = None
-      error += " No Task selected. "
+      return (False, "No Application selected.<br>")
     
     if form.has_key("Mini"):
       mini = form["Mini"].value # this is either 'mini' or 'classic'
@@ -804,7 +850,7 @@ def submit(form, SID):
     # elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
     #   mini = 'mini'
     else:
-      error += " No Rosetta binary selected. " # this is preselected in HTML code, so this case should never occur, we still make sure!
+      return (False, "No Rosetta binary selected.<br>") # this is preselected in HTML code, so this case should never occur, we still make sure!
 
     
     if form.has_key("nos"):
@@ -839,7 +885,22 @@ def submit(form, SID):
 
       if form.has_key("PM_radius") and form["PM_radius"].value != '':
         PM_radius = form["PM_radius"].value
-    
+      
+      # check if residue and chain exist in structure:
+      all_chains = pdb_object.chain_ids()
+      all_resids = pdb_object.aa_resids()
+      resid2type = pdb_object.aa_resid2type()
+
+      if PM_chain in all_chains:
+        resid = "%s%4.i" % (PM_chain,int(PM_resid)) 
+        if not resid in all_resids:
+          return (False, "Residue not found<br>")
+        elif resid2type[resid] == "C":
+          return (False, "<br>Mutation from Cystein (CYS, C) not permitted.<br>")
+      else:
+        return (False, "Chain not found<br>")
+      
+      
     # Multiple PointMutations
     elif modus == 'multiple_mutation':
       PM_chain  = []
@@ -862,7 +923,22 @@ def submit(form, SID):
         key = "PM_radius" + str(x)
         if form.has_key(key) and form[key].value != '':
           PM_radius.append(form[key].value)
-
+      
+      # check if residue and chain exist in structure:
+      all_chains = pdb_object.chain_ids()
+      all_resids = pdb_object.aa_resids()
+      resid2type = pdb_object.aa_resid2type()
+        
+      for i in range(len(PM_resid)-1):
+        if PM_chain[i] in all_chains:
+          resid = "%s%4.i" % (PM_chain[i],int(PM_resid[i]))
+          if not resid in all_resids:
+            return (False, "Residue number %s not found<br>" % PM_resid[i])
+          elif resid2type[resid] == "C":
+            return (False, "<br>Mutation from Cystein (CYS, C) not permitted.<br>")
+        else:
+          return (False, "Chain %s not found<br>" % PM_chain[i])
+      
       PM_chain  = str(PM_chain).strip('[]').replace(', ','-')
       PM_resid  = str(PM_resid).strip('[]').replace(', ','-')
       PM_newres = str(PM_newres).strip('[]').replace(', ','-')
@@ -900,7 +976,7 @@ def submit(form, SID):
         seqtol_parameter["seqtol_radius"] = str(form["seqtol_radius"].value)
       else:
         seqtol_parameter["seqtol_radius"] = ""
-      
+
       # if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
       #   seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
       # else:
@@ -932,8 +1008,26 @@ def submit(form, SID):
             seqtol_parameter["seqtol_list_1"].append(str(form[key2].value))
           elif form[key1].value == seqtol_parameter["seqtol_chain2"]:
             seqtol_parameter["seqtol_list_2"].append(str(form[key2].value))
+          else:
+            return (False, "Chain not found.<br>")
         else:
           break
+
+      # check if residue and chain exist in structure:
+      all_chains = pdb_object.chain_ids()
+      all_resids = pdb_object.aa_resids()
+      resid2type = pdb_object.aa_resid2type()
+
+      for (chain, lst_resid) in [ (seqtol_parameter["seqtol_chain1"],seqtol_parameter["seqtol_list_1"]), (seqtol_parameter["seqtol_chain2"],seqtol_parameter["seqtol_list_1"]) ]:
+        if chain in all_chains:
+          for res_no in lst_resid:
+            resid = "%s%4.i" % (chain,int(res_no))
+            if not resid in all_resids:
+              return (False, "Residue not found<br>")
+            elif resid2type[resid] == "C":
+              return (False, "<br>Design of Cystein (CYS, C) not permitted.<br>")
+        else:
+          return (False, "Chain not found<br>")
                 
     seqtol_string = pickle.dumps(seqtol_parameter)
       
@@ -988,11 +1082,11 @@ def submit(form, SID):
         # now find if there's a key like that already:
         sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
         result = execQuery(connection, sql)
-        print sql, result
+        # print sql, result
         for r in result:
           if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
             shutil.copytree( os.path.join( ROSETTAWEB_download_dir, r[1] ), os.path.join( ROSETTAWEB_download_dir, cryptID ) ) # copy the data to a new directory
-            sql = 'UPDATE backrub SET Status="2", EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
+            sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
             result = execQuery(connection, sql)
             sql = "UNLOCK TABLES"
             execQuery(connection, sql)            
@@ -1027,7 +1121,7 @@ def submit(form, SID):
 #       PM_chain = form["PM_chain"].value
 #       if PM_chain = ######## I WAS WORKING HERE!!!!!!! ###################
 #     else:
-#       return false
+#       return False
 # 
 #     if form.has_key("PM_resid") and form["PM_resid"].value != '':
 #       PM_resid = form["PM_resid"].value
@@ -1130,6 +1224,8 @@ def jobinfo(form, SID):
         
         obj_DB = rosettadb.RosettaDB( ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time )
         parameter = obj_DB.getData4cryptID('backrub', cryptID)
+        # for x,y in parameter.iteritems():
+        #   print x, y, '<br>'
         if len(parameter) > 0:
             return (True, parameter)
     
