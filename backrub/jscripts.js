@@ -520,11 +520,11 @@ function set_demo_values() {
   actual_task = getTask();
 
  if ( actual_task == 'parameter1_1') {
-      document.submitform.PDBID.value = "1KYO";
+      document.submitform.PDBID.value = "1ABE";
       document.submitform.nos.value = "10";
       document.submitform.PM_chain.value = "A";
-      document.submitform.PM_resid.value = "153";
-      document.submitform.PM_newres.value = "F";
+      document.submitform.PM_resid.value = "108";
+      document.submitform.PM_newres.value = "L";
 
   } else if ( actual_task == 'parameter1_2') {
       document.submitform.PDBID.value = "2PDZ";
