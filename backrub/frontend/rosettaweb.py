@@ -116,7 +116,6 @@ def ws():
   s = sys.stdout
   if ROSETTAWEB_server_name == 'albana.ucsf.edu':
     sys.stderr = s # should be removed later
-
   debug = ''
 
   html_content = ''
@@ -892,9 +891,9 @@ def submit(form, SID):
       resid2type = pdb_object.aa_resid2type()
 
       if PM_chain in all_chains:
-        resid = "%s%4.i" % (PM_chain,int(PM_resid)) 
+        resid = "%s%4.i" % (PM_chain,int(PM_resid))
         if not resid in all_resids:
-          return (False, "Residue not found<br>")
+          return (False, "Residue not found: %s<br>" % resid)
         elif resid2type[resid] == "C":
           return (False, "<br>Mutation from Cystein (CYS, C) not permitted.<br>")
       else:
@@ -933,7 +932,7 @@ def submit(form, SID):
         if PM_chain[i] in all_chains:
           resid = "%s%4.i" % (PM_chain[i],int(PM_resid[i]))
           if not resid in all_resids:
-            return (False, "Residue number %s not found<br>" % PM_resid[i])
+            return (False, "Residue not found: %s<br>" % PM_resid[i])
           elif resid2type[resid] == "C":
             return (False, "<br>Mutation from Cystein (CYS, C) not permitted.<br>")
         else:
@@ -972,10 +971,8 @@ def submit(form, SID):
       else:
         seqtol_parameter["seqtol_chain2"] = ""
         
-      if form.has_key("seqtol_radius") and form["seqtol_radius"].value != '':
-        seqtol_parameter["seqtol_radius"] = str(form["seqtol_radius"].value)
-      else:
-        seqtol_parameter["seqtol_radius"] = ""
+      seqtol_parameter["seqtol_radius"] = "" # DO NOT DELETE OR SET A VALUE. I wish I could fix this now, but I can't! it needs to be empty.
+      # this parameter is actually obsolete, but it's still in the rosetta_daemon. once you delete it from there it can go here too ... I don't want to restart the daemon since I'm running out of time.
 
       # if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
       #   seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
@@ -1018,12 +1015,12 @@ def submit(form, SID):
       all_resids = pdb_object.aa_resids()
       resid2type = pdb_object.aa_resid2type()
 
-      for (chain, lst_resid) in [ (seqtol_parameter["seqtol_chain1"],seqtol_parameter["seqtol_list_1"]), (seqtol_parameter["seqtol_chain2"],seqtol_parameter["seqtol_list_1"]) ]:
+      for (chain, lst_resid) in [ (seqtol_parameter["seqtol_chain1"],seqtol_parameter["seqtol_list_1"]), (seqtol_parameter["seqtol_chain2"],seqtol_parameter["seqtol_list_2"]) ]:
         if chain in all_chains:
           for res_no in lst_resid:
             resid = "%s%4.i" % (chain,int(res_no))
             if not resid in all_resids:
-              return (False, "Residue not found<br>")
+              return (False, "Residue not found: %s<br>" % resid)
             elif resid2type[resid] == "C":
               return (False, "<br>Design of Cystein (CYS, C) not permitted.<br>")
         else:
