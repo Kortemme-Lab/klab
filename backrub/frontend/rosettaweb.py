@@ -1027,21 +1027,21 @@ def submit(form, SID):
           return (False, "Chain not found<br>")
                 
     seqtol_string = pickle.dumps(seqtol_parameter)
-      
+    
+    return_vals = (True, cryptID, "new") # true we processed the data
 
     if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
       # s = sys.stdout
       #  sys.stderr = s
       #  s.write( "Content-type: text/html\n")
       #  s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
-      return (False, error)
+      return_vals = (False, error)
     else:
       # if we're good to go, create new job
       # get ip addr hostname
       IP = os.environ['REMOTE_ADDR']
       sock = socket
       hostname = sock.gethostbyaddr(IP)[0]
-      
       # lock table
       sql = "LOCK TABLES backrub WRITE, Users READ"
       execQuery(connection, sql)
@@ -1085,10 +1085,8 @@ def submit(form, SID):
             shutil.copytree( os.path.join( ROSETTAWEB_download_dir, r[1] ), os.path.join( ROSETTAWEB_download_dir, cryptID ) ) # copy the data to a new directory
             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
             result = execQuery(connection, sql)
-            sql = "UNLOCK TABLES"
-            execQuery(connection, sql)            
-            return (True, cryptID, "old")
-        
+            return_vals = (True, cryptID, "old")
+            break      
                 
       except _mysql_exceptions.OperationalError, e:
         html = '<H1 class="title">New Job not submitted</H1>'
@@ -1102,12 +1100,14 @@ def submit(form, SID):
       # unlock tables
       sql = "UNLOCK TABLES"
       execQuery(connection, sql)
-
+      return return_vals
+      
   else:
     form['error_msg'] = 'wrong mode for submit()'
     return (False, error)
     
-  return (True, cryptID, "new") # true we processed the data
+  return (True, cryptID, "new")
+  
 
 ########################################## end of submit() ####################################
 
