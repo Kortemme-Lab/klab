@@ -552,16 +552,7 @@ class RosettaHTML:
                   <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
                   </td>
               </tr>
-              <!-- tr>
-                  <td  align="right">Residues of Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_list)s"></td>
-                  <td><input type="text" name="seqtol_list" maxlength=120 SIZE=10 VALUE="">
-                  </td>
-              </tr>
-              <tr>
-                  <td  align="right">Area for repacking <img src="../images/qm_s.png" title="%(tt_Radius)s"></td>
-                  <td>Radius<input type="text" name="seqtol_radius" maxlength=5 SIZE=4 VALUE="4.0"> &#197; (recommended 4.0&#197;)</td>
-              </tr -->
-                
+              
                 <tr>
                   <td align="right">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
                   <td>

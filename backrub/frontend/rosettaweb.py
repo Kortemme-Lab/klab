@@ -971,9 +971,6 @@ def submit(form, SID):
       else:
         seqtol_parameter["seqtol_chain2"] = ""
         
-      seqtol_parameter["seqtol_radius"] = "" # DO NOT DELETE OR SET A VALUE. I wish I could fix this now, but I can't! it needs to be empty.
-      # this parameter is actually obsolete, but it's still in the rosetta_daemon. once you delete it from there it can go here too ... I don't want to restart the daemon since I'm running out of time.
-
       # if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
       #   seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
       # else:
