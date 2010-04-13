@@ -125,7 +125,7 @@ def ws():
   userid       = ''
   title        = ''
 
-  comment = ''#'TEST MODE: Data might not be processed correctely.'
+  comment = ''
   warning = ''
   
   # get the POST data from the webserver
@@ -272,7 +272,7 @@ def ws():
   ########## DEBUG Cookies ##########
 
   if not os.path.exists('/tmp/daemon-example.pid'):
-    warning = ''#'Backend not running. Jobs will not be processed immediately.'
+    warning = '' #'Backend not running. Jobs will not be processed immediately.'
 
   rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_name='Tanja Kortemme')
 

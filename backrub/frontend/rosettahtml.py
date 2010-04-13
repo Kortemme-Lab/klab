@@ -1130,7 +1130,7 @@ class RosettaHTML:
 
         return html
     
-    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, seqtol_radius, w1, w2, w3 ):
+    def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, w1, w2, w3 ):
         
         html = """
               <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction</td></tr>
@@ -1328,7 +1328,6 @@ class RosettaHTML:
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'],
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
                                                      seqtol_parameter['seqtol_list_1'], seqtol_parameter['seqtol_list_2'],
-                                                     seqtol_parameter['seqtol_radius'], 
                                                      seqtol_parameter['seqtol_weight_chain1'], seqtol_parameter['seqtol_weight_chain2'], seqtol_parameter['seqtol_weight_interface'] )
                 
         html += '</table><br></div></td>\n'
