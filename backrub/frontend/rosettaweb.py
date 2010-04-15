@@ -795,7 +795,7 @@ def submit(form, SID):
           error = "Invalid PDB identifier<br>"
           pdb_error = True
       except:
-        error = "Invalid PDB identifier (URL)<br>"
+        error = "Invalid PDB identifier<br>"
         pdb_error = True
     else:
       error = "Invalid structure file<br>"
@@ -895,7 +895,7 @@ def submit(form, SID):
         if not resid in all_resids:
           return (False, "Residue not found: %s<br>" % resid)
         elif resid2type[resid] == "C":
-          return (False, "<br>Mutation from Cystein (CYS, C) not permitted.<br>")
+          return (False, "<br>Mutation of Cystein (CYS, C) not permitted.<br>")
       else:
         return (False, "Chain not found<br>")
       
@@ -934,7 +934,7 @@ def submit(form, SID):
           if not resid in all_resids:
             return (False, "Residue not found: %s<br>" % PM_resid[i])
           elif resid2type[resid] == "C":
-            return (False, "<br>Mutation from Cystein (CYS, C) not permitted.<br>")
+            return (False, "<br>Mutation of Cystein (CYS, C) not permitted.<br>")
         else:
           return (False, "Chain %s not found<br>" % PM_chain[i])
       
