@@ -199,13 +199,14 @@ class RosettaDataDir(RosettaHTML):
       </p>
       Output files:
         <ul>
-          <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Detailed Scores for the backrub structures</li>
           <li><a href="../downloads/%s/plasticity_sequences.fasta">plasticity_sequences.fasta</a> - 10 best scoring sequences for each backrub structure</li>
           <!-- li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li -->
           <li><a href="../downloads/%s/plasticity_pwm.txt">plasticity_pwm.txt</a> - Matrix with amino acid frequencies</li>
           <li><a href="../downloads/%s/plasticity_boxplot.png">plasticity_boxplot.png</a>, 
               <a href="../downloads/%s/plasticity_boxplot.pdf">plasticity_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
-      ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, jobid, jobid, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
+      ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, jobid, jobid, cryptID, cryptID, cryptID, cryptID, cryptID )
+
+      # <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Detailed scores for the backrub structures</li> # this had to go since the molprobity analysis was taken out.
     
     # individual boxplots
     list_files = os.listdir( self.download_dir+'/'+cryptID )
@@ -225,7 +226,7 @@ class RosettaDataDir(RosettaHTML):
                         <ul>'''
     else:
       self.content += '''Individual PDB files:<br>
-                          &nbsp;&nbsp;&nbsp; Structure file from the backrub run scores along the best scoring designed sequence.
+                          &nbsp;&nbsp;&nbsp; Structure file from the backrub run along with the structures of the best scoring designed sequences.
                         <ul>'''
       
     for fn_pdb in self._get_pdb_files(cryptID):

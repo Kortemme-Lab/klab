@@ -1164,9 +1164,18 @@ class RosettaHTML:
               list_pdb_files = ['../downloads/%s/%s.pdb' % (cryptID, input_id) ]
               list_files = os.listdir( self.download_dir+'/'+cryptID )
               list_files.sort()
-              list_pdb_files.extend( [ '../downloads/%s/%s' % ( cryptID, fn_pdb ) for fn_pdb in grep('BR%slow_[0-9][0-9][0-9][0-9]_[A-Z]*\.pdb' % (input_id) ,list_files) ] )
+              list_all_pdbs = grep('BR%slow_[0-9][0-9][0-9][0-9]_[A-Z]*\.pdb' % (input_id) ,list_files)
+              # we don't know at this point what the best scoring structures are. for each backrub structure, let's take the first we can find.
+              list_structure_shown = []
+              seq_before = ''
+              for pdb_fn in list_all_pdbs:
+                if seq_before != pdb_fn.split('_')[1]:
+                  list_structure_shown.append(pdb_fn)
+                seq_before = pdb_fn.split('_')[1]
+                
+              list_pdb_files.extend( [ '../downloads/%s/%s' % ( cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
               
-            comment1 = """Backbone representation of the best scoring structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """Backbone representation of some of the best scoring structures for 10 different initial backrub structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
             designed_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
             designed_res    = seqtol_list_1 + seqtol_list_2
@@ -1182,15 +1191,16 @@ class RosettaHTML:
                                                    <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
                              </td></tr> ''' % (cryptID, cryptID, cryptID)
                            
-            html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequency at each mutated site.<br>
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
                               Download <a href="../downloads/%s/plasticity_pwm.txt">weight matrix</a> or file with all plots as 
                               <a href="../downloads/%s/plasticity_boxplot.png">PNG</a>, <a href="../downloads/%s/plasticity_boxplot.pdf">PDF</a>.<br>
-                              To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
-                              A <a href="../wiki/SequencePlasticityPrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
-                              the <a href="../wiki/" target="_blank">wiki</a>.
                               </td>
                            <td bgcolor="#FFFCD8">
                     ''' % ( cryptID, cryptID, cryptID )
+                    
+                    # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
+                    # A <a href="../wiki/SequencePlasticityPrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # the <a href="../wiki/" target="_blank">wiki</a>.
             
             for resid in seqtol_list_1:
               html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
