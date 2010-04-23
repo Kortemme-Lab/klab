@@ -1005,7 +1005,7 @@ class RosettaHTML:
         if status == 'done' or status == 'sample':
           html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)
-          comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
+          comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
         
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation_res=resid, mutation_chain=chain )
           html += self._show_molprobity( cryptID )
@@ -1041,7 +1041,7 @@ class RosettaHTML:
         if status == 'done' or status == 'sample':
           html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)
-          comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
+          comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation_res=list_resids, mutation_chain=list_chains )
           html += self._show_molprobity( cryptID )
@@ -1060,7 +1060,7 @@ class RosettaHTML:
         if status == 'done' or status == 'sample':
           html += '<tr><td align=right></td><td></td></tr>'
           html += self._show_scores_file(cryptID)
-          comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
+          comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red.'
         
           html += self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'))
           html += self._show_molprobity( cryptID )       

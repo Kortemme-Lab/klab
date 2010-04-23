@@ -199,7 +199,7 @@ class RosettaDataDir(RosettaHTML):
       </p>
       Output files:
         <ul>
-          <li><a href="../downloads/%s/plasticity_sequences.fasta">plasticity_sequences.fasta</a> - 10 best scoring sequences for each backrub structure</li>
+          <li><a href="../downloads/%s/plasticity_sequences.fasta">plasticity_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
           <!-- li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li -->
           <li><a href="../downloads/%s/plasticity_pwm.txt">plasticity_pwm.txt</a> - Matrix with amino acid frequencies</li>
           <li><a href="../downloads/%s/plasticity_boxplot.png">plasticity_boxplot.png</a>, 
@@ -226,7 +226,7 @@ class RosettaDataDir(RosettaHTML):
                         <ul>'''
     else:
       self.content += '''Individual PDB files:<br>
-                          &nbsp;&nbsp;&nbsp; Structure file from the backrub run along with the structures of the best scoring designed sequences.
+                          &nbsp;&nbsp;&nbsp; Structure file from the backrub run along with the structures of up to 10 best scoring designed sequences.
                         <ul>'''
       
     for fn_pdb in self._get_pdb_files(cryptID):
