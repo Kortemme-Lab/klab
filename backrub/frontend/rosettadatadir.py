@@ -194,7 +194,7 @@ class RosettaDataDir(RosettaHTML):
       Input files:
         <ul>
           <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>
-          <li>Rosetta Residue file: <a href="../downloads/%s/backrub_%s.resfile">backrub_%s.resfile</a></li>
+          <li>Rosetta Residue file: <a href="../downloads/%s/backrub.resfile">backrub.resfile</a></li>
         </ul>
       </p>
       Output files:
@@ -204,7 +204,7 @@ class RosettaDataDir(RosettaHTML):
           <li><a href="../downloads/%s/plasticity_pwm.txt">plasticity_pwm.txt</a> - Matrix with amino acid frequencies</li>
           <li><a href="../downloads/%s/plasticity_boxplot.png">plasticity_boxplot.png</a>, 
               <a href="../downloads/%s/plasticity_boxplot.pdf">plasticity_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
-      ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, jobid, jobid, cryptID, cryptID, cryptID, cryptID, cryptID )
+      ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
 
       # <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Detailed scores for the backrub structures</li> # this had to go since the molprobity analysis was taken out.
     

@@ -1175,7 +1175,7 @@ class RosettaHTML:
                 
               list_pdb_files.extend( [ '../downloads/%s/%s' % ( cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
               
-            comment1 = """Backbone representation of some of the best scoring structures for 10 different initial backrub structures.<br>Query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
             designed_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
             designed_res    = seqtol_list_1 + seqtol_list_2
@@ -1350,10 +1350,11 @@ class RosettaHTML:
         
         # jmol command to load files
         if list_pdb_files != None:
-            jmol_cmd = 'load %s; color red; ' % list_pdb_files[0]
+            jmol_cmd = 'load %s; color red; cpk off; wireframe off; backbone 0.2;' % (list_pdb_files[0] ) #, list_pdb_files[0].split('/')[-1].split('.')[0])
             for pdb in list_pdb_files[1:11]:
-                jmol_cmd += 'load APPEND %s; ' % pdb
-            
+                jmol_cmd += 'load APPEND %s; ' % (pdb)
+            jmol_cmd += 'cpk off; wireframe off; backbone 0.2; '
+                        
             # jmol command to show mutation as balls'n'stick
             jmol_cmd_mutation = ''
             if mutation_res != None and mutation_chain != None: 
@@ -1370,7 +1371,7 @@ class RosettaHTML:
                          <td bgcolor="#FFFCD8">
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
-                              jmolApplet(400, "set appendNew false; %s cpk off; wireframe off; backbone 0.2; %s"); 
+                              jmolApplet(400, "set appendNew false; %s %s"); 
                             </script><br>
                             <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href=http://www.jmol.org/><small>www.jmol.org</small></a>
                          </td>
