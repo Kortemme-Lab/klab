@@ -997,10 +997,10 @@ class RosettaHTML:
         
         html = """
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Point Mutation</td></tr>
-                <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF"><a href="../downloads/%s/%s">%s</a></td></tr> 
+                <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain: %s<br>Residue: %s<br>Mutation: %s</td></tr>
-                """ % ( cryptID, input_filename, input_filename, size_of_ensemble, chain, resid, newaa )
+                """ % ( input_filename, size_of_ensemble, chain, resid, newaa )
                 
         if status == 'done' or status == 'sample':
           html += '<tr><td align=right></td><td></td></tr>'
