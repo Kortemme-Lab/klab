@@ -928,7 +928,7 @@ def submit(form, SID):
       all_resids = pdb_object.aa_resids()
       resid2type = pdb_object.aa_resid2type()
         
-      for i in range(len(PM_resid)-1):
+      for i in range(len(PM_resid)):
         if PM_chain[i] in all_chains:
           resid = "%s%4.i" % (PM_chain[i],int(PM_resid[i]))
           if not resid in all_resids:
