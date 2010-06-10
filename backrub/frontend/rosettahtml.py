@@ -438,7 +438,7 @@ class RosettaHTML:
               </TR>
               <TR>
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
-                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=2 SIZE=5 VALUE="10"> (max 50, recommended 10) </TD>
+                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=2 SIZE=5 VALUE="10"> (2-50, recommended 10) </TD>
               </TR>
               <!-- TR>
                 <TD align=right>Rosetta output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
@@ -690,7 +690,6 @@ class RosettaHTML:
     
         <P style="text-align:center;">
         Please enter all required information.  
-        This account will also be valid for <A href="http://albana.ucsf.edu/alascan/">Alanine Scanning</A>. 
         </P>
         %s
         <br>

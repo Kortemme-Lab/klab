@@ -150,7 +150,7 @@ function ValidateForm() {
     }
 
     if ( notEmpty(document.submitform.nos) && isNumeric(document.submitform.nos) ) {
-        if ( document.submitform.nos.value <= 0 || document.submitform.nos.value > 50 ) {
+        if ( document.submitform.nos.value < 2 || document.submitform.nos.value > 50 ) {
             document.submitform.nos.style.background="red";
             returnvalue.push(false);
         }

@@ -272,7 +272,10 @@ def ws():
   ########## DEBUG Cookies ##########
 
   if not os.path.exists('/tmp/daemon-example.pid'):
-    warning = '' #'Backend not running. Jobs will not be processed immediately.'
+    if username == 'flo':
+      warning = 'Backend not running. Jobs will not be processed immediately.'
+    else:
+      warning = '' #'Backend not running. Jobs will not be processed immediately.'
 
   rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning, contact_name='Tanja Kortemme')
 
@@ -1039,7 +1042,10 @@ def submit(form, SID):
       # get ip addr hostname
       IP = os.environ['REMOTE_ADDR']
       sock = socket
-      hostname = sock.gethostbyaddr(IP)[0]
+      try:
+        hostname = sock.gethostbyaddr(IP)[0]
+      except:
+        hostname = IP
       # lock table
       sql = "LOCK TABLES backrub WRITE, Users READ"
       execQuery(connection, sql)
@@ -1231,4 +1237,8 @@ def jobinfo(form, SID):
 
 
 # run Forest run!
-ws()
+try:
+    ws()
+except:
+    print "An error occured. Please check your input and contact us if the problem persists."
+
