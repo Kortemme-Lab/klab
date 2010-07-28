@@ -1279,6 +1279,8 @@ class RosettaHTML:
             status = 'active'
         elif int(parameter['Status']) == 2:
             status = 'done'
+        elif int(parameter['Status']) == 4:
+            status = 'error'    
         elif int(parameter['Status']) == 5:
             status = 'sample'
                         
@@ -1304,7 +1306,7 @@ class RosettaHTML:
                                     parameter['EndDate'], parameter['time_computation'], parameter['date_expiration'], parameter['time_expiration'], parameter['Mini'], parameter['Errors'], delete=False, restart=False )
         
         
-        if str(parameter['Errors']).strip() in ['', 'Postprocessing'] or parameter['Errors'] == None:
+        if True: #str(parameter['Errors']).strip() in ['', 'Postprocessing'] or parameter['Errors'] == None:
             
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
