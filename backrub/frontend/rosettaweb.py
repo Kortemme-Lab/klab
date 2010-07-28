@@ -310,7 +310,7 @@ def ws():
   elif query_type == "submitted":
     return_val = submit(form, SID)
     if return_val[0]: # data was submitted and written to the database
-      html_content = rosettaHTML.submited( jobname='',cryptID=return_val[1], remark=return_val[2] )
+      html_content = rosettaHTML.submited( '', return_val[1], return_val[2] )
       title = 'Job submitted'
     else: # no data was submitted/there is an error
       html_content = rosettaHTML.submit(jobname='', error=return_val[1])
@@ -781,7 +781,7 @@ def submit(form, SID):
         if not form["PDBComplex"].file:
           error += " PDB data is not a file. "
         pdb_filename = form["PDBComplex"].filename
-	pdb_filename = pdb_filename.replace(' ','_')
+        pdb_filename = pdb_filename.replace(' ','_')
         if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
           pdb_filename = pdb_filename + '.pdb'
       except:
@@ -1063,6 +1063,7 @@ def submit(form, SID):
         # do not just use the ID but also a random sequence
         tgb = str(ID) + 'flo' + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
         cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
+        return_vals = (True, cryptID, "new")
         sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
         result  = execQuery(connection, sql)
         # success
@@ -1090,7 +1091,7 @@ def submit(form, SID):
             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
             result = execQuery(connection, sql)
             return_vals = (True, cryptID, "old")
-            break      
+            break 
                 
       except _mysql_exceptions.OperationalError, e:
         html = '<H1 class="title">New Job not submitted</H1>'
@@ -1100,7 +1101,8 @@ def submit(form, SID):
           <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>"""
         else:
           html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" height="15">.</P>"""
-      
+        return_vals = (False, "database error")
+    
       # unlock tables
       sql = "UNLOCK TABLES"
       execQuery(connection, sql)

@@ -634,13 +634,13 @@ class RosettaHTML:
 
 
 
-    def submited(self, jobname='', cryptID='', remark=''):
+    def submited(self, jobname, cryptID, remark):
       
       if remark == 'new':
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#F0454B;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
                     Raw data files:<br><a class="blacklink" href="https://%s%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
-                    </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )                
+                    </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
 #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
       elif remark == 'old':
