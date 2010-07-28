@@ -169,7 +169,7 @@ def ws():
       html_content = '<br>Job in queue. Please check again later.'
     elif status in [3,4]:
       html_content = '<br>No data.'
-    
+        
     rosettaDD = RosettaDataDir(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_download_dir, contact_name='Tanja Kortemme')
     
     if html_content == '':

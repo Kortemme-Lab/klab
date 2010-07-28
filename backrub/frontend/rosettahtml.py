@@ -914,7 +914,7 @@ class RosettaHTML:
         if status == 'active':
             html += '<tr><td align=right bgcolor="#EEEEFF">Started:        </td><td bgcolor="#EEEEFF">%s</td></tr>\n' % ( date_start )
         
-        if status == 'done' or status == 'sample':
+        if status == 'done' or status == 'sample' or status == 'error':
             html +="""
                 <tr><td align=right bgcolor="#EEEEFF">Started:        </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Ended:          </td><td bgcolor="#EEEEFF">%s</td></tr>
@@ -1218,12 +1218,15 @@ class RosettaHTML:
     
         html = ''
 
-        if status == "done" or status == 'sample':
+        if status == "done" or status == 'sample' or status == 'error':
             html += '<tr><td align=right bgcolor="#B7FFE0"><b>Results</b>:</td><td bgcolor="#B7FFE0">'
             
             if os.path.exists( '%s%s/' % (self.download_dir, cryptID) ): # I could also remove this since rosettadatadir.py is taking care of this
-                html += '''<A href="%s?query=datadir&job=%s"><b>View</b></A> individual files.
-                         <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, cryptID, cryptID, jobnumber )
+                if status == 'error':
+                    html += 'Please follow <a href="../downloads/%s/">this link</a> to see which files were created.' % cryptID
+                else:
+                    html += '''<A href="%s?query=datadir&job=%s"><b>View</b></A> individual files.
+                                <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, cryptID, cryptID, jobnumber )
                 # if extended:
                 #     html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
             else:

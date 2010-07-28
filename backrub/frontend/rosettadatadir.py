@@ -90,7 +90,7 @@ class RosettaDataDir(RosettaHTML):
     
     if mini:
       self.header = '<h1 align="center">Job %s - Point Mutation (mini)</h1>' % jobid
-      individual_scores = '<li>Detailes scores for each residue: <a href="../downloads/%s/scores_residues.txt">scores_residues.txt</a></li>' % cryptID
+      individual_scores = '<li>Detailed scores for each residue: <a href="../downloads/%s/scores_residues.txt">scores_residues.txt</a></li>' % cryptID
     else:
       self.header = '<h1 align="center">Job %s - Point Mutation (classic)</h1>' % jobid
     
