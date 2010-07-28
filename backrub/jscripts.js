@@ -120,6 +120,15 @@ function notEmpty(elem){
 	return true;
 }
 
+function isEmpty(elem){
+    if (elem == "" || elem == null || !isNaN(elem) || elem.charAt(0) == '' )
+    {
+        return true;
+    }
+    return false;
+}
+
+
 function allWhite(){
   for(i=0; i<document.submitform.elements.length; i++)
   {
@@ -174,11 +183,18 @@ function ValidateForm() {
       var i=0;
       for (i=0;i<=30;i=i+1) {
         // check if row is empty
-        if ( document.submitform.elements['PM_chain' + '' + i].value.length == 0 && 
-             document.submitform.elements['PM_resid' + '' + i].value.length == 0 && 
-             document.submitform.elements['PM_newres'+ '' + i].value.length == 0 && 
-             document.submitform.elements['PM_radius'+ '' + i].value.length == 0 ) {
+        if ( isEmpty(document.submitform.elements['PM_chain' + '' + i].value) && 
+             isEmpty(document.submitform.elements['PM_resid' + '' + i].value) && 
+             isEmpty(document.submitform.elements['PM_newres'+ '' + i].value) && 
+             isEmpty(document.submitform.elements['PM_radius'+ '' + i].value) ) {
            // break the loop
+           if ( i==0 ) {
+               returnvalue.push(false);
+               document.submitform.elements['PM_chain' + '' + i].style.background="red";
+               document.submitform.elements['PM_resid' + '' + i].style.background="red";
+               document.submitform.elements['PM_newres'+ '' + i].style.background="red";
+               document.submitform.elements['PM_radius'+ '' + i].style.background="red";
+           }
            break;
         }
         // if not empty, check if ALL values are entered correctly.
