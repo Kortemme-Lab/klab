@@ -712,17 +712,18 @@ def check_pdb(pdb_object):
     '''checks pdb file for errors'''
     
     # check the formatting of the file
-    if not pdb_object.check_format():
-      return (False, "PDB format incorrect<br>")
+    pdb_check_output = pdb_object.check_format()
+    if pdb_check_output != True:
+      return (False, "PDB format incorrect: %s<br>" % pdb_check_output )
     
     # check the number of atoms/residues/chains;
     # numbers are derived from 1KYO wich is huge: {'models': 0, 'chains': 23, 'residues': 4459, 'atoms': 35248}
     counts = pdb_object.get_stats()
     if counts["atoms"] > 10000:
       return (False, "Max. number of atoms exceeded<br>")
-    if counts["residues"] > 1500:
+    if counts["residues"] > 500:
       return (False, "Max. number of residues exceeded<br>")
-    if counts["chains"] > 9:
+    if counts["chains"] > 4:
       return (False, "Max. number of chains exceeded<br>")
     
     return (True, "everything is fine")

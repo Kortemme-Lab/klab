@@ -268,8 +268,8 @@ class RosettaHTML:
 
         if error != '':
             error = '''<div align="center" style="width:300pt; background:lightgrey; margin:15pt; padding:15px; border-color:black; border-style:solid; border-width:2px;">
-                          Your job could not be submitted: <font style="color:red;"><b>%s</b></font><br>
-                          <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error" target="_blank">More Information</a>. <a HREF="javascript:history.go(-1)">Return</a> to the form. 
+                          Your job could not be submitted:<br><font style="color:red;"><b>%s</b></font><br>
+                          <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_submission" target="_blank">More Information</a>. <a HREF="javascript:history.go(-1)">Return</a> to the form. 
                        </div>''' % error           
 		    
         self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename, 'error':error})
@@ -792,14 +792,13 @@ class RosettaHTML:
                   <div id="queue_bg">
                   <table border=0 cellpadding=2 cellspacing=0 width=700 >
                    <colgroup>
-                     <col width="25">
-                     <col width="60">
+                     <col width="35">
+                     <col width="80">
                      <col width="90">
                      <col width="90">
                      <col width="200">
-                     <col width="140">
+                     <col width="160">
                      <col width="25">
-                     <col width="70">
                    </colgroup>
                   <tr align=center bgcolor="#828282" style="color:white;"> 
                    <td > ID </td> 
@@ -808,8 +807,7 @@ class RosettaHTML:
                    <td > Date (PST) </td>
                    <td > Job Name </td>
                    <td > Rosetta Application </td>
-                   <td > Structures </td>
-                   <td > Error </td></tr>\n"""
+                   <td > Structures </td>\n"""
                    
         for line in job_list:
             task = ''
@@ -833,45 +831,51 @@ class RosettaHTML:
                 task = "Interface Sequence Plasticity"
                 task_color = '#FFE2E2'
           
-            html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF'" 
-                                                          onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000'" 
-                                                          onclick="window.location.href='%s?query=jobinfo&jobnumber=%s'">""" % ( self.script_filename, line[1] )
+            html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" 
+                                                          onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000';" >
+                                                          """
+            link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
             # write ID
-            html += '<td id="lw">%s </td>' % (str(line[0]))
+            html += '<td id="lw" %s>%s </td>' % (link_to_job, str(line[0]))
             # write status 
             status = int(line[2])
             if status == 0:
-                html += '<td id="lw"><font color="orange">in queue</font></td>'
+                html += '<td id="lw" %s><font color="orange">in queue</font></td>' % link_to_job
             elif status == 1:
-                html += '<td id="lw"><font color="green">active</font></td>'
+                html += '<td id="lw" %s><font color="green">active</font></td>' % link_to_job
             elif status == 2:
-                html += '<td id="lw"><font color="darkblue">done</font></td>'
+                html += '<td id="lw" %s>done</td>' % link_to_job # <font color="darkblue" %s></font>
             elif status == 5:
-                html += '<td id="lw" style="background-color: #AFE2C2;"><font color="darkblue">sample</font></td>'
+                html += '<td id="lw" style="background-color: #AFE2C2;" %s><font color="darkblue">sample</font></td>' % link_to_job
             else:
+              # write error
+              if  str(line[8]) != '' and line[8] != None:
+                # onclick="window.open('https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation','backrub_wiki')"
+                #                        onmouseover="this.style.background='#447DAE'; this.style.color='#000000'"
+                #                        onmouseout="this.style.background='#EEEEEE';"
+                html += '''<td id="lw">
+                              <font color="FF0000">error</font>
+                              (<a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation" target="_blank"
+                                 onmouseover="this.style.color='#FFFFFF'" onmouseout="this.style.color='#365a79'">%s</a>)</td>''' % str(line[8])
+              else:
                 html += '<td id="lw"><font color="FF0000">error</font></td>'
                 
             # write username
-            html += '<td id="lw">%s</td>' % str(line[3])
+            html += '<td id="lw" %s>%s</td>' % (link_to_job, str(line[3]))
             # write date
-            html += '<td id="lw" style="font-size:small;">%s</td>' % str(line[4])
+            html += '<td id="lw" style="font-size:small;" %s>%s</td>' % (link_to_job, str(line[4]))
             # write jobname or "notes"
             if len(str(line[5])) < 26:
-                html += '<td id="lw">%s</td>' % str(line[5])
+                html += '<td id="lw" %s>%s</td>' % (link_to_job, str(line[5]))
             else:
-                html += '<td id="lw">%s</td>' % (str(line[5])[0:23] + "...")
+                html += '<td id="lw" %s>%s</td>' % (link_to_job, str(line[5])[0:23] + "...")
             # Rosetta version
             if line[6] == '1' or line[6] == 'mini':
-                html += '<td id="lw" style="font-size:small;" bgcolor="%s"><i>mini</i><br>%s</td>' % (task_color, task)
+                html += '<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>mini</i><br>%s</td>' % (task_color, link_to_job, task)
             elif line[6] == '0' or line[6] == 'classic':
-                html += '<td id="lw" style="font-size:small;" bgcolor="%s"><i>classic</i><br>%s</td>' % (task_color, task)
+                html += '<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>classic</i><br>%s</td>' % (task_color, link_to_job, task)
             # write size of ensemble
-            html += '<td id="lw">%s</td>' % str(line[7])
-            # write error
-            if  str(line[8]) == '' or line[8] == None:
-              html += '<td id="lw">&nbsp;</td>'
-            else:
-              html += '<td id="lw">%s</td>' % str(line[8])
+            html += '<td id="lw" %s >%s</td>' % (link_to_job, str(line[7]))
         
             html += '</tr>\n'
         
@@ -901,7 +905,11 @@ class RosettaHTML:
         elif status == 'sample':
             status_html = '<font color="darkblue">done</font>'
         else:
-            status_html = '<font color="FF0000">error:</font> %s' % error
+            status_html = '''<font color="FF0000">Error:</font> <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation">%s</a> <br>
+                              We are sorry but your simulation failed. Please referr to 
+                              <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation">Errors during the simulation</a> 
+                              in the documentation and contact us via <img src="../images/support_email.png" height="15"> if necessary.
+                          ''' % error
         
         html += """
                 <tr><td align=right bgcolor="#EEEEFF">Job Name:       </td><td bgcolor="#EEEEFF">%s</td></tr>
@@ -1295,12 +1303,6 @@ class RosettaHTML:
             parameter['Mini'] = '???'            
         
         html += """<td align="center"><H1 class="title">Job %s</H1> """ % ( parameter['ID'] )
-        if int(parameter['Status']) == 4:
-            html += """ <P><font color=red><b>Rosetta Error:</b></font><br>
-                            We are sorry but your simulation failed. Please referr to the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error">Error messages section</a>
-                            of the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/">Documentation</a> and contact us via <img src="../images/support_email.png" height="15">if necessary.
-                        </P> 
-                    <br>"""
         
         html += '<div id="jobinfo">'
         html += '<table border=0 cellpadding=2 cellspacing=1>\n'
