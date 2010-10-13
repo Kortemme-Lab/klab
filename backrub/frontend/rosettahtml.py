@@ -12,6 +12,7 @@ import cgi
 import cgitb; cgitb.enable()
 from string import join
 import pickle
+import gzip
 
 from rwebhelper import *
 
@@ -1258,10 +1259,21 @@ class RosettaHTML:
             if filename.find(key) != -1:
               if self.lowest_structs != []: # if the list contains anything
                 if filename[-8:-4] in list_id_lowest_structs or filename[-12:-9] : # if the filename is one of the 10 lowest structures, use it
-                  list_pdb_files.append('../downloads/%s/' % cryptID + filename)
+                  list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
               else:
-                list_pdb_files.append('../downloads/%s/' % cryptID + filename)
+                list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
           list_pdb_files.sort()
+          
+          for pdb_file in list_pdb_files:
+            pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
+            if not os.path.exists(pdb_file_path + '.gz'):
+              f_in = open(pdb_file_path, 'rb')
+              f_out = gzip.open(pdb_file_path + '.gz', 'wb')
+              f_out.writelines(f_in)
+              f_out.close()
+              f_in.close()
+            pdb_file += '.gz'
+          
           return list_pdb_files
         else:
             return None
@@ -1356,10 +1368,10 @@ class RosettaHTML:
         
         # jmol command to load files
         if list_pdb_files != None:
-            jmol_cmd = 'load %s; color red; cpk off; wireframe off; backbone 0.2;' % (list_pdb_files[0] ) #, list_pdb_files[0].split('/')[-1].split('.')[0])
+            jmol_cmd = ' "load %s; color red; cpk off; wireframe off; backbone 0.2;" +\n' % (list_pdb_files[0] ) #, list_pdb_files[0].split('/')[-1].split('.')[0])
             for pdb in list_pdb_files[1:11]:
-                jmol_cmd += 'load APPEND %s; ' % (pdb)
-            jmol_cmd += 'cpk off; wireframe off; backbone 0.2; '
+                jmol_cmd += ' "load APPEND %s;" +\n' % (pdb)
+            jmol_cmd += ' "cpk off; wireframe off; backbone 0.2;" +'
                         
             # jmol command to show mutation as balls'n'stick
             jmol_cmd_mutation = ''
@@ -1377,7 +1389,9 @@ class RosettaHTML:
                          <td bgcolor="#FFFCD8">
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
-                              jmolApplet(400, "set appendNew false; %s %s"); 
+                              jmolApplet(400, "set appendNew false;" + 
+                              %s
+                              "%s" ); 
                             </script><br>
                             <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href=http://www.jmol.org/><small>www.jmol.org</small></a>
                          </td>

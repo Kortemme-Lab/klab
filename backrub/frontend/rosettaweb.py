@@ -725,6 +725,8 @@ def check_pdb(pdb_object):
       return (False, "Max. number of residues exceeded<br>")
     if counts["chains"] > 4:
       return (False, "Max. number of chains exceeded<br>")
+    if counts["cys"] > 50:
+      return (False, "Max. number of Cysteine residues exceeded<br>")
     
     return (True, "everything is fine")
 
@@ -1211,8 +1213,8 @@ def deletejob(form, SID):
         html += "Invalid. <br><br>"
   else:
     html += "No Job given. <br><br>"
-  html += 'Proceed to <A href="rosettaweb.py?query=submit">Simulation Form</A>  or \n<A href="rosettaweb.py?query=queue">Queue</A> . <br><br> \n'                                           
-  
+  html += 'Proceed to <A href="rosettaweb.py?query=submit">Simulation Form</A>  or \n<A href="rosettaweb.py?query=queue">Queue</A> . <br><br> \n'
+    
   return html
   
 ####################################### end of deletejob() ####################################
@@ -1242,6 +1244,8 @@ def jobinfo(form, SID):
 # run Forest run!
 try:
     ws()
-except:
+except Exception, e:
+    import traceback
+    traceback.print_exc()
     print "An error occured. Please check your input and contact us if the problem persists."
 
