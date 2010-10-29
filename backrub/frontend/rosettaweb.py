@@ -785,8 +785,9 @@ def submit(form, SID):
           error += " PDB data is not a file. "
         pdb_filename = form["PDBComplex"].filename
         pdb_filename = pdb_filename.replace(' ','_')
-        if pdb_filename[-4:] not in ['.pdb','.PDB' ]:
-          pdb_filename = pdb_filename + '.pdb'
+        pdb_filename = pdb_filename.replace('.','_')
+        if pdb_filename[-3:] not in ['pdb','PDB' ]:
+          pdb_filename = pdb_filename[:-4] + '.pdb'
       except:
         error = "invalid PDB file"
         pdb_error = True
