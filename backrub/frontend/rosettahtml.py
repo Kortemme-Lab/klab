@@ -69,7 +69,7 @@ class RosettaHTML:
                       "Smith": 'Smith CA, Kortemme T. <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology, Volume 380, Issue 4, 18 July 2008, Pages 742-756 </a>',
                       "Humphris": 'Humphris EL, Kortemme T. <i>Prediction of Protein-Protein Interface Sequence Diversity using Flexible Backbone Computational Protein Design</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure, Volume 16, Issue 12, 12 December 2008, Pages 1777-1788</a>',
                       "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. May;5(5):e1000393</a>',
-                      "2": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
+                      "Lauck": 'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design.</i>,<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Res. 38:W569-W575</a>',
                       "3": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "4": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "5": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
@@ -160,11 +160,11 @@ class RosettaHTML:
 
     def _showLoginStatus(self):
         """shows a little field with the username if logged in """
-        html = ''
+        html = '<td align="right">[&nbsp;Other Services: <A class="nav" style="color:green;" href="/alascan">Alanine Scanning</A>&nbsp;] '
         if self.username != '':
-            html += '<td align=right><small>[ <font color=green>%s</font> | <a href="%s?query=logout"><small>Logout</small></a> ]</small></td>' % ( self.username, self.script_filename )
+            html += '<br><small>[ <font color=green>%s</font> | <a href="%s?query=logout"><small>Logout</small></a> ]</small></td>' % ( self.username, self.script_filename )
         else:
-            html += '<td align=right><small>[&nbsp;<font color=red>not logged in</font>&nbsp;]</small></td>'
+            html += '<br><small>[&nbsp;<font color=red>not logged in</font>&nbsp;]</small></td>' 
         return html
 
     def _showWarning(self):
@@ -279,9 +279,7 @@ class RosettaHTML:
         #   [ <A href="/alascan/" class="nav" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
         # </li>
         
-        self.html_refs = '''<P>[<a name="ref1">1</a>] %(Smith)s</P>
-                            <P>[<a name="ref2">2</a>] %(Friedland)s</P>
-                            <P>[<a name="ref3">3</a>] %(Humphris)s</P>
+        self.html_refs = '''<P>%(Lauck)s</P>
                          ''' % self.refs
                 
         html = '''<td align="center">
@@ -1281,9 +1279,7 @@ class RosettaHTML:
     def jobinfo(self, parameter):
         """this function decides what _showFunction to pick"""
         
-        self.html_refs = '''<P>[<a name="ref1">1</a>] %(Smith)s</P>
-                            <P>[<a name="ref2">2</a>] %(Friedland)s</P>
-                            <P>[<a name="ref3">3</a>] %(Humphris)s</P>
+        self.html_refs = '''<P>%(Lauck)s</P>
                          ''' % self.refs
         
         # SELECT ID, Status, Email, Date, StartDate, EndDate, Notes, Errors, Mini, PDBComplexFile, EnsembleSize, Host, KeepOutput, task, UserID, 
@@ -1441,7 +1437,8 @@ class RosettaHTML:
         if login_disabled:
             disabled = 'disabled'
         
-        self.html_refs = '''<P>[<a name="ref1">1</a>] %(Davis)s</P>
+        self.html_refs = '''<P>%(Lauck)s</P>
+                            <P>[<a name="ref1">1</a>] %(Davis)s</P>
                             <P>[<a name="ref2">2</a>] %(Smith)s</P>
                             <P>[<a name="ref3">3</a>] %(Friedland)s</P>
                             <P>[<a name="ref4">4</a>] %(Humphris)s</P>
