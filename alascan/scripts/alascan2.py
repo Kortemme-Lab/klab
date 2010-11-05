@@ -218,7 +218,7 @@ def login(form, my_session, t):
       message = """<font color="FF0000">You are already logged in.</font><br>""" 
       disable = "disabled"
     output.write("""<H1 class="title">Login</H1> %s\n
-                    <P>If you do not have an account, please <A href="alascan2.py?query=register">register</A> .</P>        \n
+                    <P>If you do not have an account, please <A href="/backrub/cgi-bin/rosettaweb.py?query=register">register</A> .</P>        \n
                     <form method=post action="alascan2.py">                                                                \n
                     <table border=0 cellpadding=5 cellspacing=0>                                                           \n
                         <tr><td align=right>Username: </td><td><input type=text name=myUserName value="" %s>    </td></tr> \n
@@ -304,7 +304,7 @@ generated upon request to send you a new password. Please login and change
 your password.
 
 If you DID NOT request to reset your password, please let us know.
-mailto:lauck@cgl.ucsf.edu 
+mailto:support@kortemmelab.ucsf.edu 
   
 -----------------------
 LOGIN NAME AND PASSWORD
@@ -1187,7 +1187,7 @@ def legal_info():
     Kortemme, T., Baker, D. A simple physical model for binding energy hot spots in protein-protein complexes. Proc Natl Acad Sci U S A. 2002 Oct 29;99(22):14116-21.
     </p>
     <p style="text-align:left; font-size: 10pt" >
-    For questions, please contact <A href="mailto:kortemme@u.washington.edu" style="font-size: 10pt">Tanja Kortemme</A> 
+    For questions, please contact <img src="/backrub/images/support_email.png" height="15"> 
     </p></td></tr></table>"""
     
   return html
