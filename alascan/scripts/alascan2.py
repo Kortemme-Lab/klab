@@ -889,7 +889,7 @@ def submit(form, SID):
     
     %s\n
     <!-- Start Submit Form -->
-    <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
+    <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" action="alascan2.py" enctype="multipart/form-data">
 
     <TABLE border=0 cellpadding=2 cellspacing=0>
       <TR><TD colspan=2><b>Required</b></TD></TR>
