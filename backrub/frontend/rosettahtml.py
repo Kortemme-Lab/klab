@@ -70,6 +70,7 @@ class RosettaHTML:
                       "Humphris": 'Humphris EL, Kortemme T. <i>Prediction of Protein-Protein Interface Sequence Diversity using Flexible Backbone Computational Protein Design</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure, Volume 16, Issue 12, 12 December 2008, Pages 1777-1788</a>',
                       "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. May;5(5):e1000393</a>',
                       "Lauck": 'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design.</i>,<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Res. 38:W569-W575</a>',
+                      "Smith2": 'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains.</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17 September 2010, Pages 460-474</a>',
                       "3": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "4": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "5": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
@@ -263,16 +264,16 @@ class RosettaHTML:
 ###############################################################################################
 
     def submit(self, jobname='', error='' ):
-    	  # this function uses javascript functions from jscript.js
-		    # if you change the application tabler here, please make sure to change jscript.js accordingly
-		    # calling the function with parameters will load those into the form. #not implemented yet
+          # this function uses javascript functions from jscript.js
+            # if you change the application tabler here, please make sure to change jscript.js accordingly
+            # calling the function with parameters will load those into the form. #not implemented yet
 
         if error != '':
             error = '''<div align="center" style="width:300pt; background:lightgrey; margin:15pt; padding:15px; border-color:black; border-style:solid; border-width:2px;">
                           Your job could not be submitted:<br><font style="color:red;"><b>%s</b></font><br>
                           <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_submission" target="_blank">More Information</a>. <a HREF="javascript:history.go(-1)">Return</a> to the form. 
                        </div>''' % error           
-		    
+            
         self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename, 'error':error})
         
         # <li id="ab1">
@@ -326,11 +327,20 @@ class RosettaHTML:
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s">Interface Sequence Plasticity Prediction</A><br>
-              <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
-              <p id="menu_3" style="text-align:right;">                  
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Interface Sequence Plasticity Prediction</A>
+              
+              <p id="menu_3" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication('3','1');">Enter Data</a></td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td>
+                      <td><a href="javascript:void(0)" onclick="changeApplication('3','1'); ">
+                          <font style="font-size:10pt">todo: Title 1</font></a><br>
+                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
+                      </td></tr>
+                  <tr><td width="30" style="text-align:right;">&#8680;</td>
+                      <td><a href="javascript:void(0)" onclick="changeApplication('3','2'); ">
+                          <font style="font-size:10pt">todo: Title 2</font></a><br>
+                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 8pt">Smith and Kortemme, 2010</a> ]</font>
+                      </td></tr>
                   </table>
               </p>
             </li>
@@ -575,6 +585,19 @@ class RosettaHTML:
                 </tr>
             </table>
             </p>
+            <p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">
+            <table align="center">
+              <tr>
+                  <td  align="right">todo <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
+              </tr>
+              <tr>
+                  <td  align="right">todo <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
+                  </td>
+              </tr>
+            </table>
+            </p>
             
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values();">
@@ -602,6 +625,12 @@ class RosettaHTML:
                 If you are using the data, please cite:<br><br>
                 Humphris EL, Kortemme T. <i>Prediction of protein-protein interface sequence diversity using flexible backbone computational protein design.</i>,<br>
                 <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure. (2008). Dec 12;16(12):1777-88</a> 
+            </p> 
+
+            <p id="ref4" style="display:none; opacity:0.0; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
+                If you are using the data, please cite:<br><br>
+                Colin A. Smith, Tanja Kortemme, <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains.</i>,<br>
+                <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology Volume 402, 460-474</a> 
             </p> 
 
           </div> <!-- id=box -->  
@@ -734,14 +763,14 @@ class RosettaHTML:
                 <td><select name="country">
                 %s
             </select></td>
-	    </tr>
+        </tr>
             <tr><td>&nbsp;</td></tr>
             <tr><td></td>
             <td align=left><input type=hidden name=query  value=register>                     
                            <input type=hidden name=mode   value=%s>
             <A href="%s?query=terms_of_service#privacy">View privacy notice</A>                           
                         &nbsp; &nbsp; &nbsp; 
-	    <input type=submit name=submit value=Register>
+        <input type=submit name=submit value=Register>
                   </td>
               </form>                    
           </tr>                            
@@ -1442,21 +1471,22 @@ class RosettaHTML:
                             <P>[<a name="ref2">2</a>] %(Smith)s</P>
                             <P>[<a name="ref3">3</a>] %(Friedland)s</P>
                             <P>[<a name="ref4">4</a>] %(Humphris)s</P>
-                         ''' % self.refs
+                            <P>[<a name="ref5">5</a>] %(Smith2)s</P>
+                            ''' % self.refs
         
         html = """<td align="center">
                   <H1 class="title">Welcome to RosettaBackrub</A> </H1> 
                     <P>
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
                     The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al<a href="#ref1"><sup id="ref">1</sup></a>, 
-                    for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3,</sup></a><a href="#ref4"><sup id="ref">4</sup></a>.</P>
+                    for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3,</sup></a><a href="#ref4"><sup id="ref">4,</sup></a><a href="#ref5"><sup id="ref">5</sup></a>.</P>
                     <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
                     prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.
                     The server <b>output</b>, dependent on the application, consists of: structures of point mutants<a href="#ref2"><sup id="ref">2</sup></a> and their Rosetta force field scores, 
                     near-native structural ensembles of protein backbone conformations<a href="#ref2"><sup id="ref">2,</sup></a><a href="#ref3"><sup id="ref">3</sup></a> 
                     and designed sequences using flexible backbone computational protein design<a href="#ref4"><sup id="ref">4</sup></a>.</P>
                     <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="/backrub/wiki/" target="_blank">documentation</a>.
-			Please also check for <a href="/backrub/wiki/" target="_blank">current announcements</a>. 
+            Please also check for <a href="/backrub/wiki/" target="_blank">current announcements</a>. 
                     </P>
 
                   <div id="login_box">
