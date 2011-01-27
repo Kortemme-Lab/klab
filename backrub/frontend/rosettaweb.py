@@ -246,7 +246,7 @@ def ws():
     
       sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
       result = execQuery(connection, sql)
-      if result[0][0] != () and result[0][0] != ():
+      if result[0][0] != () and result[0][0] != (): #todo
         username = result[0][0]
         userid   = int(result[0][1])
 
