@@ -58,6 +58,9 @@ class RosettaHTML:
                         "tt_SegLength":     "header=[Maximal segment length for backrub] body=[Limit the length of the segment to which the backrub move is applied to. (3-12)] %s" % tooltip_parameter,
                         "tt_error":         "header=[Rosetta Error</b></font><br>Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occures for your structure please check the correctness of the PDB file.] %s" % tooltip_parameter,
                         "tt_seqtol_partner":"header=[Partner] body=[Define the two chains that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_partner":"header=[Partner] body=[todo: Define the chain(s) that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_weighting":"header=[Score reweighting] body=[todo: Define the intramolecular energies / self energy (e.g. k<sub>A</sub>) and the intermolecular / interaction energies (e.g. k<sub>AB</sub>).] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[todo: Define the Boltzmann factor kT.] %s" % tooltip_parameter,
                         "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] %s" % tooltip_parameter,
                         "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
                         "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
@@ -567,7 +570,7 @@ class RosettaHTML:
                   <td>
                     <table bgcolor="#EEEEEE">
                       <tr bgcolor="#828282" style="color:white;">
-                        <td>#</td<td>Chain ID</td><td>Residue Number</td>
+                        <td>#</td><td>Chain ID</td><td>Residue Number</td>
                       </tr>
                       <tr align="center" id="seqtol_row_0" >                    <td>1</td><td><input type="text" name="seqtol_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_0" maxlength=4 SIZE=4></td></tr>
                       <tr align="center" id="seqtol_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_1" maxlength=4 SIZE=4></td></tr>
@@ -588,21 +591,94 @@ class RosettaHTML:
             <p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
               <tr>
-                  <td  align="right">todo <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
+                  <td  align="left">Partner 1 <img src="../images/qm_s.png" title="%(tt_seqtol_SK_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_SK_chain1" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()"></td>
               </tr>
               <tr>
-                  <td  align="right">todo <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
+                  <td  align="left">Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_SK_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_SK_chain2" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">
                   </td>
               </tr>
+              <tr>
+                  <td  align="left">Partner 3 <img src="../images/qm_s.png" title="%(tt_seqtol_SK_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_SK_chain3" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">
+                  </td>
+              </tr>
+              
+                <tr>
+                  <td align="left" valign="top">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
+                  <td>
+                    <table bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td>#</td><td>Chain ID</td><td>Residue Number</td>
+                      </tr>
+                      <tr align="center" id="seqtol_SK_row_0" style="display:none">                    
+                          <td>1</td>
+                          <td><input type="text" name="seqtol_SK_mut_c_0" maxlength=1 SIZE=2></td>
+                          <td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td>
+                      </tr>
+                      <tr align="center" id="seqtol_SK_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_SK_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_1" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_2" style="display:none"><td>3</td><td><input type="text" name="seqtol_SK_mut_c_2" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_2" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_3" style="display:none"><td>4</td><td><input type="text" name="seqtol_SK_mut_c_3" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_3" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_4" style="display:none"><td>5</td><td><input type="text" name="seqtol_SK_mut_c_4" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_4" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_5" style="display:none"><td>6</td><td><input type="text" name="seqtol_SK_mut_c_5" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_5" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_6" style="display:none"><td>7</td><td><input type="text" name="seqtol_SK_mut_c_6" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_6" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_SK_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_7" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_SK_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_8" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_SK_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_SK_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_9" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center"><td colspan="3"><div id="seqtol_SK_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSK();">Click here to add a residue</a></div></td></tr>
+                      </table>
+                  </td>
+                </tr>
+              <tr><td height="10"></td></tr>
+                <tr>
+                  <td align="left">Boltzmann Factor (kT)<img src="../images/qm_s.png" title="%(tt_seqtol_SK_Boltzmann)s"></td>
+                  <td>
+                      <input type="text" name="seqtol_SK_Boltzmann" maxlength=5 SIZE=5 VALUE="0.23">
+                      <input type="button" value="Use cited value" onClick="set_Boltzmann();">
+                  </td>
+                </tr>                    
+              <tr><td height="10"></td></tr>
+              <tr>
+                  <td align="left">Score Reweighting<img src="../images/qm_s.png" title="%(tt_seqtol_SK_weighting)s"></td>
+              </tr>
+              <tr>
+                  <td colspan="2">
+                    <table bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td bgcolor="#EEEEEE"></td>
+                        <td>Self Energy (k<sub>_</sub>)</td>
+                        <td>P<sub>1</sub> Interaction (k<sub>P<sub>1</sub></sub>_)</td>
+                        <td>P<sub>2</sub> Interaction (k<sub>P<sub>2</sub></sub>_)</td>
+                      </tr>
+                      <tr align="left" id="seqtol_SK_weight_0" >                    
+                          <td align="left">Partner 1</td>
+                          <td><input type="text" name="seqtol_SK_kP1" maxlength=5 SIZE=5 VALUE="0.4"></td>
+                          <td></td>
+                          <td></td>
+                      </tr>
+                      <tr align="left" id="seqtol_SK_weight_1" >                    
+                          <td align="left">Partner 2</td>
+                          <td><input type="text" name="seqtol_SK_kP2" maxlength=5 SIZE=5 VALUE="0.4"></td>
+                          <td><input type="text" name="seqtol_SK_kP1P2" maxlength=5 SIZE=5 VALUE="1.0"></td>
+                          <td></td>
+                      </tr>
+                      <tr align="left" id="seqtol_SK_weight_2" >                    
+                          <td align="left">Partner 3</td>
+                          <td><input type="text" name="seqtol_SK_kP3" maxlength=5 SIZE=5 VALUE="0.4"></td>
+                          <td><input type="text" name="seqtol_SK_kP1P3" maxlength=5 SIZE=5 VALUE="1.0"></td>
+                          <td><input type="text" name="seqtol_SK_kP2P3" maxlength=5 SIZE=5 VALUE="1.0"></td>
+                      </tr>
+                      </table>
+                  </td>
+                </tr>                    
             </table>
             </p>
             
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values();">
               &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="ValidateForm();">
-              &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="allWhite();this.form.reset();">
+              &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="reset_form();">
               &nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit">
             </p>
             <!-- end parameter form -->
@@ -662,7 +738,7 @@ class RosettaHTML:
 
 
 
-    def submited(self, jobname, cryptID, remark):
+    def submited(self, jobname, cryptID, remark, warnings):
       
       if remark == 'new':
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#F0454B;">
@@ -681,7 +757,24 @@ class RosettaHTML:
       else:
         box = '<font color="red">An error occured, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
+      if warnings != '':
+          warningsbox = '''
+              <table width="550" style="background-color:#ff4500;">
+                  <tr>
+                      <td class="linkbox" align="center">
+                        <font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings:</font>
+                      </td>
+                      <td align="left"><ul>%s</ul></td>
+                      <td class="linkbox" align="center">
+                      <font color="black" style="font-weight: bold;">However, the job will continue to run.</font>
+                      </td>
+                  </tr>
+              </table>''' % ( warnings )
+      else:
+          warningsbox = ''
+      
       html = """<td align="center"><H1 class="title">New Job successfully submitted</H1>
+                  %s<br>
                   %s<br>
                   <P>Once your request has been processed the results are accessible via the above URL. You can also access your data via the <A href="%s?query=queue">job queue</A> at any time.<br>
                   If you <b>are not</b> registered and use the guest access please bookmark this link. Your data will be stored for 10 days.<br>
@@ -691,7 +784,7 @@ class RosettaHTML:
                   From here you can proceed to the <a href="%s?query=jobinfo&jobnumber=%s">job info page</a>, 
                   <a HREF="javascript:history.go(-1)">submit a new job</a>.
                   <br><br>
-                  </td>\n"""  % ( box, self.script_filename, self.script_filename, cryptID )
+                  </td>\n"""  % ( box, warningsbox, self.script_filename, self.script_filename, cryptID )
                      #% (UserName, JobName, pdbfile.filename) )
       return html
 
@@ -1305,6 +1398,7 @@ class RosettaHTML:
         else:
             return None
     
+    # This function creates the HTML for the Job Info page accessed by clicking a job in the queue
     def jobinfo(self, parameter):
         """this function decides what _showFunction to pick"""
         

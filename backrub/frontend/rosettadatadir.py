@@ -4,6 +4,7 @@
 ########################################
 # This class produces HTML code for 
 # showing the 
+# This is accessed by clicking on 'View individual files' from the finished job page
 ########################################
 
 import sys, os
@@ -31,7 +32,7 @@ class RosettaDataDir(RosettaHTML):
                     "Smith": 'Smith CA, Kortemme T. <i>Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology, Volume 380, Issue 4, 18 July 2008, Pages 742-756 </a>',
                     "Humphris": 'Humphris EL, Kortemme T. <i>Prediction of Protein-Protein Interface Sequence Diversity using Flexible Backbone Computational Protein Design</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure, Volume 16, Issue 12, 12 December 2008, Pages 1777-1788</a>',
                     "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. May;5(5):e1000393</a>',
-                    "Smith_SP": 'Smith CA, Kortemme T. <i>Some Title</i>,<br><a href="http://someDOI" style="font-size: 10pt"> somewhere </a>',
+                    "Smith_SP": 'Smith CA, Kortemme T. <i>Some Title</i>,<br><a href="http://someDOI" style="font-size: 10pt"> somewhere </a>', #todo:
                   }
    
       

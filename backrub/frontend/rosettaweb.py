@@ -95,6 +95,11 @@ ROSETTAWEB_download_dir = parameter['rosetta_dl']
 
 ROSETTAWEB_base_dir     = parameter["base_dir"]
 
+# Sequence Tolerance (Smith and Kortemme)
+ROSETTAWEB_max_seqtol_SK_chains = 3
+ROSETTAWEB_SK_BoltzmannIncrease = 0.021
+ROSETTAWEB_SK_InitialBoltzmann = 0.23
+
 # open connection to MySQL
 connection = MySQLdb.Connection( host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket )
 ########################################## Setup End ##########################################
@@ -186,6 +191,8 @@ def ws():
         rosettaDD.ensemble_design( cryptID, jobid, mini, pdb_filename )
       elif task == 'sequence_tolerance':
         rosettaDD.sequence_tolerance( cryptID, jobid, mini, pdb_filename )
+      elif task == 'sequence_tolerance_SK':
+        rosettaDD.sequence_tolerance_SK( cryptID, jobid, mini, pdb_filename )
       else:
         html_content = "No data."
 
@@ -310,7 +317,7 @@ def ws():
   elif query_type == "submitted":
     return_val = submit(form, SID)
     if return_val[0]: # data was submitted and written to the database
-      html_content = rosettaHTML.submited( '', return_val[1], return_val[2] )
+      html_content = rosettaHTML.submited( '', return_val[1], return_val[2], return_val[3] )
       title = 'Job submitted'
     else: # no data was submitted/there is an error
       html_content = rosettaHTML.submit(jobname='', error=return_val[1])
@@ -749,376 +756,502 @@ def extract_1stmodel(pdbfile):
 ###############################################################################################
 
 def submit(form, SID):
-  ''' This function processes the general parameters and writes them to the database'''
-  s = StringIO()
-  
-  # get information from the database
-  sql      = 'SELECT UserID FROM Sessions WHERE SessionID = "%s"' % SID
-  result   = execQuery(connection, sql)
-  UserID   = result[0][0]
-  sql      = 'SELECT UserName, Email FROM Users WHERE ID = "%s"'  % UserID
-  sql_out  = execQuery(connection, sql)
-  UserName = sql_out[0][0]
-  Email    = sql_out[0][1]
-  JobName  = ""
-  Partner  = ""
-  error    = ""  # is used to check if something went wrong
-  cryptID  = ''
-  pdbfile  = ''
-  pdb_object = None
-  
-  # 2 modes: check and show form
-  if form.has_key("mode") and form["mode"].value == "check":
-  
-    # check whether all arguments were entered is done by javascript
-    # if that is not the case, something went wrong and we'll get a python exception here
-    # so here we could add error handling if it would be necessary
-    if form.has_key("JobName"):
-      JobName = escape(form["JobName"].value)
+    ''' This function processes the general parameters and writes them to the database'''
+    s = StringIO()
     
-    ############## PDB STUFF ###################
-    pdb_error = False
-    if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
-      try:
-        pdbfile = form["PDBComplex"].value
-        if not form["PDBComplex"].file:
-          error += " PDB data is not a file. "
-        pdb_filename = form["PDBComplex"].filename
-        pdb_filename = pdb_filename.replace(' ','_')
-        pdb_filename = pdb_filename.replace('.','_')
-        if pdb_filename[-3:] not in ['pdb','PDB' ]:
-          pdb_filename = pdb_filename + '.pdb'
-	else:
-	  pdb_filename = pdb_filename[:-4] + '.pdb'
-      except:
-        error = "invalid PDB file"
-        pdb_error = True
+    # get information from the database
+    sql      = 'SELECT UserID FROM Sessions WHERE SessionID = "%s"' % SID
+    result   = execQuery(connection, sql)
+    UserID   = result[0][0]
+    sql      = 'SELECT UserName, Email FROM Users WHERE ID = "%s"'  % UserID
+    sql_out  = execQuery(connection, sql)
+    UserName = sql_out[0][0]
+    Email    = sql_out[0][1]
+    JobName  = ""
+    Partner  = ""
+    error    = ""  # is used to check if something went wrong
+    cryptID  = ''
+    pdbfile  = ''
+    pdb_object = None
+    warnings = ""
     
-    elif form.has_key("PDBID") and form["PDBID"].value != '':
-      try:
-        pdb_filename = form["PDBID"].value.upper() + '.pdb'
-        url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
-        req = urllib2.Request(url)
-        response = urllib2.urlopen(req)
-        pdbfile = response.read()
-        if len(pdbfile) <= 2:
-          error = "Invalid PDB identifier<br>"
-          pdb_error = True
-      except:
-        error = "Invalid PDB identifier<br>"
-        pdb_error = True
-    else:
-      error = "Invalid structure file<br>"
-      pdb_error = True
+    # 2 modes: check and show form
+    if form.has_key("mode") and form["mode"].value == "check":
+  
+        # check whether all arguments were entered is done by javascript
+        # if that is not the case, something went wrong and we'll get a python exception here
+        # so here we could add error handling if it would be necessary
+        if form.has_key("JobName"):
+            JobName = escape(form["JobName"].value)
+    
+        ############## PDB STUFF ###################
+        pdb_error = False
+        if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
+            try:
+                pdbfile = form["PDBComplex"].value
+                if not form["PDBComplex"].file:
+                    error += " PDB data is not a file. "
+                pdb_filename = form["PDBComplex"].filename
+                pdb_filename = pdb_filename.replace(' ','_')
+                pdb_filename = pdb_filename.replace('.','_')
+                if pdb_filename[-3:] not in ['pdb','PDB' ]:
+                    pdb_filename = pdb_filename + '.pdb'
+                else:
+                   pdb_filename = pdb_filename[:-4] + '.pdb'
+            except:
+                error = "invalid PDB file"
+                pdb_error = True
+    
+        elif form.has_key("PDBID") and form["PDBID"].value != '':
+            try:
+                pdb_filename = form["PDBID"].value.upper() + '.pdb'
+                url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
+                req = urllib2.Request(url)
+                response = urllib2.urlopen(req)
+                pdbfile = response.read()
+                if len(pdbfile) <= 2:
+                    error = "Invalid PDB identifier<br>"
+                    pdb_error = True
+            except:
+                error = "Invalid PDB identifier<br>"
+                pdb_error = True
+        else:
+            error = "Invalid structure file<br>"
+            pdb_error = True
 
-    if pdb_error:
-      return (False, error)
-    else:
-      pdbfile = pdbfile.replace('"',' ')  # removes \" that mislead python. not needed anyway
-      pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
-      
-      pdb_object = PDB(pdbfile.split('\n'))
-      pdb_check_result = check_pdb(pdb_object)
-      if not pdb_check_result[0]:
-        return pdb_check_result
-        
-      
-        
-    ############## PDB STUFF END ###############
+        if pdb_error:
+            return (False, error)
+        else:
+            pdbfile = pdbfile.replace('"',' ')  # removes \" that mislead python. not needed anyway
+            pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
             
-    if form.has_key("Mutations"):
-      mutationsfile = form["Mutations"]
-      mutations_data = str(mutationsfile.value)
-      if not mutationsfile.file:
-         return (False, "Mutations list data is not a file.<br>")
-    else:
-      mutations_data = ""
-    
-    # tasks are: no_mutation, point_mutation, multiple_mutation, upload_mutation, ensemble
-    if form.has_key('task') and form['task'].value != '':
-      if form['task'].value == 'parameter1_1':
-        modus = 'point_mutation'
-      elif form['task'].value == 'parameter1_2':
-        modus = 'multiple_mutation'
-      elif form['task'].value == 'parameter1_3':
-        modus = 'upload_mutation'
-      elif form['task'].value == 'parameter2_1':
-        modus = 'no_mutation'
-      elif form['task'].value == 'parameter2_2':
-        modus = 'ensemble'
-      elif form['task'].value == 'parameter3_1':
-        modus = 'sequence_tolerance'
-    else:
-      modus = None
-      return (False, "No Application selected.<br>")
-    
-    if form.has_key("Mini"):
-      mini = form["Mini"].value # this is either 'mini' or 'classic'
-    elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
-      mini = "classic"
-    # elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
-    #   mini = 'mini'
-    else:
-      return (False, "No Rosetta binary selected.<br>") # this is preselected in HTML code, so this case should never occur, we still make sure!
-
-    
-    if form.has_key("nos"):
-      nos = min( int(form["nos"].value), 50)
-    else:
-      nos = 10
-        
-    if form.has_key("keep_output") and int(form["keep_output"].value) == 1:
-      keep_output = 1
-    else:
-      keep_output = 1 # ALWAYS KEEP OUTPUT FOR NOW
-    
-    PM_chain  = ''
-    PM_resid  = ''
-    PM_newres = ''
-    PM_radius = ''
-    ENS_temperature = ''
-    ENS_num_designs_per_struct = ''
-    ENS_segment_length = ''
-    seqtol_parameter = {}    
- 
-    if modus == 'point_mutation':
-      # submit_point_mutation(self,database,form)
-      if form.has_key("PM_chain") and form["PM_chain"].value != '':
-        PM_chain = form["PM_chain"].value
-
-      if form.has_key("PM_resid") and form["PM_resid"].value != '':
-        PM_resid = form["PM_resid"].value
-
-      if form.has_key("PM_newres") and form["PM_newres"].value != '':
-        PM_newres = form["PM_newres"].value
-
-      if form.has_key("PM_radius") and form["PM_radius"].value != '':
-        PM_radius = form["PM_radius"].value
-      
-      # check if residue and chain exist in structure:
-      all_chains = pdb_object.chain_ids()
-      all_resids = pdb_object.aa_resids()
-      resid2type = pdb_object.aa_resid2type()
-
-      if PM_chain in all_chains:
-        resid = "%s%4.i" % (PM_chain,int(PM_resid))
-        if not resid in all_resids:
-          return (False, "Residue not found: %s<br>" % resid)
-        elif resid2type[resid] == "C":
-          return (False, "<br>Mutation of Cystein (CYS, C) not permitted.<br>")
-      else:
-        return (False, "Chain not found<br>")
-      
-      
-    # Multiple PointMutations
-    elif modus == 'multiple_mutation':
-      PM_chain  = []
-      PM_resid  = []
-      PM_newres = []
-      PM_radius = []
-      
-      for x in range(ROSETTAWEB_max_point_mutation):
-        key = "PM_chain" + str(x)
-        if form.has_key(key) and form[key].value != '':
-          PM_chain.append(form[key].value)
-        else:
-          break
-        key = "PM_resid" + str(x)
-        if form.has_key(key) and form[key].value != '':
-          PM_resid.append(form[key].value)
-        key = "PM_newres" + str(x)
-        if form.has_key(key) and form[key].value != '':
-          PM_newres.append(form[key].value)
-        key = "PM_radius" + str(x)
-        if form.has_key(key) and form[key].value != '':
-          PM_radius.append(form[key].value)
-      
-      # check if residue and chain exist in structure:
-      all_chains = pdb_object.chain_ids()
-      all_resids = pdb_object.aa_resids()
-      resid2type = pdb_object.aa_resid2type()
-        
-      for i in range(len(PM_resid)):
-        if PM_chain[i] in all_chains:
-          resid = "%s%4.i" % (PM_chain[i],int(PM_resid[i]))
-          if not resid in all_resids:
-            return (False, "Residue not found: %s<br>" % PM_resid[i])
-          elif resid2type[resid] == "C":
-            return (False, "<br>Mutation of Cystein (CYS, C) not permitted.<br>")
-        else:
-          return (False, "Chain %s not found<br>" % PM_chain[i])
-      
-      PM_chain  = str(PM_chain).strip('[]').replace(', ','-')
-      PM_resid  = str(PM_resid).strip('[]').replace(', ','-')
-      PM_newres = str(PM_newres).strip('[]').replace(', ','-')
-      PM_radius = str(PM_radius).strip('[]').replace(', ','-')
-      
-# gregs ensemble
-    elif modus == 4 or modus == 'ensemble':
-      if form.has_key("ENS_temperature") and form["ENS_temperature"].value != '':
-        ENS_temperature = form["ENS_temperature"].value
-      else:
-        ENS_temperature = ""
-      if form.has_key("ENS_num_designs_per_struct") and form["ENS_num_designs_per_struct"].value != '':
-        ENS_num_designs_per_struct = form["ENS_num_designs_per_struct"].value
-      else:
-        ENS_num_designs_per_struct = ""
-      if form.has_key("ENS_segment_length") and form["ENS_segment_length"].value != '':
-        ENS_segment_length = form["ENS_segment_length"].value
-      else:
-        ENS_segment_length = ""
-  #    else:
-  #      (ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) = ('','','')
-
-# sequence tolerance aka library design
-    elif modus == 'sequence_tolerance':
-      if form.has_key("seqtol_chain1") and form["seqtol_chain1"].value != '':
-        seqtol_parameter["seqtol_chain1"] = str(form["seqtol_chain1"].value)
-      else:
-        seqtol_parameter["seqtol_chain1"] = ""
-      if form.has_key("seqtol_chain2") and form["seqtol_chain2"].value != '':
-        seqtol_parameter["seqtol_chain2"] = str(form["seqtol_chain2"].value)
-      else:
-        seqtol_parameter["seqtol_chain2"] = ""
-        
-      # if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
-      #   seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
-      # else:
-      seqtol_parameter["seqtol_weight_chain1"] = "1"
-        
-      # if form.has_key("seqtol_weight_chain2") and form["seqtol_weight_chain2"].value != '':
-      #   seqtol_parameter["seqtol_weight_chain2"] = form["seqtol_weight_chain2"].value
-      # else:
-      seqtol_parameter["seqtol_weight_chain2"] = "1"
-        
-      # if form.has_key("seqtol_weight_interface") and form["seqtol_weight_interface"].value != '':
-      #   seqtol_parameter["seqtol_weight_interface"] = form["seqtol_weight_interface"].value
-      # else:
-      seqtol_parameter["seqtol_weight_interface"] = "2"
-
-# <!-- weights ? -->
-#   <input type="hidden" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1">
-#   <input type="hidden" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1">
-#   <input type="hidden" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2">      
-      
-      seqtol_parameter["seqtol_list_1"] = []
-      seqtol_parameter["seqtol_list_2"] = []
-      
-      for x in range(ROSETTAWEB_max_seqtol_design):
-        key1 = "seqtol_mut_c_" + str(x)
-        key2 = "seqtol_mut_r_" + str(x)
-        if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
-          if form[key1].value == seqtol_parameter["seqtol_chain1"]:
-            seqtol_parameter["seqtol_list_1"].append(str(form[key2].value))
-          elif form[key1].value == seqtol_parameter["seqtol_chain2"]:
-            seqtol_parameter["seqtol_list_2"].append(str(form[key2].value))
-          else:
-            return (False, "Chain not found.<br>")
-        else:
-          break
-
-      # check if residue and chain exist in structure:
-      all_chains = pdb_object.chain_ids()
-      all_resids = pdb_object.aa_resids()
-      resid2type = pdb_object.aa_resid2type()
-
-      for (chain, lst_resid) in [ (seqtol_parameter["seqtol_chain1"],seqtol_parameter["seqtol_list_1"]), (seqtol_parameter["seqtol_chain2"],seqtol_parameter["seqtol_list_2"]) ]:
-        if chain in all_chains:
-          for res_no in lst_resid:
-            resid = "%s%4.i" % (chain,int(res_no))
-            if not resid in all_resids:
-              return (False, "Residue not found: %s<br>" % resid)
-            elif resid2type[resid] == "C":
-              return (False, "<br>Design of Cystein (CYS, C) not permitted.<br>")
-        else:
-          return (False, "Chain not found<br>")
+            pdb_object = PDB(pdbfile.split('\n'))
+            pdb_check_result = check_pdb(pdb_object)
+            if not pdb_check_result[0]:
+                return pdb_check_result
+            
+        ############## PDB STUFF END ###############
                 
-    seqtol_string = pickle.dumps(seqtol_parameter)
-    
-    return_vals = (True, cryptID, "new") # true we processed the data
-
-    if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
-      # s = sys.stdout
-      #  sys.stderr = s
-      #  s.write( "Content-type: text/html\n")
-      #  s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
-      return_vals = (False, error)
-    else:
-      # if we're good to go, create new job
-      # get ip addr hostname
-      IP = os.environ['REMOTE_ADDR']
-      sock = socket
-      try:
-        hostname = sock.gethostbyaddr(IP)[0]
-      except:
-        hostname = IP
-      # lock table
-      sql = "LOCK TABLES backrub WRITE, Users READ"
-      execQuery(connection, sql)
-      # write information to database
-      sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter) 
-                      VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_string )
-                      
-      try: 
-        import random
-        execQuery(connection, sql)
-        sql = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % ( UserID , JobName )
-        result  = execQuery(connection, sql)
-        ID      = result[0][0]
-        # create a unique key as name for directories from the ID, for the case we need to hide the results
-        # do not just use the ID but also a random sequence
-        tgb = str(ID) + 'flo' + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
-        cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
-        return_vals = (True, cryptID, "new")
-        sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
-        result  = execQuery(connection, sql)
-        # success
-        
-        # create a hash key for the entry we just made
-        sql = '''SELECT Mutations, PDBComplex, PDBComplexFile, Mini, EnsembleSize, PM_chain, PM_resid, PM_newres, PM_radius, task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter 
-                   FROM backrub 
-                  WHERE ID="%s" ''' % ID # get data
-        result = execQuery(connection, sql)
-        value_string = "" 
-        for value in result[0]: # combine it to a string
-          value_string += str(value)
-        hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
-        sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
-        result = execQuery(connection, sql)
-        # success
-
-        # now find if there's a key like that already:
-        sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
-        result = execQuery(connection, sql)
-        # print sql, result
-        for r in result:
-          if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
-            shutil.copytree( os.path.join( ROSETTAWEB_download_dir, r[1] ), os.path.join( ROSETTAWEB_download_dir, cryptID ) ) # copy the data to a new directory
-            sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
-            result = execQuery(connection, sql)
-            return_vals = (True, cryptID, "old")
-            break 
-                
-      except _mysql_exceptions.OperationalError, e:
-        html = '<H1 class="title">New Job not submitted</H1>'
-        if e[0] == 1153:
-          html += """<P>We are sorry but the size of the PDB file exceeds the upload limit. 
-          Please revise your file and delete unneccessary entries (e.g. copies of chains, MODELS, etc.).</P>
-          <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>"""
+        if form.has_key("Mutations"):
+            mutationsfile = form["Mutations"]
+            mutations_data = str(mutationsfile.value)
+            if not mutationsfile.file:
+                return (False, "Mutations list data is not a file.<br>")
         else:
-          html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" height="15">.</P>"""
-        return_vals = (False, "database error")
+            mutations_data = ""
+        
+        # tasks are: no_mutation, point_mutation, multiple_mutation, upload_mutation, ensemble
+        if form.has_key('task') and form['task'].value != '':
+            if form['task'].value == 'parameter1_1':
+                modus = 'point_mutation'
+            elif form['task'].value == 'parameter1_2':
+                modus = 'multiple_mutation'
+            elif form['task'].value == 'parameter1_3':
+                modus = 'upload_mutation'
+            elif form['task'].value == 'parameter2_1':
+                modus = 'no_mutation'
+            elif form['task'].value == 'parameter2_2':
+                modus = 'ensemble'
+            elif form['task'].value == 'parameter3_1':
+                modus = 'sequence_tolerance'
+            elif form['task'].value == 'parameter3_2':
+                modus = 'sequence_tolerance_SK'
+        else:
+            modus = None
+            return (False, "No Application selected.<br>")
+        
+        if form.has_key("Mini"):
+            mini = form["Mini"].value # this is either 'mini' or 'classic'
+        elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
+            mini = "classic"
+        # elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
+        #   mini = 'mini'
+        else:
+            return (False, "No Rosetta binary selected.<br>") # this is preselected in HTML code, so this case should never occur, we still make sure!
     
-      # unlock tables
-      sql = "UNLOCK TABLES"
-      execQuery(connection, sql)
-      return return_vals
+        
+        if form.has_key("nos"):
+            nos = min( int(form["nos"].value), 50)
+        else:
+            nos = 10
+            
+        if form.has_key("keep_output") and int(form["keep_output"].value) == 1:
+            keep_output = 1
+        else:
+            keep_output = 1 # ALWAYS KEEP OUTPUT FOR NOW
+        
+        PM_chain  = ''
+        PM_resid  = ''
+        PM_newres = ''
+        PM_radius = ''
+        ENS_temperature = ''
+        ENS_num_designs_per_struct = ''
+        ENS_segment_length = ''
+        seqtol_parameter = {}    
+     
+        if modus == 'point_mutation':
+          # submit_point_mutation(self,database,form)
+            if form.has_key("PM_chain") and form["PM_chain"].value != '':
+                PM_chain = form["PM_chain"].value
+            
+            if form.has_key("PM_resid") and form["PM_resid"].value != '':
+                PM_resid = form["PM_resid"].value
+            
+            if form.has_key("PM_newres") and form["PM_newres"].value != '':
+                PM_newres = form["PM_newres"].value
+            
+            if form.has_key("PM_radius") and form["PM_radius"].value != '':
+                PM_radius = form["PM_radius"].value
+          
+            # check if residue and chain exist in structure:
+            all_chains = pdb_object.chain_ids()
+            all_resids = pdb_object.aa_resids()
+            resid2type = pdb_object.aa_resid2type()
+            
+            if PM_chain in all_chains:
+                resid = "%s%4.i" % (PM_chain,int(PM_resid))
+                if not resid in all_resids:
+                    return (False, "Residue not found: %s<br>" % resid)
+                elif resid2type[resid] == "C":
+                    return (False, "<br>Mutation of Cystein (CYS, C) not permitted.<br>")
+            else:
+                return (False, "Chain not found<br>")
       
-  else:
-    form['error_msg'] = 'wrong mode for submit()'
-    return (False, error)
+          
+        # Multiple PointMutations
+        elif modus == 'multiple_mutation':
+            PM_chain  = []
+            PM_resid  = []
+            PM_newres = []
+            PM_radius = []
+            
+            for x in range(ROSETTAWEB_max_point_mutation):
+                key = "PM_chain" + str(x)
+                if form.has_key(key) and form[key].value != '':
+                    PM_chain.append(form[key].value)
+                else:
+                    break
+                key = "PM_resid" + str(x)
+                if form.has_key(key) and form[key].value != '':
+                    PM_resid.append(form[key].value)
+                key = "PM_newres" + str(x)
+                if form.has_key(key) and form[key].value != '':
+                    PM_newres.append(form[key].value)
+                key = "PM_radius" + str(x)
+                if form.has_key(key) and form[key].value != '':
+                    PM_radius.append(form[key].value)
+          
+            # check if residue and chain exist in structure:
+            all_chains = pdb_object.chain_ids()
+            all_resids = pdb_object.aa_resids()
+            resid2type = pdb_object.aa_resid2type()
+
+            for i in range(len(PM_resid)):
+                if PM_chain[i] in all_chains:
+                    resid = "%s%4.i" % (PM_chain[i],int(PM_resid[i]))
+                    if not resid in all_resids:
+                        return (False, "Residue not found: %s<br>" % PM_resid[i])
+                    elif resid2type[resid] == "C":
+                        return (False, "<br>Mutation of Cystein (CYS, C) not permitted.<br>")
+                else:
+                    return (False, "Chain %s not found<br>" % PM_chain[i])
+
+            PM_chain  = str(PM_chain).strip('[]').replace(', ','-')
+            PM_resid  = str(PM_resid).strip('[]').replace(', ','-')
+            PM_newres = str(PM_newres).strip('[]').replace(', ','-')
+            PM_radius = str(PM_radius).strip('[]').replace(', ','-')
+          
+        # gregs ensemble
+        elif modus == 4 or modus == 'ensemble':
+            if form.has_key("ENS_temperature") and form["ENS_temperature"].value != '':
+                ENS_temperature = form["ENS_temperature"].value
+            else:
+                ENS_temperature = ""
+            if form.has_key("ENS_num_designs_per_struct") and form["ENS_num_designs_per_struct"].value != '':
+                ENS_num_designs_per_struct = form["ENS_num_designs_per_struct"].value
+            else:
+                ENS_num_designs_per_struct = ""
+            if form.has_key("ENS_segment_length") and form["ENS_segment_length"].value != '':
+                ENS_segment_length = form["ENS_segment_length"].value
+            else:
+                ENS_segment_length = ""
+            #    else:
+            #      (ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length) = ('','','')
     
-  return (True, cryptID, "new")
+        # sequence tolerance aka library design
+        elif modus == 'sequence_tolerance':
+            if form.has_key("seqtol_chain1") and form["seqtol_chain1"].value != '':
+                seqtol_parameter["seqtol_chain1"] = str(form["seqtol_chain1"].value)
+            else:
+                seqtol_parameter["seqtol_chain1"] = ""
+            if form.has_key("seqtol_chain2") and form["seqtol_chain2"].value != '':
+                seqtol_parameter["seqtol_chain2"] = str(form["seqtol_chain2"].value)
+            else:
+                seqtol_parameter["seqtol_chain2"] = ""
+              
+            # if form.has_key("seqtol_weight_chain1") and form["seqtol_weight_chain1"].value != '':
+            #   seqtol_parameter["seqtol_weight_chain1"] = form["seqtol_weight_chain1"].value
+            # else:
+            seqtol_parameter["seqtol_weight_chain1"] = "1"
+            
+            # if form.has_key("seqtol_weight_chain2") and form["seqtol_weight_chain2"].value != '':
+            #   seqtol_parameter["seqtol_weight_chain2"] = form["seqtol_weight_chain2"].value
+            # else:
+            seqtol_parameter["seqtol_weight_chain2"] = "1"
+              
+            # if form.has_key("seqtol_weight_interface") and form["seqtol_weight_interface"].value != '':
+            #   seqtol_parameter["seqtol_weight_interface"] = form["seqtol_weight_interface"].value
+            # else:
+            seqtol_parameter["seqtol_weight_interface"] = "2"
+    
+            # <!-- weights ? -->
+            #   <input type="hidden" name="seqtol_weight_chain1" maxlength=1 SIZE=2 VALUE="1">
+            #   <input type="hidden" name="seqtol_weight_chain2" maxlength=1 SIZE=2 VALUE="1">
+            #   <input type="hidden" name="seqtol_weight_interface" maxlength=1 SIZE=2 VALUE="2">      
+            
+            seqtol_parameter["seqtol_list_1"] = []
+            seqtol_parameter["seqtol_list_2"] = []
+          
+            for x in range(ROSETTAWEB_max_seqtol_design):
+                key1 = "seqtol_mut_c_" + str(x)
+                key2 = "seqtol_mut_r_" + str(x)
+                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
+                    if form[key1].value == seqtol_parameter["seqtol_chain1"]:
+                        seqtol_parameter["seqtol_list_1"].append(str(form[key2].value))
+                    elif form[key1].value == seqtol_parameter["seqtol_chain2"]:
+                        seqtol_parameter["seqtol_list_2"].append(str(form[key2].value))
+                    else:
+                        return (False, "Chain not found.<br>")
+                else:
+                    break
+    
+            # check if residue and chain exist in structure:
+            all_chains = pdb_object.chain_ids()
+            all_resids = pdb_object.aa_resids()
+            resid2type = pdb_object.aa_resid2type()
+            
+            for (chain, lst_resid) in [ (seqtol_parameter["seqtol_chain1"],seqtol_parameter["seqtol_list_1"]), (seqtol_parameter["seqtol_chain2"],seqtol_parameter["seqtol_list_2"]) ]:
+                if chain in all_chains:
+                    for res_no in lst_resid:
+                        resid = "%s%4.i" % (chain,int(res_no))
+                        if not resid in all_resids:
+                            return (False, "Residue not found: %s<br>" % resid)
+                        elif resid2type[resid] == "C":
+                            return (False, "<br>Design of Cystein (CYS, C) not permitted.<br>")
+                else:
+                    return (False, "Chain not found<br>")
+
+        #todo: all this code here is messy - clean it up as suggested in website meeting
+        # sequence tolerance aka library design
+        elif modus == 'sequence_tolerance_SK':
+                        
+            success = True
+            errormsg = ""
+            
+            # Store the Partner identifiers
+            numPartners = 0
+            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                seqtol_parameter["seqtol_SK_list_%d" % i] = []
+                mkey = "seqtol_SK_chain%d" % i
+                formvalue = form[mkey].value
+                if form.has_key(mkey) and formvalue != '':
+                    seqtol_parameter[mkey] = str(formvalue)
+                    numPartners = numPartners + 1
+                else:
+                    seqtol_parameter[mkey] = None
+
+            # Sanity check: Ensure partners are distinct chains
+            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                pi = seqtol_parameter["seqtol_SK_chain%d" % i]
+                for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                    pj = seqtol_parameter["seqtol_SK_chain%d" % j]
+                    if (pi is not None) and (pj is not None) and (pi == pj):
+                        success, errormsg = False, errormsg + "Partners %d and %d have the same chain %s.<br>" % (i,j,pi)
+
+            if numPartners == 0:
+                success, errormsg = False, "You need to specify at least one chain.<br>"
+            
+            # Store the Score Reweighting values
+            # Sanity check: If P_i is specified then k_{P_i} must be filled in.
+            #               Furthermore, if P_j is specified, j > i, then k_{P_iP_j} must be filled in.
+            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                if seqtol_parameter["seqtol_SK_chain%d" % i] is not None:
+                    # Check that the self energy is filled in
+                    mkey = "seqtol_SK_kP%d" % i
+                    if not(form.has_key(mkey)) or form[mkey].value == '':
+                        success, errormsg = False, errormsg + "Partner %d was specified as %s but its self energy was missing.<br>" % (i,seqtol_parameter["seqtol_SK_chain%d" % i])
+                        # else we could assign the default value of 0.4 here
+                    else:
+                        seqtol_parameter[mkey] = str(form[mkey].value)
+
+                    # Check that the interaction energies are filled in
+                    for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                        if seqtol_parameter["seqtol_SK_chain%d" % j] is not None:
+                            # Check that the interaction energy is filled in
+                            mkey = "seqtol_SK_kP%dP%d" % (i, j)
+                            if not(form.has_key(mkey)) or form[mkey].value == '':
+                                success, errormsg = False, errormsg + "Partners %d and %d were specified as %s and %s but their interaction energy k<sub>P<sub>%d</sub>P<sub>%d</sub></sub> was missing.<br>" % (i,j,seqtol_parameter["seqtol_SK_chain%d" % i],seqtol_parameter["seqtol_SK_chain%d" % j],i,j)
+                                # else we could assign the default value of 1.0 here
+                            else: 
+                                seqtol_parameter[mkey] = str(form[mkey].value)
+                        
+            numResidues = 0
+            lastRes = ROSETTAWEB_max_seqtol_design
+            for x in range(ROSETTAWEB_max_seqtol_design):
+                lastRes = x
+                key1 = "seqtol_SK_mut_c_" + str(x)
+                key2 = "seqtol_SK_mut_r_" + str(x)
+                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
+                    numResidues = numResidues + 1
+                    chainWasFound = False
+                    for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                        if form[key1].value == seqtol_parameter["seqtol_SK_chain%d" % i]:
+                            seqtol_parameter["seqtol_SK_list_%d" % i].append(str(form[key2].value))
+                            chainWasFound = True
+                    if not chainWasFound:
+                        success, errormsg = False, errormsg + "The chain %s was not found for residue %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
+                else:
+                    break
+
+            #todo: check in JS whether numeric values are actually numeric 
+            
+            # Warn if the user left gaps in the residue list
+            for x in range(lastRes + 1, ROSETTAWEB_max_seqtol_design):
+                key1 = "seqtol_SK_mut_c_" + str(x)
+                key2 = "seqtol_SK_mut_r_" + str(x)
+                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
+                    warnings = warnings + "<li>Residue %d ('%s%4.i') was not added to the run as previous residues were left blank.</li>" % (x + 1, form[key1].value, int(form[key2].value))
+                
+            # Store the Boltzmann Factor
+            if form.has_key("seqtol_SK_Boltzmann") and form["seqtol_SK_Boltzmann"].value != '':
+                seqtol_parameter["seqtol_SK_Boltzmann"] = str(form["seqtol_SK_Boltzmann"].value)
+            else:
+                kT = ROSETTAWEB_SK_InitialBoltzmann + numResidues * ROSETTAWEB_SK_BoltzmannIncrease
+                warnings = warnings + "<li>The Boltzmann factor was not specified. The job will run with kT = %f + %d * %f = %f.</li>" % (ROSETTAWEB_SK_InitialBoltzmann, numResidues, ROSETTAWEB_SK_BoltzmannIncrease, kT)
+                seqtol_parameter["seqtol_SK_Boltzmann"] = kT
+            
+            # Sanity checks:
+            # check if residue and chain exist in structure:
+            all_chains = pdb_object.chain_ids()
+            all_resids = pdb_object.aa_resids()
+            resid2type = pdb_object.aa_resid2type()
+            
+            # First, build up the chain lists
+            chainsreslists = []
+            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                chain = "seqtol_SK_chain%d" % i
+                if (seqtol_parameter[chain] is not None) and seqtol_parameter[chain] != '':
+                    chainsreslists.append((seqtol_parameter[chain],seqtol_parameter["seqtol_SK_list_%d" % i]))
+            
+            # Then check for matches within the pdb structure
+            for (chain, lst_resid) in chainsreslists:
+                if chain in all_chains:
+                    for res_no in lst_resid:
+                        resid = "%s%4.i" % (chain,int(res_no))
+                        if not resid in all_resids:
+                            success, errormsg = False, errormsg + "Residue not found: %s<br>" % resid
+                            for r in all_resids:
+                                errormsg = errormsg + ("%s, " % str(r))
+                            #return (False, "Residue not found: %s<br>" % resid)
+                        elif resid2type[resid] == "C":
+                            success, errormsg = False, errormsg + "Design of Cystein (CYS, C) not permitted.<br>"
+                            #return (False, "<br>Design of Cystein (CYS, C) not permitted.<br>")
+                else:
+                    success, errormsg = False, errormsg + "Chain '%s' not found.<br>" % chain
+                    #return (False, "Chain '%s' not found.<br>" % chain)
+            
+            if not success:
+                return (False, errormsg)
+            
+        # todo: output where the time is going on Albana
+        # todo: add test input button which tests submit but does not add a job to the db
+                                 
+        seqtol_string = pickle.dumps(seqtol_parameter)
+        
+        return_vals = (True, cryptID, "new", warnings) # true we processed the data
+    
+        if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
+            # s = sys.stdout
+            #  sys.stderr = s
+            #  s.write( "Content-type: text/html\n")
+            #  s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
+            return_vals = (False, error)
+        else:
+            # if we're good to go, create new job
+            # get ip addr hostname
+            IP = os.environ['REMOTE_ADDR']
+            sock = socket
+            try:
+                hostname = sock.gethostbyaddr(IP)[0]
+            except:
+                hostname = IP
+            # lock table
+            sql = "LOCK TABLES backrub WRITE, Users READ"
+            execQuery(connection, sql)
+            # write information to database
+            sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter) 
+                            VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_string )
+                          
+            try: 
+                import random
+                execQuery(connection, sql)
+                sql = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % ( UserID , JobName )
+                result  = execQuery(connection, sql)
+                ID      = result[0][0]
+                # create a unique key as name for directories from the ID, for the case we need to hide the results
+                # do not just use the ID but also a random sequence
+                tgb = str(ID) + 'flo' + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
+                cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
+                return_vals = (True, cryptID, "new", warnings)
+                sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
+                result  = execQuery(connection, sql)
+                # success
+                
+                # create a hash key for the entry we just made
+                sql = '''SELECT Mutations, PDBComplex, PDBComplexFile, Mini, EnsembleSize, PM_chain, PM_resid, PM_newres, PM_radius, task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter 
+                           FROM backrub 
+                          WHERE ID="%s" ''' % ID # get data
+                result = execQuery(connection, sql)
+                value_string = "" 
+                for value in result[0]: # combine it to a string
+                    value_string += str(value)
+                hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
+                sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
+                result = execQuery(connection, sql)
+                # success
+        
+                # now find if there's a key like that already:
+                sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
+                result = execQuery(connection, sql)
+                # print sql, result
+                for r in result:
+                    if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
+                        shutil.copytree( os.path.join( ROSETTAWEB_download_dir, r[1] ), os.path.join( ROSETTAWEB_download_dir, cryptID ) ) # copy the data to a new directory
+                        sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % ( r[2], ID ) # save the new/old filename and the simulation "end" time.
+                        result = execQuery(connection, sql)
+                        return_vals = (True, cryptID, "old", warnings)
+                        break 
+                    
+            except _mysql_exceptions.OperationalError, e:
+                html = '<H1 class="title">New Job not submitted</H1>'
+                if e[0] == 1153:
+                    html += """<P>We are sorry but the size of the PDB file exceeds the upload limit. 
+                    Please revise your file and delete unneccessary entries (e.g. copies of chains, MODELS, etc.).</P>
+                    <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>"""
+                else:
+                    html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" height="15">.</P>"""
+                return_vals = (False, "database error")
+        
+            # unlock tables
+            sql = "UNLOCK TABLES"
+            execQuery(connection, sql)
+            return return_vals
+      
+    else:
+        form['error_msg'] = 'wrong mode for submit()'
+        return (False, error)
+    
+    return (True, cryptID, "new")
   
 
 ########################################## end of submit() ####################################

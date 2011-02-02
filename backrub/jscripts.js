@@ -1,8 +1,17 @@
 
 var numMPM = 0; // Multiple Point Mutations
 var numSeqTol = 0; // Mutation SeqTol
+var numSeqTolSK = 0; // Mutation SeqTolSK
 
-	
+// Constants
+
+// Sequence Tolerance (Humphries and Kortemme, Smith and Kortemme)
+const HK_MaxMutations = 10;
+const SK_InitialBoltzmann = 0.23;
+const SK_BoltzmannIncrease = 0.021;
+const SK_MaxMutations = 10;
+const SK_max_seqtol_chains = 3;
+
 function startup(query)
 {
 	if (query == "submit" || query == "submitted") 
@@ -26,7 +35,7 @@ function startup(query)
 }
 
 function ValidateFormRegister()
-{
+{ 
 	if ( document.myForm.username.value == "" ||
 			document.myForm.firstname.value == "" ||
             document.myForm.lastname.value == "" ||
@@ -137,6 +146,23 @@ function isPDB(elem){
 	}
 }
 
+function checkIsEmpty(elem)
+{
+	return elem.value.length == 0;
+}
+
+function checkIsAlpha(elem)
+{
+	var numericExpression = /^[A-Za-z]+$/;
+	if(elem.value.match(numericExpression))
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
 
 function notEmpty(elem)
 {
@@ -165,12 +191,21 @@ function allWhite()
 {
 	for(i = 0; i < document.submitform.elements.length; i++)
 	{
-		document.submitform.elements[i].style.background = "white";
+		var elem = document.submitform.elements[i];
+		if ((elem.disabled == false) || (elem.name == "UserName"))
+		{
+			elem.style.background = "white";
+		}
+		else
+		{
+			elem.style.background = "grey";
+		}
 	}
 }
 
 function ValidateForm()
 {
+	allWhite();
 	var returnvalue = new Array(); // we collect all the return values, if only one is "false" in the end, we return false
     returnvalue.push( notEmpty(document.submitform.JobName) );
     if (document.submitform.PDBComplex.value == "" && document.submitform.PDBID.value == "" ) 
@@ -283,7 +318,7 @@ function ValidateForm()
         // notEmpty( document.submitform.seqtol_weight_chain2, "Please enter a weight for Partner 2");
         // notEmpty( document.submitform.seqtol_weight_interface, "Please enter a weight for the interface") ;
         var i=0;
-        for (i=0;i<=10;i=i+1) {
+        for (i = 0; i <= HK_MaxMutations ; i = i + 1) {
           // check if row is empty
           if ( document.submitform.elements['seqtol_mut_c_' + '' + i].value.length == 0 && 
                document.submitform.elements['seqtol_mut_r_' + '' + i].value.length == 0 ) {
@@ -298,7 +333,60 @@ function ValidateForm()
     
     if ( document.submitform.task.value == "parameter3_2" ) 
     {
-    	//todo:
+    	/*for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) {
+        	var row =  document.getElementById("seqtol_SK_chain" + i);
+        	if (row.style.display != "none")
+	    */
+        
+    	// Highlight Partner 1 if no partners are specified
+    	var allempty = true;
+    	for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+    	{
+    		var c = document.submitform.elements["seqtol_SK_chain" + i];
+    		allempty = allempty && (c.value.length == 0);
+    	}
+    	if (allempty == true)
+    	{
+    		returnvalue.push( notEmpty( document.submitform.seqtol_SK_chain1) );
+    		returnvalue.push( isAlpha ( document.submitform.seqtol_SK_chain1) );
+    	}
+    
+    	// Highlight Boltzmann factor if missing or invalid
+		returnvalue.push( notEmpty( document.submitform.seqtol_SK_Boltzmann) );
+		returnvalue.push( isNumeric ( document.submitform.seqtol_SK_Boltzmann) );
+    	    	
+    	// Highlight any blank mutation rows
+        var i=0;
+        for (i = 0; i < SK_MaxMutations ; i = i + 1) {
+        	var row =  document.getElementById("seqtol_SK_row_" + i);
+        	if (row.style.display != "none")
+	        {
+        		returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_c_' + i]));
+	            returnvalue.push( isAlpha  (document.submitform.elements['seqtol_SK_mut_c_' + i]));
+	            returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_r_' + i]));
+	            returnvalue.push( isNumeric(document.submitform.elements['seqtol_SK_mut_r_' + i]));
+        	}
+        }
+        
+        // Highlight any missing weights
+        for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+        {
+        	var c = document.submitform.elements["seqtol_SK_kP" + i];
+        	if (c.style.background == "white")
+        	{
+        		returnvalue.push( notEmpty(c));
+	            returnvalue.push( isNumeric(c));
+        	}
+        	for (j = i + 1; j <= SK_max_seqtol_chains ; j = j + 1) 
+            {
+        		var c = document.submitform.elements["seqtol_SK_kP" + i + "P" + j]; 
+        		if (c.style.background == "white")
+            	{
+            		returnvalue.push( notEmpty(c));
+    	            returnvalue.push( isNumeric(c));
+            	}	
+            }
+        }		
     }
     
     // if there's only one false, return false
@@ -309,7 +397,62 @@ function ValidateForm()
     return true;
 }
 
+function set_Boltzmann()
+{
+	var i = 0;
+    for (i = 0; i < SK_MaxMutations ; i = i + 1) 
+    {
+    	var row =  document.getElementById("seqtol_SK_row_" + i);
+    	if (row.style.display == "none")
+    	{
+    		break;
+    	}
+    }
+    document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann + SK_BoltzmannIncrease * i;
+}
 
+function chainsChanged()
+{
+	// todo: Should probably index seqtol_SK_chains from 0 rather than 1
+	// todo: Rename seqtol_SK_kPi to seqtol_SK_kPiPi for more generic treatment in logic
+	// todo: if chain i is not filled in, hide row i and column i+1 (assume 1-indexed)
+	var i;
+	var chainIsInvalid = new Array();
+	for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+	{
+		var c = document.submitform.elements["seqtol_SK_chain" + i];
+		chainIsInvalid[i] = checkIsEmpty(c) || !checkIsAlpha(c);
+	}
+	
+	for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+	{
+		if (chainIsInvalid[i])
+		{
+			document.submitform.elements["seqtol_SK_kP" + i].style.background="grey";
+			document.submitform.elements["seqtol_SK_kP" + i].disabled = true;
+		}
+		else
+		{
+			document.submitform.elements["seqtol_SK_kP" + i].style.background="white";
+			document.submitform.elements["seqtol_SK_kP" + i].disabled = false;
+		}
+		for (j = i + 1; j <= SK_max_seqtol_chains ; j = j + 1) 
+		{
+			if (chainIsInvalid[i] || chainIsInvalid[j])
+			{
+				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].style.background="grey";
+				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].disabled = true;
+			}
+			else
+			{
+				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].style.background="white";
+				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].disabled = false;
+			}
+		}	
+	}
+	
+}
+	
 function ValidateFormEmail()
 {
 	if ( document.myForm.Email.value.indexOf("@") == -1 ||
@@ -409,7 +552,7 @@ function changeApplication( app, _task ) {
 	  new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
 	}
 	if ( task == 'parameter3_2' ) { 
-		//todo:
+		chainsChanged();
 		new Effect.Appear( "ref4" ); 
 	  	document.submitform.Mini[0].disabled=true;
 	    document.submitform.Mini[0].checked=false;
@@ -417,6 +560,9 @@ function changeApplication( app, _task ) {
 	    document.submitform.Mini[1].checked=true;
 	    document.getElementById('rv0').style.color='#D8D8D8';
 	    document.getElementById('rv1').style.color='#000000';
+	    
+	    //new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
+	    
 	}
 	else 
 	{ 
@@ -610,6 +756,25 @@ function addOneMoreSeqtol()
     return true;
 }
 
+//Adds a residue input field for Smith and Kortemme's Interface Sequence Plasticity Prediction
+//todo: Add delete functionality
+function addOneMoreSeqtolSK()
+{
+	//todo: stop incrementing count when number of HTML elements is exceeded
+  new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK);
+  var i = parseFloat(document.submitform.seqtol_SK_Boltzmann.value);
+  if (i != '0' && (i+'') != 'NaN')
+  {
+	  document.submitform.seqtol_SK_Boltzmann.value = parseFloat(i) + SK_BoltzmannIncrease;
+  }
+  numSeqTolSK = numSeqTolSK + 1;
+  if (numSeqTolSK >= SK_MaxMutations)
+  {
+	  new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
+  }
+  return true;
+}
+
 //todo: Unused - delete
 function writeRow( numbr ) 
 {
@@ -649,6 +814,25 @@ function confirm_delete(jobID)
     window.location.href = "rosettaweb.py?query=delete&jobID=" + jobID + "&button=Delete" ; }
 //  else {
 //    window.location.href = "rosettaweb.py?query=queue" ; }
+}
+
+function reset_form ()
+{
+	document.submitform.reset();
+	allWhite();
+	reset_seqtolSK_mutations();
+}
+
+function reset_seqtolSK_mutations ()
+{
+	var oSubmitForm = document.forms["submitform"];			
+	for (i = 0; i < SK_MaxMutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
+		new Effect.Fade( "seqtol_SK_row_" + i, { duration: 0.0 } );
+	}
+	new Effect.Appear("seqtol_SK_addrow");
+	numSeqTolSK = 0;
 }
 
 // Fills in sample data for the protocols when 'Load sample data' is clicked
@@ -724,6 +908,23 @@ function set_demo_values()
 		document.submitform.seqtol_mut_c_3.value = "B";
 		document.submitform.seqtol_mut_r_3.value = "6";
 		addOneMoreSeqtol();
+	}
+	else if ( actual_task == 'parameter3_2')
+	{
+		document.submitform.PDBID.value = "2PDZ";
+		document.submitform.nos.value = "10";
+		document.submitform.seqtol_SK_chain1.value = "A";
+		document.submitform.seqtol_SK_chain2.value = "B";
+		document.submitform.seqtol_SK_chain3.value = "";
+		document.submitform.seqtol_SK_kA.value = "0.4";
+		document.submitform.seqtol_SK_kB.value = "0.4";
+		document.submitform.seqtol_SK_kAB.value = "1.0";
+		document.submitform.seqtol_SK_kC.value = "";
+		document.submitform.seqtol_SK_kAC.value = "";
+		document.submitform.seqtol_SK_kBC.value = "";
+		document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
+		
+		reset_seqtolSK_mutations();
 	}
 	return true;
 }
