@@ -5,7 +5,7 @@ var numSeqTolSK = 0; // Mutation SeqTolSK
 
 // Constants
 
-// Sequence Tolerance (Humphries and Kortemme, Smith and Kortemme)
+// Sequence Tolerance (Humphris and Kortemme, Smith and Kortemme)
 const HK_MaxMutations = 10;
 const SK_InitialBoltzmann = 0.23;
 const SK_BoltzmannIncrease = 0.021;

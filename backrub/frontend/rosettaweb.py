@@ -1048,6 +1048,14 @@ def submit(form, SID):
             success = True
             errormsg = ""
             
+            # seqtol_parameter stores the following fields:
+            #    seqtol_SK_list_1    .. seqtol_SK_list_n
+            #    seqtol_SK_chain1    .. seqtol_SK_chainn
+            #    seqtol_SK_kP1       .. seqtol_SK_kPn
+            #    seqtol_SK_kP1P2     .. seqtol_SK_kPiPj     where i,j \in n, i < j
+            #    seqtol_SK_Boltzmann
+            # where n is the maximum allowed number of chains. seqtol_SK_list_i should be None if empty.
+            
             # Store the Partner identifiers
             numPartners = 0
             for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
@@ -1159,6 +1167,12 @@ def submit(form, SID):
                 else:
                     success, errormsg = False, errormsg + "Chain '%s' not found.<br>" % chain
                     #return (False, "Chain '%s' not found.<br>" % chain)
+            
+            # Wipe any unused chains for cleaner serialization
+            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                mykey = "seqtol_SK_list_%d" % i;
+                if (not seqtol_parameter[mykey]):
+                    seqtol_parameter[mykey] = None
             
             if not success:
                 return (False, errormsg)

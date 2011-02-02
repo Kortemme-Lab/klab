@@ -1261,7 +1261,7 @@ class RosettaHTML:
     def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, w1, w2, w3 ):
         
         html = """
-              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction  (Humphris, Kortemme 2008)</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Parameters:   </td>
@@ -1342,6 +1342,80 @@ class RosettaHTML:
             html +="</td></tr>"
         return html      
     
+    def _showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_parameter):
+
+        html = """
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction (Smith, Kortemme 2010)</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
+              <tr><td align=right valign=top bgcolor="#EEEEFF">Parameters:   </td>
+                  <td bgcolor="#EEEEFF">
+                      """ % ( input_filename, size_of_ensemble)
+        
+        # todo: remove these and use a central file for constants
+        ROSETTAWEB_max_seqtol_SK_chains = 3
+        ROSETTAWEB_SK_BoltzmannIncrease = 0.021
+        ROSETTAWEB_SK_InitialBoltzmann = 0.23
+        
+        active = []    
+        active.append(False)   # todo: Adding a zero index - nasty artifact of using non-zero based indices for the chain numbers 
+        activeList = []
+        maxActive = -1
+        
+        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            partner = seqtol_parameter["seqtol_SK_chain%d" % i]
+            if partner:
+                active.append(True)
+                activeList.append(i)
+                if i > maxActive:
+                    maxActive = i
+                html += 'Partner %d: Chain %s<br>' % (i, partner)
+                plist = seqtol_parameter["seqtol_SK_list_%d" % i]
+                if plist:
+                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues:</i></td><td></td><td>%d: %s</td></tr></table>' % (i, join(plist,' '))
+            else:
+                active.append(False)
+        
+        html += '<br>Boltzmann factor: %s' % (seqtol_parameter["seqtol_SK_Boltzmann"])
+        
+        #seqtol_SK_kP1 seqtol_SK_kP1P2
+        html += """
+                    <br><br>
+                    Score Reweighting<br>
+                    <table><tr>
+                      <td> 
+                        <table><thead>
+                            <tr bgcolor="#828282" style="color:white;">
+                            <td bgcolor="#EEEEFF"></td>
+                            <td>Self Energy (k<sub>_</sub>)</td>"""
+
+        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            if active[i] and i != maxActive:
+                html += "<td>k<sub>P<sub>%d</sub></sub>_</td>" % i
+        
+        html += "</thead></tr><tbody bgcolor='#F4F4FF'>"
+    
+        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            if active[i]:
+                html += """
+                        <tr align="left" border=1>                    
+                              <td bgcolor="#828282" style="color:white; align="left">Partner %d</td>
+                              <td>%s</td>""" % (i, seqtol_parameter["seqtol_SK_kP%d" % i])
+                for j in activeList:
+                    if j < i:
+                        html += "<td>%s</td>" % seqtol_parameter["seqtol_SK_kP%dP%d" % (j, i)]
+                    elif j != maxActive:
+                        html += "<td bgcolor='#EEEEFF'></td>"
+                html += "</tr>"
+
+        html += "</tbody></table></td></tr></table>" 
+        html += "</td></tr>"
+        
+        input_id = input_filename[:-4] # filename without suffix
+        
+        #todo: if status == 'done' or status == 'sample':
+            
+        return html  
     
     def _showDownloadLinks(self, status, extended, cryptID, jobnumber):
     
@@ -1443,7 +1517,7 @@ class RosettaHTML:
         
         
         if True: #str(parameter['Errors']).strip() in ['', 'Postprocessing'] or parameter['Errors'] == None:
-            
+            #todo: Clean up the logic here - why is there two possibilities? maybe old legacy DB records in which case update the DB
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
             if parameter['task'] == '0' or parameter['task'] == 'no_mutation':
@@ -1470,12 +1544,17 @@ class RosettaHTML:
                                             parameter['ENS_num_designs_per_struct'], parameter['ENS_segment_length'] )
                                             
             elif parameter['task'] == 'sequence_tolerance':
-                task = "Interface Sequence Plasticity Prediciton"
+                task = "Interface Sequence Plasticity Prediction" #todo: Fill in with proper name
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'],
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
                                                      seqtol_parameter['seqtol_list_1'], seqtol_parameter['seqtol_list_2'],
                                                      seqtol_parameter['seqtol_weight_chain1'], seqtol_parameter['seqtol_weight_chain2'], seqtol_parameter['seqtol_weight_interface'] )
+
+            elif parameter['task'] == 'sequence_tolerance_SK':
+                task = "Interface Sequence Plasticity Prediction" #todo: Fill in with proper name
+                seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
+                html += self._showSequenceToleranceSK( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'], seqtol_parameter)
                 
         html += '</table><br></div></td>\n'
         
