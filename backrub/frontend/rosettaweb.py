@@ -63,6 +63,7 @@ from cStringIO import StringIO
 from cgi import escape
 
 import pickle
+#todo: Test this for debugging import cgitb
 
 ###############################################################################################
 # Setup: Change these values according to your settings and usage of the server               #
@@ -95,16 +96,11 @@ ROSETTAWEB_download_dir = parameter['rosetta_dl']
 
 ROSETTAWEB_base_dir     = parameter["base_dir"]
 
-# Sequence Tolerance (Smith and Kortemme)
-ROSETTAWEB_max_seqtol_SK_chains = 3
-ROSETTAWEB_SK_BoltzmannIncrease = 0.021
-ROSETTAWEB_SK_InitialBoltzmann = 0.23
-
 # open connection to MySQL
 connection = MySQLdb.Connection( host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket )
 ########################################## Setup End ##########################################
 
-# this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
+# todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
 sys.path.insert(0, "%sdaemon/" % ROSETTAWEB_base_dir)
 from pdb import PDB
 
@@ -120,7 +116,8 @@ def ws():
   
   s = sys.stdout
   if ROSETTAWEB_server_name == 'albana.ucsf.edu':
-    sys.stderr = s # should be removed later
+    sys.stderr = s # todo: should be removed later
+    #todo: Test this for debugging  cgitb.enable(display=0, logdir="/tmp")
   debug = ''
 
   html_content = ''
@@ -136,10 +133,12 @@ def ws():
   # get the POST data from the webserver
   form = cgi.FieldStorage()
 
-  # SECURITY CHECK - escape HTML code
+  # SECURITY CHECK
   for key in form:
+    # Escape HTML code
     form[key].value = escape(form[key].value)
     if (key == "Password" or key == "ConfirmPassword" or key == "myPassword" or key == "password" or key == "confirmpassword"):
+      # Store the password as an MD5 hex digest
       tgb = str(form[key].value)
       form[key].value = md5.new(tgb.encode('utf-8')).hexdigest()
 
@@ -159,14 +158,17 @@ def ws():
       cryptID = form["job"].value
       sql     = 'SELECT ID,Status,task,mini,PDBComplexFile FROM backrub WHERE cryptID="%s"' % ( cryptID )
       result  = execQuery(connection, sql)
-      jobid   = result[0][0]
-      status  = result[0][1]
-      task    = result[0][2]
-      if result[0][3] == 'mini':
-        mini = True
-      pdb_filename = result[0][4]
+      if len(result) > 0:
+          jobid   = result[0][0]
+          status  = result[0][1]
+          task    = result[0][2]
+          if result[0][3] == 'mini':
+            mini = True
+          pdb_filename = result[0][4]
+      else:
+          html_content = "Either an invalid job ID was given or else the job no longer exists in the database."  
     else:
-      html_content = "Invalid link. No JobID given."
+      html_content = "Invalid link. No job ID given."
       
     if status == 1: # running
       html_content = '<br>Job is Running. Please check again later.'
@@ -192,7 +194,7 @@ def ws():
       elif task == 'sequence_tolerance':
         rosettaDD.sequence_tolerance( cryptID, jobid, mini, pdb_filename )
       elif task == 'sequence_tolerance_SK':
-        rosettaDD.sequence_tolerance_SK( cryptID, jobid, mini, pdb_filename )
+        rosettaDD.sequence_tolerance( cryptID, jobid, mini, pdb_filename )
       else:
         html_content = "No data."
 
@@ -421,7 +423,7 @@ def login(form, my_session, t):
     else:
       password_entered = form["myPassword"].value
     # check for userID and password
-    sql = 'SELECT ID,Password  FROM Users WHERE UserName = "%s"' % form["myUserName"].value
+    sql = 'SELECT ID,Password FROM Users WHERE UserName = "%s"' % form["myUserName"].value
     result = execQuery(connection, sql)
     try:
       UserID = result[0][0]
@@ -719,7 +721,7 @@ def check_pdb(pdb_object):
     '''checks pdb file for errors'''
     
     # check the formatting of the file
-    pdb_check_output = pdb_object.check_format()
+    pdb_check_output, wrns = pdb_object.check_format()
     if pdb_check_output != True:
       return (False, "PDB format incorrect: %s<br>" % pdb_check_output )
     
@@ -735,7 +737,7 @@ def check_pdb(pdb_object):
     if counts["cys"] > 50:
       return (False, "Max. number of Cysteine residues exceeded<br>")
     
-    return (True, "everything is fine")
+    return (True, wrns) #"everything is fine")
 
 
 def extract_1stmodel(pdbfile):
@@ -829,6 +831,12 @@ def submit(form, SID):
             pdb_check_result = check_pdb(pdb_object)
             if not pdb_check_result[0]:
                 return pdb_check_result
+            wrns = pdb_check_result[1]
+            if wrns:
+                for w in wrns:
+                    warnings = warnings + "<li>%s</li>" % w
+
+                
             
         ############## PDB STUFF END ###############
                 
@@ -1049,17 +1057,18 @@ def submit(form, SID):
             errormsg = ""
             
             # seqtol_parameter stores the following fields:
-            #    seqtol_SK_list_1    .. seqtol_SK_list_n
-            #    seqtol_SK_chain1    .. seqtol_SK_chainn
-            #    seqtol_SK_kP1       .. seqtol_SK_kPn
-            #    seqtol_SK_kP1P2     .. seqtol_SK_kPiPj     where i,j \in n, i < j
+            #    seqtol_SK_list_0     .. seqtol_SK_list_n     A list of designed residues
+            #    seqtol_SK_plist_0    .. seqtol_SK_plist_n    A premutations mapping from residue positions to amino acids codes (the single letter codes used in resfiles) 
+            #    seqtol_SK_chain0     .. seqtol_SK_chainn
+            #    seqtol_SK_kP0P0      .. seqtol_SK_kPiPj    where i,j \in n, i <= j
             #    seqtol_SK_Boltzmann
             # where n is the maximum allowed number of chains. seqtol_SK_list_i should be None if empty.
             
             # Store the Partner identifiers
             numPartners = 0
-            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
                 seqtol_parameter["seqtol_SK_list_%d" % i] = []
+                seqtol_parameter["seqtol_SK_plist_%d" % i] = {}
                 mkey = "seqtol_SK_chain%d" % i
                 formvalue = form[mkey].value
                 if form.has_key(mkey) and formvalue != '':
@@ -1069,9 +1078,9 @@ def submit(form, SID):
                     seqtol_parameter[mkey] = None
 
             # Sanity check: Ensure partners are distinct chains
-            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
                 pi = seqtol_parameter["seqtol_SK_chain%d" % i]
-                for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains):
                     pj = seqtol_parameter["seqtol_SK_chain%d" % j]
                     if (pi is not None) and (pj is not None) and (pi == pj):
                         success, errormsg = False, errormsg + "Partners %d and %d have the same chain %s.<br>" % (i,j,pi)
@@ -1080,12 +1089,13 @@ def submit(form, SID):
                 success, errormsg = False, "You need to specify at least one chain.<br>"
             
             # Store the Score Reweighting values
-            # Sanity check: If P_i is specified then k_{P_i} must be filled in.
+            # Sanity check: If P_i is specified then k_{P_iP_i} must be filled in.
             #               Furthermore, if P_j is specified, j > i, then k_{P_iP_j} must be filled in.
-            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
+                #todo: clean up logic here since change to PiPi
                 if seqtol_parameter["seqtol_SK_chain%d" % i] is not None:
                     # Check that the self energy is filled in
-                    mkey = "seqtol_SK_kP%d" % i
+                    mkey = "seqtol_SK_kP%dP%d" % (i, i)
                     if not(form.has_key(mkey)) or form[mkey].value == '':
                         success, errormsg = False, errormsg + "Partner %d was specified as %s but its self energy was missing.<br>" % (i,seqtol_parameter["seqtol_SK_chain%d" % i])
                         # else we could assign the default value of 0.4 here
@@ -1093,7 +1103,7 @@ def submit(form, SID):
                         seqtol_parameter[mkey] = str(form[mkey].value)
 
                     # Check that the interaction energies are filled in
-                    for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                    for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains):
                         if seqtol_parameter["seqtol_SK_chain%d" % j] is not None:
                             # Check that the interaction energy is filled in
                             mkey = "seqtol_SK_kP%dP%d" % (i, j)
@@ -1103,39 +1113,92 @@ def submit(form, SID):
                             else: 
                                 seqtol_parameter[mkey] = str(form[mkey].value)
                         
-            numResidues = 0
-            lastRes = ROSETTAWEB_max_seqtol_design
-            for x in range(ROSETTAWEB_max_seqtol_design):
+            numDesignedResidues = 0
+            lastRes = ROSETTAWEB_SK_MaxMutations
+            for x in range(ROSETTAWEB_SK_MaxMutations):
                 lastRes = x
                 key1 = "seqtol_SK_mut_c_" + str(x)
                 key2 = "seqtol_SK_mut_r_" + str(x)
                 if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
-                    numResidues = numResidues + 1
+                    numDesignedResidues = numDesignedResidues + 1
                     chainWasFound = False
-                    for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+                    for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
                         if form[key1].value == seqtol_parameter["seqtol_SK_chain%d" % i]:
-                            seqtol_parameter["seqtol_SK_list_%d" % i].append(str(form[key2].value))
                             chainWasFound = True
+                            dlist = "seqtol_SK_list_%d" % i
+                            dkey = str(form[key2].value)
+                            if seqtol_parameter[dlist] and seqtol_parameter[dlist][dkey]:
+                                success, errormsg = False, errormsg + "There are multiple designed residues at position %s in chain %s.<br>" % (pkey, form[key1].value)                                
+                            else:
+                                seqtol_parameter[dlist].append(dkey)
                     if not chainWasFound:
                         success, errormsg = False, errormsg + "The chain %s was not found for residue %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
+                else:
+                    break
+
+            if numDesignedResidues < 1:
+                success, errormsg = False, errormsg + "There must be at least one designed residue."                               
+            
+            numPremutations = 0
+            lastPremut = ROSETTAWEB_SK_MaxPremutations
+            for x in range(ROSETTAWEB_SK_MaxPremutations):
+                lastPremut = x
+                sx = str(x)
+                key1 = "seqtol_SK_pre_mut_c_" + sx
+                key2 = "seqtol_SK_pre_mut_r_" + sx
+                key3 = "premutatedAA" + sx
+                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '' and len(form[key2].value) == 3:
+                    numPremutations = numPremutations + 1
+                    chainWasFound = False
+                    for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
+                        if form[key1].value == seqtol_parameter["seqtol_SK_chain%d" % i]:
+                            chainWasFound = True
+                            AAid = ROSETTAWEB_SK_AA[form[key3].value]
+                            if not AAid:
+                                # Should never happen but just in case
+                                success, errormsg = False, errormsg + "No amino acid could be found matching %s. This is probably a server error; please contact support@kortemmelab.ucsf.edu.<br>" % (AAid)
+                                break;
+                            else:
+                                plist = "seqtol_SK_plist_%d" % i
+                                pkey = str(form[key2].value)
+                                if seqtol_parameter[plist] and seqtol_parameter[plist][pkey]:
+                                    success, errormsg = False, errormsg + "There are multiple premutations or designed residues at position %s in chain %s.<br>" % (pkey, form[key1].value)
+                                else:
+                                    seqtol_parameter[plist][pkey] = AAid
+                    if not chainWasFound:
+                        success, errormsg = False, errormsg + "The chain %s was not found for premutation %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
                 else:
                     break
 
             #todo: check in JS whether numeric values are actually numeric 
             
             # Warn if the user left gaps in the residue list
-            for x in range(lastRes + 1, ROSETTAWEB_max_seqtol_design):
+            for x in range(lastRes + 1, ROSETTAWEB_SK_MaxMutations):
                 key1 = "seqtol_SK_mut_c_" + str(x)
                 key2 = "seqtol_SK_mut_r_" + str(x)
                 if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
                     warnings = warnings + "<li>Residue %d ('%s%4.i') was not added to the run as previous residues were left blank.</li>" % (x + 1, form[key1].value, int(form[key2].value))
+                            
+            # Warn if the user left gaps in the premutation list
+            for x in range(lastRes + 1, ROSETTAWEB_SK_MaxPremutations):
+                key1 = "seqtol_SK_pre_mut_c_" + str(x)
+                key2 = "seqtol_SK_pre_mut_r_" + str(x)
+                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
+                    warnings = warnings + "<li>Premutation %d ('%s%4.i') was not added to the run as previous premutations were left blank.</li>" % (x + 1, form[key1].value, int(form[key2].value))
                 
             # Store the Boltzmann Factor
-            if form.has_key("seqtol_SK_Boltzmann") and form["seqtol_SK_Boltzmann"].value != '':
-                seqtol_parameter["seqtol_SK_Boltzmann"] = str(form["seqtol_SK_Boltzmann"].value)
+            if form.getvalue("customBoltzmann") and form.has_key("seqtol_SK_Boltzmann") and form["seqtol_SK_Boltzmann"].value != '':
+                userkT = str(form["seqtol_SK_Boltzmann"].value)
+                try:
+                    kT = float(userkT)
+                except ValueError:
+                    success, errormsg = False, errormsg + "The Boltzmann factor was specified as '%s' which could not be read as a numeric value.<br>" % userkT
+                else:
+                    warnings = warnings + "<li>Using a user-defined value for kT (%s) rather than the published value." % userkT
+                    seqtol_parameter["seqtol_SK_Boltzmann"] = kT
             else:
-                kT = ROSETTAWEB_SK_InitialBoltzmann + numResidues * ROSETTAWEB_SK_BoltzmannIncrease
-                warnings = warnings + "<li>The Boltzmann factor was not specified. The job will run with kT = %f + %d * %f = %f.</li>" % (ROSETTAWEB_SK_InitialBoltzmann, numResidues, ROSETTAWEB_SK_BoltzmannIncrease, kT)
+                kT = ROSETTAWEB_SK_InitialBoltzmann + numPremutations * ROSETTAWEB_SK_BoltzmannIncrease
+                warnings = warnings + "<li>Running the job with the published value for kT = %f + %d * %f = %f.</li>" % (ROSETTAWEB_SK_InitialBoltzmann, numPremutations, ROSETTAWEB_SK_BoltzmannIncrease, kT)
                 seqtol_parameter["seqtol_SK_Boltzmann"] = kT
             
             # Sanity checks:
@@ -1146,11 +1209,14 @@ def submit(form, SID):
             
             # First, build up the chain lists
             chainsreslists = []
-            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
                 chain = "seqtol_SK_chain%d" % i
                 if (seqtol_parameter[chain] is not None) and seqtol_parameter[chain] != '':
-                    chainsreslists.append((seqtol_parameter[chain],seqtol_parameter["seqtol_SK_list_%d" % i]))
+                    chainsreslists.append((seqtol_parameter[chain], seqtol_parameter["seqtol_SK_list_%d" % i]))
+                    chainsreslists.append((seqtol_parameter[chain], seqtol_parameter["seqtol_SK_plist_%d" % i].keys()))
             
+            # todo:Check with Colin. I'm checking premutations against all_resids as well.
+            # todo:Check with Colin. Can you premutate to Cystein? If you can then I need to change the logic below to allow a premutation to use it
             # Then check for matches within the pdb structure
             for (chain, lst_resid) in chainsreslists:
                 if chain in all_chains:
@@ -1168,12 +1234,18 @@ def submit(form, SID):
                     success, errormsg = False, errormsg + "Chain '%s' not found.<br>" % chain
                     #return (False, "Chain '%s' not found.<br>" % chain)
             
-            # Wipe any unused chains for cleaner serialization
-            for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            # Wipe any unused chains and residue/premutation lists for cleaner and more general serialization
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
                 mykey = "seqtol_SK_list_%d" % i;
                 if (not seqtol_parameter[mykey]):
-                    seqtol_parameter[mykey] = None
-            
+                    del seqtol_parameter[mykey]
+                mykey = "seqtol_SK_plist_%d" % i;
+                if (not seqtol_parameter[mykey]):
+                    del seqtol_parameter[mykey]
+                mykey = "seqtol_SK_chain%d" % i;
+                if (not seqtol_parameter[mykey]):
+                    del seqtol_parameter[mykey]
+                    
             if not success:
                 return (False, errormsg)
             

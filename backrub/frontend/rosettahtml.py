@@ -19,7 +19,7 @@ from rwebhelper import *
 class RosettaHTML:
 
     server = {}
-
+    
     def __init__(self, server_url, server_title, script_filename, download_dir, 
                   username='', comment='', warning='', contact_name='FLO'):
         self.server_url      = server_url
@@ -32,6 +32,15 @@ class RosettaHTML:
         self.download_dir    = download_dir
         self.lowest_structs  = []
         self.html_refs       = ''
+        self.protocolForms = (
+             self.submitOnePointMutation,
+             self.submitMultiplePointMutations,
+             self.submitBRConformationalEnsemble,
+             self.submitBREnsembleDesign,
+             self.submitSeqTolHK,
+             self.submitSeqTolSK,
+            )
+    
         #self.server = { 'Structure Prediction Backrub': 'http://%s/backrub' % self.server_url,
                         #'Interface Alanine Scanning' : 'http://%s/alascan/' % self.server_url,
                         #'more server soon' : 'http://kortemmelab.ucsf.edu/' }
@@ -60,11 +69,12 @@ class RosettaHTML:
                         "tt_seqtol_partner":"header=[Partner] body=[Define the two chains that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_SK_partner":"header=[Partner] body=[todo: Define the chain(s) that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_SK_weighting":"header=[Score reweighting] body=[todo: Define the intramolecular energies / self energy (e.g. k<sub>A</sub>) and the intermolecular / interaction energies (e.g. k<sub>AB</sub>).] %s" % tooltip_parameter,
-                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[todo: Define the Boltzmann factor kT.] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[todo: Define the Boltzmann factor kT. If the cited value is chosen then kT will be set as (0.23 + n * 0.021) where n is the number of valid premutated residues.] %s" % tooltip_parameter,
                         "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] %s" % tooltip_parameter,
                         "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
                         "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
                         "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
+                        "tt_seqtol_premutated": "header=[Residues for design] body=[todo:] %s" % tooltip_parameter,
                         "tt_click":         "body=[Click on the link to read the description.] %s" % tooltip_parameter,
                         }
         
@@ -89,7 +99,7 @@ class RosettaHTML:
     def setUsername(self, username):
         self.username = username
 
-    def main(self, CONTENT='This server is made of awesome.', site='', query='' ):
+    def main(self, CONTENT='This server is made of awesome sauce.', site='', query='' ):
         html = """
             <!-- *********************************************************
                  * RosettaBackrub                                        *
@@ -109,7 +119,19 @@ class RosettaHTML:
                 <script src="/javascripts/niftycube.js" type="text/javascript"></script>
                 <script src="/javascripts/boxover.js" type="text/javascript"></script>
                 <script src="/jmol/Jmol.js" type="text/javascript"></script>
-                <script src="/backrub/jscripts.js" type="text/javascript"></script>
+                """ % (self.server_title, site)
+        
+        # Embed the Python constants into the Javascript
+        html += """<script type="text/javascript">//<![CDATA[
+                        const SK_max_seqtol_chains = %d;
+                        const SK_InitialBoltzmann = %f;
+                        const SK_BoltzmannIncrease = %f;
+                        const SK_MaxMutations = %d;
+                        const SK_MaxPremutations = %d;
+                     //]]></script>""" % (ROSETTAWEB_max_seqtol_SK_chains, ROSETTAWEB_SK_InitialBoltzmann, ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations)
+                
+                    
+        html += """        <script src="/backrub/jscripts.js" type="text/javascript"></script>
             </head>
 
             <body bgcolor="#ffffff" onload="startup( \'%s\' );">
@@ -139,8 +161,7 @@ class RosettaHTML:
            </table>
            </center>
            </body>
-           </html>\n""" % ( self.server_title, site,
-                            query,
+           </html>\n""" % ( query,
                             self._showHeader(),
                             self._showWarning(),
                             self._showLoginStatus(),
@@ -263,7 +284,7 @@ class RosettaHTML:
         return self.login(message=message, username=username, login_disabled=login_disabled)
 
 ###############################################################################################
-# submit()                                                                                    #
+# submit() and the submission forms
 ###############################################################################################
 
     def submit(self, jobname='', error='' ):
@@ -426,7 +447,7 @@ class RosettaHTML:
               </TR>
               <TR>
                 <TD align=right>Upload Structure <img src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20"></TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20" ></TD>
               </TR>
               <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR>
@@ -462,219 +483,18 @@ class RosettaHTML:
               </TR>
             </TABLE>
             
-            <!-- Backrub - Point Mutation -->
-            <p id="parameter1_1" style="display:none; opacity:0.0; text-align:justify;">
-                <table align=center>
-                <tr>
-                    <td align="right">Chain ID <img src="../images/qm_s.png" title="%(tt_ChainId)s"></td><td><input type="text" name="PM_chain"  maxlength=1 SIZE=5 VALUE=""></td>
-                </tr>
-                <tr>
-                    <td align="right">Residue Number <img src="../images/qm_s.png" title="%(tt_ResId)s"></td><td><input type="text" name="PM_resid"  maxlength=4 SIZE=5 VALUE=""></td>
-                </tr>
-                <tr>
-                    <td align="right">New Amino Acid <img src="../images/qm_s.png" title="%(tt_NewAA)s"></td><td><input type="text" name="PM_newres" maxlength=1 SIZE=5 VALUE=""></td>
-                </tr>
-                <tr>
-                    <td><INPUT TYPE="hidden" NAME="PM_radius" VALUE="6.0"></td>
-                </tr>
-                </table>
-                <br>
-            </p>
-            
-            <!-- Backrub - Multiple Point Mutation -->
-            <p id="parameter1_2" style="display:none; opacity:0.0; text-align:justify;">
-                <table bgcolor="#EEEEEE" align="center">
-                <tr bgcolor="#828282" style="color:white;">
-                    <td align="center">#</td>
-                    <td align="center" title="%(tt_ChainId)s">Chain ID</td>
-                    <td align="center" title="%(tt_ResId)s">Res ID</td>
-                    <td align="center" title="%(tt_NewAA)s">AA</td>
-                    <td align="center" title="%(tt_Radius)s">Radius [&#197;]</td>
-                </tr>
-                <!-- up to 31 point mutations are possible -->
-                <tr id="row_PM0" style=""><td align="center">1</td><td align="center"><input name="PM_chain0" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid0" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres0" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius0" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM1" style="display:none"><td align="center">2</td><td align="center"><input name="PM_chain1" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid1" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres1" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius1" maxlength="4" size="7" type="text"></td></tr>   
-                <tr id="row_PM2" style="display:none"><td align="center">3</td><td align="center"><input name="PM_chain2" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid2" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres2" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius2" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM3" style="display:none"><td align="center">4</td><td align="center"><input name="PM_chain3" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid3" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres3" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius3" maxlength="4" size="7" type="text"></td></tr>   
-                <tr id="row_PM4" style="display:none"><td align="center">5</td><td align="center"><input name="PM_chain4" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid4" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres4" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius4" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM5" style="display:none"><td align="center">6</td><td align="center"><input name="PM_chain5" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid5" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres5" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius5" maxlength="4" size="7" type="text"></td></tr>   
-                <tr id="row_PM6" style="display:none"><td align="center">7</td><td align="center"><input name="PM_chain6" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid6" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres6" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius6" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM7" style="display:none"><td align="center">8</td><td align="center"><input name="PM_chain7" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid7" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres7" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius7" maxlength="4" size="7" type="text"></td></tr>  
-                <tr id="row_PM8" style="display:none"><td align="center">9</td><td align="center"><input name="PM_chain8" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid8" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres8" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius8" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM9" style="display:none"><td align="center">10</td><td align="center"><input name="PM_chain9" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid9" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres9" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius9" maxlength="4" size="7" type="text"></td></tr>   
-                <tr id="row_PM10" style="display:none"><td align="center">11</td><td align="center"><input name="PM_chain10" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid10" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres10" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius10" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM11" style="display:none"><td align="center">12</td><td align="center"><input name="PM_chain11" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid11" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres11" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius11" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM12" style="display:none"><td align="center">13</td><td align="center"><input name="PM_chain12" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid12" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres12" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius12" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM13" style="display:none"><td align="center">14</td><td align="center"><input name="PM_chain13" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid13" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres13" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius13" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM14" style="display:none"><td align="center">15</td><td align="center"><input name="PM_chain14" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid14" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres14" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius14" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM15" style="display:none"><td align="center">16</td><td align="center"><input name="PM_chain15" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid15" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres15" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius15" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM16" style="display:none"><td align="center">17</td><td align="center"><input name="PM_chain16" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid16" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres16" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius16" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM17" style="display:none"><td align="center">18</td><td align="center"><input name="PM_chain17" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid17" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres17" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius17" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM18" style="display:none"><td align="center">19</td><td align="center"><input name="PM_chain18" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid18" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres18" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius18" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM19" style="display:none"><td align="center">20</td><td align="center"><input name="PM_chain19" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid19" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres19" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius19" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM20" style="display:none"><td align="center">21</td><td align="center"><input name="PM_chain20" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid20" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres20" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius20" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM21" style="display:none"><td align="center">22</td><td align="center"><input name="PM_chain21" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid21" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres21" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius21" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM22" style="display:none"><td align="center">23</td><td align="center"><input name="PM_chain22" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid22" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres22" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius22" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM23" style="display:none"><td align="center">24</td><td align="center"><input name="PM_chain23" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid23" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres23" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius23" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM24" style="display:none"><td align="center">25</td><td align="center"><input name="PM_chain24" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid24" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres24" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius24" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM25" style="display:none"><td align="center">26</td><td align="center"><input name="PM_chain25" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid25" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres25" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius25" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM26" style="display:none"><td align="center">27</td><td align="center"><input name="PM_chain26" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid26" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres26" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius26" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM27" style="display:none"><td align="center">28</td><td align="center"><input name="PM_chain27" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid27" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres27" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius27" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM28" style="display:none"><td align="center">29</td><td align="center"><input name="PM_chain28" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid28" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres28" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius28" maxlength="4" size="7" type="text"></td></tr>
-                <tr id="row_PM29" style="display:none"><td align="center">30</td><td align="center"><input name="PM_chain29" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid29" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres29" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius29" maxlength="4" size="7" type="text"></td></tr> 
-                <tr id="row_PM30" style="display:none"><td align="center">31</td><td align="center"><input name="PM_chain30" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid30" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres30" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius30" maxlength="4" size="7" type="text"></td></tr>
-                <tr><td align="center" colspan="4"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a residue</a></td></tr>
-                </table>
-                
-            </p>
-            
             <!-- Backrub - Costum Mutation -->
+            <!-- todo: seems to be deprecated - was this a hack for Greg's protocol? -->
             <p id="parameter1_3" style="display:none; opacity:0.0; text-align:justify;"><b>Custom mutation.</b><br><br>
                 This allows for a more flexible definition of mutations. Detailed information about the format of the file can be found in the <A style="color:#365a79; "href="../wiki/Mutations">documentation</A>. <br>
                 <font style="text-align:left;">Upload file <INPUT TYPE="file" NAME="Mutations" size="13"></font>
             </p>
-            
-            <!-- Ensemble - simple -->
-            <p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;">no options</p>
-            
-            <!-- Ensemble - design -->
-            <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
-                <table align="center">
-                <tr>
-                    <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2">(max 4.8, recommended 1.2)</td>
-                </tr>
-                <tr>
-                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
-                </tr>
-                <tr>
-                    <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20">(max 20, recommended 20)</td>
-                </tr>
-                </table>
-            </p>
-            
-            <!-- Library Design -->
-            <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
-            <table align="center">
-              <tr>
-                  <td  align="right">Partner 1 <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
-              </tr>
-              <tr>
-                  <td  align="right">Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
-                  </td>
-              </tr>
-              
-                <tr>
-                  <td align="right">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
-                  <td>
-                    <table bgcolor="#EEEEEE">
-                      <tr bgcolor="#828282" style="color:white;">
-                        <td>#</td><td>Chain ID</td><td>Residue Number</td>
-                      </tr>
-                      <tr align="center" id="seqtol_row_0" >                    <td>1</td><td><input type="text" name="seqtol_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_0" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_1" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_2" style="display:none"><td>3</td><td><input type="text" name="seqtol_mut_c_2" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_2" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_3" style="display:none"><td>4</td><td><input type="text" name="seqtol_mut_c_3" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_3" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_4" style="display:none"><td>5</td><td><input type="text" name="seqtol_mut_c_4" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_4" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_5" style="display:none"><td>6</td><td><input type="text" name="seqtol_mut_c_5" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_5" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_6" style="display:none"><td>7</td><td><input type="text" name="seqtol_mut_c_6" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_6" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_7" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_8" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_9" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a residue</a></td></tr>
-                      </table>
-                  </td>
-                </tr>
-            </table>
-            </p>
-            <p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">
-            <table align="center">
-              <tr>
-                  <td  align="left">Partner 1 <img src="../images/qm_s.png" title="%(tt_seqtol_SK_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_SK_chain1" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()"></td>
-              </tr>
-              <tr>
-                  <td  align="left">Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_SK_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_SK_chain2" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">
-                  </td>
-              </tr>
-              <tr>
-                  <td  align="left">Partner 3 <img src="../images/qm_s.png" title="%(tt_seqtol_SK_partner)s"></td>
-                  <td>Chain <input type="text" name="seqtol_SK_chain3" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">
-                  </td>
-              </tr>
-              
-                <tr>
-                  <td align="left" valign="top">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
-                  <td>
-                    <table bgcolor="#EEEEEE">
-                      <tr bgcolor="#828282" style="color:white;">
-                        <td>#</td><td>Chain ID</td><td>Residue Number</td>
-                      </tr>
-                      <tr align="center" id="seqtol_SK_row_0" style="display:none">                    
-                          <td>1</td>
-                          <td><input type="text" name="seqtol_SK_mut_c_0" maxlength=1 SIZE=2></td>
-                          <td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td>
-                      </tr>
-                      <tr align="center" id="seqtol_SK_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_SK_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_1" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_2" style="display:none"><td>3</td><td><input type="text" name="seqtol_SK_mut_c_2" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_2" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_3" style="display:none"><td>4</td><td><input type="text" name="seqtol_SK_mut_c_3" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_3" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_4" style="display:none"><td>5</td><td><input type="text" name="seqtol_SK_mut_c_4" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_4" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_5" style="display:none"><td>6</td><td><input type="text" name="seqtol_SK_mut_c_5" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_5" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_6" style="display:none"><td>7</td><td><input type="text" name="seqtol_SK_mut_c_6" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_6" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_SK_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_7" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_SK_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_8" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_SK_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_SK_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_9" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center"><td colspan="3"><div id="seqtol_SK_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSK();">Click here to add a residue</a></div></td></tr>
-                      </table>
-                  </td>
-                </tr>
-              <tr><td height="10"></td></tr>
-                <tr>
-                  <td align="left">Boltzmann Factor (kT)<img src="../images/qm_s.png" title="%(tt_seqtol_SK_Boltzmann)s"></td>
-                  <td>
-                      <input type="text" name="seqtol_SK_Boltzmann" maxlength=5 SIZE=5 VALUE="0.23">
-                      <input type="button" value="Use cited value" onClick="set_Boltzmann();">
-                  </td>
-                </tr>                    
-              <tr><td height="10"></td></tr>
-              <tr>
-                  <td align="left">Score Reweighting<img src="../images/qm_s.png" title="%(tt_seqtol_SK_weighting)s"></td>
-              </tr>
-              <tr>
-                  <td colspan="2">
-                    <table bgcolor="#EEEEEE">
-                      <tr bgcolor="#828282" style="color:white;">
-                        <td bgcolor="#EEEEEE"></td>
-                        <td>Self Energy (k<sub>_</sub>)</td>
-                        <td>P<sub>1</sub> Interaction (k<sub>P<sub>1</sub></sub>_)</td>
-                        <td>P<sub>2</sub> Interaction (k<sub>P<sub>2</sub></sub>_)</td>
-                      </tr>
-                      <tr align="left" id="seqtol_SK_weight_0" >                    
-                          <td align="left">Partner 1</td>
-                          <td><input type="text" name="seqtol_SK_kP1" maxlength=5 SIZE=5 VALUE="0.4"></td>
-                          <td></td>
-                          <td></td>
-                      </tr>
-                      <tr align="left" id="seqtol_SK_weight_1" >                    
-                          <td align="left">Partner 2</td>
-                          <td><input type="text" name="seqtol_SK_kP2" maxlength=5 SIZE=5 VALUE="0.4"></td>
-                          <td><input type="text" name="seqtol_SK_kP1P2" maxlength=5 SIZE=5 VALUE="1.0"></td>
-                          <td></td>
-                      </tr>
-                      <tr align="left" id="seqtol_SK_weight_2" >                    
-                          <td align="left">Partner 3</td>
-                          <td><input type="text" name="seqtol_SK_kP3" maxlength=5 SIZE=5 VALUE="0.4"></td>
-                          <td><input type="text" name="seqtol_SK_kP1P3" maxlength=5 SIZE=5 VALUE="1.0"></td>
-                          <td><input type="text" name="seqtol_SK_kP2P3" maxlength=5 SIZE=5 VALUE="1.0"></td>
-                      </tr>
-                      </table>
-                  </td>
-                </tr>                    
-            </table>
-            </p>
-            
+        ''' % self.tooltips
+
+        for protocolForm in self.protocolForms:
+            html += protocolForm()
+
+        html += '''     
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values();">
               &nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="ValidateForm();">
@@ -736,8 +556,280 @@ class RosettaHTML:
         #     </td>
         #   </tr>
 
+    def submitOnePointMutation(self):
+        return '''
+         <!-- Backrub - Point Mutation -->
+            <p id="parameter1_1" style="display:none; opacity:0.0; text-align:justify;">
+                <table align=center>
+                <tr>
+                    <td align="right">Chain ID <img src="../images/qm_s.png" title="%(tt_ChainId)s"></td><td><input type="text" name="PM_chain"  maxlength=1 SIZE=5 VALUE=""></td>
+                </tr>
+                <tr>
+                    <td align="right">Residue Number <img src="../images/qm_s.png" title="%(tt_ResId)s"></td><td><input type="text" name="PM_resid"  maxlength=4 SIZE=5 VALUE=""></td>
+                </tr>
+                <tr>
+                    <td align="right">New Amino Acid <img src="../images/qm_s.png" title="%(tt_NewAA)s"></td><td><input type="text" name="PM_newres" maxlength=1 SIZE=5 VALUE=""></td>
+                </tr>
+                <tr>
+                    <td><INPUT TYPE="hidden" NAME="PM_radius" VALUE="6.0"></td>
+                </tr>
+                </table>
+                <br>
+            </p>
+            ''' % self.tooltips
 
+    def submitMultiplePointMutations(self):
+        return '''
+            <!-- Backrub - Multiple Point Mutation -->
+            <p id="parameter1_2" style="display:none; opacity:0.0; text-align:justify;">
+                <table bgcolor="#EEEEEE" align="center">
+                <tr bgcolor="#828282" style="color:white;">
+                    <td align="center">#</td>
+                    <td align="center" title="%(tt_ChainId)s">Chain ID</td>
+                    <td align="center" title="%(tt_ResId)s">Res ID</td>
+                    <td align="center" title="%(tt_NewAA)s">AA</td>
+                    <td align="center" title="%(tt_Radius)s">Radius [&#197;]</td>
+                </tr>
+                <!-- up to 31 point mutations are possible -->
+                <tr id="row_PM0" style=""><td align="center">1</td><td align="center"><input name="PM_chain0" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid0" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres0" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius0" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM1" style="display:none"><td align="center">2</td><td align="center"><input name="PM_chain1" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid1" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres1" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius1" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM2" style="display:none"><td align="center">3</td><td align="center"><input name="PM_chain2" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid2" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres2" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius2" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM3" style="display:none"><td align="center">4</td><td align="center"><input name="PM_chain3" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid3" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres3" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius3" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM4" style="display:none"><td align="center">5</td><td align="center"><input name="PM_chain4" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid4" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres4" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius4" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM5" style="display:none"><td align="center">6</td><td align="center"><input name="PM_chain5" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid5" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres5" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius5" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM6" style="display:none"><td align="center">7</td><td align="center"><input name="PM_chain6" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid6" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres6" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius6" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM7" style="display:none"><td align="center">8</td><td align="center"><input name="PM_chain7" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid7" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres7" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius7" maxlength="4" size="7" type="text"></td></tr>  
+                <tr id="row_PM8" style="display:none"><td align="center">9</td><td align="center"><input name="PM_chain8" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid8" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres8" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius8" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM9" style="display:none"><td align="center">10</td><td align="center"><input name="PM_chain9" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid9" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres9" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius9" maxlength="4" size="7" type="text"></td></tr>   
+                <tr id="row_PM10" style="display:none"><td align="center">11</td><td align="center"><input name="PM_chain10" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid10" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres10" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius10" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM11" style="display:none"><td align="center">12</td><td align="center"><input name="PM_chain11" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid11" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres11" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius11" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM12" style="display:none"><td align="center">13</td><td align="center"><input name="PM_chain12" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid12" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres12" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius12" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM13" style="display:none"><td align="center">14</td><td align="center"><input name="PM_chain13" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid13" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres13" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius13" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM14" style="display:none"><td align="center">15</td><td align="center"><input name="PM_chain14" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid14" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres14" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius14" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM15" style="display:none"><td align="center">16</td><td align="center"><input name="PM_chain15" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid15" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres15" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius15" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM16" style="display:none"><td align="center">17</td><td align="center"><input name="PM_chain16" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid16" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres16" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius16" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM17" style="display:none"><td align="center">18</td><td align="center"><input name="PM_chain17" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid17" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres17" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius17" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM18" style="display:none"><td align="center">19</td><td align="center"><input name="PM_chain18" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid18" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres18" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius18" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM19" style="display:none"><td align="center">20</td><td align="center"><input name="PM_chain19" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid19" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres19" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius19" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM20" style="display:none"><td align="center">21</td><td align="center"><input name="PM_chain20" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid20" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres20" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius20" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM21" style="display:none"><td align="center">22</td><td align="center"><input name="PM_chain21" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid21" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres21" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius21" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM22" style="display:none"><td align="center">23</td><td align="center"><input name="PM_chain22" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid22" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres22" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius22" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM23" style="display:none"><td align="center">24</td><td align="center"><input name="PM_chain23" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid23" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres23" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius23" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM24" style="display:none"><td align="center">25</td><td align="center"><input name="PM_chain24" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid24" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres24" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius24" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM25" style="display:none"><td align="center">26</td><td align="center"><input name="PM_chain25" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid25" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres25" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius25" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM26" style="display:none"><td align="center">27</td><td align="center"><input name="PM_chain26" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid26" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres26" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius26" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM27" style="display:none"><td align="center">28</td><td align="center"><input name="PM_chain27" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid27" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres27" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius27" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM28" style="display:none"><td align="center">29</td><td align="center"><input name="PM_chain28" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid28" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres28" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius28" maxlength="4" size="7" type="text"></td></tr>
+                <tr id="row_PM29" style="display:none"><td align="center">30</td><td align="center"><input name="PM_chain29" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid29" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres29" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius29" maxlength="4" size="7" type="text"></td></tr> 
+                <tr id="row_PM30" style="display:none"><td align="center">31</td><td align="center"><input name="PM_chain30" maxlength="1" size="5" type="text"></td><td align="center"><input name="PM_resid30" maxlength="4" size="5" type="text"></td><td align="center"><input name="PM_newres30" maxlength="1" size="2" type="text"></td><td align="center"><input name="PM_radius30" maxlength="4" size="7" type="text"></td></tr>
+                <tr><td align="center" colspan="4"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a residue</a></td></tr>
+                </table>
+            </p>
+            ''' % self.tooltips
 
+    def submitBRConformationalEnsemble(self):
+        return '''
+            <!-- Ensemble - simple -->
+            <p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;">no options</p>            
+            ''' % self.tooltips
+
+    def submitBREnsembleDesign(self):
+        return '''
+            <!-- Ensemble - design -->
+            <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
+                <table align="center">
+                <tr>
+                    <td align="right">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td><td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2">(max 4.8, recommended 1.2)</td>
+                </tr>
+                <tr>
+                    <td align="right">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td><td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12">(max 12, recommended 12)</td>
+                </tr>
+                <tr>
+                    <td align="right">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td><td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20">(max 20, recommended 20)</td>
+                </tr>
+                </table>
+            </p>
+            ''' % self.tooltips
+            
+    def submitSeqTolHK(self):
+        return '''
+            <!-- Library Design -->
+            <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
+            <table align="center">
+              <tr>
+                  <td  align="right">Partner 1 <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_chain1" maxlength=1 SIZE=2 VALUE=""></td>
+              </tr>
+              <tr>
+                  <td  align="right">Partner 2 <img src="../images/qm_s.png" title="%(tt_seqtol_partner)s"></td>
+                  <td>Chain <input type="text" name="seqtol_chain2" maxlength=1 SIZE=2 VALUE="">
+                  </td>
+              </tr>
+              
+                <tr>
+                  <td align="right">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
+                  <td>
+                    <table bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td>#</td><td>Chain ID</td><td>Residue Number</td>
+                      </tr>
+                      <tr align="center" id="seqtol_row_0" >                    <td>1</td><td><input type="text" name="seqtol_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_0" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_1" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_2" style="display:none"><td>3</td><td><input type="text" name="seqtol_mut_c_2" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_2" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_3" style="display:none"><td>4</td><td><input type="text" name="seqtol_mut_c_3" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_3" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_4" style="display:none"><td>5</td><td><input type="text" name="seqtol_mut_c_4" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_4" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_5" style="display:none"><td>6</td><td><input type="text" name="seqtol_mut_c_5" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_5" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_6" style="display:none"><td>7</td><td><input type="text" name="seqtol_mut_c_6" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_6" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_7" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_8" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center" id="seqtol_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_9" maxlength=4 SIZE=4></td></tr>
+                      <tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a residue</a></td></tr>
+                      </table>
+                  </td>
+                </tr>
+            </table>
+            </p>
+            ''' % self.tooltips
+
+    def submitSeqTolSK(self):
+        # Test: python rosettaseqtol.py 1601 2I0L_A_C_V2006.pdb 2 10.0 0.23 2 0.4 1.0 0.4 A 318 B
+            #Upload structure: 2I0L_A_C_V2006.pdb
+            #Number of structures: 2 
+            #Radius: 10.0
+            #kT: 0.23
+            #Weights list: 2 0.4 1.0 0.4
+            #Designed residues: A 318 B
+        
+        html = '''
+        <p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">
+            <table align="center">'''
+ 
+        # Premutated residues
+        html += '''
+              <tr><td height="10"></td></tr>
+                <tr>
+                  <td align="left" valign="top">Premutated residues<img src="../images/qm_s.png" title="%(tt_seqtol_premutated)s"></td>
+                  <td>
+                    <table bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td>#</td><td>Chain ID</td><td>Residue Number</td><td>Target amino acid</td>
+                      </tr>
+              ''' % self.tooltips
+        for i in range(0, ROSETTAWEB_SK_MaxPremutations):
+            #style="display:none"
+            html += '''<tr align="center" id="seqtol_SK_pre_row_%d"> 
+                            <td>%d</td>
+                            <td><input type="text" name="seqtol_SK_pre_mut_c_%d" maxlength=1 SIZE=2 onChange="chainAddedSK(%d, 0);"></td>
+                            <td><input type="text" name="seqtol_SK_pre_mut_r_%d" maxlength=4 SIZE=4></td>
+                            <td><select name="premutatedAA%d">
+                            <option value="" selected>Select an amino acid</option>''' % (i, i+1, i, i, i, i)
+            for j in sorted(ROSETTAWEB_SK_AA.keys()):
+                html += ''' <option value="%s">%s</option> ''' % (j, j)
+            html += ''' </select></tr>'''
+            
+        html += '''
+                      <tr align="center"><td colspan="3"><div id="seqtol_SK_pre_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSKPremutated();">Click here to add a residue</a></div></td></tr>
+                      </table>
+                  </td>
+                </tr>
+              <tr><td height="10"></td></tr>'''
+        
+        # Residues for design       
+        html += '''
+              <tr><td height="10"></td></tr>
+                <tr>
+                  <td align="left" valign="top">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
+                  <td>
+                    <table bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td>#</td><td>Chain ID</td><td>Residue Number</td>
+                      </tr>
+              ''' % self.tooltips
+        html += '''<tr align="center" id="seqtol_SK_row_0"><td>1</td><td><input type="text" name="seqtol_SK_mut_c_0" maxlength=1 SIZE=2 onChange="chainAddedSK(0, 1);"></td><td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td></tr>'''
+        for i in range(1, ROSETTAWEB_SK_MaxMutations):
+            html += '''<tr align="center" id="seqtol_SK_row_%d" style="display:none"><td>%d</td><td><input type="text" name="seqtol_SK_mut_c_%d" maxlength=1 SIZE=2 onChange="chainAddedSK(%d, 1);"></td><td><input type="text" name="seqtol_SK_mut_r_%d" maxlength=4 SIZE=4></td></tr>''' % (i, i+1, i, i, i)
+        html += '''
+                      <tr align="center"><td colspan="3"><div id="seqtol_SK_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSK();">Click here to add a residue</a></div></td></tr>
+                      </table>
+                  </td>
+                </tr>
+              <tr><td height="10"></td></tr>'''
+        
+        # Chains
+        tt = self.tooltips["tt_seqtol_SK_partner"]
+        for i in range(ROSETTAWEB_max_seqtol_SK_chains):
+            html += '''
+              <tr id="seqtol_SK_chainrow_%d">
+                  <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
+                  <td>Chain <input type="text" name="seqtol_SK_chain%d" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()"></td>
+              </tr> 
+              ''' % (i, i + 1, tt, i)
+        
+        html += '''
+              <tr>
+                  <td></td>
+                  <td><div id="seqtol_SK_addchain"><a href="javascript:void(0)" onclick="addOneMoreChainSK();">Click here to add a chain</a></div></td>
+              </tr> '''
+
+        
+        # Score reweighting        
+        html += '''               
+              <tr><td height="10"></td></tr>
+              <tr>
+                  <td align="left">Score Reweighting<img src="../images/qm_s.png" title="%(tt_seqtol_SK_weighting)s"></td>
+              </tr>
+              <tr>''' % self.tooltips
+        
+        html += '''
+                  <td colspan="2">
+                    <table id="mutationsTable" bgcolor="#EEEEEE">
+                      <tr bgcolor="#828282" style="color:white;">
+                          <td bgcolor="#EEEEEE"></td>
+                          <td align="center">Self Energy</td>
+                          <td align="center" colspan="%d">Interaction Energies</td> 
+                      </tr>
+                      <tr align="center" bgcolor="#828282" style="color:white;" >
+                        <td bgcolor="#EEEEEE"></td>
+                        <td>k<sub>_</sub></td>
+                ''' % (ROSETTAWEB_max_seqtol_SK_chains - 1)
+        
+        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains):
+            html += '''<td class="seqtol_SK_kP%d" style="display:none">k<sub>P<sub>%d</sub></sub>_</td>''' % (i - 1, i)
+        
+        
+        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
+            html += '''   <tr align="center" id="seqtol_SK_weight_%d" style="display:none">                    
+                          <td align="left">Partner %d</td>
+                          <td><input type="text" name="seqtol_SK_kP%dP%d" maxlength=5 SIZE=4 VALUE="0.4"></td>
+                           ''' % (i, i + 1, i, i)
+                        
+            for j in range(0, i):
+                html += '''<td class="seqtol_SK_kP%d"><input type="text" name="seqtol_SK_kP%dP%d" maxlength=5 SIZE=4 VALUE="1.0"></td>''' % (j, j, i)                           
+            
+            for j in range(i, ROSETTAWEB_max_seqtol_SK_chains - 1):
+                html += '''<td class="seqtol_SK_kP%d"></td>''' % j   
+            
+            html += "</tr>"
+        html += "</tr></table></td></tr>"
+        
+        # Boltzmann factor
+        html += '''
+                <tr><td height="10"></td></tr>
+                <tr>
+                  <td align="left">Boltzmann Factor (kT)<img src="../images/qm_s.png" title="%(tt_seqtol_SK_Boltzmann)s"></td>
+                  <td>
+                  ''' % self.tooltips
+        html += '''<input type="text" name="seqtol_SK_Boltzmann" disabled="true" maxlength=5 SIZE=5 VALUE="%f">           
+                      <input type="checkbox" name="customBoltzmann" checked="checked" value="Milk" onClick="set_Boltzmann();">Use cited value
+                  </td>
+                </tr>''' % ROSETTAWEB_SK_InitialBoltzmann
+ 
+        html += '''                    
+            </table>
+            </p>'''
+
+        return html
+            
     def submited(self, jobname, cryptID, remark, warnings):
       
       if remark == 'new':
@@ -755,6 +847,7 @@ class RosettaHTML:
                          <a class="blacklink" href="%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
                     </td></tr></table>''' % ( self.script_filename, cryptID, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
       else:
+        # I don't think this can happen but best to be safe
         box = '<font color="red">An error occured, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
       if warnings != '':
@@ -762,7 +855,7 @@ class RosettaHTML:
               <table width="550" style="background-color:#ff4500;">
                   <tr>
                       <td class="linkbox" align="center">
-                        <font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings:</font>
+                        <font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings/messages:</font>
                       </td>
                       <td align="left"><ul>%s</ul></td>
                       <td class="linkbox" align="center">
@@ -1098,7 +1191,7 @@ class RosettaHTML:
                 <td bgcolor="#FFFCD8"><a href="../downloads/%s/molprobity_plot.png">
                                       <img src="../downloads/%s/molprobity_plot.png" alt="image file not available" width="400"></a>
                                       </td></tr>''' % ( cryptID,cryptID,cryptID,cryptID)
-      html = ''
+      html = '' #todo: this is turned off!
       return html
     
     
@@ -1342,7 +1435,7 @@ class RosettaHTML:
             html +="</td></tr>"
         return html      
     
-    def _showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_parameter):
+    def _showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, seqtol_parameter):
 
         html = """
               <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction (Smith, Kortemme 2010)</td></tr>
@@ -1351,34 +1444,29 @@ class RosettaHTML:
               <tr><td align=right valign=top bgcolor="#EEEEFF">Parameters:   </td>
                   <td bgcolor="#EEEEFF">
                       """ % ( input_filename, size_of_ensemble)
-        
-        # todo: remove these and use a central file for constants
-        ROSETTAWEB_max_seqtol_SK_chains = 3
-        ROSETTAWEB_SK_BoltzmannIncrease = 0.021
-        ROSETTAWEB_SK_InitialBoltzmann = 0.23
-        
+                
         active = []    
-        active.append(False)   # todo: Adding a zero index - nasty artifact of using non-zero based indices for the chain numbers 
         activeList = []
         maxActive = -1
         
-        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
-            partner = seqtol_parameter["seqtol_SK_chain%d" % i]
+        # Note:  We use get here rather than direct dictionary access as we choose not to 
+        #        store empty keys in the parameter to save space 
+        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
+            partner = seqtol_parameter.get("seqtol_SK_chain%d" % i)
             if partner:
                 active.append(True)
                 activeList.append(i)
                 if i > maxActive:
                     maxActive = i
-                html += 'Partner %d: Chain %s<br>' % (i, partner)
-                plist = seqtol_parameter["seqtol_SK_list_%d" % i]
+                html += 'Partner %d: Chain %s<br>' % (i + 1, partner)
+                plist = seqtol_parameter.get("seqtol_SK_list_%d" % i)
                 if plist:
-                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues:</i></td><td></td><td>%d: %s</td></tr></table>' % (i, join(plist,' '))
+                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(plist,' '))
             else:
                 active.append(False)
         
         html += '<br>Boltzmann factor: %s' % (seqtol_parameter["seqtol_SK_Boltzmann"])
         
-        #seqtol_SK_kP1 seqtol_SK_kP1P2
         html += """
                     <br><br>
                     Score Reweighting<br>
@@ -1389,18 +1477,18 @@ class RosettaHTML:
                             <td bgcolor="#EEEEFF"></td>
                             <td>Self Energy (k<sub>_</sub>)</td>"""
 
-        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
             if active[i] and i != maxActive:
-                html += "<td>k<sub>P<sub>%d</sub></sub>_</td>" % i
+                html += "<td>k<sub>P<sub>%s</sub></sub>_</td>" % (seqtol_parameter.get("seqtol_SK_chain%d" % i))
         
         html += "</thead></tr><tbody bgcolor='#F4F4FF'>"
     
-        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains + 1):
+        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
             if active[i]:
                 html += """
                         <tr align="left" border=1>                    
-                              <td bgcolor="#828282" style="color:white; align="left">Partner %d</td>
-                              <td>%s</td>""" % (i, seqtol_parameter["seqtol_SK_kP%d" % i])
+                              <td bgcolor="#828282" style="color:white; align="left">%s</td>
+                              <td>%s</td>""" % (seqtol_parameter.get("seqtol_SK_chain%d" % i), seqtol_parameter["seqtol_SK_kP%dP%d" % (i, i)])
                 for j in activeList:
                     if j < i:
                         html += "<td>%s</td>" % seqtol_parameter["seqtol_SK_kP%dP%d" % (j, i)]
@@ -1411,9 +1499,54 @@ class RosettaHTML:
         html += "</tbody></table></td></tr></table>" 
         html += "</td></tr>"
         
-        input_id = input_filename[:-4] # filename without suffix
+        
         
         #todo: if status == 'done' or status == 'sample':
+        input_id = input_filename[:-4] # filename without suffix
+        if status == 'done' or status == 'sample':
+            html += '<tr><td align=right></td><td></td></tr>'
+            
+            list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
+            list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
+            
+            comment1 = """Backbone representation of the best scoring designs for ?#todo: different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+             
+            designed_chains = []
+            designed_res = []
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains): 
+                chain = seqtol_parameter.get("seqtol_SK_chain%d" % i)
+                if chain:
+                    reslist = seqtol_parameter.get("seqtol_SK_list_%d" % i)
+                    if reslist:
+                        designed_chains += [chain for res in reslist]
+                        designed_res += reslist
+             
+            html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
+            
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
+                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
+                                                   <img src="../downloads/%s/plasticity_motif.png" alt="image file not available" width="400"></a><br>
+                                                   <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
+                                                   <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
+                                                   <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
+                             </td></tr> ''' % (cryptID, cryptID, cryptID)
+                           
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
+                              Download <a href="../downloads/%s/plasticity_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="../downloads/%s/plasticity_boxplot.png">PNG</a>, <a href="../downloads/%s/plasticity_boxplot.pdf">PDF</a>.<br>
+                              </td>
+                           <td bgcolor="#FFFCD8">
+                    ''' % ( cryptID, cryptID, cryptID )
+                    
+                    # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
+                    # A <a href="../wiki/SequencePlasticityPrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # the <a href="../wiki/" target="_blank">wiki</a>.
+            
+            for (chain, resid) in zip(designed_chains, designed_res):
+              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                    ''' % ( cryptID, chain, resid, cryptID, chain, resid )
+                            
+            html +="</td></tr>"
             
         return html  
     
@@ -1554,7 +1687,7 @@ class RosettaHTML:
             elif parameter['task'] == 'sequence_tolerance_SK':
                 task = "Interface Sequence Plasticity Prediction" #todo: Fill in with proper name
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
-                html += self._showSequenceToleranceSK( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'], seqtol_parameter)
+                html += self._showSequenceToleranceSK( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], seqtol_parameter)
                 
         html += '</table><br></div></td>\n'
         

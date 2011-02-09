@@ -1,19 +1,22 @@
 
 var numMPM = 0; // Multiple Point Mutations
 var numSeqTol = 0; // Mutation SeqTol
-var numSeqTolSK = 0; // Mutation SeqTolSK
+var numSeqTolSK = 1; // Mutation SeqTolSK
+var numSeqTolSKPremutations = 0; // Mutation SeqTolSK
+const initNumSeqTolSKChains = 2;
+const minSeqTolSKMutations = 1;
+const minSeqTolSKPremutations = 0;
+var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains for SeqTolSK
 
 // Constants
 
 // Sequence Tolerance (Humphris and Kortemme, Smith and Kortemme)
+// todo: add these on the fly using Python constants
 const HK_MaxMutations = 10;
-const SK_InitialBoltzmann = 0.23;
-const SK_BoltzmannIncrease = 0.021;
-const SK_MaxMutations = 10;
-const SK_max_seqtol_chains = 3;
 
 function startup(query)
 {
+	// Round the corners using Nifty
 	if (query == "submit" || query == "submitted") 
 	{
 		Nifty("ul#about li","big fixed-height");
@@ -162,6 +165,12 @@ function checkIsAlpha(elem)
 	{
 		return false;
 	}
+}
+
+function markError(elem)
+{
+	elem.focus();
+	elem.style.background="red";
 }
 
 function notEmpty(elem)
@@ -322,7 +331,7 @@ function ValidateForm()
           // check if row is empty
           if ( document.submitform.elements['seqtol_mut_c_' + '' + i].value.length == 0 && 
                document.submitform.elements['seqtol_mut_r_' + '' + i].value.length == 0 ) {
-            break
+            break;
           }
           returnvalue.push( notEmpty(document.submitform.elements['seqtol_mut_c_' + '' + i]));
           returnvalue.push( isAlpha(document.submitform.elements['seqtol_mut_c_' + '' + i]));
@@ -332,36 +341,78 @@ function ValidateForm()
     }
     
     if ( document.submitform.task.value == "parameter3_2" ) 
-    {
-    	/*for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) {
-        	var row =  document.getElementById("seqtol_SK_chain" + i);
-        	if (row.style.display != "none")
-	    */
-        
+    {        
     	// Highlight Partner 1 if no partners are specified
     	var allempty = true;
-    	for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+    	chainList = new Array();
+    	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
     	{
     		var c = document.submitform.elements["seqtol_SK_chain" + i];
-    		allempty = allempty && (c.value.length == 0);
+    		var cval = c.value;
+    		var cIsEmpty = (cval.length == 0);
+    		allempty = allempty && cIsEmpty;
+    		
+    		// require unique chain names
+    		if (!cIsEmpty)
+    		{
+    			if (chainList[cval])
+    			{
+    				markError(c);
+    				returnvalue.push(false);
+    			}
+    			chainList[cval] = true;
+    		}
     	}
     	if (allempty == true)
     	{
-    		returnvalue.push( notEmpty( document.submitform.seqtol_SK_chain1) );
-    		returnvalue.push( isAlpha ( document.submitform.seqtol_SK_chain1) );
+    		returnvalue.push( notEmpty( document.submitform.seqtol_SK_chain0) );
+    		returnvalue.push( isAlpha ( document.submitform.seqtol_SK_chain0) );
     	}
     
     	// Highlight Boltzmann factor if missing or invalid
-		returnvalue.push( notEmpty( document.submitform.seqtol_SK_Boltzmann) );
-		returnvalue.push( isNumeric ( document.submitform.seqtol_SK_Boltzmann) );
-    	    	
+		if (!document.submitform.elements["customBoltzmann"].checked)
+		{
+			returnvalue.push( notEmpty( document.submitform.seqtol_SK_Boltzmann) );
+			returnvalue.push( isNumeric ( document.submitform.seqtol_SK_Boltzmann) );
+		}
+		
+		// Highlight any blank premutation rows
+        var i=0;
+        for (i = 0; i < SK_MaxPremutations ; i = i + 1) {
+        	var row =  document.getElementById("seqtol_SK_pre_row_" + i);
+        	if (row.style.display != "none")
+	        {
+        		// check if row is empty
+        		if ( document.submitform.elements['seqtol_SK_pre_mut_c_' + '' + i].value.length == 0 && 
+        			document.submitform.elements['seqtol_SK_pre_mut_r_' + '' + i].value.length == 0 &&
+        			document.submitform.elements['premutatedAA' + i].value.length != 3) 
+        		{
+        			continue;
+                }
+                returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_c_' + i]));
+	            returnvalue.push( isAlpha  (document.submitform.elements['seqtol_SK_mut_c_' + i]));
+	            returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_r_' + i]));
+	            returnvalue.push( isNumeric(document.submitform.elements['seqtol_SK_mut_r_' + i]));
+	            /* Note: The next line depends on the fact that the default option is not 
+	             		 alphabetic (as it contains spaces) and that the valid values are alphabetic */
+	            returnvalue.push( isAlpha (document.submitform.elements['premutatedAA' + i]));
+        	}
+        }
+        
     	// Highlight any blank mutation rows
         var i=0;
         for (i = 0; i < SK_MaxMutations ; i = i + 1) {
         	var row =  document.getElementById("seqtol_SK_row_" + i);
         	if (row.style.display != "none")
 	        {
-        		returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_c_' + i]));
+        		//alert(""+document.submitform.elements['seqtol_SK_mut_c_' + '' + i].value.length);
+        		// check if row is empty
+        		if ( document.submitform.elements['seqtol_SK_mut_c_' + '' + i].value.length == 0 && 
+        			document.submitform.elements['seqtol_SK_mut_r_' + '' + i].value.length == 0 ) 
+        		{
+        			continue;
+                }
+                returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_c_' + i]));
 	            returnvalue.push( isAlpha  (document.submitform.elements['seqtol_SK_mut_c_' + i]));
 	            returnvalue.push( notEmpty (document.submitform.elements['seqtol_SK_mut_r_' + i]));
 	            returnvalue.push( isNumeric(document.submitform.elements['seqtol_SK_mut_r_' + i]));
@@ -369,15 +420,9 @@ function ValidateForm()
         }
         
         // Highlight any missing weights
-        for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+        for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
         {
-        	var c = document.submitform.elements["seqtol_SK_kP" + i];
-        	if (c.style.background == "white")
-        	{
-        		returnvalue.push( notEmpty(c));
-	            returnvalue.push( isNumeric(c));
-        	}
-        	for (j = i + 1; j <= SK_max_seqtol_chains ; j = j + 1) 
+        	for (j = i; j < SK_max_seqtol_chains ; j = j + 1) 
             {
         		var c = document.submitform.elements["seqtol_SK_kP" + i + "P" + j]; 
         		if (c.style.background == "white")
@@ -392,13 +437,28 @@ function ValidateForm()
     // if there's only one false, return false
     var j=0;
     for (j=0;j<=returnvalue.length;j=j+1) {
-      if (returnvalue[j] == false ) { return false; }
+    	if (returnvalue[j] == false )
+    	{
+    		return false; 
+    	}
     }
     return true;
 }
 
 function set_Boltzmann()
 {
+	var b = document.submitform.elements["seqtol_SK_Boltzmann"];
+	if (document.submitform.elements["customBoltzmann"].checked)
+	{
+		b.style.background="silver";
+		b.disabled = true;
+	}
+	else
+	{
+		b.style.background="white";
+		b.disabled = false;
+	}
+	/*
 	var i = 0;
     for (i = 0; i < SK_MaxMutations ; i = i + 1) 
     {
@@ -408,49 +468,179 @@ function set_Boltzmann()
     		break;
     	}
     }
-    document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann + SK_BoltzmannIncrease * i;
+    //document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann + SK_BoltzmannIncrease * i;
+    */
+}
+
+var columnElements;
+
+function buildSKColumns()
+{	
+	if (!columnElements)
+	{
+		columnElements = new Array();
+		for (i = 0; i < SK_max_seqtol_chains; i = i + 1)
+		{
+			columnElements[i] = new Array();
+		}
+
+		if (document.getElementsByClassName == undefined)
+		{
+			alert("here")
+			var integralExpression = /^[0-9]+$/;
+						
+			var tds = document.getElementsByTagName("td");
+			for (j = 0; j < tds.length; j++)
+			{
+				var cn = tds[j].className;
+				if (cn && cn.indexOf("seqtol_SK_kP") == 0)
+				{
+					var idx = cn.substring(11);
+					if (idx.match(integralExpression))
+					{
+						idx = parseInt(idx);
+						if (idx < SK_max_seqtol_chains - 1)
+						{
+							alert("add " + columnElements[idx].className + " to list " + idx)
+						}
+					}
+				}
+			}
+		}
+		else
+		{
+			for (i = 0; i < SK_max_seqtol_chains - 1 ; i = i + 1)
+			{
+				columnElements[i] = document.getElementsByClassName("seqtol_SK_kP" + i)
+			}
+		}
+	}
+}
+
+function addChain(_key)
+{
+	var elems = document.submitform.elements;
+	var firstblank;
+	for (i = 0; i < numSeqTolSKChains; i++)
+	{
+		var e = elems["seqtol_SK_chain" + i];
+		var ev = e.value;
+		if (ev == _key)
+	    {
+	    	return;
+	    }
+		if (ev == "" && !firstblank)
+		{
+			firstblank = e;
+		}
+	}
+	if (firstblank)
+	{
+		firstblank.value = _key;
+		chainsChanged();
+	}
+	else
+	{
+		if (numSeqTolSKChains < SK_max_seqtol_chains)
+		{
+			elems["seqtol_SK_chain" + numSeqTolSKChains].value = _key;
+			addOneMoreChainSK();
+		}
+		chainsChanged();
+	}
+} 
+
+function chainAddedSK(idx, type)
+{
+	var c;
+	if (type == 0)
+	{
+		c = document.submitform.elements["seqtol_SK_pre_mut_c_" + idx];
+	}
+	else if (type == 1)
+	{
+		c = document.submitform.elements["seqtol_SK_mut_c_" + idx];
+	}
+	else
+	{
+		// Should never occur
+		return;
+	}
+	if (checkIsAlpha(c))
+	{
+		cv = c.value;
+		// todo: If chain ids are always uppercase, enable this line: cv = c.value.toUpperCase();
+		c.value = cv;
+		addChain(cv);
+	}
 }
 
 function chainsChanged()
 {
-	// todo: Should probably index seqtol_SK_chains from 0 rather than 1
-	// todo: Rename seqtol_SK_kPi to seqtol_SK_kPiPi for more generic treatment in logic
-	// todo: if chain i is not filled in, hide row i and column i+1 (assume 1-indexed)
 	var i;
 	var chainIsInvalid = new Array();
-	for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
+	
+	buildSKColumns();
+	
+	var highestValidChain = initNumSeqTolSKChains - 1;
+	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1)
 	{
 		var c = document.submitform.elements["seqtol_SK_chain" + i];
-		chainIsInvalid[i] = checkIsEmpty(c) || !checkIsAlpha(c);
-	}
-	
-	for (i = 1; i <= SK_max_seqtol_chains ; i = i + 1) 
-	{
-		if (chainIsInvalid[i])
+		var invalid = checkIsEmpty(c) || !checkIsAlpha(c);
+		chainIsInvalid[i] = invalid
+		if (!invalid && (i > highestValidChain))
 		{
-			document.submitform.elements["seqtol_SK_kP" + i].style.background="grey";
-			document.submitform.elements["seqtol_SK_kP" + i].disabled = true;
+			highestValidChain = i
+		}
+	}
+			
+	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1)
+	{
+		// Hide the rows and columns of any invalid chains
+		if (chainIsInvalid[i] && i >= initNumSeqTolSKChains)
+		{
+			new Effect.Fade( "seqtol_SK_weight_" + i , { duration: 0.0 } );
+			
+			for (var k = 0; k < columnElements[i].length; k++)
+			{
+				new Effect.Fade( columnElements[i][k] , { duration: 0.0 } );
+			}				
 		}
 		else
 		{
-			document.submitform.elements["seqtol_SK_kP" + i].style.background="white";
-			document.submitform.elements["seqtol_SK_kP" + i].disabled = false;
+			
+			new Effect.Appear( 'seqtol_SK_weight_' + i, { duration: 0.5, queue: { scope: 'task' } } ) ;
+			if ((highestValidChain > i) && i < (SK_max_seqtol_chains - 1))
+			{
+				for (var k = 0; k < columnElements[i].length; k++)
+				{
+					new Effect.Appear( columnElements[i][k] , { duration: 0.0 } );
+				}
+			}
 		}
-		for (j = i + 1; j <= SK_max_seqtol_chains ; j = j + 1) 
+		if (initNumSeqTolSKChains > 1 && highestValidChain < initNumSeqTolSKChains)
 		{
+			for (var k = 0; k < columnElements[initNumSeqTolSKChains - 1].length; k++)
+			{
+				new Effect.Fade( columnElements[initNumSeqTolSKChains - 1][k] , { duration: 0.0 } );
+			}
+		}
+		
+		for (j = i; j < SK_max_seqtol_chains ; j = j + 1)
+		{
+			var pself = "seqtol_SK_kP" + i + "P" + j;
 			if (chainIsInvalid[i] || chainIsInvalid[j])
 			{
-				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].style.background="grey";
-				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].disabled = true;
+				document.submitform.elements[pself].style.background="silver";
+				document.submitform.elements[pself].disabled = true;
 			}
 			else
 			{
-				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].style.background="white";
-				document.submitform.elements["seqtol_SK_kP" + i + "P" + j].disabled = false;
+				document.submitform.elements[pself].style.background="white";
+				document.submitform.elements[pself].disabled = false;
 			}
 		}	
-	}
-	
+	}	
 }
 	
 function ValidateFormEmail()
@@ -553,6 +743,7 @@ function changeApplication( app, _task ) {
 	}
 	if ( task == 'parameter3_2' ) { 
 		chainsChanged();
+		reset_seqtolSKData();
 		new Effect.Appear( "ref4" ); 
 	  	document.submitform.Mini[0].disabled=true;
 	    document.submitform.Mini[0].checked=false;
@@ -760,19 +951,44 @@ function addOneMoreSeqtol()
 //todo: Add delete functionality
 function addOneMoreSeqtolSK()
 {
-	//todo: stop incrementing count when number of HTML elements is exceeded
   new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK);
-  var i = parseFloat(document.submitform.seqtol_SK_Boltzmann.value);
-  if (i != '0' && (i+'') != 'NaN')
-  {
-	  document.submitform.seqtol_SK_Boltzmann.value = parseFloat(i) + SK_BoltzmannIncrease;
-  }
   numSeqTolSK = numSeqTolSK + 1;
   if (numSeqTolSK >= SK_MaxMutations)
   {
 	  new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
   }
   return true;
+}
+
+function addOneMoreSeqtolSKPremutated()
+{
+	new Effect.Appear("seqtol_SK_pre_row_" + "" + numSeqTolSKPremutations);
+	// todo: Should only increase on valid input
+	//var i = parseFloat(document.submitform.seqtol_SK_Boltzmann.value);
+	//if (i != '0' && (i+'') != 'NaN')
+	//{
+	//	document.submitform.seqtol_SK_Boltzmann.value = parseFloat(i) + SK_BoltzmannIncrease;
+	//}
+	numSeqTolSKPremutations = numSeqTolSKPremutations + 1;
+	if (numSeqTolSKPremutations >= SK_MaxPremutations)
+	{
+		new Effect.Fade("seqtol_SK_pre_addrow", { duration: 0.0 } );
+	}
+	return true;
+}
+
+//Adds a residue input field for Smith and Kortemme's Interface Sequence Plasticity Prediction
+//todo: Add delete functionality
+function addOneMoreChainSK()
+{
+	new Effect.Appear("seqtol_SK_chainrow_" + "" + numSeqTolSKChains);
+	
+	numSeqTolSKChains = numSeqTolSKChains + 1;
+	if (numSeqTolSKChains >= SK_max_seqtol_chains)
+	{
+		  new Effect.Fade("seqtol_SK_addchain", { duration: 0.0 } );
+	}
+	return true;
 }
 
 //todo: Unused - delete
@@ -820,19 +1036,52 @@ function reset_form ()
 {
 	document.submitform.reset();
 	allWhite();
-	reset_seqtolSK_mutations();
+	reset_seqtolSKData();
 }
 
-function reset_seqtolSK_mutations ()
+function reset_seqtolSKData ()
 {
-	var oSubmitForm = document.forms["submitform"];			
-	for (i = 0; i < SK_MaxMutations; i++)
+	var oSubmitForm = document.forms["submitform"];
+	
+	// Premutations for design
+	for (i = 0; i < minSeqTolSKPremutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_pre_mut_c_" + i].value = "";
+		new Effect.Appear( "seqtol_SK_pre_row_" + i, { duration: 0.0 } );
+	}
+	for (i = minSeqTolSKPremutations; i < SK_MaxPremutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_pre_mut_c_" + i].value = "";
+		new Effect.Fade( "seqtol_SK_pre_row_" + i, { duration: 0.0 } );
+	}
+	new Effect.Appear("seqtol_SK_pre_addrow");
+	numSeqTolSKPremutations = minSeqTolSKPremutations;
+	
+	// Mutations for design
+	for (i = 0; i < minSeqTolSKMutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
+		new Effect.Appear( "seqtol_SK_row_" + i, { duration: 0.0 } );
+	}
+	for (i = minSeqTolSKMutations; i < SK_MaxMutations; i++)
 	{
 		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
 		new Effect.Fade( "seqtol_SK_row_" + i, { duration: 0.0 } );
 	}
 	new Effect.Appear("seqtol_SK_addrow");
-	numSeqTolSK = 0;
+	numSeqTolSK = minSeqTolSKMutations;
+	
+	// Chains
+	for (i = initNumSeqTolSKChains; i < SK_max_seqtol_chains; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_chain" + i].value = "";
+		new Effect.Fade( "seqtol_SK_chainrow_" + i, { duration: 0.0 } );
+	}
+	numSeqTolSKChains = initNumSeqTolSKChains;
+	if (numSeqTolSKChains < SK_max_seqtol_chains)
+	{
+		new Effect.Appear("seqtol_SK_addchain");
+	}
 }
 
 // Fills in sample data for the protocols when 'Load sample data' is clicked
@@ -913,18 +1162,20 @@ function set_demo_values()
 	{
 		document.submitform.PDBID.value = "2PDZ";
 		document.submitform.nos.value = "10";
-		document.submitform.seqtol_SK_chain1.value = "A";
-		document.submitform.seqtol_SK_chain2.value = "B";
-		document.submitform.seqtol_SK_chain3.value = "";
-		document.submitform.seqtol_SK_kA.value = "0.4";
-		document.submitform.seqtol_SK_kB.value = "0.4";
-		document.submitform.seqtol_SK_kAB.value = "1.0";
-		document.submitform.seqtol_SK_kC.value = "";
-		document.submitform.seqtol_SK_kAC.value = "";
-		document.submitform.seqtol_SK_kBC.value = "";
-		document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
-		
-		reset_seqtolSK_mutations();
+		document.submitform.seqtol_SK_chain0.value = "A";
+		document.submitform.seqtol_SK_chain1.value = "B";
+		//todo: loop here over chains
+		document.submitform.seqtol_SK_chain2.value = "";
+		document.submitform.seqtol_SK_kP0P0.value = "0.4";
+		document.submitform.seqtol_SK_kP1P1.value = "0.4";
+		document.submitform.seqtol_SK_kP0P1.value = "1.0";
+		//todo: loop here over chains
+		//document.submitform.seqtol_SK_kC.value = "";
+		//document.submitform.seqtol_SK_kAC.value = "";
+		//document.submitform.seqtol_SK_kBC.value = "";
+		//document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
+		chainsChanged();
+		reset_seqtolSKData();
 	}
 	return true;
 }

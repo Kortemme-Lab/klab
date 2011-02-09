@@ -190,29 +190,46 @@ class RosettaDataDir(RosettaHTML):
       self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (classic)</h1>' % jobid
       self.html_refs = '<P>%(Humphris)s</P>' % self.refs
     
+    # individual boxplots
+    list_files = os.listdir( self.download_dir+'/'+cryptID )
+    list_files.sort()
+
+    # todo: Add support for new seqtol
     self.content = '''
       <p>
       Input files:
         <ul>
-          <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>
-          <li>Rosetta Residue file: <a href="../downloads/%s/backrub.resfile">backrub.resfile</a></li>
+          <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>''' % (cryptID, pdb_filename, pdb_filename)
+          
+    for br_resfile in grep('backrub_[0-9]+\.resfile',list_files):
+        self.content += '''
+          <li>Rosetta Residue file: <a href="../downloads/%s/%s">%s</a></li>
+            ''' % (cryptID, br_resfile, br_resfile)
+    
+    if mini: 
+        self.content += '''
+          <li>Sequence tolerance residue file: <a href="../downloads/%s/seqtol_%s.resfile">seqtol_%s.resfile</a></li> 
+            ''' % (cryptID, jobid, jobid)
+            
+    self.content += '''
         </ul>
       </p>
       Output files:
         <ul>
           <li><a href="../downloads/%s/plasticity_sequences.fasta">plasticity_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
-          <!-- li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li -->
+          ''' % cryptID
+        
+    if mini: 
+        self.content += '''<li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li>'''  % cryptID #todo: Use?
+            
+    self.content += '''
           <li><a href="../downloads/%s/plasticity_pwm.txt">plasticity_pwm.txt</a> - Matrix with amino acid frequencies</li>
           <li><a href="../downloads/%s/plasticity_boxplot.png">plasticity_boxplot.png</a>, 
               <a href="../downloads/%s/plasticity_boxplot.pdf">plasticity_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
-      ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
+      ''' % ( cryptID, cryptID, cryptID )
 
       # <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Detailed scores for the backrub structures</li> # this had to go since the molprobity analysis was taken out.
     
-    # individual boxplots
-    list_files = os.listdir( self.download_dir+'/'+cryptID )
-    list_files.sort()
-
     self.content += '<li> Boxplot for each position: <BR>'
 
     for png_fn in grep('plasticity_boxplot_[A-Z][0-9]*\.png',list_files):
@@ -224,7 +241,7 @@ class RosettaDataDir(RosettaHTML):
       self.content += '''Individual PDB files: <br>
                           &nbsp;&nbsp;&nbsp;"low" PDB files are the result of the backrub run, <br>
                           &nbsp;&nbsp;&nbsp;"low_ms" PDB files contain the lowest scoring designed sequence based on this backrub run.
-                        <ul>'''
+                        <ul>''' #todo: no low_ms files?
     else:
       self.content += '''Individual PDB files:<br>
                           &nbsp;&nbsp;&nbsp; Structure file from the backrub run along with the structures of up to 10 best scoring designed sequences.

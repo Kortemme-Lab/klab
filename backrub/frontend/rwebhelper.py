@@ -8,6 +8,21 @@ import re
 import MySQLdb
 import _mysql_exceptions
 
+# Common constants
+
+# Sequence Tolerance (Smith and Kortemme)
+ROSETTAWEB_max_seqtol_SK_chains = 6
+ROSETTAWEB_SK_BoltzmannIncrease = 0.021
+ROSETTAWEB_SK_InitialBoltzmann = 0.23
+ROSETTAWEB_SK_MaxMutations = 10
+ROSETTAWEB_SK_MaxPremutations = 10
+
+ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
+       "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
+       "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
+       "TRP": "W", "TYR": "Y"}
+
+
 #############################################################################################
 # execQuery()                                                                               #
 # A general function to execute an SQL query. This function is called whenever a query is   #
