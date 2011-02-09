@@ -21,7 +21,7 @@ class RosettaHTML:
     server = {}
     
     def __init__(self, server_url, server_title, script_filename, download_dir, 
-                  username='', comment='', warning='', contact_name='FLO'):
+                  username='', comment= '', warning='', contact_name='FLO'):
         self.server_url      = server_url
         self.server_title    = server_title
         self.script_filename = script_filename
@@ -83,7 +83,7 @@ class RosettaHTML:
                       "Humphris": 'Humphris EL, Kortemme T. <i>Prediction of Protein-Protein Interface Sequence Diversity using Flexible Backbone Computational Protein Design</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure, Volume 16, Issue 12, 12 December 2008, Pages 1777-1788</a>',
                       "Friedland": 'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>,<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Comput Biol. May;5(5):e1000393</a>',
                       "Lauck": 'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design.</i>,<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Res. 38:W569-W575</a>',
-                      "Smith2": 'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains.</i>,<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17 September 2010, Pages 460-474</a>',
+                      "Smith2": 'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains.</i><br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17 September 2010, Pages 460-474</a>',
                       "3": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "4": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
                       "5": '<i></i>,<br><a href="" style="font-size: 10pt"> </a>',
@@ -351,7 +351,7 @@ class RosettaHTML:
               </p>
             </li>
             <li id="ab4">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Interface Sequence Plasticity Prediction</A>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('3');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Interface / Fold Sequence Tolerance</A>
               
               <p id="menu_3" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
@@ -525,7 +525,7 @@ class RosettaHTML:
 
             <p id="ref4" style="display:none; opacity:0.0; text-align:justify;border:1px solid #000000; padding:5px; font-size: 10pt; background-color:#FFFFFF; ">
                 If you are using the data, please cite:<br><br>
-                Colin A. Smith, Tanja Kortemme, <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains.</i>,<br>
+                Colin A. Smith, Tanja Kortemme, <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains.</i><br>
                 <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt"> Journal of Molecular Biology Volume 402, 460-474</a> 
             </p> 
 
@@ -794,7 +794,7 @@ class RosettaHTML:
                 ''' % (ROSETTAWEB_max_seqtol_SK_chains - 1)
         
         for i in range(1, ROSETTAWEB_max_seqtol_SK_chains):
-            html += '''<td class="seqtol_SK_kP%d" style="display:none">k<sub>P<sub>%d</sub></sub>_</td>''' % (i - 1, i)
+            html += '''<td class="seqtol_SK_kP%d" style="display:none">Partner %d</td>''' % (i - 1, i)
         
         
         for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
@@ -1042,6 +1042,9 @@ class RosettaHTML:
                 task = "Backrub Ensemble Design"
                 task_color = '#B7FFE0'
             elif line[9] == 'sequence_tolerance':
+                task = "Interface Sequence Plasticity"
+                task_color = '#FFE2E2'
+            elif line[9] == 'sequence_tolerance_SK':
                 task = "Interface Sequence Plasticity"
                 task_color = '#FFE2E2'
           
