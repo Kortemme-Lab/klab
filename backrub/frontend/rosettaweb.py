@@ -1140,9 +1140,7 @@ def submit(form, SID):
                 success, errormsg = False, errormsg + "There must be at least one designed residue."                               
             
             numPremutations = 0
-            lastPremut = ROSETTAWEB_SK_MaxPremutations
             for x in range(ROSETTAWEB_SK_MaxPremutations):
-                lastPremut = x
                 sx = str(x)
                 key1 = "seqtol_SK_pre_mut_c_" + sx
                 key2 = "seqtol_SK_pre_mut_r_" + sx

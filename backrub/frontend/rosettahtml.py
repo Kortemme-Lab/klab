@@ -700,10 +700,38 @@ class RosettaHTML:
             #Weights list: 2 0.4 1.0 0.4
             #Designed residues: A 318 B
         
-        html = '''
-        <p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">
-            <table align="center">'''
- 
+        html = '''<p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">'''
+        
+         # Header
+        html += '''<table id="parameter3_2_header"  style="display:none; opacity:0.0; text-align:center;"><tr><td>
+                    <select id="numPartners" name="numPartners" onChange="changeApplication('3','2', this.selectedIndex);">
+                    <option value="x">Select the number of partners</option>'''
+        html += ''' <option value="1">1 (Fold stability)</option> ''' 
+        html += ''' <option value="2">2 (Interaction)</option> '''
+        for j in range(3, ROSETTAWEB_max_seqtol_SK_chains + 1):
+            html += ''' <option value="%s">%s</option> ''' % (j, j)
+        html += ''' </select></td></tr><tr><td height="10"></td></tr></table>'''
+        
+        # Body
+        html += '''<table align="center" id="parameter3_2_body">'''
+        
+        # Chains
+        tt = self.tooltips["tt_seqtol_SK_partner"]
+        
+        for i in range(ROSETTAWEB_max_seqtol_SK_chains):
+            html += '''
+              <tr id="seqtol_SK_chainrow_%d">
+                  <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
+                  <td>Chain <input type="text" name="seqtol_SK_chain%d" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()"></td>
+              </tr> 
+              ''' % (i, i + 1, tt, i)
+        
+        html += '''
+              <tr>
+                  <td></td>
+                  <td><div id="seqtol_SK_addchain"><a href="javascript:void(0)" onclick="addOneMoreChainSK();">Click here to add a chain</a></div></td>
+              </tr> '''
+
         # Premutated residues
         html += '''
               <tr><td height="10"></td></tr>
@@ -719,10 +747,10 @@ class RosettaHTML:
             #style="display:none"
             html += '''<tr align="center" id="seqtol_SK_pre_row_%d"> 
                             <td>%d</td>
-                            <td><input type="text" name="seqtol_SK_pre_mut_c_%d" maxlength=1 SIZE=2 onChange="chainAddedSK(%d, 0);"></td>
-                            <td><input type="text" name="seqtol_SK_pre_mut_r_%d" maxlength=4 SIZE=4></td>
-                            <td><select name="premutatedAA%d">
-                            <option value="" selected>Select an amino acid</option>''' % (i, i+1, i, i, i, i)
+                            <td><input type="text" name="seqtol_SK_pre_mut_c_%d" maxlength=1 SIZE=2 onChange="updateBoltzmann();"></td>
+                            <td><input type="text" name="seqtol_SK_pre_mut_r_%d" maxlength=4 SIZE=4 onChange="updateBoltzmann();"></td>
+                            <td><select name="premutatedAA%d" onChange="updateBoltzmann();">
+                            <option value="" selected>Select an amino acid</option>''' % (i, i+1, i, i, i)
             for j in sorted(ROSETTAWEB_SK_AA.keys()):
                 html += ''' <option value="%s">%s</option> ''' % (j, j)
             html += ''' </select></tr>'''
@@ -745,9 +773,9 @@ class RosettaHTML:
                         <td>#</td><td>Chain ID</td><td>Residue Number</td>
                       </tr>
               ''' % self.tooltips
-        html += '''<tr align="center" id="seqtol_SK_row_0"><td>1</td><td><input type="text" name="seqtol_SK_mut_c_0" maxlength=1 SIZE=2 onChange="chainAddedSK(0, 1);"></td><td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td></tr>'''
+        html += '''<tr align="center" id="seqtol_SK_row_0"><td>1</td><td><input type="text" name="seqtol_SK_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td></tr>'''
         for i in range(1, ROSETTAWEB_SK_MaxMutations):
-            html += '''<tr align="center" id="seqtol_SK_row_%d" style="display:none"><td>%d</td><td><input type="text" name="seqtol_SK_mut_c_%d" maxlength=1 SIZE=2 onChange="chainAddedSK(%d, 1);"></td><td><input type="text" name="seqtol_SK_mut_r_%d" maxlength=4 SIZE=4></td></tr>''' % (i, i+1, i, i, i)
+            html += '''<tr align="center" id="seqtol_SK_row_%d" style="display:none"><td>%d</td><td><input type="text" name="seqtol_SK_mut_c_%d" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_%d" maxlength=4 SIZE=4></td></tr>''' % (i, i+1, i, i)
         html += '''
                       <tr align="center"><td colspan="3"><div id="seqtol_SK_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSK();">Click here to add a residue</a></div></td></tr>
                       </table>
@@ -755,47 +783,30 @@ class RosettaHTML:
                 </tr>
               <tr><td height="10"></td></tr>'''
         
-        # Chains
-        tt = self.tooltips["tt_seqtol_SK_partner"]
-        for i in range(ROSETTAWEB_max_seqtol_SK_chains):
-            html += '''
-              <tr id="seqtol_SK_chainrow_%d">
-                  <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
-                  <td>Chain <input type="text" name="seqtol_SK_chain%d" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()"></td>
-              </tr> 
-              ''' % (i, i + 1, tt, i)
-        
-        html += '''
-              <tr>
-                  <td></td>
-                  <td><div id="seqtol_SK_addchain"><a href="javascript:void(0)" onclick="addOneMoreChainSK();">Click here to add a chain</a></div></td>
-              </tr> '''
-
-        
         # Score reweighting        
         html += '''               
               <tr><td height="10"></td></tr>
               <tr>
                   <td align="left">Score Reweighting<img src="../images/qm_s.png" title="%(tt_seqtol_SK_weighting)s"></td>
-              </tr>
-              <tr>''' % self.tooltips
+              ''' % self.tooltips
         
         html += '''
-                  <td colspan="2">
+                  <td colspan="1">
                     <table id="mutationsTable" bgcolor="#EEEEEE">
                       <tr bgcolor="#828282" style="color:white;">
                           <td bgcolor="#EEEEEE"></td>
-                          <td align="center">Self Energy</td>
-                          <td align="center" colspan="%d">Interaction Energies</td> 
+                          <td align="center" bgcolor="#EEEEEE"></td>
+                          <td align="center" colspan="%d" id="seqtol_SK_IEHeader">Interaction Energies</td> 
                       </tr>
                       <tr align="center" bgcolor="#828282" style="color:white;" >
                         <td bgcolor="#EEEEEE"></td>
-                        <td>k<sub>_</sub></td>
+                        <td>Self Energy</td>
                 ''' % (ROSETTAWEB_max_seqtol_SK_chains - 1)
         
         for i in range(1, ROSETTAWEB_max_seqtol_SK_chains):
             html += '''<td class="seqtol_SK_kP%d" style="display:none">Partner %d</td>''' % (i - 1, i)
         
+        html += '''</tr>'''
         
         for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
             html += '''   <tr align="center" id="seqtol_SK_weight_%d" style="display:none">                    
@@ -819,10 +830,12 @@ class RosettaHTML:
                   <td align="left">Boltzmann Factor (kT)<img src="../images/qm_s.png" title="%(tt_seqtol_SK_Boltzmann)s"></td>
                   <td>
                   ''' % self.tooltips
-        html += '''<input type="text" name="seqtol_SK_Boltzmann" disabled="true" maxlength=5 SIZE=5 VALUE="%f">           
-                      <input type="checkbox" name="customBoltzmann" checked="checked" value="Milk" onClick="set_Boltzmann();">Use cited value
+        html += '''<input type="text" name="seqtol_SK_Boltzmann" disabled="true" maxlength=5 SIZE=5 VALUE="">                                 
                   </td>
-                </tr>''' % ROSETTAWEB_SK_InitialBoltzmann
+                </tr>
+                <tr>
+                <td></td><td><input type="checkbox" name="customBoltzmann" checked="checked" value="Milk" onClick="set_Boltzmann();">Use published value</td>
+                </tr>''' 
  
         html += '''                    
             </table>
@@ -1042,10 +1055,10 @@ class RosettaHTML:
                 task = "Backrub Ensemble Design"
                 task_color = '#B7FFE0'
             elif line[9] == 'sequence_tolerance':
-                task = "Interface Sequence Plasticity"
+                task = "Sequence Tolerance"
                 task_color = '#FFE2E2'
             elif line[9] == 'sequence_tolerance_SK':
-                task = "Interface Sequence Plasticity"
+                task = "Sequence Tolerance"
                 task_color = '#FFE2E2'
           
             html += """<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" 
@@ -1357,7 +1370,7 @@ class RosettaHTML:
     def _showSequenceTolerance(self, status, cryptID, input_filename, size_of_ensemble, mini, seqtol_chain1, seqtol_chain2, seqtol_list_1, seqtol_list_2, w1, w2, w3 ):
         
         html = """
-              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction  (Humphris, Kortemme 2008)</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Tolerance Prediction  (Humphris, Kortemme 2008)</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Parameters:   </td>
@@ -1407,30 +1420,30 @@ class RosettaHTML:
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
             
             if mini == 'mini' or mini == '1':        
-              html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
-                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
-                                                   <img src="../downloads/%s/plasticity_motif.png" alt="image file not available" width="400"></a><br>
+              html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/tolerance_motif.png">
+                                                   <img src="../downloads/%s/tolerance_motif.png" alt="image file not available" width="400"></a><br>
                                                    <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
                                                    <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
                                                    <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
                              </td></tr> ''' % (cryptID, cryptID, cryptID)
                            
             html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
-                              Download <a href="../downloads/%s/plasticity_pwm.txt">weight matrix</a> or file with all plots as 
-                              <a href="../downloads/%s/plasticity_boxplot.png">PNG</a>, <a href="../downloads/%s/plasticity_boxplot.pdf">PDF</a>.<br>
+                              Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="../downloads/%s/tolerance_boxplot.png">PNG</a>, <a href="../downloads/%s/tolerance_boxplot.pdf">PDF</a>.<br>
                               </td>
                            <td bgcolor="#FFFCD8">
                     ''' % ( cryptID, cryptID, cryptID )
                     
                     # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
-                    # A <a href="../wiki/SequencePlasticityPrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
             for resid in seqtol_list_1:
-              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+              html += '''<a href="../downloads/%s/tolerance_boxplot_%s%s.png"><img src="../downloads/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( cryptID, seqtol_chain1, resid, cryptID, seqtol_chain1, resid )
             for resid in seqtol_list_2:
-              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+              html += '''<a href="../downloads/%s/tolerance_boxplot_%s%s.png"><img src="../downloads/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( cryptID, seqtol_chain2, resid, cryptID, seqtol_chain2, resid )
             
             html += self._show_molprobity( cryptID )
@@ -1441,7 +1454,7 @@ class RosettaHTML:
     def _showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, seqtol_parameter):
 
         html = """
-              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Plasticity Prediction (Smith, Kortemme 2010)</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Tolerance Prediction (Smith, Kortemme 2010)</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
               <tr><td align=right valign=top bgcolor="#EEEEFF">Parameters:   </td>
@@ -1512,7 +1525,7 @@ class RosettaHTML:
             list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
             list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation of the best scoring designs for ?#todo: different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
              
             designed_chains = []
             designed_res = []
@@ -1526,27 +1539,27 @@ class RosettaHTML:
              
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
             
-            html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence plasticity of the mutated residues.<br>Download corresponding <a href="../downloads/%s/plasticity_sequences.fasta">FASTA file</a>.</td>
-                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/plasticity_motif.png">
-                                                   <img src="../downloads/%s/plasticity_motif.png" alt="image file not available" width="400"></a><br>
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/tolerance_motif.png">
+                                                   <img src="../downloads/%s/tolerance_motif.png" alt="image file not available" width="400"></a><br>
                                                    <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
                                                    <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
                                                    <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
                              </td></tr> ''' % (cryptID, cryptID, cryptID)
                            
             html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
-                              Download <a href="../downloads/%s/plasticity_pwm.txt">weight matrix</a> or file with all plots as 
-                              <a href="../downloads/%s/plasticity_boxplot.png">PNG</a>, <a href="../downloads/%s/plasticity_boxplot.pdf">PDF</a>.<br>
+                              Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="../downloads/%s/tolerance_boxplot.png">PNG</a>, <a href="../downloads/%s/tolerance_boxplot.pdf">PDF</a>.<br>
                               </td>
                            <td bgcolor="#FFFCD8">
                     ''' % ( cryptID, cryptID, cryptID )
                     
                     # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
-                    # A <a href="../wiki/SequencePlasticityPrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
             for (chain, resid) in zip(designed_chains, designed_res):
-              html += '''<a href="../downloads/%s/plasticity_boxplot_%s%s.png"><img src="../downloads/%s/plasticity_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+              html += '''<a href="../downloads/%s/tolerance_boxplot_%s%s.png"><img src="../downloads/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( cryptID, chain, resid, cryptID, chain, resid )
                             
             html +="</td></tr>"
@@ -1621,7 +1634,6 @@ class RosettaHTML:
         # DATE_ADD(EndDate, INTERVAL 8 DAY), TIMEDIFF(DATE_ADD(EndDate, INTERVAL 7 DAY), NOW()), TIMEDIFF(EndDate, StartDate)
         
         status  = ''
-        task    = ''
         html    = ''
         rosetta = ''
         
@@ -1657,30 +1669,24 @@ class RosettaHTML:
             html += self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID'])
             
             if parameter['task'] == '0' or parameter['task'] == 'no_mutation':
-                task = "Backrub Conformational Ensemble"
                 html += self._showNoMutation( status, parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['cryptID'] )            
                 
             elif parameter['task'] == '1' or parameter['task'] == 'point_mutation':
-                task = "Point Mutation"
                 html += self._showPointMutation( status, parameter['cryptID'],  parameter['PDBComplexFile'], parameter['EnsembleSize'], 
                                                  parameter['PM_chain'], parameter['PM_resid'], parameter['PM_newres'])
                 
             elif parameter['task'] == '3' or parameter['task'] == 'multiple_mutation':
-                task = "Multiple Point Mutations"
                 html += self._showMultiplePointMutations( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['PM_chain'], 
                                                           parameter['PM_resid'], parameter['PM_newres'], parameter['PM_radius'])
                 
             elif parameter['task'] == '2' or parameter['task'] == 'upload_mutation':
-                task = "Custom Mutation"
                 html += self._showComplexMutation( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mutations'])
                 
             elif parameter['task'] == '4' or parameter['task'] == 'ensemble':
-                task = "Backrub Ensemble Design"
                 html += self._showEnsemble( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['ENS_temperature'], 
                                             parameter['ENS_num_designs_per_struct'], parameter['ENS_segment_length'] )
                                             
             elif parameter['task'] == 'sequence_tolerance':
-                task = "Interface Sequence Plasticity Prediction" #todo: Fill in with proper name
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'],
                                                      seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
@@ -1688,7 +1694,6 @@ class RosettaHTML:
                                                      seqtol_parameter['seqtol_weight_chain1'], seqtol_parameter['seqtol_weight_chain2'], seqtol_parameter['seqtol_weight_interface'] )
 
             elif parameter['task'] == 'sequence_tolerance_SK':
-                task = "Interface Sequence Plasticity Prediction" #todo: Fill in with proper name
                 seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceToleranceSK( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], seqtol_parameter)
                 

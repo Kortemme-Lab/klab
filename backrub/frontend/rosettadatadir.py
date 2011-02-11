@@ -203,7 +203,7 @@ class RosettaDataDir(RosettaHTML):
           
     for br_resfile in grep('backrub_[0-9]+\.resfile',list_files):
         self.content += '''
-          <li>Rosetta Residue file: <a href="../downloads/%s/%s">%s</a></li>
+          <li>Backrub premutations residue file: <a href="../downloads/%s/%s">%s</a></li>
             ''' % (cryptID, br_resfile, br_resfile)
     
     if mini: 
@@ -215,24 +215,31 @@ class RosettaDataDir(RosettaHTML):
         </ul>
       </p>
       Output files:
-        <ul>
-          <li><a href="../downloads/%s/plasticity_sequences.fasta">plasticity_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
+        <ul>'''
+
+    if mini: 
+        self.content += '''
+          <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Backrub scores</li> 
+            ''' % (cryptID)
+        
+    self.content += '''
+          <li><a href="../downloads/%s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
           ''' % cryptID
         
     if mini: 
-        self.content += '''<li><a href="../downloads/%s/plasticity_motif.png">plasticity_motif.png</a> - Motif of the best scoring sequences</li>'''  % cryptID #todo: Use?
+        self.content += '''<li><a href="../downloads/%s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>'''  % cryptID #todo: Use?
             
     self.content += '''
-          <li><a href="../downloads/%s/plasticity_pwm.txt">plasticity_pwm.txt</a> - Matrix with amino acid frequencies</li>
-          <li><a href="../downloads/%s/plasticity_boxplot.png">plasticity_boxplot.png</a>, 
-              <a href="../downloads/%s/plasticity_boxplot.pdf">plasticity_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
+          <li><a href="../downloads/%s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
+          <li><a href="../downloads/%s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
+              <a href="../downloads/%s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
       ''' % ( cryptID, cryptID, cryptID )
 
       # <li><a href="../downloads/%s/backrub_scores.dat">backrub_scores.dat</a> - Detailed scores for the backrub structures</li> # this had to go since the molprobity analysis was taken out.
     
     self.content += '<li> Boxplot for each position: <BR>'
 
-    for png_fn in grep('plasticity_boxplot_[A-Z][0-9]*\.png',list_files):
+    for png_fn in grep('tolerance_boxplot_[A-Z][0-9]*\.png',list_files):
       self.content += '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="../downloads/%s/%s">%s</a><br>' % ( cryptID, png_fn, png_fn )
     
     self.content += '</li></ul>'

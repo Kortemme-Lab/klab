@@ -291,19 +291,19 @@ process_specificity <- function(dirpath, fitness_coef = c(1, 1, 1, 2),
 	
 	pwm <- apply(pwm, 2, function(x) x/sum(x))
 	
-	write.table(pwm, "plasticity_pwm.txt", quote=FALSE, sep="\t", col.names=NA)
+	write.table(pwm, "tolerance_pwm.txt", quote=FALSE, sep="\t", col.names=NA)
 	
 	seqmat <- pwm_to_seqmat(pwm)
 	
-	cat(paste(">", seq_len(nrow(seqmat)), "\n", apply(seqmat, 1, paste, collapse=""), sep=""), file="plasticity_sequences.fasta", sep="\n")
+	cat(paste(">", seq_len(nrow(seqmat)), "\n", apply(seqmat, 1, paste, collapse=""), sep=""), file="tolerance_sequences.fasta", sep="\n")
 	
 	plotwidth <- 7
 	plotheight <- 3
 	pointsize <- 12
 	
-	pdf("plasticity_boxplot.pdf", width=plotwidth, height=plotheight, pointsize=pointsize)
+	pdf("tolerance_boxplot.pdf", width=plotwidth, height=plotheight, pointsize=pointsize)
 	pdfdev <- dev.cur()
-	png("plasticity_boxplot.png", width=plotwidth*72, height=plotheight*72*length(posnames), pointsize=3/2*pointsize)
+	png("tolerance_boxplot.png", width=plotwidth*72, height=plotheight*72*length(posnames), pointsize=3/2*pointsize)
 	pngdev <- dev.cur()
 	par(mfrow=c(length(posnames), 1))
 	
@@ -313,10 +313,10 @@ process_specificity <- function(dirpath, fitness_coef = c(1, 1, 1, 2),
 			
 			if (type == "pdf") dev.set(pdfdev)
 			if (type == "png") dev.set(pngdev)
-			if (type == "pngsep") png(paste("plasticity_boxplot_", posnames[i],".png", sep=""), width=plotwidth*72, height=plotheight*72, pointsize=pointsize)
+			if (type == "pngsep") png(paste("tolerance_boxplot_", posnames[i],".png", sep=""), width=plotwidth*72, height=plotheight*72, pointsize=pointsize)
 			
 			par(mar = c(2.8, 2.8, 1.5, 0.1), mgp = c(1.7, 0.6, 0))
-			main <- paste("Residue", posnames[i], "Plasticity Boxplot")
+			main <- paste("Residue", posnames[i], "Sequence Tolerance Boxplot")
 			plot(0, 0, type="n", xlim=c(1,20), ylim=c(0,1), main=main, xlab="Amino Acid", ylab="Predicted Frequency", axes=FALSE)
 			abline(h=seq(0, 1, by=.2), col="gray")
 			boxplot(t(pwms[,,i]), col="white", add=TRUE)
