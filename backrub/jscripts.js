@@ -81,7 +81,6 @@ function isNumeric(elem)
 	}
 	else
 	{
-    // alert(helperMsg);
 		elem.focus();
 		elem.style.background="red";
 		return false;
@@ -98,7 +97,6 @@ function isAlpha(elem)
 	}
 	else
 	{
-		// alert(helperMsg);
 		elem.focus();
 		elem.style.background="red";
 		return false;
@@ -115,7 +113,6 @@ function isAA(elem)
 	}
 	else
 	{
-		// alert(helperMsg);
 		elem.focus();
 		elem.style.background="red";
 		return false;
@@ -126,7 +123,7 @@ function isCYS(elem)
 {
 	if(elem.value == "C")
 	{
-		alert("We're sorry, but mutation to Cystein is not allowed.");
+		alert("We are sorry but mutation to Cystein is not allowed.");
 		elem.focus();
 		elem.style.background="red";
 		return false;
@@ -148,7 +145,6 @@ function isPDB(elem){
 	}
 	else
 	{
-		// alert(helperMsg);
 		elem.focus();
 		elem.style.background="red";
 		return false;
@@ -183,7 +179,6 @@ function notEmpty(elem)
 {
 	if(elem.value.length == 0)
 	{
-		// alert(helperMsg);
 		elem.focus();
 		elem.style.background="red";
 		return false;
@@ -227,7 +222,7 @@ function ValidateForm()
 	// return value - if false then we do not submit the job
 	var ret = notEmpty(sbmtform.JobName);
 	
-    if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" ) 
+	if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" ) 
     {
     	sbmtform.PDBComplex.style.background="red";
     	sbmtform.PDBID.style.background="red";
@@ -239,7 +234,7 @@ function ValidateForm()
     	sbmtform.PDBComplex.style.background="white";
     	sbmtform.PDBID.style.background="white";
     }
-    if ( sbmtform.PDBComplex.value == "" ) 
+	if ( sbmtform.PDBComplex.value == "" ) 
     {
     	if ( sbmtform.PDBID.value.length < 4 ) 
     	{
@@ -254,17 +249,30 @@ function ValidateForm()
 
     if ( notEmpty(sbmtform.nos) && isNumeric(sbmtform.nos) ) 
     {
-    	if ( sbmtform.nos.value < 2 || sbmtform.nos.value > 50 ) 
+    	if ( sbmtform.task.value == "parameter3_2" )
     	{
-    		sbmtform.nos.style.background="red";
-            ret = false;
-        }
+    		// todo: These values (10, 100, 2, 50) should be set by Python to centralize them
+    		// todo: min should be 10 but I've allowed 2 for testing
+	    	if ( sbmtform.nos.value < 2 || sbmtform.nos.value > 100 ) 
+	    	{
+	    		sbmtform.nos.style.background="red";
+	            ret = false;
+	        }
+    	}
+    	else
+    	{
+	    	if ( sbmtform.nos.value < 2 || sbmtform.nos.value > 50 ) 
+	    	{
+	    		sbmtform.nos.style.background="red";
+	            ret = false;
+	        }
+    	}
     }
     else 
     {
     	ret = false; 
     }
-
+    
     if ( sbmtform.task.value == "parameter1_1" )
     {
     	ret = ret && (notEmpty(sbmtform.PM_chain)); 
@@ -696,7 +704,7 @@ function chainsChanged()
 			}
 		}
 	}
-			
+		
 	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1)
 	{
 		// Hide the rows and columns of any invalid chains
@@ -711,7 +719,7 @@ function chainsChanged()
 		}
 		else
 		{
-			new Effect.Appear( 'seqtol_SK_weight_' + i, { duration: 0.5, queue: { scope: 'task' } } ) ;
+			new Effect.Appear( 'seqtol_SK_weight_' + i, { duration: 0.0 } ) ;
 			if ((highestValidChain > i) && i < (SK_max_seqtol_chains - 1))
 			{
 				for (var k = 0; k < columnElements[i].length; k++)
@@ -743,9 +751,10 @@ function chainsChanged()
 			}
 		}	
 	}	
+	
 	if ((numSeqTolSKChains > 1) && ((chainIsInvalid[0] && numvalidchains > 0) || (numvalidchains >= 2)))
 	{
-		Effect.Appear("seqtol_SK_IEHeader");
+		Effect.Appear("seqtol_SK_IEHeader", { duration: 0.0 } );
 	}
 	else
 	{
@@ -769,7 +778,7 @@ function ValidateFormEmail()
 
 // This function shows the input form for the protocol <_task> of protocol series <app>.
 // This includes a logo and parameter fields for the protocol.
-function changeApplication( app, _task, _extra ) {
+function changeApplication( app, _task, _extra, _override ) {
 
 	// Clear all form fields
 	document.submitform.reset();
@@ -852,16 +861,13 @@ function changeApplication( app, _task, _extra ) {
 	{ 
 	  new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
 	}
+	
 	if ( task == 'parameter3_2' )
 	{ 
 		var elems = document.submitform.elements;
-		var c = document.getElementById("numPartners");//elems["numPartners"];
-		//if (!isNaN(c))
-		{
-			//alert(c);
-		}
+		var c = document.getElementById("numPartners");
 		
-		if (!_extra || document.getElementById("parameter3_2_header").style.display == "none")
+		if (!_override && (!_extra || document.getElementById("parameter3_2_header").style.display == "none"))
 		{
 			new Effect.Appear( "parameter3_2_header" );		
 			new Effect.Fade( "parameter3_2_body", { duration: 0.0} );
@@ -885,8 +891,11 @@ function changeApplication( app, _task, _extra ) {
 			}
 			numSeqTolSKChains = _extra
 			new Effect.Fade("seqtol_SK_addchain", { duration: 0.0 } );
-			chainsChanged();
-			reset_seqtolSKData();
+			if (!_override)
+			{
+				chainsChanged();
+				reset_seqtolSKData();
+			}
 		  	document.submitform.Mini[0].disabled=true;
 		    document.submitform.Mini[0].checked=false;
 		    document.submitform.Mini[1].disabled=false;
@@ -897,10 +906,15 @@ function changeApplication( app, _task, _extra ) {
 		}
 		new Effect.Appear( "ref4" ); 	    
 	    //new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
+		new Effect.Fade( "recNumStructures", { duration: 0.0 } );
+		new Effect.Appear( "recNumStructuresSeqTolSK" );
+		document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
 	}
 	else 
 	{ 
-	  new Effect.Fade( "ref4", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
+		new Effect.Appear( "recNumStructures" );
+		new Effect.Fade( "recNumStructuresSeqTolSK", { duration: 0.0 } );
+		new Effect.Fade( "ref4", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
 	}
 
 	// Change the colour of the box depending on the series and add the appropriate logo
@@ -1028,7 +1042,6 @@ function getTask()
 function setTask(mode)
 {
     document.submitform.task.value = mode;
-    //alert(mode);
     return true;
 }
 
@@ -1230,7 +1243,7 @@ function set_demo_values()
 	if ( actual_task == 'parameter1_1')
 	{
 		document.submitform.PDBID.value = "1ABE";
-		document.submitform.nos.value = "10";
+		document.submitform.nos.value = RecommendedNumStructures;
 		document.submitform.PM_chain.value = "A";
 		document.submitform.PM_resid.value = "108";
 		document.submitform.PM_newres.value = "L";
@@ -1238,7 +1251,7 @@ function set_demo_values()
 	else if ( actual_task == 'parameter1_2') 
 	{
 		document.submitform.PDBID.value = "2PDZ";
-		document.submitform.nos.value = "10";
+		document.submitform.nos.value = RecommendedNumStructures;
 		document.submitform.PM_chain0.value = "A";
 		document.submitform.PM_resid0.value = "17";
 		document.submitform.PM_newres0.value = "A";
@@ -1263,12 +1276,12 @@ function set_demo_values()
 	else if ( actual_task == "parameter2_1")
 	{
 		document.submitform.PDBID.value = "1UBQ";
-		document.submitform.nos.value = "10";  
+		document.submitform.nos.value = RecommendedNumStructures;  
 	}
 	else if ( actual_task == 'parameter2_2')
 	{
 		document.submitform.PDBID.value = "1UBQ";
-		document.submitform.nos.value = "10";
+		document.submitform.nos.value = RecommendedNumStructures;
 		document.submitform.ENS_temperature.value = "1.2";
 		document.submitform.ENS_num_designs_per_struct.value = "20";
 		document.submitform.ENS_segment_length.value = "12";
@@ -1276,7 +1289,7 @@ function set_demo_values()
 	else if ( actual_task == 'parameter3_1')
 	{
 		document.submitform.PDBID.value = "2PDZ";
-		document.submitform.nos.value = "10";
+		document.submitform.nos.value = RecommendedNumStructures;
 		document.submitform.seqtol_chain1.value = "A";
 		document.submitform.seqtol_chain2.value = "B";
 		// document.submitform.seqtol_radius.value = "4.0";
@@ -1298,12 +1311,14 @@ function set_demo_values()
 	}
 	else if ( actual_task == 'parameter3_2')
 	{
+		reset_seqtolSKData();
+		changeApplication(3, 2, 2, true);
 		document.submitform.PDBID.value = "2PDZ";
-		document.submitform.nos.value = "10";
+		document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
 		document.submitform.seqtol_SK_chain0.value = "A";
 		document.submitform.seqtol_SK_chain1.value = "B";
 		//todo: loop here over chains
-		document.submitform.seqtol_SK_chain2.value = "";
+		//document.submitform.seqtol_SK_chain2.value = "";
 		document.submitform.seqtol_SK_kP0P0.value = "0.4";
 		document.submitform.seqtol_SK_kP1P1.value = "0.4";
 		document.submitform.seqtol_SK_kP0P1.value = "1.0";
@@ -1313,7 +1328,6 @@ function set_demo_values()
 		//document.submitform.seqtol_SK_kBC.value = "";
 		//document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
 		chainsChanged();
-		reset_seqtolSKData();
 	}
 	return true;
 }

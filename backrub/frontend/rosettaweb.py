@@ -319,7 +319,7 @@ def ws():
   elif query_type == "submitted":
     return_val = submit(form, SID)
     if return_val[0]: # data was submitted and written to the database
-      html_content = rosettaHTML.submited( '', return_val[1], return_val[2], return_val[3] )
+      html_content = rosettaHTML.submitted( '', return_val[1], return_val[2], return_val[3] )
       title = 'Job submitted'
     else: # no data was submitted/there is an error
       html_content = rosettaHTML.submit(jobname='', error=return_val[1])

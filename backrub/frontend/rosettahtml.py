@@ -76,6 +76,7 @@ class RosettaHTML:
                         "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
                         "tt_seqtol_premutated": "header=[Residues for design] body=[todo:] %s" % tooltip_parameter,
                         "tt_click":         "body=[Click on the link to read the description.] %s" % tooltip_parameter,
+                        "ROSETTAWEB_SK_RecommendedNumStructures":   ROSETTAWEB_SK_RecommendedNumStructures,
                         }
         
         self.refs = { "Davis": 'Davis IW, Arendall III WB, Richardson DC, Richardson JS. <i>The Backrub Motion: How Protein Backbone Shrugs When a Sidechain Dances</i>,<br><a href="http://dx.doi.org/10.1016/j.str.2005.10.007" style="font-size: 10pt">Structure, Volume 14, Issue 2, 2 February 2006, Pages 265-274</a>',
@@ -128,7 +129,9 @@ class RosettaHTML:
                         const SK_BoltzmannIncrease = %f;
                         const SK_MaxMutations = %d;
                         const SK_MaxPremutations = %d;
-                     //]]></script>""" % (ROSETTAWEB_max_seqtol_SK_chains, ROSETTAWEB_SK_InitialBoltzmann, ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations)
+                        const RecommendedNumStructures = %d;
+                        const RecommendedNumStructuresSeqTolSK = %d;
+                     //]]></script>""" % (ROSETTAWEB_max_seqtol_SK_chains, ROSETTAWEB_SK_InitialBoltzmann, ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations, ROSETTAWEB_SK_RecommendedNumStructures, ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK)
                 
                     
         html += """        <script src="/backrub/jscripts.js" type="text/javascript"></script>
@@ -471,7 +474,7 @@ class RosettaHTML:
               </TR>
               <TR>
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
-                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=2 SIZE=5 VALUE="10"> (2-50, recommended 10) </TD>
+                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="%(ROSETTAWEB_SK_RecommendedNumStructures)s"><span id="recNumStructures">(2-50, recommended 10)</span><span id="recNumStructuresSeqTolSK" style="display:none; opacity:0.0;">(10-100, recommended 20)</span></TD>
               </TR>
               <!-- TR>
                 <TD align=right>Rosetta output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
@@ -707,7 +710,7 @@ class RosettaHTML:
                     <select id="numPartners" name="numPartners" onChange="changeApplication('3','2', this.selectedIndex);">
                     <option value="x">Select the number of partners</option>'''
         html += ''' <option value="1">1 (Fold stability)</option> ''' 
-        html += ''' <option value="2">2 (Interaction)</option> '''
+        html += ''' <option value="2">2 (Interface)</option> '''
         for j in range(3, ROSETTAWEB_max_seqtol_SK_chains + 1):
             html += ''' <option value="%s">%s</option> ''' % (j, j)
         html += ''' </select></td></tr><tr><td height="10"></td></tr></table>'''
@@ -843,7 +846,7 @@ class RosettaHTML:
 
         return html
             
-    def submited(self, jobname, cryptID, remark, warnings):
+    def submitted(self, jobname, cryptID, remark, warnings):
       
       if remark == 'new':
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#F0454B;">
@@ -1538,15 +1541,7 @@ class RosettaHTML:
                         designed_res += reslist
              
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
-            
-            html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%s/tolerance_sequences.fasta">FASTA file</a>.</td>
-                             <td bgcolor="#FFFCD8"><a href="../downloads/%s/tolerance_motif.png">
-                                                   <img src="../downloads/%s/tolerance_motif.png" alt="image file not available" width="400"></a><br>
-                                                   <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
-                                                   <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
-                                                   <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
-                             </td></tr> ''' % (cryptID, cryptID, cryptID)
-                           
+                                       
             html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
                               Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
                               <a href="../downloads/%s/tolerance_boxplot.png">PNG</a>, <a href="../downloads/%s/tolerance_boxplot.pdf">PDF</a>.<br>
@@ -1564,6 +1559,15 @@ class RosettaHTML:
                             
             html +="</td></tr>"
             
+                        #todo: There's a lot of duplicated code between the protocols here and I specialized the image size below.
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                             <td align="center" bgcolor="#FFFCD8"><a href="../downloads/%s/tolerance_motif.png">
+                                                   <img height="250" src="../downloads/%s/tolerance_motif.png" alt="image file not available" ></a><br>
+                                                   <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
+                                                   <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
+                                                   <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
+                             </td></tr> ''' % (cryptID, cryptID, cryptID)
+
         return html  
     
     def _showDownloadLinks(self, status, extended, cryptID, jobnumber):
@@ -1705,6 +1709,8 @@ class RosettaHTML:
     def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutation_res=None, mutation_chain=None):
         """This shows the Jmol applet for an ensemble of structures with their point mutation(s)"""
         
+        # todo: set these values in rwebhelper
+        # todo: Albana currently uses Jmol 12.1.7. The server currently uses Jmol 11.8.21.
         # jmol command to load files
         if list_pdb_files != None:
             jmol_cmd = ' "load %s; color red; cpk off; wireframe off; backbone 0.2;" +\n' % (list_pdb_files[0] ) #, list_pdb_files[0].split('/')[-1].split('.')[0])
@@ -1728,9 +1734,7 @@ class RosettaHTML:
                          <td bgcolor="#FFFCD8">
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
-                              jmolApplet(400, "set appendNew false;" + 
-                              %s
-                              "%s" ); 
+                              jmolApplet(400, "set appendNew false;" + %s "%s frame all;" ); 
                             </script><br>
                             <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href=http://www.jmol.org/><small>www.jmol.org</small></a>
                          </td>
