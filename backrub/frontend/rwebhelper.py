@@ -13,17 +13,22 @@ import _mysql_exceptions
 # Sequence Tolerance (Smith and Kortemme)
 ROSETTAWEB_max_seqtol_SK_chains = 6
 ROSETTAWEB_SK_BoltzmannIncrease = 0.021
-ROSETTAWEB_SK_InitialBoltzmann = 0.23
+ROSETTAWEB_SK_InitialBoltzmann = 0.228
 ROSETTAWEB_SK_MaxMutations = 10
 ROSETTAWEB_SK_MaxPremutations = 30
 ROSETTAWEB_SK_RecommendedNumStructures = 10
-ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK = 20
+ROSETTAWEB_SK_Radius = 10.0
+#todo: change to 20
+ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK = 2
 
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
        "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
        "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
        "TRP": "W", "TYR": "Y"}
 
+ROSETTAWEB_SK_AAinv = {}
+for k, v in ROSETTAWEB_SK_AA.items():
+    ROSETTAWEB_SK_AAinv[v] = k
 
 #############################################################################################
 # execQuery()                                                                               #
@@ -71,7 +76,7 @@ def grep(string,list):
 # read_config_file()                                                                        #
 # parser for configuration file                                                             #
 #############################################################################################
-
+# todo: This code is duplicated in rosetta_daemon.py 
 def read_config_file(filename_config):
     handle = open(filename_config, 'r')
     lines  = handle.readlines()

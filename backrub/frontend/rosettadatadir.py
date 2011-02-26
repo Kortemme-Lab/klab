@@ -194,7 +194,7 @@ class RosettaDataDir(RosettaHTML):
     list_files = os.listdir( self.download_dir+'/'+cryptID )
     list_files.sort()
 
-    # todo: Add support for new seqtol
+    # todo: Name this better - not "if mini" but if CASTK or EHTK...
     self.content = '''
       <p>
       Input files:
@@ -227,7 +227,9 @@ class RosettaDataDir(RosettaHTML):
           ''' % cryptID
         
     if mini: 
-        self.content += '''<li><a href="../downloads/%s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>'''  % cryptID #todo: Use?
+        self.content += '''<li><a href="../downloads/%s/tolerance_seqrank.png">tolerance_seqrank.png</a>, 
+                               <a href="../downloads/%s/tolerance_seqrank.pdf">tolerance_seqrank.pdf</a> - ranked table of amino acid types for each position</li>'''  % ( cryptID, cryptID )
+        self.content += '''<li><a href="../downloads/%s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>'''  % cryptID 
             
     self.content += '''
           <li><a href="../downloads/%s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
@@ -248,7 +250,7 @@ class RosettaDataDir(RosettaHTML):
       self.content += '''Individual PDB files: <br>
                           &nbsp;&nbsp;&nbsp;"low" PDB files are the result of the backrub run, <br>
                           &nbsp;&nbsp;&nbsp;"low_ms" PDB files contain the lowest scoring designed sequence based on this backrub run.
-                        <ul>''' #todo: no low_ms files?
+                        <ul>''' 
     else:
       self.content += '''Individual PDB files:<br>
                           &nbsp;&nbsp;&nbsp; Structure file from the backrub run along with the structures of up to 10 best scoring designed sequences.

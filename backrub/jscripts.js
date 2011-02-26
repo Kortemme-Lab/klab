@@ -7,6 +7,7 @@ const initNumSeqTolSKChains = 1;
 const minSeqTolSKMutations = 1;
 const minSeqTolSKPremutations = 0;
 var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains for SeqTolSK
+var subtask = 0;
 
 // Constants
 
@@ -21,7 +22,16 @@ function startup(query)
 	{
 		Nifty("ul#about li","big fixed-height");
         Nifty("div#box","big transparent fixed-height");
+        subtask = 0;
     }
+	else if (query == "parsePDB")
+	{
+		Nifty("ul#about li","big fixed-height");
+        Nifty("div#box","big transparent fixed-height");
+		// todo: get this value (3,2) from the form
+		subtask = 1;
+		changeApplication(3, 2, 2 );
+	}	 
 	else if (query == "index" || query == "login") 
     {
     	Nifty("div#login_box","big transparent fixed-height");
@@ -136,6 +146,12 @@ function isCYS(elem)
 }
 
 
+function isStoredPDB(str)
+{
+	var expr = /^[A-Za-z0-9]+\.pdb$/i;
+	return str.match(expr);		
+}
+
 function isPDB(elem){
 	var numericExpression = /^[A-Za-z0-9]+$/;
 	if(elem.value.match(numericExpression))
@@ -222,11 +238,11 @@ function ValidateForm()
 	// return value - if false then we do not submit the job
 	var ret = notEmpty(sbmtform.JobName);
 	
-	if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" ) 
+	if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" && sbmtform.StoredPDB.value == "") 
     {
     	sbmtform.PDBComplex.style.background="red";
     	sbmtform.PDBID.style.background="red";
-    	// alert("Please upload a structure or enter a PDB identifier.");
+    	//alert("Please upload a structure or enter a PDB identifier.");
     	ret = false;
     }
     else 
@@ -234,9 +250,14 @@ function ValidateForm()
     	sbmtform.PDBComplex.style.background="white";
     	sbmtform.PDBID.style.background="white";
     }
+	
 	if ( sbmtform.PDBComplex.value == "" ) 
     {
-    	if ( sbmtform.PDBID.value.length < 4 ) 
+		if ( sbmtform.StoredPDB.value != "" ) 
+	    {
+			ret = ret && isStoredPDB(sbmtform.StoredPDB.value);
+	    }
+		else if ( sbmtform.PDBID.value.length < 4 ) 
     	{
     		sbmtform.PDBID.style.background="red";
     		ret = false;
@@ -246,7 +267,7 @@ function ValidateForm()
     		ret = ret && isPDB(sbmtform.PDBID);
     	}
     }
-
+	
     if ( notEmpty(sbmtform.nos) && isNumeric(sbmtform.nos) ) 
     {
     	if ( sbmtform.task.value == "parameter3_2" )
@@ -272,7 +293,7 @@ function ValidateForm()
     {
     	ret = false; 
     }
-    
+	
     if ( sbmtform.task.value == "parameter1_1" )
     {
     	ret = ret && (notEmpty(sbmtform.PM_chain)); 
@@ -370,21 +391,29 @@ function ValidateForm()
     }
     
     if ( sbmtform.task.value == "parameter3_2" ) 
-    {        
+    {       
     	// Highlight Partner 1 if no partners are specified
     	var allempty = true;
     	chainList = new Array();
-    	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
+
+    	// iterate through the displayed chains only
+    	for (i = 0; i < numSeqTolSKChains ; i = i + 1) 
     	{
     		var c = elems["seqtol_SK_chain" + i];
     		var cval = c.value;
+    		
     		var cIsEmpty = (cval.length == 0);
     		allempty = allempty && cIsEmpty;
     		
     		// require unique chain names
     		if (!cIsEmpty)
     		{
-    			if (chainList[cval])
+    			if (cval == "invalid")
+    			{
+    				markError(c);
+    				ret = false;
+    			}
+    			else if (cval != "ignore" && chainList[cval])
     			{
     				markError(c);
     				ret = false;
@@ -523,7 +552,7 @@ function getValidResidues()
 		var resid = "" + elems["seqtol_SK_pre_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
 		var AA = "" + elems["premutatedAA" + i].value;
         
-		if (chain == "" && resid == "" && AA.length != 3)
+		if (chain == "invalid" && resid == "" && AA.length != 3)
 		{
 			premutated[i] = -1;
 		}
@@ -543,7 +572,7 @@ function getValidResidues()
 		var chain = "" + elems["seqtol_SK_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
 		var resid = "" + elems["seqtol_SK_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
 		
-		if (chain == "" && resid == "")
+		if (chain == "invalid" && resid == "")
 		{
 			designed[i] = -1;
 		}
@@ -693,7 +722,7 @@ function chainsChanged()
 	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1)
 	{
 		var c = document.submitform.elements["seqtol_SK_chain" + i];
-		var invalid = checkIsEmpty(c) || !checkIsAlpha(c.value);
+		var invalid = checkIsEmpty(c) || (c.value.length > 1) || !checkIsAlpha(c.value);
 		chainIsInvalid[i] = invalid;
 		if (!invalid)
 		{
@@ -776,13 +805,90 @@ function ValidateFormEmail()
     return true;
 }
 
+// todo: These two functions are similar. Parameterize them on the classname and handle extras (UploadedPDB)
+function showGeneralSettings(visible)
+{
+	//todo: may not work on all browsers - test
+	nonPDBelems = document.getElementsByClassName("PostPDBSubmission")
+	// Display the general section
+	if (visible)
+	{
+		for (var k = 0; k < nonPDBelems.length; k++)
+		{
+			new Effect.Appear( nonPDBelems[k] , { duration: 0.5, queue: { scope: 'task' } });
+		}
+	}
+	else
+	{
+		//todo: may not work on all browsers - test
+		for (var k = 0; k < nonPDBelems.length; k++)
+		{
+			new Effect.Fade( nonPDBelems[k] , { duration: 0.0 } );
+		}	
+	}
+}
+
+
+function showPDBUploadElements(visible)
+{
+	//todo: may not work on all browsers - test
+	PDBelems = document.getElementsByClassName("PDBSelector")
+
+	// Display the PDB uploading section
+	if (visible)
+	{
+		for (var k = 0; k < PDBelems.length; k++)
+		{
+			new Effect.Appear( PDBelems[k] , { duration: 0.0 } );
+		}
+		new Effect.Fade('UploadedPDB' , { duration: 0.0 } );
+	}
+	else
+	{
+		//todo: may not work on all browsers - test
+		for (var k = 0; k < PDBelems.length; k++)
+		{
+			new Effect.Fade( PDBelems[k] , { duration: 0.0 } );
+		}	
+		new Effect.Appear('UploadedPDB' , { duration: 0.0 } );
+	}
+}
+
 // This function shows the input form for the protocol <_task> of protocol series <app>.
 // This includes a logo and parameter fields for the protocol.
+// The _override parameter is used for the demo data 
 function changeApplication( app, _task, _extra, _override ) {
 
 	// Clear all form fields
+	var elems = document.submitform.elements;
+	var numPartners = elems["numPartners"].value
+	
+	// Remember any persistent fields here
+	persistent = new Array("JobName", "nos");
+	previousValues = new Array();
+	for (var i= 0; i < persistent.length; i++ ) 
+	{
+		k = persistent[i];
+		v = elems[k].value;
+		if (v != '')
+		{
+			previousValues[k] = v;
+		}
+	}
+	
+	// White out the form
 	document.submitform.reset();
 	allWhite();
+	
+	// Recover any persistent fields now
+	for (var k in previousValues) 
+	{
+		if (elems[k])
+		{
+			//alert(previousValues[k]);
+			elems[k].value = previousValues[k];
+		}
+	}
 	
 	// Names of HTML elements defined in rosettahtml.py for defining specialized protocol parameters
 	// Change these two arrays if you change the table in rosettahtml.py
@@ -794,18 +900,17 @@ function changeApplication( app, _task, _extra, _override ) {
  	myFields = new Array( "logo1","logo2","logo3",
  							"text1","text2","text3",
  							"ref1","ref2","ref3" );
-
   	// Hide the description of the protocol series #app
   	new Effect.Fade( "text" + app , { duration: 0.0 } );
   	//new Effect.Fade( "ref" + app, { duration: 0.0 } );
-
+	
   	task = "parameter" + app + "_" + _task;
   	
   	// Set the form's "task" value
 	setTask(task);
 	
 	// Show the HTML elements for entering parameters and submitting the form
-  	new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
+	new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
 	new Effect.Appear( task, { duration: 0.5 } )
   	new Effect.Appear( 'parameter_submit', { duration: 0.5, queue: { scope: 'task' } } ) ;
   
@@ -818,6 +923,19 @@ function changeApplication( app, _task, _extra, _override ) {
 		}
 	}
 	
+	// Display the PDB uploading section
+	if (task != 'parameter3_2')
+	{
+		subtask = 0;
+	}
+	else
+	{
+		elems["numPartners"].value = numPartners
+	}
+	
+	showPDBUploadElements(subtask == 0);
+	showGeneralSettings(task != 'parameter3_2' || subtask != 0);
+
 	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
 	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) 
 	{ 
@@ -864,17 +982,21 @@ function changeApplication( app, _task, _extra, _override ) {
 	
 	if ( task == 'parameter3_2' )
 	{ 
-		var elems = document.submitform.elements;
-		var c = document.getElementById("numPartners");
-		
-		if (!_override && (!_extra || document.getElementById("parameter3_2_header").style.display == "none"))
+		if (subtask == 0)
+		{
+			new Effect.Fade( "parameter3_2_header" );
+			new Effect.Fade( "parameter3_2_body", { duration: 0.0} );
+		}
+		else if (subtask == 1)
+		//todo: check load demo values if (!_override && (!_extra || document.getElementById("parameter3_2_header").style.display == "none"))
 		{
 			new Effect.Appear( "parameter3_2_header" );		
 			new Effect.Fade( "parameter3_2_body", { duration: 0.0} );
+			document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
 		}
-		else
+		else if (subtask == 2)
 		{
-			new Effect.Fade( "parameter3_2_header", { duration: 0.0} );		
+			//new Effect.Fade( "parameter3_2_header", { duration: 0.0} );		
 			
 			var i;
 			if (_extra < initNumSeqTolSKChains)
@@ -890,7 +1012,9 @@ function changeApplication( app, _task, _extra, _override ) {
 				new Effect.Fade("seqtol_SK_chainrow_" + "" + i, { duration: 0.0} );
 			}
 			numSeqTolSKChains = _extra
+			//todo: seqtol_SK_addchain seems deprecated now
 			new Effect.Fade("seqtol_SK_addchain", { duration: 0.0 } );
+			
 			if (!_override)
 			{
 				chainsChanged();
@@ -902,13 +1026,12 @@ function changeApplication( app, _task, _extra, _override ) {
 		    document.submitform.Mini[1].checked=true;
 		    document.getElementById('rv0').style.color='#D8D8D8';
 		    document.getElementById('rv1').style.color='#000000';
-			new Effect.Appear( "parameter3_2_body" );
+			new Effect.Appear( "parameter3_2_body" );			
 		}
 		new Effect.Appear( "ref4" ); 	    
 	    //new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
 		new Effect.Fade( "recNumStructures", { duration: 0.0 } );
 		new Effect.Appear( "recNumStructuresSeqTolSK" );
-		document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
 	}
 	else 
 	{ 
@@ -1312,11 +1435,36 @@ function set_demo_values()
 	else if ( actual_task == 'parameter3_2')
 	{
 		reset_seqtolSKData();
+		subtask = 2
 		changeApplication(3, 2, 2, true);
-		document.submitform.PDBID.value = "2PDZ";
+		document.submitform.StoredPDB.value = '';
+	    document.submitform.PDBID.value = "2PDZ";
+	    showPDBUploadElements(true);
 		document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
-		document.submitform.seqtol_SK_chain0.value = "A";
-		document.submitform.seqtol_SK_chain1.value = "B";
+		
+		elemA = document.submitform.seqtol_SK_chain0
+		elemB = document.submitform.seqtol_SK_chain1
+		elemNumPartners = document.submitform.numPartners
+		// todo: Fix this up using an array
+		for (i = elemA.length; i >= 0; i--)
+		{
+			elemA.options[i] = null;
+		}
+		for (i = elemB.length; i >= 0; i--)
+		{
+			elemB.options[i] = null;
+		}
+		for (i = elemNumPartners.length; i >= 0; i--)
+		{
+			elemNumPartners.options[i] = null;
+		}
+		elemA.options[0] = new Option('A','A')
+		elemB.options[0] = new Option('B','B')
+		elemNumPartners.options[0] = new Option('2 Partners (Interface)','2')
+		elemA.value = "A";
+		elemA.value = "B";
+		//todo: loop here over residues and add choices for A and B
+		
 		//todo: loop here over chains
 		//document.submitform.seqtol_SK_chain2.value = "";
 		document.submitform.seqtol_SK_kP0P0.value = "0.4";

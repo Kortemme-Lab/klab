@@ -69,7 +69,7 @@ class RosettaHTML:
                         "tt_seqtol_partner":"header=[Partner] body=[Define the two chains that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_SK_partner":"header=[Partner] body=[todo: Define the chain(s) that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_SK_weighting":"header=[Score reweighting] body=[todo: Define the intramolecular energies / self energy (e.g. k<sub>A</sub>) and the intermolecular / interaction energies (e.g. k<sub>AB</sub>).] %s" % tooltip_parameter,
-                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[todo: Define the Boltzmann factor kT. If the cited value is chosen then kT will be set as (0.23 + n * 0.021) where n is the number of valid premutated residues.] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[todo: Define the Boltzmann factor kT. If the cited value is chosen then kT will be set as (0.228 + n * 0.021) where n is the number of valid premutated residues.] %s" % tooltip_parameter,
                         "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] %s" % tooltip_parameter,
                         "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
                         "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
@@ -290,7 +290,7 @@ class RosettaHTML:
 # submit() and the submission forms
 ###############################################################################################
 
-    def submit(self, jobname='', error='' ):
+    def submit(self, jobname='', error='', task=None, UploadedPDB='', StoredPDB='', listOfChains = [] ):
           # this function uses javascript functions from jscript.js
             # if you change the application tabler here, please make sure to change jscript.js accordingly
             # calling the function with parameters will load those into the form. #not implemented yet
@@ -310,6 +310,7 @@ class RosettaHTML:
         self.html_refs = '''<P>%(Lauck)s</P>
                          ''' % self.refs
                 
+        postscripts = ""
         html = '''<td align="center">
     <H1 class="title">Submit a new job</H1>
     %(error)s
@@ -364,7 +365,7 @@ class RosettaHTML:
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
                       </td></tr>
                   <tr><td width="30" style="text-align:right;">&#8680;</td>
-                      <td><a href="javascript:void(0)" onclick="changeApplication('3','2'); ">
+                      <td><a href="javascript:void(0)" onclick="subtask = 0; changeApplication('3','2'); ">
                           <font style="font-size:10pt">todo: Title 2</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 8pt">Smith and Kortemme, 2010</a> ]</font>
                       </td></tr>
@@ -444,44 +445,53 @@ class RosettaHTML:
                 </TD>
               </TR>
               <TR></td></TR>
-              <TR>
+              <TR class="PostPDBSubmission" style="display:none;">
                 <TD align=right>Job Name <img src="../images/qm_s.png" title="%(tt_JobName)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%(jobname)s"></TD>
               </TR>
-              <TR>
+              <TR class="PDBSelector" style="display:none;">
                 <TD align=right>Upload Structure <img src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="file" NAME="PDBComplex" size="20" ></TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" >
+                <INPUT id="PDBComplex" TYPE="file" NAME="PDBComplex" size="20" onChange="if (document.submitform.task.value=='parameter3_2'){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
+                </TD>
               </TR>
-              <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
-              <TR>
+              <TR class="PDBSelector" style="display:none;"><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
+              <TR class="PDBSelector" style="display:none;">
                 <TD align=right>4-digit PDB identifier <img src="../images/qm_s.png" title="%(tt_PDBID)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="4">
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="4" onkeydown="if (event.keyCode == 13){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
               </TD>
+              </TR>''' % self.tooltips
+        
+        html += '''
+              <TR id="UploadedPDB">
+                  <TD></TD>
+                  <TD align=right style="color:#00bb00;">PDB uploaded: %s</TD>
+                  ''' % UploadedPDB
+                  
+        html += '''
               </TR>
-              <TR><TD colspan=2><br></TD></TR>
-              <TR>
+              <TR class="PostPDBSubmission" style="display:none;"><TD colspan=2><br></TD></TR>
+              <TR class="PostPDBSubmission" style="display:none;">
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
               </TR>
-              <TR>
+              <TR class="PostPDBSubmission" style="display:none;">
                 <TD align=right>Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
                 <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">
                     <div id="rv0"><input type="radio" name="Mini" value="classic" checked> Rosetta v.2 (classic, as published)<div>
                     <div id="rv1"><input type="radio" name="Mini" value="mini"> Rosetta v.3 (mini, new)</div>
                 </TD>
               </TR>
-              <TR>
+              <TR class="PostPDBSubmission" style="display:none;">
                 <TD colspan="2" id="rosetta_remark" style="display:none;" align="right">The Rosetta version in this application is as published [2].</TD>
               </TR>
-              <TR>
+              <TR class="PostPDBSubmission" style="display:none;">
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
-                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="%(ROSETTAWEB_SK_RecommendedNumStructures)s"><span id="recNumStructures">(2-50, recommended 10)</span><span id="recNumStructuresSeqTolSK" style="display:none; opacity:0.0;">(10-100, recommended 20)</span></TD>
+                <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="%(ROSETTAWEB_SK_RecommendedNumStructures)s">
+                <span id="recNumStructures">(2-50, recommended 10)</span>
+                <span id="recNumStructuresSeqTolSK" style="display:none; opacity:0.0;">(10-100, recommended 20)</span></TD>
               </TR>
-              <!-- TR>
-                <TD align=right>Rosetta output <img src="../images/qm_s.png" title="%(tt_ROutput)s"></TD>
-                <TD id="rosetta2" style="padding-left:5pt; padding-top:5pt;"> <input type="checkbox" name="keep_output" VALUE="1" disabled checked> keep files</TD>
-              </TR -->
               <TR><TD align=left><br></TD></TR>
-              <TR>
+              <TR class="PostPDBSubmission" style="display:none;">
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">Application Specific Settings <img src="../images/qm_s.png" border="0" title="%(tt_specific)s"></TD>
               </TR>
             </TABLE>
@@ -495,7 +505,9 @@ class RosettaHTML:
         ''' % self.tooltips
 
         for protocolForm in self.protocolForms:
-            html += protocolForm()
+            htmlcode, ps = protocolForm(listOfChains)
+            html += htmlcode
+            postscripts += ps
 
         html += '''     
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
@@ -537,13 +549,30 @@ class RosettaHTML:
 <!-- end right column -->            
         </tr>
       </table>
-            <INPUT TYPE="hidden" NAME="task"  VALUE="init">
+            ''' % self.tooltips
+      
+        if task == None:
+            task = "init"
+      
+        # We store the uploaded PDB as a form value so it can be retrieved on submission
+        # Note that this could allow a malicious user to replace the filename. As we read
+        # and check the file for PDB content, this shouldn't be an issue but serverside, we
+        # should ignore any path in the filename.
+        # todo:  In fact, if a filename contains path information or is not a PDB (we have 
+        #        ensured that the actual uploaded file was a PDB), then we should flag this 
+        #        behaviour and email the admin.
+        # todo:  Name the PDB better e.g. directory with user session id / original name
+        html += '''
+            <INPUT TYPE="hidden" NAME="task"  VALUE="%s">
+            <INPUT TYPE="hidden" NAME="StoredPDB"  VALUE="%s">
             <INPUT TYPE="hidden" NAME="query" VALUE="submitted">
             <INPUT TYPE="hidden" NAME="mode"  VALUE="check">
           </FORM>
 <!-- End Submit Form -->
-        </td>''' % self.tooltips
+        </td>
+            ''' % (task, StoredPDB) 
 
+        html += postscripts
         return html
 
         # <tr>
@@ -559,7 +588,7 @@ class RosettaHTML:
         #     </td>
         #   </tr>
 
-    def submitOnePointMutation(self):
+    def submitOnePointMutation(self, listOfChains):
         return '''
          <!-- Backrub - Point Mutation -->
             <p id="parameter1_1" style="display:none; opacity:0.0; text-align:justify;">
@@ -579,9 +608,9 @@ class RosettaHTML:
                 </table>
                 <br>
             </p>
-            ''' % self.tooltips
+            ''' % self.tooltips, ""
 
-    def submitMultiplePointMutations(self):
+    def submitMultiplePointMutations(self, listOfChains):
         return '''
             <!-- Backrub - Multiple Point Mutation -->
             <p id="parameter1_2" style="display:none; opacity:0.0; text-align:justify;">
@@ -628,15 +657,15 @@ class RosettaHTML:
                 <tr><td align="center" colspan="4"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a residue</a></td></tr>
                 </table>
             </p>
-            ''' % self.tooltips
+            ''' % self.tooltips, ""
 
-    def submitBRConformationalEnsemble(self):
+    def submitBRConformationalEnsemble(self, listOfChains):
         return '''
             <!-- Ensemble - simple -->
             <p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;">no options</p>            
-            ''' % self.tooltips
+            ''' % self.tooltips, ""
 
-    def submitBREnsembleDesign(self):
+    def submitBREnsembleDesign(self, listOfChains):
         return '''
             <!-- Ensemble - design -->
             <p id="parameter2_2" style="display:none; opacity:0.0; text-align:center;">
@@ -652,9 +681,9 @@ class RosettaHTML:
                 </tr>
                 </table>
             </p>
-            ''' % self.tooltips
+            ''' % self.tooltips, ""
             
-    def submitSeqTolHK(self):
+    def submitSeqTolHK(self, listOfChains):
         return '''
             <!-- Library Design -->
             <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
@@ -692,42 +721,82 @@ class RosettaHTML:
                 </tr>
             </table>
             </p>
-            ''' % self.tooltips
+            ''' % self.tooltips, ""
 
-    def submitSeqTolSK(self):
-        # Test: python rosettaseqtol.py 1601 2I0L_A_C_V2006.pdb 2 10.0 0.23 2 0.4 1.0 0.4 A 318 B
+    def submitSeqTolSK(self, listOfChains):
+
+        # Test: python rosettaseqtol.py 1601 2I0L_A_C_V2006.pdb 2 10.0 0.228 2 0.4 1.0 0.4 A 318 B
             #Upload structure: 2I0L_A_C_V2006.pdb
             #Number of structures: 2 
             #Radius: 10.0
-            #kT: 0.23
+            #kT: 0.228
             #Weights list: 2 0.4 1.0 0.4
             #Designed residues: A 318 B
         
+        postscript = ""
+        
+        # This string holds options for comboboxes to select chains
+        # When there is only one, we fill in the default choice
+        numChainsAvailable = len(listOfChains)
+        chainOptions = ""
+        if numChainsAvailable == 1:
+            for c in listOfChains:
+                chainOptions = '''<option value="%s" selected>%s</option> 
+                                  <option value="invalid">Select a chain</option>
+                                ''' % (c, c) 
+        else:
+            chainOptions = '''<option value="invalid" selected>Select a chain</option>''' 
+            for c in listOfChains:
+                chainOptions += '''<option value="%s">%s</option>''' % (c, c)
+
+
         html = '''<p id="parameter3_2" style="display:none; opacity:0.0; text-align:center;">'''
         
          # Header
-        html += '''<table id="parameter3_2_header"  style="display:none; opacity:0.0; text-align:center;"><tr><td>
-                    <select id="numPartners" name="numPartners" onChange="changeApplication('3','2', this.selectedIndex);">
-                    <option value="x">Select the number of partners</option>'''
-        html += ''' <option value="1">1 (Fold stability)</option> ''' 
-        html += ''' <option value="2">2 (Interface)</option> '''
-        for j in range(3, ROSETTAWEB_max_seqtol_SK_chains + 1):
-            html += ''' <option value="%s">%s</option> ''' % (j, j)
-        html += ''' </select></td></tr><tr><td height="10"></td></tr></table>'''
+
+        html += '''<table id="parameter3_2_header"  style="display:none; opacity:0.0; text-align:center;">
+                    <tr>
+                    <td>
+                    <select id="numPartners" name="numPartners" onfocus="this.valueatfocus=this.value" 
+                        onChange="if ((this.value != this.valueatfocus) && (this.value != 'x')) {subtask = 2; changeApplication('3','2', this.selectedIndex);} " 
+                        onblur  ="if ((this.value != this.valueatfocus) && (this.value != 'x')) {subtask = 2; changeApplication('3','2', this.selectedIndex);} "                        
+                    >
+                        <option value="x">Select the number of partners</option>
+                        <option value="1">1 Partner (Fold stability)</option>                    
+                    '''
+         
+        if numChainsAvailable > 1:
+            html += '''
+                            <option value="2">2 Partners (Interface)</option> '''
+            numChainsAllowed = min(ROSETTAWEB_max_seqtol_SK_chains, numChainsAvailable)
+            for j in range(3, numChainsAllowed + 1):
+                html += ''' <option value="%s">%s Partners</option> ''' % (j, j)
+        
+        html += '''</select></td></tr><tr><td height="10"></td></tr></table>'''
         
         # Body
         html += '''<table align="center" id="parameter3_2_body">'''
         
         # Chains
         tt = self.tooltips["tt_seqtol_SK_partner"]
-        
-        for i in range(ROSETTAWEB_max_seqtol_SK_chains):
+
+        # Chains are either: i) selectable with the name of the chain as value or "invalid" if no selection is made;
+        # or ii) not selectable with the value set to "ignore"
+    
+        for i in range(numChainsAvailable):
             html += '''
               <tr id="seqtol_SK_chainrow_%d">
                   <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
-                  <td>Chain <input type="text" name="seqtol_SK_chain%d" maxlength=1 SIZE=2 VALUE="" onChange="chainsChanged()" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()"></td>
-              </tr> 
-              ''' % (i, i + 1, tt, i)
+                  <td>Chain <select name="seqtol_SK_chain%d" onChange="chainsChanged();" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">%s</select></td>
+                  </tr>
+                  ''' % (i, i+1, tt, i, chainOptions)
+        for i in range(numChainsAvailable, ROSETTAWEB_max_seqtol_SK_chains):
+            html += '''
+                <tr id="seqtol_SK_chainrow_%d">
+                  <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
+                  <td>Chain <select name="seqtol_SK_chain%d"><option value="ignore" selected>Select a chain</option></select></td>
+                  </tr>
+                  ''' % (i, i+1, tt, i)
         
         html += '''
               <tr>
@@ -750,10 +819,12 @@ class RosettaHTML:
             #style="display:none"
             html += '''<tr align="center" id="seqtol_SK_pre_row_%d"> 
                             <td>%d</td>
-                            <td><input type="text" name="seqtol_SK_pre_mut_c_%d" maxlength=1 SIZE=2 onChange="updateBoltzmann();"></td>
-                            <td><input type="text" name="seqtol_SK_pre_mut_r_%d" maxlength=4 SIZE=4 onChange="updateBoltzmann();"></td>
-                            <td><select name="premutatedAA%d" onChange="updateBoltzmann();">
-                            <option value="" selected>Select an amino acid</option>''' % (i, i+1, i, i, i)
+                            <td><select name="seqtol_SK_pre_mut_c_%d" style="text-align:center;" onChange="updateBoltzmann();">%s</select></td>
+                        ''' % (i, i+1, i, chainOptions)
+            
+            html += '''     <td><input type="text" name="seqtol_SK_pre_mut_r_%d" maxlength=4 SIZE=4 onChange="updateBoltzmann();"></td>
+                            <td><select name="premutatedAA%d" style="text-align:center;" onChange="updateBoltzmann();">
+                            <option value="" selected>Select an amino acid</option>''' % (i, i)
             for j in sorted(ROSETTAWEB_SK_AA.keys()):
                 html += ''' <option value="%s">%s</option> ''' % (j, j)
             html += ''' </select></tr>'''
@@ -776,9 +847,18 @@ class RosettaHTML:
                         <td>#</td><td>Chain ID</td><td>Residue Number</td>
                       </tr>
               ''' % self.tooltips
-        html += '''<tr align="center" id="seqtol_SK_row_0"><td>1</td><td><input type="text" name="seqtol_SK_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td></tr>'''
+        html += '''<tr align="center" id="seqtol_SK_row_0"><td>1</td>
+                    <td><select name="seqtol_SK_mut_c_0" style="text-align:center;">%s</select>
+                    </td>
+                    <td><input type="text" name="seqtol_SK_mut_r_0" maxlength=4 SIZE=4></td></tr>''' % chainOptions
         for i in range(1, ROSETTAWEB_SK_MaxMutations):
-            html += '''<tr align="center" id="seqtol_SK_row_%d" style="display:none"><td>%d</td><td><input type="text" name="seqtol_SK_mut_c_%d" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_SK_mut_r_%d" maxlength=4 SIZE=4></td></tr>''' % (i, i+1, i, i)
+            html += '''<tr align="center" id="seqtol_SK_row_%d" style="display:none">
+                        <td>%d</td>
+                        <td><select name="seqtol_SK_mut_c_%d" style="text-align:center;">%s</select></td>
+                        ''' % (i, i+1, i, chainOptions)
+                
+            html += ''' <td><input type="text" name="seqtol_SK_mut_r_%d" maxlength=4 SIZE=4></td>
+                        </tr>''' % i
         html += '''
                       <tr align="center"><td colspan="3"><div id="seqtol_SK_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSK();">Click here to add a residue</a></div></td></tr>
                       </table>
@@ -844,7 +924,7 @@ class RosettaHTML:
             </table>
             </p>'''
 
-        return html
+        return html, postscript
             
     def submitted(self, jobname, cryptID, remark, warnings):
       
@@ -1471,20 +1551,26 @@ class RosettaHTML:
         # Note:  We use get here rather than direct dictionary access as we choose not to 
         #        store empty keys in the parameter to save space 
         for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-            partner = seqtol_parameter.get("seqtol_SK_chain%d" % i)
+            partner = seqtol_parameter.get("Partner%d" % i)
             if partner:
                 active.append(True)
                 activeList.append(i)
                 if i > maxActive:
                     maxActive = i
                 html += 'Partner %d: Chain %s<br>' % (i + 1, partner)
-                plist = seqtol_parameter.get("seqtol_SK_list_%d" % i)
+                plist = seqtol_parameter.get("Premutated%d" % i)
                 if plist:
-                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(plist,' '))
+                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Premutated residues at positions:</i></td><td></td><td>'
+                    for k,v in sorted(plist.items()):
+                        html += '%s (%s) ' % (k, ROSETTAWEB_SK_AAinv[v])
+                    html += '</td></tr></table>'
+                dlist = seqtol_parameter.get("Designed%d" % i)
+                if dlist:
+                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(dlist.keys(),' '))
             else:
                 active.append(False)
         
-        html += '<br>Boltzmann factor: %s' % (seqtol_parameter["seqtol_SK_Boltzmann"])
+        html += '<br>Boltzmann factor: %s' % (seqtol_parameter["kT"])
         
         html += """
                     <br><br>
@@ -1498,7 +1584,7 @@ class RosettaHTML:
 
         for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
             if active[i] and i != maxActive:
-                html += "<td>k<sub>P<sub>%s</sub></sub>_</td>" % (seqtol_parameter.get("seqtol_SK_chain%d" % i))
+                html += "<td>k<sub>P<sub>%s</sub></sub>_</td>" % (seqtol_parameter.get("Partner%d" % i))
         
         html += "</thead></tr><tbody bgcolor='#F4F4FF'>"
     
@@ -1507,10 +1593,10 @@ class RosettaHTML:
                 html += """
                         <tr align="left" border=1>                    
                               <td bgcolor="#828282" style="color:white; align="left">%s</td>
-                              <td>%s</td>""" % (seqtol_parameter.get("seqtol_SK_chain%d" % i), seqtol_parameter["seqtol_SK_kP%dP%d" % (i, i)])
+                              <td>%s</td>""" % (seqtol_parameter.get("Partner%d" % i), seqtol_parameter["kP%dP%d" % (i, i)])
                 for j in activeList:
                     if j < i:
-                        html += "<td>%s</td>" % seqtol_parameter["seqtol_SK_kP%dP%d" % (j, i)]
+                        html += "<td>%s</td>" % seqtol_parameter["kP%dP%d" % (j, i)]
                     elif j != maxActive:
                         html += "<td bgcolor='#EEEEFF'></td>"
                 html += "</tr>"
@@ -1533,14 +1619,31 @@ class RosettaHTML:
             designed_chains = []
             designed_res = []
             for i in range(0, ROSETTAWEB_max_seqtol_SK_chains): 
-                chain = seqtol_parameter.get("seqtol_SK_chain%d" % i)
+                chain = seqtol_parameter.get("Partner%d" % i)
                 if chain:
-                    reslist = seqtol_parameter.get("seqtol_SK_list_%d" % i)
+                    reslist = seqtol_parameter.get("Designed%d" % i)
                     if reslist:
-                        designed_chains += [chain for res in reslist]
+                        designed_chains += [chain for res in reslist.keys()]
                         designed_res += reslist
              
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
+            
+            #todo: text
+            html += '''<tr><td align="left" bgcolor="#FFFCD8">A ranked table of amino acid types for each position.<br>
+                              Download the table as 
+                              <a href="../downloads/%s/tolerance_seqrank.png">PNG</a>, <a href="../downloads/%s/tolerance_seqrank.pdf">PDF</a>.<br>
+                              </td>
+                           <td bgcolor="#FFFCD8">
+                    ''' % ( cryptID, cryptID )
+                    
+                    # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
+                    # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # the <a href="../wiki/" target="_blank">wiki</a>.
+            
+            html += '''<a href="../downloads/%s/tolerance_seqrank.png"><img src="../downloads/%s/tolerance_seqrank.png" alt="image file not available" width="400"></a><br>
+                    ''' % ( cryptID, cryptID )
+                            
+            html +="</td></tr>"
                                        
             html += '''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
                               Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
@@ -1710,7 +1813,6 @@ class RosettaHTML:
         """This shows the Jmol applet for an ensemble of structures with their point mutation(s)"""
         
         # todo: set these values in rwebhelper
-        # todo: Albana currently uses Jmol 12.1.7. The server currently uses Jmol 11.8.21.
         # jmol command to load files
         if list_pdb_files != None:
             jmol_cmd = ' "load %s; color red; cpk off; wireframe off; backbone 0.2;" +\n' % (list_pdb_files[0] ) #, list_pdb_files[0].split('/')[-1].split('.')[0])

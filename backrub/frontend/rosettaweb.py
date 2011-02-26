@@ -48,6 +48,7 @@ import MySQLdb
 import _mysql_exceptions
 import socket
 import md5
+import traceback
 
 import urllib2
 
@@ -95,7 +96,9 @@ ROSETTAWEB_bin_sendmail = parameter['bin_sendmail']
 ROSETTAWEB_download_dir = parameter['rosetta_dl']
 
 ROSETTAWEB_base_dir     = parameter["base_dir"]
-
+ROSETTAWEB_temp_dir     = parameter["rosetta_tmp"]
+        
+        
 # open connection to MySQL
 connection = MySQLdb.Connection( host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket )
 ########################################## Setup End ##########################################
@@ -112,14 +115,34 @@ from pdb import PDB
 #  query  [ register | login | logout | index | terms_of_service | submit | queue | update ]  #
 ###############################################################################################
 
+def saveTempPDB(SID, pdbfile):
+    tempdir = "%spdbs/" % ROSETTAWEB_temp_dir
+    if not os.path.exists(tempdir):
+        os.mkdir(tempdir, 0775)
+    try:
+        newfilename = "%s.pdb" % SID 
+        F = open("%s%s" % (tempdir, newfilename), "w+")
+        F.write(pdbfile)
+        F.close()
+        return True, "", newfilename
+    except:
+        estring = traceback.format_exc()
+        if estring.find("IOError: [Errno 13] Permission denied") != -1:
+            estring = "Write permission was denied when creating the file. If this persists, please contact support@kortemmelab.ucsf.edu."
+        else:
+            # We don't know what the error was but returning the string back as is gives the user too much internal information
+            # todo: We should log this error and should email the admin as well (update error string to indicate that admin was notified)
+            estring = "An error occurred uploading the file. If this persists, please contact support@kortemmelab.ucsf.edu." 
+        return False, estring, ''
+   
 def ws():
-  
   s = sys.stdout
   if ROSETTAWEB_server_name == 'albana.ucsf.edu':
     sys.stderr = s # todo: should be removed later
-    #todo: Test this for debugging  cgitb.enable(display=0, logdir="/tmp")
+    #todo: Test this for debugging  
+    #cgitb.enable(display=0, logdir="/tmp")
   debug = ''
-
+  
   html_content = ''
   query_type   = 'dftba'
   SID          = ''
@@ -250,7 +273,7 @@ def ws():
     sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
     result = execQuery( connection, sql )
     # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
-    if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register","login","loggedin","logout","index","jobinfo","terms_of_service","submit","submitted","queue", "update","doc","delete"]:
+    if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register","login","loggedin","logout","index","jobinfo","terms_of_service","submit","submitted","queue", "update","doc","delete","parsePDB"]:
       query_type = form["query"].value
     
       sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
@@ -316,6 +339,32 @@ def ws():
       html_content = rosettaHTML.index()
     title = 'Logout'
 
+  elif query_type == "parsePDB":
+      #html_content = rosettaHTML.submit(jobname='')
+      #form
+      
+      #if False:
+      pdb_okay, errormsg, warnings, pdbfile, pdb_filename, pdb_object = parsePDB(form)
+      if not pdb_okay:
+          # reset the query for the JS startup function
+          query_type = "submit"
+          html_content = rosettaHTML.submit(jobname='', error=errormsg)
+      else:
+          saveSucceeded, errormsg, newfilename = saveTempPDB(SID, pdbfile)
+          if not saveSucceeded:
+              # reset the query for the JS startup function
+              query_type = "submit"
+              html_content = rosettaHTML.submit(jobname='', error=errormsg)
+          else:
+              errors = ''
+              PDBchains = pdb_object.chain_ids() 
+              numPDBchains = len(PDBchains)
+              
+              if numPDBchains > ROSETTAWEB_max_seqtol_SK_chains:
+                  errors = 'The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_max_seqtol_SK_chains)
+              html_content = rosettaHTML.submit('', errors, None, pdb_filename, newfilename, pdb_object.chain_ids())
+              title = 'Submission Form'
+      
   elif query_type == "submitted":
     return_val = submit(form, SID)
     if return_val[0]: # data was submitted and written to the database
@@ -728,14 +777,16 @@ def check_pdb(pdb_object):
     # check the number of atoms/residues/chains;
     # numbers are derived from 1KYO wich is huge: {'models': 0, 'chains': 23, 'residues': 4459, 'atoms': 35248}
     counts = pdb_object.get_stats()
+    #todo: Parameterize these constants in rwebhelper
     if counts["atoms"] > 10000:
-      return (False, "Max. number of atoms exceeded<br>")
+      return (False, "Maximum number of atoms exceeded;<br>The maximum is %d, the PDB contained %d.<br>" % (10000, counts["atoms"]))
     if counts["residues"] > 500:
-      return (False, "Max. number of residues exceeded<br>")
-    if counts["chains"] > 4:
-      return (False, "Max. number of chains exceeded<br>")
+      return (False, "Maximum number of residues exceeded;<br>The maximum is %d, the PDB contained %d.<br>" % (500, counts["residues"]))
+    # todo: This value used to be 4 but ROSETTAWEB_max_seqtol_SK_chains is currently greater than 4 so we use that
+    if counts["chains"] > ROSETTAWEB_max_seqtol_SK_chains:
+      return (False, "Maximum number of chains exceeded;<br>The maximum is %d, the PDB contained %d.<br>" % (ROSETTAWEB_max_seqtol_SK_chains, counts["chains"]))
     if counts["cys"] > 50:
-      return (False, "Max. number of Cysteine residues exceeded<br>")
+      return (False, "Maximum number of Cysteine residues exceeded;<br>The maximum is %d, the PDB contained %d.<br>" % (50, counts["cys"]))
     
     return (True, wrns) #"everything is fine")
 
@@ -751,12 +802,89 @@ def extract_1stmodel(pdbfile):
         break
     return new_pdbfile
 
-
 ###############################################################################################
 # submit()                                                                                    #
 # this function processes the parameter of the input form and adds a new job to the database  # 
 ###############################################################################################
 
+def parsePDB(form):
+    ############## PDB STUFF ###################
+    pdb_okay = True
+    errormsg = ""
+    pdbfile = ''
+    pdb_filename = None
+    pdb_object = None
+    warnings = ""
+    
+    if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
+        try:
+            pdbfile = form["PDBComplex"].value
+            if not form["PDBComplex"].file:
+                error += " PDB data is not a file. "
+            pdb_filename = form["PDBComplex"].filename
+            pdb_filename = pdb_filename.replace(' ','_')
+            pdb_filename = pdb_filename.replace('.','_')
+            if pdb_filename[-3:] not in ['pdb','PDB' ]:
+                pdb_filename = pdb_filename + '.pdb'
+            else:
+                pdb_filename = pdb_filename[:-4] + '.pdb'
+        except:
+            errormsg = "invalid PDB file"
+            pdb_okay = False
+    
+    elif form.has_key("PDBID") and form["PDBID"].value != '':
+        try:
+            pdb_filename = form["PDBID"].value.upper() + '.pdb'
+            url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
+            req = urllib2.Request(url)
+            response = urllib2.urlopen(req)
+            pdbfile = response.read()
+            if len(pdbfile) <= 2:
+                errormsg = "Invalid PDB identifier<br>"
+                pdb_okay = False
+        except:
+            errormsg = "Invalid PDB identifier<br>"
+            pdb_okay = False
+    elif form.has_key("StoredPDB"):
+        # We should have gotten here from a ParsePDB generated webpage
+        # The filename in StoredPDB should have been created by saveTempPDB 
+        sPDB = form["StoredPDB"].value
+        if sPDB != '' and re.match("[A-Z\d]+\.pdb", sPDB, re.IGNORECASE):
+            # The filename should be generated from always match this if SID is alphanumeric
+            try:
+                pdb_filename = sPDB
+                F = open("%spdbs/%s" % (ROSETTAWEB_temp_dir, pdb_filename), "r")
+                pdbfile = F.read()
+                F.close()
+            except:
+                errormsg = "An I/O error occurred reading the uploaded file. Please contact support@kortemmelab.ucsf.edu.<br>"
+                pdb_okay = False
+        else:
+            # Something odd happened. We have gremlins on the bus.
+            errormsg = "The uploaded file could not be retrieved. Please contact support@kortemmelab.ucsf.edu.<br>"
+            pdb_okay = False
+            
+    else:
+        errormsg = "Invalid structure file<br>"
+        pdb_okay = False
+    
+    if not pdb_okay:
+        return pdb_okay, errormsg, warnings, pdbfile, pdb_filename, pdb_object
+    else:
+        pdbfile = pdbfile.replace('"',' ')  # removes \" that mislead python. not needed anyway
+        pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
+
+        pdb_object = PDB(pdbfile.split('\n'))
+        pdb_check_result = check_pdb(pdb_object)
+        if not pdb_check_result[0]:
+            return pdb_check_result[0], pdb_check_result[1], pdbfile, pdb_filename, pdb_object, warnings
+        wrns = pdb_check_result[1]
+        if wrns:
+            for w in wrns:
+                warnings = warnings + "<li>%s</li>" % w
+                
+    return pdb_okay, errormsg, warnings, pdbfile, pdb_filename, pdb_object
+            
 def submit(form, SID):
     ''' This function processes the general parameters and writes them to the database'''
     s = StringIO()
@@ -771,7 +899,7 @@ def submit(form, SID):
     Email    = sql_out[0][1]
     JobName  = ""
     Partner  = ""
-    error    = ""  # is used to check if something went wrong
+    errormsg = ""  # is used to check if something went wrong
     cryptID  = ''
     pdbfile  = ''
     pdb_object = None
@@ -787,57 +915,12 @@ def submit(form, SID):
             JobName = escape(form["JobName"].value)
     
         ############## PDB STUFF ###################
-        pdb_error = False
-        if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
-            try:
-                pdbfile = form["PDBComplex"].value
-                if not form["PDBComplex"].file:
-                    error += " PDB data is not a file. "
-                pdb_filename = form["PDBComplex"].filename
-                pdb_filename = pdb_filename.replace(' ','_')
-                pdb_filename = pdb_filename.replace('.','_')
-                if pdb_filename[-3:] not in ['pdb','PDB' ]:
-                    pdb_filename = pdb_filename + '.pdb'
-                else:
-                   pdb_filename = pdb_filename[:-4] + '.pdb'
-            except:
-                error = "invalid PDB file"
-                pdb_error = True
-    
-        elif form.has_key("PDBID") and form["PDBID"].value != '':
-            try:
-                pdb_filename = form["PDBID"].value.upper() + '.pdb'
-                url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
-                req = urllib2.Request(url)
-                response = urllib2.urlopen(req)
-                pdbfile = response.read()
-                if len(pdbfile) <= 2:
-                    error = "Invalid PDB identifier<br>"
-                    pdb_error = True
-            except:
-                error = "Invalid PDB identifier<br>"
-                pdb_error = True
-        else:
-            error = "Invalid structure file<br>"
-            pdb_error = True
-
-        if pdb_error:
-            return (False, error)
-        else:
-            pdbfile = pdbfile.replace('"',' ')  # removes \" that mislead python. not needed anyway
-            pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
-            
-            pdb_object = PDB(pdbfile.split('\n'))
-            pdb_check_result = check_pdb(pdb_object)
-            if not pdb_check_result[0]:
-                return pdb_check_result
-            wrns = pdb_check_result[1]
-            if wrns:
-                for w in wrns:
-                    warnings = warnings + "<li>%s</li>" % w
-
-                
-            
+                    
+        pdb_okay, errormsg, wrns, pdbfile, pdb_filename, pdb_object = parsePDB(form)
+        warnings += wrns
+        
+        if not pdb_okay:
+            return (False, errormsg)
         ############## PDB STUFF END ###############
                 
         if form.has_key("Mutations"):
@@ -1052,133 +1135,151 @@ def submit(form, SID):
         #todo: all this code here is messy - clean it up as suggested in website meeting
         # sequence tolerance aka library design
         elif modus == 'sequence_tolerance_SK':
-                        
             success = True
-            errormsg = ""
+            skerrormsg = ""
             
             # seqtol_parameter stores the following fields:
-            #    seqtol_SK_list_0     .. seqtol_SK_list_n     A list of designed residues
-            #    seqtol_SK_plist_0    .. seqtol_SK_plist_n    A premutations mapping from residue positions to amino acids codes (the single letter codes used in resfiles) 
-            #    seqtol_SK_chain0     .. seqtol_SK_chainn
-            #    seqtol_SK_kP0P0      .. seqtol_SK_kPiPj    where i,j \in n, i <= j
-            #    seqtol_SK_Boltzmann
-            # where n is the maximum allowed number of chains. seqtol_SK_list_i should be None if empty.
+            #    Designed0   .. Designedn      A mapping from designed residues to True
+            #    Premutated0 .. Premutatedn    A premutations mapping from residue positions to amino acids codes (the single letter codes used in resfiles) 
+            #    Partner0    .. Partnern
+            #    kP0P0       .. kPiPj          where i,j \in n, i <= j
+            #    kT
+            # where n is the maximum allowed number of chains. Designedi and Premutatedi should be None if empty.
             
             # Store the Partner identifiers
-            numPartners = 0
-            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-                seqtol_parameter["seqtol_SK_list_%d" % i] = []
-                seqtol_parameter["seqtol_SK_plist_%d" % i] = {}
-                mkey = "seqtol_SK_chain%d" % i
-                formvalue = form[mkey].value
-                if form.has_key(mkey) and formvalue != '':
-                    seqtol_parameter[mkey] = str(formvalue)
-                    numPartners = numPartners + 1
-                else:
-                    seqtol_parameter[mkey] = None
+            # Only read up to the number of chains selected by the user
+            numChainsToRead = ROSETTAWEB_max_seqtol_SK_chains
+            try:
+                numChainsToRead = int(form["numPartners"].value)
+            except:
+                numChainsToRead = ROSETTAWEB_max_seqtol_SK_chains
 
+            numPartners = 0
+            for i in range(0, numChainsToRead):
+                seqtol_parameter["Designed%d" % i] = {}
+                seqtol_parameter["Premutated%d" % i] = {}
+                mkey = "seqtol_SK_chain%d" % i
+                dbkey = "Partner%d" % i
+                seqtol_parameter[dbkey] = None
+                if form.has_key(mkey):
+                    formvalue = form[mkey].value
+                    #todo: one of these checks may not be needed
+                    if formvalue != '' and formvalue != 'ignore':
+                        seqtol_parameter[dbkey] = str(formvalue)
+                        numPartners = numPartners + 1
+            for i in range(numChainsToRead, ROSETTAWEB_max_seqtol_SK_chains):
+                seqtol_parameter["Designed%d" % i] = {}
+                seqtol_parameter["Premutated%d" % i] = {}
+                seqtol_parameter["Partner%d" % i] = None
+                        
             # Sanity check: Ensure partners are distinct chains
             for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-                pi = seqtol_parameter["seqtol_SK_chain%d" % i]
+                pi = seqtol_parameter["Partner%d" % i]
                 for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains):
-                    pj = seqtol_parameter["seqtol_SK_chain%d" % j]
+                    pj = seqtol_parameter["Partner%d" % j]
                     if (pi is not None) and (pj is not None) and (pi == pj):
-                        success, errormsg = False, errormsg + "Partners %d and %d have the same chain %s.<br>" % (i,j,pi)
+                        success, skerrormsg = False, skerrormsg + "Partners %d and %d have the same chain %s.<br>" % (i,j,pi)
 
             if numPartners == 0:
-                success, errormsg = False, "You need to specify at least one chain.<br>"
+                success, skerrormsg = False, "You need to specify at least one chain.<br>"
             
             # Store the Score Reweighting values
             # Sanity check: If P_i is specified then k_{P_iP_i} must be filled in.
-            #               Furthermore, if P_j is specified, j > i, then k_{P_iP_j} must be filled in.
+            #               Furthermore, if P_j is specified, j > i, then k_{P_iP_j} must be filled in.                
             for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
                 #todo: clean up logic here since change to PiPi
-                if seqtol_parameter["seqtol_SK_chain%d" % i] is not None:
+                if seqtol_parameter["Partner%d" % i] is not None:
                     # Check that the self energy is filled in
                     mkey = "seqtol_SK_kP%dP%d" % (i, i)
+                    dbkey = "kP%dP%d" % (i, i)
                     if not(form.has_key(mkey)) or form[mkey].value == '':
-                        success, errormsg = False, errormsg + "Partner %d was specified as %s but its self energy was missing.<br>" % (i,seqtol_parameter["seqtol_SK_chain%d" % i])
+                        success, skerrormsg = False, skerrormsg + "Partner %d was specified as %s but its self energy was missing.<br>" % (i, seqtol_parameter["Partner%d" % i])
                         # else we could assign the default value of 0.4 here
                     else:
-                        seqtol_parameter[mkey] = str(form[mkey].value)
+                        seqtol_parameter[dbkey] = str(form[mkey].value)
 
                     # Check that the interaction energies are filled in
                     for j in range(i + 1, ROSETTAWEB_max_seqtol_SK_chains):
-                        if seqtol_parameter["seqtol_SK_chain%d" % j] is not None:
+                        if seqtol_parameter["Partner%d" % j] is not None:
                             # Check that the interaction energy is filled in
                             mkey = "seqtol_SK_kP%dP%d" % (i, j)
+                            dbkey = "kP%dP%d" % (i, j)
                             if not(form.has_key(mkey)) or form[mkey].value == '':
-                                success, errormsg = False, errormsg + "Partners %d and %d were specified as %s and %s but their interaction energy k<sub>P<sub>%d</sub>P<sub>%d</sub></sub> was missing.<br>" % (i,j,seqtol_parameter["seqtol_SK_chain%d" % i],seqtol_parameter["seqtol_SK_chain%d" % j],i,j)
+                                success, skerrormsg = False, skerrormsg + "Partners %d and %d were specified as %s and %s but their interaction energy k<sub>P<sub>%d</sub>P<sub>%d</sub></sub> was missing.<br>" % (i,j,seqtol_parameter["Partner%d" % i],seqtol_parameter["Partner%d" % j],i,j)
                                 # else we could assign the default value of 1.0 here
                             else: 
-                                seqtol_parameter[mkey] = str(form[mkey].value)
-                        
+                                seqtol_parameter[dbkey] = str(form[mkey].value)
+            
+            # todo: Refactor these two residue sections to use a common function            
             numDesignedResidues = 0
-            lastRes = ROSETTAWEB_SK_MaxMutations
+            lastDesignedRes = ROSETTAWEB_SK_MaxMutations
             for x in range(ROSETTAWEB_SK_MaxMutations):
-                lastRes = x
-                key1 = "seqtol_SK_mut_c_" + str(x)
-                key2 = "seqtol_SK_mut_r_" + str(x)
+                lastDesignedRes = x
+                sx = str(x)
+                key1 = "seqtol_SK_mut_c_" + sx
+                key2 = "seqtol_SK_mut_r_" + sx
                 if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
                     numDesignedResidues = numDesignedResidues + 1
                     chainWasFound = False
                     for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-                        if form[key1].value == seqtol_parameter["seqtol_SK_chain%d" % i]:
+                        if form[key1].value == seqtol_parameter["Partner%d" % i]:
                             chainWasFound = True
-                            dlist = "seqtol_SK_list_%d" % i
-                            dkey = str(form[key2].value)
-                            if seqtol_parameter[dlist] and seqtol_parameter[dlist][dkey]:
-                                success, errormsg = False, errormsg + "There are multiple designed residues at position %s in chain %s.<br>" % (pkey, form[key1].value)                                
+                            dlist = "Designed%d" % i
+                            dkey = form[key2].value
+                            if seqtol_parameter[dlist] and seqtol_parameter[dlist].get(dkey):
+                                success, skerrormsg = False, skerrormsg + "There are multiple designed residues at position %s in chain %s.<br>" % (pkey, form[key1].value)                                
                             else:
-                                seqtol_parameter[dlist].append(dkey)
+                                seqtol_parameter[dlist][dkey] = True
                     if not chainWasFound:
-                        success, errormsg = False, errormsg + "The chain %s was not found for residue %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
+                        success, skerrormsg = False, skerrormsg + "The chain %s was not found for residue %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
                 else:
                     break
 
             if numDesignedResidues < 1:
-                success, errormsg = False, errormsg + "There must be at least one designed residue."                               
+                success, skerrormsg = False, skerrormsg + "There must be at least one designed residue."                               
             
             numPremutations = 0
+            lastPremutatedRes = ROSETTAWEB_SK_MaxPremutations
             for x in range(ROSETTAWEB_SK_MaxPremutations):
+                lastPremutatedRes = x
                 sx = str(x)
                 key1 = "seqtol_SK_pre_mut_c_" + sx
                 key2 = "seqtol_SK_pre_mut_r_" + sx
                 key3 = "premutatedAA" + sx
-                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '' and len(form[key2].value) == 3:
+                if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '' and len(form[key3].value) == 3:
                     numPremutations = numPremutations + 1
                     chainWasFound = False
                     for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-                        if form[key1].value == seqtol_parameter["seqtol_SK_chain%d" % i]:
+                        if form[key1].value == seqtol_parameter["Partner%d" % i]:
                             chainWasFound = True
                             AAid = ROSETTAWEB_SK_AA[form[key3].value]
                             if not AAid:
                                 # Should never happen but just in case
-                                success, errormsg = False, errormsg + "No amino acid could be found matching %s. This is probably a server error; please contact support@kortemmelab.ucsf.edu.<br>" % (AAid)
+                                success, skerrormsg = False, skerrormsg + "No amino acid could be found matching %s. This is probably a server error; please contact support@kortemmelab.ucsf.edu.<br>" % (AAid)
                                 break;
                             else:
-                                plist = "seqtol_SK_plist_%d" % i
-                                pkey = str(form[key2].value)
-                                if seqtol_parameter[plist] and seqtol_parameter[plist][pkey]:
-                                    success, errormsg = False, errormsg + "There are multiple premutations or designed residues at position %s in chain %s.<br>" % (pkey, form[key1].value)
+                                plist = "Premutated%d" % i
+                                pkey = form[key2].value
+                                if seqtol_parameter[plist] and seqtol_parameter[plist].get(pkey):
+                                    success, skerrormsg = False, skerrormsg + "There are multiple premutations or designed residues at position %s in chain %s.<br>" % (pkey, form[key1].value)
                                 else:
                                     seqtol_parameter[plist][pkey] = AAid
                     if not chainWasFound:
-                        success, errormsg = False, errormsg + "The chain %s was not found for premutation %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
+                        success, skerrormsg = False, skerrormsg + "The chain %s was not found for premutation %i ('%s%4.i').<br>" % (form[key1].value, x + 1, form[key1].value, int(form[key2].value) )
                 else:
                     break
 
             #todo: check in JS whether numeric values are actually numeric 
             
             # Warn if the user left gaps in the residue list
-            for x in range(lastRes + 1, ROSETTAWEB_SK_MaxMutations):
+            for x in range(lastDesignedRes + 1, ROSETTAWEB_SK_MaxMutations):
                 key1 = "seqtol_SK_mut_c_" + str(x)
                 key2 = "seqtol_SK_mut_r_" + str(x)
                 if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
                     warnings = warnings + "<li>Residue %d ('%s%4.i') was not added to the run as previous residues were left blank.</li>" % (x + 1, form[key1].value, int(form[key2].value))
                             
             # Warn if the user left gaps in the premutation list
-            for x in range(lastRes + 1, ROSETTAWEB_SK_MaxPremutations):
+            for x in range(lastPremutatedRes + 1, ROSETTAWEB_SK_MaxPremutations):
                 key1 = "seqtol_SK_pre_mut_c_" + str(x)
                 key2 = "seqtol_SK_pre_mut_r_" + str(x)
                 if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
@@ -1190,60 +1291,83 @@ def submit(form, SID):
                 try:
                     kT = float(userkT)
                 except ValueError:
-                    success, errormsg = False, errormsg + "The Boltzmann factor was specified as '%s' which could not be read as a numeric value.<br>" % userkT
+                    success, skerrormsg = False, skerrormsg + "The Boltzmann factor was specified as '%s' which could not be read as a numeric value.<br>" % userkT
                 else:
                     warnings = warnings + "<li>Using a user-defined value for kT (%s) rather than the published value." % userkT
-                    seqtol_parameter["seqtol_SK_Boltzmann"] = kT
+                    seqtol_parameter["kT"] = kT
             else:
                 kT = ROSETTAWEB_SK_InitialBoltzmann + numPremutations * ROSETTAWEB_SK_BoltzmannIncrease
                 warnings = warnings + "<li>Running the job with the published value for kT = %f + %d * %f = %f.</li>" % (ROSETTAWEB_SK_InitialBoltzmann, numPremutations, ROSETTAWEB_SK_BoltzmannIncrease, kT)
-                seqtol_parameter["seqtol_SK_Boltzmann"] = kT
+                seqtol_parameter["kT"] = kT
             
             # Sanity checks:
             # check if residue and chain exist in structure:
             all_chains = pdb_object.chain_ids()
             all_resids = pdb_object.aa_resids()
-            resid2type = pdb_object.aa_resid2type()
-            
+            resid2type = pdb_object.aa_resid2type() 
+             
             # First, build up the chain lists
             chainsreslists = []
             for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-                chain = "seqtol_SK_chain%d" % i
+                chain = "Partner%d" % i
                 if (seqtol_parameter[chain] is not None) and seqtol_parameter[chain] != '':
-                    chainsreslists.append((seqtol_parameter[chain], seqtol_parameter["seqtol_SK_list_%d" % i]))
-                    chainsreslists.append((seqtol_parameter[chain], seqtol_parameter["seqtol_SK_plist_%d" % i].keys()))
+                    chainsreslists.append((seqtol_parameter[chain], seqtol_parameter["Designed%d"  % i].keys(), False))
+                    chainsreslists.append((seqtol_parameter[chain], seqtol_parameter["Premutated%d" % i].keys(), True))
             
-            # todo:Check with Colin. I'm checking premutations against all_resids as well.
-            # todo:Check with Colin. Can you premutate to Cystein? If you can then I need to change the logic below to allow a premutation to use it
             # Then check for matches within the pdb structure
-            for (chain, lst_resid) in chainsreslists:
+            for (chain, lst_resid, cysteinAllowed) in chainsreslists:
                 if chain in all_chains:
                     for res_no in lst_resid:
                         resid = "%s%4.i" % (chain,int(res_no))
                         if not resid in all_resids:
-                            success, errormsg = False, errormsg + "Residue not found: %s<br>" % resid
+                            success, skerrormsg = False, skerrormsg + "Residue not found: %s<br>" % resid
+                            
+                            skerrormsg += "Valid residues (displaying at most 1000) are:<br>"
+                            rnumber = 0
                             for r in all_resids:
-                                errormsg = errormsg + ("%s, " % str(r))
+                                skerrormsg = skerrormsg + ("%s, " % str(r))
+                                rnumber += 1
+                                if rnumber > 1000:
+                                    break;
                             #return (False, "Residue not found: %s<br>" % resid)
-                        elif resid2type[resid] == "C":
-                            success, errormsg = False, errormsg + "Design of Cystein (CYS, C) not permitted.<br>"
+                        elif resid2type[resid] == "C" and not cysteinAllowed:
+                            success, skerrormsg = False, skerrormsg + "Design of Cystein (CYS, C) not permitted.<br>"
                             #return (False, "<br>Design of Cystein (CYS, C) not permitted.<br>")
                 else:
-                    success, errormsg = False, errormsg + "Chain '%s' not found.<br>" % chain
+                    success, skerrormsg = False, skerrormsg + "Chain '%s' not found.<br>" % chain
                     #return (False, "Chain '%s' not found.<br>" % chain)
             
+            # Test to see if the seqtol resfile would be empty before proceeding 
+            params = {} 
+            params['partners'] = []
+            params['designed'] = {}
+            remove = ""
+            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
+                chain = "Partner%d" % i
+                partner = seqtol_parameter[chain]
+                if (partner is not None) and partner != '':
+                    params['partners'].append(partner)
+                    params['designed'][partner] = seqtol_parameter["Designed%d" % i]
+                    remove += "%s:%s " % (partner, join(seqtol_parameter["Designed%d" % i]," "))                    
+            resfileHasContents, contents = pdb_object.make_seqtol_resfile(params, ROSETTAWEB_SK_Radius)
+            if not resfileHasContents:
+                success, skerrormsg = False, skerrormsg + "<br>" + contents                     
+            #return (False, remove + "<br>" + contents)
+        
             # Wipe any unused chains and residue/premutation lists for cleaner and more general serialization
             for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-                mykey = "seqtol_SK_list_%d" % i;
+                mykey = "Designed%d" % i;
                 if (not seqtol_parameter[mykey]):
                     del seqtol_parameter[mykey]
-                mykey = "seqtol_SK_plist_%d" % i;
+                mykey = "Premutated%d" % i;
                 if (not seqtol_parameter[mykey]):
                     del seqtol_parameter[mykey]
-                mykey = "seqtol_SK_chain%d" % i;
+                mykey = "Partner%d" % i;
                 if (not seqtol_parameter[mykey]):
                     del seqtol_parameter[mykey]
-                    
+            
+            if skerrormsg != "":
+                errormsg += "\n%s" % skerrormsg        
             if not success:
                 return (False, errormsg)
             
@@ -1254,12 +1378,13 @@ def submit(form, SID):
         
         return_vals = (True, cryptID, "new", warnings) # true we processed the data
     
-        if len(error):      # if something went wrong, sent HTML header that redirects user/browser to the form
+        if len(errormsg):      # if something went wrong, sent HTML header that redirects user/browser to the form
             # s = sys.stdout
             #  sys.stderr = s
             #  s.write( "Content-type: text/html\n")
             #  s.write( "Location: %s?query=submit&error_msg=%s\n\n" % ( ROSETTAWEB_server_script, error) )
-            return_vals = (False, error)
+            #return (False, errormsg)
+            dummy = 1
         else:
             # if we're good to go, create new job
             # get ip addr hostname
@@ -1275,7 +1400,7 @@ def submit(form, SID):
             # write information to database
             sql = """INSERT INTO backrub (Date,Email,UserID,Notes,Mutations,PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,PM_chain,PM_resid,PM_newres,PM_radius,task, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter) 
                             VALUES (NOW(), "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % ( Email, UserID, JobName, mutations_data, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, PM_chain, PM_resid, PM_newres, PM_radius, modus, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_string )
-                          
+              
             try: 
                 import random
                 execQuery(connection, sql)
@@ -1333,7 +1458,7 @@ def submit(form, SID):
       
     else:
         form['error_msg'] = 'wrong mode for submit()'
-        return (False, error)
+        return (False, errormsg)
     
     return (True, cryptID, "new")
   
@@ -1465,7 +1590,6 @@ def jobinfo(form, SID):
 try:
     ws()
 except Exception, e:
-    import traceback
     traceback.print_exc()
     print "An error occured. Please check your input and contact us if the problem persists."
 
