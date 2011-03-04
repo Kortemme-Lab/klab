@@ -148,7 +148,7 @@ function isCYS(elem)
 
 function isStoredPDB(str)
 {
-	var expr = /^[A-Za-z0-9]+\.pdb$/i;
+	var expr = /^[A-Za-z0-9]+\/[^\/\\]\.pdb$/i;
 	return str.match(expr);		
 }
 
@@ -842,6 +842,15 @@ function showPDBUploadElements(visible)
 			new Effect.Appear( PDBelems[k] , { duration: 0.0 } );
 		}
 		new Effect.Fade('UploadedPDB' , { duration: 0.0 } );
+		// todo: Hacky special case. This can be tidied up when all protocols use the preuploading
+		if (document.submitform.task.value != 'parameter3_2')
+		{
+			new Effect.Fade( "SKSpecial", { duration: 0.0} )
+		}
+		else
+		{
+			new Effect.Appear( "SKSpecial", { duration: 0.0} )
+		}
 	}
 	else
 	{
@@ -851,6 +860,7 @@ function showPDBUploadElements(visible)
 			new Effect.Fade( PDBelems[k] , { duration: 0.0 } );
 		}	
 		new Effect.Appear('UploadedPDB' , { duration: 0.0 } );
+		new Effect.Fade( "SKSpecial", { duration: 0.0} )
 	}
 }
 
@@ -935,7 +945,7 @@ function changeApplication( app, _task, _extra, _override ) {
 	
 	showPDBUploadElements(subtask == 0);
 	showGeneralSettings(task != 'parameter3_2' || subtask != 0);
-
+	
 	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
 	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) 
 	{ 

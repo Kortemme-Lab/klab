@@ -458,7 +458,8 @@ class RosettaHTML:
               <TR class="PDBSelector" style="display:none;"><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR class="PDBSelector" style="display:none;">
                 <TD align=right>4-digit PDB identifier <img src="../images/qm_s.png" title="%(tt_PDBID)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="4" onkeydown="if (event.keyCode == 13){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="4" onkeydown="if (event.keyCode == 13 && document.submitform.task.value == 'parameter3_2' && document.submitform.PDBID.value.length == 4){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
+                <span id="SKSpecial"><input type="button" value="Load PDB" onClick="if (document.submitform.PDBID.value.length == 4) {document.submitform.query.value = 'parsePDB'; document.submitform.submit();}"></span>
               </TD>
               </TR>''' % self.tooltips
         
