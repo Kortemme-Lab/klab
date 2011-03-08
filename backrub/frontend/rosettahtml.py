@@ -290,18 +290,20 @@ class RosettaHTML:
 # submit() and the submission forms
 ###############################################################################################
 
-    def submit(self, jobname='', error='', task=None, UploadedPDB='', StoredPDB='', listOfChains = [] ):
+    def submit(self, jobname='', errors=None, task=None, UploadedPDB='', StoredPDB='', listOfChains = [] ):
           # this function uses javascript functions from jscript.js
             # if you change the application tabler here, please make sure to change jscript.js accordingly
             # calling the function with parameters will load those into the form. #not implemented yet
 
-        if error != '':
-            error = '''<div align="center" style="width:300pt; background:lightgrey; margin:15pt; padding:15px; border-color:black; border-style:solid; border-width:2px;">
+        if errors:
+            errors = '''<div align="center" style="width:300pt; background:lightgrey; margin:15pt; padding:15px; border-color:black; border-style:solid; border-width:2px;">
                           Your job could not be submitted:<br><font style="color:red;"><b>%s</b></font><br>
                           <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_submission" target="_blank">More Information</a>. <a HREF="javascript:history.go(-1)">Return</a> to the form. 
-                       </div>''' % error           
-            
-        self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename, 'error':error})
+                       </div>''' % join(errors, '<br>')           
+        else:
+            errors = ''
+             
+        self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename, 'errors':errors})
         
         # <li id="ab1">
         #   [ <A href="/alascan/" class="nav" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
@@ -313,7 +315,7 @@ class RosettaHTML:
         postscripts = ""
         html = '''<td align="center">
     <H1 class="title">Submit a new job</H1>
-    %(error)s
+    %(errors)s
 <!-- Start Submit Form -->
     <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
 
@@ -947,7 +949,8 @@ class RosettaHTML:
         # I don't think this can happen but best to be safe
         box = '<font color="red">An error occured, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
-      if warnings != '':
+      if warnings:
+          warnings = "<li>" + join(warnings, "</li><li>") + "</li>"
           warningsbox = '''
               <table width="550" style="background-color:#ff4500;">
                   <tr>
@@ -984,11 +987,11 @@ class RosettaHTML:
 #                                                                                             #
 ###############################################################################################
 
-    def register(self, username='', firstname='', lastname='', institution='', email='', address='', city='', zip='', state='', country='', error='', update=False ):
+    def register(self, username='', firstname='', lastname='', institution='', email='', address='', city='', zip='', state='', country='', errors=None, update=False ):
         
         error_html = ''
-        if error != '':
-            error_html = '<P style="text-align:center; color:red;">%s</P>' % ( error )
+        if errors != None:
+            error_html = '<P style="text-align:center; color:red;">%s</P>' % ( join(errors, '<br>') )
         
         disabled = ''
         mode = 'check'
@@ -1535,7 +1538,7 @@ class RosettaHTML:
             html +="</td></tr>"
         return html      
     
-    def _showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, seqtol_parameter):
+    def _showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, params):
 
         html = """
               <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Tolerance Prediction (Smith, Kortemme 2010)</td></tr>
@@ -1545,33 +1548,23 @@ class RosettaHTML:
                   <td bgcolor="#EEEEFF">
                       """ % ( input_filename, size_of_ensemble)
                 
-        active = []    
-        activeList = []
-        maxActive = -1
-        
         # Note:  We use get here rather than direct dictionary access as we choose not to 
-        #        store empty keys in the parameter to save space 
-        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-            partner = seqtol_parameter.get("Partner%d" % i)
-            if partner:
-                active.append(True)
-                activeList.append(i)
-                if i > maxActive:
-                    maxActive = i
-                html += 'Partner %d: Chain %s<br>' % (i + 1, partner)
-                plist = seqtol_parameter.get("Premutated%d" % i)
-                if plist:
-                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Premutated residues at positions:</i></td><td></td><td>'
-                    for k,v in sorted(plist.items()):
-                        html += '%s (%s) ' % (k, ROSETTAWEB_SK_AAinv[v])
-                    html += '</td></tr></table>'
-                dlist = seqtol_parameter.get("Designed%d" % i)
-                if dlist:
-                    html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(dlist.keys(),' '))
-            else:
-                active.append(False)
+        #        store empty keys in the parameter to save space
+        numActive = 0
+        for partner in params["Partners"]:
+            numActive += 1
+            html += 'Partner %d: Chain %s<br>' % (numActive, partner)
+            plist = params["Premutated"][partner]
+            if plist:
+                html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Premutated residues at positions:</i></td><td></td><td>'
+                for k,v in sorted(plist.items()):
+                    html += '%s (%s) ' % (k, ROSETTAWEB_SK_AAinv[v])
+                html += '</td></tr></table>'
+            dlist = params["Designed"][partner]
+            if dlist:
+                html += '<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(dlist.keys(),' '))
         
-        html += '<br>Boltzmann factor: %s' % (seqtol_parameter["kT"])
+        html += '<br>Boltzmann factor: %s' % (params["kT"])
         
         html += """
                     <br><br>
@@ -1583,29 +1576,37 @@ class RosettaHTML:
                             <td bgcolor="#EEEEFF"></td>
                             <td>Self Energy (k<sub>_</sub>)</td>"""
 
-        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-            if active[i] and i != maxActive:
-                html += "<td>k<sub>P<sub>%s</sub></sub>_</td>" % (seqtol_parameter.get("Partner%d" % i))
+        for i in range(numActive - 1):
+            html += "<td>k<sub>P<sub>%s</sub></sub>_</td>" % (params["Partners"][i])
         
         html += "</thead></tr><tbody bgcolor='#F4F4FF'>"
     
-        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
-            if active[i]:
-                html += """
-                        <tr align="left" border=1>                    
-                              <td bgcolor="#828282" style="color:white; align="left">%s</td>
-                              <td>%s</td>""" % (seqtol_parameter.get("Partner%d" % i), seqtol_parameter["kP%dP%d" % (i, i)])
-                for j in activeList:
-                    if j < i:
-                        html += "<td>%s</td>" % seqtol_parameter["kP%dP%d" % (j, i)]
-                    elif j != maxActive:
-                        html += "<td bgcolor='#EEEEFF'></td>"
-                html += "</tr>"
+        weights = params["Weights"]
+        
+        lweights = []
+        offset = 0
+        idx = 1 + numActive
+        
+        for i in range(numActive):
+            numweights = numActive - i - 1
+            if numweights:
+                lweights.append(weights[idx : idx + numweights])
+            idx += numweights
+        
+        for i in range(numActive):
+            html += """
+                    <tr align="left" border=1>                    
+                          <td bgcolor="#828282" style="color:white; align="left">%s</td>
+                          <td>%s</td>""" % (params["Partners"][i], params["Weights"][i+1])
+            for h in range(numActive - 1):
+                if h < i:
+                    html += "<td>%s</td>" % lweights[h][i - h - 1]
+                else:
+                    html += "<td bgcolor='#EEEEFF'></td>"
+            html += "</tr>"
 
         html += "</tbody></table></td></tr></table>" 
         html += "</td></tr>"
-        
-        
         
         #todo: if status == 'done' or status == 'sample':
         input_id = input_filename[:-4] # filename without suffix
@@ -1619,13 +1620,11 @@ class RosettaHTML:
              
             designed_chains = []
             designed_res = []
-            for i in range(0, ROSETTAWEB_max_seqtol_SK_chains): 
-                chain = seqtol_parameter.get("Partner%d" % i)
-                if chain:
-                    reslist = seqtol_parameter.get("Designed%d" % i)
-                    if reslist:
-                        designed_chains += [chain for res in reslist.keys()]
-                        designed_res += reslist
+            for partner in params["Partners"]:
+                reslist = params["Designed"][partner]
+                if reslist:
+                    designed_chains += [partner for res in reslist.keys()]
+                    designed_res += reslist.keys()
              
             html += self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains) # only the first 10 structures are shown
             
@@ -1795,15 +1794,15 @@ class RosettaHTML:
                                             parameter['ENS_num_designs_per_struct'], parameter['ENS_segment_length'] )
                                             
             elif parameter['task'] == 'sequence_tolerance':
-                seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
+                ProtocolParameters = pickle.loads(parameter['seqtol_parameter'])
                 html += self._showSequenceTolerance( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], parameter['Mini'],
-                                                     seqtol_parameter['seqtol_chain1'], seqtol_parameter['seqtol_chain2'], 
-                                                     seqtol_parameter['seqtol_list_1'], seqtol_parameter['seqtol_list_2'],
-                                                     seqtol_parameter['seqtol_weight_chain1'], seqtol_parameter['seqtol_weight_chain2'], seqtol_parameter['seqtol_weight_interface'] )
+                                                     ProtocolParameters['seqtol_chain1'], ProtocolParameters['seqtol_chain2'], 
+                                                     ProtocolParameters['seqtol_list_1'], ProtocolParameters['seqtol_list_2'],
+                                                     ProtocolParameters['seqtol_weight_chain1'], ProtocolParameters['seqtol_weight_chain2'], ProtocolParameters['seqtol_weight_interface'] )
 
             elif parameter['task'] == 'sequence_tolerance_SK':
-                seqtol_parameter = pickle.loads(parameter['seqtol_parameter'])
-                html += self._showSequenceToleranceSK( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], seqtol_parameter)
+                ProtocolParameters = pickle.loads(parameter['ProtocolParameters'])
+                html += self._showSequenceToleranceSK( status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters)
                 
         html += '</table><br></div></td>\n'
         
