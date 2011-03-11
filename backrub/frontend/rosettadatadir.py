@@ -184,10 +184,10 @@ class RosettaDataDir(RosettaHTML):
     
     self.jobid = jobid
     if mini:
-      self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (mini)</h1>' % jobid
+      self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (mini)</h1>' % jobid
       self.html_refs = '<P>%(Smith_SP)s</P>' % self.refs
     else:
-      self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (classic)</h1>' % jobid
+      self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (classic)</h1>' % jobid
       self.html_refs = '<P>%(Humphris)s</P>' % self.refs
     
     # individual boxplots
@@ -207,9 +207,10 @@ class RosettaDataDir(RosettaHTML):
             ''' % (cryptID, br_resfile, br_resfile)
     
     if mini: 
-        self.content += '''
-          <li>Sequence tolerance residue file: <a href="../downloads/%s/seqtol_%s.resfile">seqtol_%s.resfile</a></li> 
-            ''' % (cryptID, jobid, jobid)
+        for st_resfile in grep('seqtol_[0-9]+\.resfile',list_files):
+            self.content += '''
+              <li>Sequence tolerance residue file: <a href="../downloads/%s/%s">%s</a></li> 
+                ''' % (cryptID, st_resfile, st_resfile)
             
     self.content += '''
         </ul>

@@ -98,8 +98,13 @@ ROSETTAWEB_download_dir = parameter['rosetta_dl']
 
 ROSETTAWEB_base_dir = parameter["base_dir"]
 ROSETTAWEB_temp_dir = parameter["rosetta_tmp"]
-        
-        
+
+# Keep a reference to the Apache error stream in case we need to use it for debugging scripts timing out.
+apacheerr = sys.stderr     
+
+if ROSETTAWEB_server_name == 'albana.ucsf.edu':
+    import profile 
+  
 # open connection to MySQL
 connection = MySQLdb.Connection(host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket)
 ########################################## Setup End ##########################################
@@ -160,13 +165,13 @@ def saveTempPDB(SID, pdbfile, pdb_filename):
 # It takes no formal arugments, but parses the following CGI form fields:                     #
 #  query  [ register | login | logout | index | terms_of_service | submit | queue | update ]  #
 ###############################################################################################
-
+        
 def ws():
   s = sys.stdout
   if ROSETTAWEB_server_name == 'albana.ucsf.edu':
-    sys.stderr = s # todo: should be removed later
-    #todo: Test this for debugging  
-    #cgitb.enable(display=0, logdir="/tmp")
+      sys.stderr = s # todo: should be removed later
+      #todo: Test this for debugging  
+      #cgitb.enable(display=0, logdir="/tmp")
   debug = ''
   
   html_content = ''
@@ -390,7 +395,7 @@ def ws():
               html_content = rosettaHTML.submit('', errors, None, pdb_filename, newfilepath, pdb_object.chain_ids())
               title = 'Submission Form'
       
-  elif query_type == "submitted":
+  elif query_type == "submitted":    
     return_val = submit(form, SID)
     if return_val: # data was submitted and written to the database
         html_content = rosettaHTML.submitted('', return_val[0], return_val[1], warnings)
@@ -809,7 +814,7 @@ def check_pdb(pdb_object):
     if counts["atoms"] > 10000:
         errors.append("Maximum number of atoms exceeded;<br>The maximum is %d, the PDB contained %d." % (10000, counts["atoms"]))
         return False
-    elif counts["residues"] > 500:
+    elif counts["residues"] > 1500:
         errors.append("Maximum number of residues exceeded;<br>The maximum is %d, the PDB contained %d." % (500, counts["residues"]))
         return False
     # todo: This value used to be 4 but ROSETTAWEB_max_seqtol_SK_chains is currently greater than 4 so we use that
@@ -966,7 +971,7 @@ def SequenceToleranceSKSubmit(form, pdb_object):
     Premutated = {}
     Designed = {}
     Weights = []    
-    
+            
     # Store the Partner identifiers
     # Only read up to the number of chains selected by the user
     numChainsToRead = int(form["numPartners"].value)
@@ -991,13 +996,13 @@ def SequenceToleranceSKSubmit(form, pdb_object):
         return None        
         
     # If the user specified the chains in a different order from the PDB, we will need to correct this
-    # all_chains is ordered by appearance in the PDB
+    # all_chains is ordered by appearance in the PDB    
     all_chains = pdb_object.chain_ids()
     weightRemap = []
     for i in range(0, len(all_chains)):
         if all_chains[i] in Partners:
             weightRemap.append(Partners[all_chains[i]])
-    
+        
     # Store the Score Reweighting values, using the mapping above to fix the order. We assume the JS has done its job properly. 
     try: 
         # We order the weights to match the command-line input format e.g. Other A B A-B, or A B C A-B A-C B-C, etc.                
@@ -1035,7 +1040,7 @@ def SequenceToleranceSKSubmit(form, pdb_object):
     except:
         errors.append("An error occurred reordering the weights matrix to match the PDB file.")
         return None
-    
+        
     # Store the residues
     scs, numDesignedResidues = SequenceToleranceSKSubmitResidues(form, Partners, Designed, ROSETTAWEB_SK_MaxMutations, "designed", "seqtol_SK_mut_c_", "seqtol_SK_mut_r_", None)
     success = success and scs
@@ -1044,7 +1049,7 @@ def SequenceToleranceSKSubmit(form, pdb_object):
     if numDesignedResidues < 1:
         success = False
         errors.append("There must be at least one designed residue.")                               
-
+    
     #todo: check in JS whether numeric values are actually numeric 
                                
     # Store the Boltzmann Factor
@@ -1060,8 +1065,7 @@ def SequenceToleranceSKSubmit(form, pdb_object):
             warnings.append("Using a user-defined value for kT (%s) rather than the published value." % userkT)
     else:
         kT = ROSETTAWEB_SK_InitialBoltzmann + numPremutations * ROSETTAWEB_SK_BoltzmannIncrease
-        warnings.append("Running the job with the published value for kT = %f + %d * %f = %f." % (ROSETTAWEB_SK_InitialBoltzmann, numPremutations, ROSETTAWEB_SK_BoltzmannIncrease, kT))
-        
+        warnings.append("Running the job with the published value for kT = %f + %d * %f = %f." % (ROSETTAWEB_SK_InitialBoltzmann, numPremutations, ROSETTAWEB_SK_BoltzmannIncrease, kT))    
     
     parameters = {
             "Partners"      :   Partners.keys(),
@@ -1079,11 +1083,11 @@ def SequenceToleranceSKSubmit(form, pdb_object):
 def SequenceToleranceSKChecks(params, pdb_object):
     # Sanity checks:
     
-    # Check if residue and chain exist in structure:
+    # Check if residue and chain exist in structure:    
     all_chains = pdb_object.chain_ids()
     all_resids = pdb_object.aa_resids()
     resid2type = pdb_object.aa_resid2type() 
-    
+        
     success  = True
         
     # First, build up the chain lists
@@ -1123,7 +1127,9 @@ def SequenceToleranceSKChecks(params, pdb_object):
     for partner in params["Partners"]:
         lparams['partners'].append(partner)
         lparams['designed'][partner] = params["Designed"][partner]
-    resfileHasContents, contents = pdb_object.make_seqtol_resfile(lparams, ROSETTAWEB_SK_Radius)
+        
+    resfileHasContents, contents = pdb_object.make_seqtol_resfile(lparams, ROSETTAWEB_SK_Radius, all_resids)
+    
     if not resfileHasContents:
         success = False
         errors.append(contents)                     
@@ -1163,7 +1169,7 @@ def submit(form, SID):
             ############## PDB STUFF ###################
                         
             pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(form)
-            
+                        
             if not pdb_okay:
                 return False
             ############## PDB STUFF END ###############
@@ -1393,14 +1399,13 @@ def submit(form, SID):
     
             #todo: all this code here is messy - clean it up as suggested in website meeting
             # sequence tolerance aka library design
-            elif modus == 'sequence_tolerance_SK':
-                ProtocolParameters = SequenceToleranceSKSubmit(form, pdb_object)
+            elif modus == 'sequence_tolerance_SK':            
+                ProtocolParameters = SequenceToleranceSKSubmit(form, pdb_object)       
                 if not ProtocolParameters:
                     return False
                 
             # todo: output where the time is going on Albana
             # todo: add test input button which tests submit but does not add a job to the db
-
             seqtol_parameter = pickle.dumps(seqtol_parameter)                                     
             ProtocolParameters = pickle.dumps(ProtocolParameters)
             
@@ -1490,6 +1495,7 @@ def submit(form, SID):
                 # unlock tables
                 sql = "UNLOCK TABLES"
                 execQuery(connection, sql)
+                
                 return return_vals
           
         else:
