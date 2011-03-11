@@ -65,6 +65,7 @@ from cgi import escape
 
 import string
 import pickle
+
 #todo: Test this for debugging import cgitb
 
 ###############################################################################################
@@ -72,6 +73,12 @@ import pickle
 ###############################################################################################
 
 parameter = read_config_file('/etc/rosettaweb/parameter.conf')
+
+# todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
+ROSETTAWEB_base_dir = parameter["base_dir"]
+sys.path.insert(0, "%sdaemon/" % ROSETTAWEB_base_dir)
+from pdb import PDB
+from rosettaseqtol import make_seqtol_resfile
 
 ROSETTAWEB_db_host = parameter['db_host']
 ROSETTAWEB_db_db = parameter['db_name']
@@ -96,7 +103,6 @@ ROSETTAWEB_cookie_expiration = 60 * 60
 ROSETTAWEB_bin_sendmail = parameter['bin_sendmail']
 ROSETTAWEB_download_dir = parameter['rosetta_dl']
 
-ROSETTAWEB_base_dir = parameter["base_dir"]
 ROSETTAWEB_temp_dir = parameter["rosetta_tmp"]
 
 # Keep a reference to the Apache error stream in case we need to use it for debugging scripts timing out.
@@ -104,14 +110,10 @@ apacheerr = sys.stderr
 
 if ROSETTAWEB_server_name == 'albana.ucsf.edu':
     import profile 
-  
+ 
 # open connection to MySQL
 connection = MySQLdb.Connection(host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket)
 ########################################## Setup End ##########################################
-
-# todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
-sys.path.insert(0, "%sdaemon/" % ROSETTAWEB_base_dir)
-from pdb import PDB
 
 # todo: These would be tidier as member elements of a ws class
 errors = []
@@ -1120,15 +1122,8 @@ def SequenceToleranceSKChecks(params, pdb_object):
             errors.append("Chain '%s' not found." % chain)
     
     # Test to see if the seqtol resfile would be empty before proceeding 
-    # todo: Tidy this logic up with rosettaseqtol.py
-    lparams = {} 
-    lparams['partners'] = []
-    lparams['designed'] = {}
-    for partner in params["Partners"]:
-        lparams['partners'].append(partner)
-        lparams['designed'][partner] = params["Designed"][partner]
-        
-    resfileHasContents, contents = pdb_object.make_seqtol_resfile(lparams, ROSETTAWEB_SK_Radius, all_resids)
+    # todo: Tidy this logic up with rosettaseqtol.py        
+    resfileHasContents, contents = make_seqtol_resfile(pdb_object, params, ROSETTAWEB_SK_Radius, all_resids)
     
     if not resfileHasContents:
         success = False
