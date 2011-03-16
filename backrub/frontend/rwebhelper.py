@@ -22,9 +22,9 @@ ROSETTAWEB_SK_Radius = 10.0
 ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK = 2
 
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
-       "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
-       "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
-       "TRP": "W", "TYR": "Y"}
+                    "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
+                    "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
+                    "TRP": "W", "TYR": "Y"}
 
 ROSETTAWEB_SK_AAinv = {}
 for k, v in ROSETTAWEB_SK_AA.items():

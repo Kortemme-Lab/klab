@@ -161,6 +161,14 @@ def saveTempPDB(SID, pdbfile, pdb_filename):
         errors.append(estring)
         return False, ''
    
+def getMiniVersion(form):         
+    if form.has_key("Mini"):
+        return form["Mini"].value # this is either 'mini' or 'classic'
+    elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
+        return "classic"
+    else:
+        return None          
+
 ###############################################################################################
 # ws()                                                                                        #
 # This is the main function call. It parses the CGI arguments and generates web pages.        #
@@ -798,11 +806,11 @@ def getUserData(form, SID):
 
 ################################### end update() ##############################################
 
-def check_pdb(pdb_object):
+def check_pdb(pdb_object, usingClassic):
     '''checks pdb file for errors'''
     
     # check the formatting of the file
-    pdb_check_output, wrns = pdb_object.check_format()
+    pdb_check_output, wrns = pdb_object.check_format(usingClassic)
     if pdb_check_output != True:
         errors.append("PDB format incorrect: %s" % pdb_check_output)
         return False
@@ -853,6 +861,8 @@ def parsePDB(form):
     pdb_filename = None
     pdb_object = None
     
+    usingClassic = (getMiniVersion(form) == "classic")
+          
     if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
         try:
             pdbfile = form["PDBComplex"].value
@@ -912,7 +922,7 @@ def parsePDB(form):
         pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
 
         pdb_object = PDB(pdbfile.split('\n'))
-        pdb_check_result = check_pdb(pdb_object)
+        pdb_check_result = check_pdb(pdb_object, usingClassic)
         if not pdb_check_result:
             return pdb_check_result, pdbfile, pdb_filename, pdb_object
                 
@@ -1160,7 +1170,7 @@ def submit(form, SID):
             # so here we could add error handling if it would be necessary
             if form.has_key("JobName"):
                 JobName = escape(form["JobName"].value)
-        
+    
             ############## PDB STUFF ###################
                         
             pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(form)
@@ -1198,18 +1208,7 @@ def submit(form, SID):
                 modus = None
                 errors.append("No Application selected.")
                 return False 
-            
-            if form.has_key("Mini"):
-                mini = form["Mini"].value # this is either 'mini' or 'classic'
-            elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
-                mini = "classic"
-            # elif modus == 'sequence_tolerance': # we're fine and don't need a binary, so let's set a default
-            #   mini = 'mini'
-            else:
-                # this is preselected in HTML code, so this case should never occur, we still make sure!
-                errors.append("No Rosetta binary selected.")
-                return False
-            
+                        
             if form.has_key("nos"):
                 nos = min(int(form["nos"].value), 50)
             else:
@@ -1220,6 +1219,12 @@ def submit(form, SID):
             else:
                 keep_output = 1 # ALWAYS KEEP OUTPUT FOR NOW
             
+            mini = getMiniVersion(form)
+            if not mini:
+                # this is preselected in HTML code, so this case should never occur, we still make sure!
+                errors.append("No Rosetta binary selected.")
+                return False
+
             PM_chain = ''
             PM_resid = ''
             PM_newres = ''
