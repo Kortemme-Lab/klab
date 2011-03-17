@@ -124,6 +124,7 @@ class RosettaHTML:
         
         # Embed the Python constants into the Javascript
         html += """<script type="text/javascript">//<![CDATA[
+                        const HK_MaxMutations = %d;
                         const SK_max_seqtol_chains = %d;
                         const SK_InitialBoltzmann = %f;
                         const SK_BoltzmannIncrease = %f;
@@ -131,7 +132,7 @@ class RosettaHTML:
                         const SK_MaxPremutations = %d;
                         const RecommendedNumStructures = %d;
                         const RecommendedNumStructuresSeqTolSK = %d;
-                     //]]></script>""" % (ROSETTAWEB_max_seqtol_SK_chains, ROSETTAWEB_SK_InitialBoltzmann, ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations, ROSETTAWEB_SK_RecommendedNumStructures, ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK)
+                     //]]></script>""" % (ROSETTAWEB_HK_MaxMutations, ROSETTAWEB_max_seqtol_SK_chains, ROSETTAWEB_SK_InitialBoltzmann, ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations, ROSETTAWEB_SK_RecommendedNumStructures, ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK)
                 
                     
         html += """        <script src="/backrub/jscripts.js" type="text/javascript"></script>
@@ -687,7 +688,8 @@ class RosettaHTML:
             ''' % self.tooltips, ""
             
     def submitSeqTolHK(self, listOfChains):
-        return '''
+        html = []
+        html.append('''
             <!-- Library Design -->
             <p id="parameter3_1" style="display:none; opacity:0.0; text-align:center;">
             <table align="center">
@@ -707,24 +709,29 @@ class RosettaHTML:
                     <table bgcolor="#EEEEEE">
                       <tr bgcolor="#828282" style="color:white;">
                         <td>#</td><td>Chain ID</td><td>Residue Number</td>
-                      </tr>
-                      <tr align="center" id="seqtol_row_0" >                    <td>1</td><td><input type="text" name="seqtol_mut_c_0" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_0" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_1" style="display:none"><td>2</td><td><input type="text" name="seqtol_mut_c_1" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_1" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_2" style="display:none"><td>3</td><td><input type="text" name="seqtol_mut_c_2" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_2" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_3" style="display:none"><td>4</td><td><input type="text" name="seqtol_mut_c_3" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_3" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_4" style="display:none"><td>5</td><td><input type="text" name="seqtol_mut_c_4" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_4" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_5" style="display:none"><td>6</td><td><input type="text" name="seqtol_mut_c_5" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_5" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_6" style="display:none"><td>7</td><td><input type="text" name="seqtol_mut_c_6" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_6" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_7" style="display:none"><td>8</td><td><input type="text" name="seqtol_mut_c_7" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_7" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_8" style="display:none"><td>9</td><td><input type="text" name="seqtol_mut_c_8" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_8" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center" id="seqtol_row_9" style="display:none"><td>10</td><td><input type="text" name="seqtol_mut_c_9" maxlength=1 SIZE=2></td><td><input type="text" name="seqtol_mut_r_9" maxlength=4 SIZE=4></td></tr>
-                      <tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a residue</a></td></tr>
+                      </tr> ''')
+        
+        html.append('''<tr align="center" id="seqtol_row_0" >
+                            <td>1</td>
+                            <td><input type="text" name="seqtol_mut_c_0" maxlength=1 SIZE=2></td>
+                            <td><input type="text" name="seqtol_mut_r_0" maxlength=4 SIZE=4></td>
+                        </tr>''')
+        
+        for i in range(1, ROSETTAWEB_HK_MaxMutations):
+            html.append('''<tr align="center" id="seqtol_row_%d" style="display:none">
+                                <td>%d</td>
+                                <td><input type="text" name="seqtol_mut_c_%d" maxlength=1 SIZE=2></td>
+                                <td><input type="text" name="seqtol_mut_r_%d" maxlength=4 SIZE=4></td>
+                            </tr>''' % (i, i + 1, i, i))
+        
+        html.append('''<tr align="center"><td colspan="3"><a href="javascript:void(0)" onclick="addOneMoreSeqtol();">Click here to add a residue</a></td></tr>
                       </table>
                   </td>
                 </tr>
             </table>
-            </p>
-            ''' % self.tooltips, ""
+            </p>''')
+            
+        return join(html,""), ""
 
     def submitSeqTolSK(self, listOfChains):
 

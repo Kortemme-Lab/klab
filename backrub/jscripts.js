@@ -1,6 +1,6 @@
 
 var numMPM = 0; // Multiple Point Mutations
-var numSeqTol = 0; // Mutation SeqTol
+var numSeqTol = 1; // Mutation SeqTolHK
 var numSeqTolSK = 1; // Mutation SeqTolSK
 var numSeqTolSKPremutations = 0; // Mutation SeqTolSK
 const initNumSeqTolSKChains = 1;
@@ -9,11 +9,7 @@ const minSeqTolSKPremutations = 0;
 var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains for SeqTolSK
 var subtask = 0;
 
-// Constants
-
-// Sequence Tolerance (Humphris and Kortemme, Smith and Kortemme)
-// todo: add these on the fly using Python constants
-const HK_MaxMutations = 10;
+// Note: some constants are passed in by rosettahtml.py 
 
 function startup(query)
 {
@@ -388,6 +384,26 @@ function ValidateForm()
         	ret = ret && ( notEmpty(elems['seqtol_mut_r_' + '' + i]));
         	ret = ret && ( isNumeric(elems['seqtol_mut_r_' + '' + i]));
         }
+        
+        var validResidues = getValidResidues();
+		var validDesigned = validResidues["designed"]
+   		// Highlight any invalid designed residue rows
+		for (i = 0; i < validDesigned.length; i++)
+		{
+			if (!validDesigned[i])
+			{
+				markError(elems['seqtol_mut_c_' + i]);
+				markError(elems['seqtol_mut_r_' + i]);
+				ret = false;
+	        }
+		}
+		// Require at least one designed residue
+		if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
+		{
+			markError(elems['seqtol_mut_c_0']);
+			markError(elems['seqtol_mut_r_0']);
+			ret = false;
+		}
     }
     
     if ( sbmtform.task.value == "parameter3_2" ) 
@@ -518,6 +534,26 @@ function validChain(c)
 	return false;
 }
 
+// todo: Unify and remove this function
+function validChainHK(c)
+{
+	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
+	// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
+	if (checkIsAlpha(c))
+	{
+		var elems = document.submitform.elements;
+		if (elems["seqtol_chain1"].value == c)
+		{
+			return true;
+		}
+		else if (elems["seqtol_chain2"].value == c)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
 function validResidueID(i)
 {
 	// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
@@ -545,45 +581,76 @@ function getValidResidues()
 	var numValidPremutations = 0;
 	var numValidDesignedResidues = 0;
 	var elems = document.submitform.elements;
-	for (i = 0; i < numSeqTolSKPremutations ; i = i + 1) 
+		
+	if (task == 'parameter3_2')
 	{
-		premutated[i] = false; 
-		var chain = "" + elems["seqtol_SK_pre_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
-		var resid = "" + elems["seqtol_SK_pre_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
-		var AA = "" + elems["premutatedAA" + i].value;
-        
-		if (chain == "invalid" && resid == "" && AA.length != 3)
+		for (i = 0; i < numSeqTolSKPremutations ; i = i + 1) 
 		{
-			premutated[i] = -1;
-		}
-		else if (validChain(chain) && validResidueID(resid) && AA.length == 3)
-		{
-			if (!existingPremutations[chain+resid])
+			premutated[i] = false; 
+			var chain = "" + elems["seqtol_SK_pre_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
+			var resid = "" + elems["seqtol_SK_pre_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
+			var AA = "" + elems["premutatedAA" + i].value;
+	        
+			if (chain == "invalid" && resid == "" && AA.length != 3)
 			{
-				numValidPremutations = numValidPremutations + 1;
-				premutated[i] = true; 
+				premutated[i] = -1;
 			}
-			existingPremutations[chain+resid] = true;
+			else if (validChain(chain) && validResidueID(resid) && AA.length == 3)
+			{
+				if (!existingPremutations[chain+resid])
+				{
+					numValidPremutations = numValidPremutations + 1;
+					premutated[i] = true; 
+				}
+				existingPremutations[chain+resid] = true;
+			}
 		}
 	}
-	for (i = 0; i < numSeqTolSK ; i = i + 1) 
+	if (task == 'parameter3_2')
 	{
-		designed[i] = false; 
-		var chain = "" + elems["seqtol_SK_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
-		var resid = "" + elems["seqtol_SK_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
-		
-		if (chain == "invalid" && resid == "")
+		for (i = 0; i < numSeqTolSK ; i = i + 1) 
 		{
-			designed[i] = -1;
-		}
-		else if (validChain(chain) && validResidueID(resid))
-		{
-			if (!existingDesignedResidues[chain+resid])
+			designed[i] = false; 
+			var chain = "" + elems["seqtol_SK_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
+			var resid = "" + elems["seqtol_SK_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
+			
+			if (chain == "invalid" && resid == "")
 			{
-				numValidDesignedResidues = numValidDesignedResidues + 1;
-				designed[i] = true; 
+				designed[i] = -1;
 			}
-			existingDesignedResidues[chain+resid] = true;
+			else if (validChain(chain) && validResidueID(resid))
+			{
+				if (!existingDesignedResidues[chain+resid])
+				{
+					numValidDesignedResidues = numValidDesignedResidues + 1;
+					designed[i] = true; 
+				}
+				existingDesignedResidues[chain+resid] = true;
+			}
+		}
+	}
+	// todo: Unify this logic when HK is changed to behave as above (using invalid for default chain in dropdown box)
+	else if (task == 'parameter3_1')
+	{
+		for (i = 0; i < numSeqTol ; i = i + 1) 
+		{
+			designed[i] = false; 
+			var chain = "" + elems["seqtol_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
+			var resid = "" + elems["seqtol_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
+			
+			if (chain == "" && resid == "")
+			{
+				designed[i] = -1;
+			}
+			else if (validChainHK(chain) && validResidueID(resid))
+			{
+				if (!existingDesignedResidues[chain+resid])
+				{
+					numValidDesignedResidues = numValidDesignedResidues + 1;
+					designed[i] = true; 
+				}
+				existingDesignedResidues[chain+resid] = true;
+			}
 		}
 	}
 	premutated[-1] = numValidPremutations
@@ -1228,11 +1295,11 @@ function addOneMore()
 }
 
 //Adds a residue input field for Humphris and Kortemme's Interface Sequence Plasticity Prediction
-//todo: Add delete functionality
+//todo: Add delete functionality and fade add button
 function addOneMoreSeqtol()
 {
-    numSeqTol = numSeqTol + 1;
     new Effect.Appear("seqtol_row_" + "" + numSeqTol);
+    numSeqTol = numSeqTol + 1;
     return true;
 }
 

@@ -134,6 +134,17 @@ def getSortedString(o):
         return "{" + string.join(l, ",") + "}"    
     else:
         return str(o)
+
+def fixFilename(filename):
+    filename = filename.replace(' ', '_')
+    filename = filename.replace('.', '_')
+    filename = filename.replace(':', '_')
+    filename = filename.replace('\t', '_')
+    if filename[-3:] not in ['pdb', 'PDB' ]:
+        filename = filename + '.pdb'
+    else:
+        filename = filename[:-4] + '.pdb'
+    return filename
     
 def saveTempPDB(SID, pdbfile, pdb_filename):
     tempdir = "%spdbs" % ROSETTAWEB_temp_dir
@@ -144,6 +155,8 @@ def saveTempPDB(SID, pdbfile, pdb_filename):
             os.mkdir(tempdir, 0775)
         if not os.path.exists(innertempdir):
             os.mkdir(innertempdir, 0775)
+        
+        pdb_filename = fixFilename(pdb_filename)
         filepath = "%s/%s" % (innertempdir, pdb_filename)
         F = open(filepath, "w+")
         F.write(pdbfile)
@@ -162,6 +175,8 @@ def saveTempPDB(SID, pdbfile, pdb_filename):
         return False, ''
    
 def getMiniVersion(form):         
+    if form['task'].value == 'parameter3_2':
+        return 'mini'
     if form.has_key("Mini"):
         return form["Mini"].value # this is either 'mini' or 'classic'
     elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
@@ -812,7 +827,9 @@ def check_pdb(pdb_object, usingClassic):
     # check the formatting of the file
     pdb_check_output, wrns = pdb_object.check_format(usingClassic)
     if pdb_check_output != True:
-        errors.append("PDB format incorrect: %s" % pdb_check_output)
+        errors.append("PDB format incorrect:<p style='text-align:left'>")
+        errors.extend(pdb_check_output)
+        errors.append("</p>")
         return False
     else:
         warnings.extend(wrns)
@@ -869,12 +886,7 @@ def parsePDB(form):
             if not form["PDBComplex"].file:
                 errors.append("PDB data is not a file.")
             pdb_filename = form["PDBComplex"].filename
-            pdb_filename = pdb_filename.replace(' ', '_')
-            pdb_filename = pdb_filename.replace('.', '_')
-            if pdb_filename[-3:] not in ['pdb', 'PDB' ]:
-                pdb_filename = pdb_filename + '.pdb'
-            else:
-                pdb_filename = pdb_filename[:-4] + '.pdb'
+            pdb_filename = fixFilename(pdb_filename)
         except:
             errors.append("Invalid PDB file.")
             pdb_okay = False
@@ -1382,6 +1394,10 @@ def submit(form, SID):
                 all_resids = pdb_object.aa_resids()
                 resid2type = pdb_object.aa_resid2type()
                 
+                if not seqtol_parameter["seqtol_list_1"] and not seqtol_parameter["seqtol_list_2"]:
+                    errors.append("There must be at least one designed residue.")
+                    return False
+
                 for (chain, lst_resid) in [ (seqtol_parameter["seqtol_chain1"], seqtol_parameter["seqtol_list_1"]), (seqtol_parameter["seqtol_chain2"], seqtol_parameter["seqtol_list_2"]) ]:
                     if chain in all_chains:
                         for res_no in lst_resid:
@@ -1396,6 +1412,7 @@ def submit(form, SID):
                         errors.append("Chain not found.")
                         return False
                 #todo: This is what we eventually want - ProtocolParameters = seqtol_parameter
+                
     
             #todo: all this code here is messy - clean it up as suggested in website meeting
             # sequence tolerance aka library design

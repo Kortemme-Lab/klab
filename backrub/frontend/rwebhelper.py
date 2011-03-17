@@ -14,6 +14,7 @@ import _mysql_exceptions
 ROSETTAWEB_max_seqtol_SK_chains = 6
 ROSETTAWEB_SK_BoltzmannIncrease = 0.021
 ROSETTAWEB_SK_InitialBoltzmann = 0.228
+ROSETTAWEB_HK_MaxMutations = 10
 ROSETTAWEB_SK_MaxMutations = 10
 ROSETTAWEB_SK_MaxPremutations = 30
 ROSETTAWEB_SK_RecommendedNumStructures = 10
