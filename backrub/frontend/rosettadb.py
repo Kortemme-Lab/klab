@@ -11,6 +11,7 @@
 
 import sys, os
 import MySQLdb
+import traceback
 
 from string import join
 
@@ -47,16 +48,15 @@ class RosettaDB:
                
         fields = self._getFieldsInDB(tablename)
         
-        SQL = 'SELECT *,DATE_ADD(EndDate, INTERVAL %s DAY),TIMEDIFF(DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMEDIFF(EndDate, StartDate) FROM %s WHERE cryptID="%s"' % (self.store_time, self.store_time, tablename, ID)
-        
+        SQL = 'SELECT *,MAKETIME(0,0,TIMESTAMPDIFF(SECOND, StartDate, EndDate)),DATE_ADD(EndDate, INTERVAL %s DAY),TIMESTAMPDIFF(DAY,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMESTAMPDIFF(HOUR,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()) FROM %s WHERE cryptID="%s"' % (self.store_time, self.store_time, self.store_time, tablename, ID)
         array_data = self._execQuery(SQL)
-
+        
         if len(array_data) > 0:
             for x in range( len(fields) ):
                 self.data[fields[x]] = array_data[0][x]
             self.data['date_expiration']  = array_data[0][-3]
-            self.data['time_expiration']  = array_data[0][-2]
-            self.data['time_computation'] = array_data[0][-1]
+            self.data['time_expiration']  = "%d days, %d hours" % (abs(array_data[0][-2]),abs(array_data[0][-1]) - abs(array_data[0][-2] * 24))
+            self.data['time_computation'] = array_data[0][-4]
                          
         return self.data
         
@@ -145,7 +145,10 @@ class RosettaDB:
         
     def _execQuery(self,sql):
         cursor = self.connection.cursor()
-        cursor.execute(sql)
+        errcode = cursor.execute(sql)
+        #@debug:
+        #if errcode != 1:
+        #    print("%d: %s" %(errcode,traceback.print_stack()))
         results = cursor.fetchall()
         cursor.close()
         
@@ -164,7 +167,7 @@ class RosettaDB:
 if __name__ == "__main__":
     """here goes our testcode"""
     
-    test_fields = [ 'ID', 'cryptID', 'Date', 'StartDate', 'EndDate', 'UserID', 'Email', 'Status', 'Notes', 'task', 'PDBComplex', 'Mutations', 'ExperimentalValues', 'Errors', 'IPAddress', 'Host', 'ResultsTable', 'PDBComplexFile', 'ResultsRasmol', 'Mini', 'EnsembleSize', 'KeepOutput', 'PM_chain', 'PM_resid', 'PM_newres', 'PM_radius', 'RDC_temperature', 'RDC_num_designs_per_struct', 'RDC_segment_length'] 
+    test_fields = [ 'ID', 'cryptID', 'Date', 'StartDate', 'EndDate', 'UserID', 'Email', 'Status', 'Notes', 'task', 'PDBComplex', 'ExperimentalValues', 'Errors', 'IPAddress', 'Host', 'ResultsTable', 'PDBComplexFile', 'ResultsRasmol', 'Mini', 'EnsembleSize', 'KeepOutput', 'RDC_temperature', 'RDC_num_designs_per_struct', 'RDC_segment_length'] 
 
     test_db = RosettaDB( 'localhost', 'alascan', 'alascan', 'h4UjX!', 3306, '/opt/lampp/var/mysql/mysql.sock' )
     

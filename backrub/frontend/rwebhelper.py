@@ -19,6 +19,7 @@ ROSETTAWEB_SK_MaxMutations = 10
 ROSETTAWEB_SK_MaxPremutations = 30
 ROSETTAWEB_SK_RecommendedNumStructures = 10
 ROSETTAWEB_SK_Radius = 10.0
+ROSETTAWEB_MaxMultiplePointMutations = 30
 #todo: change to 20
 ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK = 2
 
@@ -27,10 +28,12 @@ ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", 
                     "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
                     "TRP": "W", "TYR": "Y"}
 
+ROSETTAWEB_CONTACT = "Tanja Kortemme"
+
 ROSETTAWEB_SK_AAinv = {}
 for k, v in ROSETTAWEB_SK_AA.items():
     ROSETTAWEB_SK_AAinv[v] = k
-
+    
 #############################################################################################
 # execQuery()                                                                               #
 # A general function to execute an SQL query. This function is called whenever a query is   #
