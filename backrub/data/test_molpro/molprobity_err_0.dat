@@ -1,0 +1,2 @@
+PHP Warning:  include_once(/opt/rosettabackend/bin/molprobity3/config/config.php): failed to open stream: No such file or directory in /opt/rosettabackend/bin/molprobity3/lib/core.php on line 21
+PHP Warning:  include_once(): Failed opening '/opt/rosettabackend/bin/molprobity3/config/config.php' for inclusion (include_path='.:/usr/share/pear:/usr/share/php') in /opt/rosettabackend/bin/molprobity3/lib/core.php on line 21

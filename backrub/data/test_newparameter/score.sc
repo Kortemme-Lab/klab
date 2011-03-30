@@ -1,0 +1,5 @@
+SEQUENCE: 
+SCORE: total_score dslf_ca_dih dslf_cs_ang dslf_ss_dih dslf_ss_dst      fa_atr      fa_dun fa_intra_rep      fa_pair       fa_rep       fa_sol hbond_bb_sc hbond_lr_bb    hbond_sc hbond_sr_bb     mm_bend       omega     p_aa_pp pro_close      rama       ref description 
+SCORE:     806.694       0.000       0.000       0.000       0.000    -302.724     312.062        1.128       -5.493      489.425      139.203      -1.765     -18.544      -0.521      -7.440     184.694       0.235      -3.393     0.312    42.875   -23.360 2PDZ_MODEL1_0001_low_0001
+SCORE:     806.694       0.000       0.000       0.000       0.000    -302.724     312.062        1.128       -5.493      489.425      139.203      -1.765     -18.544      -0.521      -7.440     184.694       0.235      -3.393     0.312    42.875   -23.360 2PDZ_MODEL1_0001_low_0001
+SCORE:     806.694       0.000       0.000       0.000       0.000    -302.724     312.062        1.128       -5.493      489.425      139.203      -1.765     -18.544      -0.521      -7.440     184.694       0.235      -3.393     0.312    42.875   -23.360 2PDZ_MODEL1_0001_low_0001
