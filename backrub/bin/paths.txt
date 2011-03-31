@@ -3,13 +3,13 @@ path is first '/', './',or  '../' to next whitespace, must end with '/'
 INPUT PATHS:
 pdb1	                        ./
 pdb2                            /
-alternate data files            /var/rosettabackend/data/rosetta_database/
+alternate data files            /var/www/html/rosettaweb/backrub/data/rosetta_database/
 fragments                       ./
 structure dssp,ssa (dat,jones)  ./
 sequence fasta,dat,jones        ./
 constraints                     ./
 starting structure              /
-data files                      /var/rosettabackend/data/rosetta_database/
+data files                      /var/www/html/rosettaweb/backrub/data/rosetta_database/
 OUTPUT PATHS:
 movie                           ./
 pdb path                        ./
