@@ -1,2 +1,53 @@
-This directory contains data necessary for the simulation as for instance the rosetta databases. I also keep some test code in here. The content of this dictionary is not checked in to the SVN.
+This directory contains data necessary for the simulation e.g. the Rosetta databases. Florian also kept some test code in here. Much of the data is not versioned in this repository as it is quite large. The databases can be reconstructed as follows:
+
+data/minirosetta_database
+> svn info minirosetta_database
+Path: minirosetta_database
+URL: https://svn.rosettacommons.org/source/trunk/minirosetta_database
+Repository Root: https://svn.rosettacommons.org/source
+Repository UUID: 6189c7af-7406-0410-a2ce-f22f51069c23
+Revision: 39284
+Node Kind: directory
+Schedule: normal
+Last Changed Author: sthyme
+Last Changed Rev: 39117
+Last Changed Date: 2010-10-29 10:13:42 -0700 (Fri, 29 Oct 2010)
+--or as it was on kortemmelab before the first update by Shane:
+Path: minirosetta_database
+URL: https://svn.rosettacommons.org/source/trunk/minirosetta_database
+Repository Root: https://svn.rosettacommons.org/source
+Repository UUID: 6189c7af-7406-0410-a2ce-f22f51069c23
+Revision: 32532
+Node Kind: directory
+Schedule: normal
+Last Changed Author: johnk
+Last Changed Rev: 32509
+Last Changed Date: 2009-09-02 17:25:09 -0700 (Wed, 02 Sep 2009)
+
+data/rosetta_database
+> svn info rosetta_database
+Path: rosetta_database
+URL: https://svn.rosettacommons.org/source/trunk/rosetta_database
+Repository Root: https://svn.rosettacommons.org/source
+Repository UUID: 6189c7af-7406-0410-a2ce-f22f51069c23
+Revision: 26316
+Node Kind: directory
+Schedule: normal
+Last Changed Author: possu
+Last Changed Rev: 20479
+Last Changed Date: 2008-02-19 17:23:25 -0800 (Tue, 19 Feb 2008)
+
+data/rosetta_database_elisabeth
+> svn info rosetta_database_elisabeth/
+Path: rosetta_database_elisabeth
+URL: https://svn.rosettacommons.org/source/trunk/rosetta_database
+Repository Root: https://svn.rosettacommons.org/source
+Repository UUID: 6189c7af-7406-0410-a2ce-f22f51069c23
+Revision: 15454
+Node Kind: directory
+Schedule: normal
+Last Changed Author: johnk
+Last Changed Rev: 15286
+Last Changed Date: 2007-06-01 22:24:40 -0700 (Fri, 01 Jun 2007)
+
 

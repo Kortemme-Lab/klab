@@ -1,15 +1,81 @@
+/************************************
+ * Constants and globals
+ * Note: some constants are passed in by rosettahtml.py 
+ ************************************/
 
-var numMPM = 0; // Multiple Point Mutations
-var numSeqTol = 1; // Mutation SeqTolHK
-var numSeqTolSK = 1; // Mutation SeqTolSK
-var numSeqTolSKPremutations = 0; // Mutation SeqTolSK
+// Constants used by validation functions
+const integralExpression 	= /^[0-9]+$/;
+const numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/;
+const alphaExpression 		= /^[A-Za-z]+$/;
+const chainExpression 		= /^[A-Za-z]$/;
+const emptyExpression 		= /^\s*$/;
+const PDBExpression 		= /^[A-Za-z0-9]+$/;
+const StoredPDBExpression 	= /^[A-Za-z0-9]+\/[^\/\\]\.pdb$/i;
+const CysteineExpression 	= /^CYS$/i;
+const CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in mini Rosetta."
+
+/* Protocol variables */
+// Multiple Point Mutations
+var numMPM = 1;
+
+// SeqTolHK
+var numSeqTol = 1;	// Mutations
+
+// SeqTolSK
+var numSeqTolSK = 1; // Mutations
+var numSeqTolSKPremutations = 0; // Premutations
+var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains
+var columnElements;
 const initNumSeqTolSKChains = 1;
 const minSeqTolSKMutations = 1;
 const minSeqTolSKPremutations = 0;
-var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains for SeqTolSK
-var subtask = 0;
 
-// Note: some constants are passed in by rosettahtml.py 
+// An array of validation functions for the protocols
+protocolValidators = 
+[ 
+	[validateOneMutation, validateMultipleMutations],
+	[validateEnsemble, validateEnsembleDesign],
+	[validateSeqtolHK, validateSeqtolSK]
+]
+
+//An array of functions to set demo values for the protocols
+setDemoValues = 
+[ 
+	[demoOneMutation, demoMultipleMutations],
+	[demoEnsemble, demoEnsembleDesign],
+	[demoSeqtolHK, demoSeqtolSK]
+]
+
+// An array of functions to handle protocol-specific GUI setup
+const numSubTasks = 3
+function noop(app, task, extra){}
+additionalGUISetup = new Array(protocolTasks.length)
+for (var i = 0; i < protocolTasks.length; i++)
+{
+	additionalGUISetup[i] = new Array(protocolTasks[i])
+	for (var j = 0; j < protocolTasks[i]; j++)
+	{
+		additionalGUISetup[i][j] = new Array(numSubTasks)
+		for (var k = 0; k < numSubTasks; k++)
+		{
+			additionalGUISetup[i][j][k] = noop
+		}
+	}
+}
+
+// Additional GUI setup
+function showMutationRowAdder(app, task, extra)
+{
+	new Effect.Appear("addmrow_" + app + "_" + task, { duration: 0.0 } );
+}
+additionalGUISetup[2][1][1] = changeApplicationToSeqtolSK1
+additionalGUISetup[2][1][2] = changeApplicationToSeqtolSK2
+additionalGUISetup[0][1][1] = showMutationRowAdder
+additionalGUISetup[2][0][1] = showMutationRowAdder
+
+/************************************
+ * Main functions
+ ************************************/
 
 function startup(query)
 {
@@ -18,19 +84,17 @@ function startup(query)
 	{
 		Nifty("ul#about li","big fixed-height");
         Nifty("div#box","big transparent fixed-height");
-        subtask = 0;
     }
 	else if (query == "parsePDB")
 	{
 		Nifty("ul#about li","big fixed-height");
         Nifty("div#box","big transparent fixed-height");
-		// todo: get this value (3,2) from the form
-		subtask = 1;
-		changeApplication(3, 2, 2 );
+		protocol = getProtocol();
+		changeApplication(protocol[0], protocol[1], 1, 2 );
 	}	 
 	else if (query == "index" || query == "login") 
     {
-    	Nifty("div#login_box","big transparent fixed-height");
+		Nifty("div#login_box","big transparent fixed-height");
     }
 	else if (query == "queue" ) 
     {
@@ -40,9 +104,187 @@ function startup(query)
     {
     	Nifty("div#jobinfo","big transparent fixed-height");
     }
-    //updateCellSize2();
 }
 
+//This function shows the input form for the protocol <_task> of protocol series <app>.
+//This includes a logo and parameter fields for the protocol.
+//The _override parameter is used for the demo data 
+function changeApplication( app, task, subtask, extra, override ) 
+{
+	// Reset to the start on protocol change
+	if (!isProtocol(app, task) || subtask == undefined)
+	{
+		subtask = 0;
+	}
+	
+	// Clear all form fields
+	clearFormFields()
+
+	// Set the form's protocol values
+	setProtocol(app, task);
+
+	// Hide the descriptions of the protocol series and the descriptions of other protocol tasks
+	thistask = hideInactiveProtocols(app, task);
+	
+	// Display the PDB uploading section
+	// Show the HTML elements for entering parameters and submitting the form
+	showCommonElements(subtask);
+	
+	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
+	revisionFields = document.getElementsByClassName("bin_revisions");
+	for ( i = 0; i < protocolBins[app][task].length; i++ )
+	{
+		new Effect.Appear('rv' + protocolBins[app][task][i], { duration: 0.0, queue: { scope: 'task' } });		
+	}
+	
+	// Select the default binary (which should be defined as position 0)
+	var miniGroup = document.submitform.Mini
+	for (var i = 0; i < miniGroup.length; i++)
+	{
+		if (miniGroup[i].value == protocolBins[app][task][0])
+		{
+			miniGroup[i].checked = true;
+		}
+	}
+	
+	// Display the GUI elements based on the subtask
+	if (subtask == 0)
+	{
+		// Set the default number of structures
+		document.submitform.nos.value = protocolNos[app][task][1];
+		
+		new Effect.Fade( thistask + "_step1" );
+		new Effect.Fade( thistask + "_step2", { duration: 0.0} );
+	}
+	else if (subtask == 1)
+	//todo: check load demo values if (!override && (!extra || document.getElementById("parameter2_1_step1").style.display == "none"))
+	{
+		additionalGUISetup[app][task][1](app, task, [extra, override])
+		new Effect.Appear( thistask + "_step1", { duration: 0.0, queue: { scope: 'task' }} );		
+		new Effect.Fade(   thistask + "_step2", { duration: 0.0, queue: { scope: 'task' }} );
+	}
+	if (subtask == 2)
+	{ 
+		additionalGUISetup[app][task][2](app, task, [extra, override])
+		new Effect.Appear( thistask + "_step2" );
+	}
+}
+
+//This function shows the preliminary screen for each protocol series.
+//This includes a logo and descriptive text but no input form.
+function showMenu( menu_id ) {
+	
+	document.submitform.reset();
+	/* This function extends or hides the menu on the left */	
+
+	// box contains the pici, texti, common parameters, parameteri_j, parameter submission, and refi elements where i = menu_id
+	// Essentially, it is the right column in the description (resp. submission pages) for protocol series (resp. protocols)   
+	// Set the color as above and the minimum height.
+	mycolor = colors[menu_id];
+	document.getElementById("box").style.background = mycolor;
+	document.getElementById("box").style.minHeight = document.getElementById("columnLeft").style.offsetHeight;
+	Nifty("div#box","big transparent fixed-height");
+	  
+	// Hide the common submission page text
+	new Effect.Fade( "textintro", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+	  
+	// Display any elements pic and text suffixed with menu_id and hide all others
+	for ( i = 0; i < protocolTasks.length; i++ )
+	{
+		if (i == menu_id)
+		{
+			// This will display the logo and descriptive text. 
+			new Effect.Appear( "pic"  + i);
+			new Effect.Appear( "text" + i);
+		}
+		else
+		{
+			new Effect.Fade( "pic"  + i, { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+			new Effect.Fade( "text" + i, { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+		}			
+
+		for ( j = 0; j < protocolTasks[i]; j++ )
+		{
+			// Hide all reference elements
+			new Effect.Fade( "ref" + i + "_" + j, { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+			new Effect.Fade( "parameter" + i + "_" + j, {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
+		}
+	}
+ 
+	// Hide all other parameter fields (used on the submission pages)
+	parameterDivs = new Array("PrePDBParameters", "PostPDBParameters", "parameter_submit");
+	for ( i = 0; i < parameterDivs.length; i++ )
+	{
+		new Effect.Fade( parameterDivs[i], {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
+	}
+	     
+	return true;
+}
+
+function ValidateForm()
+{
+	allWhite();
+	var sbmtform = document.submitform;
+	var elems = sbmtform.elements;
+	protocol = getProtocol();
+	pgroup = protocol[0];
+	ptask = protocol[1];
+
+	// return value - if false then we do not submit the job
+	var ret
+	
+	// Check the job name
+	ret = validateNotEmpty(sbmtform.JobName);
+
+	// Check that a PDB has been uploaded
+	if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" && sbmtform.StoredPDB.value == "") 
+    {
+    	sbmtform.PDBComplex.style.background="red";
+    	sbmtform.PDBID.style.background="red";
+    	ret = false;
+    }
+    else 
+    {
+    	sbmtform.PDBComplex.style.background="white";
+    	sbmtform.PDBID.style.background="white";
+    }
+	if ( sbmtform.PDBComplex.value == "" ) 
+    {
+		if ( sbmtform.StoredPDB.value != "" ) 
+	    {
+			ret = checkValue(sbmtform.StoredPDB.value, StoredPDBExpression) && ret;
+	    }
+		else if ( sbmtform.PDBID.value.length < 4 ) 
+    	{
+    		sbmtform.PDBID.style.background="red";
+    		ret = false;
+    	}
+    	else
+    	{
+    		ret = validateElem(sbmtform.PDBID, PDBExpression) && ret;
+    	}
+    }
+	
+	// Check the number of structures
+    if ( validateElem(sbmtform.nos, integralExpression) ) 
+    {
+    	minNos = protocolNos[pgroup][ptask][0];
+    	maxNos = protocolNos[pgroup][ptask][2];                   	                               		
+    	if ( sbmtform.nos.value < minNos || sbmtform.nos.value > maxNos ) 
+    	{
+    		sbmtform.nos.style.background="red";
+            ret = false;
+        }
+    }
+    else 
+    {
+    	ret = false; 
+    }
+    
+    ret = protocolValidators[pgroup][ptask]() && ret;
+    return ret;
+}
+	
 function ValidateFormRegister()
 { 
 	if ( document.myForm.username.value == "" ||
@@ -70,606 +312,550 @@ function ValidateFormRegister()
     }
     return true;
 }
-
-function isInteger(n)
+	
+function ValidateFormEmail()
 {
-	var integralExpression = /^[0-9]+$/;
-	return n.match(integralExpression);
-}
-
-function isNumeric(elem)
-{
-	var numericExpression = /^[0-9\.]+$/;
-	if(elem.value.match(numericExpression))
+	if ( document.myForm.Email.value.indexOf("@") == -1 ||
+		document.myForm.Email.value.indexOf(".") == -1 ||
+        document.myForm.Email.value.indexOf(" ") != -1 ||
+        document.myForm.Email.value.length < 6 )
 	{
-		elem.style.background="white";
-		return true;
-	}
-	else
-	{
-		elem.focus();
-		elem.style.background="red";
-		return false;
-	}
-}
-
-function isAlpha(elem)
-{
-	var numericExpression = /^[A-Za-z]+$/;
-	if(elem.value.match(numericExpression))
-	{
-		elem.style.background="white";
-		return true;
-	}
-	else
-	{
-		elem.focus();
-		elem.style.background="red";
-		return false;
-	}
-}
-
-function isAA(elem)
-{
-	var numericExpression = /^[ACDEFGHIKLMNOPQRSTUVWY]+$/;
-	if(elem.value.match(numericExpression))
-	{
-		elem.style.background="white";
-		return true;
-	}
-	else
-	{
-		elem.focus();
-		elem.style.background="red";
-		return false;
-	}
-}
-
-function isCYS(elem)
-{
-	if(elem.value == "C")
-	{
-		alert("We are sorry but mutation to Cystein is not allowed.");
-		elem.focus();
-		elem.style.background="red";
-		return false;
-	}
-	else
-	{
-		elem.style.background="white";
-		return true;
-	}
-}
-
-
-function isStoredPDB(str)
-{
-	var expr = /^[A-Za-z0-9]+\/[^\/\\]\.pdb$/i;
-	return str.match(expr);		
-}
-
-function isPDB(elem){
-	var numericExpression = /^[A-Za-z0-9]+$/;
-	if(elem.value.match(numericExpression))
-	{
-		elem.style.background="white";
-		return true;
-	}
-	else
-	{
-		elem.focus();
-		elem.style.background="red";
-		return false;
-	}
-}
-
-function checkIsEmpty(elem)
-{
-	return elem.value.length == 0;
-}
-
-function checkIsAlpha(v)
-{
-	var alphaExpression = /^[A-Za-z]+$/;
-	if(v.match(alphaExpression))
-	{
-		return true;
-	}
-	else
-	{
-		return false;
-	}
-}
-
-function markError(elem)
-{
-	elem.focus();
-	elem.style.background="red";
-}
-
-function notEmpty(elem)
-{
-	if(elem.value.length == 0)
-	{
-		elem.focus();
-		elem.style.background="red";
-		return false;
-	}
-	elem.style.background="white";
-	return true;
-}
-
-function isEmpty(elem)
-{
-    if (elem == "" || elem == null || !isNaN(elem) || elem.charAt(0) == '' )
-    {
-        return true;
+		alert("Your email address is not valid.");
+        return false;
     }
-    return false;
+    return true;
 }
 
-
-function allWhite()
+// Fills in sample data for the protocols when 'Load sample data' is clicked
+function set_demo_values() 
 {
-	for(i = 0; i < document.submitform.elements.length; i++)
+	protocol = getProtocol();
+	pgroup = protocol[0];
+	ptask = protocol[1];
+	
+	document.submitform.nos.value = protocolNos[pgroup][ptask][1];
+	setDemoValues[pgroup][ptask]()
+	//return true;
+}
+
+/************************************
+ * Protocol-specific functions
+ ************************************/
+
+/* All protocol-specific functions are defined here. Define at least the validator and demo value setter */
+
+/************************************
+ * Protocol-specific functions - Point Mutation
+ ************************************/
+
+function validateOneMutation()
+{
+    ret = true;
+    var sbmtform = document.submitform;
+		
+	if (sbmtform.PM_chain.value == "invalid")
+    {
+    	ret = false;
+    	sbmtform.PM_chain.style.background="red";
+    }
+
+	if ( usingMini() && validateElem(sbmtform.PM_newres, CysteineExpression))
 	{
-		var elem = document.submitform.elements[i];
-		if ((elem.disabled == false) || (elem.name == "UserName"))
-		{
-			elem.style.background = "white";
-		}
-		else
-		{
-			elem.style.background = "grey";
-		}
+		alert(CysteinMutationError);
+		ret = false;
 	}
+	
+	ret = validateElem(sbmtform.PM_resid, integralExpression) && ret;
+	ret = validateElem(sbmtform.PM_newres, alphaExpression) && ret;
+	ret = validateElem(sbmtform.PM_radius, numericExpression) && ret;
+	return ret;
 }
 
-function ValidateForm()
+function demoOneMutation()
 {
-	allWhite();
+	var sbmtform = document.submitform;
+	sbmtform.PDBID.value = "1ABE";
+	sbmtform.PM_chain.value = "A";
+	sbmtform.PM_resid.value = "108";
+	sbmtform.PM_newres.value = "L";
+}
+
+/************************************
+ * Protocol-specific functions - Multiple Mutations
+ ************************************/
+
+function validateMultipleMutations()
+{
+	ret = true;
 	var sbmtform = document.submitform;
 	var elems = sbmtform.elements;
 	
-	// return value - if false then we do not submit the job
-	var ret = notEmpty(sbmtform.JobName);
-	
-	if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" && sbmtform.StoredPDB.value == "") 
-    {
-    	sbmtform.PDBComplex.style.background="red";
-    	sbmtform.PDBID.style.background="red";
-    	//alert("Please upload a structure or enter a PDB identifier.");
-    	ret = false;
-    }
-    else 
-    {
-    	sbmtform.PDBComplex.style.background="white";
-    	sbmtform.PDBID.style.background="white";
-    }
-	
-	if ( sbmtform.PDBComplex.value == "" ) 
-    {
-		if ( sbmtform.StoredPDB.value != "" ) 
-	    {
-			ret = ret && isStoredPDB(sbmtform.StoredPDB.value);
-	    }
-		else if ( sbmtform.PDBID.value.length < 4 ) 
+	for (var i = 0 ; i < MaxMultiplePointMutations ; i = i + 1) 
+	{
+		chain = elems['PM_chain' + i];
+		resid = elems['PM_resid' + i];
+		newres = elems['PM_newres' + i];
+		radius = elems['PM_radius' + i];
+		
+		// break the loop on the first empty row (the radius is filled in automatically and not checked)
+        if ((chain.value == "invalid") && (resid.value.length == 0) && (newres.value.length == 0)) 
+        {
+           if ( i == 0 ) 
+           {   
+        	   ret = false;
+               chain.style.background="red";
+               resid.style.background="red";
+               newres.style.background="red";
+               radius.style.background="red";
+           }
+           break;
+        }
+
+        // if not empty, check if ALL values are entered correctly.=, including the radius
+        if (chain.value == "invalid")
+        {
+        	ret = false;
+        	chain.style.background="red";
+        }    	
+    	
+    	if ( usingMini() && validateElem(newres, CysteineExpression))
     	{
-    		sbmtform.PDBID.style.background="red";
+    		alert(CysteinMutationError);
     		ret = false;
     	}
-    	else
-    	{
-    		ret = ret && isPDB(sbmtform.PDBID);
-    	}
-    }
-	
-    if ( notEmpty(sbmtform.nos) && isNumeric(sbmtform.nos) ) 
-    {
-    	if ( sbmtform.task.value == "parameter3_2" )
-    	{
-    		// todo: These values (10, 100, 2, 50) should be set by Python to centralize them
-    		// todo: min should be 10 but I've allowed 2 for testing
-	    	if ( sbmtform.nos.value < 2 || sbmtform.nos.value > 100 ) 
-	    	{
-	    		sbmtform.nos.style.background="red";
-	            ret = false;
-	        }
-    	}
-    	else
-    	{
-	    	if ( sbmtform.nos.value < 2 || sbmtform.nos.value > 50 ) 
-	    	{
-	    		sbmtform.nos.style.background="red";
-	            ret = false;
-	        }
-    	}
-    }
-    else 
-    {
-    	ret = false; 
-    }
-	
-    if ( sbmtform.task.value == "parameter1_1" )
-    {
-    	ret = ret && (notEmpty(sbmtform.PM_chain)); 
-    	ret = ret && (isAlpha(sbmtform.PM_chain));
-    	ret = ret && (notEmpty(sbmtform.PM_resid)); 
-    	ret = ret && (isNumeric(sbmtform.PM_resid));
-    	ret = ret && (notEmpty(sbmtform.PM_newres));
-    	ret = ret && (isAA(sbmtform.PM_newres));
-    	ret = ret && (notEmpty(sbmtform.PM_radius));
-    	ret = ret && (isNumeric(sbmtform.PM_radius));
-    	if ( sbmtform.Mini.value == 'mini') {
-    		ret = ret && (isCys(sbmtform.PM_newres));          
-    	}
-    }
-    
-    if ( sbmtform.task.value == "parameter1_2" ) {
-    	var i=0;
-    	for (i=0;i<=30;i=i+1) 
-    	{
-	        // check if row is empty
-	        if ( isEmpty(elems['PM_chain' + '' + i].value) && 
-	             isEmpty(elems['PM_resid' + '' + i].value) && 
-	             isEmpty(elems['PM_newres'+ '' + i].value) && 
-	             isEmpty(elems['PM_radius'+ '' + i].value) ) 
-	        {
-	           // break the loop
-	           if ( i==0 ) 
-	           {
-	               ret = false;
-	               elems['PM_chain' + '' + i].style.background="red";
-	               elems['PM_resid' + '' + i].style.background="red";
-	               elems['PM_newres'+ '' + i].style.background="red";
-	               elems['PM_radius'+ '' + i].style.background="red";
-	           }
-	           break;
-	        }
-	        // if not empty, check if ALL values are entered correctly.
-	        ret = ret && ( notEmpty(elems['PM_chain' + '' + i]));
-	        ret = ret && ( isAlpha(elems['PM_chain' + '' + i]));
-	        ret = ret && ( notEmpty(elems['PM_resid' + '' + i]));
-	        ret = ret && ( isNumeric(elems['PM_resid' + '' + i]));
-	        ret = ret && ( notEmpty(elems['PM_newres'+ '' + i]));
-	        ret = ret && ( isAlpha(elems['PM_newres'+ '' + i]));
-	        if ( sbmtform.Mini.value == 'mini' )
-	        { 
-	        	ret = ret && (isCys(elems['PM_newres' + '' + i]));
-	        }
-	        ret = ret && ( notEmpty(elems['PM_radius'+ '' + i]));
-	        ret = ret && ( isNumeric(elems['PM_radius'+ '' + i]));
-    	}
-    }
-    
-    if ( sbmtform.task.value == "parameter2_2" ) 
-    {
-    	ret = ret && ( notEmpty(sbmtform.ENS_temperature) ); 
-    	ret = ret && ( isNumeric(sbmtform.ENS_temperature) );
-    	if ( parseFloat(sbmtform.ENS_temperature.value) < 0.0 || parseFloat(sbmtform.ENS_temperature.value) > 4.8) 
-    	{ 
-    		ret = false;  
-    		sbmtform.ENS_temperature.style.background="red";
-        }
-    	ret = ret && ( notEmpty(sbmtform.ENS_num_designs_per_struct) ); 
-    	ret = ret && ( isNumeric(sbmtform.ENS_num_designs_per_struct) );
-    	ret = ret && ( notEmpty(sbmtform.ENS_segment_length) ); 
-    	ret = ret && ( isNumeric(sbmtform.ENS_segment_length) );
-    }
-    
-    if ( sbmtform.task.value == "parameter1_3" ) 
-    {
-    	ret = ret && ( notEmpty(sbmtform.Mutations) );
-    }
-    
-    if ( sbmtform.task.value == "parameter3_1" ) 
-    {
-    	ret = ret && ( notEmpty( sbmtform.seqtol_chain1) );
-    	ret = ret && ( isAlpha( sbmtform.seqtol_chain1) );
-    	ret = ret && ( notEmpty( sbmtform.seqtol_chain2) );
-    	ret = ret && ( isAlpha( sbmtform.seqtol_chain2) );
-        // notEmpty( sbmtform.seqtol_weight_chain1, "Please enter a weight for Partner 1");
-        // notEmpty( sbmtform.seqtol_weight_chain2, "Please enter a weight for Partner 2");
-        // notEmpty( sbmtform.seqtol_weight_interface, "Please enter a weight for the interface") ;
-        var i=0;
-        for (i = 0; i <= HK_MaxMutations ; i = i + 1) 
-        {
-        	// check if row is empty
-        	if ( elems['seqtol_mut_c_' + '' + i].value.length == 0 && elems['seqtol_mut_r_' + '' + i].value.length == 0 ) 
-        	{
-        		break;
-        	}
-        	ret = ret && ( notEmpty(elems['seqtol_mut_c_' + '' + i]));
-        	ret = ret && ( isAlpha(elems['seqtol_mut_c_' + '' + i]));
-        	ret = ret && ( notEmpty(elems['seqtol_mut_r_' + '' + i]));
-        	ret = ret && ( isNumeric(elems['seqtol_mut_r_' + '' + i]));
-        }
-        
-        var validResidues = getValidResidues();
-		var validDesigned = validResidues["designed"]
-   		// Highlight any invalid designed residue rows
-		for (i = 0; i < validDesigned.length; i++)
-		{
-			if (!validDesigned[i])
-			{
-				markError(elems['seqtol_mut_c_' + i]);
-				markError(elems['seqtol_mut_r_' + i]);
-				ret = false;
-	        }
-		}
-		// Require at least one designed residue
-		if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
-		{
-			markError(elems['seqtol_mut_c_0']);
-			markError(elems['seqtol_mut_r_0']);
-			ret = false;
-		}
-    }
-    
-    if ( sbmtform.task.value == "parameter3_2" ) 
-    {       
-    	// Highlight Partner 1 if no partners are specified
-    	var allempty = true;
-    	chainList = new Array();
-
-    	// iterate through the displayed chains only
-    	for (i = 0; i < numSeqTolSKChains ; i = i + 1) 
-    	{
-    		var c = elems["seqtol_SK_chain" + i];
-    		var cval = c.value;
-    		
-    		var cIsEmpty = (cval.length == 0);
-    		allempty = allempty && cIsEmpty;
-    		
-    		// require unique chain names
-    		if (!cIsEmpty)
-    		{
-    			if (cval == "invalid")
-    			{
-    				markError(c);
-    				ret = false;
-    			}
-    			else if (cval != "ignore" && chainList[cval])
-    			{
-    				markError(c);
-    				ret = false;
-    			}
-    			chainList[cval] = true;
-    		}
-    	}
     	
-    	if (allempty == true)
+        ret = validateElem(resid, integralExpression) && ret;
+        ret = validateElem(newres, alphaExpression) && ret;
+        ret = validateElem(radius, numericExpression) && ret;
+	}
+	return ret;
+}
+
+function demoMultipleMutations()
+{
+	var sbmtform = document.submitform;
+	sbmtform.PDBID.value = "2PDZ";
+	sbmtform.PM_chain0.value = "A";
+	sbmtform.PM_resid0.value = "17";
+	sbmtform.PM_newres0.value = "A";
+	sbmtform.PM_radius0.value = "6.0";
+	addOneMore();
+	sbmtform.PM_chain1.value = "A";
+	sbmtform.PM_resid1.value = "32";
+	sbmtform.PM_newres1.value = "A";
+	sbmtform.PM_radius1.value = "6.0";
+	addOneMore();
+	sbmtform.PM_chain2.value = "A";
+	sbmtform.PM_resid2.value = "65";
+	sbmtform.PM_newres2.value = "A";
+	sbmtform.PM_radius2.value = "6.0";
+	addOneMore();
+	sbmtform.PM_chain3.value = "A";
+	sbmtform.PM_resid3.value = "72";
+	sbmtform.PM_newres3.value = "A";
+	sbmtform.PM_radius3.value = "6.0";
+	addOneMore();
+}
+
+/************************************
+ * Protocol-specific functions - Backrub Conformational Ensemble
+ ************************************/
+
+function validateEnsemble()
+{
+	return true;
+}
+
+function demoEnsemble()
+{
+	document.submitform.PDBID.value = "1UBQ";
+}
+
+/************************************
+ * Protocol-specific functions - Backrub Ensemble Design
+ ************************************/
+
+function validateEnsembleDesign()
+{
+	ret = true;
+	var sbmtform = document.submitform;
+	var elems = sbmtform.elements;
+	
+	ret = validateElem(sbmtform.ENS_temperature, numericExpression) && ret
+	if (ret && parseFloat(sbmtform.ENS_temperature.value) < 0.0 || parseFloat(sbmtform.ENS_temperature.value) > 4.8) 
+	{ 
+		ret = false;  
+		sbmtform.ENS_temperature.style.background="red";
+    }
+	ret = validateElem(sbmtform.ENS_num_designs_per_struct, integralExpression) && ret
+	ret = validateElem(sbmtform.ENS_segment_length, numericExpression) && ret
+	return ret;
+}   
+
+function demoEnsembleDesign()
+{
+	var sbmtform = document.submitform;
+	sbmtform.PDBID.value = "1UBQ";
+	sbmtform.ENS_temperature.value = "1.2";
+	sbmtform.ENS_num_designs_per_struct.value = "20";
+	sbmtform.ENS_segment_length.value = "12";
+}
+
+/************************************
+ * Protocol-specific functions -Sequence Tolerance HK
+ ************************************/
+
+function validateSeqtolHK()
+{
+	ret = true;
+	var sbmtform = document.submitform;
+	var elems = sbmtform.elements;
+	
+	ret = validateElem(sbmtform.seqtol_chain1, chainExpression) && ret;
+	ret = validateElem(sbmtform.seqtol_chain2, chainExpression) && ret;
+	
+	// validateNotEmpty( sbmtform.seqtol_weight_chain1, "Please enter a weight for Partner 1");
+    // validateNotEmpty( sbmtform.seqtol_weight_chain2, "Please enter a weight for Partner 2");
+    // validateNotEmpty( sbmtform.seqtol_weight_interface, "Please enter a weight for the interface") ;
+    for (var i = 0; i < HK_MaxMutations ; i = i + 1) 
+    {
+    	chain = elems['seqtol_mut_c_' + '' + i];
+    	resid = elems['seqtol_mut_r_' + '' + i];
+    	
+    	// check if row is empty
+    	if ( chain.value == "invalid" && validateElem(resid, emptyExpression)) 
     	{
-    		ret = ret && ( notEmpty( sbmtform.seqtol_SK_chain0) );
-    		ret = ret && ( isAlpha ( sbmtform.seqtol_SK_chain0) );
+    		break;
     	}
+    	ret = validateElem(chain, chainExpression) && ret;
+    	ret = validateElem(resid, integralExpression) && ret;
+    }
     
-    	// Highlight Boltzmann factor if missing or invalid
-		if (!elems["customBoltzmann"].checked)
+    var validResidues = getValidResidues();
+	var validDesigned = validResidues["designed"]
+	// Highlight any invalid designed residue rows
+	for (i = 0; i < validDesigned.length; i++)
+	{
+		if (!validDesigned[i])
 		{
-			ret = ret && ( notEmpty( sbmtform.seqtol_SK_Boltzmann) );
-			ret = ret && ( isNumeric ( sbmtform.seqtol_SK_Boltzmann) );
-		}
-		
-		var validResidues = getValidResidues();
-		var validPremutations = validResidues["premutated"]
-		var validDesigned = validResidues["designed"]
-		
-   		// Highlight any invalid premutation rows
-		for (i = 0; i < validPremutations.length; i++)
-		{
-			if (!validPremutations[i])
-			{
-				markError(elems['seqtol_SK_pre_mut_c_' + i]);
-				markError(elems['seqtol_SK_pre_mut_r_' + i]);
-				markError(elems['premutatedAA' + i]);
-				ret = false;
-	        }
-		}
-		// Highlight any invalid designed residue rows
-		for (i = 0; i < validDesigned.length; i++)
-		{
-			if (!validDesigned[i])
-			{
-				markError(elems['seqtol_SK_mut_c_' + i]);
-				markError(elems['seqtol_SK_mut_r_' + i]);
-				ret = false;
-	        }
-		}
-		// Require at least one designed residue
-		if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
-		{
-			markError(elems['seqtol_SK_mut_c_0']);
-			markError(elems['seqtol_SK_mut_r_0']);
+			markError(elems['seqtol_mut_c_' + i]);
+			markError(elems['seqtol_mut_r_' + i]);
 			ret = false;
+        }
+	}
+	// Require at least one designed residue
+	if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
+	{
+		markError(elems['seqtol_mut_c_0']);
+		markError(elems['seqtol_mut_r_0']);
+		ret = false;
+	}
+	return ret;
+}
+
+function demoSeqtolHK()
+{
+	// todo: Fix this up since move to dropdowns + other protocols as well
+	var sbmtform = document.submitform;
+	sbmtform.PDBID.value = "2PDZ";
+	sbmtform.seqtol_chain1.value = "A";
+	sbmtform.seqtol_chain2.value = "B";
+	// sbmtform.seqtol_radius.value = "4.0";
+	// sbmtform.seqtol_weight_chain1.value = "1";
+	// sbmtform.seqtol_weight_chain2.value = "1";      
+	// sbmtform.seqtol_weight_interface.value = "2";
+	sbmtform.seqtol_mut_c_0.value = "B";
+	sbmtform.seqtol_mut_r_0.value = "3";
+	addOneMoreSeqtol();
+	sbmtform.seqtol_mut_c_1.value = "B";
+	sbmtform.seqtol_mut_r_1.value = "4";
+	addOneMoreSeqtol();
+	sbmtform.seqtol_mut_c_2.value = "B";
+	sbmtform.seqtol_mut_r_2.value = "5";
+	addOneMoreSeqtol();
+	sbmtform.seqtol_mut_c_3.value = "B";
+	sbmtform.seqtol_mut_r_3.value = "6";
+	addOneMoreSeqtol();
+}
+
+/************************************
+ * Protocol-specific functions - Sequence Tolerance SK
+ ************************************/
+
+function validateSeqtolSK()
+{
+	ret = true;
+	var sbmtform = document.submitform;
+	var elems = sbmtform.elements;
+	// Highlight Partner 1 if no partners are specified
+	var allempty = true;
+	chainList = new Array();
+
+	// iterate through the displayed chains only
+	for (i = 0; i < numSeqTolSKChains ; i = i + 1) 
+	{
+		var c = elems["seqtol_SK_chain" + i];
+		var cval = c.value;
+		
+		var cIsEmpty = (cval.length == 0);
+		allempty = allempty && cIsEmpty;
+		
+		// require unique chain names
+		if (!cIsEmpty)
+		{
+			if (cval == "invalid")
+			{
+				markError(c);
+				ret = false;
+			}
+			else if (cval != "ignore" && chainList[cval])
+			{
+				markError(c);
+				ret = false;
+			}
+			chainList[cval] = true;
 		}
-                
-        // Highlight any missing weights
-        for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
+	}
+	
+	if (allempty == true)
+	{
+		ret = validateElem(sbmtform.seqtol_SK_chain0, alphaExpression) && ret;
+	}
+
+	// Highlight Boltzmann factor if missing or invalid
+	if (!elems["customBoltzmann"].checked)
+	{		
+    	ret = validateElem(sbmtform.seqtol_SK_Boltzmann, numericExpression) && ret;
+	}
+	
+	var validResidues = getValidResidues();
+	var validPremutations = validResidues["premutated"]
+	var validDesigned = validResidues["designed"]
+	
+	// Highlight any invalid premutation rows
+	for (i = 0; i < validPremutations.length; i++)
+	{
+		if (!validPremutations[i])
+		{
+			markError(elems['seqtol_SK_pre_mut_c_' + i]);
+			markError(elems['seqtol_SK_pre_mut_r_' + i]);
+			markError(elems['premutatedAA' + i]);
+			ret = false;
+        }
+	}
+	// Highlight any invalid designed residue rows
+	for (i = 0; i < validDesigned.length; i++)
+	{
+		if (!validDesigned[i])
+		{
+			markError(elems['seqtol_SK_mut_c_' + i]);
+			markError(elems['seqtol_SK_mut_r_' + i]);
+			ret = false;
+        }
+	}
+	// Require at least one designed residue
+	if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
+	{
+		markError(elems['seqtol_SK_mut_c_0']);
+		markError(elems['seqtol_SK_mut_r_0']);
+		ret = false;
+	}
+            
+    // Highlight any missing weights
+    for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
+    {
+    	for (j = i; j < SK_max_seqtol_chains ; j = j + 1) 
         {
-        	for (j = i; j < SK_max_seqtol_chains ; j = j + 1) 
-            {
-        		var c = elems["seqtol_SK_kP" + i + "P" + j]; 
-        		if (c.style.background == "white")
-            	{
-        			ret = ret && ( notEmpty(c));
-        			ret = ret && ( isNumeric(c));
-            	}	
-            }
-        }		
+    		var c = elems["seqtol_SK_kP" + i + "P" + j]; 
+    		if (c.style.background == "white")
+        	{
+    			ret = validateElem(c, numericExpression) && ret;
+        	}	
+        }
     }
     return ret;
 }
 
-function set_Boltzmann()
+function demoSeqtolSK()
 {
-	var b = document.submitform.elements["seqtol_SK_Boltzmann"];
-	if (document.submitform.elements["customBoltzmann"].checked)
-	{
-		b.style.background="silver";
-		b.disabled = true;
-	}
-	else
-	{
-		b.style.background="white";
-		b.disabled = false;
-	}
-}
-
-function validChain(c)
-{
-	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
-	// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
-	if (checkIsAlpha(c))
-	{
-		var elems = document.submitform.elements;
-		for (i = 0 ; i < numSeqTolSKChains; i++)
-		{
-			if (elems["seqtol_SK_chain" + i].value == c)
-			{
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-// todo: Unify and remove this function
-function validChainHK(c)
-{
-	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
-	// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
-	if (checkIsAlpha(c))
-	{
-		var elems = document.submitform.elements;
-		if (elems["seqtol_chain1"].value == c)
-		{
-			return true;
-		}
-		else if (elems["seqtol_chain2"].value == c)
-		{
-			return true;
-		}
-	}
-	return false;
-}
-
-function validResidueID(i)
-{
-	// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
-	return i != '' && isInteger(i);
-}
-
-// *** Sequence Tolerance *** 
-// Returns an array of two arrays.
-// The first array maps the displayed (numSeqTolSKPremutations) premutation indices to one of the values (true, false, "").
-// 		true means that the premutation is valid (todo: check against actual PDB - at present we just check the syntax and existing chains)
-//		false means that the premutation is invalid
-//		-1 means that the premutation fields are empty
-// The second array holds similar information for the designed residues
-function getValidResidues()
-{
-	var validResidues = new Array();
+	reset_seqtolSKData();
+	changeApplication(2, 1, 2, 2, true);
 	
-	var premutated = new Array();
-	var designed = new Array();
+	var sbmtform = document.submitform;
+	sbmtform.StoredPDB.value = '';
+    sbmtform.PDBID.value = "2PDZ";
+    // todo: Load sample PDB			
+	elemA = sbmtform.seqtol_SK_chain0
+	elemB = sbmtform.seqtol_SK_chain1
+	elemNumPartners = sbmtform.numPartners
+	// todo: Fix this up using an array
+	for (i = elemA.length; i >= 0; i--)
+	{
+		elemA.options[i] = null;
+	}
+	for (i = elemB.length; i >= 0; i--)
+	{
+		elemB.options[i] = null;
+	}
+	for (i = elemNumPartners.length; i >= 0; i--)
+	{
+		elemNumPartners.options[i] = null;
+	}
+	elemA.options[0] = new Option('A','A')
+	elemB.options[0] = new Option('B','B')
+	elemNumPartners.options[0] = new Option('2 Partners (Interface)','2')
+	elemA.value = "A";
+	elemA.value = "B";
+	//todo: loop here over residues and add choices for A and B
 	
-	var existingPremutations = new Array();
-	var existingDesignedResidues = new Array();
-	
-	var i = 0;
-	var numValidPremutations = 0;
-	var numValidDesignedResidues = 0;
-	var elems = document.submitform.elements;
-		
-	if (task == 'parameter3_2')
-	{
-		for (i = 0; i < numSeqTolSKPremutations ; i = i + 1) 
-		{
-			premutated[i] = false; 
-			var chain = "" + elems["seqtol_SK_pre_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
-			var resid = "" + elems["seqtol_SK_pre_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
-			var AA = "" + elems["premutatedAA" + i].value;
-	        
-			if (chain == "invalid" && resid == "" && AA.length != 3)
-			{
-				premutated[i] = -1;
-			}
-			else if (validChain(chain) && validResidueID(resid) && AA.length == 3)
-			{
-				if (!existingPremutations[chain+resid])
-				{
-					numValidPremutations = numValidPremutations + 1;
-					premutated[i] = true; 
-				}
-				existingPremutations[chain+resid] = true;
-			}
-		}
-	}
-	if (task == 'parameter3_2')
-	{
-		for (i = 0; i < numSeqTolSK ; i = i + 1) 
-		{
-			designed[i] = false; 
-			var chain = "" + elems["seqtol_SK_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
-			var resid = "" + elems["seqtol_SK_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
-			
-			if (chain == "invalid" && resid == "")
-			{
-				designed[i] = -1;
-			}
-			else if (validChain(chain) && validResidueID(resid))
-			{
-				if (!existingDesignedResidues[chain+resid])
-				{
-					numValidDesignedResidues = numValidDesignedResidues + 1;
-					designed[i] = true; 
-				}
-				existingDesignedResidues[chain+resid] = true;
-			}
-		}
-	}
-	// todo: Unify this logic when HK is changed to behave as above (using invalid for default chain in dropdown box)
-	else if (task == 'parameter3_1')
-	{
-		for (i = 0; i < numSeqTol ; i = i + 1) 
-		{
-			designed[i] = false; 
-			var chain = "" + elems["seqtol_mut_c_" + i].value.replace(/^\s+|\s+$/g, '');
-			var resid = "" + elems["seqtol_mut_r_" + i].value.replace(/^\s+|\s+$/g, '');
-			
-			if (chain == "" && resid == "")
-			{
-				designed[i] = -1;
-			}
-			else if (validChainHK(chain) && validResidueID(resid))
-			{
-				if (!existingDesignedResidues[chain+resid])
-				{
-					numValidDesignedResidues = numValidDesignedResidues + 1;
-					designed[i] = true; 
-				}
-				existingDesignedResidues[chain+resid] = true;
-			}
-		}
-	}
-	premutated[-1] = numValidPremutations
-	designed[-1] = numValidDesignedResidues
-	validResidues["premutated"] = premutated
-	validResidues["designed"] = designed
-	return validResidues;
+	//todo: loop here over chains
+	//sbmtform.seqtol_SK_chain2.value = "";
+	sbmtform.seqtol_SK_kP0P0.value = "0.4";
+	sbmtform.seqtol_SK_kP1P1.value = "0.4";
+	sbmtform.seqtol_SK_kP0P1.value = "1.0";
+	//todo: loop here over chains
+	//sbmtform.seqtol_SK_kC.value = "";
+	//sbmtform.seqtol_SK_kAC.value = "";
+	//sbmtform.seqtol_SK_kBC.value = "";
+	//sbmtform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
+	chainsChanged();
 }
 
-function updateBoltzmann()
+/************************************
+ * Protocol-specific GUI functions 
+ ************************************/
+
+// todo - The addOneMore functions could be merged
+
+/* Multiple point mutations */
+
+//Adds a residue input field 
+//todo: Add delete functionality
+function addOneMore()
 {
-	if (document.submitform.elements["customBoltzmann"].checked)
+	new Effect.Appear("row_PM" + "" + numMPM);
+	numMPM = numMPM + 1;
+	if (numMPM >= MaxMultiplePointMutations)
 	{
-		var validPremuations = getValidResidues()["premutated"]
-       	document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann + validPremuations[-1] * SK_BoltzmannIncrease;
+		  new Effect.Fade("addmrow_0_1", { duration: 0.0 } );
 	}
+	return true;
 }
 
-var columnElements;
+/* Sequence Tolerance HK */
+
+//Adds a residue input field
+//todo: Add delete functionality and fade add button
+function addOneMoreSeqtol()
+{
+	new Effect.Appear("seqtol_row_" + "" + numSeqTol);
+	numSeqTol = numSeqTol + 1;
+	if (numSeqTol >= HK_MaxMutations)
+	{
+		  new Effect.Fade("addmrow_2_0", { duration: 0.0 } );
+	}
+	return true;
+}
+
+/* Sequence Tolerance SK */
+
+//Adds a residue input field
+//todo: Add delete functionality
+function addOneMoreSeqtolSK()
+{
+	new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK);
+	numSeqTolSK = numSeqTolSK + 1;
+	if (numSeqTolSK >= SK_MaxMutations)
+	{
+		  new Effect.Fade("addmrow_2_1", { duration: 0.0 } );
+	}
+	return true;
+}
+
+function addOneMoreSeqtolSKPremutated()
+{
+	new Effect.Appear("seqtol_SK_pre_row_" + "" + numSeqTolSKPremutations);
+	numSeqTolSKPremutations = numSeqTolSKPremutations + 1;
+	if (numSeqTolSKPremutations >= SK_MaxPremutations)
+	{
+		new Effect.Fade("seqtol_SK_pre_addrow", { duration: 0.0 } );
+	}
+	return true;
+}
+
+function changeApplicationToSeqtolSK1(app, task, extra)
+{
+	new Effect.Fade( "recNumStructures" + app + "_" + task );
+}
+
+function changeApplicationToSeqtolSK2(app, task, extra)
+{
+	_extra = extra[0]
+	_override = extra[1]
+	                          	 
+	var i;
+	if (_extra < initNumSeqTolSKChains)
+	{
+		_extra = initNumSeqTolSKChains;
+	}
+	for (i = 0; i < _extra; i++)
+	{
+		new Effect.Appear("seqtol_SK_chainrow_" + "" + i);
+	}
+	for (; i < SK_max_seqtol_chains; i++)
+	{
+		new Effect.Fade("seqtol_SK_chainrow_" + "" + i, { duration: 0.0} );
+	}
+	numSeqTolSKChains = _extra
+	
+	if (!_override)
+	{
+		chainsChanged();
+		reset_seqtolSKData();
+	}
+	new Effect.Appear( "recNumStructures" + app + "_" + task );
+}
+
+function reset_seqtolSKData ()
+{
+	var oSubmitForm = document.forms["submitform"];
+	
+	// Premutations for design
+	for (i = 0; i < minSeqTolSKPremutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_pre_mut_c_" + i].value = "";
+		new Effect.Appear( "seqtol_SK_pre_row_" + i, { duration: 0.0 } );
+	}
+	for (i = minSeqTolSKPremutations; i < SK_MaxPremutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_pre_mut_c_" + i].value = "";
+		new Effect.Fade( "seqtol_SK_pre_row_" + i, { duration: 0.0 } );
+	}
+	new Effect.Appear("seqtol_SK_pre_addrow");
+	numSeqTolSKPremutations = minSeqTolSKPremutations;
+	
+	// Mutations for design
+	for (i = 0; i < minSeqTolSKMutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
+		new Effect.Appear( "seqtol_SK_row_" + i, { duration: 0.0 } );
+	}
+	for (i = minSeqTolSKMutations; i < SK_MaxMutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
+		new Effect.Fade( "seqtol_SK_row_" + i, { duration: 0.0 } );
+	}
+	new Effect.Appear("addmrow_2_1");
+	numSeqTolSK = minSeqTolSKMutations;
+	
+	// Chains
+	for (i = initNumSeqTolSKChains; i < SK_max_seqtol_chains; i++)
+	{
+		oSubmitForm.elements["seqtol_SK_chain" + i].value = "";
+		//new Effect.Fade( "seqtol_SK_chainrow_" + i, { duration: 0.0 } );
+	}
+	//numSeqTolSKChains = initNumSeqTolSKChains;
+}
 
 function buildSKColumns()
 {	
@@ -694,7 +880,7 @@ function buildSKColumns()
 				if (cn && cn.indexOf("seqtol_SK_kP") == 0)
 				{
 					var idx = cn.substring(11);
-					if (isInteger(idx))
+					if (checkValue(idx, integralExpression))
 					{
 						idx = parseInt(idx);
 						//columnElements[][]
@@ -717,66 +903,6 @@ function buildSKColumns()
 	}
 }
 
-// todo: deprecated
-function addChain(_key)
-{
-	var elems = document.submitform.elements;
-	var firstblank;
-	for (i = 0; i < numSeqTolSKChains; i++)
-	{
-		var e = elems["seqtol_SK_chain" + i];
-		var ev = e.value;
-		if (ev == _key)
-	    {
-	    	return;
-	    }
-		if (ev == "" && !firstblank)
-		{
-			firstblank = e;
-		}
-	}
-	if (firstblank)
-	{
-		firstblank.value = _key;
-		chainsChanged();
-	}
-	else
-	{
-		if (numSeqTolSKChains < SK_max_seqtol_chains)
-		{
-			elems["seqtol_SK_chain" + numSeqTolSKChains].value = _key;
-			addOneMoreChainSK();
-		}
-		chainsChanged();
-	}
-} 
-
-// todo: deprecated
-function chainAddedSK(idx, type)
-{
-	var c;
-	if (type == 0)
-	{
-		c = document.submitform.elements["seqtol_SK_pre_mut_c_" + idx];
-	}
-	else if (type == 1)
-	{
-		c = document.submitform.elements["seqtol_SK_mut_c_" + idx];
-	}
-	else
-	{
-		// Should never occur
-		return;
-	}
-	if (checkIsAlpha(c.value))
-	{
-		cv = c.value;
-		// todo: If chain ids are always uppercase, enable this line: cv = c.value.toUpperCase();
-		c.value = cv;
-		addChain(cv);
-	}
-}
-
 function chainsChanged()
 {
 	var i;
@@ -789,7 +915,7 @@ function chainsChanged()
 	for (i = 0; i < SK_max_seqtol_chains ; i = i + 1)
 	{
 		var c = document.submitform.elements["seqtol_SK_chain" + i];
-		var invalid = checkIsEmpty(c) || (c.value.length > 1) || !checkIsAlpha(c.value);
+		var invalid = !checkValue(c.value, chainExpression);
 		chainIsInvalid[i] = invalid;
 		if (!invalid)
 		{
@@ -858,92 +984,229 @@ function chainsChanged()
 	}
 	updateBoltzmann();
 }
+
+function updateBoltzmann()
+{
+	if (document.submitform.elements["customBoltzmann"].checked)
+	{
+		var validPremuations = getValidResidues()["premutated"]
+       	document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann + validPremuations[-1] * SK_BoltzmannIncrease;
+	}
+}
+
+function set_Boltzmann()
+{
+	var b = document.submitform.elements["seqtol_SK_Boltzmann"];
+	if (document.submitform.elements["customBoltzmann"].checked)
+	{
+		b.style.background="silver";
+		b.disabled = true;
+	}
+	else
+	{
+		b.style.background="white";
+		b.disabled = false;
+	}
+}
+
+/************************************
+ * Validity subfunctions
+ ************************************/
+
+//Generic checkers and validators
+
+function checkValue(v, expression)
+{
+	return v.match(expression)
+}
+
+function validateElem(elem, expression)
+{
+	var val = elem.value
+	if(val.length > 0 && val.match(expression))
+	{
+		elem.style.background="white";
+		return true;
+	}
+	else
+	{
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+}
+
+function validateNotEmpty(elem)
+{
+	if(elem.value.match(emptyExpression))
+	{
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+	elem.style.background="white";
+	return true;
+}
+
+// Specific validators
+
+function validChain(c)
+{
+	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
+	if (checkValue(c, chainExpression))
+	{
+		var elems = document.submitform.elements;
+		for (i = 0 ; i < numSeqTolSKChains; i++)
+		{
+			if (elems["seqtol_SK_chain" + i].value == c)
+			{
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+// todo: Unify and remove this function
+function validChainHK(c)
+{
+	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
+	if (checkValue(c, chainExpression))
+	{
+		var elems = document.submitform.elements;
+		if (elems["seqtol_chain1"].value == c)
+		{
+			return true;
+		}
+		else if (elems["seqtol_chain2"].value == c)
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
+
+// *** Sequence Tolerance *** 
+// Returns an array of two arrays.
+// The first array maps the displayed (numSeqTolSKPremutations) premutation indices to one of the values (true, false, "").
+// 		true means that the premutation is valid (todo: check against actual PDB - at present we just check the syntax and existing chains)
+//		false means that the premutation is invalid
+//		-1 means that the premutation fields are empty
+// The second array holds similar information for the designed residues
+function getValidResidues()
+{
+	var validResidues = new Array();
 	
-function ValidateFormEmail()
-{
-	if ( document.myForm.Email.value.indexOf("@") == -1 ||
-		document.myForm.Email.value.indexOf(".") == -1 ||
-        document.myForm.Email.value.indexOf(" ") != -1 ||
-        document.myForm.Email.value.length < 6 )
-	{
-		alert("Your email address is not valid.");
-        return false;
-    }
-    return true;
-}
-
-// todo: These two functions are similar. Parameterize them on the classname and handle extras (UploadedPDB)
-function showGeneralSettings(visible)
-{
-	//todo: may not work on all browsers - test
-	nonPDBelems = document.getElementsByClassName("PostPDBSubmission")
-	// Display the general section
-	if (visible)
-	{
-		for (var k = 0; k < nonPDBelems.length; k++)
-		{
-			new Effect.Appear( nonPDBelems[k] , { duration: 0.5, queue: { scope: 'task' } });
-		}
-	}
-	else
-	{
-		//todo: may not work on all browsers - test
-		for (var k = 0; k < nonPDBelems.length; k++)
-		{
-			new Effect.Fade( nonPDBelems[k] , { duration: 0.0 } );
-		}	
-	}
-}
-
-
-function showPDBUploadElements(visible)
-{
-	//todo: may not work on all browsers - test
-	PDBelems = document.getElementsByClassName("PDBSelector")
-
-	// Display the PDB uploading section
-	if (visible)
-	{
-		for (var k = 0; k < PDBelems.length; k++)
-		{
-			new Effect.Appear( PDBelems[k] , { duration: 0.0 } );
-		}
-		new Effect.Fade('UploadedPDB' , { duration: 0.0 } );
-		// todo: Hacky special case. This can be tidied up when all protocols use the preuploading
-		if (document.submitform.task.value != 'parameter3_2')
-		{
-			new Effect.Fade( "SKSpecial", { duration: 0.0} )
-		}
-		else
-		{
-			new Effect.Appear( "SKSpecial", { duration: 0.0} )
-		}
-	}
-	else
-	{
-		//todo: may not work on all browsers - test
-		for (var k = 0; k < PDBelems.length; k++)
-		{
-			new Effect.Fade( PDBelems[k] , { duration: 0.0 } );
-		}	
-		new Effect.Appear('UploadedPDB' , { duration: 0.0 } );
-		new Effect.Fade( "SKSpecial", { duration: 0.0} )
-	}
-}
-
-// This function shows the input form for the protocol <_task> of protocol series <app>.
-// This includes a logo and parameter fields for the protocol.
-// The _override parameter is used for the demo data 
-function changeApplication( app, _task, _extra, _override ) {
-
-	// Clear all form fields
+	var premutated = new Array();
+	var designed = new Array();
+	
+	var existingPremutations = new Array();
+	var existingDesignedResidues = new Array();
+	
+	var i = 0;
+	var numValidPremutations = 0;
+	var numValidDesignedResidues = 0;
 	var elems = document.submitform.elements;
-	var numPartners = elems["numPartners"].value
+		
+	if (isProtocol(2, 1))
+	{
+		for (i = 0; i < numSeqTolSKPremutations ; i = i + 1) 
+		{
+			premutated[i] = false; 
+			var chain = "" + elems["seqtol_SK_pre_mut_c_" + i].value;
+			var resid = elems["seqtol_SK_pre_mut_r_" + i]
+			resid.value = resid.value.replace(/^\s+|\s+$/g, '')
+			var rval = resid.value 
+			var AA = "" + elems["premutatedAA" + i].value;
+	        
+			if (chain == "invalid" && rval == "" && AA.length != 3)
+			{
+				premutated[i] = -1;
+			}
+			else if (validChain(chain) && validateElem(resid, integralExpression) && AA.length == 3)
+			{
+				if (!existingPremutations[chain+rval])
+				{
+					numValidPremutations = numValidPremutations + 1;
+					premutated[i] = true; 
+				}
+				existingPremutations[chain+rval] = true;
+			}
+		}
+	}
+	if (isProtocol(2, 1))
+	{
+		for (i = 0; i < numSeqTolSK ; i = i + 1) 
+		{
+			designed[i] = false; 
+			var chain = "" + elems["seqtol_SK_mut_c_" + i].value;
+			var resid = elems["seqtol_SK_mut_r_" + i]
+			resid.value = resid.value.replace(/^\s+|\s+$/g, '')
+			var rval = resid.value 
+						  			
+			if (chain == "invalid" && rval == "")
+			{
+				designed[i] = -1;
+			}
+			else if (validChain(chain) && validateElem(resid, integralExpression))
+			{
+				if (!existingDesignedResidues[chain+rval])
+				{
+					numValidDesignedResidues = numValidDesignedResidues + 1;
+					designed[i] = true; 
+				}
+				existingDesignedResidues[chain+rval] = true;
+			}
+		}
+	}
+	// todo: Unify this logic when HK is changed to behave as above (using invalid for default chain in dropdown box)
+	else if (isProtocol(2, 0))
+	{
+		for (i = 0; i < numSeqTol ; i = i + 1) 
+		{
+			designed[i] = false; 
+			var chain = elems["seqtol_mut_c_" + i].value;
+			var resid = elems["seqtol_mut_r_" + i]
+			resid.value = resid.value.replace(/^\s+|\s+$/g, '');
+			var rval = resid.value 
+			
+			if (chain == "" && rval == "")
+			{
+				designed[i] = -1;
+			}
+			else if (validChainHK(chain) && validateElem(resid, integralExpression))
+			{
+				if (!existingDesignedResidues[chain+rval])
+				{
+					numValidDesignedResidues = numValidDesignedResidues + 1;
+					designed[i] = true; 
+				}
+				existingDesignedResidues[chain+rval] = true;
+			}
+		}
+	}
+	premutated[-1] = numValidPremutations
+	designed[-1] = numValidDesignedResidues
+	validResidues["premutated"] = premutated
+	validResidues["designed"] = designed
+	return validResidues;
+}
+
+/************************************
+ * GUI functions
+ ************************************/
+
+//This function clears all form fields except for those specifically listed in the persistent array
+function clearFormFields()
+{
+	var elems = document.submitform.elements;
 	
 	// Remember any persistent fields here
-	persistent = new Array("JobName", "nos");
+	persistent = new Array("JobName", "nos", "numPartners");
 	previousValues = new Array();
-	for (var i= 0; i < persistent.length; i++ ) 
+	for (var i = 0; i < persistent.length; i++ ) 
 	{
 		k = persistent[i];
 		v = elems[k].value;
@@ -966,420 +1229,79 @@ function changeApplication( app, _task, _extra, _override ) {
 			elems[k].value = previousValues[k];
 		}
 	}
-	
-	// Names of HTML elements defined in rosettahtml.py for defining specialized protocol parameters
-	// Change these two arrays if you change the table in rosettahtml.py
-	myParameter = new Array("parameter1_1","parameter1_2","parameter1_3",
-	                        "parameter2_1","parameter2_2",
-	                        "parameter3_1","parameter3_2");
-  
-	// Names of images (logo) and HTML elements defined in rosettahtml.py for describing the protocols
- 	myFields = new Array( "logo1","logo2","logo3",
- 							"text1","text2","text3",
- 							"ref1","ref2","ref3" );
-  	// Hide the description of the protocol series #app
-  	new Effect.Fade( "text" + app , { duration: 0.0 } );
-  	//new Effect.Fade( "ref" + app, { duration: 0.0 } );
-	
-  	task = "parameter" + app + "_" + _task;
-  	
-  	// Set the form's "task" value
-	setTask(task);
-	
-	// Show the HTML elements for entering parameters and submitting the form
-	new Effect.Appear( 'parameter_common', { duration: 0.5, queue: { scope: 'task' } } ) ;
-	new Effect.Appear( task, { duration: 0.5 } )
-  	new Effect.Appear( 'parameter_submit', { duration: 0.5, queue: { scope: 'task' } } ) ;
-  
+}
+
+function showCommonElements(subtask)
+{
+	// Show or hide the PDB uploading section
+	if (subtask == 0)
+	{
+		new Effect.Appear('PrePDBParameters', { duration: 0.0 } );
+		new Effect.Fade('PostPDBParameters', { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade('PrePDBParameters', { duration: 0.0 } );
+		new Effect.Appear('PostPDBParameters', { duration: 0.0 } );
+	}
+	new Effect.Appear( 'parameter_submit', { duration: 0.5, queue: { scope: 'task' } } ) ;
+}
+
+function hideInactiveProtocols(app, task)
+{
+	// Change the color of the box depending on the series and add the appropriate logo
+	for ( i = 0; i < protocolTasks.length; i++ ) 
+	{
+		new Effect.Fade( "text" + i , { duration: 0.0 } );
+		if (i == app)
+		{
+			new Effect.Appear("pic" + i);
+		}
+		else
+		{
+			new Effect.Fade( "pic" + i, { duration: 0.0, queue: { position: '0', scope: 'img' } } );
+		}
+	}	
+	document.getElementById("box").style.background = colors[app];	
+	  	
 	// Hide all other specialized parameters
-	for ( i = 0; i < myParameter.length; i++ ) 
+	var thistask = undefined
+	for ( i = 0; i < protocolTasks.length; i++ ) 
 	{
-		if ( myParameter[i] != task) 
+		for ( j = 0; j < protocolTasks[i]; j++ )
 		{
-			new Effect.Fade( myParameter[i], { duration: 0.0 } );
+			ptask = 'parameter' + i + '_' + j;
+			if ( !isProtocol(i, j)) 
+			{
+				new Effect.Fade(ptask , { duration: 0.0, queue: { scope: 'task' }} );
+				new Effect.Fade( "ref" + i + "_" + j, { duration: 0.0, queue: { scope: 'task' }} );
+				new Effect.Fade( "recNumStructures" + i + "_" + j, { duration: 0.0 } );
+			}
+			else
+			{
+				thistask = ptask
+				new Effect.Appear(ptask, { duration: 0.0, queue: { scope: 'task' }} )
+				new Effect.Appear( "ref" + i + "_" + j, { duration: 0.0, queue: { scope: 'task' }} )
+			}
 		}
 	}
-	
-	// Display the PDB uploading section
-	if (task != 'parameter3_2')
+	return thistask
+}
+
+function allWhite()
+{
+	for(i = 0; i < document.submitform.elements.length; i++)
 	{
-		subtask = 0;
-	}
-	else
-	{
-		elems["numPartners"].value = numPartners
-	}
-	
-	showPDBUploadElements(subtask == 0);
-	showGeneralSettings(task != 'parameter3_2' || subtask != 0);
-	
-	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
-	if ( task == 'parameter1_1' || task == 'parameter1_2' || task == 'parameter2_1' ) 
-	{ 
-		new Effect.Appear( "ref1" );
-	  	document.submitform.Mini[0].checked=true;
-	  	document.submitform.Mini[0].disabled=false;
-	    document.submitform.Mini[1].disabled=false;
-	    // 
-	    document.getElementById('rv0').style.color='#000000';
-	    document.getElementById('rv1').style.color='#000000';
-  	}
-  	else 
-  	{ 
-    	new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
-  	}
-	if ( task == 'parameter2_2' ) 
-	{  
-		new Effect.Appear( "ref2" ); 
-	  	new Effect.Appear( "rosetta_remark" );
-	  	document.submitform.Mini[0].checked=true;
-	    document.submitform.Mini[1].disabled=true;
-	    document.getElementById('rv0').style.color='#000000';
-	    document.getElementById('rv1').style.color='#D8D8D8';
-	}
-	else
-	{ 
-		new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
-    	new Effect.Fade( "rosetta_remark", { duration: 0.0, queue: { position: '20', scope: 'task' } } );
-    }
-	if ( task == 'parameter3_1' ) { 
-		new Effect.Appear( "ref3" ); 
-	  	document.submitform.Mini[0].disabled=false;
-	    document.submitform.Mini[0].checked=true;
-	    document.submitform.Mini[1].disabled=true;
-	    document.getElementById('rv1').style.color='#D8D8D8';
-	    document.getElementById('rv0').style.color='#000000';
-	    // todo: Is this intentional?
-	    //document.getElementById('rv1').style.color='#000000';	  
-	}
-	else 
-	{ 
-	  new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
-	}
-	
-	if ( task == 'parameter3_2' )
-	{ 
-		if (subtask == 0)
+		var elem = document.submitform.elements[i];
+		if ((elem.disabled == false) || (elem.name == "UserName"))
 		{
-			new Effect.Fade( "parameter3_2_header" );
-			new Effect.Fade( "parameter3_2_body", { duration: 0.0} );
+			elem.style.background = "white";
 		}
-		else if (subtask == 1)
-		//todo: check load demo values if (!_override && (!_extra || document.getElementById("parameter3_2_header").style.display == "none"))
+		else
 		{
-			new Effect.Appear( "parameter3_2_header" );		
-			new Effect.Fade( "parameter3_2_body", { duration: 0.0} );
-			document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
+			elem.style.background = "grey";
 		}
-		else if (subtask == 2)
-		{
-			//new Effect.Fade( "parameter3_2_header", { duration: 0.0} );		
-			
-			var i;
-			if (_extra < initNumSeqTolSKChains)
-			{
-				_extra = initNumSeqTolSKChains;
-			}
-			for (i = 0; i < _extra; i++)
-			{
-				new Effect.Appear("seqtol_SK_chainrow_" + "" + i);
-			}
-			for (; i < SK_max_seqtol_chains; i++)
-			{
-				new Effect.Fade("seqtol_SK_chainrow_" + "" + i, { duration: 0.0} );
-			}
-			numSeqTolSKChains = _extra
-			//todo: seqtol_SK_addchain seems deprecated now
-			new Effect.Fade("seqtol_SK_addchain", { duration: 0.0 } );
-			
-			if (!_override)
-			{
-				chainsChanged();
-				reset_seqtolSKData();
-			}
-		  	document.submitform.Mini[0].disabled=true;
-		    document.submitform.Mini[0].checked=false;
-		    document.submitform.Mini[1].disabled=false;
-		    document.submitform.Mini[1].checked=true;
-		    document.getElementById('rv0').style.color='#D8D8D8';
-		    document.getElementById('rv1').style.color='#000000';
-			new Effect.Appear( "parameter3_2_body" );			
-		}
-		new Effect.Appear( "ref4" ); 	    
-	    //new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
-		new Effect.Fade( "recNumStructures", { duration: 0.0 } );
-		new Effect.Appear( "recNumStructuresSeqTolSK" );
 	}
-	else 
-	{ 
-		new Effect.Appear( "recNumStructures" );
-		new Effect.Fade( "recNumStructuresSeqTolSK", { duration: 0.0 } );
-		new Effect.Fade( "ref4", { duration: 0.0, queue: { position: '0', scope: 'task' } } ); 
-	}
-
-	// Change the colour of the box depending on the series and add the appropriate logo
-	mycolor = "";
-	if (task == 'parameter1_1' || task == 'parameter1_2') {
-		mycolor = "#DCE9F4" ;
-	    new Effect.Appear("pic1");
-	    new Effect.Fade( "pic2", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
-	    new Effect.Fade( "pic3", { duration: 0.0, queue: { position: '0', scope: 'img' } } );   
-	}
-	else if (task == 'parameter2_1' || task == 'parameter2_2') {
-	    mycolor = "#B7FFE0" ;
-	    new Effect.Appear("pic2");
-	    new Effect.Fade( "pic1", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
-	    new Effect.Fade( "pic3", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
-	}
-	else if (task == 'parameter3_1' || task == 'parameter3_2') {
-	    mycolor = "#FFE2E2" ;
-	    new Effect.Appear("pic3");
-	    new Effect.Fade( "pic1", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
-	    new Effect.Fade( "pic2", { duration: 0.0, queue: { position: '0', scope: 'img' } } );
-	}
-  
-	document.getElementById("box").style.background = mycolor;
-}
-
-// This function shows the preliminary screen for each protocol series.
-// This includes a logo and descriptive text but no input form.
-function showMenu( menu_id ) {
-	
-    document.submitform.reset();
-    /* This function extends or hides the menu on the left */
-    
-    // Names of HTML elements defined in rosettahtml.py for describing the protocols
-    myTasks = new Array("pic1","pic2","pic3",
-                        "text1","text2","text3"); // ,
-                        //"ref1","ref2","ref3" );
-    
-    // Names of HTML elements defined in rosettahtml.py for defining generalised and specialized protocol parameters
-    myParameter = new Array("parameter_common", "parameter_submit",
-                            "parameter1_1", "parameter1_2", "parameter1_3",
-  	                        "parameter2_1", "parameter2_2",
-  	                        "parameter3_1", "parameter3_2");
-    
-    // this builds an dictionary that supports the in operator
-    myFields = oc(['pic', 'text','ref'], menu_id);
-
-    // The background colors for the protocol series
-    mycolor = "";     
-    if (menu_id == "1")
-    {
-    	mycolor = "#DCE9F4" ;
-    } 
-    else if (menu_id == "2") 
-    {
-    	mycolor = "#B7FFE0" ;
-    }
-    else if (menu_id = "3")
-    {
-    	mycolor = "#FFE2E2" ;
-    }
-    
-    // box contains the pici, texti, common parameters, parameteri_j, parameter submission, and refi elements where i = menu_id
-    // Essentially, it is the right column in the description (resp. submission pages) for protocol series (resp. protocols)   
-    // Set the color as above and the minimum height.
-    document.getElementById("box").style.background = mycolor;
-    document.getElementById("box").style.minHeight = document.getElementById("columnLeft").style.offsetHeight;
-    Nifty("div#box","big transparent fixed-height");
-     
-    // Hide the common submission page text
-    new Effect.Fade( "text0", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
-    
-    // new Effect.Appear( "parameter_common", { queue: { position: '0', scope: 'task' } } );
-    // new Effect.Appear( "parameter_submit", { queue: { position: '0', scope: 'task' } } );
-    
-    // Display any elements of myTasks suffixed with menu_id and hide all others
-    // This will just display the logo and descriptive text. 
-	for ( i=0; i < myTasks.length; i++ )
-    {
-    	if ( myTasks[i] in myFields )
-    	{
-    		new Effect.Appear( myTasks[i] );
-        }
-    	else
-    	{
-    		new Effect.Fade( myTasks[i], { duration: 0.0, queue: { position: '0', scope: 'task' } } );
-        }
-    }
-    // Hide all parameter fields (used on the submission pages)
-    for ( i = 0; i < myParameter.length; i++ )
-    {
-    	new Effect.Fade( myParameter[i], {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
-    }
-    
-    // Hide all reference elements
-    new Effect.Fade( "ref1", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
-  	new Effect.Fade( "ref2", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
-  	new Effect.Fade( "ref3", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
-        
-    return true;
-}
-
-/************************************
- * helper functions 
- ************************************/
-
-// Creates a dictionary/hashtable mapping keys which are a concatenation of an element of a with (the number) n 
-// e.g. oc(['pic','text',...],3) returns ['pic3' -> '', 'text3'->'',...]
-function oc(a, n)
- {
-   var o = {};
-   for(var i=0;i<a.length;i++)
-   {
-     o[a[i]+n]='';
-   }
-   return o;
- }
-
-// Setter and getter for document.submitform.task
-function getTask()
-{
-	return document.submitform.task.value
-}
-
-function setTask(mode)
-{
-    document.submitform.task.value = mode;
-    return true;
-}
-
-// todo: unused at present - make use of this or delete
-function setMini( disable )
-{
-	if ( disable == 1 ) 
-	{
-	    document.submitform.Mini[0].disabled=true;
-	    document.submitform.Mini[1].disabled=true;
-	    //document.submitform.keep_output.disabled=true;
-	    document.getElementById('rosetta1').style.color='#D8D8D8';
-	    //document.getElementById('rosetta2').style.color='#D8D8D8';
-    }
-	else 
-	{
-	    document.submitform.Mini[0].disabled=false;
-	    document.submitform.Mini[1].disabled=false;
-	    //document.submitform.keep_output.disabled=false;
-	    document.getElementById('rosetta1').style.color='#000000';
-	    //document.getElementById('rosetta2').style.color='#000000';
-    }
-    return true;
-}
-
-// todo: Unused - delete
-function updateCellSize1( task )
-{
-    var high = document.getElementById( 'pic' ).offsetHeight + document.getElementById( 'common_form' ).offsetHeight + document.getElementById( 'submit_button' ).offsetHeight + document.getElementById( task ).offsetHeight ;
-    document.getElementById('empty_box').style.height = high ;
-}
-
-//todo: Unused - delete
-function updateCellSize2()
-{
-    var high = document.getElementById( 'pic' ).offsetHeight + document.getElementById( 'task_init' ).offsetHeight;
-    document.getElementById('empty_box').style.height = high ;
-}
-
-// Adds a residue input field for Multiple point mutations
-// todo: Add delete functionality
-function addOneMore()
-{
-    numMPM = numMPM + 1;
-    //document.write("row_PM");
-    //document.write(numMPM);
-    new Effect.Appear("row_PM" + "" + numMPM);
-    //return "row_PM" + "" + numMPM;
-    
-    return true;
-}
-
-//Adds a residue input field for Humphris and Kortemme's Interface Sequence Plasticity Prediction
-//todo: Add delete functionality and fade add button
-function addOneMoreSeqtol()
-{
-    new Effect.Appear("seqtol_row_" + "" + numSeqTol);
-    numSeqTol = numSeqTol + 1;
-    return true;
-}
-
-//Adds a residue input field for Smith and Kortemme's Interface Sequence Plasticity Prediction
-//todo: Add delete functionality
-function addOneMoreSeqtolSK()
-{
-  new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK);
-  numSeqTolSK = numSeqTolSK + 1;
-  if (numSeqTolSK >= SK_MaxMutations)
-  {
-	  new Effect.Fade("seqtol_SK_addrow", { duration: 0.0 } );
-  }
-  return true;
-}
-
-function addOneMoreSeqtolSKPremutated()
-{
-	new Effect.Appear("seqtol_SK_pre_row_" + "" + numSeqTolSKPremutations);
-	numSeqTolSKPremutations = numSeqTolSKPremutations + 1;
-	if (numSeqTolSKPremutations >= SK_MaxPremutations)
-	{
-		new Effect.Fade("seqtol_SK_pre_addrow", { duration: 0.0 } );
-	}
-	return true;
-}
-
-//Adds a residue input field for Smith and Kortemme's Interface Sequence Plasticity Prediction
-//todo: Add delete functionality
-function addOneMoreChainSK()
-{
-	new Effect.Appear("seqtol_SK_chainrow_" + "" + numSeqTolSKChains);
-	
-	numSeqTolSKChains = numSeqTolSKChains + 1;
-	if (numSeqTolSKChains >= SK_max_seqtol_chains)
-	{
-		  new Effect.Fade("seqtol_SK_addchain", { duration: 0.0 } );
-	}
-	return true;
-}
-
-//todo: Unused - delete
-function writeRow( numbr ) 
-{
-    x = numbr + 1
-    var s = '<td align="center">' + '' + x + '</td>';
-    s = s + '<td align="center"><input type="text" name="PM_chain'  + '' + numbr + '" maxlength=1 SIZE=5 VALUE=""></td>';
-    s = s + '<td align="center"><input type="text" name="PM_resid'  + '' + numbr + '" maxlength=4 SIZE=5 VALUE=""></td>';
-    s = s + '<td align="center"><input type="text" name="PM_newres' + '' + numbr + '" maxlength=1 SIZE=2 VALUE=""></td>';
-    s = s + '<td align="center"><input type="text" name="PM_radius' + '' + numbr + '" maxlength=4 SIZE=7 VALUE=""></td>';
-    document.write(s);
-    return true;
-}
-
-//todo: Unused - delete
-function writeRowDEMO( numbr, chain, resid, newres, radius ) 
-{
-    x = numbr + 1
-    var s = '<td align="center">' + '' + x + '</td>';
-    s = s + '<td align="center"><input type="text" name="PM_chain'  + '' + numbr + '" maxlength=1 SIZE=5 VALUE="' + '' + chain + '"></td>';
-    s = s + '<td align="center"><input type="text" name="PM_resid'  + '' + numbr + '" maxlength=4 SIZE=5 VALUE="' + '' + resid + '"></td>';
-    s = s + '<td align="center"><input type="text" name="PM_newres' + '' + numbr + '" maxlength=1 SIZE=2 VALUE="' + '' + newres + '"></td>';
-    s = s + '<td align="center"><input type="text" name="PM_radius' + '' + numbr + '" maxlength=4 SIZE=7 VALUE="' + '' + radius + '"></td>';
-    document.write(s);
-    addOneMore();
-    return true;
-}
-
-/************************************
- * helper functions  END
- ************************************/
-
-function confirm_delete(jobID)
-{
-  var r=confirm("Delete Job " + jobID + "?");
-  if (r==true) {
-    //document.write("You pressed OK!");
-    window.location.href = "rosettaweb.py?query=delete&jobID=" + jobID + "&button=Delete" ; }
-//  else {
-//    window.location.href = "rosettaweb.py?query=queue" ; }
 }
 
 function reset_form ()
@@ -1390,214 +1312,51 @@ function reset_form ()
 	reset_seqtolSKData();
 }
 
-function reset_seqtolSKData ()
+/************************************
+ * Getters / Setters
+ ************************************/
+
+function setProtocol(group, task)
 {
-	var oSubmitForm = document.forms["submitform"];
-	
-	// Premutations for design
-	for (i = 0; i < minSeqTolSKPremutations; i++)
-	{
-		oSubmitForm.elements["seqtol_SK_pre_mut_c_" + i].value = "";
-		new Effect.Appear( "seqtol_SK_pre_row_" + i, { duration: 0.0 } );
-	}
-	for (i = minSeqTolSKPremutations; i < SK_MaxPremutations; i++)
-	{
-		oSubmitForm.elements["seqtol_SK_pre_mut_c_" + i].value = "";
-		new Effect.Fade( "seqtol_SK_pre_row_" + i, { duration: 0.0 } );
-	}
-	new Effect.Appear("seqtol_SK_pre_addrow");
-	numSeqTolSKPremutations = minSeqTolSKPremutations;
-	
-	// Mutations for design
-	for (i = 0; i < minSeqTolSKMutations; i++)
-	{
-		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
-		new Effect.Appear( "seqtol_SK_row_" + i, { duration: 0.0 } );
-	}
-	for (i = minSeqTolSKMutations; i < SK_MaxMutations; i++)
-	{
-		oSubmitForm.elements["seqtol_SK_mut_c_" + i].value = "";
-		new Effect.Fade( "seqtol_SK_row_" + i, { duration: 0.0 } );
-	}
-	new Effect.Appear("seqtol_SK_addrow");
-	numSeqTolSK = minSeqTolSKMutations;
-	
-	// Chains
-	for (i = initNumSeqTolSKChains; i < SK_max_seqtol_chains; i++)
-	{
-		oSubmitForm.elements["seqtol_SK_chain" + i].value = "";
-		//new Effect.Fade( "seqtol_SK_chainrow_" + i, { duration: 0.0 } );
-	}
-	//numSeqTolSKChains = initNumSeqTolSKChains;
-	if (numSeqTolSKChains < SK_max_seqtol_chains)
-	{
-		//new Effect.Appear("seqtol_SK_addchain");
-	}
+	document.submitform.protocolgroup.value = group
+	document.submitform.protocoltask.value = task
 }
 
-// Fills in sample data for the protocols when 'Load sample data' is clicked
-function set_demo_values() 
+function getProtocol()
 {
-	actual_task = getTask();
-	
-	if ( actual_task == 'parameter1_1')
-	{
-		document.submitform.PDBID.value = "1ABE";
-		document.submitform.nos.value = RecommendedNumStructures;
-		document.submitform.PM_chain.value = "A";
-		document.submitform.PM_resid.value = "108";
-		document.submitform.PM_newres.value = "L";
-	}
-	else if ( actual_task == 'parameter1_2') 
-	{
-		document.submitform.PDBID.value = "2PDZ";
-		document.submitform.nos.value = RecommendedNumStructures;
-		document.submitform.PM_chain0.value = "A";
-		document.submitform.PM_resid0.value = "17";
-		document.submitform.PM_newres0.value = "A";
-		document.submitform.PM_radius0.value = "6.0";
-		addOneMore();
-		document.submitform.PM_chain1.value = "A";
-		document.submitform.PM_resid1.value = "32";
-		document.submitform.PM_newres1.value = "A";
-		document.submitform.PM_radius1.value = "6.0";
-		addOneMore();
-		document.submitform.PM_chain2.value = "A";
-		document.submitform.PM_resid2.value = "65";
-		document.submitform.PM_newres2.value = "A";
-		document.submitform.PM_radius2.value = "6.0";
-		addOneMore();
-		document.submitform.PM_chain3.value = "A";
-		document.submitform.PM_resid3.value = "72";
-		document.submitform.PM_newres3.value = "A";
-		document.submitform.PM_radius3.value = "6.0";
-		addOneMore();
-	}
-	else if ( actual_task == "parameter2_1")
-	{
-		document.submitform.PDBID.value = "1UBQ";
-		document.submitform.nos.value = RecommendedNumStructures;  
-	}
-	else if ( actual_task == 'parameter2_2')
-	{
-		document.submitform.PDBID.value = "1UBQ";
-		document.submitform.nos.value = RecommendedNumStructures;
-		document.submitform.ENS_temperature.value = "1.2";
-		document.submitform.ENS_num_designs_per_struct.value = "20";
-		document.submitform.ENS_segment_length.value = "12";
-	}
-	else if ( actual_task == 'parameter3_1')
-	{
-		document.submitform.PDBID.value = "2PDZ";
-		document.submitform.nos.value = RecommendedNumStructures;
-		document.submitform.seqtol_chain1.value = "A";
-		document.submitform.seqtol_chain2.value = "B";
-		// document.submitform.seqtol_radius.value = "4.0";
-		// document.submitform.seqtol_weight_chain1.value = "1";
-		// document.submitform.seqtol_weight_chain2.value = "1";      
-		// document.submitform.seqtol_weight_interface.value = "2";
-		document.submitform.seqtol_mut_c_0.value = "B";
-		document.submitform.seqtol_mut_r_0.value = "3";
-		addOneMoreSeqtol();
-		document.submitform.seqtol_mut_c_1.value = "B";
-		document.submitform.seqtol_mut_r_1.value = "4";
-		addOneMoreSeqtol();
-		document.submitform.seqtol_mut_c_2.value = "B";
-		document.submitform.seqtol_mut_r_2.value = "5";
-		addOneMoreSeqtol();
-		document.submitform.seqtol_mut_c_3.value = "B";
-		document.submitform.seqtol_mut_r_3.value = "6";
-		addOneMoreSeqtol();
-	}
-	else if ( actual_task == 'parameter3_2')
-	{
-		reset_seqtolSKData();
-		subtask = 2
-		changeApplication(3, 2, 2, true);
-		document.submitform.StoredPDB.value = '';
-	    document.submitform.PDBID.value = "2PDZ";
-	    showPDBUploadElements(true);
-		document.submitform.nos.value = RecommendedNumStructuresSeqTolSK;
-		
-		elemA = document.submitform.seqtol_SK_chain0
-		elemB = document.submitform.seqtol_SK_chain1
-		elemNumPartners = document.submitform.numPartners
-		// todo: Fix this up using an array
-		for (i = elemA.length; i >= 0; i--)
-		{
-			elemA.options[i] = null;
-		}
-		for (i = elemB.length; i >= 0; i--)
-		{
-			elemB.options[i] = null;
-		}
-		for (i = elemNumPartners.length; i >= 0; i--)
-		{
-			elemNumPartners.options[i] = null;
-		}
-		elemA.options[0] = new Option('A','A')
-		elemB.options[0] = new Option('B','B')
-		elemNumPartners.options[0] = new Option('2 Partners (Interface)','2')
-		elemA.value = "A";
-		elemA.value = "B";
-		//todo: loop here over residues and add choices for A and B
-		
-		//todo: loop here over chains
-		//document.submitform.seqtol_SK_chain2.value = "";
-		document.submitform.seqtol_SK_kP0P0.value = "0.4";
-		document.submitform.seqtol_SK_kP1P1.value = "0.4";
-		document.submitform.seqtol_SK_kP0P1.value = "1.0";
-		//todo: loop here over chains
-		//document.submitform.seqtol_SK_kC.value = "";
-		//document.submitform.seqtol_SK_kAC.value = "";
-		//document.submitform.seqtol_SK_kBC.value = "";
-		//document.submitform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
-		chainsChanged();
-	}
-	return true;
+	return [document.submitform.protocolgroup.value, document.submitform.protocoltask.value]
 }
 
-/*
- todo: Delete
- disabled 
-else if ( actual_task == 'upload_mutation') {
-    document.submitform.nos.value = "10"
-    
-    document.submitform..value = "";
-    document.submitform..value = "";
-    document.submitform..value = "";
-
-} */
-
-
-// obsolete:
-
-// function popUp( obj ) {
-//     my_obj = document.getElementById(obj).style;
-//     if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
-//         my_obj.visibility = "hidden";
-//     }
-//     else { if ( my_obj.visibility == "hidden" ) {
-//         my_obj.visibility = "visible";
-//     }
-//     }
-// }
-
-// todo: Delete
-function popUp( obj ) {
-    my_obj = document.getElementById(obj).style;
-    offset=10
-    if ( my_obj.visibility == "visible" || my_obj.visibility == "show" ) {
-        my_obj.top  = e.clientY + offset;
-        my_obj.left = e.clientX + offset*2;
-        my_obj.visibility = "hidden";
-    }
-    else {
-        my_obj.visibility = "visible";
-    }
+function isProtocol(group, task)
+{
+	return (document.submitform.protocolgroup.value == group && document.submitform.protocoltask.value == task); 
 }
 
+function isProtocolGroup(group)
+{
+	return (document.submitform.protocolgroup.value == group); 
+}
 
+/************************************
+ * helper functions 
+ ************************************/
 
+function markError(elem)
+{
+	elem.focus();
+	elem.style.background="red";
+}
 
-
+function usingMini()
+{
+	Mini = document.submitform.Mini;
+	for (var i = 0 ; i < Mini.length ; i++)
+	{
+		if (Mini[i].checked)
+		{
+			return bversion[Mini[i].value];
+		}
+	}
+	alert("Rosetta version unidentified.")
+	return false;
+}
