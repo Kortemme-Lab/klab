@@ -10,7 +10,7 @@ const alphaExpression 		= /^[A-Za-z]+$/;
 const chainExpression 		= /^[A-Za-z]$/;
 const emptyExpression 		= /^\s*$/;
 const PDBExpression 		= /^[A-Za-z0-9]+$/;
-const StoredPDBExpression 	= /^[A-Za-z0-9]+\/[^\/\\]\.pdb$/i;
+const StoredPDBExpression 	= /^pdbs\/[A-Za-z0-9\/]+[^\.]+\.pdb$/i;
 const CysteineExpression 	= /^CYS$/i;
 const CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in mini Rosetta."
 
@@ -125,18 +125,30 @@ function changeApplication( app, task, subtask, extra, override )
 
 	// Hide the descriptions of the protocol series and the descriptions of other protocol tasks
 	thistask = hideInactiveProtocols(app, task);
+		
+	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
+	revisionFields = document.getElementsByClassName("bin_revisions");
+	showRevisions = new Array(); 
+	for ( i = 0; i < protocolBins[app][task].length; i++ )
+	{
+		showRevisions['rv' + protocolBins[app][task][i]] = true;
+	}
+	for ( i = 0; i < revisionFields.length; i++ )
+	{
+		if (showRevisions[revisionFields[i].id])
+		{
+			new Effect.Appear(revisionFields[i], { duration: 0.0, queue: { position: '0', scope: 'task' } });
+		}
+		else
+		{
+			new Effect.Fade(revisionFields[i], { duration: 0.0, queue: { position: '0', scope: 'task' } });
+		}
+	}
 	
 	// Display the PDB uploading section
 	// Show the HTML elements for entering parameters and submitting the form
 	showCommonElements(subtask);
-	
-	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
-	revisionFields = document.getElementsByClassName("bin_revisions");
-	for ( i = 0; i < protocolBins[app][task].length; i++ )
-	{
-		new Effect.Appear('rv' + protocolBins[app][task][i], { duration: 0.0, queue: { scope: 'task' } });		
-	}
-	
+
 	// Select the default binary (which should be defined as position 0)
 	var miniGroup = document.submitform.Mini
 	for (var i = 0; i < miniGroup.length; i++)
@@ -144,6 +156,8 @@ function changeApplication( app, task, subtask, extra, override )
 		if (miniGroup[i].value == protocolBins[app][task][0])
 		{
 			miniGroup[i].checked = true;
+			//alert(miniGroup[i].value)
+			miniGroup[i].onchange();		// Set the MiniVersion form value
 		}
 	}
 	
@@ -235,7 +249,7 @@ function ValidateForm()
 	
 	// Check the job name
 	ret = validateNotEmpty(sbmtform.JobName);
-
+	
 	// Check that a PDB has been uploaded
 	if (sbmtform.PDBComplex.value == "" && sbmtform.PDBID.value == "" && sbmtform.StoredPDB.value == "") 
     {
@@ -248,11 +262,12 @@ function ValidateForm()
     	sbmtform.PDBComplex.style.background="white";
     	sbmtform.PDBID.style.background="white";
     }
+	
 	if ( sbmtform.PDBComplex.value == "" ) 
     {
 		if ( sbmtform.StoredPDB.value != "" ) 
 	    {
-			ret = checkValue(sbmtform.StoredPDB.value, StoredPDBExpression) && ret;
+			ret = !!checkValue(sbmtform.StoredPDB.value, StoredPDBExpression) && ret;
 	    }
 		else if ( sbmtform.PDBID.value.length < 4 ) 
     	{
@@ -280,9 +295,8 @@ function ValidateForm()
     {
     	ret = false; 
     }
-    
-    ret = protocolValidators[pgroup][ptask]() && ret;
-    return ret;
+	ret = protocolValidators[pgroup][ptask]() && ret;
+	return ret;
 }
 	
 function ValidateFormRegister()
@@ -364,11 +378,12 @@ function validateOneMutation()
 		alert(CysteinMutationError);
 		ret = false;
 	}
-	
+    
 	ret = validateElem(sbmtform.PM_resid, integralExpression) && ret;
 	ret = validateElem(sbmtform.PM_newres, alphaExpression) && ret;
 	ret = validateElem(sbmtform.PM_radius, numericExpression) && ret;
-	return ret;
+
+    return ret;
 }
 
 function demoOneMutation()
@@ -1015,6 +1030,8 @@ function set_Boltzmann()
 
 //Generic checkers and validators
 
+// Be careful using this as a boolean value as it uses match. 
+// Apply negation or double negation to get a boolean value back.
 function checkValue(v, expression)
 {
 	return v.match(expression)
@@ -1293,7 +1310,7 @@ function allWhite()
 	for(i = 0; i < document.submitform.elements.length; i++)
 	{
 		var elem = document.submitform.elements[i];
-		if ((elem.disabled == false) || (elem.name == "UserName"))
+		if ((elem.disabled == false) || (elem.name == "UserName") || (elem.name == "MiniTextbox"))
 		{
 			elem.style.background = "white";
 		}

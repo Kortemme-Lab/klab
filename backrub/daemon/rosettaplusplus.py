@@ -31,11 +31,7 @@ residues = ["ALA", "CYS", "ASP", "GLU", "PHE", "GLY", "HIS", "ILE", "LYS",
 class RosettaPlusPlus:
     """A class to execute Rosetta++ operations"""
 
-    def __init__(self, ID = 0, mini = False, 
-                 executable = "~/svn/rosetta++/rosetta.gcc",
-                 datadir = "~/svn/rosetta_database",
-                 tempdir = tempfile.gettempdir(),
-                 auto_cleanup = True):
+    def __init__(self, ID, executable, datadir, tempdir, mini = False, auto_cleanup = False):
         
         self.ID           = ID
         self.mini         = mini
@@ -67,6 +63,8 @@ class RosettaPlusPlus:
           prefix = "rpp_"
           
         self.workingdir = tempfile.mkdtemp(prefix = prefix, dir = self.tempdir)
+        if not os.path.isdir(self.workingdir):
+            raise os.error
         return self.workingdir
     
     def remove_workingdir(self):
@@ -179,6 +177,7 @@ this information may be out of date
              args.extend(self.pivot_res)
         
         self.command = self.executable + ' ' + string.join([str(arg) for arg in args]) ##debug
+        print(self.command)
         # print [self.executable] + [str(arg) for arg in args]
         self.subp = subprocess.Popen( [self.executable] + [str(arg) for arg in args], 
                                       stdout=self.file_stdout, 

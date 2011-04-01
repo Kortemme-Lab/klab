@@ -61,6 +61,7 @@ class RosettaProtocolGroup:
         return self.name
         
 # todo: I access some of these class members directly - use getters/setters for all
+# todo: Split this over be/fe like the WebserverProtocols class
 class RosettaProtocol:
     def __init__(self, name, dbname):
         self.name = name
@@ -73,89 +74,175 @@ class RosettaProtocol:
         self.nos = None
         self.StoreFunction = None
         self.resultsfunction = None
+        self.startFunction = None
+        self.checkFunction = None
+        self.endFunction = None
         
+    # Setters and getters
+    def setBackendFunctions(self, startFunction, checkFunction, endFunction):
+        self.startFunction = startFunction
+        self.checkFunction = checkFunction
+        self.endFunction = endFunction
+    
     def setStoreFunction(self, storefunction):
         self.StoreFunction = storefunction
-        
+    #    
     def setSubmitFunction(self, submitfunction):
         self.submitfunction = submitfunction
     
+    def getSubmitfunction(self):
+        return self.submitfunction
+    #
     def setShowResultsFunction(self, resultsfunction):
         self.resultsfunction = resultsfunction
     
     def getShowResultsFunction(self):
         return self.resultsfunction 
-    
+    #
     def setBinaries(self, *binaries):
         self.binaries = binaries
-            
+    #        
     def setReferences(self, *references):
         self.references = references
-        
-    def getNumStructures(self):
-        return self.nos
-    
+    #    
     def setNumStructures(self, minimum, recommended, maximum):
         self.nos = (minimum, recommended, maximum)
     
+    def getNumStructures(self):
+        return self.nos
+    #    
     def setGroup(self, group):
         self.group = group
-
+    #
     def setDataDirFunction(self, datadirfunction):
         self.datadirfunction = datadirfunction
 
     def getDataDirFunction(self):
         return self.datadirfunction
-        
+    #    
     def getName(self):
         return self.name
-
-    def getSubmitfunction(self):
-        return self.submitfunction
-
+    #
     def getReferences(self):
         return self.references
-    
+    # Utility functions
+    def canUseMini(self):
+        miniAvailable = False
+        for binary in self.binaries:
+            miniAvailable = miniAvailable or RosettaBinaries[binary]["mini"]
+        return miniAvailable
 
+    
+#todo: Ask Greg and Elisabeth for exact revisions
 RosettaBinaries = {        
     "classic"   :{  # 2.3.0 was released 2008-04-21, this revision dates 2008-12-27
+                    "name"      : "Rosetta++ 2.32 (classic), as published",
+                    "revision"  : 26316, 
                     "mini"      : False,
-                    "backrub" : "rosetta_20090109.gcc", 
-                    "revision" : 26316, 
-                    "name"   :   "Rosetta++ 2.32 (classic), as published",
+                    "backrub"   : "rosetta_20090109.gcc", 
+                    "database"  : "rosetta_database"
                  },
     "mini"      :{  # Revision is clear here
+                    "name" : "Rosetta 3.1 (mini)",
+                    "revision" : 32532, 
                     "mini"      : True,
                     "backrub" : "backrub_r32532", 
                     "postprocessing" : "score_jd2_r32532", 
-                    "revision" : 32532, 
-                    "name" : "Rosetta 3.1 (mini)",
+                    "database"  : "minirosetta_database"
                  },
     "ensemble"  :{  # based solely on the date, roughly between revisions 22709 - 22736
+                    "name" : "Rosetta++ 2.30 (classic), as published",
+                    "revision" : 22736, 
                     "mini"      : False,
                     "backrub" : "ros_052208.gcc",
-                    "revision" : 22736, 
-                    "name" : "Rosetta++ 2.30 (classic), as published",
                  },
     "seqtolHK"  :{  # based solely on the date, roughly between revisions 24967 - 24980
+                    "name" : "Rosetta++ 2.30 (classic), as published",
+                    "revision" : 24980, 
                     "mini"      : False,
                     "backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
                     "sequence_tolerance" : "rosetta_1Oct08.gcc",
-                    "revision" : 24980, 
-                    "name" : "Rosetta++ 2.30 (classic), as published",
+                    "minimize" : "rosetta_minimize_12_17_05.gcc",
+                    "database" : "rosetta_database_elisabeth"
                  },
     "seqtolJMB" :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "mini"      : True,
-                    "backrub" : "backrub_r39284", 
-                    "sequence_tolerance" : "sequence_tolerance_r39284",
-                    "revision" : 39284, 
                     "name" : "Rosetta 3.2 (mini), as published",
+                    "revision" : 39284,
+                    "mini"      : True,
+                    "backrub" : "backrub_r39284",
+                    "sequence_tolerance" : "sequence_tolerance_r39284",
+                    "database"  : "minirosetta_database_r39284"
                  },
     "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
+                    "name" : "Rosetta 3.2 (mini), as published",
+                    "revision" : 0, 
                     "mini"      : True,
                     "backrub" : "backrub_r", 
                     "sequence_tolerance" : "sequence_tolerance_r",
-                    "revision" : 0, 
-                    "name" : "Rosetta 3.2 (mini), as published",
+                    "database"  : "minirosetta_database_r"
                  },
 }
+
+# This class and its child classes set up all the protocol data.
+# The idea is to reduce redundancy in data descriptions, avoid updating errors, and make it easier to add new protocols.         
+class WebserverProtocols(object):
+    
+    protocols = None
+    protocolGroups = None
+    
+    def __init__(self):
+        protocols = []
+        protocolGroups = []
+        
+        protocolGroups.append(RosettaProtocolGroup("Point Mutation", "#DCE9F4"))
+                
+        proto = RosettaProtocol("One Mutation", "point_mutation")
+        proto.setBinaries("classic", "mini")
+        proto.setNumStructures(2,10,50)
+        protocolGroups[0].add(proto)
+    
+        proto = RosettaProtocol("Multiple Mutations", "multiple_mutation")
+        proto.setBinaries("classic", "mini")
+        proto.setNumStructures(2,10,50)
+        protocolGroups[0].add(proto)
+        
+        protocolGroups.append(RosettaProtocolGroup("Backrub Ensembles", "#B7FFE0"))
+        
+        proto = RosettaProtocol("Backrub Conformational Ensemble", "no_mutation")
+        proto.setBinaries("classic", "mini")
+        proto.setNumStructures(2,10,50)
+        protocolGroups[1].add(proto)
+        
+        proto = RosettaProtocol("Backrub Ensemble Design", "ensemble")
+        proto.setBinaries("ensemble")
+        proto.setNumStructures(2,10,50)
+        protocolGroups[1].add(proto)
+        
+        protocolGroups.append(RosettaProtocolGroup("Sequence Tolerance", "#FFE2E2"))
+                
+        proto = RosettaProtocol("Interface Sequence Tolerance", "sequence_tolerance")
+        proto.setBinaries("seqtolHK")
+        proto.setNumStructures(2,10,50)
+        protocolGroups[2].add(proto)
+        
+        proto = RosettaProtocol("Interface / Fold Sequence Tolerance", "sequence_tolerance_SK")
+        proto.setBinaries("seqtolJMB") # todo: "seqtolP1"), see todo above 
+        proto.setNumStructures(2,20,100)    #todo: min should be 10 but I've allowed 2 for testing
+        protocolGroups[2].add(proto)
+        
+        # A flat list of the protocols 
+        protocols = []
+        protocols.extend(protocolGroups[0].getProtocols())
+        protocols.extend(protocolGroups[1].getProtocols())
+        protocols.extend(protocolGroups[2].getProtocols())
+        
+        self.protocolGroups = protocolGroups
+        self.protocols = protocols        
+        
+    def getProtocols(self):
+        return self.protocolGroups, self.protocols
+
+
+
+
+       

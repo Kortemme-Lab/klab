@@ -154,7 +154,7 @@ class AnalyzeMini:
     return score_lines
     
  
-  def calculate_residue_scores(self, base_dir, rosetta_mini_db, workingdir, scores_out_fn):
+  def calculate_residue_scores(self, base_dir, postprocessingBinary, databaseDir, workingdir, scores_out_fn):
     if workingdir[-1] != '/' : workingdir = workingdir+'/'
     try:
       # open scores file, this file will contain all scores for all structures
@@ -168,8 +168,8 @@ class AnalyzeMini:
       for fn in files:
         if re.match ('.*low.*(pdb|PDB)', fn):
           # add pairwise energies to the pdb file
-          args = [ base_dir + 'bin/score_jd2_r32532',
-                   '-database', rosetta_mini_db,
+          args = [ postprocessingBinary,
+                   '-database', databaseDir,
                    '-s', workingdir + fn,
                    '-no_optH',
                    '-score:weights', base_dir + "data/scores.txt" ]

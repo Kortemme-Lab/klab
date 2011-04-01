@@ -24,8 +24,8 @@ from rosettahelper import grep
 import md5 # todo: remove when generateHash is centralized
 
 #todo: cleanup when scripts are centralized
-sys.path.insert(0, "/var/www/html/rosettaweb/backrub/frontend/")
-from RosettaProtocols import RosettaBinaries
+sys.path.insert(0, "../frontend/")
+from RosettaProtocols import *
 
 cwd = str(os.getcwd())
 
@@ -45,10 +45,6 @@ class RosettaDaemon(Daemon):
     db_table          = ''
     server_name       = ''
     base_dir          = ''
-    rosetta_bin       = ''  # rosetta++ binary
-    rosetta_db        = ''  # rosetta++ database
-    rosetta_mini_bin  = ''  # backrub in mini binary
-    rosetta_mini_db   = ''  # mini rosetta database
     rosetta_tmp       = ''  
     rosetta_ens_tmp   = ''
     rosetta_dl        = ''  # webserver accessible directory
@@ -83,6 +79,16 @@ Have a nice day!
 The Kortemme Lab Server Daemon
 
 """
+
+    protocolGroups = None
+    protocols = None
+
+    def __init__(self, pid, stdout, stderr):
+        super(RosettaDaemon, self).__init__(pid, stdout = stdout, stderr = stderr)
+        beProtocols = BackendProtocols(self)
+        self.protocolGroups, self.protocols = beProtocols.getProtocols()
+
+
     def kill_process (self, pid):
         try:
             os.kill(int(pid), 0)
@@ -234,25 +240,14 @@ The Kortemme Lab Server Daemon
     # split this one up in individual functions at some point
     def start_job(self, ID, pdb_info, pdb_filename, mini, ensemble_size, task, ProtocolParameters):
         
-        mini = RosettaBinaries[mini]["mini"]
-        
-        # task = [point_mutation, multiple_mutation, no_mutation, upload_mutation, ensemble, library_design]
         pid = None
         try:
-            #todo; for p in protocols:
-            #if p.dbname == task, print Task (change line below) and run associated protocol function
             self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, mini, task) )
-            params = pickle.loads(ProtocolParameters)
-            
-            params["task"] = task # This is a hack for the mutations protocols. Remove when their functions are separated out
-            if task == 'ensemble':
-                return self.StartEnsemble(ID, pdb_info, pdb_filename, mini, ensemble_size, params)                
-            if task == 'sequence_tolerance':
-                return self.StartSequenceToleranceHK(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
-            if task == 'sequence_tolerance_SK':
-                return self.StartSequenceToleranceSK(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
-            if task == 'point_mutation' or task == 'multiple_mutation' or task == 'no_mutation':
-                return self.StartMutations(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
+            params = pickle.loads(ProtocolParameters)            
+            params["task"] = task # This is a hack for the mutations protocols. Remove when their functions are separated out            
+            for p in protocols:
+                if p.dbname == task:
+                    return p.startFunction(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
           
         except Exception, e: 
             self.log("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, traceback.format_exc() ) )
@@ -263,17 +258,10 @@ The Kortemme Lab Server Daemon
         """checks whether all pdb files were created
            sometimes Rosetta classic crashes at the end, but the results are ok
         """
-        # This function takes the last-files into account... and deletes them! We don't need them!
-        
-        #todo; for p in protocols:
-        #if p.dbname == task, print Task (change line below) and run associated protocol function
-                    
-        if task == 'ensemble':
-            retval = self.CheckEnsemble(r_object, ensembleSize, pdb_id, job_id, task)
-        elif task == 'sequence_tolerance' or task == 'sequence_tolerance_SK':
-            retval = self.CheckSequenceTolerance(r_object, ensembleSize, pdb_id, job_id, task)
-        else:
-            retval = self.CheckMutations(r_object, ensembleSize, pdb_id, job_id, task)
+        # This function takes the last-files into account... and deletes them! We don't need them!        
+        for p in protocols:
+            if p.dbname == task:
+                return p.checkFunction(r_object, ensembleSize, pdb_id, job_id, task)
         
         if retval:
             self.log("%s\t\t check_files() ID = %s, task = %s : all files successfully created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
@@ -323,14 +311,9 @@ The Kortemme Lab Server Daemon
                 # remove error file, it should be empty anyway
                 #os.remove( rosetta_object.workingdir + "/stderr_%s.dat" % ( ID ) )
 
-                #todo; for p in protocols:
-                #if p.dbname == task, print Task (change line below) and run associated protocol function
-                if task == 'ensemble':
-                    self.EndEnsemble(rosetta_object, pdb_id, ensembleSize, state, ID)                     
-                if task == 'sequence_tolerance_SK':
-                    self.EndSequenceToleranceSK(rosetta_object, pdb_id, ensembleSize, state, ID) 
-                elif task == 'sequence_tolerance':
-                    self.EndSequenceToleranceHK(rosetta_object, pdb_id, ensembleSize, state, ID)                         
+                for p in protocols:
+                    if p.dbname == task:
+                        return p.endFunction(rosetta_object, pdb_id, ensembleSize, state, ID)
 
                 # remove the resfile, and rosetta raw output if the user doesn't want to keep it
                 if not state["keep_output"]:
@@ -565,11 +548,8 @@ The Kortemme Lab Server Daemon
         self.db_table               = parameter["db_table"]
         self.server_name            = parameter["server_name"]
         self.base_dir               = parameter["base_dir"]
-        self.rosetta_score_jd2      = parameter["rosetta_score_jd2"]
-        self.rosetta_bin            = parameter["rosetta_bin"]
-        self.rosetta_db             = parameter["rosetta_db"]
-        self.rosetta_mini_bin       = parameter["rosetta_mini_bin"]
-        self.rosetta_mini_db        = parameter["rosetta_mini_db"]
+        self.binDir                 = "%sbin" % self.base_dir
+        self.dataDir                = "%sdata" % self.base_dir
         self.rosetta_tmp            = parameter["rosetta_tmp"]
         self.rosetta_ens_tmp        = parameter["rosetta_ens_tmp"]
         self.rosetta_dl             = parameter["rosetta_dl"]
@@ -828,19 +808,11 @@ The Kortemme Lab Server Daemon
     def StartMutations(self, ID, pdb_info, pdb_filename, mini, ensemble_size, params):                       
         # create rosetta run
         #todo: get binaries from RosettaBinaries
-        if mini:
-            object_rosetta = rosettaplusplus.RosettaPlusPlus( ID = ID, 
-                                                              mini = True, 
-                                                              executable = self.rosetta_mini_bin, #todo: replace this with RosettaBinaries value
-                                                              datadir = self.rosetta_mini_db, #todo: replace this with RosettaBinaries value
-                                                              tempdir = self.rosetta_tmp, 
-                                                              auto_cleanup = False)
-        else:
-            object_rosetta = rosettaplusplus.RosettaPlusPlus( ID = ID, 
-                                                              executable = self.rosetta_bin, 
-                                                              datadir = self.rosetta_db, 
-                                                              tempdir = self.rosetta_tmp, 
-                                                              auto_cleanup = False)
+        binary = RosettaBinaries[mini]
+        usingMini = binary["mini"]
+        executable = "%s/%s" % (self.binDir, binary["backrub"])
+        databaseDir = "%s/%s" % (self.dataDir, binary["database"])
+        object_rosetta = rosettaplusplus.RosettaPlusPlus( ID, executable, databaseDir, self.rosetta_tmp, mini = usingMini)
         
         # store Rosetta object to list; this is not a copy since Python uses references
         self.list_RosettaPP.append(object_rosetta)
@@ -971,8 +943,9 @@ The Kortemme Lab Server Daemon
         fn_resfile = object_rosetta.write_resfile( default, dict_residues, backbone )
         # run rosetta
         r_command = ''
-        if mini:
-            object_rosetta.run_args( [ "-database", self.rosetta_mini_db, 
+        
+        if usingMini:
+            object_rosetta.run_args( [ "-database", databaseDir, 
                                        "-s", fn_pdb, 
                                        "-ignore_unrecognized_res", 
                                        "-resfile", fn_resfile, 
@@ -1008,15 +981,17 @@ The Kortemme Lab Server Daemon
         low_scores  = []
         last_scores = []
         
-        workingdir = rosetta_object.workingdir
-        mini = rosetta_object.mini
+        workingdir = r_object.workingdir
+        mini = r_object.mini
         
         try:
-            if mini or mini == 'mini' or mini == 1:              
+            if mini:
+                databaseDir = "%s/%s" % (self.dataDir, binary["mini"]["database"])              
+                postprocessingBinary = "%s/%s" % (self.binDir, binary["mini"]["postprocessing"])              
                 analysis = AnalyzeMini(filename="%s/stdout_%s.dat" % ( workingdir, job_id) )
                 if not analysis.analyze(outfile="%s/scores_detailed.txt" % workingdir, outfile2="%s/scores_overall.txt" % workingdir):
                     self.log("%s\t\t check_files() ID = %s : individual scores could not be created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id ) )
-                if not analysis.calculate_residue_scores( self.base_dir, self.rosetta_mini_db, workingdir, "%s/scores_residues.txt" % workingdir ):
+                if not analysis.calculate_residue_scores( self.base_dir, postprocessingBinary, databaseDir, workingdir, "%s/scores_residues.txt" % workingdir ):
                     self.log("%s\t\t check_files() ID = %s : residue energies could not be calculated\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id ) )
                         
                 x = 1
@@ -1033,7 +1008,7 @@ The Kortemme Lab Server Daemon
                      
                     x += 1 # IMPORTANT because of while loop
                 
-            elif not mini or mini == 'classic' or mini == 0:
+            else:
                 initial_file = '%s/BR%s_initial.pdb' % ( workingdir, pdb_id )
                 cmd_stdout = os.popen("tail -n 1 %s" % initial_file).readline().split()
                 if cmd_stdout[0] == 'SCORE':
@@ -1069,15 +1044,15 @@ The Kortemme Lab Server Daemon
                 # handle_out.write('\n')
                 # handle_out.close()
                 
-            else:
-                print 'wrong binary format'
-                return False
         except:
             self.log("%s\t\t check_files() ID = %s, task = %s : failed\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
             return False
         
         return True
-            
+    
+    def EndMutations(self, rosetta_object, pdb_id, ensembleSize, state, ID):
+        pass
+
     def StartEnsemble(self, ID, pdb_info, pdb_filename, mini, ensemble_size, params):                
                 
         ENS_obj = rosetta_rdc.Rosetta_RDC( ID=ID, tempdir = self.rosetta_ens_tmp )
@@ -1303,9 +1278,32 @@ The Kortemme Lab Server Daemon
         
     ##################################### end of sendMail() ######################################
 
+class BackendProtocols(WebserverProtocols):
+      
+    def __init__(self, rosettaDaemon):
+        super(BackendProtocols, self).__init__()
+        
+        protocolGroups = self.protocolGroups
+        protocols = self.protocols
+        
+        # Add backend specific information
+        for p in protocols:
+            if p.dbname == "point_mutation":
+                p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
+            elif p.dbname == "multiple_mutation":
+                p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
+            elif p.dbname == "no_mutation":
+                p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
+            elif p.dbname == "ensemble":
+                p.setBackendFunctions(rosettaDaemon.StartEnsemble, rosettaDaemon.CheckEnsemble, rosettaDaemon.EndEnsemble)
+            elif p.dbname == "sequence_tolerance":
+                p.setBackendFunctions(rosettaDaemon.StartSequenceToleranceHK, rosettaDaemon.CheckSequenceTolerance, rosettaDaemon.EndSequenceToleranceHK)
+            elif p.dbname == "sequence_tolerance_SK":
+                p.setBackendFunctions(rosettaDaemon.StartSequenceToleranceSK, rosettaDaemon.CheckSequenceTolerance, rosettaDaemon.EndSequenceToleranceSK)
+                
 if __name__ == "__main__":
 
-    daemon = RosettaDaemon('/tmp/daemon-example.pid', stdout='/var/rosettabackend/temp/running.log', stderr='/var/rosettabackend/temp/running.log')
+    daemon = RosettaDaemon('/tmp/daemon-example.pid', stdout='/var/www/html/rosettaweb/backrub/temp/running.log', stderr='/var/www/html/rosettaweb/backrub/temp/running.log')
     if len(sys.argv) > 1 and len(sys.argv) <= 3:
         if 'start' == sys.argv[1]:
             daemon.start()

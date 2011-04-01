@@ -30,7 +30,7 @@ class MolProbityAnalysis(RosettaExec):
 
       
   def __init__( self, ID = 0, 
-                      bin_dir = "/var/rosettabackend/bin/",
+                      bin_dir = "/var/www/html/rosettaweb/backrub/bin/",
                       workingdir = "../temp/",
                       initial_structure = ''):
       
@@ -268,7 +268,7 @@ if __name__ == "__main__":
     sys.exit(1)
 
   obj = MolProbityAnalysis(ID=0,
-                           bin_dir="/var/rosettabackend/bin/",
+                           bin_dir="/var/www/html/rosettaweb/backrub/bin/",
                            workingdir=sys.argv[1],
                            initial_structure=sys.argv[2])
   

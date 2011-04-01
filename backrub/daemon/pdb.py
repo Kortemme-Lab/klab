@@ -408,7 +408,7 @@ class PDB:
             return True
         return False          
     
-    def check_format(self, usingClassic):
+    def check_format(self, usingClassic, ableToUseMini):
         
         warnings = []
         errors = []
@@ -566,7 +566,10 @@ class PDB:
             lineidx = lineidx + 1
                     
         if classicErrors:
-            errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. Try using the mini version of Rosetta or else altering the PDB.<br>")
+            if ableToUseMini:
+                errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. Try using the mini version of Rosetta or else altering the PDB.<br>")
+            else:
+                errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. No mini version is available for this protocol so the PDB will need to be altered.<br>")                
             errors.append("<br>The classic-specific errors are as follows:<ul style='text-align:left'>")
             errors.append("<li>%s" % string.join(classicErrors, "<li>"))
             errors.append("</ul>")

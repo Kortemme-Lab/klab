@@ -26,7 +26,11 @@ from rosettaseqtol_onerun import RosettaSeqTolONE
 from weblogolib import *
 #from molprobity_analysis import MolProbityAnalysis
 
-server_root = '/var/rosettabackend/'
+#todo: cleanup when scripts are centralized
+sys.path.insert(0, "../frontend/")
+from RosettaProtocols import RosettaBinaries
+
+server_root = '/var/www/html/rosettaweb/backrub/'
 
 def parseResidueList(partners, pattern, argv):
     mapping = {}
@@ -420,8 +424,8 @@ if __name__ == "__main__":
         #dict_para['backrub_executable'] = '%sbackrub_r32532' % bin_dir
         #dict_para['seqtol_executable']  = '%ssequence_tolerance_r32532' % bin_dir
 
-        dict_para['backrub_executable'] = '%sbackrub_r39284' % bin_dir
-        dict_para['seqtol_executable']  = '%ssequence_tolerance_r39284' % bin_dir
+        dict_para['backrub_executable'] = '%s%s' % (bin_dir, RosettaBinaries["seqtolJMB"]["backrub"])
+        dict_para['seqtol_executable']  = '%s%s' % (bin_dir, RosettaBinaries["seqtolJMB"]["sequence_tolerance"])
         
         # parse parameters
         dict_para['pdb_filename'] = sys.argv[2].split('/')[-1]
@@ -464,7 +468,7 @@ if __name__ == "__main__":
       
         obj = RosettaSeqTol(ID = sys.argv[1],
                     executable = "ls", # not needed since this class doesn't actually execute the simulation
-                    dbdir      = "%sdata/minirosetta_database/" % server_root,
+                    dbdir      = "%sdata/%s/" % (server_root, RosettaBinaries["seqtolJMB"]["database"]),
                     tempdir    = './',
                     parameter  = dict_para )
         

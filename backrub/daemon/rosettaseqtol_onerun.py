@@ -18,6 +18,10 @@ import shutil
 import tempfile
 import subprocess
 
+#todo: cleanup when scripts are centralized
+sys.path.insert(0, "../frontend/")
+from RosettaProtocols import RosettaBinaries
+
 from rosettaexec import RosettaExec
 
 aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
@@ -119,8 +123,8 @@ if __name__ == "__main__":
   '''test the postprocessing'''
   
   one_run = RosettaSeqTolONE( ID = 1,
-                              executable = "/var/rosettabackend/bin/sequence_tolerance_r32532",
-                              dbdir      = "/var/rosettabackend/data/minirosetta_database/",
+                              executable = "/var/www/html/rosettaweb/backrub/bin/%s" % RosettaBinaries["seqtolJMB"]["sequence_tolerance"],
+                              dbdir      = "/var/www/html/rosettaweb/backrub/data/%s/" % RosettaBinaries["seqtolJMB"]["database"],
                               tempdir    = "./",
                               parameter  = {} )
   one_run.workingdir = './'

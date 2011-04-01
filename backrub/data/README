@@ -1,6 +1,6 @@
 This directory contains data necessary for the simulation e.g. the Rosetta databases. Florian also kept some test code in here. Much of the data is not versioned in this repository as it is quite large. The databases can be reconstructed as follows:
 
-data/minirosetta_database
+data/minirosetta_database_r39284
 > svn info minirosetta_database
 Path: minirosetta_database
 URL: https://svn.rosettacommons.org/source/trunk/minirosetta_database
@@ -12,7 +12,8 @@ Schedule: normal
 Last Changed Author: sthyme
 Last Changed Rev: 39117
 Last Changed Date: 2010-10-29 10:13:42 -0700 (Fri, 29 Oct 2010)
---or as it was on kortemmelab before the first update by Shane:
+
+data/minirosetta_database
 Path: minirosetta_database
 URL: https://svn.rosettacommons.org/source/trunk/minirosetta_database
 Repository Root: https://svn.rosettacommons.org/source

@@ -47,7 +47,7 @@ class RosettaExec:
       
   def __init__(self,   ID = 0,
                executable = "ls",
-               dbdir      = "/var/rosettaweb/data/minirosetta_database/",
+               dbdir      = "/var/rosettaweb/data/%s/" % RosettaBinaries["mini"]["database"],
                tempdir    = tempfile.gettempdir(),
                parameter  = {}
                ):

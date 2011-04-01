@@ -126,7 +126,7 @@ class RosettaBackrub(RosettaExec):
              "-ignore_unrecognized_res", 
              "-resfile", self.name_resfile, 
              "-nstruct", self.parameter['ensemble_size'], 
-             "-backrub:ntrials", "10000", # should be 10000
+             "-backrub:ntrials", "10", # should be 10000
              "-pivot_atoms", "CA" ]
     
     if len(self.pivot_res) > 0:

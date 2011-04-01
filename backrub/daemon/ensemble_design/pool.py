@@ -227,7 +227,7 @@ class Job:
 
     def start(self):
         self.status = "running"
-        full_cmd = "/var/rosettabackend/bin/start_limited.sh ((%s) > %s; mv %s %s) &" % (self.cmd, self.running_file, self.running_file, self.done_file)
+        full_cmd = "/var/www/html/rosettaweb/backrub/bin/start_limited.sh ((%s) > %s; mv %s %s) &" % (self.cmd, self.running_file, self.running_file, self.done_file)
 
         #if self.debug_file:
         #    print "[Job] started '%s'" % (self)

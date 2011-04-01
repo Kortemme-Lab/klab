@@ -11,6 +11,7 @@ import sys, os
 import cgi
 import cgitb; cgitb.enable()
 from string import join
+from string import find
 import pickle
 import gzip
 
@@ -162,7 +163,7 @@ class RosettaHTML(object):
 # submit()
 ###############################################################################################
 
-    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [] ):
+    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='' ):
           # this function uses javascript functions from jscript.js
             # if you change the application tabler here, please make sure to change jscript.js accordingly
             # calling the function with parameters will load those into the form. #not implemented yet
@@ -318,6 +319,36 @@ class RosettaHTML(object):
               </TR>
               <TR><td></td></TR>
               <TR>
+                <TD align=right style="width:300px">Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
+                <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">''' % self.tooltips)
+        
+        i = 0
+        # As it happens, alphabetical ordering of RosettaBinaries co-incides with revision ordering 
+        
+        refIDs = self.refs.getReferences()
+        for desc, details in sorted(RosettaBinaries.iteritems()):
+            # This is a hack to add show which of the two Sequence Tolerance papers the binary references
+            bname = details["name"]
+            if desc == "seqtolJMB":
+                bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
+            elif desc == "seqtolP1":
+                bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
+            
+            # Escape the name so we can pass it to javascript
+            bnamevalue = bname
+            embeddedHTML = find(bname, "<")
+            if embeddedHTML != -1:
+                bnamevalue = bname[0:embeddedHTML]
+            
+            html.append('''
+                    <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s" onChange="document.submitform.MiniTextValue.value = '%s'"/> %s</div>
+                    ''' % (desc, desc, bnamevalue, bname))
+            i += 1
+        
+        html.append('''
+             </TD>
+              </TR>
+              <TR>
                 <TD align=right>Upload Structure <img src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" >
                 <INPUT id="PDBComplex" TYPE="file" NAME="PDBComplex" size="20" onChange="document.submitform.query.value = 'parsePDB'; document.submitform.submit();">
@@ -337,12 +368,18 @@ class RosettaHTML(object):
               </TABLE> ''' % self.tooltips)
                 
         # Subform after PDB is loaded
+        self.tooltips["MiniVersion"] = MiniVersion
         html.append('''
           <!-- parameter form -->
             <TABLE id="PostPDBParameters" align="center" style="display:none; opacity:0.0;">
               <TR>
                 <TD align=right>User Name </TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=30 SIZE=31 NAME="UserName" VALUE="%(username)s" disabled>
+                </TD>
+              </TR>
+              <TR>
+                <TD align=right>Rosetta Version </TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=70 SIZE=31 NAME="MiniTextbox" VALUE="%(MiniVersion)s" disabled>
                 </TD>
               </TR>
               <TR><td></td></TR>
@@ -357,30 +394,6 @@ class RosettaHTML(object):
               <TR><TD colspan=2><br></TD></TR>
               <TR>
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
-              </TR>
-              <TR>
-                <TD align=right style="width:300px">Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
-                <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">''' % self.tooltips)
-        
-        i = 0
-        # As it happens, alphabetical ordering of RosettaBinaries co-incides with revision ordering 
-        
-        refIDs = self.refs.getReferences()
-        for desc, details in sorted(RosettaBinaries.iteritems()):
-            # This is a hack to add show which of the two Sequence Tolerance papers the binary references
-            bname = details["name"]
-            if desc == "seqtolJMB":
-                bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
-            elif desc == "seqtolP1":
-                bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
-             
-            html.append('''
-                    <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s"/> %s</div>
-                    ''' % (desc, desc, bname))
-            i += 1
-        
-        html.append('''
-             </TD>
               </TR>
               <TR>
                 <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
@@ -451,6 +464,7 @@ class RosettaHTML(object):
         html.append(' <INPUT TYPE="hidden" NAME="protocoltask" VALUE="%s"> ' % activeProtocol[1])
         html.append('''
             <INPUT TYPE="hidden" NAME="StoredPDB"  VALUE="%s">
+            <INPUT TYPE="hidden" NAME="MiniTextValue" VALUE="none">
             <INPUT TYPE="hidden" NAME="query" VALUE="submitted">
             <INPUT TYPE="hidden" NAME="mode"  VALUE="check">
           </FORM>
@@ -724,11 +738,14 @@ class RosettaHTML(object):
                 html.append('<td id="lw" %s>%s</td>' % (link_to_job, str(line[5])))
             else:
                 html.append('<td id="lw" %s>%s</td>' % (link_to_job, str(line[5])[0:23] + "..."))
+            
             # Rosetta version
-            if line[6] == '1' or line[6] == 'mini':
-                html.append('<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>mini</i><br>%s</td>' % (task_color, link_to_job, task))
-            elif line[6] == '0' or line[6] == 'classic':
-                html.append('<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>classic</i><br>%s</td>' % (task_color, link_to_job, task))
+            # todo: the mini/classic distinction is somewhat deprecated with the new seqtol protocol
+            miniVersion = "classic"
+            if RosettaBinaries[line[6]]["mini"]:
+                miniVersion = "mini"
+            html.append('<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
+
             # write size of ensemble
             html.append('<td id="lw" %s >%s</td>' % (link_to_job, str(line[7])))
         
@@ -931,9 +948,10 @@ class RosettaHTML(object):
       html = '' #todo: this is turned off!
       return html
   
-    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutation_res=None, mutation_chain=None):
+    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutated = None, designed = None):
         """This shows the Jmol applet for an ensemble of structures with their point mutation(s)"""
-                
+       
+        # todo: Maybe think about color-scheme selector w.r.t. color blindness         
         # todo: set these values in rwebhelper
         # jmol command to load files
         if list_pdb_files != None:
@@ -943,15 +961,24 @@ class RosettaHTML(object):
             jmol_cmd += ' "cpk off; wireframe off; backbone 0.2;" +'
                         
             # jmol command to show mutation as balls'n'stick
+            # todo: the coercion to string for the residue is a hangover from the old codebase. Remove when it always passes  
             jmol_cmd_mutation = ''
-            if mutation_res != None and mutation_chain != None: 
-                #todo: the check to see if the mutation_res type is a string is a hangover from the old codebase. Remove when it always passes  
-                if type(mutation_res) == type('') or type(mutation_res) == type(1):
-                    jmol_cmd_mutation = 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( mutation_res, mutation_chain )
-                elif type(mutation_res) == type([]):
-                    for i in range(len(mutation_res)):
-                        jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % (mutation_res[i], mutation_chain[i])
-            
+            if mutated:
+                for chain, residues in mutated.iteritems():
+                    for residue in residues:
+                        jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )        
+            jmol_cmd_designed = ''
+            if designed: 
+                for chain, residues in designed.iteritems():
+                    for residue in residues:
+                        # Not the most efficient but numbers should be small
+                        # Display residues which are designed but not mutated using green
+                        # Display residues which are designed and mutated using yellow 
+                        if mutated and mutated[chain] and (residue in mutated[chain]):
+                            jmol_cmd_designed += 'select %s:%s; color backbone yellow; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )
+                        else:
+                            jmol_cmd_designed += 'select %s:%s; color backbone green; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )
+                        
             # html code
             html = """
                     <form>
@@ -959,13 +986,13 @@ class RosettaHTML(object):
                          <td bgcolor="#FFFCD8">
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
-                              jmolApplet(400, "set appendNew false;" + %s "%s frame all;" ); 
+                              jmolApplet(400, "set appendNew false;" + %s "%s %s frame all;" ); 
                             </script><br>
                             <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href=http://www.jmol.org/><small>www.jmol.org</small></a>
                          </td>
                     </tr>
                     </form>
-                    """ % ( comment, jmol_cmd, jmol_cmd_mutation )
+                    """ % ( comment, jmol_cmd, jmol_cmd_mutation, jmol_cmd_designed )
         else:
             html = '<tr><td align="center" bgcolor="#FFFCD8" colspan=2>no structures found</td></tr>'
                 
@@ -1201,7 +1228,7 @@ class RosettaHTML(object):
           html.append(self._show_scores_file(cryptID))
           comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
         
-          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation_res=resid, mutation_chain=chain ))
+          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutated = {chain : [resid]}))
           html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1255,12 +1282,17 @@ class RosettaHTML(object):
         list_resids = []
         list_newres = []
         list_radius = []
+        mutated = {}
         for entry in ProtocolParameters["Mutations"]:
-            list_chains.append(ProtocolParameters["Mutations"][0])
-            list_resids.append(ProtocolParameters["Mutations"][1])
+            chain = ProtocolParameters["Mutations"][0]
+            resid = ProtocolParameters["Mutations"][1] 
+            list_chains.append(chain)
+            list_resids.append(resid)
             list_newres.append(ProtocolParameters["Mutations"][2])
             list_radius.append(ProtocolParameters["Mutations"][3])
-        
+            mutated[chain] = mutated[chain] or []
+            mutated[chain].append(resid)
+            
         multiple_mutations_html = ''
         for x in range(len(list_chains)):
             multiple_mutations_html += '<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>' % ( x+1, list_chains[x], list_resids[x], list_newres[x], list_radius[x] )
@@ -1286,7 +1318,7 @@ class RosettaHTML(object):
           html.append(self._show_scores_file(cryptID))
           comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
-          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutation_res=list_resids, mutation_chain=list_chains ))
+          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutated = mutated ))
           html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1508,10 +1540,7 @@ class RosettaHTML(object):
               
             comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
-            designed_chains = [seqtol_chain1 for res in seqtol_list_1] + [seqtol_chain2 for res in seqtol_list_2]
-            designed_res    = seqtol_list_1 + seqtol_list_2
-            
-            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains)) # only the first 10 structures are shown
+            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = ProtocolParameters["Designed"])) # only the first 10 structures are shown
                            
             html.append('''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
                               Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
@@ -1788,17 +1817,30 @@ class RosettaHTML(object):
             list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
             list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>
+                        The query structure is shown in red. 
+                        The designed residues and premutated residues are shown in balls-and-stick representation.
+                        Residues which are designed but not mutated have green backbone atoms.
+                        Residues which are designed <i>and</i> mutated have yellow backbone atoms.
+                        """
              
             designed_chains = []
             designed_res = []
+            designed = {}
             for partner in ProtocolParameters["Partners"]:
                 reslist = ProtocolParameters["Designed"][partner]
                 if reslist:
+                    designed[partner] = reslist.keys() 
                     designed_chains += [partner for res in reslist.keys()]
                     designed_res += reslist.keys()
+        
+            premutated = {}
+            for partner in ProtocolParameters["Partners"]:
+                reslist = ProtocolParameters["Premutated"][partner]
+                if reslist:
+                    premutated[partner] = reslist.keys()
              
-            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutation_res=designed_res , mutation_chain=designed_chains)) # only the first 10 structures are shown
+            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
             #todo: text
             html.append('''<tr><td align="left" bgcolor="#FFFCD8">A ranked table of amino acid types for each position.<br>

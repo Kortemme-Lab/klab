@@ -27,13 +27,17 @@ import subprocess
 import chainsequence
 import rosettahelper
 
+#todo: cleanup when scripts are centralized
+sys.path.insert(0, "../frontend/")
+from RosettaProtocols import RosettaBinaries
+
 from rosettaexec import RosettaExec
 from rosettaplusplus import RosettaPlusPlus
 from rosettaseqtol_onerun_classic import RosettaSeqTolONE
 from weblogolib import *
 #from molprobity_analysis import MolProbityAnalysis
 
-server_root = '/var/rosettabackend/'
+server_root = '/var/www/html/rosettaweb/backrub/'
 
 class RosettaSeqTol(RosettaExec):
   """Rosetta Sequence Tolerance Code class. 
@@ -176,11 +180,7 @@ class RosettaSeqTol(RosettaExec):
   def minimization(self):
     try:
       # this creates an minimized strcuture, we hijack the RosettaBackrub class
-      Minimization = RosettaPlusPlus( ID = 0, 
-                                             executable = self.parameter['minimize_executable'], 
-                                             datadir = self.dbdir, 
-                                             tempdir = self.tempdir, 
-                                             auto_cleanup = False)
+      Minimization = RosettaPlusPlus(0, self.parameter['minimize_executable'], self.dbdir, self.tempdir)
       # do preprocessing
       Minimization.workingdir = './'
       Minimization.set_pdb( self.parameter['pdb_filename'], self.parameter['pdb_content'] )
@@ -234,11 +234,7 @@ class RosettaSeqTol(RosettaExec):
     if not os.path.exists( self.workingdir + '/backrub' ): # skip the whole backrub run
       # RUN BACKRUB FIRST TO CREATE AN ENSEMBLE
       # this creates an backrub object, with a temporary directory "backrub" insiede the seqtol tempdir
-      self.RosettaBackrub = RosettaPlusPlus( ID = 0, 
-                                             executable = self.parameter['backrub_executable'], 
-                                             datadir = self.dbdir, 
-                                             tempdir = self.tempdir, 
-                                             auto_cleanup = False)
+      self.RosettaBackrub = RosettaPlusPlus(0, self.parameter['backrub_executable'], self.dbdir, self.tempdir)
       # do preprocessing
       os.mkdir( self.workingdir + '/backrub' )
       self.RosettaBackrub.workingdir = './backrub'
@@ -325,6 +321,7 @@ class RosettaSeqTol(RosettaExec):
     seqtol_parameter = {'resfile': self.workingdir_file_path(self.name_resfile)}
     self.list_outfiles = []
     
+todo - copy the database here for use with seqtol protocol and set in RosettaBinaries
 
     machines = ["xe5345","xe5430","xe5520"]
     run_on = machines[random.randint(0,2)]
@@ -665,9 +662,10 @@ if __name__ == "__main__":
 
   bin_dir = '%sbin/' % server_root
   
-  dict_para['minimize_executable'] = '%srosetta_minimize_12_17_05.gcc' % bin_dir
-  dict_para['backrub_executable']  = '%srosetta_classic_elisabeth_backrub.gcc' % bin_dir
-  dict_para['seqtol_executable']   = '%srosetta_1Oct08.gcc' % bin_dir
+  #todo: These should be passed in better if the calling mechanism ever gets refactored
+  dict_para['minimize_executable'] = '%s%s' % (bin_dir, RosettaBinaries["seqtolHK"]["minimize"])
+  dict_para['backrub_executable']  = '%s%s' % (bin_dir, RosettaBinaries["seqtolHK"]["backrub"])
+  dict_para['seqtol_executable']   = '%s%s' % (bin_dir, RosettaBinaries["seqtolHK"]["sequence_tolerance"])
   
   # parse parameter
   dict_para['pdb_filename'] = sys.argv[2].split('/')[-1]
@@ -703,7 +701,7 @@ if __name__ == "__main__":
   print "Creating RosettaSeqTol object."
   obj = RosettaSeqTol(ID = sys.argv[1],
                       executable = "ls", # not needed since this class doesn't actually execute the simulation
-                      dbdir      = "%sdata/rosetta_database_elisabeth/" % server_root,
+                      dbdir      = "%sdata/%s/" % (server_root, RosettaBinaries["seqtolHK"]["database"]),
                       tempdir    = './',
                       parameter  = dict_para )
   print "Running Preprocessing."

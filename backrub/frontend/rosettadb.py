@@ -55,7 +55,10 @@ class RosettaDB:
             for x in range( len(fields) ):
                 self.data[fields[x]] = array_data[0][x]
             self.data['date_expiration']  = array_data[0][-3]
-            self.data['time_expiration']  = "%d days, %d hours" % (abs(array_data[0][-2]),abs(array_data[0][-1]) - abs(array_data[0][-2] * 24))
+            time_expiration = None
+            if array_data[0][-2] and array_data[0][-1]:
+                time_expiration = "%d days, %d hours" % (abs(array_data[0][-2]),abs(array_data[0][-1]) - abs(array_data[0][-2] * 24))            
+            self.data['time_expiration']  = time_expiration
             self.data['time_computation'] = array_data[0][-4]
                          
         return self.data

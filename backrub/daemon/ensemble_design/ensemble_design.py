@@ -25,6 +25,11 @@
 
 import sys
 
+#todo: cleanup when scripts are centralized
+sys.path.insert(0, "../../frontend/")
+from RosettaProtocols import RosettaBinaries
+
+
 CORERES_CBETA_NB_CUTOFF = 18
 AAS = list("ACDEFGHIKLMNPQRSTVWY")
 
@@ -34,7 +39,6 @@ DESIGN_DIR = "designs"
 
 # needed files
 #ROSETTA_BIN = "/kortemmelab/home/gfriedla/bin/ros_090907.gcc"
-#ROSETTA_BIN = "/opt/lampp/htdocs/backrub/backend/bin/ros_052208.gcc"
 
 # output files
 DESIGNS_FASTA_FILE = "designs.fasta"
@@ -93,7 +97,7 @@ try:
     BIN_DIR = bin_directory
     SCRIPT_DIR = sys.path[0]
     sys.path.append(BIN_DIR)
-    ROSETTA_BIN = "%s/ros_052208.gcc" % BIN_DIR
+    ROSETTA_BIN = "%s/%s" % (BIN_DIR, RosettaBinaries["ensemble"]["backrub"])
     PATHS_FILE = "%s/paths.txt" % BIN_DIR
     MAKE_RESFILE_SCRIPT = "%s/makeResfile.pl" % SCRIPT_DIR
     PDBLITE_SCRIPT = "%s/PDBlite.py" % SCRIPT_DIR

@@ -196,6 +196,10 @@ protocols = []
 
 
 #todo - Move these into a common file
+def lowercaseToStr(x):
+    return str.lower(str(x))
+    
+    
 def getSortedString(o):
     """
     Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
@@ -203,7 +207,7 @@ def getSortedString(o):
     # todo: replace this with something like pprint on Python upgrade 
     # We assume here that any container type is either list or tuple which may not always hold 
     if isinstance(o, (dict)):
-        pkeys = sorted(o.keys(), key=str.lower)
+        pkeys = sorted(o.keys(), key=lowercaseToStr)
         l = []
         for k in pkeys:
             l.append(str(k) + ":" + getSortedString(o[k]))
@@ -230,130 +234,7 @@ def generateHash(connection, ID):
     result = execQuery(connection, sql)
     return hash_key
   
-# This function sets up all the protocol data.
-# The idea is to reduce redundancy in data descriptions, avoid updating errors, and make it easier to add new protocols.         
-def setupProtocols(rosettaDD, rosettaHTML):
-    refIDs = rosettaHTML.refs.getReferences()
 
-    global protocolGroups
-    global protocols
-    
-    protocolGroups = []
-    protocolGroups.append(RosettaProtocolGroup("Point Mutation", "#DCE9F4"))
-    protocolGroups[0].setDescription('''
-            This function utilizes the backrub protocol implemented in Rosetta and applies it to the neighborhood of a mutated amino acid residue to model conformational changes in this region.
-            There are two options.
-            <dl style="text-align:left;">
-                <dt><b>One Mutation</b></dt><dd>
-                    A single amino acid residue will be substituted and the neighboring residues within a radius of 6&#197; of the mutated residues 
-                    will be allowed to change their side-chain conformations (\"repacked\"). 
-                    The method, choice of parameters and benchmarking are described in [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd>
-                <dt><b>Multiple Mutations</b></dt><dd>Up to 30 residues can be mutated and their neighborhoods repacked.
-                                                      The modeling protocol is as described above for single mutations (but has not been benchmarked yet).</dd>
-                <!-- dt>Upload List</dt><dd>Upload a list with single residue mutations.</dd -->
-            </dl>''' % refIDs)
-    
-    proto = RosettaProtocol("One Mutation", "point_mutation")
-    proto.setReferences("SmithKortemme:2008")
-    proto.setBinaries("classic", "mini")
-    proto.setNumStructures(2,10,50)
-    proto.setSubmitFunction(rosettaHTML.submitformPointMutation)
-    proto.setShowResultsFunction(rosettaHTML.resultsPointMutation)
-    proto.setStoreFunction(storePointMutation)
-    proto.setDataDirFunction(rosettaDD.PointMutation)
-    protocolGroups[0].add(proto)
-
-    proto = RosettaProtocol("Multiple Mutations", "multiple_mutation")
-    proto.setReferences("SmithKortemme:2008")
-    proto.setBinaries("classic", "mini")
-    proto.setNumStructures(2,10,50)
-    proto.setSubmitFunction(rosettaHTML.submitformMultiplePointMutations)
-    proto.setShowResultsFunction(rosettaHTML.resultsMultiplePointMutations)
-    proto.setStoreFunction(storeMultiplePointMutations)
-    proto.setDataDirFunction(rosettaDD.MultiplePointMutations)
-    protocolGroups[0].add(proto)
-    
-    protocolGroups.append(RosettaProtocolGroup("Backrub Ensembles", "#B7FFE0"))
-    protocolGroups[1].setDescription('''
-            This function utilizes backrub and design protocols implemented in Rosetta. 
-            There are two options.
-            <dl style="text-align:left;">
-                <dt><b>Backrub Conformational Ensemble</b></dt>
-                    <dd>Backrub is applied to the entire input structure to generate a flexible backbone ensemble of modeled protein conformations. 
-                    Near-native ensembles made using this method have been shown to be consistent with measures of protein dynamics by 
-                    Residual Dipolar Coupling measurements on Ubiquitin [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd>
-                <dt><b>Backrub Ensemble Design</b></dt>
-                  <dd>This method first creates an ensemble of structures to model protein flexibility. 
-                      In a second step, the generated protein structures are used to predict an ensemble of low-energy sequences consistent with the input structures, 
-                      using computational design implemented in Rosetta. The output is a sequence profile of this family of structures. 
-                      For ubiquitin, the predicted conformational and sequence ensembles resemble those of the natural occurring protein family [<a href="#refFriedlandEtAl:2009">%(FriedlandEtAl:2009)d</a>].</dd>
-            </dl>''' % refIDs)
-    
-    proto = RosettaProtocol("Backrub Conformational Ensemble", "no_mutation")
-    proto.setReferences("SmithKortemme:2008")
-    proto.setBinaries("classic", "mini")
-    proto.setNumStructures(2,10,50)
-    proto.setSubmitFunction(rosettaHTML.submitformEnsemble)
-    proto.setShowResultsFunction(rosettaHTML.showEnsemble)    
-    proto.setStoreFunction(storeEnsemble)
-    proto.setDataDirFunction(rosettaDD.Ensemble)
-    protocolGroups[1].add(proto)
-    
-    proto = RosettaProtocol("Backrub Ensemble Design", "ensemble")
-    proto.setReferences("FriedlandEtAl:2009")
-    proto.setBinaries("ensemble")
-    proto.setNumStructures(2,10,50)
-    proto.setSubmitFunction(rosettaHTML.submitformEnsembleDesign)
-    proto.setShowResultsFunction(rosettaHTML.showEnsembleDesign)
-    proto.setStoreFunction(storeEnsembleDesign)
-    proto.setDataDirFunction(rosettaDD.EnsembleDesign)
-    protocolGroups[1].add(proto)
-    
-    protocolGroups.append(RosettaProtocolGroup("Sequence Tolerance", "#FFE2E2"))
-    protocolGroups[2].setDescription('''
-            This function utilizes backrub and design protocols implemented in Rosetta.
-            There are two options.
-            <dl style="text-align:left;">
-                <dt><b>Interface Sequence Tolerance</b></dt>
-                    <dd>First, the backrub algorithm is applied to the uploaded protein-protein complex to generate a flexible backbone conformational ensemble of the entire complex. 
-                    Then, for each of the resulting structure, residue positions given by the user (up to 10) are subjected to protein design, using a genetic algorithm implemented in Rosetta. 
-                    All generated sequences are ranked by their Rosetta force field score. 
-                    Sequences with favorable scores both for the total protein complex and the interaction interface are used to build a sequence profile, as described and benchmarked in [<a href="#refHumphrisKortemme:2008">%(HumphrisKortemme:2008)d</a>].</dd>
-                <dt><b>Interface / Fold Sequence Tolerance</b></dt>
-                    <dd> Insert text.[<a href="#refSmithKortemme:2010">%(SmithKortemme:2010)d</a>]</dd>
-            </dl>''' % refIDs) 
-    
-    proto = RosettaProtocol("Interface Sequence Tolerance", "sequence_tolerance")
-    proto.setReferences("HumphrisKortemme:2008")
-    proto.setBinaries("seqtolHK")
-    proto.setNumStructures(2,10,50)
-    proto.setSubmitFunction(rosettaHTML.submitformSequenceToleranceHK)
-    proto.setShowResultsFunction(rosettaHTML.showSequenceToleranceHK)
-    proto.setStoreFunction(storeSequenceToleranceHK)
-    proto.setDataDirFunction(rosettaDD.SequenceTolerance)
-    protocolGroups[2].add(proto)
-    
-    proto = RosettaProtocol("Interface / Fold Sequence Tolerance", "sequence_tolerance_SK")
-    proto.setReferences("SmithKortemme:2010")  # todo: "SmithKortemme:2011"
-    proto.setBinaries("seqtolJMB") # todo: "seqtolP1"), see todo above 
-    proto.setNumStructures(2,20,100)    #todo: min should be 10 but I've allowed 2 for testing
-    proto.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
-    proto.setShowResultsFunction(rosettaHTML.showSequenceToleranceSK)
-    proto.setStoreFunction(storeSequenceToleranceSK)
-    proto.setDataDirFunction(rosettaDD.SequenceTolerance)  
-    protocolGroups[2].add(proto)
-    
-    # A flat list of the protocols
-    protocols = []
-    protocols.extend(protocolGroups[0].getProtocols())
-    protocols.extend(protocolGroups[1].getProtocols())
-    protocols.extend(protocolGroups[2].getProtocols())
-
-    # Create references for the HTML generators    
-    rosettaDD.protocolGroups = protocolGroups
-    rosettaHTML.protocolGroups = protocolGroups
-    rosettaDD.protocols = protocols
-    rosettaHTML.protocols = protocols
 
 
 def ws():
@@ -474,7 +355,11 @@ def ws():
 
   rosettaDD = RosettaDataDir(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir)
   rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning)
-  setupProtocols(rosettaDD, rosettaHTML)
+  
+  global protocolGroups
+  global protocols
+  feProtocols = FrontendProtocols(rosettaDD, rosettaHTML)
+  protocolGroups, protocols = feProtocols.getProtocols()
   
     #######################################
   # show the result files, no login     #
@@ -559,7 +444,6 @@ def ws():
       #form
       
       protocol = (form["protocolgroup"].value, form["protocoltask"].value)
-    
       #if False:
       pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(rosettaHTML, form)
       if not pdb_okay:
@@ -579,7 +463,7 @@ def ws():
               
               if numPDBchains > ROSETTAWEB_max_seqtol_SK_chains:
                   errors.append('The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_max_seqtol_SK_chains))
-              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids())
+              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value)
               title = 'Submission Form'
       
   elif query_type == "submitted":    
@@ -983,11 +867,11 @@ def getUserData(form, SID):
 
 ################################### end update() ##############################################
 
-def check_pdb(pdb_object, pdb_filename, usingClassic):
+def check_pdb(pdb_object, pdb_filename, usingClassic, ableToUseMini):
     '''checks pdb file for errors'''
     
     # check the formatting of the file
-    pdb_check_output, wrns = pdb_object.check_format(usingClassic)
+    pdb_check_output, wrns = pdb_object.check_format(usingClassic, ableToUseMini)
     if pdb_check_output != True:
         errors.append("PDB format incorrect in %s:<p style='text-align:left'>" % pdb_filename)
         errors.extend(pdb_check_output)
@@ -1041,7 +925,9 @@ def parsePDB(rosettaHTML, form):
     pdb_object = None
 
     pgroup, ptask = int(form["protocolgroup"].value), int(form["protocoltask"].value)
+    protocol = protocolGroups[pgroup][ptask]
     usingClassic = not(usingMini(form))
+    ableToUseMini = protocol.canUseMini()
           
     if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
         try:
@@ -1097,12 +983,11 @@ def parsePDB(rosettaHTML, form):
         pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
 
         pdb_object = PDB(pdbfile.split('\n'))
-        pdb_check_result = check_pdb(pdb_object, pdb_filename, usingClassic)
+        pdb_check_result = check_pdb(pdb_object, pdb_filename, usingClassic, ableToUseMini)
         if not pdb_check_result:
             return pdb_check_result, pdbfile, pdb_filename, pdb_object
     
     # Specific check for sequence tolerance protocol
-    protocol = protocolGroups[pgroup][ptask]
     if protocol.dbname == "sequence_tolerance":
         if len(pdb_object.chain_ids()) < 2:
             errors.append("The %s protocol requires at least two chains to be selected - the PDB only contains %d." % (protocol.name, len(pdb_object.chain_ids())))
@@ -1738,6 +1623,7 @@ def SequenceToleranceSKChecks(params, pdb_object):
 
     # Test to see if the seqtol resfile would be empty before proceeding 
     # todo: Tidy this logic up with rosettaseqtol.py        
+    all_resids = pdb_object.aa_resids() # todo: Calling this twice (in checkResidues as well)
     resfileHasContents, contents = make_seqtol_resfile(pdb_object, params, ROSETTAWEB_SK_Radius, all_resids)
     
     if not resfileHasContents:
@@ -1746,6 +1632,106 @@ def SequenceToleranceSKChecks(params, pdb_object):
     
     return success
 
+class FrontendProtocols(WebserverProtocols):
+      
+    def __init__(self, rosettaDD, rosettaHTML):
+        super(FrontendProtocols, self).__init__()
+        
+        # Add frontend specific information
+        refIDs = rosettaHTML.refs.getReferences()
+        protocolGroups = self.protocolGroups
+        protocols = self.protocols
+        
+        for pgroup in protocolGroups:
+            if pgroup.name == "Point Mutation":
+                pgroup.setDescription('''
+                This function utilizes the backrub protocol implemented in Rosetta and applies it to the neighborhood of a mutated amino acid residue to model conformational changes in this region.
+                There are two options.
+                <dl style="text-align:left;">
+                    <dt><b>One Mutation</b></dt><dd>
+                        A single amino acid residue will be substituted and the neighboring residues within a radius of 6&#197; of the mutated residues 
+                        will be allowed to change their side-chain conformations (\"repacked\"). 
+                        The method, choice of parameters and benchmarking are described in [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd>
+                    <dt><b>Multiple Mutations</b></dt><dd>Up to 30 residues can be mutated and their neighborhoods repacked.
+                                                          The modeling protocol is as described above for single mutations (but has not been benchmarked yet).</dd>
+                    <!-- dt>Upload List</dt><dd>Upload a list with single residue mutations.</dd -->
+                </dl>''' % refIDs)
+            elif pgroup.name == "Backrub Ensembles":
+                pgroup.setDescription('''
+                This function utilizes backrub and design protocols implemented in Rosetta. 
+                There are two options.
+                <dl style="text-align:left;">
+                    <dt><b>Backrub Conformational Ensemble</b></dt>
+                        <dd>Backrub is applied to the entire input structure to generate a flexible backbone ensemble of modeled protein conformations. 
+                        Near-native ensembles made using this method have been shown to be consistent with measures of protein dynamics by 
+                        Residual Dipolar Coupling measurements on Ubiquitin [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd>
+                    <dt><b>Backrub Ensemble Design</b></dt>
+                      <dd>This method first creates an ensemble of structures to model protein flexibility. 
+                          In a second step, the generated protein structures are used to predict an ensemble of low-energy sequences consistent with the input structures, 
+                          using computational design implemented in Rosetta. The output is a sequence profile of this family of structures. 
+                          For ubiquitin, the predicted conformational and sequence ensembles resemble those of the natural occurring protein family [<a href="#refFriedlandEtAl:2009">%(FriedlandEtAl:2009)d</a>].</dd>
+                </dl>''' % refIDs)
+            elif pgroup.name == "Sequence Tolerance":
+                pgroup.setDescription('''
+                This function utilizes backrub and design protocols implemented in Rosetta.
+                There are two options.
+                <dl style="text-align:left;">
+                    <dt><b>Interface Sequence Tolerance</b></dt>
+                        <dd>First, the backrub algorithm is applied to the uploaded protein-protein complex to generate a flexible backbone conformational ensemble of the entire complex. 
+                        Then, for each of the resulting structure, residue positions given by the user (up to 10) are subjected to protein design, using a genetic algorithm implemented in Rosetta. 
+                        All generated sequences are ranked by their Rosetta force field score. 
+                        Sequences with favorable scores both for the total protein complex and the interaction interface are used to build a sequence profile, as described and benchmarked in [<a href="#refHumphrisKortemme:2008">%(HumphrisKortemme:2008)d</a>].</dd>
+                    <dt><b>Interface / Fold Sequence Tolerance</b></dt>
+                        <dd> Insert text.[<a href="#refSmithKortemme:2010">%(SmithKortemme:2010)d</a>]</dd>
+                </dl>''' % refIDs) 
+            else:
+                raise
+
+        for p in protocols:
+            if p.dbname == "point_mutation":
+                p.setSubmitFunction(rosettaHTML.submitformMultiplePointMutations)
+                p.setShowResultsFunction(rosettaHTML.resultsMultiplePointMutations)
+                p.setStoreFunction(storeMultiplePointMutations)
+                p.setDataDirFunction(rosettaDD.MultiplePointMutations)
+                p.setReferences("SmithKortemme:2008")
+            elif p.dbname == "multiple_mutation":
+                p.setSubmitFunction(rosettaHTML.submitformPointMutation)
+                p.setShowResultsFunction(rosettaHTML.resultsPointMutation)
+                p.setStoreFunction(storePointMutation)
+                p.setDataDirFunction(rosettaDD.PointMutation)
+                p.setReferences("SmithKortemme:2008")
+            elif p.dbname == "no_mutation":
+                p.setSubmitFunction(rosettaHTML.submitformEnsemble)
+                p.setShowResultsFunction(rosettaHTML.showEnsemble)    
+                p.setStoreFunction(storeEnsemble)
+                p.setDataDirFunction(rosettaDD.Ensemble)
+                p.setReferences("SmithKortemme:2008")
+            elif p.dbname == "ensemble":
+                p.setSubmitFunction(rosettaHTML.submitformEnsembleDesign)
+                p.setShowResultsFunction(rosettaHTML.showEnsembleDesign)
+                p.setStoreFunction(storeEnsembleDesign)
+                p.setDataDirFunction(rosettaDD.EnsembleDesign)
+                p.setReferences("FriedlandEtAl:2009")
+            elif p.dbname == "sequence_tolerance":
+                p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceHK)
+                p.setShowResultsFunction(rosettaHTML.showSequenceToleranceHK)
+                p.setStoreFunction(storeSequenceToleranceHK)
+                p.setDataDirFunction(rosettaDD.SequenceTolerance)
+                p.setReferences("HumphrisKortemme:2008")
+            elif p.dbname == "sequence_tolerance_SK":
+                p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
+                p.setShowResultsFunction(rosettaHTML.showSequenceToleranceSK)
+                p.setStoreFunction(storeSequenceToleranceSK)
+                p.setDataDirFunction(rosettaDD.SequenceTolerance)
+                p.setReferences("SmithKortemme:2010")  # todo: "SmithKortemme:2011"
+            else:
+                raise 
+        # Create references for the HTML generators    
+        rosettaDD.protocolGroups = protocolGroups
+        rosettaHTML.protocolGroups = protocolGroups
+        rosettaDD.protocols = protocols
+        rosettaHTML.protocols = protocols
+        
 # run Forest run!
 try:
     ws()
