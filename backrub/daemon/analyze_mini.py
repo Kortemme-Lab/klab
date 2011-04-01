@@ -12,6 +12,7 @@ This class analyzes the raw output of a mini run. It parses the output file and 
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import re
 import time
 import string
