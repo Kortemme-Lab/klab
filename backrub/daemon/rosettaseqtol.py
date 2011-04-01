@@ -9,6 +9,7 @@ Copyright (c) 2009 __UCSF__. All rights reserved.
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import time
 import types
@@ -25,9 +26,6 @@ from rosettabackrub import RosettaBackrub
 from rosettaseqtol_onerun import RosettaSeqTolONE
 from weblogolib import *
 #from molprobity_analysis import MolProbityAnalysis
-
-#todo: cleanup when scripts are centralized
-sys.path.insert(0, "../frontend/")
 from RosettaProtocols import RosettaBinaries
 
 server_root = '/var/www/html/rosettaweb/backrub/'

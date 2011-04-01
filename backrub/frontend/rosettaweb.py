@@ -36,6 +36,7 @@ import sys, os
 # Append document_root to sys.path to be able to find user modulesface
 #sys.path.append(os.environ['DOCUMENT_ROOT'])
 
+sys.path.insert(0, "../common/")
 import shutil
 import sha, time
 import cgi
@@ -75,10 +76,10 @@ import pickle
 
 parameter = read_config_file('/etc/rosettaweb/parameter.conf')
 
+from pdb import PDB
 # todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
 ROSETTAWEB_base_dir = parameter["base_dir"]
 sys.path.insert(0, "%sdaemon/" % ROSETTAWEB_base_dir)
-from pdb import PDB
 from rosettaseqtol import make_seqtol_resfile
 
 ROSETTAWEB_db_host = parameter['db_host']

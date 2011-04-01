@@ -14,6 +14,7 @@ Copyright (c) 2009 __UCSF__. All rights reserved.
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import re
 import pdb
 import time
@@ -27,10 +28,7 @@ import subprocess
 import chainsequence
 import rosettahelper
 
-#todo: cleanup when scripts are centralized
-sys.path.insert(0, "../frontend/")
 from RosettaProtocols import RosettaBinaries
-
 from rosettaexec import RosettaExec
 from rosettaplusplus import RosettaPlusPlus
 from rosettaseqtol_onerun_classic import RosettaSeqTolONE

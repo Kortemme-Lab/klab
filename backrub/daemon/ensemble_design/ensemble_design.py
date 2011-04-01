@@ -25,8 +25,7 @@
 
 import sys
 
-#todo: cleanup when scripts are centralized
-sys.path.insert(0, "../../frontend/")
+sys.path.insert(0, "../../common/")
 from RosettaProtocols import RosettaBinaries
 
 

@@ -10,6 +10,7 @@ This class is based on similar work of Colin Smith.
 """
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import time
 import types
@@ -17,6 +18,7 @@ import string
 import shutil
 import tempfile
 import subprocess
+from RosettaProtocols import RosettaBinaries
 
 aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
        "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",

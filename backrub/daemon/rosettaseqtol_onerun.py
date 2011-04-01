@@ -9,6 +9,7 @@ Copyright (c) 2009 __UCSF__. All rights reserved.
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import gzip
 import time
@@ -18,10 +19,7 @@ import shutil
 import tempfile
 import subprocess
 
-#todo: cleanup when scripts are centralized
-sys.path.insert(0, "../frontend/")
 from RosettaProtocols import RosettaBinaries
-
 from rosettaexec import RosettaExec
 
 aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",

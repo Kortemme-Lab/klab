@@ -9,6 +9,7 @@ Copyright (c) 2009 __UCSF__. All rights reserved.
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import time
 import types
@@ -126,7 +127,7 @@ class RosettaBackrub(RosettaExec):
              "-ignore_unrecognized_res", 
              "-resfile", self.name_resfile, 
              "-nstruct", self.parameter['ensemble_size'], 
-             "-backrub:ntrials", "10", # should be 10000
+             "-backrub:ntrials", "10000", # should be 10000
              "-pivot_atoms", "CA" ]
     
     if len(self.pivot_res) > 0:

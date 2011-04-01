@@ -9,6 +9,7 @@ Copyright (c) 2009 __UCSF__. All rights reserved.
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import gzip
 import time

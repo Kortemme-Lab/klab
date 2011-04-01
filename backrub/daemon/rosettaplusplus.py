@@ -8,6 +8,7 @@
 ###########################################################
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import time
 import types

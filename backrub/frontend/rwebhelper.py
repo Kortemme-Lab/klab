@@ -23,6 +23,7 @@ ROSETTAWEB_MaxMultiplePointMutations = 30
 #todo: change to 20
 ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK = 2
 
+#todo: Only define these once in a common file and reference everywhere
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
                     "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",

@@ -2,6 +2,7 @@
 
 import os
 import sys
+sys.path.insert(0, "../common/")
 import pdb
 import time
 import string
@@ -21,11 +22,9 @@ from analyze_classic import AnalyzeClassic
 from rosettahelper import RosettaError
 from rosettahelper import get_files
 from rosettahelper import grep
+from RosettaProtocols import *
 import md5 # todo: remove when generateHash is centralized
 
-#todo: cleanup when scripts are centralized
-sys.path.insert(0, "../frontend/")
-from RosettaProtocols import *
 
 cwd = str(os.getcwd())
 

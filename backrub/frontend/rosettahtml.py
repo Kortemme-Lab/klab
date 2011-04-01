@@ -8,6 +8,7 @@
 #
 
 import sys, os
+sys.path.insert(0, "../common/")
 import cgi
 import cgitb; cgitb.enable()
 from string import join
