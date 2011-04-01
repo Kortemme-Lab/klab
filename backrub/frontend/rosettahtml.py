@@ -1766,9 +1766,9 @@ class RosettaHTML(object):
                 html.append('</td></tr></table>')
             dlist = ProtocolParameters["Designed"][partner]
             if dlist:
-                html.append('<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(dlist.keys(),' ')))
+                html.append('<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(map(str, dlist.keys()),' ')))
         
-        html.append('''<br>Boltzmann factor: %s' 
+        html.append('''<br>Boltzmann factor: %f 
                     <br><br>
                     Score Reweighting<br>
                     <table><tr>
