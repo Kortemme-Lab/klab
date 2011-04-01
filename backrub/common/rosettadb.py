@@ -30,8 +30,9 @@ class RosettaDB:
                
         fields = self._getFieldsInDB(tablename)
         #DATE_ADD(EndDate, INTERVAL 8 DAY), TIMEDIFF(DATE_ADD(EndDate, INTERVAL 7 DAY), NOW()), TIMEDIFF(EndDate, StartDate)
-        SQL = 'SELECT *,DATE_ADD(EndDate, INTERVAL %s DAY),TIMEDIFF(DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMEDIFF(EndDate, StartDate) FROM %s WHERE ID=%s' % (self.store_time, self.store_time, tablename, ID)
-        
+        SQL = '''SELECT *,DATE_ADD(EndDate, INTERVAL %s DAY),TIMEDIFF(DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMEDIFF(EndDate, StartDate) 
+                 FROM %s WHERE ID=%s''' % (self.store_time, self.store_time, tablename, ID)
+
         array_data = self._execQuery(SQL)
         
         if len(array_data) > 0:
@@ -40,7 +41,7 @@ class RosettaDB:
             self.data['date_expiration']  = array_data[0][-3]
             self.data['time_expiration']  = array_data[0][-2]
             self.data['time_computation'] = array_data[0][-1]
-             
+
         return self.data
         
     def getData4cryptID(self, tablename, ID):
@@ -49,6 +50,7 @@ class RosettaDB:
         fields = self._getFieldsInDB(tablename)
         
         SQL = 'SELECT *,MAKETIME(0,0,TIMESTAMPDIFF(SECOND, StartDate, EndDate)),DATE_ADD(EndDate, INTERVAL %s DAY),TIMESTAMPDIFF(DAY,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMESTAMPDIFF(HOUR,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()) FROM %s WHERE cryptID="%s"' % (self.store_time, self.store_time, self.store_time, tablename, ID)
+        
         array_data = self._execQuery(SQL)
         
         if len(array_data) > 0:
@@ -97,41 +99,6 @@ class RosettaDB:
                 
         # build the command
         SQL = 'INSERT INTO %s (%s) VALUES (%s)' % ( tablename, join(lst_field, ','), join(lst_value, ',') )
-        
-        self._execQuery( SQL )
-        
-        return True
-    
-    # this is somewhat redundant but there are subtle differences
-    def updateData(self, ID, tablename, list_value_pairs, list_SQLCMD_pairs=None):
-        """update data in table
-            - ID: identifier of the updated value
-            - list_value_pairs: contains the table field ID and the according value
-            - list_SQLCMD_pairs: contains the table field ID and a SQL command
-            """
-                
-        fields = self._getFieldsInDB(tablename)
-        
-        lst_field = []
-        # normal field-value-pairs
-        for pair in list_value_pairs:
-            if pair[0] in fields:
-                lst_field.append( '%s="%s"' % (pair[0], pair[1]) )
-            else:
-                print "err: field %s can't be found in the table" % pair[0]
-                return False
-            
-        # field-SQL-command-pairs: the only difference is the missing double quotes in the SQL command
-        if list_SQLCMD_pairs != None:
-            for pair in list_SQLCMD_pairs:
-                if pair[0] in fields:
-                    lst_field.append( '%s=%s' % (pair[0], pair[1]) )
-                else:
-                    print "err: field %s can't be found in the table" % pair[0]
-                    return False
-                
-        # build the command
-        SQL = 'UPDATE %s SET (%s) WHERE ID=%s' % ( tablename, join(lst_field, ','), ID )
         
         self._execQuery( SQL )
         
