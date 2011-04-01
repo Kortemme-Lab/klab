@@ -76,20 +76,3 @@ def grep(string,list):
   expr = re.compile(string)
   results = filter(expr.search,[str(line) for line in list])
   return results
-
-#############################################################################################
-# read_config_file()                                                                        #
-# parser for configuration file                                                             #
-#############################################################################################
-# todo: This code is duplicated in rosetta_daemon.py 
-def read_config_file(filename_config):
-    handle = open(filename_config, 'r')
-    lines  = handle.readlines()
-    handle.close()
-    parameter = {}
-    for line in lines:
-        if line[0] != '#' and len(line) > 1  : # skip comments and empty lines
-            # format is: "parameter = value"
-            list_data = line.split()
-            parameter[list_data[0]] = list_data[2]
-    return parameter

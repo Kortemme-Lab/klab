@@ -18,6 +18,7 @@ import shutil
 import tempfile
 import subprocess
 
+from rbutils import read_config_file
 from rosettahelper import * 
 from rosettaexec import RosettaExec
 from analyze_mini import AnalyzeMini
@@ -122,12 +123,17 @@ class RosettaBackrub(RosettaExec):
   
   def run( self ):
     """gather data for the command line and start the job"""
+    
+    ntrials = "10000" # should be 10000 on the live webserver
+    if read_config_file()["server_name"] == 'albana.ucsf.edu':
+        ntrials = "10"
+            
     args = [ "-database", self.dbdir, 
              "-s", self.name_pdb, 
              "-ignore_unrecognized_res", 
              "-resfile", self.name_resfile, 
              "-nstruct", self.parameter['ensemble_size'], 
-             "-backrub:ntrials", "10000", # should be 10000
+             "-backrub:ntrials", ntrials, 
              "-pivot_atoms", "CA" ]
     
     if len(self.pivot_res) > 0:

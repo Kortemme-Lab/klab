@@ -57,6 +57,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
+from rbutils import *
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
@@ -74,7 +75,7 @@ import pickle
 # Setup: Change these values according to your settings and usage of the server               #
 ###############################################################################################
 
-parameter = read_config_file('/etc/rosettaweb/parameter.conf')
+parameter = read_config_file()
 
 from pdb import PDB
 # todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!

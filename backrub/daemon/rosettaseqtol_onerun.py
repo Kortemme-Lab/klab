@@ -19,6 +19,7 @@ import shutil
 import tempfile
 import subprocess
 
+from rbutils import read_config_file
 from RosettaProtocols import RosettaBinaries
 from rosettaexec import RosettaExec
 
@@ -53,7 +54,11 @@ class RosettaSeqTolONE(RosettaExec):
   def run(self):
     """run a single design run"""
     
-    # This should be the PDB filename without the suffix
+    pop_size = "2000" # should be 2000 on the live webserver
+    if read_config_file()["server_name"] == 'albana.ucsf.edu':
+        pop_size = "20"
+
+# This should be the PDB filename without the suffix
     self.prefix = self.name_pdb.split('/')[-1][:-4]
     
     args = [ "-database", self.dbdir,
@@ -62,7 +67,7 @@ class RosettaSeqTolONE(RosettaExec):
              "-ex1", "-ex2", "-extrachi_cutoff", "0",
              "-score:ref_offsets", "TRP", "0.9", # todo: Ask Colin
              "-ms:generations", "5",
-             "-ms:pop_size", "2000", #  should be 2000
+             "-ms:pop_size", pop_size, #  should be 2000
              "-ms:pop_from_ss", "1",
              "-ms:checkpoint:prefix", self.prefix,
              "-ms:checkpoint:interval", "200",

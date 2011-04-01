@@ -23,6 +23,7 @@ from rosettahelper import RosettaError
 from rosettahelper import get_files
 from rosettahelper import grep
 from RosettaProtocols import *
+from rbutils import *
 import md5 # todo: remove when generateHash is centralized
 
 
@@ -32,7 +33,7 @@ cwd = str(os.getcwd())
 class RosettaDaemon(Daemon):
     """This class controls the rosetta simulation"""
     
-    # those are set by read_config_file(self, filename_config)
+    # those are set by configure(self, filename_config)
     email_admin       = ''  # server administrators email adderss
     max_processes     = ''  # maximal number of processes that can be run at a time
     db_host           = ''  # database access info
@@ -106,13 +107,7 @@ The Kortemme Lab Server Daemon
         self.list_RosettaPP = [] # list of running processes
         self.running_P = 0 # total no of jobs
         self.running_S = 0 # sequence tolerance
-        
-        filename_config = "/etc/rosettaweb/parameter.conf"
-        try:
-            self.read_config_file(filename_config)
-        except IOError:
-            print filename_config, "could not be found."
-            sys.exit(2)
+        self.configure()
         
         # logfile
         self.logfile = self.rosetta_tmp + "RosettaDaemon.log"
@@ -524,17 +519,9 @@ The Kortemme Lab Server Daemon
                 self.execQuery(query)
                 self.log("%s\t job %s: marked as expired in database\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID ) )
 
-    def read_config_file(self,filename_config):
-        handle = open(filename_config, 'r')
-        lines  = handle.readlines()
-        handle.close()
-        parameter = {}
-        for line in lines:
-            if line[0] != '#' and len(line) > 1  : # skip comments and empty lines
-                # format is: "parameter = value"
-                list_data = line.split()
-                parameter[list_data[0]] = list_data[2]
-        
+    def configure(self):
+        parameter = read_config_file()
+                
         self.email_admin            = parameter["email_admin"]
         self.max_processes          = int(parameter["max_processes"])
         self.MaxSeqTolJobsRunning   = 3
@@ -639,12 +626,7 @@ The Kortemme Lab Server Daemon
         
         
     def dbrehash(self):
-        filename_config = "/etc/rosettaweb/parameter.conf"
-        try:
-            self.read_config_file(filename_config)
-        except IOError:
-            print filename_config, "could not be found."
-            sys.exit(2)
+        self.configure()
         
         sql = "SELECT ID, hashkey FROM %s" % self.db_table
         results = self.execQuery(sql)
@@ -669,12 +651,7 @@ The Kortemme Lab Server Daemon
         
     
     def dbcheck(self):
-        filename_config = "/etc/rosettaweb/parameter.conf"
-        try:
-            self.read_config_file(filename_config)
-        except IOError:
-            print filename_config, "could not be found."
-            sys.exit(2)
+        self.configure()
         
         sql = "SELECT ID, ProtocolParameters, task FROM %s" % self.db_table
         results = self.execQuery(sql)
@@ -686,12 +663,7 @@ The Kortemme Lab Server Daemon
     
     def dbconvert(self):
         # if there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
-        filename_config = "/etc/rosettaweb/parameter.conf"
-        try:
-            self.read_config_file(filename_config)
-        except IOError:
-            print filename_config, "could not be found."
-            sys.exit(2)
+        self.configure()
         
         sql = "SELECT ID, task, PM_chain, PM_resid, PM_newres, PM_radius, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter, ProtocolParameters FROM %s" % self.db_table
         results = self.execQuery(sql)
