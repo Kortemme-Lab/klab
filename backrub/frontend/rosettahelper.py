@@ -36,49 +36,6 @@ def get_residue_scores_from_pdb(self, filename):
   handle.close()
   return scores
 
-def unique(s):
-    """Return a list of the elements in s, but without duplicates.
-    http://code.activestate.com/recipes/52560/
-    """
-    # case 0, empty object
-    n = len(s)
-    if n == 0:
-        return []
-
-    # case 1: if the objects in the list are hashable, try to use a dict
-    u = {}
-    try:
-        for x in s:
-            u[x] = 1
-    except TypeError:
-        del u  # move on to the next method
-    else:
-        return u.keys()
-
-    # case 2: objects are not hashable, use sorting
-    try:
-        t = list(s)
-        t.sort()
-    except TypeError:
-        del t  # move on to the next method
-    else:
-        assert n > 0
-        last = t[0]
-        lasti = i = 1
-        while i < n:
-            if t[i] != last:
-                t[lasti] = last = t[i]
-                lasti += 1
-            i += 1
-        return t[:lasti]
-
-    # case 3: Brute force is all that's left.
-    u = []
-    for x in s:
-        if x not in u:
-            u.append(x)
-    return u
-
 def get_files(dirname):
   '''recursion rockz'''
   all_files = []

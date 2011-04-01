@@ -5,7 +5,6 @@ import re
 # read_config_file()                                                                        #
 # parser for configuration file                                                             #
 #############################################################################################
-# todo: This code is duplicated in rosetta_daemon.py
 def read_config_file(): 
     try:
         handle = open('/etc/rosettaweb/parameter.conf', 'r')
@@ -22,3 +21,5 @@ def read_config_file():
         sys.exit(2)
         
     return parameter
+
+

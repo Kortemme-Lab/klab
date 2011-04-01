@@ -37,6 +37,52 @@ from weblogolib import *
 
 server_root = '/var/www/html/rosettaweb/backrub/'
 
+# todo:  Maybe remove this function entirely as it's outside code and is overkill for how it is used by us
+#        e.g. see the differences to pdb.py/make_seqtol_resfile from revisions 227-229 where I removed it
+#        The last remaining use of this function is in this file. 
+def unique(s):
+    """Return a list of the elements in s, but without duplicates.
+    http://code.activestate.com/recipes/52560/
+    """
+    # case 0, empty object
+    n = len(s)
+    if n == 0:
+        return []
+
+    # case 1: if the objects in the list are hashable, try to use a dict
+    u = {}
+    try:
+        for x in s:
+            u[x] = 1
+    except TypeError:
+        del u  # move on to the next method
+    else:
+        return u.keys()
+
+    # case 2: objects are not hashable, use sorting
+    try:
+        t = list(s)
+        t.sort()
+    except TypeError:
+        del t  # move on to the next method
+    else:
+        assert n > 0
+        last = t[0]
+        lasti = i = 1
+        while i < n:
+            if t[i] != last:
+                t[lasti] = last = t[i]
+                lasti += 1
+            i += 1
+        return t[:lasti]
+
+    # case 3: Brute force is all that's left.
+    u = []
+    for x in s:
+        if x not in u:
+            u.append(x)
+    return u
+
 class RosettaSeqTol(RosettaExec):
   """Rosetta Sequence Tolerance Code class. 
      This class executes a backrub rub on it's own and uses the resulting ensemble for interface design"""
@@ -137,7 +183,7 @@ class RosettaSeqTol(RosettaExec):
     for residue in self.design:
       neighbor_list.extend( self.pdb.neighbors3(self.parameter['radius'], residue) )
     
-    neighbor_list = rosettahelper.unique(neighbor_list)
+    neighbor_list = unique(neighbor_list)
     neighbor_list.sort()
 
     self.map_chainres2seq = {}
