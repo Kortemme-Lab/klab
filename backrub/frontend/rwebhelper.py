@@ -5,7 +5,6 @@
 
 import sys, os
 import re
-import MySQLdb
 import _mysql_exceptions
 
 # Common constants
@@ -35,23 +34,6 @@ ROSETTAWEB_SK_AAinv = {}
 for k, v in ROSETTAWEB_SK_AA.items():
     ROSETTAWEB_SK_AAinv[v] = k
     
-#############################################################################################
-# execQuery()                                                                               #
-# A general function to execute an SQL query. This function is called whenever a query is   #
-# made to the database.                                                                     #
-#############################################################################################
-
-def execQuery(connection, sql):
-  #connection = MySQLdb.Connection(host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket )
-  cursor = connection.cursor()
-  cursor.execute(sql)
-  results = cursor.fetchall()
-  cursor.close()
-  
-  return results
-
-##################################### end of execQuery() ####################################
-
 #############################################################################################
 # sendMail()                                                                                #
 # sendmail wrapper                                                                          #

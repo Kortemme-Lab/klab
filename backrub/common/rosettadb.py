@@ -12,6 +12,7 @@
 import sys, os
 import MySQLdb
 import traceback
+import md5
 
 from string import join
 
@@ -20,10 +21,11 @@ class RosettaDB:
     data = {}
     store_time = 7 # how long will the stuff be stored
     
-    def __init__(self, hostname, database, user, password, port, socket, store_time):
+    def __init__(self, hostname, database, user, password, port, socket, store_time, numTries = 1):
         self.connection = MySQLdb.Connection( host=hostname, db=database, user=user, passwd=password, 
                                               port=port, unix_socket=socket )
         self.store_time = store_time
+        self.numTries = numTries
         
     def getData4ID(self, tablename, ID):
         """get the whole row from the database and store it in a dict"""
@@ -33,7 +35,7 @@ class RosettaDB:
         SQL = '''SELECT *,DATE_ADD(EndDate, INTERVAL %s DAY),TIMEDIFF(DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMEDIFF(EndDate, StartDate) 
                  FROM %s WHERE ID=%s''' % (self.store_time, self.store_time, tablename, ID)
 
-        array_data = self._execQuery(SQL)
+        array_data = self.execQuery(SQL)
         
         if len(array_data) > 0:
             for x in range( len(fields) ):
@@ -51,7 +53,7 @@ class RosettaDB:
         
         SQL = 'SELECT *,MAKETIME(0,0,TIMESTAMPDIFF(SECOND, StartDate, EndDate)),DATE_ADD(EndDate, INTERVAL %s DAY),TIMESTAMPDIFF(DAY,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMESTAMPDIFF(HOUR,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()) FROM %s WHERE cryptID="%s"' % (self.store_time, self.store_time, self.store_time, tablename, ID)
         
-        array_data = self._execQuery(SQL)
+        array_data = self.execQuery(SQL)
         
         if len(array_data) > 0:
             for x in range( len(fields) ):
@@ -100,7 +102,7 @@ class RosettaDB:
         # build the command
         SQL = 'INSERT INTO %s (%s) VALUES (%s)' % ( tablename, join(lst_field, ','), join(lst_value, ',') )
         
-        self._execQuery( SQL )
+        self.execQuery( SQL )
         
         return True
 
@@ -111,27 +113,76 @@ class RosettaDB:
            function is empty
         """
         pass    
-        
-        
-    def _execQuery(self,sql):
-        cursor = self.connection.cursor()
-        errcode = cursor.execute(sql)
-        #@debug:
-        #if errcode != 1:
-        #    print("%d: %s" %(errcode,traceback.print_stack()))
-        results = cursor.fetchall()
-        cursor.close()
-        
-        return results   
     
+    def execQuery(self, sql):
+        """execute SQL query"""
+        i = 0
+        while i < self.numTries:
+            try:    
+                cursor = self.connection.cursor()
+                errcode = cursor.execute(sql)
+                #@debug:
+                #if errcode != 1:
+                #    print("%d: %s" %(errcode,traceback.print_stack()))
+                results = cursor.fetchall()
+                cursor.close()
+                return results
+    
+            except:
+                traceback.print_exc()
+                time.sleep(i)
+                i += i
+                break
+        return None
+
     def _getFieldsInDB(self, tablename):
         """get all the fields from a specific table"""
         SQL = 'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.Columns where TABLE_NAME="%s"' % tablename
     
-        array_data = self._execQuery(SQL)
+        array_data = self.execQuery(SQL)
         
         return [x[0] for x in array_data]
+
+    def _lowercaseToStr(x):
+        return str.lower(str(x))   
+        
+    def _getSortedString(o):
+        """
+        Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
+        """
+        # todo: replace this with something like pprint on Python upgrade 
+        # We assume here that any container type is either list or tuple which may not always hold 
+        if isinstance(o, (dict)):
+            pkeys = sorted(o.keys(), key=_lowercaseToStr)
+            l = []
+            for k in pkeys:
+                l.append(str(k) + ":" + _getSortedString(o[k]))
+            return "{" + string.join(l, ",") + "}"    
+        else:
+            return str(o)
     
+    def generateHash(self, ID, debug = False):
+        # create a hash key for the entry we just made
+        sql = '''SELECT PDBComplex, PDBComplexFile, Mini, EnsembleSize, task, ProtocolParameters
+                   FROM backrub 
+                  WHERE ID="%s" ''' % ID # get data
+        result = self.execQuery(sql)
+        value_string = "" 
+        for value in result[0][0:5]: # combine it to a string
+            value_string += str(value)
+        
+        # We sort the complex datatypes to get deterministic hashes
+        # todo: This works better than before (it works!) but could be cleverer.
+        value_string += _getSortedString(pickle.loads(result[0][5]))
+        
+        hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
+        sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
+        if not debug:
+            result = self.execQuery(sql)
+        else:
+            print(sql)
+        return hash_key
+ 
 
 
 if __name__ == "__main__":
@@ -142,9 +193,9 @@ if __name__ == "__main__":
     test_db = RosettaDB( 'localhost', 'alascan', 'alascan', 'h4UjX!', 3306, '/opt/lampp/var/mysql/mysql.sock' )
     
     SQL = 'SELECT Username FROM Users WHERE ID=1'
-    print 'test: _execQuery()',
+    print 'test: execQuery()',
     try:
-        assert test_db._execQuery(SQL)[0][0] == 'flo', 'test: _execQuery() failed'
+        assert test_db.execQuery(SQL)[0][0] == 'flo', 'test: execQuery() failed'
         print "success"
     except AssertionError:
         print "failed"

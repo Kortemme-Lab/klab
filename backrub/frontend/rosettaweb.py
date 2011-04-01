@@ -25,7 +25,6 @@
 # make_footer()                            
 # terms_of_service()                            
 # help()                            
-# execQuery()                            
 # sendMail()
 # print_countries()                            
 # 
@@ -45,7 +44,6 @@ import Cookie
 # set Python egg dir MscOSX only
 if os.uname()[0] == 'Darwin':
   os.environ['PYTHON_EGG_CACHE'] = '/Applications/XAMPP/xamppfiles/tmp'
-import MySQLdb  
 import _mysql_exceptions
 import socket
 import md5
@@ -115,7 +113,7 @@ if ROSETTAWEB_server_name == 'albana.ucsf.edu':
     import profile 
  
 # open connection to MySQL
-connection = MySQLdb.Connection(host=ROSETTAWEB_db_host, db=ROSETTAWEB_db_db, user=ROSETTAWEB_db_user, passwd=ROSETTAWEB_db_passwd, port=ROSETTAWEB_db_port, unix_socket=ROSETTAWEB_db_socket)
+DBConnection = rosettadb.RosettaDB(ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
 ########################################## Setup End ##########################################
 
 # todo: These would be tidier as member elements of a ws class
@@ -196,49 +194,6 @@ def usingMini(form):
 protocolGroups = []
 protocols = []
 
-
-#todo - Move these into a common file
-def lowercaseToStr(x):
-    return str.lower(str(x))
-    
-    
-def getSortedString(o):
-    """
-    Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
-    """
-    # todo: replace this with something like pprint on Python upgrade 
-    # We assume here that any container type is either list or tuple which may not always hold 
-    if isinstance(o, (dict)):
-        pkeys = sorted(o.keys(), key=lowercaseToStr)
-        l = []
-        for k in pkeys:
-            l.append(str(k) + ":" + getSortedString(o[k]))
-        return "{" + string.join(l, ",") + "}"    
-    else:
-        return str(o)
-
-def generateHash(connection, ID):
-    # create a hash key for the entry we just made
-    sql = '''SELECT PDBComplex, PDBComplexFile, Mini, EnsembleSize, task, ProtocolParameters
-               FROM backrub 
-              WHERE ID="%s" ''' % ID # get data
-    result = execQuery(connection, sql)
-    value_string = "" 
-    for value in result[0][0:5]: # combine it to a string
-        value_string += str(value)
-    
-    # We sort the complex datatypes to get deterministic hashes
-    # todo: This works better than before (it works!) but could be cleverer.
-    value_string += getSortedString(pickle.loads(result[0][5]))
-    
-    hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
-    sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
-    result = execQuery(connection, sql)
-    return hash_key
-  
-
-
-
 def ws():
   s = sys.stdout
   if ROSETTAWEB_server_name == 'albana.ucsf.edu':
@@ -298,7 +253,7 @@ def ws():
         my_session.data['lastvisit'] = repr(time.time())
         lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
         sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % (SID, lv_strftime, "login", "0")
-        result = execQuery(connection, sql)
+        result = DBConnection.execQuery(sql)
         # redirect user to the index page
         query_type = "index"
          
@@ -316,13 +271,13 @@ def ws():
         my_session.data['lastvisit'] = repr(time.time())
         # get infos about session
         sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
-        result = execQuery(connection, sql)
+        result = DBConnection.execQuery(sql)
         # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
         if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB"]:
           query_type = form["query"].value
         
           sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
-          result = execQuery(connection, sql)
+          result = DBConnection.execQuery(sql)
           if result[0][0] != () and result[0][0] != (): #todo
             username = result[0][0]
             userid = int(result[0][1])
@@ -378,7 +333,7 @@ def ws():
     if form.has_key("job"):
       cryptID = form["job"].value
       sql = 'SELECT ID,Status,task,mini,PDBComplexFile FROM backrub WHERE cryptID="%s"' % (cryptID)
-      result = execQuery(connection, sql)
+      result = DBConnection.execQuery(sql)
       if len(result) > 0:
           jobid = result[0][0]
           status = result[0][1]
@@ -576,14 +531,14 @@ def login(form, my_session, t):
       password_entered = form["myPassword"].value
     # check for userID and password
     sql = 'SELECT ID,Password FROM Users WHERE UserName = "%s"' % form["myUserName"].value
-    result = execQuery(connection, sql)
+    result = DBConnection.execQuery(sql)
     try:
       UserID = result[0][0]
       PW = result[0][1]
       if password_entered == PW: 
         # all clear ... go!
         sql = "UPDATE Sessions SET UserID = \"%s\", Date = \"%s\", loggedin = \"%s\" WHERE SessionID = \"%s\" " % (UserID, lv_strftime, "1", SID)
-        result = execQuery(connection, sql)
+        result = DBConnection.execQuery(sql)
         return True # successfully logged in
 
       else:
@@ -596,7 +551,7 @@ def login(form, my_session, t):
 
   else: # need form
     sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID
-    result = execQuery(connection, sql)
+    result = DBConnection.execQuery(sql)
     if result[0][0] == 1:
       return 'logged_in'
 
@@ -615,7 +570,7 @@ def logout(form, my_session, SID=None):
       SID = my_session.cookie['sid'].value
     # update database
     sql = "UPDATE Sessions SET loggedin = \"%s\" WHERE SessionID = \"%s\" " % ("0", SID)
-    execQuery(connection, sql)
+    DBConnection.execQuery(sql)
 
     return True
 
@@ -635,7 +590,7 @@ def send_password(form):
     Email = form["Email"].value
     
     sql = "SELECT ID,FirstName,UserName FROM Users where Email=\"%s\"" % Email
-    result = execQuery(connection, sql)
+    result = DBConnection.execQuery(sql)
     
     if len(result) < 1:
       password_updated = False
@@ -645,7 +600,7 @@ def send_password(form):
       crypt_pw = md5.new(password.encode('utf-8')).hexdigest()
       
       sql = 'UPDATE Users SET Password="%s" WHERE ID=%s' % (crypt_pw, result[0][0])
-      result_null = execQuery(connection, sql)
+      result_null = DBConnection.execQuery(sql)
       
       text = """Dear %s,
     
@@ -696,14 +651,14 @@ def _checkUserInfo(form):
     error = None
     
     sql = "SELECT * FROM Users WHERE UserName =\"%s\"" % form["username"].value
-    sql_out = execQuery(connection, sql)
+    sql_out = DBConnection.execQuery(sql)
     if len(sql_out) >= 1:           # if we get something, name is already taken
       form["username"].value = ''   # reset
       process_data = False 
       error = 'Username is already in use.'
     
     sql = "SELECT * FROM Users WHERE Email = \"%s\"" % form["email"].value
-    sql_out = execQuery(connection, sql)
+    sql_out = DBConnection.execQuery(sql)
     if len(sql_out) >= 1:
       form["email"].value = ''
       process_data = False
@@ -728,7 +683,7 @@ def _updateUserInfo(form, SID):
     variables = ""
     # get userid from db
     sql = "SELECT UserID from Sessions WHERE SessionID = \"%s\" " % SID
-    result = execQuery(connection, sql)
+    result = DBConnection.execQuery(sql)
     userid = result[0][0]
     
     for value_name in value_list:
@@ -739,7 +694,7 @@ def _updateUserInfo(form, SID):
             fields += value_names[value_name] + "=\"" + form[value_name].value + "\", "
     sql = "UPDATE Users SET %s WHERE ID=%s" % (fields[:-2], userid)
     #print sql
-    execQuery(connection, sql)
+    DBConnection.execQuery(sql)
 
 
 def register(form, SID):
@@ -776,7 +731,7 @@ def register(form, SID):
         variables += "\"%s\"," % form[value_name].value
       sql = "INSERT INTO Users (Date, %s) VALUES (NOW(), %s)" % (fields[:-1], variables[:-1])
     #print sql
-    execQuery(connection, sql)
+    DBConnection.execQuery(sql)
 
     # send a conformation email
     text = """Dear %s,
@@ -832,11 +787,11 @@ def getUserData(form, SID):
   
   # get userid from db
   sql = "SELECT UserID from Sessions WHERE SessionID = \"%s\"" % SID
-  result = execQuery(connection, sql)
+  result = DBConnection.execQuery(sql)
   # get all user data from DB
   UserID = result[0][0]
   sql = "SELECT * FROM Users WHERE ID = \"%s\"" % UserID
-  sql_out = execQuery(connection, sql)
+  sql_out = DBConnection.execQuery(sql)
   
   # create a dict with that information
  
@@ -1004,10 +959,10 @@ def submit(rosettaHTML, form, SID):
     
     # get information from the database
     sql = 'SELECT UserID FROM Sessions WHERE SessionID = "%s"' % SID
-    result = execQuery(connection, sql)
+    result = DBConnection.execQuery(sql)
     UserID = result[0][0]
     sql = 'SELECT UserName, Email FROM Users WHERE ID = "%s"' % UserID
-    sql_out = execQuery(connection, sql)
+    sql_out = DBConnection.execQuery(sql)
     UserName = sql_out[0][0]
     Email = sql_out[0][1]
     JobName = ""
@@ -1084,7 +1039,7 @@ def submit(rosettaHTML, form, SID):
                     hostname = IP
                 # lock table
                 sql = "LOCK TABLES backrub WRITE, Users READ"
-                execQuery(connection, sql)
+                DBConnection.execQuery(sql)
                 # write information to database
                 
                 # Strip the path information from  the pdb
@@ -1098,9 +1053,9 @@ def submit(rosettaHTML, form, SID):
                   
                 try: 
                     import random
-                    execQuery(connection, sql)
+                    DBConnection.execQuery(sql)
                     sql = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
-                    result = execQuery(connection, sql)
+                    result = DBConnection.execQuery(sql)
                     ID = result[0][0]
                     # create a unique key as name for directories from the ID, for the case we need to hide the results
                     # do not just use the ID but also a random sequence
@@ -1108,20 +1063,20 @@ def submit(rosettaHTML, form, SID):
                     cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
                     return_vals = (cryptID, "new")
                     sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
-                    result = execQuery(connection, sql)
+                    result = DBConnection.execQuery(sql)
                     # success
                     
-                    hash_key = generateHash(connection, ID)
+                    hash_key = DBConnection.generateHash(ID)
             
                     # now find if there's a key like that already:
                     sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
-                    result = execQuery(connection, sql)
+                    result = DBConnection.execQuery(sql)
                     # print sql, result
                     for r in result:
                         if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
                             shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
-                            result = execQuery(connection, sql)
+                            result = DBConnection.execQuery(sql)
                             return_vals = (cryptID, "old")
                             break 
                         
@@ -1138,7 +1093,7 @@ def submit(rosettaHTML, form, SID):
             
                 # unlock tables
                 sql = "UNLOCK TABLES"
-                execQuery(connection, sql)
+                DBConnection.execQuery(sql)
                 
                 return return_vals
           
@@ -1190,16 +1145,16 @@ def queue(form, userid):
   output = StringIO()
   output.write('<TD align="center">')
   sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE Expired=0 ORDER BY backrub.ID DESC"
-  result1 = execQuery(connection, sql)
+  result1 = DBConnection.execQuery(sql)
   # get user id of logged in user
   # sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
-  #   userID1 = execQuery(connection, sql)[0][0]
+  #   userID1 = DBConnection.execQuery(sql)[0][0]
   
   results = []
   for line in result1:
     new_lst = []
     sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
-    result2 = execQuery(connection, sql)
+    result2 = DBConnection.execQuery(sql)
     new_lst.extend(line)
     if int(line[3]) == int(userid):
         new_lst[3] = '<b><font color="green">' + result2[0][0] + '</font></b>'
@@ -1221,12 +1176,12 @@ def deletejob(form, SID):
   
   # get logged in user
   sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
-  userID1 = execQuery(connection, sql)[0][0]  
+  userID1 = DBConnection.execQuery(sql)[0][0]  
     
   if form.has_key("jobID"): # check if there is in fact a jobID
     # get user id for this job
     sql = 'SELECT UserID,Status FROM backrub WHERE ID="%s"' % (form["jobID"].value)
-    userID2 = execQuery(connection, sql)
+    userID2 = DBConnection.execQuery(sql)
     
     # job does no longer exist
     if len(userID2) == 0:
@@ -1244,7 +1199,7 @@ def deletejob(form, SID):
       # delete the job from database only if it's still not running
       if form.has_key("button") and form["button"].value == "Delete":
         sql = 'DELETE FROM backrub WHERE ID="%s" AND UserID="%s" AND Status=0' % (form["jobID"].value, userID1)
-        result = execQuery(connection, sql)
+        result = DBConnection.execQuery(sql)
         html += 'Job %s deleted. <br> <br> \n' % (form["jobID"].value)
       else:
         html += "Invalid. <br><br>"
@@ -1265,8 +1220,7 @@ def jobinfo(form, SID):
     if form.has_key("jobnumber"):
         cryptID = form["jobnumber"].value
         
-        obj_DB = rosettadb.RosettaDB(ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)
-        parameter = obj_DB.getData4cryptID('backrub', cryptID)
+        parameter = DBConnection.getData4cryptID('backrub', cryptID)
         # for x,y in parameter.iteritems():
         #   print x, y, '<br>'
         if len(parameter) > 0:
