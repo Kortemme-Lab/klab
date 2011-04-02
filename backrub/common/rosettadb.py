@@ -190,8 +190,6 @@ if __name__ == "__main__":
     
     test_fields = [ 'ID', 'cryptID', 'Date', 'StartDate', 'EndDate', 'UserID', 'Email', 'Status', 'Notes', 'task', 'PDBComplex', 'ExperimentalValues', 'Errors', 'IPAddress', 'Host', 'ResultsTable', 'PDBComplexFile', 'ResultsRasmol', 'Mini', 'EnsembleSize', 'KeepOutput', 'RDC_temperature', 'RDC_num_designs_per_struct', 'RDC_segment_length'] 
 
-    test_db = RosettaDB( 'localhost', 'alascan', 'alascan', 'h4UjX!', 3306, '/opt/lampp/var/mysql/mysql.sock' )
-    
     SQL = 'SELECT Username FROM Users WHERE ID=1'
     print 'test: execQuery()',
     try:
