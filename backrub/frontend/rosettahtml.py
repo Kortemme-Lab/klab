@@ -79,7 +79,13 @@ class RosettaHTML(object):
                         "tt_seqtol_premutated": "header=[Residues for design] body=[todo:] %s" % tooltip_parameter,
                         "tt_click":         "body=[Click on the link to read the description.] %s" % tooltip_parameter,
                         "ROSETTAWEB_SK_RecommendedNumStructures":   ROSETTAWEB_SK_RecommendedNumStructures,
-                        }          
+                        }
+        self.WebLogoText = '''
+            <small>Crooks GE, Hon G, Chandonia JM, Brenner SE,                                           
+            <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>,                                           
+            <em>Genome Research</em>, 14:1188-1190, (2004)</small>
+            [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]'''
+    
         
     def main(self, CONTENT='This server is made of awesome sauce.', site='', query='' ):
         html = []
@@ -1388,55 +1394,50 @@ class RosettaHTML(object):
                 """ % ( input_filename, size_of_ensemble, temperature, seq_per_struct, len_of_seg )]
         
         if status == 'done' or status == 'sample':
-          html.append('<tr><td align=right></td><td></td></tr>')
+            html.append('<tr><td align=right></td><td></td></tr>')
           
-          comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
-          [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]
-          <br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.""" % cryptID
+            comment2 = """Structures of the C&alpha; backbone traces of the backrub ensemble.<br>
+              [ <a href="../downloads/%s/ensemble.pdb">PDB file</a> ]
+              <br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.""" % cryptID
         
-          html.append(self._showApplet4EnsembleFile( comment2, '../downloads/%s/ensemble.pdb' % cryptID, style='backbone' ))        
+            html.append(self._showApplet4EnsembleFile( comment2, '../downloads/%s/ensemble.pdb' % cryptID, style='backbone' ))        
           
-          comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure. 
+            comment1 = """Mean C&alpha; difference distance values of the ensemble mapped onto X-ray structure. 
                         The gradient from red to white to blue corresponds to flexible, intermediate and rigid regions, respectively.<br>
-           [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]
-           <br><br>Please wait, it may take a few moments to load cartoon representation.""" % cryptID
+               [ <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">PDB file</a> ]
+               <br><br>Please wait, it may take a few moments to load cartoon representation.""" % cryptID
         
-          html.append(self._showApplet4EnsembleFile( comment1, '../downloads/%s/ca_dist_difference_bfactors.pdb' % cryptID, style='cartoon' ))
+            html.append(self._showApplet4EnsembleFile( comment1, '../downloads/%s/ca_dist_difference_bfactors.pdb' % cryptID, style='cartoon' ))
           
-          html.append("""
+            WebLogoText = self.WebLogoText
+            html.append("""
                 <tr><td align="right" bgcolor="#FFFCD8">Mean C&alpha; difference distance values</td>                 
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_1D_plot.png">
-                                          <img src="../downloads/%s/ca_dist_difference_1D_plot.png" alt="image file not available" width="400"></a></td></tr>
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/ca_dist_difference_1D_plot.png">
+                                          <img src="../downloads/%(cryptID)s/ca_dist_difference_1D_plot.png" alt="image file not available" width="400"></a></td></tr>
               
-                <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; difference distance values [ <a href="../downloads/%s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/ca_dist_difference_2D_plot.png">
-                                          <img src="../downloads/%s/ca_dist_difference_2D_plot.png" alt="image file not available" width="400"></a></td></tr>
+                <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; difference distance values [ <a href="../downloads/%(cryptID)s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/ca_dist_difference_2D_plot.png">
+                                          <img src="../downloads/%(cryptID)s/ca_dist_difference_2D_plot.png" alt="image file not available" width="400"></a></td></tr>
                 
                 <tr><td align="right" bgcolor="#FFFCD8">Mean RMSD of C&alpha; atoms for individual residues</td>
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/rmsd_plot.png"><img src="../downloads/%s/rmsd_plot.png" alt="image file not available" width="400"></a></td></tr>                          
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/rmsd_plot.png"><img src="../downloads/%(cryptID)s/rmsd_plot.png" alt="image file not available" width="400"></a></td></tr>                          
                                           
                 <tr><td align="center" colspan="2" bgcolor="#FFFCD8">Design results:</td></tr>
                 <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for core residues<br><br>
-                                                        Sequences [ <a href="../downloads/%s/designs_core.fasta">fasta formated file</a> ]<br>
-                                                        Sequence population matrix [ <a href="../downloads/%s/seq_pop_core.txt">matrix file</a> ]</td> 
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo_core.png"><img src="../downloads/%s/logo_core.png" alt="image file not available" width="400"></a><br>
-                                          <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
-                                          <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
-                                          <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]</td></tr>
+                                                        Sequences [ <a href="../downloads/%(cryptID)s/designs_core.fasta">fasta formated file</a> ]<br>
+                                                        Sequence population matrix [ <a href="../downloads/%(cryptID)s/seq_pop_core.txt">matrix file</a> ]</td> 
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/logo_core.png"><img src="../downloads/%(cryptID)s/logo_core.png" alt="image file not available" width="400"></a><br>
+                    %(WebLogoText)s
+                    </td>
+                </tr>
                 
                 <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for all residues<br><br>
-                                                        Sequences [ <a href="../downloads/%s/designs.fasta">fasta formated file</a> ]<br>
-                                                        Sequence population matrix [ <a href="../downloads/%s/seq_pop.txt">matrix file</a> ]</td>
-                    <td bgcolor="#FFFCD8"><a href="../downloads/%s/logo.png"><img src="../downloads/%s/logo.png" alt="image file not available" width="400"></a><br>
-                                          <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, <a href="Crooks-2004-GR-WebLogo.pdf">
-                                          <small>WebLogo: A sequence <br>logo generator</small></a>, <em>Genome Research</em>, 14:1188-1190, (2004)</small> 
-                                          [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
+                                                        Sequences [ <a href="../downloads/%(cryptID)s/designs.fasta">fasta formated file</a> ]<br>
+                                                        Sequence population matrix [ <a href="../downloads/%(cryptID)s/seq_pop.txt">matrix file</a> ]</td>
+                    <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/logo.png"><img src="../downloads/%(cryptID)s/logo.png" alt="image file not available" width="400"></a><br>
+                    %(WebLogoText)s
                     </td></tr>
-
-              
-                """ % ( cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID ))
-        
-          html.append('<tr><td align=right></td><td></td></tr>')
+                    <tr><td align=right></td><td></td></tr>""" % vars())
 
         return html
     
@@ -1873,15 +1874,14 @@ class RosettaHTML(object):
                     ''' % ( cryptID, chain, resid, cryptID, chain, resid ))
                             
             
-            #todo: There's a lot of duplicated code between the protocols here and I specialized the image size below.
+            #todo: I arbitrarily chose the image size below.
+            WebLogoText = self.WebLogoText
             html.append('''</td></tr>
-                        <tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%s/tolerance_sequences.fasta">FASTA file</a>.</td>
-                             <td align="center" bgcolor="#FFFCD8"><a href="../downloads/%s/tolerance_motif.png">
-                                                   <img height="250" src="../downloads/%s/tolerance_motif.png" alt="image file not available" ></a><br>
-                                                   <small>Crooks GE, Hon G, Chandonia JM, Brenner SE, 
-                                                   <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>, 
-                                                   <em>Genome Research</em>, 14:1188-1190, (2004)</small> [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]
-                             </td></tr> ''' % (cryptID, cryptID, cryptID))
+                        <tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                             <td align="center" bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/tolerance_motif.png">
+                                                   <img height="250" src="../downloads/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
+                             %(WebLogoText)s
+                             </td></tr> ''' % vars())
 
         return html  
 
