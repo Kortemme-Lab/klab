@@ -166,13 +166,14 @@ function changeApplication( app, task, subtask, extra, override )
 	{
 		// Set the default number of structures
 		document.submitform.nos.value = protocolNos[app][task][1];
-		
+		setSubmissionButtonsVisibility(false);
 		new Effect.Fade( thistask + "_step1" );
 		new Effect.Fade( thistask + "_step2", { duration: 0.0} );
 	}
 	else if (subtask == 1)
 	//todo: check load demo values if (!override && (!extra || document.getElementById("parameter2_1_step1").style.display == "none"))
 	{
+		setSubmissionButtonsVisibility(true);
 		additionalGUISetup[app][task][1](app, task, [extra, override])
 		new Effect.Appear( thistask + "_step1", { duration: 0.0, queue: { scope: 'task' }} );		
 		new Effect.Fade(   thistask + "_step2", { duration: 0.0, queue: { scope: 'task' }} );
@@ -184,6 +185,21 @@ function changeApplication( app, task, subtask, extra, override )
 	}
 }
 
+function setSubmissionButtonsVisibility(visible)
+{
+	submissionButtons = document.getElementsByClassName("allStepsShown");
+	for ( i = 0; i < submissionButtons.length; i++ )
+	{
+		if (visible)
+		{
+			new Effect.Appear(submissionButtons[i], { duration: 0.0, queue: { position: '0', scope: 'task' } });
+		}
+		else
+		{
+			new Effect.Fade(submissionButtons[i], { duration: 0.0, queue: { position: '0', scope: 'task' } });
+		}
+	}
+}
 //This function shows the preliminary screen for each protocol series.
 //This includes a logo and descriptive text but no input form.
 function showMenu( menu_id ) {
@@ -801,6 +817,7 @@ function addOneMoreSeqtolSKPremutated()
 function changeApplicationToSeqtolSK1(app, task, extra)
 {
 	new Effect.Fade( "recNumStructures" + app + "_" + task );
+	setSubmissionButtonsVisibility(false);
 }
 
 function changeApplicationToSeqtolSK2(app, task, extra)
@@ -809,6 +826,7 @@ function changeApplicationToSeqtolSK2(app, task, extra)
 	_override = extra[1]
 	                          	 
 	var i;
+	setSubmissionButtonsVisibility(true);
 	if (_extra < initNumSeqTolSKChains)
 	{
 		_extra = initNumSeqTolSKChains;
