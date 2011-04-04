@@ -242,7 +242,6 @@ class RosettaHTML(object):
                   <table style="border:0px; padding:0px; margin:0px;">
                   <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 0); ">One mutation</a></td></tr>
                   <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 1); ">Multiple mutations</a></td></tr>
-                  <!-- tr><td width="10" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 2); ">Upload List</td></tr -->
                   </table>
               </p>
             </li>
@@ -287,25 +286,21 @@ class RosettaHTML(object):
 <!-- right column -->
           <td id="columnRight" align="center" style="vertical-align:top; padding:0px; margin:0px; height:240px; text-align:center;">
           <div id="box">
-          <!-- pictures for the different applications -->
-            <p id="pic0" style="display:none; text-align:center;">
-              <img src="../images/logo0.png" width="85%%" alt="logo0" border=0>
-            </p>
-
-            <p id="pic1" style="display:none; text-align:center;">
-              <img src="../images/logo1.png" width="85%%" alt="logo1" border=0>
-            </p>
+          <!-- pictures for the different applications -->''' % self.tooltips)
+        
+        for i in range(len(self.protocolGroups)):
+            html.append('''
+            <p id="pic%d" style="display:none; text-align:center;">
+              <img src="../images/logo%d.png" width="85%%" alt="logo%d" border=0>
+            </p>''' % (i, i, i))
             
-            <p id="pic2" style="display:none; text-align:center;">
-              <img src="../images/logo2.png" width="85%%" alt="logo2" border=0>
-            </p>
-
+        html.append('''
           <!-- end pictures -->
           <!-- description -->
             <p id="textintro" style="text-align:justify;">
               Choose one of the applications on the left. Each application will give you a short explanation and a set of parameters that can be adjusted.<br><br>
               A <a href="../wiki/Tutorial">tutorial</a> on how to submit a job can be found in the <a href="../wiki">documentation</a>. For a brief explanation of each parameter move your mouse to the question mark symbol. The button "Check form" can be used to highlight fields with invalid entries in red; this is also shown when "Submit" is clicked.
-            </p>''' % self.tooltips)
+            </p>''')
         
         protocolGroups = self.protocolGroups
         numProtocolGroups = len(protocolGroups)
@@ -707,20 +702,19 @@ class RosettaHTML(object):
                     task_color = p.group.color
                     break
           
-            html.append("""<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" 
-                                                          onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000';" >
-                                                          """)
+            html.append("""<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000';" >""")
             link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
             # write ID
             html.append('<td id="lw" %s>%s </td>' % (link_to_job, str(line[0])))
             # write status 
             status = int(line[2])
+            
             if status == 0:
                 html.append('<td id="lw" %s><font color="orange">in queue</font></td>' % link_to_job)
             elif status == 1:
                 html.append('<td id="lw" %s><font color="green">active</font></td>' % link_to_job)
             elif status == 2:
-                html.append('<td id="lw" %s>done</td>' % link_to_job) # <font color="darkblue" %s></font>
+                html.append('<td id="lw" %s><font color="black">done</font></td>' % link_to_job) # <font color="darkblue" %s></font>
             elif status == 5:
                 html.append('<td id="lw" style="background-color: #AFE2C2;" %s><font color="darkblue">sample</font></td>' % link_to_job)
             else:
@@ -754,10 +748,8 @@ class RosettaHTML(object):
             html.append('<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
 
             # write size of ensemble
-            html.append('<td id="lw" %s >%s</td>' % (link_to_job, str(line[7])))
-        
-            html.append('</tr>\n')
-        
+            html.append('<td id="lw" %s >%s</td></tr>\n' % (link_to_job, str(line[7])))
+                
         html.append('</table> </div><br> </td>')
         
         return join(html, "")
