@@ -451,6 +451,9 @@ class PDB:
                 ATOMidx = lineidx
                 
                 if not lastReadResidue:
+                    if currentResidue == '^ 999 ':
+                        # We reached the end of the file
+                        break
                     lastReadResidue = (residue, lineidx, currentResidue)
                     
                 if lastReadResidue[2] != currentResidue:
@@ -563,6 +566,7 @@ class PDB:
     
             # print len(line),'\t', line[0:6]
             # remove all white spaces, and check if the line is empty or too long:
+                
             if len(line.strip()) == 0:
                 errors.append("Empty line found on line %d." % lineidx)
             elif len(line.rstrip()) > 81:
@@ -581,6 +585,9 @@ class PDB:
         # Remove the extra ATOM lines added above
         self.lines = self.lines[0:len(self.lines) - 5]
         
+        if not lastReadResidue:
+            errors.append("No valid ATOM lines were found.")                
+
         if not missingSomeBBAtoms and someBBAtomsAreUnoccupied:
             errors.insert(0, "The PDB has some backbone atoms set as unoccupied. You can set these as occupied using the checkbox on the submission page.<br>")                
                             
