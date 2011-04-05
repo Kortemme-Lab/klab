@@ -13,9 +13,29 @@ import sys, os
 import MySQLdb
 import traceback
 import md5
+import pickle
+import time
 
 from string import join
 
+def _lowercaseToStr(x):
+    return str.lower(str(x))   
+    
+def _getSortedString(o):
+    """
+    Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
+    """
+    # todo: replace this with something like pprint on Python upgrade 
+    # We assume here that any container type is either list or tuple which may not always hold 
+    if isinstance(o, (dict)):
+        pkeys = sorted(o.keys(), key=_lowercaseToStr)
+        l = []
+        for k in pkeys:
+            l.append(str(k) + ":" + _getSortedString(o[k]))
+        return "{" + join(l, ",") + "}"    
+    else:
+        return str(o)
+    
 class RosettaDB:
     
     data = {}
@@ -116,7 +136,9 @@ class RosettaDB:
     
     def execQuery(self, sql):
         """execute SQL query"""
+        # Note: This loop was always disabled!
         i = 0
+        errcode = 0
         while i < self.numTries:
             try:    
                 cursor = self.connection.cursor()
@@ -127,11 +149,17 @@ class RosettaDB:
                 results = cursor.fetchall()
                 cursor.close()
                 return results
-    
-            except:
+            except MySQLdb.OperationalError, e:
+                errcode = e[0]
+                # errcode 1100 is an error with table locking
+                # @debug:
+                # sys.stderr.write("\nSQL execution error.")
+                # sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
                 traceback.print_exc()
-                time.sleep(i)
-                i += i
+                raise MySQLdb.OperationalError
+                break
+            except:                
+                traceback.print_exc()
                 break
         return None
 
@@ -142,24 +170,6 @@ class RosettaDB:
         array_data = self.execQuery(SQL)
         
         return [x[0] for x in array_data]
-
-    def _lowercaseToStr(x):
-        return str.lower(str(x))   
-        
-    def _getSortedString(o):
-        """
-        Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
-        """
-        # todo: replace this with something like pprint on Python upgrade 
-        # We assume here that any container type is either list or tuple which may not always hold 
-        if isinstance(o, (dict)):
-            pkeys = sorted(o.keys(), key=_lowercaseToStr)
-            l = []
-            for k in pkeys:
-                l.append(str(k) + ":" + _getSortedString(o[k]))
-            return "{" + string.join(l, ",") + "}"    
-        else:
-            return str(o)
     
     def generateHash(self, ID, debug = False):
         # create a hash key for the entry we just made
