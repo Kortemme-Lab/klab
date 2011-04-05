@@ -398,7 +398,7 @@ class RosettaHTML(object):
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
               </TR>
               <TR>
-                <TD align=right>Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
+                <TD align=right style="width:155px">Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
                 <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="%(ROSETTAWEB_SK_RecommendedNumStructures)s">
                  ''' % self.tooltips)
         
@@ -498,7 +498,7 @@ class RosettaHTML(object):
     def submitted(self, jobname, cryptID, remark, warnings):
       
       if remark == 'new':
-        box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#F0454B;">
+        box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
                     Raw data files:<br><a class="blacklink" href="https://%s%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
                     </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
@@ -518,16 +518,10 @@ class RosettaHTML(object):
       if warnings:
           warnings = "<li>" + join(warnings, "</li><li>") + "</li>"
           warningsbox = '''
-              <table width="550" style="background-color:#ff4500;">
-                  <tr>
-                      <td class="linkbox" align="center">
-                        <font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings/messages:</font>
-                      </td>
-                      <td align="left"><ul>%s</ul></td>
-                      <td class="linkbox" align="center">
-                      <font color="black" style="font-weight: bold;">However, the job will continue to run.</font>
-                      </td>
-                  </tr>
+              <table width="550" style="background-color:#ccccff;" frame="border" bordercolor="black">
+                  <tr><td align="center"><font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings/messages:</font></td></tr>
+                  <tr></tr>
+                  <tr><td align="left"><ul>%s</ul></td></tr>
               </table>''' % ( warnings )
       else:
           warningsbox = ''

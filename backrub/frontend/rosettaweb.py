@@ -998,7 +998,7 @@ def submit(rosettaHTML, form, SID):
                 return False
             ############## PDB STUFF END ###############
                     
-                                
+                                            
             # Note: Forces a cap on the number of structures
             #       This should be unnecessary as the JavaScript should enforce it
             nos = min(int(form["nos"].value), protocolGroups[pgroup][ptask].getNumStructures()[2])
@@ -1013,15 +1013,16 @@ def submit(rosettaHTML, form, SID):
                 # this is preselected in HTML code, so this case should never occur, we still make sure!
                 errors.append("No Rosetta binary selected.")
                 return False
-
+            
             ProtocolParameters = {}    
-
-            for protocol in protocols:
+            
+            for protocol in protocols:                       
                 if protocol.dbname == modus:
                     ProtocolParameters = protocol.StoreFunction(form, pdb_object)
                     if not ProtocolParameters:
+                        errors.append("Server error: The store procedure for the protocol %s failed." % modus)
                         return False   
-                
+            
             # todo: output where the time is going on Albana
             # todo: add test input button which tests submit but does not add a job to the db
             ProtocolParameters = pickle.dumps(ProtocolParameters)
@@ -1078,7 +1079,22 @@ def submit(rosettaHTML, form, SID):
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
                             result = DBConnection.execQuery(sql)
                             return_vals = (cryptID, "old")
-                            break 
+                            break
+                    
+                    # otherwise, see if there are already two similar jobs in the queue to avoid server spamming
+                    sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND Status="0" AND ID!="%s"''' % (hash_key, ID)
+                    results = DBConnection.execQuery(sql)
+                    if results and len(results) > 0:
+                        job = results[0]
+                        #similarJobs = []
+                        #for job in results:
+                        #    similarJobs.append(job[0])
+                        #join(map(str,similarJobs),", ")
+                        errors.append('''There is already a job (<a href="%s?query=jobinfo&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, job[1], job[0]))
+                        sql = """DELETE FROM backrub WHERE ID="%s" """ % ID
+                        result = DBConnection.execQuery(sql)
+                        return False
+                     
                         
                 except _mysql_exceptions.OperationalError, e:
                     html = '<H1 class="title">New Job not submitted</H1>'
@@ -1645,16 +1661,16 @@ class FrontendProtocols(WebserverProtocols):
 
         for p in protocols:
             if p.dbname == "point_mutation":
-                p.setSubmitFunction(rosettaHTML.submitformMultiplePointMutations)
-                p.setShowResultsFunction(rosettaHTML.resultsMultiplePointMutations)
-                p.setStoreFunction(storeMultiplePointMutations)
-                p.setDataDirFunction(rosettaDD.MultiplePointMutations)
-                p.setReferences("SmithKortemme:2008")
-            elif p.dbname == "multiple_mutation":
                 p.setSubmitFunction(rosettaHTML.submitformPointMutation)
                 p.setShowResultsFunction(rosettaHTML.resultsPointMutation)
                 p.setStoreFunction(storePointMutation)
                 p.setDataDirFunction(rosettaDD.PointMutation)
+                p.setReferences("SmithKortemme:2008")
+            elif p.dbname == "multiple_mutation":
+                p.setSubmitFunction(rosettaHTML.submitformMultiplePointMutations)
+                p.setShowResultsFunction(rosettaHTML.resultsMultiplePointMutations)
+                p.setStoreFunction(storeMultiplePointMutations)
+                p.setDataDirFunction(rosettaDD.MultiplePointMutations)
                 p.setReferences("SmithKortemme:2008")
             elif p.dbname == "no_mutation":
                 p.setSubmitFunction(rosettaHTML.submitformEnsemble)
