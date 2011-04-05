@@ -44,7 +44,7 @@ class RosettaDaemon(Daemon):
     store_time_guest  = '30'  # how long are we going to store the data for guest users
     logfile           = ''
     ntrials           = 10000 # THIS SHOULD BE 10000
-        
+    logSQL            = True
     email_text_error = """Dear %s,
 
 An error occurred during your simulation. Please check 
@@ -105,19 +105,16 @@ The Kortemme Lab Server Daemon
         self.log("%s\tstarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
         # if there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
-        sql = "SELECT ID, status, pid FROM %s WHERE status=1 ORDER BY Date" % self.db_table
-        results = self.DBConnection.execQuery(sql)
+        results = self.runSQL("SELECT ID, status, pid FROM %s WHERE status=1 ORDER BY Date" % self.db_table)
         try:
             for simulation in results:
                 if os.path.exists("/proc/%s" % simulation[2]): # checks if process is running
                     if self.kill_process(simulation[2]): # checks if process was killed
-                        sql = "UPDATE %s SET status=0 WHERE ID=%s" % (self.db_table, simulation[0])
-                        self.DBConnection.execQuery(sql)
+                        self.runSQL("UPDATE %s SET status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
                     else:
                         self.log("%s\t process not killed: ID %s PID %s\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), simulation[0], simulation[2]) )
                 else:
-                    sql = "UPDATE %s SET status=0 WHERE ID=%s" % (self.db_table, simulation[0])
-                    self.DBConnection.execQuery(sql)
+                    self.runSQL("UPDATE %s SET status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
         except TypeError: # iteration over non-sequence, i.e. results is empty
             pass
         
@@ -154,17 +151,14 @@ The Kortemme Lab Server Daemon
                     
                     # remove object
                     self.list_RosettaPP.remove(rosetta_object)
-                    errors = ''
-                    query = 'SELECT Errors FROM %s WHERE ID=%s' % (self.db_table, ID)
-                    res = self.DBConnection.execQuery(query)
+                    res = self.runSQL('SELECT Errors FROM %s WHERE ID=%s' % (self.db_table, ID))
                     if res[0][0] != '' and res[0][0] != None:
-                      query = 'UPDATE %s SET status=4, EndDate=NOW() WHERE ID=%s' % ( self.db_table, ID )
+                        self.runSQL('UPDATE %s SET status=4, EndDate=NOW() WHERE ID=%s' % ( self.db_table, ID ))
                     elif error != '':
-                      query = 'UPDATE %s SET status=4, Errors=%s, EndDate=NOW() WHERE ID=%s' % ( self.db_table,error,ID )
+                        self.runSQL('UPDATE %s SET status=4, Errors=%s, EndDate=NOW() WHERE ID=%s' % ( self.db_table,error,ID ))
                     else:
-                      query = 'UPDATE %s SET status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, ID )
-                    self.DBConnection.execQuery(query)
-            
+                        self.runSQL('UPDATE %s SET status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, ID ))
+                    
             # check whether data of simulations need to be deleted, and delete them from the database as well as from the harddrive
             try:
                 self.delete_data()
@@ -176,15 +170,13 @@ The Kortemme Lab Server Daemon
                 #print "check for new job"
                 # get job from db
                 # first lock tables, no surprises!
-                query = "LOCK TABLES %s WRITE, Users READ" % self.db_table
-                self.DBConnection.execQuery(query)
+                self.runSQL("LOCK TABLES %s WRITE, Users READ" % self.db_table)
+                
                 # get all jobs in queue                            vvv 0
-                query = "SELECT ID,Date,status,task FROM %s WHERE status=0 ORDER BY Date" % self.db_table
-                data = self.DBConnection.execQuery(query)
+                data = self.runSQL("SELECT ID,Date,status,task FROM %s WHERE status=0 ORDER BY Date" % self.db_table)
                 try:
                     if len(data) == 0:
-                        sql = "UNLOCK TABLES"
-                        self.DBConnection.execQuery(query)
+                        self.runSQL("UNLOCK TABLES")
                         time.sleep(10) # wait 10 seconds if there's no job in queue
                         continue
                     else:
@@ -198,25 +190,22 @@ The Kortemme Lab Server Daemon
                                 ID = data[i][0]
                                                                                
                                 # get pdb file
-                                sql_query = "SELECT PDBComplex,PDBComplexFile,Mini,EnsembleSize,task, ProtocolParameters FROM %s WHERE ID=%s" % ( self.db_table, ID )
-                                job_data = self.DBConnection.execQuery(sql_query)
+                                job_data = self.runSQL("SELECT PDBComplex,PDBComplexFile,Mini,EnsembleSize,task, ProtocolParameters FROM %s WHERE ID=%s" % ( self.db_table, ID ))
                             
                                 #start the job
                                 pid = self.start_job(ID,job_data[0][0],job_data[0][1],job_data[0][2],job_data[0][3],job_data[0][4],job_data[0][5])
                                 #change status and write starttime to DB
-                                sql_query = "UPDATE %s SET status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID )
-                                self.DBConnection.execQuery(sql_query)
-                                break
+                                if pid:
+                                    self.runSQL("UPDATE %s SET status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID ))
+                                    break
 
                         # don't forget to unlock the tables!
-                        sql = "UNLOCK TABLES"
-                        self.DBConnection.execQuery(query)
+                        self.runSQL("UNLOCK TABLES")
                         
                         time.sleep(3) # wait 3 seconds after a job was started
                 except Exception, e:
                     self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
-                    sql = 'UPDATE %s SET Errors="Start" Status=4 WHERE ID=%s' % ( self.db_table, ID )
-                    self.DBConnection.execQuery(sql)                  
+                    self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))                  
                     time.sleep(10)
             else:
                 time.sleep(30)  # wait 5 seconds if max number of jobs is running
@@ -230,7 +219,7 @@ The Kortemme Lab Server Daemon
             self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, mini, task) )
             params = pickle.loads(ProtocolParameters)            
             params["task"] = task # This is a hack for the mutations protocols. Remove when their functions are separated out            
-            for p in protocols:
+            for p in self.protocols:
                 if p.dbname == task:
                     return p.startFunction(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
           
@@ -244,7 +233,7 @@ The Kortemme Lab Server Daemon
            sometimes Rosetta classic crashes at the end, but the results are ok
         """
         # This function takes the last-files into account... and deletes them! We don't need them!        
-        for p in protocols:
+        for p in self.protocols:
             if p.dbname == task:
                 return p.checkFunction(r_object, ensembleSize, pdb_id, job_id, task)
         
@@ -252,12 +241,20 @@ The Kortemme Lab Server Daemon
             self.log("%s\t\t check_files() ID = %s, task = %s : all files successfully created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
             return True
             
-            
+    def runSQL(self, query):
+        """ This function should be the only place in this class which executes SQL.
+            Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
+            Using this function and passing the string in reduces the likelihood of these errors.
+            It also allows us to log all executed SQL here if we wish.""" 
+        if self.logSQL:
+            self.log("SQL: %s\n" % query)
+        return self.DBConnection.execQuery(query)
+        
     def end_job(self, rosetta_object):
         
         ID       = int( rosetta_object.get_ID() )
-        sql_query = "SELECT u.Email,u.FirstName,b.KeepOutput,b.cryptID,b.task,b.PDBComplexFile,b.EnsembleSize FROM Users u JOIN %s b on (u.ID=b.UserID) WHERE b.ID=%s" % ( self.db_table, ID )
-        data = self.DBConnection.execQuery(sql_query)
+                        
+        data = self.runSQL("SELECT u.Email,u.FirstName,b.KeepOutput,b.cryptID,b.task,b.PDBComplexFile,b.EnsembleSize FROM Users AS u JOIN %s AS b on (u.ID=b.UserID) WHERE b.ID=%s" % ( self.db_table, ID ))
         cryptID      = data[0][3]
         task         = data[0][4]
         pdb_id       = data[0][5].split('.')[0]
@@ -296,9 +293,9 @@ The Kortemme Lab Server Daemon
                 # remove error file, it should be empty anyway
                 #os.remove( rosetta_object.workingdir + "/stderr_%s.dat" % ( ID ) )
 
-                for p in protocols:
+                for p in self.protocols:
                     if p.dbname == task:
-                        return p.endFunction(rosetta_object, pdb_id, ensembleSize, state, ID)
+                        p.endFunction(rosetta_object, pdb_id, ensembleSize, state, ID)
 
                 # remove the resfile, and rosetta raw output if the user doesn't want to keep it
                 if not state["keep_output"]:
@@ -309,8 +306,7 @@ The Kortemme Lab Server Daemon
             ID = rosetta_object.get_ID()
             XX = "%s\t error: end_job() ID %s - postprocessing error\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID )
             self.log("%s\n%s*******************************\n" % (XX, traceback.format_exc()) )
-            sql = 'UPDATE %s SET Errors="Postprocessing", Status=4 WHERE ID=%s' % ( self.db_table, ID )
-            self.DBConnection.execQuery(sql)
+            self.runSQL('UPDATE %s SET Errors="Postprocessing", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
             state["error"] = "Postprocessing"
             
             #try:
@@ -332,9 +328,7 @@ The Kortemme Lab Server Daemon
         except Exception, e:
             ID = rosetta_object.get_ID()
             self.log("%s\t error: end_job() ID = %s - error moving files\n*******************************\n%s*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, traceback.format_exc() ) )
-            
-            sql = 'UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID )
-            self.DBConnection.execQuery(sql)
+            self.runSQL('UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
             error = "error moving files"
             
             # # if this error occurs we store the output in the error directory so that the user cannot access it
@@ -356,7 +350,7 @@ The Kortemme Lab Server Daemon
             os.chdir(result_dir)
             self.exec_cmd('find . -size 0 -exec rm {} \";\"', result_dir)
             os.chdir(current_dir)
-
+        
         self.notifyUserOfCompletedJob(data, ID, cryptID, error)
         return (status, error, ID)
     
@@ -415,15 +409,13 @@ The Kortemme Lab Server Daemon
 
         if mailTXT != '' and user_name != "guest":
             if not self.sendMail(user_email, self.email_admin, subject, mailTXT):
-                self.log("%s\t error: sendMail() ID = %s" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
-                sql = 'UPDATE %s SET Errors="no email sent" WHERE ID=%s' % ( self.db_table, ID )
-                self.DBConnection.execQuery(sql)
+                self.log("%s\t error: sendMail() ID = %s" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )                
+                self.runSQL('UPDATE %s SET Errors="no email sent" WHERE ID=%s' % ( self.db_table, ID ))
         
         if adminTXT != '':
             if not self.sendMail(self.email_admin, self.email_admin, subject, adminTXT):
-                self.log("%s\t error: sendMail() ID = %s" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
-                sql = 'UPDATE %s SET Errors="no email sent" WHERE ID=%s' % ( self.db_table, ID )
-                self.DBConnection.execQuery(sql)
+                self.log("%s\t error: sendMail() ID = %s" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )                
+                self.runSQL('UPDATE %s SET Errors="no email sent" WHERE ID=%s' % ( self.db_table, ID ))
                 
     def exec_cmd(self, cmd, run_dir):
         subp = subprocess.Popen(cmd,
@@ -446,15 +438,15 @@ The Kortemme Lab Server Daemon
     def delete_data(self):
         # Delete jobs whose time has expired
         
-        # get due runs for guest user
-        query1 = 'SELECT br.ID, br.cryptID, br.EndDate, br.Status FROM %s br, Users u WHERE u.UserName="guest" AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time_guest )
-        data = self.DBConnection.execQuery(query1)
+        # get due runs for guest user        
+        data = self.runSQL('SELECT br.ID, br.cryptID, br.EndDate, br.Status FROM %s br, Users u WHERE u.UserName="guest" AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time_guest ))
+        
         #get due runs for all others
-        query2 = 'SELECT br.ID, br.cryptID, br.EndDate, br.Status FROM %s br, Users u WHERE u.UserName!="guest" AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time )
+        sqlquery = 'SELECT br.ID, br.cryptID, br.EndDate, br.Status FROM %s br, Users u WHERE u.UserName!="guest" AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time )
         if data == None:
-            data = self.DBConnection.execQuery(query2)
+            data = self.runSQL(sqlquery)
         else:
-            data += self.DBConnection.execQuery(query2)
+            data += self.runSQL(sqlquery)
         if len(data) > 0:
             for x in data:
               
@@ -476,11 +468,9 @@ The Kortemme Lab Server Daemon
                 # log.write("%s\t job %s: directory %s%s deleted \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID, self.rosetta_dl, cryptID ) )
                 # log.close() # END DELETE
                 
-                # instead of deleting, we now copy everything into the archive directory... another hack :(
-                query   = 'SELECT * FROM %s WHERE ID=%s' % ( self.db_table, del_ID )
-                data = self.DBConnection.execQuery(query)
-                query   = 'SHOW COLUMNS FROM %s' % ( self.db_table )
-                columns_raw = self.DBConnection.execQuery(query)
+                # instead of deleting, we now copy everything into the archive directory... another hack :(                
+                data = self.runSQL('SELECT * FROM %s WHERE ID=%s' % ( self.db_table, del_ID ))
+                columns_raw = self.runSQL('SHOW COLUMNS FROM %s' % ( self.db_table ))
                 columns = [col[0] for col in columns_raw]
                 
                 if x[3] in [2,4]: # done and error
@@ -506,8 +496,7 @@ The Kortemme Lab Server Daemon
                         break
                  
                 # Keep the data in the database but mark it as expired
-                updatesql = 'UPDATE %s SET Expired=1 WHERE ID=%s' % (self.db_table, del_ID)
-                self.DBConnection.execQuery(query)
+                self.runSQL('UPDATE %s SET Expired=1 WHERE ID=%s' % (self.db_table, del_ID))
                 self.log("%s\t job %s: marked as expired in database\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID ) )
 
     def configure(self):
@@ -534,7 +523,7 @@ The Kortemme Lab Server Daemon
         db_port                = int(parameter["db_port"])
         db_socket              = parameter["db_socket"]
         db_numTries            = 32
-        self.DBConnection = rosettadb.RosettaDB(db_host, db_name, db_user, db_pw, db_port, db_socket, self.store_time, db_numTries)
+        self.DBConnection      = rosettadb.RosettaDB(db_host, db_name, db_user, db_pw, db_port, db_socket, self.store_time, db_numTries)
 
         if self.server_name == 'albana.ucsf.edu':
             self.ntrials = 10        
@@ -567,9 +556,8 @@ The Kortemme Lab Server Daemon
         # open connection to MySQL
         dbconnection = self.DBConnection
         
-        sql = "SELECT ID, hashkey FROM %s" % self.db_table
-        results = dbconnection.execQuery(sql)
-        
+        results = self.runSQL("SELECT ID, hashkey FROM %s" % self.db_table)
+                
         hashkeys = {}
         for simulation in results:
             hashkeys[simulation[0]] = simulation[1]
@@ -578,9 +566,8 @@ The Kortemme Lab Server Daemon
             #if hashkeys[simulation[0]] == newhash:
             #    print("unchanged: %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
             
-            
-        sql = "SELECT ID, hashkey FROM %s" % self.db_table
-        results = self.DBConnection.execQuery(sql)
+        results = self.runSQL("SELECT ID, hashkey FROM %s" % self.db_table)
+        
         for simulation in results:
             if hashkeys[simulation[0]] == simulation[1]:
                 print("unchanged: Simulation %d hash remains as %s." % (simulation[0], simulation[1]))
@@ -591,9 +578,8 @@ The Kortemme Lab Server Daemon
     
     def dbcheck(self):
         self.configure()
-        
-        sql = "SELECT ID, ProtocolParameters, task FROM %s" % self.db_table
-        results = self.DBConnection.execQuery(sql)
+
+        results = self.runSQL("SELECT ID, ProtocolParameters, task FROM %s" % self.db_table)
         for simulation in results:
             protoparams = pickle.loads((simulation[1]))
             task = simulation[2]
@@ -603,9 +589,7 @@ The Kortemme Lab Server Daemon
     def dbconvert(self):
         # if there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
         self.configure()
-        
-        sql = "SELECT ID, task, PM_chain, PM_resid, PM_newres, PM_radius, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter, ProtocolParameters FROM %s" % self.db_table
-        results = self.DBConnection.execQuery(sql)
+        results = self.runSQL("SELECT ID, task, PM_chain, PM_resid, PM_newres, PM_radius, ENS_temperature, ENS_num_designs_per_struct, ENS_segment_length, seqtol_parameter, ProtocolParameters FROM %s" % self.db_table)
         
         sqlupdates = []
         try:
@@ -701,7 +685,7 @@ The Kortemme Lab Server Daemon
                     ProtocolParameters = pickle.dumps(ProtocolParameters)
                     updatesql = 'UPDATE %s SET ProtocolParameters="%s" WHERE ID=%s' % (self.db_table, ProtocolParameters, simulation[0])
                     sqlupdates.append(updatesql)
-                    if self.DBConnection.execQuery(updatesql) == None:
+                    if self.runSQL(updatesql) == None:
                         print("Update failed on record %d" % id)
                     
             #print(string.join(sqlupdates,"\n"))
@@ -882,9 +866,9 @@ The Kortemme Lab Server Daemon
             r_command = object_rosetta.command
         
         pid = object_rosetta.get_pid()
-        
         self.log("%s %s: mutation job started with pid: %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, pid ) )
         self.log("%s %s: %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, r_command ) )
+        return pid
         
     def CheckMutations(self, r_object, ensembleSize, pdb_id, job_id, task):
         initial_score = 'xxx'
@@ -1060,22 +1044,18 @@ The Kortemme Lab Server Daemon
         if os.path.exists(rosetta_object.workingdir + '/failed_minimization.txt'):
             ID = rosetta_object.get_ID()
             self.log("%s\t error: ID %s SEQTOL MINIMIZATION FAILED\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
-            sql = 'UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID )
-            self.DBConnection.execQuery(sql)
+            self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
                             
         elif os.path.exists(rosetta_object.workingdir + '/failed_backrub.txt'):
             failed_handle = open(rosetta_object.workingdir + '/backrub_failed.txt','r')
             ID = rosetta_object.get_ID()
             if len(failed_handle.readlines()) == 2:
                 self.log("%s\t error: ID %s SEQTOL BACKRUB TERMINATED\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
-                sql = 'UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID )
-                self.DBConnection.execQuery(sql)
-            
+                self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))    
             else: # individual files missing
                 no_failed = len(failed_handle.readlines()) - 2
                 self.log("%s\t error: ID %s SEQTOL BACKRUB FAILED %s\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, no_failed ) )
-                sql = 'UPDATE %s SET Errors="backrub failed" Status=4 WHERE ID=%s' % ( self.db_table, ID )
-                self.DBConnection.execQuery(sql)
+                self.runSQL('UPDATE %s SET Errors="backrub failed" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
         
         elif os.path.exists(rosetta_object.workingdir + '/failed_jobs.txt'):
             failed_handle = open(rosetta_object.workingdir + '/failed_jobs.txt','r')
@@ -1083,8 +1063,7 @@ The Kortemme Lab Server Daemon
             failed_handle.close()  
             ID = rosetta_object.get_ID()
             self.log("%s\t warning: ID %s SEQTOL RUNS TERMINATED %s\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, no_failed ) )
-            sql = 'UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID )
-            self.DBConnection.execQuery(sql)
+            self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
 
     def CheckSequenceTolerance(self, r_object, ensembleSize, pdb_id, job_id, task):
         #todo: fix this up       
@@ -1093,8 +1072,7 @@ The Kortemme Lab Server Daemon
             # AAAAAAAHHHH MESSY CODE!
             ID = r_object.get_ID()
             self.log("%s\t error: end_job() ID %s - error during simulation\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
-            sql = 'UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID )
-            self.DBConnection.execQuery(sql)
+            self.runSQL('UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
         
             handle.close()
             return True # to not raise the RosettaError and trigger additional error handling. Yikes!
