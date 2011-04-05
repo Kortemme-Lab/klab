@@ -1328,7 +1328,7 @@ function allWhite()
 	for(i = 0; i < document.submitform.elements.length; i++)
 	{
 		var elem = document.submitform.elements[i];
-		if ((elem.disabled == false) || (elem.name == "UserName") || (elem.name == "MiniTextbox"))
+		if ((elem.disabled == false) || (elem.name == "UserName") || (elem.name == "MiniTextbox") || (elem.name == "UploadedPDB"))
 		{
 			elem.style.background = "white";
 		}

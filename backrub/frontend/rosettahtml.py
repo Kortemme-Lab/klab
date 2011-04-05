@@ -54,6 +54,7 @@ class RosettaHTML(object):
                         "tt_specific":      "header=[Application Specific Settings] body=[These settings are dependent on the applications. If you are not sure use the recommended values. For a more detailed explanation of the parameters and their influence on simulation results see the reference below.] %s" % tooltip_parameter,
                         "tt_JobName":       "header=[Name for your job] body=[Enter a name that helps you identify your job later on the job queue page.] %s" % tooltip_parameter,
                         "tt_Structure":     "header=[Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
+                        "tt_AtomOccupancy": "header=[Set atom occupancy] body=[Rosetta will ignore any ATOM records in the PDB file with zero occupancy. You can choose to upload the PDB as is (default), remove records with empty occupancy, or set these records with an occupancy of 1.0.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_PDBID":         "header=[PDB identifier] body=[Enter the 4-digit PDB identifier of the structure file. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_RVersion":      "header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or the new Rosetta 3 (\'mini\'). Some applications only work with one version.] %s" % tooltip_parameter,
@@ -314,11 +315,15 @@ class RosettaHTML(object):
         # PDB loading subform
         html.append('''        
             <TABLE id="PrePDBParameters" align="center" style="display:none; opacity:0.0;">
-              <TR>
+            <COLGROUP>
+                <COL>
+                <COL width="300">
+            </COLGROUP>
+              <!--<TR>
                 <TD align=right>User Name </TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=30 SIZE=31 NAME="UserName" VALUE="%(username)s" disabled>
                 </TD>
-              </TR>
+              </TR>-->
               <TR><td></td></TR>
               <TR>
                 <TD align=right style="width:300px">Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
@@ -350,6 +355,17 @@ class RosettaHTML(object):
         html.append('''
              </TD>
               </TR>
+              <tr>
+                  <td align=right>Atom occupancy <img src="../images/qm_s.png" title="%(tt_AtomOccupancy)s"></td>
+                  <td align=left>
+                    &nbsp;
+                    <select name="AtomOccupancy"> 
+                        <option value="unchanged">Unchanged</option>                    
+                        <option value="remove">Remove unoccupied ATOM records</option>                    
+                        <option value="fill">Fill unoccupied ATOM records</option>
+                    </select>                    
+                  </td>
+              </tr>
               <TR>
                 <TD align=right>Upload Structure <img src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" >
@@ -384,18 +400,19 @@ class RosettaHTML(object):
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=70 SIZE=31 NAME="MiniTextbox" VALUE="%(MiniVersion)s" disabled>
                 </TD>
               </TR>
-              <TR><td></td></TR>
               <TR>
-                <TD align=right>Job Name <img src="../images/qm_s.png" title="%(tt_JobName)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%(jobname)s"></TD>
+                <TD align=right>PDB</TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" ><INPUT TYPE="text" maxlength=70 SIZE=31 NAME="UploadedPDB" VALUE="%(UploadedPDB)s" disabled>
+                </TD>
               </TR>
-              <TR id="UploadedPDB">
-                  <TD></TD>
-                  <TD align=right style="color:#00bb00;">PDB uploaded: %(UploadedPDB)s</TD>
-              </TR>
+              <TR><td></td></TR>
               <TR><TD colspan=2><br></TD></TR>
               <TR>
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
+              </TR>
+              <TR>
+                <TD align=right>Job Name <img src="../images/qm_s.png" title="%(tt_JobName)s"></TD>
+                <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%(jobname)s"></TD>
               </TR>
               <TR>
                 <TD align=right style="width:155px">Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>

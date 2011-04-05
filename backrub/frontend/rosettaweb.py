@@ -132,7 +132,7 @@ def fixFilename(filename):
         filename = filename[:-4] + '.pdb'
     return filename
     
-def saveTempPDB(SID, pdbfile, pdb_filename):
+def saveTempPDB(SID, pdb_object, pdb_filename):
     tempdir = "%spdbs" % ROSETTAWEB_temp_dir
     innertempdir = "%s/%s" % (tempdir, SID)
         
@@ -144,9 +144,7 @@ def saveTempPDB(SID, pdbfile, pdb_filename):
         
         pdb_filename = fixFilename(pdb_filename)
         filepath = "%s/%s" % (innertempdir, pdb_filename)
-        F = open(filepath, "w+")
-        F.write(pdbfile)
-        F.close()
+        pdb_object.write(filepath)        
         filepath = "pdbs/%s/%s" % (SID, pdb_filename)
         return True, filepath
     except:
@@ -401,14 +399,15 @@ def ws():
       #form
       
       protocol = (form["protocolgroup"].value, form["protocoltask"].value)
+      
       #if False:
       pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(rosettaHTML, form)
       if not pdb_okay:
           # reset the query for the JS startup function
           query_type = "submit"
           html_content = rosettaHTML.submit(jobname='', errors=errors, activeProtocol = protocol)
-      else:
-          saveSucceeded, newfilepath = saveTempPDB(SID, pdbfile, pdb_filename)
+      else:              
+          saveSucceeded, newfilepath = saveTempPDB(SID, pdb_object, pdb_filename)
           if not saveSucceeded:
               # reset the query for the JS startup function
               query_type = "submit"
@@ -938,8 +937,13 @@ def parsePDB(rosettaHTML, form):
     else:
         pdbfile = pdbfile.replace('"', ' ')  # removes \" that mislead python. not needed anyway
         pdbfile = extract_1stmodel(pdbfile) # removes everything but one model for NMR structures
-
+        
         pdb_object = PDB(pdbfile.split('\n'))
+        if form["AtomOccupancy"].value == "remove":
+            pdb_object.removeUnoccupied()
+        elif form["AtomOccupancy"].value == "fill":
+            pdb_object.fillUnoccupied()
+        
         pdb_check_result = check_pdb(pdb_object, pdb_filename, usingClassic, ableToUseMini)
         if not pdb_check_result:
             return pdb_check_result, pdbfile, pdb_filename, pdb_object

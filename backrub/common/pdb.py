@@ -76,6 +76,16 @@ class PDB:
                                                      line[21:26] not in resid_set or
                                                      line[12:16].strip() in backbone_atoms]
 
+    def removeUnoccupied(self):
+        self.lines = [line for line in self.lines if not (line.startswith("ATOM") and float(line[54:60]) == 0)]
+    
+    def fillUnoccupied(self):
+        for i in xrange(len(self.lines)):
+            line = self.lines[i]
+            if line.startswith("ATOM") and float(line[54:60]) == 0:
+                self.lines[i] = line[:54] + "  1.00" + line[60:]
+
+    # Unused function
     def fix_backbone_occupancy(self):
     
         backbone_atoms = set(["N", "CA", "C", "O"])
@@ -391,35 +401,45 @@ class PDB:
         residueNumber = 0
         
         # Variables for checking missing backbone residues
-        # todo: We quit at the moment on first error. We should return a list of errors.
         missingBackboneResidues = False
-        lastResidue = None
+        lastReadResidue = None
         currentResidue = None
-        NFOUND = 2 ** 0
-        OFOUND = 2 ** 1
-        CFOUND = 2 ** 2
-        CAFOUND = 2 ** 3
-        CBFOUND = 2 ** 4
         bbatoms = ["N", "O", "C", "CA", "CB"]
-        # todo: Use Bitarray or similar when Python is upgraded to 2.5 or higher
-        ALLFOUND = NFOUND + OFOUND + CFOUND + CAFOUND + CBFOUND
+        
+        # For readability
+        NOT_OCCUPIED = -1.0
+        NINDEX = 0
+        OINDEX = 1
+        CINDEX = 2
+        CAINDEX = 3
+        CBINDEX = 4
+        missingSomeBBAtoms = False
+        someBBAtomsAreUnoccupied = False
         backboneAtoms = {}
-        backboneAtoms[" "] = ALLFOUND
+        backboneAtoms[" "] = [0.0, 0.0, 0.0, 0.0, 0.0]
         oldres = ""
         
         # Check for bad resfile input to classic
         resfileEntries = {}
         classicErrors = []
+       
+        # We add these dummy lines to avoid messy edge-case logic in the loop below.
+        self.lines.append("ATOM   9999  N   VAL ^ 999       0.000   0.000   0.000  1.00 00.00           N")
+        self.lines.append("ATOM   9999  CA  VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
+        self.lines.append("ATOM   9999  C   VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
+        self.lines.append("ATOM   9999  O   VAL ^ 999       0.000   0.000   0.000  1.00 00.00           O")
+        self.lines.append("ATOM   9999  CB  VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
         
         for line in self.lines:
 
             if line[0:4] == "ATOM":
+                # http://www.wwpdb.org/documentation/format32/sect9.html#ATOM
                 alternateConformation = line[16]
                 residue = line[17:20]
                 currentChain = line[21]
                 currentResidue = line[21:27]
                 classicCurrentResidue = line[21:26] # classic did not handle the insertion code in resfiles until revision 29386
-                            
+                occupancy = float(line[54:60])   
                 
                 if usingClassic and (not allowedResidues.get(residue)):
                     # Check for residues outside the list classic can handle
@@ -430,7 +450,10 @@ class PDB:
                     errors.append("A TER field on line %d interrupts two ATOMS on lines %d and %d with the same chain %s." % (TERidx, ATOMidx, lineidx, currentChain))
                 ATOMidx = lineidx
                 
-                if lastResidue != currentResidue:
+                if not lastReadResidue:
+                    lastReadResidue = (residue, lineidx, currentResidue)
+                    
+                if lastReadResidue[2] != currentResidue:
                     residueNumber += 1
                 
                     # Check for malformed resfiles for classic
@@ -448,62 +471,97 @@ class PDB:
                     # Check for missing backbone residues
                     # Add the backbone atoms common to all alternative conformations to the common conformation 
                     if not usingClassic:
-                        commonToAllAlternatives = (2 ** 5) -1
+                        commonToAllAlternatives = [0, 0, 0, 0, 0]
                         for conformation, bba in backboneAtoms.items():
-                            if conformation != " ":
-                                commonToAllAlternatives &= backboneAtoms[conformation]
-                        backboneAtoms[" "] |= commonToAllAlternatives
+                            for atomocc in range(5):
+                                if conformation != " " and backboneAtoms[conformation][atomocc]:
+                                    commonToAllAlternatives[atomocc] += backboneAtoms[conformation][atomocc]
+                        for atomocc in range(5):
+                            backboneAtoms[" "][atomocc] = backboneAtoms[" "][atomocc] or 0
+                            backboneAtoms[" "][atomocc] += commonToAllAlternatives[atomocc]
                     
                     ps = ""
                     for conformation, bba in backboneAtoms.items():
                         # Add the backbone atoms of the common conformation to all alternatives
                         if not usingClassic:
-                            backboneAtoms[conformation] |= backboneAtoms[" "]
+                            for atomocc in range(5):
+                                if backboneAtoms[" "][atomocc]:
+                                    backboneAtoms[conformation][atomocc] = backboneAtoms[conformation][atomocc] or 0
+                                    backboneAtoms[conformation][atomocc] += backboneAtoms[" "][atomocc]
                         
-                        if backboneAtoms[conformation] != (2 ** 5) - 1:
+                        missingBBAtoms = False
+                        for atomocc in range(5):
+                            if not backboneAtoms[conformation][atomocc]:
+                                missingBBAtoms = True
+                                break
+                            
+                        if missingBBAtoms:
                             missing = []
-                            for m in range(len(bbatoms)):
-                                if not(backboneAtoms[conformation] & (2 ** m)):
+                            unoccupied = []
+                            for m in range(5):
+                                if backboneAtoms[conformation][m] == 0:
+                                    unoccupied.append(bbatoms[m])
+                                    someBBAtomsAreUnoccupied = True
+                                elif not(backboneAtoms[conformation][m]):
                                     missing.append(bbatoms[m])
-                            s = ""
+                                    missingSomeBBAtoms = True
+                            s1 = ""
+                            s2 = ""
                             if len(missing) > 1:
-                                s = "s"
+                                s1 = "s"
+                            if len(unoccupied) > 1:
+                                s2 = "s"
                             missing = string.join(missing, ",")
+                            unoccupied = string.join(unoccupied, ",")
                             
                             failedClassic = False
-                            if backboneAtoms[conformation] | backboneAtoms[" "] == (2 ** 5) - 1:
+                            haveAllAtoms = True
+                            for atomocc in range(5):
+                                if backboneAtoms[conformation][atomocc] <= 0 or backboneAtoms[" "][atomocc] <= 0:
+                                    haveAllAtoms = False
+                                    break
+                            if haveAllAtoms:
                                 failedClassic = True
-                                ps = " The common conformation correctly has these atoms." 
+                                ps = " The common conformation correctly has these atoms."
+                                 
                             if conformation == " ":
                                 conformation = "common"
                             
-                            errstring = "The '%s' residue on line %d is missing the backbone atom%s %s in the %s conformation.%s" % (oldres, lineidx - 1, s, missing, conformation, ps)
-                            if ps:
-                                classicErrors.append(errstring)
-                            else:
-                                errors.append(errstring)
+                            if missing:
+                                errstring = "The %s residue %s on line %d is missing the backbone atom%s %s in the %s conformation.%s" % (lastReadResidue[0], lastReadResidue[2], lastReadResidue[1], s1, missing, conformation, ps)
+                                if ps:
+                                    classicErrors.append(errstring)
+                                else:
+                                    errors.append(errstring)
+                            if unoccupied:
+                                errstring = "The %s residue %s on line %d has the backbone atom%s %s set as unoccupied in the %s conformation.%s" % (lastReadResidue[0], lastReadResidue[2], lastReadResidue[1], s2, unoccupied, conformation, ps)
+                                if ps:
+                                    classicErrors.append(errstring)
+                                else:
+                                    errors.append(errstring)
                     backboneAtoms = {}
-                    backboneAtoms[" "] = 0
-                    lastResidue = currentResidue
+                    backboneAtoms[" "] = [None, None, None, None, None]
+                    lastReadResidue = (residue, lineidx, currentResidue)
                 oldres = residue
                 atom = line[12:16]
-                backboneAtoms[alternateConformation] = backboneAtoms.get(alternateConformation) or 0
-                if atom == ' N  ':
-                    backboneAtoms[alternateConformation] |= NFOUND
-                elif atom == ' O  ' or atom == ' OT1' or atom == ' OT2':
-                    backboneAtoms[alternateConformation] |= OFOUND
-                elif atom == ' C  ':
-                    backboneAtoms[alternateConformation] |= CFOUND
-                elif atom == ' CA ':
-                    backboneAtoms[alternateConformation] |= CAFOUND
-                if atom == ' CB ' or residue == 'GLY':
-                    backboneAtoms[alternateConformation] |= CBFOUND
+                backboneAtoms[alternateConformation] = backboneAtoms.get(alternateConformation) or [None, None, None, None, None]
+                if occupancy >= 0:
+                    if atom == ' N  ':
+                        backboneAtoms[alternateConformation][NINDEX] = occupancy
+                    elif atom == ' O  ' or atom == ' OT1' or atom == ' OT2':
+                        backboneAtoms[alternateConformation][OINDEX] = occupancy
+                    elif atom == ' C  ':
+                        backboneAtoms[alternateConformation][CINDEX] = occupancy
+                    elif atom == ' CA ':
+                        backboneAtoms[alternateConformation][CAINDEX] = occupancy
+                    if atom == ' CB ' or residue == 'GLY':
+                        backboneAtoms[alternateConformation][CBINDEX] = occupancy
                 
             elif line[0:3] == "TER":
                 oldChain = currentChain
                 TERidx = lineidx            
     
-    # print len(line),'\t', line[0:6]
+            # print len(line),'\t', line[0:6]
             # remove all white spaces, and check if the line is empty or too long:
             if len(line.strip()) == 0:
                 errors.append("Empty line found on line %d." % lineidx)
@@ -519,7 +577,13 @@ class PDB:
                 else:
                     warnings.append("The PDB file contains the following non-standard line which is allowed by the server:\n  line %d: %s" % (lineidx, line))
             lineidx = lineidx + 1
-                    
+
+        # Remove the extra ATOM lines added above
+        self.lines = self.lines[0:len(self.lines) - 5]
+        
+        if not missingSomeBBAtoms and someBBAtomsAreUnoccupied:
+            errors.insert(0, "The PDB has some backbone atoms set as unoccupied. You can set these as occupied using the checkbox on the submission page.<br>")                
+                            
         if classicErrors:
             if ableToUseMini:
                 errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. Try using the mini version of Rosetta or else altering the PDB.<br>")
