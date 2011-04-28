@@ -4,6 +4,8 @@
 import sys
 import os
 import time
+import traceback
+import pprint
 sys.path.insert(0, "../common/")
 
 import RosettaTasks
@@ -21,71 +23,127 @@ if not os.path.exists("output"):
 #   ii) they are named <somename>_<clusterrev>_static
 # Furthermore, the related database should be in a subdirectory of the bindir named "rosetta_database"
 # The "static" in the name is a reminder that these binaries must be built statically.
-      
 
+
+#todo: Load from rwebhelper.py
+ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
+                    "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
+                    "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
+                    "TRP": "W", "TYR": "Y"}
+ROSETTAWEB_SK_AAinv = {}
+for k, v in ROSETTAWEB_SK_AA.items():
+    ROSETTAWEB_SK_AAinv[v] = k
+    
 if __name__ == "__main__":
+    qstatpause = 20
     
-    test = "HK"
+    test = "1KI1"
+    try:
+        clusterjob = None
+        
+        if test == "SK":
+            mini = "seqtolJMB"
+            ID = 1234
+            pdb_filename = "2I0L_A_C_V2006.pdb"    
+            output_handle = open(pdb_filename,'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 2
+            
+            params = {
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : 10,
+                "kT"                : 0.228,
+                "numchains"         : 1,
+                "Partners"          : ["A"],
+                "Weights"           : [0.4, 0.4],
+                "Premutated"        : {"A" : {319 : "A"}},
+                "Designed"          : {"A" : [318]}
+                }
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")            
+        
+        if test == "1KI1":
+            mini = "seqtolJMB"
+            ID = 1234
+            pdb_filename = "1KI1-AB.pdb"
+            pdb_filename = "2I0L_A_C_V2006.pdb"
+               
+            output_handle = open(pdb_filename,'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 2
+            allAAsExceptCysteine = ROSETTAWEB_SK_AAinv.keys()
+            allAAsExceptCysteine.remove('C')
     
-    if test = "SK":
-        mini = "seqtolJMB"
-        ID = 1234
-        pdb_filename = "2I0L_A_C_V2006.pdb"    
-        output_handle = open(pdb_filename,'r')
-        pdb_info = output_handle.read()
-        output_handle.close()
-        nstruct = 2
+            params = {
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : 10,
+                "kT"                : 0.228 + 0.021,
+                "numchains"         : 2,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
+                "Designed"          : {"A" : [56], "B" : [1369, 1373, 1376, 1380]}
+                }
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")            
+                
+        elif test == "HK":
+            mini = "seqtolHK"
+            ID = 1234
+            pdb_filename = "hktest.pdb"    
+            output_handle = open(pdb_filename,'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 2
+            radius = 5.0 #todo: Set this in the constants file instead
+            
+            params = {
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : radius,
+                "Partners"          : ["A", "B"],
+                "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
+                }
+            
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")            
         
-        params = {
-            "binary"            : mini,
-            "ID"                : ID,
-            "pdb_filename"      : pdb_filename,
-            "pdb_info"          : pdb_info,
-            "nstruct"           : nstruct,
-            "radius"            : 10,
-            "kT"                : 0.228,
-            "numchains"         : 1,
-            "Partners"          : ["A"],
-            "Weights"           : [0.4, 0.4],
-            "Premutated"        : {"A" : {319 : "A"}},
-            "Designed"          : {"A" : [318]}
-            }
-        seqtol = RosettaTasks.RosettaSequenceToleranceSK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")
-        seqtol.start()
         
-        while not(seqtol.isCompleted()):
-            time.sleep(20)
+        if clusterjob:
+            #todo: testing clusterjob._analyze()
+            
+            clusterjob.start()
+            
+            try:
+                while not(clusterjob.isCompleted()):
+                    time.sleep(qstatpause)
+            except Exception, e:
+                print("The scheduler failed at some point: %s." % str(e))
+                print(traceback.print_exc())
+                
+            clusterjob.analyze()
+            clusterjob.cleanup()
+            jobprofile = clusterjob.getprofile()
+            print("<profile>")
+            pprint.pprint(jobprofile) #"<profile>\n%s\n</profile>" % jobprofile)
+            print("</profile>")
+            
+            print("<profile>")
+            print(clusterjob.getprofileXML())
+            print("</profile>")
+    
+    except Exception, e:
+        print(traceback.print_exc())
+        print(e)
         
-        seqtol.cleanup()
-        
-    elif test = "HK":
-        mini = "seqtolHK"
-        ID = 1234
-        pdb_filename = "hktest.pdb"    
-        output_handle = open(pdb_filename,'r')
-        pdb_info = output_handle.read()
-        output_handle.close()
-        nstruct = 2
-        
-        radius = 5.0 #todo: Set this in the constants file instead
-        
-        params = {
-            "binary"            : mini,
-            "ID"                : ID,
-            "pdb_filename"      : pdb_filename,
-            "pdb_info"          : pdb_info,
-            "nstruct"           : nstruct,
-            "radius"            : radius,
-            "Partners"          : ["A", "B"],
-            "Designed"          : {"B" : [145, 147, 148, 150, 152, 153]}
-            }
-        
-        seqtol = RosettaTasks.RosettaSequenceToleranceHK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")
-        seqtol.start()
-        
-        while not(seqtol.isCompleted()):
-            time.sleep(20)
-        
-        seqtol.analyze()
-        seqtol.cleanup()
-        
+

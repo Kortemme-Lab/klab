@@ -20,6 +20,14 @@ RETIRED_TASK = 3
 COMPLETED_TASK = 4
 FAILED_TASK = 5
 
+status = {
+    INITIAL_TASK    : "pending",
+    INACTIVE_TASK   : "pending",
+    ACTIVE_TASK     : "active",
+    RETIRED_TASK    : "retired",
+    COMPLETED_TASK  : "completed",
+    FAILED_TASK     : "failed",
+    }
 #todo: remove
 
 RosettaBinaries = {        
@@ -44,13 +52,12 @@ RosettaBinaries = {
                     "mini"      : False,
                     "backrub" : "ros_052208.gcc",
                  },
-    "seqtolHK"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta++ 2.30 (classic), as published",
-                    "revision" : 24980, 
+    "seqtolHK"  :{  "name" : "Rosetta++ 2.30 (classic), as published",
+                    "revision" : 17289,  # based on the sequence tolerance database revision
                     "mini"      : False,
                     "backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
                     "sequence_tolerance" : "rosetta_1Oct08.gcc",
-                    "minimize" : "rosetta_minimize_12_17_05.gcc",
+                    "minimize" : "minimization_seqtolhk.gcc",
                     "database" : "rosetta_database_elisabeth", #todo: Now defunct
                     "clusterrev" : "rElisabeth",
                     "cluster_databases" : ["rosetta_database_r15286", "rosetta_database_r17289"],
@@ -59,18 +66,19 @@ RosettaBinaries = {
                     "name" : "Rosetta 3.2 (mini), as published",
                     "revision" : 39284,
                     "mini"      : True,
-                    "backrub" : "backrub_r39284",
-                    "sequence_tolerance" : "sequence_tolerance_r39284",
-                    "database"  : "minirosetta_database_r39284",
-                    "clusterrev" : "r3.2.1"
+                    #"backrub" : "backrub_r39284",
+                    #"sequence_tolerance" : "sequence_tolerance_r39284",
+                    #"database"  : "minirosetta_database_r39284",
+                    "clusterrev" : "r39284"
                  },
     "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta 3.2 (mini), as published",
+                    "name" : "Rosetta 3.2.r (mini), as published",
                     "revision" : 0, 
                     "mini"      : True,
-                    "backrub" : "backrub_r", 
-                    "sequence_tolerance" : "sequence_tolerance_r",
-                    "database"  : "minirosetta_database_r"
+                    #"backrub" : "backrub_r", 
+                    #"sequence_tolerance" : "sequence_tolerance_r",
+                    #"database"  : "minirosetta_database_r",
+                    "clusterrev" : "r_"
                  },
 }
 
@@ -189,8 +197,12 @@ echo "</enddate>"
         return self.workingdir
 
 class ClusterTask(object):
-     
+    prefix = "task"
+    
     def __init__(self, workingdir, targetdirectory, scriptfilename, parameters = {}, name = ""):
+        self.profiler = SimpleProfiler.SimpleProfiler(name)
+        self.profiler.PROFILE_START("Initialization")
+        self.parameters = parameters
         self.failOnStdErr = True
         self.debug = True
         self.targetdirectory = targetdirectory
@@ -199,7 +211,6 @@ class ClusterTask(object):
         self.state = INACTIVE_TASK
         self.dependents = []
         self.prerequisites = {}
-        self.parameters = parameters
         self.workingdir = workingdir
         self.scriptfilename = scriptfilename
         self.filename = os.path.join(workingdir, scriptfilename)
@@ -208,9 +219,16 @@ class ClusterTask(object):
         self.filename_stderr = None
         self.name = name or "unnamed"
         self.numtasks = 1
+        self.outputstreams = []
         if parameters.get("pdb_filename"):
             parameters["pdbRootname"] = parameters["pdb_filename"][:-4]
-
+        self._initialize()
+        self.profiler.PROFILE_STOP("Initialization")
+    
+    def _initialize(self):
+        '''Override this function.'''
+        raise Exception
+    
     def _workingdir_file_path(self, filename):
         """Get the path for a file within the working directory"""
         return os.path.join(self.workingdir, filename)   
@@ -218,15 +236,23 @@ class ClusterTask(object):
     def _targetdir_file_path(self, filename):
         """Get the path for a file within the working directory"""
         return os.path.join(self.targetdirectory, filename)   
+    
+    def getOutputStreams(self):
+        return self.outputstreams
+
+    def getExpectedOutputFileNames(self):
+        outputFilenames = []
+        for i in range(1, self.numtasks + 1):
+            outputFilenames.append("%s_%d.cmd.o%d.%d" % (self.prefix, self.parameters["ID"], self.jobid, i))
+        return outputFilenames 
 
     def getName(self):
         return self.name
         
-    def start(self, profiler):
+    def start(self):
         # Our job submission engine is sequential at present so we use one filename
         # todo: use a safe equivalent of tempname
         if self.script:
-            
             self._status("Starting %s" % self.name)
             # Copy files from prerequisites
             for prereq, files in self.prerequisites.iteritems():
@@ -235,13 +261,11 @@ class ClusterTask(object):
                 
             write_file(self.filename, self.script)
             #print(self.script)
-            self._status("<qsub>", plain = True)
-            self.jobid = sge.qsub_submit(self.filename, self.workingdir, name = self.scriptfilename, showstdout = self.debug)
-            self._status("</qsub>", plain = True)
+            self.jobid, stdo = sge.qsub_submit(self.filename, self.workingdir, name = self.scriptfilename, showstdout = self.debug)
+            self._status("<qsub>%s</qsub>" % stdo, plain = True)
             self._status("Job started with id %d." % self.jobid)
             if self.jobid != 0:
-                self.profiler = profiler
-                profiler.PROFILE_START(self.getName())
+                self.profiler.PROFILE_START("Execution")
                 self.state = ACTIVE_TASK
                 return self.jobid
         else:
@@ -260,12 +284,14 @@ class ClusterTask(object):
                 shutil.copy(file, targetdirectory)
            
     
-    def _copyAllFilesBackToHost(self):
-        #todo: This will copy the files from the cluster submission host back to the originating host
-        for file in glob.glob(self._workingdir_file_path("*")):
-            self._status('copying %s' % file)
-            shutil.copy(file, self.targetdirectory)
-
+    def _copyFilesBackToHost(self, filemasks = ["*"]):
+        if type(filemasks) == type(""):
+            filemasks = [filemasks]
+        for p in filemasks:
+            for file in glob.glob(self._workingdir_file_path(p)):
+                self._status('copying %s' % file)
+                shutil.copy(file, self.targetdirectory)    
+        
     def retire(self):
         """ This is the place to implement any interim postprocessing steps for your task to generate input the dependents require (Pay it forward).
             All necessary input files for dependents should be copied back to the originating host here. 
@@ -283,8 +309,13 @@ class ClusterTask(object):
             # The root of self.targetdirectory should exists - otherwise we should not
             # create the tree here as there is probably a bug in the code
             os.mkdir(self.targetdirectory)
-            
+        
+        clusterScript = self._workingdir_file_path(self.scriptfilename)
+        if os.path.exists(clusterScript):
+            shutil.copy(clusterScript, self.targetdirectory)
+                    
         if self.scriptfilename:
+            failedOutput = False
             for i in range(1, self.numtasks + 1):
             
                 if self.numtasks == 1:
@@ -294,36 +325,59 @@ class ClusterTask(object):
                     filename_stdout = "%s.o%s.%d" % (self.scriptfilename, self.jobid, i)
                     filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
                 
+                stderrhasfailed = False
+                    
                 if os.path.exists(self._workingdir_file_path(filename_stdout)):
                     self.filename_stdout = filename_stdout
-                    self._status('shutil.copy(%s/%s %s")' % (self.workingdir, filename_stdout, self.targetdirectory))
-                    shutil.copy("%s/%s" % (self.workingdir, filename_stdout), self.targetdirectory)
+                    self._status('shutil.copy(%s %s")' % (self._workingdir_file_path(filename_stdout), self.targetdirectory))
+                    shutil.copy(self._workingdir_file_path(filename_stdout), self.targetdirectory)
+                else:
+                    self._status("Failed on %s, subtask %d" % (self.name, i))
+                    filename_stdout = None
+                    failedOutput = True
+
                 if os.path.exists(self._workingdir_file_path(filename_stderr )):                    
                     self.filename_stderr = filename_stderr
-                    self._status('shutil.copy(%s/%s %s")' % (self.workingdir, filename_stderr, self.targetdirectory))
-                    shutil.copy("%s/%s" % (self.workingdir, filename_stderr), self.targetdirectory)
-                    if self.failOnStdErr and os.path.getsize(self._workingdir_file_path(filename_stderr)) > 0:
+                    self._status('shutil.copy(%s %s")' % (self._workingdir_file_path(filename_stderr), self.targetdirectory))
+                    shutil.copy(self._workingdir_file_path(filename_stderr), self.targetdirectory)
+                    stderrHasFailed = os.path.getsize(self._workingdir_file_path(filename_stderr)) > 0
+                    if self.failOnStdErr and stderrHasFailed:
                         self._status("Failed on %s, subtask %d" % (self.name, i))
                         self.state = FAILED_TASK
-                        return False
+                        failedOutput = True
+                else:
+                    self._status("Failed on %s, subtask %d" % (self.name, i))
+                    filename_stderr = None
+                    failedOutput = True
+    
+                self.outputstreams.append({"stdout" : filename_stdout, "stderr" : filename_stderr, "failed" : stderrhasfailed})
 
-            return self.filename_stdout and self.filename_stderr
+            return not failedOutput
         else:
             self.state = FAILED_TASK
             return False
     
-    def complete(self):
+    def _complete(self):
         """This is the place to implement any final postprocessing steps for your task which prerequisites require (Pay it backward).
            All necessary input files for prerequisites should be copied back to the originating host here. 
            e.g.  -check if all files were created
                  -execute final analysis
                  -optionally get rid of unused files
                  -copy final output files back to the originating host\n"""
-
-        self._status("Completing %s" % self.name)
-        self.state = COMPLETED_TASK
         return True
     
+    def complete(self):
+        """This function should not be overridden. Completion code should be written in the _complete function."""
+        self.profiler.PROFILE_START("Completion")
+        self._status("Completing %s" % self.name)
+        result = self._complete()
+        self.state = COMPLETED_TASK
+        self.profiler.PROFILE_STOP("Completion")
+        return result
+    
+    def getprofile(self):
+        return self.profiler.PROFILE_STATS()
+
     def _status(self, message, plain = False):
         if self.debug:
             if plain:
@@ -349,18 +403,28 @@ class ClusterTask(object):
     def getDependents(self):
         return self.dependents
     
-    def getState(self):
+    def getClusterStatus(self, qstatjobs = None):
+        if self.state == ACTIVE_TASK:
+            thisjob, alljobs = sge.qstat(self.jobid, jobs = qstatjobs)
+            if thisjob:
+                return "%s - %s" % (self.scriptfilename, thisjob)
+        return None
+
+    def getState(self, qstatjobs = None, allowToRetire = True):
         # ping server
         if self.state == ACTIVE_TASK:
             # Query the submission host
-            thisjob, alljobs = sge.qstat(self.jobid)
+            thisjob, alljobs = sge.qstat(self.jobid, jobs = qstatjobs)
                         
-            if not thisjob:
+            if not thisjob and allowToRetire:
                 self.state = RETIRED_TASK
-                self.retire()
+                self.profiler.PROFILE_STOP("Execution")
+                self.profiler.PROFILE_START("Retirement")
+                if not self.retire():
+                    self._status("Failed while retiring task %s." % self.name)
+                    self.state = FAILED_TASK
+                self.profiler.PROFILE_STOP("Retirement")
                 # look at stderr
                 # determine scratch dir
                 # copy files back to dir with jobid
-            else:
-                self._status("%s - %s" % (self.scriptfilename, thisjob))
-        return self.state   
+        return self.state
