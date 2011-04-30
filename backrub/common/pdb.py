@@ -152,6 +152,11 @@ class PDB:
                     if chain in chainsChosen:
                         # Only keep ATOM lines for chosen chains
                         templines.append(line)
+                elif line[0:4] == "TER ":
+                    chain = line[21:22]
+                    if chain in chainsChosen:
+                        # Only keep TER lines for chosen chains
+                        templines.append(line)
                 else:
                     # Keep all non-ATOM lines
                     templines.append(line)

@@ -9,6 +9,10 @@ import time
 from string import join, strip
 
 DEBUG = False
+clusterUserAccount = "klabqb3backrub"
+qstatLastCalled = None
+qstatWaitingPeriod = 19.0 # todo - use global for this and cluster.py
+emptyDict = {}
 
 #scp tempdir/* shaneoconner@chef.compbio.ucsf.edu:/netapp/home/shaneoconner/temp/tempdir
 #publickey = /netapp/home/shaneoconner/.ssh/id_rsa.pub
@@ -50,12 +54,7 @@ class qjob(object):
         else:
             return "Job does not exist."
             
-
-qstatLastCalled = None
-qstatWaitingPeriod = 19.0 # todo - use global for this and cluster.py
-emptyDict = {}
-
-def qstat(jobid = None, jobs = None, user = "shaneoconner"):
+def qstat(jobid = None, jobs = None, user = clusterUserAccount):
     """ Returns a table of jobs run by the current user."""
     
     #debug: for testing without submission - 

@@ -9,9 +9,12 @@ import tempfile
 import re
 import glob
 from string import join
-import SimpleProfiler
 
+import SimpleProfiler
 import sge
+from rosettahelper import make755Directory, makeTemp755Directory
+
+rootdir = "/netapp/home/shaneoconner"
 
 INITIAL_TASK = 0
 INACTIVE_TASK = 1
@@ -28,8 +31,8 @@ status = {
     COMPLETED_TASK  : "completed",
     FAILED_TASK     : "failed",
     }
-#todo: remove
 
+#todo: remove
 RosettaBinaries = {        
     "classic"   :{  # 2.3.0 was released 2008-04-21, this revision dates 2008-12-27
                     "name"      : "Rosetta++ 2.32 (classic), as published",
@@ -89,8 +92,6 @@ def write_file(filename, contents):
    file.close()
    return
 
-rootdir = "/netapp/home/shaneoconner"
-
 def getClusterDatabasePath(binary, cluster_database_index = 0):
     if cluster_database_index in range(len(RosettaBinaries[binary]["cluster_databases"])):
         return "%s/%s/%s" % (rootdir, RosettaBinaries[binary]["clusterrev"], RosettaBinaries[binary]["cluster_databases"][cluster_database_index])
@@ -128,7 +129,7 @@ class ClusterScript:
 #$ -j n
 #$ -l arch=lx24-amd64
 #$ -l panqb3=1G,scratch=1G,mem_total=3G
-#$ -l h_rt=11:59:00
+#$ -l h_rt=335:59:00
 %(taskparam)s
 %(taskline)s
 %(taskvar)s
@@ -308,7 +309,7 @@ class ClusterTask(object):
         if not os.path.isdir(self.targetdirectory):
             # The root of self.targetdirectory should exists - otherwise we should not
             # create the tree here as there is probably a bug in the code
-            os.mkdir(self.targetdirectory)
+            make755Directory(self.targetdirectory)
         
         clusterScript = self._workingdir_file_path(self.scriptfilename)
         if os.path.exists(clusterScript):

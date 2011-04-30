@@ -3,10 +3,9 @@
 # Set up array jobs for QB3 cluster.
 import sys
 import os
-sys.path.insert(0, "../common/")
+sys.path.insert(0, "../../common/")
 import time
 import shutil
-import tempfile
 import re
 from string import join
 import distutils.dir_util
@@ -14,7 +13,8 @@ import distutils.dir_util
 import sge
 import ClusterTask  
 import SimpleProfiler
-
+from rosettahelper import make755Directory, makeTemp755Directory
+         
 dsger='''
     We allow directed acylic graphs, not necessarily strongly connected.
 
@@ -150,14 +150,18 @@ class TaskScheduler(object):
         # todo: Check the reachability and acylicity of the graph here
         checkGraphReachability(self.tasks[ClusterTask.INITIAL_TASK])
             
+        tasksToStart = []
         for task in self.tasks[ClusterTask.INITIAL_TASK]:
+            tasksToStart.append(task)
+        
+        for task in tasksToStart:
             #todo: pass in files?
             started = task.start()
             tstate = task.getState()
             self._status("Started %s %d " % (task.getName(), tstate))
             if started and tstate != ClusterTask.FAILED_TASK:
                 self.tasks_in_order.append(task)
-                self._movequeue(task, ClusterTask.INITIAL_TASK, tstate)
+                self._movequeue(task, ClusterTask.INITIAL_TASK, tstate)    
             else:
                 self.raiseFailure(SchedulerStartException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "Exception starting: %s" % task.getName()))
                 return False
@@ -228,7 +232,7 @@ class TaskScheduler(object):
         
         # Bad scheduler. No biscuit.
         if self.tasks[ClusterTask.INITIAL_TASK]:
-            raise BadSchedulerException 
+            raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The scheduler has failed.")  
         
         # If we have no more tasks which will trigger other tasks to start i.e. active tasks
         # and we have pending tasks which have not been started, they never will be started.
@@ -277,6 +281,7 @@ class RosettaClusterJob(object):
         self.profiler.PROFILE_START("Initialization")
         self._initialize()
         self.profiler.PROFILE_STOP("Initialization")
+        self.failed = False
         
     def _initialize(self):
         '''Override this function.'''
@@ -290,18 +295,27 @@ class RosettaClusterJob(object):
         try:
             self.scheduler.start()
         except TaskSchedulerException, e:
+            self.failed = True
             print(e)
     
     def cleanup(self):
         self.scheduler.cleanup()
     
     def isCompleted(self):
-        if self.scheduler.step():
-            self.scheduler.cleanup()
-            #self._status('distutils.dir_util.copy_tree(%s, %s)' % (self.workingdir, self.targetdirectory))
-            return True
-        else:
+        if not self.failed:
+            if self.scheduler.step():
+                self.scheduler.cleanup()
+                #self._status('distutils.dir_util.copy_tree(%s, %s)' % (self.workingdir, self.targetdirectory))
+                return True
+            else:
+                # A little hacky but avoids waiting another cycle if all jobs have completed
+                if not(self.scheduler.tasks[ClusterTask.ACTIVE_TASK]):
+                    if self.scheduler.step():
+                        self.scheduler.cleanup()
+                        return True
             return False
+        else:
+            raise
 
     def _analyze(self):
         '''Override this function.'''
@@ -316,11 +330,11 @@ class RosettaClusterJob(object):
         
         attr = None
         if self.scheduler.hasFailed():
-            attr = 'succeeded = "false"' 
+            attr = 'succeeded="false"' 
         else:    
-            attr = 'succeeded = "true"' 
+            attr = 'succeeded="true"' 
         
-        stats = [("%s %s" % (self.suffix, attr), stats)]
+        stats = [('%s %s workingDir="%s" resultsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory), stats)]
         SimpleProfiler.sumTuples(stats)
         return stats
         
@@ -330,13 +344,11 @@ class RosettaClusterJob(object):
         self._analyze()
         self.profiler.PROFILE_STOP("Analysis")
         return True
-        
+
     def _make_workingdir(self):
         """Make a single used working directory inside the temporary directory"""
         # make a tempdir on the host
-        self.workingdir = tempfile.mkdtemp("_%s" % self.suffix, dir = self.tempdir)
-        if not os.path.isdir(self.workingdir):
-            raise os.error
+        self.workingdir = makeTemp755Directory(self.tempdir, self.suffix) 
         return self.workingdir
 
     def _targetdir_file_path(self, filename):
@@ -346,9 +358,7 @@ class RosettaClusterJob(object):
     def _make_targetdir(self):
         """Make a single used target directory inside the target directory"""
         # make a tempdir on the host
-        self.targetdirectory = tempfile.mkdtemp("_%s" % self.suffix, dir = self.targetroot)
-        if not os.path.isdir(self.targetdirectory):
-            raise os.error
+        self.targetdirectory = makeTemp755Directory(self.targetroot, self.suffix) 
         return self.targetdirectory
     
     def _taskresultsdir_file_path(self, taskdir, filename):
@@ -359,7 +369,7 @@ class RosettaClusterJob(object):
             Filenames should be relative to the working directory."""
         taskdir = "%s/%s" % (self.workingdir, dirname)
         if not os.path.isdir(taskdir):
-            os.mkdir(taskdir)
+            make755Directory(taskdir)
         if not os.path.isdir(taskdir):
             raise os.error
         for file in files:

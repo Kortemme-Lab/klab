@@ -6,17 +6,15 @@ import os
 import time
 import traceback
 import pprint
-sys.path.insert(0, "../common/")
+sys.path.insert(0, "../../common/")
 
 import RosettaTasks
- 
+from rosettahelper import make755Directory, makeTemp755Directory
+
 #todo: so your job must copy back any data it needs on completion.
 
 #scp tempdir/* shaneoconner@chef.compbio.ucsf.edu:/netapp/home/shaneoconner/temp/tempdir
 #publickey = /netapp/home/shaneoconner/.ssh/id_rsa.pub
-
-if not os.path.exists("output"):
-    os.mkdir("output")
 
 # All cluster binaries should have the same name format based on the clusterrev field in RosettaBinaries: 
 #    i) they are stored in the subdirectory of home named <clusterrev>
@@ -33,9 +31,20 @@ ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", 
 ROSETTAWEB_SK_AAinv = {}
 for k, v in ROSETTAWEB_SK_AA.items():
     ROSETTAWEB_SK_AAinv[v] = k
+
+
+netappRoot = "/netapp/home/klabqb3backrub/temp"
+resultsRoot = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/output"
+inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/"
+
+
+if not os.path.exists(netappRoot):
+    make755Directory(netappRoot)
+if not os.path.exists(resultsRoot):
+    make755Directory(resultsRoot)
     
 if __name__ == "__main__":
-    qstatpause = 20
+    qstatpause = 60
     
     test = "1KI1"
     try:
@@ -44,8 +53,8 @@ if __name__ == "__main__":
         if test == "SK":
             mini = "seqtolJMB"
             ID = 1234
-            pdb_filename = "2I0L_A_C_V2006.pdb"    
-            output_handle = open(pdb_filename,'r')
+            pdb_filename = "1MDY_mod.pdb"    
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
             pdb_info = output_handle.read()
             output_handle.close()
             nstruct = 2
@@ -61,21 +70,19 @@ if __name__ == "__main__":
                 "numchains"         : 1,
                 "Partners"          : ["A"],
                 "Weights"           : [0.4, 0.4],
-                "Premutated"        : {"A" : {319 : "A"}},
-                "Designed"          : {"A" : [318]}
+                "Premutated"        : {"A" : {102 : "A"}},
+                "Designed"          : {"A" : [103, 104]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")            
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, resultsRoot)            
         
         if test == "1KI1":
             mini = "seqtolJMB"
             ID = 1234
-            pdb_filename = "1KI1-AB.pdb"
-            pdb_filename = "2I0L_A_C_V2006.pdb"
-               
-            output_handle = open(pdb_filename,'r')
+            pdb_filename = "1KI1.pdb"
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
             pdb_info = output_handle.read()
             output_handle.close()
-            nstruct = 2
+            nstruct = 100
             allAAsExceptCysteine = ROSETTAWEB_SK_AAinv.keys()
             allAAsExceptCysteine.remove('C')
     
@@ -91,15 +98,15 @@ if __name__ == "__main__":
                 "Partners"          : ["A", "B"],
                 "Weights"           : [0.4, 0.4, 0.4, 1.0],
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
-                "Designed"          : {"A" : [56], "B" : [1369, 1373, 1376, 1380]}
+                "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")            
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, netappRoot, resultsRoot)            
                 
         elif test == "HK":
             mini = "seqtolHK"
             ID = 1234
             pdb_filename = "hktest.pdb"    
-            output_handle = open(pdb_filename,'r')
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
             pdb_info = output_handle.read()
             output_handle.close()
             nstruct = 2
@@ -116,7 +123,7 @@ if __name__ == "__main__":
                 "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
                 }
             
-            clusterjob = RosettaTasks.SequenceToleranceJobHK(params, "/netapp/home/shaneoconner/temp", "/netapp/home/shaneoconner/results")            
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(params, netappRoot, resultsRoot)            
         
         
         if clusterjob:
@@ -134,9 +141,6 @@ if __name__ == "__main__":
             clusterjob.analyze()
             clusterjob.cleanup()
             jobprofile = clusterjob.getprofile()
-            print("<profile>")
-            pprint.pprint(jobprofile) #"<profile>\n%s\n</profile>" % jobprofile)
-            print("</profile>")
             
             print("<profile>")
             print(clusterjob.getprofileXML())

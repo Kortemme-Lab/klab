@@ -11,7 +11,28 @@ import os
 import sys
 import re
 import string
+import stat
+import tempfile
 
+permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+
+def make755Directory(path):
+    os.mkdir(path)
+    if not os.path.isdir(path):
+        raise os.error
+    global permissions755SGID
+    os.chmod(path, permissions755SGID)
+
+def makeTemp755Directory(temproot, suffix = None):
+    if suffix:
+        path = tempfile.mkdtemp("_%s" % suffix, dir = temproot)
+    else:
+        path = tempfile.mkdtemp(dir = temproot)
+    if not os.path.isdir(path):
+        raise os.error
+    global permissions755SGID
+    os.chmod(path, permissions755SGID)
+    return path
 
 def get_score_from_pdb_file(self, filename):
     handle = open(filename, 'r')
