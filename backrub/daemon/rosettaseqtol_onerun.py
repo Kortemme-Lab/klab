@@ -77,7 +77,7 @@ class RosettaSeqTolONE(RosettaExec):
              # todo: I commented this out: Ask Colin "-norepack_disulf", "-find_disulf",
              ]
 
-    args.extend(["-seq_tol:fitness_master_weights"]) # todo: Ask Colin - I use 0.4 here to match the examples
+    args.extend(["-seq_tol:fitness_master_weights"]) 
     args.extend(self.parameter['weights'])
     
     self.filename_stdout = 'seqtol_%s_stdout.txt' % self.ID

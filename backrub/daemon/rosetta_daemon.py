@@ -44,7 +44,7 @@ class RosettaDaemon(Daemon):
     store_time_guest  = '30'  # how long are we going to store the data for guest users
     logfile           = ''
     ntrials           = 10000 # THIS SHOULD BE 10000
-    logSQL            = True
+    logSQL            = False
     email_text_error = """Dear %s,
 
 An error occurred during your simulation. Please check 
@@ -217,8 +217,11 @@ The Kortemme Lab Server Daemon
         pid = None
         try:
             self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, mini, task) )
-            params = pickle.loads(ProtocolParameters)            
-            params["task"] = task # This is a hack for the mutations protocols. Remove when their functions are separated out            
+            
+            # todo: The "task" dict entry is a hack for the mutations protocols. Remove when their functions are separated out            
+            params = pickle.loads(ProtocolParameters)
+            params["task"] = task 
+            
             for p in self.protocols:
                 if p.dbname == task:
                     return p.startFunction(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
@@ -228,18 +231,17 @@ The Kortemme Lab Server Daemon
             
         return pid
 
-    def check_files(self, r_object, ensembleSize, pdb_id, job_id, task):
+    def check_files(self, r_object, ensembleSize, pdb_id, job_id, task, binaryName):
         """checks whether all pdb files were created
            sometimes Rosetta classic crashes at the end, but the results are ok
         """
         # This function takes the last-files into account... and deletes them! We don't need them!        
         for p in self.protocols:
             if p.dbname == task:
-                return p.checkFunction(r_object, ensembleSize, pdb_id, job_id, task)
-        
-        if retval:
-            self.log("%s\t\t check_files() ID = %s, task = %s : all files successfully created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
-            return True
+                if p.checkFunction(r_object, ensembleSize, pdb_id, job_id, task, binaryName):
+                    self.log("%s\t\t check_files() ID = %s, task = %s : all files successfully created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
+                    return True
+        return False
             
     def runSQL(self, query):
         """ This function should be the only place in this class which executes SQL.
@@ -254,11 +256,12 @@ The Kortemme Lab Server Daemon
         
         ID       = int( rosetta_object.get_ID() )
                         
-        data = self.runSQL("SELECT u.Email,u.FirstName,b.KeepOutput,b.cryptID,b.task,b.PDBComplexFile,b.EnsembleSize FROM Users AS u JOIN %s AS b on (u.ID=b.UserID) WHERE b.ID=%s" % ( self.db_table, ID ))
+        data = self.runSQL("SELECT u.Email,u.FirstName,b.KeepOutput,b.cryptID,b.task,b.PDBComplexFile,b.EnsembleSize,b.Mini FROM Users AS u JOIN %s AS b on (u.ID=b.UserID) WHERE b.ID=%s" % ( self.db_table, ID ))
         cryptID      = data[0][3]
         task         = data[0][4]
         pdb_id       = data[0][5].split('.')[0]
         ensembleSize = data[0][6]
+        binaryName   = data[0][7]
         state = {
                  "status" : 2,       # 2 means everything went well
                  "error" : "",
@@ -275,7 +278,7 @@ The Kortemme Lab Server Daemon
             # check whether an error occured i.e. the error file is empty
             # default movemap error! if len(error_file) > 1 # lets ignore the error file as long as all files are there
             # I naively assume that Gregs ensembles are always created correctly
-            if not self.check_files(rosetta_object, ensembleSize, pdb_id, ID, task):
+            if not self.check_files(rosetta_object, ensembleSize, pdb_id, ID, task, binaryName):
                 state["error"] = "Rosetta Error"
                 state["status"] = 4
                 raise RosettaError( task, ID )
@@ -717,7 +720,6 @@ The Kortemme Lab Server Daemon
         
         # copy pdb data in object and get filename
         fn_pdb = object_rosetta.set_pdb(pdb_filename, pdb_info)
-        
         # create mutations and define backrub residues
         dict_residues = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
         backbone      = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
@@ -834,7 +836,7 @@ The Kortemme Lab Server Daemon
                     backbone.append((list_chains[y], int(entry_list_resid)))
         
         # create resfile and get filename
-        fn_resfile = object_rosetta.write_resfile( default, dict_residues, backbone )
+        fn_resfile = object_rosetta.write_resfile( default, dict_residues, backbone, None)
         # run rosetta
         r_command = ''
         
@@ -870,18 +872,18 @@ The Kortemme Lab Server Daemon
         self.log("%s %s: %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, r_command ) )
         return pid
         
-    def CheckMutations(self, r_object, ensembleSize, pdb_id, job_id, task):
+    def CheckMutations(self, r_object, ensembleSize, pdb_id, job_id, task, binaryName):
         initial_score = 'xxx'
         low_scores  = []
         last_scores = []
         
+        binary = RosettaBinaries[binaryName]
         workingdir = r_object.workingdir
-        mini = r_object.mini
-        
+        usingMini = r_object.mini
         try:
-            if mini:
-                databaseDir = "%s/%s" % (self.dataDir, binary["mini"]["database"])              
-                postprocessingBinary = "%s/%s" % (self.binDir, binary["mini"]["postprocessing"])              
+            if usingMini:
+                databaseDir = "%s/%s" % (self.dataDir, binary["database"])              
+                postprocessingBinary = "%s/%s" % (self.binDir, binary["postprocessing"])              
                 analysis = AnalyzeMini(filename="%s/stdout_%s.dat" % ( workingdir, job_id) )
                 if not analysis.analyze(outfile="%s/scores_detailed.txt" % workingdir, outfile2="%s/scores_overall.txt" % workingdir):
                     self.log("%s\t\t check_files() ID = %s : individual scores could not be created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id ) )
@@ -940,6 +942,7 @@ The Kortemme Lab Server Daemon
                 
         except:
             self.log("%s\t\t check_files() ID = %s, task = %s : failed\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
+            self.log("Exception: %s\n" % traceback.format_exc())
             return False
         
         return True
@@ -970,7 +973,7 @@ The Kortemme Lab Server Daemon
     
         return pid
     
-    def CheckEnsemble(self, r_object, ensembleSize, pdb_id, job_id, task):
+    def CheckEnsemble(self, r_object, ensembleSize, pdb_id, job_id, task, binaryName):
         return True
 
     def EndEnsemble(self, rosetta_object, pdb_id, ensembleSize, state, ID):
@@ -1065,7 +1068,7 @@ The Kortemme Lab Server Daemon
             self.log("%s\t warning: ID %s SEQTOL RUNS TERMINATED %s\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, no_failed ) )
             self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
 
-    def CheckSequenceTolerance(self, r_object, ensembleSize, pdb_id, job_id, task):
+    def CheckSequenceTolerance(self, r_object, ensembleSize, pdb_id, job_id, task, binaryName):
         #todo: fix this up       
         handle = open(r_object.workingdir_file_path(r_object.filename_stdout),'r')
         if len(grep("Running Postprocessing and Analysis.", handle.readlines())) < 1:

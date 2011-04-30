@@ -123,8 +123,21 @@ function changeApplication( app, task, subtask, extra, override )
 	// Set the form's protocol values
 	setProtocol(app, task);
 
+	// Show the specific message for point mutations
+	if (app == 0)
+	{
+		new Effect.Appear( "pointMutationRecommendation", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+	}
+	else
+	{
+		new Effect.Fade( "pointMutationRecommendation", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+	}
+	
 	// Hide the descriptions of the protocol series and the descriptions of other protocol tasks
 	thistask = hideInactiveProtocols(app, task);
+		
+	// Hide the common submission page text
+	new Effect.Fade( "textintro", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
 		
 	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
 	revisionFields = document.getElementsByClassName("bin_revisions");
@@ -1306,17 +1319,22 @@ function hideInactiveProtocols(app, task)
 		for ( j = 0; j < protocolTasks[i]; j++ )
 		{
 			ptask = 'parameter' + i + '_' + j;
+			arrowstyle = document.getElementById("protocolarrow" + i + "_" + j).style
 			if ( !isProtocol(i, j)) 
 			{
 				new Effect.Fade(ptask , { duration: 0.0, queue: { scope: 'task' }} );
 				new Effect.Fade( "ref" + i + "_" + j, { duration: 0.0, queue: { scope: 'task' }} );
 				new Effect.Fade( "recNumStructures" + i + "_" + j, { duration: 0.0 } );
+				arrowstyle.color = "black"
+				arrowstyle.fontWeight = "normal"
 			}
 			else
 			{
 				thistask = ptask
 				new Effect.Appear(ptask, { duration: 0.0, queue: { scope: 'task' }} )
 				new Effect.Appear( "ref" + i + "_" + j, { duration: 0.0, queue: { scope: 'task' }} )
+				arrowstyle.color = "#d55414"
+				arrowstyle.fontWeight = "bold"
 			}
 		}
 	}

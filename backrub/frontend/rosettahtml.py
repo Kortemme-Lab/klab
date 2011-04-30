@@ -171,7 +171,7 @@ class RosettaHTML(object):
 # submit()
 ###############################################################################################
 
-    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='' ):
+    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='', extraValues = ''):
           # this function uses javascript functions from jscript.js
             # if you change the application tabler here, please make sure to change jscript.js accordingly
             # calling the function with parameters will load those into the form. #not implemented yet
@@ -221,12 +221,15 @@ class RosettaHTML(object):
 
         postscripts = []
         html = []
+       
+        protocolGroups = self.protocolGroups
+        numProtocolGroups = len(protocolGroups)
+                         
         html.append('''<td align="center">
     <H1 class="title">Submit a new job</H1>
     %(errors)s
 <!-- Start Submit Form -->
     <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
-
       <table border=0 cellpadding=0 cellspacing=0>
         <colgroup>
           <col width="230">
@@ -241,8 +244,8 @@ class RosettaHTML(object):
               <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>            
               <p id="menu_1" style="text-align:left; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 0); ">One mutation</a></td></tr>
-                  <tr><td width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 1); ">Multiple mutations</a></td></tr>
+                  <tr><td id="protocolarrow0_0" width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 0); ">One mutation</a></td></tr>
+                  <tr><td id="protocolarrow0_1" width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 1); ">Multiple mutations</a></td></tr>
                   </table>
               </p>
             </li>
@@ -250,12 +253,12 @@ class RosettaHTML(object):
               <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Backrub Ensembles</A>
               <p id="menu_2" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow1_0"  width="30" style="text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(1, 0); ">
                           <font style="font-size:10pt">Backrub Conformational Ensemble</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>
                       </td></tr>
-                  <tr><td width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow1_1"  width="30" style="text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(1, 1); ">
                           <font style="font-size:10pt">Backrub Ensemble Design</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 8pt">Friedland et. al., 2008</a> ]</font>
@@ -268,12 +271,12 @@ class RosettaHTML(object):
               
               <p id="menu_3" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow2_0" width="30" style="text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(2, 0); ">
                           <font style="font-size:10pt">Interface Sequence Tolerance</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
                       </td></tr>
-                  <tr><td width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow2_1" width="30" style="text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(2, 1); ">
                           <font style="font-size:10pt">Interface / Fold Sequence Tolerance</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 8pt">Smith and Kortemme, 2010</a> ]</font>
@@ -303,8 +306,6 @@ class RosettaHTML(object):
               A <a href="../wiki/Tutorial">tutorial</a> on how to submit a job can be found in the <a href="../wiki">documentation</a>. For a brief explanation of each parameter move your mouse to the question mark symbol. The button "Check form" can be used to highlight fields with invalid entries in red; this is also shown when "Submit" is clicked.
             </p>''')
         
-        protocolGroups = self.protocolGroups
-        numProtocolGroups = len(protocolGroups)
         for i in range(numProtocolGroups):
             html.append('<div id="text%d" style="display:none; opacity:0.0; text-align:justify;">%s</div>' % (i, protocolGroups[i].getDescription()))
         
@@ -314,6 +315,7 @@ class RosettaHTML(object):
         
         # PDB loading subform
         html.append('''        
+            <br><br>
             <TABLE id="PrePDBParameters" align="center" style="display:none; opacity:0.0;">
             <COLGROUP>
                 <COL>
@@ -347,9 +349,16 @@ class RosettaHTML(object):
             if embeddedHTML != -1:
                 bnamevalue = bname[0:embeddedHTML]
             
+            # Hack to show a warning to avoid crashes of point mutation with classic
+            recommendation = ""
+            if desc == "mini":
+                recommendation = '''<span id='pointMutationRecommendation' style="display:none;">, recommended<sup>*</sup></span>'''
+            
             html.append('''
-                    <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s" onChange="document.submitform.MiniTextValue.value = '%s'"/> %s</div>
-                    ''' % (desc, desc, bnamevalue, bname))
+                    <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s" onChange="document.submitform.MiniTextValue.value = '%s'"/> %s%s</div>
+                    ''' % (desc, desc, bnamevalue, bname, recommendation))
+            
+            
             i += 1
         
         html.append('''
@@ -438,7 +447,7 @@ class RosettaHTML(object):
             protocolForm = protocol.getSubmitfunction()
             htmlcode, ps = protocolForm(chainOptions, aminoAcidOptions, numChainsAvailable)
             html.extend(htmlcode)
-            postscripts.append(ps)        
+            postscripts.append(ps)                                  
         
         html.append('''     
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
@@ -460,6 +469,11 @@ class RosettaHTML(object):
                         If you are using the data, please cite:''' % (i, j))
                 for r in protocolGroups[i][j].getReferences():
                     html.append('<br><br>%s' % self.refs[r])
+                
+                # Hack to show a warning to avoid crashes of point mutation with classic
+                if i == 0:
+                    html.append('''<br><br><span><sup>*</sup>For details, see <a href="/backrub/wiki/" target="_blank">documentation</a>.</span>''')
+
                 html.append('</p>')
 
         html.append('''
@@ -481,6 +495,7 @@ class RosettaHTML(object):
         
         html.append(' <INPUT TYPE="hidden" NAME="protocolgroup" VALUE="%s"> ' % activeProtocol[0])
         html.append(' <INPUT TYPE="hidden" NAME="protocoltask" VALUE="%s"> ' % activeProtocol[1])
+        html.append(extraValues)
         html.append('''
             <INPUT TYPE="hidden" NAME="StoredPDB"  VALUE="%s">
             <INPUT TYPE="hidden" NAME="MiniTextValue" VALUE="none">
@@ -1056,11 +1071,20 @@ class RosettaHTML(object):
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
                     The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al.<a href="#refDavisEtAl:2006"><sup id="ref">%(DavisEtAl:2006)d</sup></a>, 
                     for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>.</P>
-                    <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
+
+                    <!--<P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
                     prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.
                     The server <b>output</b>, dependent on the application, consists of: structures of point mutants<a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d</sup></a> and their Rosetta force field scores, 
                     near-native structural ensembles of protein backbone conformations<a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d</sup></a> 
-                    and designed sequences using flexible backbone computational protein design<a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>.</P>
+                    and designed sequences using flexible backbone computational protein design<a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>.</P>-->
+
+                    <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) in PDB format uploaded by the user or obtained directly from the PDB plus some application-specific parameters. The server <b>output</b> is dependent on the application: 
+                    <ul align="justify">
+                    <li><b>Point mutation</b><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d</sup></a>: generates modeled structures and Rosetta scores for single and multiple point mutants in monomeric proteins;
+                    <li style="margin-top:.5em; margin-bottom:.5em;"><b>Backbone ensemble</b><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d</sup></a>: creates near-native structural ensembles of protein backbone conformations (for monomeric proteins) and sequences consistent with those ensembles;
+                    <li><b>Sequence tolerance</b><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">,%(HumphrisKortemme:2008)d</sup></a>: predicts sequences tolerated for proteins and protein-protein interfaces using flexible backbone design methods.  Example applications are the generation of sequence libraries for experimental screening and prediction of protein or peptide interaction specificity.</P>
+                    </ul>
+
                     <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="/backrub/wiki/" target="_blank">documentation</a>.
             Please also check for <a href="/backrub/wiki/" target="_blank">current announcements</a>. 
                     </P>""" % refIDs)

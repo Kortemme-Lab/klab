@@ -7,7 +7,7 @@ class References:
             "HumphrisKortemme:2008" :   'Humphris EL, Kortemme T. <i>Prediction of Protein-Protein Interface Sequence Diversity using Flexible Backbone Computational Protein Design</i>.<br><a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 10pt"> Structure, Volume 16, Issue 12, 12<sup>th</sup> December 2008, Pages 1777-1788</a>',
             "FriedlandEtAl:2009"    :   'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>.<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Computational Biology, May 2009</a>',
             "LauckEtAl:2010"        :   'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design</i>.<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Research, Volume 38, Issue suppl. 2, Pages W569-W575</a>',
-            "SmithKortemme:2010"    :   'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains</i>.<br><a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17<sup>th</sup> September 2010, Pages 460-474</a>',
+            "SmithKortemme:2010"    :   'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains</i>.<br><a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17<sup>th</sup> September 2010, Pages 460-474</a>',
         }
     
     def __getitem__(self, index):
@@ -162,7 +162,7 @@ RosettaBinaries = {
                     "mini"      : False,
                     "backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
                     "sequence_tolerance" : "rosetta_1Oct08.gcc",
-                    "minimize" : "rosetta_minimize_12_17_05.gcc",
+                    "minimize" : "minimization_seqtolhk.gcc",
                     "database" : "rosetta_database_elisabeth"
                  },
     "seqtolJMB" :{  # based solely on the date, roughly between revisions 24967 - 24980
@@ -197,12 +197,12 @@ class WebserverProtocols(object):
         protocolGroups.append(RosettaProtocolGroup("Point Mutation", "#DCE9F4"))
                 
         proto = RosettaProtocol("One Mutation", "point_mutation")
-        proto.setBinaries("classic", "mini")
+        proto.setBinaries("mini", "classic")
         proto.setNumStructures(2,10,50)
         protocolGroups[0].add(proto)
     
         proto = RosettaProtocol("Multiple Mutations", "multiple_mutation")
-        proto.setBinaries("classic", "mini")
+        proto.setBinaries("mini", "classic")
         proto.setNumStructures(2,10,50)
         protocolGroups[0].add(proto)
         

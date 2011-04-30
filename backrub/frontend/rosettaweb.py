@@ -159,13 +159,15 @@ def saveTempPDB(SID, pdb_object, pdb_filename):
         return False, ''
 
 def getRosettaVersion(form):
-    if form.has_key("Mini"):
-        return form["Mini"].value
+    if form.has_key("ChosenBinary"):
+        return form["ChosenBinary"].value
     else:
         return None    #if "protocol" in form:
    
 def usingMini(form):
-    if form.has_key("Mini"):
+    if form.has_key("ChosenBinary"):
+        return RosettaBinaries[form["ChosenBinary"].value]["mini"]
+    elif form.has_key("Mini"):
         return RosettaBinaries[form["Mini"].value]["mini"]
     else:
         return None    #if "protocol" in form:
@@ -419,7 +421,10 @@ def ws():
               
               if numPDBchains > ROSETTAWEB_max_seqtol_SK_chains:
                   errors.append('The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_max_seqtol_SK_chains))
-              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value)
+              
+              extraValues = '<INPUT TYPE="hidden" NAME="ChosenBinary" VALUE="%s">' % form["Mini"].value
+
+              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value, extraValues)
               title = 'Submission Form'
       
   elif query_type == "submitted":    
@@ -884,7 +889,6 @@ def parsePDB(rosettaHTML, form):
     protocol = protocolGroups[pgroup][ptask]
     usingClassic = not(usingMini(form))
     ableToUseMini = protocol.canUseMini()
-          
     if form.has_key("PDBComplex") and form["PDBComplex"].value != '':
         try:
             pdbfile = form["PDBComplex"].value
@@ -953,7 +957,7 @@ def parsePDB(rosettaHTML, form):
         if len(pdb_object.chain_ids()) < 2:
             errors.append("The %s protocol requires at least two chains to be selected - the PDB only contains %d." % (protocol.name, len(pdb_object.chain_ids())))
             pdb_okay = False
-    
+
     return pdb_okay, pdbfile, pdb_filename, pdb_object
 
             
@@ -997,7 +1001,6 @@ def submit(rosettaHTML, form, SID):
             ############## PDB STUFF ###################
                         
             pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(rosettaHTML, form)
-                        
             if not pdb_okay:
                 return False
             ############## PDB STUFF END ###############
@@ -1350,7 +1353,7 @@ def storeMultiplePointMutations(form, pdb_object):
     return None
 
 def storeEnsemble(form, pdb_object):
-    return "none"
+    return {"dummy" : 0}
     
 def storeEnsembleDesign(form, pdb_object):
     """
@@ -1627,7 +1630,7 @@ class FrontendProtocols(WebserverProtocols):
                     <dt><b>One Mutation</b></dt><dd>
                         A single amino acid residue will be substituted and the neighboring residues within a radius of 6&#197; of the mutated residues 
                         will be allowed to change their side-chain conformations (\"repacked\"). 
-                        The method, choice of parameters and benchmarking are described in [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd>
+                        The method, choice of parameters and benchmarking are described in [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd><br>
                     <dt><b>Multiple Mutations</b></dt><dd>Up to 30 residues can be mutated and their neighborhoods repacked.
                                                           The modeling protocol is as described above for single mutations (but has not been benchmarked yet).</dd>
                     <!-- dt>Upload List</dt><dd>Upload a list with single residue mutations.</dd -->
@@ -1640,7 +1643,7 @@ class FrontendProtocols(WebserverProtocols):
                     <dt><b>Backrub Conformational Ensemble</b></dt>
                         <dd>Backrub is applied to the entire input structure to generate a flexible backbone ensemble of modeled protein conformations. 
                         Near-native ensembles made using this method have been shown to be consistent with measures of protein dynamics by 
-                        Residual Dipolar Coupling measurements on Ubiquitin [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd>
+                        Residual Dipolar Coupling measurements on Ubiquitin [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd><br>
                     <dt><b>Backrub Ensemble Design</b></dt>
                       <dd>This method first creates an ensemble of structures to model protein flexibility. 
                           In a second step, the generated protein structures are used to predict an ensemble of low-energy sequences consistent with the input structures, 
@@ -1649,7 +1652,20 @@ class FrontendProtocols(WebserverProtocols):
                 </dl>''' % refIDs)
             elif pgroup.name == "Sequence Tolerance":
                 pgroup.setDescription('''
-                This function utilizes backrub and design protocols implemented in Rosetta.
+                
+                This function utilizes backrub and design protocols in Rosetta. 
+
+                There are two implementations:
+                <dl style="text-align:left;">
+                    <dt><b>Generalized RosettaBackrub sequence tolerance method</b> [<a href="#refSmithKortemme:2010">%(SmithKortemme:2010)d</a>]</dt>
+                        <dd>Predicts tolerated sequences for proteins or protein-protein interfaces.  This is the most recent protocol based on Rosetta 3.0.</dd><br>
+                    <dt><b>Interface sequence plasticity method</b> [<a href="#refHumphrisKortemme:2008">%(HumphrisKortemme:2008)d</a>]
+                         <dd>Predicts tolerated sequence space for up to 10 positions in protein-protein interfaces.  This method is based on Rosetta 2.0.</dd>
+                </dl>
+
+                Both implementations first apply the RosettaBackrub method to generate a conformational ensemble, design sequences consistent with the members in the ensemble, and then combine the sequences to build a predicted profile.
+
+                <!--This function utilizes backrub and design protocols implemented in Rosetta.
                 There are two options.
                 <dl style="text-align:left;">
                     <dt><b>Interface Sequence Tolerance</b></dt>
@@ -1659,7 +1675,7 @@ class FrontendProtocols(WebserverProtocols):
                         Sequences with favorable scores both for the total protein complex and the interaction interface are used to build a sequence profile, as described and benchmarked in [<a href="#refHumphrisKortemme:2008">%(HumphrisKortemme:2008)d</a>].</dd>
                     <dt><b>Interface / Fold Sequence Tolerance</b></dt>
                         <dd> Insert text.[<a href="#refSmithKortemme:2010">%(SmithKortemme:2010)d</a>]</dd>
-                </dl>''' % refIDs) 
+                </dl>-->''' % refIDs) 
             else:
                 raise
 

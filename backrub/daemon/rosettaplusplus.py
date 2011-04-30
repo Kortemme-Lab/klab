@@ -271,7 +271,11 @@ this information may be out of date
             output_handle.write( "\n" )
             
             for (chain,resid) in backbone:
-              self.pivot_res.append( self._map_res_id[ '%s%4.i' % (chain, resid) ] )
+              if resid == 0:
+                  # Python formats stupidly for 0
+                  self.pivot_res.append( self._map_res_id[ '%s   0' % chain ] )
+              else:
+                  self.pivot_res.append( self._map_res_id[ '%s%4.i' % (chain, resid) ] )
 
         else:
             output_handle.write("""This file specifies which residues will be varied
