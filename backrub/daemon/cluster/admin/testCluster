@@ -1,0 +1,3 @@
+#!/bin/sh
+. /ccpr1/sge6/qb3/common/settings.sh
+python cluster.py
