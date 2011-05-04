@@ -15,13 +15,12 @@ import traceback
 import rosettahelper
 import itertools
 import subprocess
+import math
 from weblogolib import *
 
 import chainsequence       
 import pdb
 from analyze_mini import AnalyzeMini
-# RosettaTasks.py
-
 from ClusterTask import ClusterTask, ClusterScript, getClusterDatabasePath, FAILED_TASK
 from ClusterScheduler import TaskScheduler, RosettaClusterJob
 
@@ -97,19 +96,7 @@ resfileheader = """This file specifies which residues will be varied
 class SequenceToleranceException(Exception): pass
 class PostProcessingException(Exception): pass
 
-
 #todo: Does the backrub ever use the pdb file? 
-
-def readFile(filepath):
-    output_handle = open(filepath,'r')
-    contents = output_handle.read()
-    output_handle.close()
-    return contents
-
-def writeFile(filepath, contents):
-    output_handle = open(filepath,'w')
-    output_handle.write(contents)
-    output_handle.close()
 
 def printException(e):
     print("<exception>%s<br>%s</exception>" % (traceback.format_exc(), str(e)))
@@ -170,18 +157,17 @@ def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
         
     return True, contents
 
-# Tasks
 
 class BackrubClusterSKTask(ClusterTask):
 
     # additional attributes
-    residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
-    pivot_res     = []   # list of pivot residues, consecutively numbered from 1 [1,...]
-    map_res_id    = {}   # contains the mapping from (chain,resid) to pivot_res
     prefix = "backrub"
     
     def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
         self.resfile = resfile
+        self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
+        self.pivot_res     = []   # list of pivot residues, consecutively numbered from 1 [1,...]
+        self.map_res_id    = {}   # contains the mapping from (chain,resid) to pivot_res
         super(BackrubClusterSKTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name)          
     
     def _initialize(self):
@@ -538,7 +524,6 @@ class SequenceToleranceHKClusterTask(ClusterTask):
 
 class SequenceToleranceJobSK(RosettaClusterJob):
 
-    map_res_id = {}
     suffix = "seqtolSK"
 
     def __init__(self, parameters, tempdir, targetroot):
@@ -546,6 +531,7 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+        self.map_res_id = {}
         super(SequenceToleranceJobSK, self).__init__(parameters, tempdir, targetroot)
     
     def _initialize(self):
@@ -633,7 +619,7 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         logo_options.color_scheme = std_color_schemes["chemistry"]
         
         ann = getResIDs(self.parameters)
-        print(ann)
+        
         logo_options.annotate = ann
         
         logo_format = LogoFormat(logo_data, logo_options)
@@ -664,7 +650,34 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         self.parameters["map_res_id"] = self.map_res_id 
         
         self.pdb.write(self._workingdir_file_path(filename))
-            
+    
+    def _write_backrub_resfile2( self ):
+        """create a resfile of premutations for the backrub"""
+        
+        residue_ids = self.pdb.aa_resids()
+    
+        # backrub is applied to all residues: append all residues to the backrub list
+        for res in residue_ids:
+          x = [ res[0], res[1:].strip() ] # 0: chain ID, 1..: resid
+          if len(x) == 1:
+            self.backrub.append( ( "_", int(x[0].lstrip())) )
+          else:
+            self.backrub.append( ( x[0], int(x[1].lstrip())) )
+        
+        default_mode = 'NATAA'
+        # store filename
+        
+        s = []
+        for (key, value) in self.residues.iteritems():  # { (chain, resID):["PIKAA","PHKL"] } + ("""111 A PIKAA I""")
+          s.append("%s %s %s %s\n" % (key[1], key[0], value[0], value[1]) )
+        s.append( "\n" )
+        
+        # translate resid to absolute mini rosetta res ids
+        for residue in self.backrub:
+          self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
+        
+        rosettahelper.writeFile(self._workingdir_file_path(self.backrub_resfile), 'NATAA\nstart\n%s\n' % s)
+                
     def _write_backrub_resfile( self ):
         """create a resfile of premutations for the backrub"""
                
@@ -680,7 +693,7 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         
         # Only create a file if there are any premutations
         self.backrub_resfile = "backrub_%s.resfile" % self.parameters["ID"]
-        writeFile(self._workingdir_file_path(self.backrub_resfile), 'NATAA\nstart\n%s\n' % s)
+        rosettahelper.writeFile(self._workingdir_file_path(self.backrub_resfile), 'NATAA\nstart\n%s\n' % s)
         
         
     def _write_seqtol_resfile( self ):
@@ -692,7 +705,7 @@ class SequenceToleranceJobSK(RosettaClusterJob):
                 
         if resfileHasContents:
             self.seqtol_resfile = "seqtol_%s.resfile" % self.parameters["ID"]
-            writeFile(self._workingdir_file_path(self.seqtol_resfile), "%s\n" % contents)
+            rosettahelper.writeFile(self._workingdir_file_path(self.seqtol_resfile), "%s\n" % contents)
         else:
             sys.stderr.write("An error occurred during the sequence tolerance execution. The chosen designed residues resulting in an empty resfile and so could not be used.")
             raise SequenceToleranceException          
@@ -700,14 +713,15 @@ class SequenceToleranceJobSK(RosettaClusterJob):
 import pprint
 class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
 
-    map_res_id = {}
     suffix = "seqtolMultiSK"
-
+    horizontaltiles = 4
+    
     def __init__(self, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+        self.map_res_id = {}
         super(SequenceToleranceMultiJobSK, self).__init__(parameters, tempdir, targetroot)
     
     @staticmethod
@@ -766,7 +780,7 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
                 "Designed"          : self.parameters["Designed"],
                 })
         self.multiparameters = multiparameters
-
+        
     def _initialize(self):
         self._status("Creating RosettaSeqTol multi object.\nWorking dir:%s\nTarget dir: %s." % (self.workingdir, self.targetdirectory))
         parameters = self.parameters
@@ -811,16 +825,16 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
         prefix  = '\\"tolerance\\"'
         percentile = '.5'
         
-        cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                  | /bin/cat %sdaemon/specificity.R - \\
-                  | /usr/bin/R --vanilla''' % ( self.targetdirectory, fitness_coef, thresh_or_temp, type_st, percentile, prefix, server_root)
-                         
-        self._status(cmd)
-        
         for i in range(self.numberOfRuns):
             
             targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
 
+            cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
+                      | /bin/cat %sdaemon/specificity.R - \\
+                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, server_root)
+                             
+            self._status(cmd)
+            
             # open files for stderr and stdout 
             self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
             self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
@@ -869,6 +883,27 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
                 self._status('deleting %s' % file)
                 os.remove(file)
         
+        # Generate tolerance motif montage
+        self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
+        montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
+        # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
+        for i in range(self.numberOfRuns):
+            params = self.multiparameters[i]
+            lbl = []
+            for partner in params['Partners']:
+                if params['Premutated'].get(partner):
+                    pm = params['Premutated'][partner]
+                    for residue in pm:
+                        lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
+            montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
+        montagecmd += "multi_tolerance_motif.png"
+        self._status(montagecmd)
+        
+        self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+        self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+        self.file_stdout.write("*********************** montage output ***********************\n")
+        subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
+        
         return True
             
     def _write_backrub_resfiles( self ):
@@ -888,7 +923,7 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
             
             # Only create a file if there are any premutations
             backrub_resfile = ("backrub_%s_%d.resfile" % (self.parameters["ID"], i))
-            writeFile(self._workingdir_file_path(backrub_resfile), 'NATAA\nstart\n%s\n' % s)
+            rosettahelper.writeFile(self._workingdir_file_path(backrub_resfile), 'NATAA\nstart\n%s\n' % s)
             self.backrub_resfiles.append(backrub_resfile)
                
 
@@ -896,12 +931,6 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
 class SequenceToleranceJobHK(RosettaClusterJob):
 
     suffix = "seqtolHK"
-    
-    # additional attributes
-    residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
-    backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
-    failed_runs   = []
-    executable    = ''
     
     #todo: Remove after testing / add as test
     def __testinginit__(self, parameters, tempdir, targetroot):
@@ -933,6 +962,10 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+        self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
+        self.backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
+        self.failed_runs   = []
+        self.executable    = ''
         super(SequenceToleranceJobHK, self).__init__(parameters, tempdir, targetroot)
     
     def _initialize(self):
@@ -992,7 +1025,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             stdfile = streams[i]["stdout"]
             if stdfile:
                 stdoutput = self._taskresultsdir_file_path("sequence_tolerance", stdfile)
-                contents = readFile(stdoutput)
+                contents = rosettahelper.readFile(stdoutput)
                 success = successFSA.search(contents)
                 if not success:
                     failed_runs.append(i)
@@ -1008,7 +1041,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             for fn in failed_runs:
                 s += "%s\n" % self.stTask.getExpectedOutputFileNames()[fn]
             print(s)
-            writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
+            rosettahelper.writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
             
         self._status("Analyzing results")
         handle_err = open( self._targetdir_file_path( 'error.log' ), 'a+' )
@@ -1248,7 +1281,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             "workingdir": workingdir,
             "databasepath": getClusterDatabasePath(self.parameters["binary"], databaseindex)
             }
-        writeFile(self._workingdir_file_path(self.pathsfile), pathfilecontents % pathsdict)
+        rosettahelper.writeFile(self._workingdir_file_path(self.pathsfile), pathfilecontents % pathsdict)
             
     def _write_resfile( self, default_mode, mutations, backbone, filename ):
         """create resfile from list of mutations and backbone"""
@@ -1346,128 +1379,3 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         output_handle.close()
         return
 
-class SequenceToleranceJobHKTest(SequenceToleranceJobHK):
-    def _initialize(self):
-        self._status("Creating RosettaSeqTol object in %s." % self.targetdirectory)
-        parameters = self.parameters
-        
-        # Create input files        
-        self.seqtol_resfile = "seqtol.resfile"
-        
-        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
-        self._prepare_backrub_resfile() # fills in self.backrub for resfile creation
-        self._write_seqtol_resfile()
-        
-        if False:
-            self.targetdirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/output/tmpxyt3bg_seqtolHK/"
-    
-            
-            parameters = self.parameters
-            partner0 = parameters['Partners'][0]
-            partner1 = parameters['Partners'][1]
-            designed = parameters['Designed']        
-            designed[partner0] = designed.get(partner0) or [] # todo: Only needed for testing separately 
-            designed[partner1] = designed.get(partner1) or [] 
-            
-            self._status("Checking output")
-            successFSA = re.compile("DONE ::\s+\d+ starting structures built\s+\d+ \(nstruct\) times")
-            
-            streams = [
-                {"stdout" : "seqtol_1234.cmd.o6113757.1", "stderr" : "seqtol_1234.cmd.e6113757.1", "failed" : False},
-                {"stdout" : "seqtol_1234.cmd.o6113757.2", "stderr" : "seqtol_1234.cmd.e6113757.2", "failed" : False}]
-            
-            failed_runs = []
-            list_outfiles = []
-            for i in range(len(streams)):
-                stdfile = streams[i]["stdout"]
-                if stdfile:
-                    stdoutput = self._targetdir_file_path(stdfile)
-                    contents = readFile(stdoutput)
-                    success = successFSA.search(contents)
-                    if not success:
-                        failed_runs.append(i)
-                        self._status("%s failed" % stdoutput)
-                    else:
-                        self._status("%s succeeded" % stdoutput)
-                        list_outfiles.append(stdoutput)
-                else:
-                    failed_runs.append(i)    
-            if failed_runs != []: # check if any failed
-                s = ""
-                for fn in failed_runs:
-                    s += "%s\n" % self.stTask.getExpectedOutputFileNames()[fn]
-                print(s)
-                writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
-            
-            self._status("Analyzing results")
-            handle_err = open( self._targetdir_file_path( 'error.log' ), 'a+' )
-            # AMINO ACID FREQUENCIES
-            self._status("\tAmino Acid frequencies")
-            list_res = []
-            for x in designed[partner0]:
-                list_res.append(partner0 + str(x))
-            for x in designed[partner1]:
-                list_res.append(partner1 + str(x))
-            
-            # this does the same as get_data.pl
-            for design_res in list_res:
-                one_pos = []
-                for filename in list_outfiles:
-                    handle = open(filename,'r')
-                    # print "grep:", 
-                    # print '^ %s' % self.map_chainres2seq[design_res], "result: "
-                    grep_result = rosettahelper.grep('^ %s' % self.map_chainres2seq[design_res], handle)
-                    # print 'list:',  grep_result
-                    # print 'string', grep_result[0]
-                    # print 'split:', grep_result[0].split()
-                    # print grep_result
-                    if grep_result != []:
-                        one_pos.append( grep_result[0].split() )
-                    else:
-                        handle_err.write('Single sequence tolerance prediction run failed: see %s for details\n' % filename)
-                    handle.close()
-                
-                # sort and transpose the data of one_pos table: invert_textfiles.pl
-                # the values are in the following order:
-                order = ['id','A','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-                # they should be in this order:
-                res_order = ['W','F','Y','M','L','I','V','A','G','S','T','R','K','H','N','Q','D','E','P']
-                # transpose:
-                dict_res2values = {}
-                for res in order:
-                    i = order.index(res)
-                    values4oneres = []
-                    for line in one_pos:
-                        values4oneres.append(line[i])
-                    dict_res2values[res] = values4oneres
-                
-                # sort and write the table to a file
-                frequency_file = "freq_%s.txt" % design_res
-                print(frequency_file)
-                handle2 = open(self._targetdir_file_path(frequency_file), 'w')
-                for res in res_order:
-                    for freq in dict_res2values[res]:
-                        handle2.write('%s ' % freq)
-                    handle2.write('\n')
-                handle2.write('\n')
-                handle2.close()
-                
-                
-            sys.exit(0)
-            self._analyze()
-            
-           
-        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile])
-                    
-        targetsubdirectory = "sequence_tolerance"
-        self._write_paths_file("%s/%s" % (self.workingdir, targetsubdirectory), 1)
-        taskdir = self._make_taskdir(targetsubdirectory, [self.pathsfile, self.seqtol_resfile])
-        stTask = SequenceToleranceHKClusterTask(taskdir, os.path.join(self.targetdirectory, targetsubdirectory), parameters, self.seqtol_resfile, name="Sequence tolerance step for sequence tolerance protocol")
-        
-        for file in glob.glob("/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/hksttest/*"):
-            shutil.copy(file, stTask.workingdir)
-
-        self.stTask = stTask
-        
-        scheduler.addInitialTasks(stTask)
-        self.scheduler = scheduler

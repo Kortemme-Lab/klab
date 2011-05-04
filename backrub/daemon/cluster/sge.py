@@ -144,6 +144,10 @@ def qsub_submit(command_filename, workingdir, hold_jobid = None, name = None, sh
     command.append('%s' % command_filename)
     
     # Submit the job and capture output.
+    print(command)
+    print(file_stdout)
+    print(file_stderr)
+    print(workingdir)
     subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
     waitfor = 0
     errorcode = subp.wait()

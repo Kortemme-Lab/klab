@@ -22,13 +22,13 @@ ROSETTAWEB_MaxMultiplePointMutations = 30
 #todo: change to 20
 ROSETTAWEB_SK_RecommendedNumStructuresSeqTolSK = 2
 
-#todo: Only define these once in a common file and reference everywhere
+ROSETTAWEB_CONTACT = "Tanja Kortemme"
+
+#todo: Remove these from here - they are defined in rosettahelper
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
                     "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
                     "TRP": "W", "TYR": "Y"}
-
-ROSETTAWEB_CONTACT = "Tanja Kortemme"
 
 ROSETTAWEB_SK_AAinv = {}
 for k, v in ROSETTAWEB_SK_AA.items():

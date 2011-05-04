@@ -14,8 +14,34 @@ import string
 import stat
 import tempfile
 
+ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
+                    "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
+                    "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
+                    "TRP": "W", "TYR": "Y"}
+
+ROSETTAWEB_SK_AAinv = {}
+for k, v in ROSETTAWEB_SK_AA.items():
+    ROSETTAWEB_SK_AAinv[v] = k
+
 permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
 
+def readFile(filepath):
+    output_handle = open(filepath,'r')
+    contents = output_handle.read()
+    output_handle.close()
+    return contents
+
+def writeFile(filepath, contents):
+    output_handle = open(filepath,'w')
+    output_handle.write(contents)
+    output_handle.close()
+
+# Tasks
+def write_file(filename, contents):
+   file = open(filename, 'w')
+   file.write(contents)
+   file.close()
+   
 def make755Directory(path):
     os.mkdir(path)
     if not os.path.isdir(path):
@@ -73,27 +99,6 @@ def grep(string, list):
   expr = re.compile(string)
   results = filter(expr.search, [str(line) for line in list])
   return results
-
-
-
-# def analyze_residue_level():
-#     args = [  self.parameter["rosetta_score_jd2"],
-#               '-database', self.parameter["rosetta_mini_db"], 
-#               '-s', low_file,
-#               '-no_optH',
-#               '-score:weights', string.join( self.parameter["rosetta_mini_db"].split('/')[:-1],'/') + '/scores.txt' # /opt/rosettabackend/data/scores.txt
-#               ]
-#               
-#     subp = subprocess.Popen([str(arg) for arg in args], 
-#                             stdout=PIPE, 
-#                             stderr=PIPE, 
-#                             cwd=workingdir )
-# 
-#     while self.subp.poll() == None:
-#       time.sleep(0.5)
-#     
-#     get_residue_scores_from_pdb()
-  
 class RosettaError(Exception):
     def __init__(self, task, ID):
         self.task = task

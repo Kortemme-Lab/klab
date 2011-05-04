@@ -2,6 +2,8 @@
 
 # Set up array jobs for QB3 cluster.
 import sys
+sys.path.insert(0, "../")
+sys.path.insert(0, "../../common/")
 import os
 import time
 import shutil
@@ -12,9 +14,9 @@ from string import join
 
 import SimpleProfiler
 import sge
-from rosettahelper import make755Directory, makeTemp755Directory
-
-rootdir = "/netapp/home/shaneoconner"
+from rosettahelper import make755Directory, makeTemp755Directory, writeFile
+from RosettaProtocols import *
+from conf_daemon import *
 
 INITIAL_TASK = 0
 INACTIVE_TASK = 1
@@ -32,76 +34,16 @@ status = {
     FAILED_TASK     : "failed",
     }
 
-#todo: remove
-RosettaBinaries = {        
-    "classic"   :{  # 2.3.0 was released 2008-04-21, this revision dates 2008-12-27
-                    "name"      : "Rosetta++ 2.32 (classic), as published",
-                    "revision"  : 26316, 
-                    "mini"      : False,
-                    "backrub"   : "rosetta_20090109.gcc", 
-                    "database"  : "rosetta_database"
-                 },
-    "mini"      :{  # Revision is clear here
-                    "name" : "Rosetta 3.1 (mini)",
-                    "revision" : 32532, 
-                    "mini"      : True,
-                    "backrub" : "backrub_r32532", 
-                    "postprocessing" : "score_jd2_r32532", 
-                    "database"  : "minirosetta_database"
-                 },
-    "ensemble"  :{  # based solely on the date, roughly between revisions 22709 - 22736
-                    "name" : "Rosetta++ 2.30 (classic), as published",
-                    "revision" : 22736, 
-                    "mini"      : False,
-                    "backrub" : "ros_052208.gcc",
-                 },
-    "seqtolHK"  :{  "name" : "Rosetta++ 2.30 (classic), as published",
-                    "revision" : 17289,  # based on the sequence tolerance database revision
-                    "mini"      : False,
-                    "backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
-                    "sequence_tolerance" : "rosetta_1Oct08.gcc",
-                    "minimize" : "minimization_seqtolhk.gcc",
-                    "database" : "rosetta_database_elisabeth", #todo: Now defunct
-                    "clusterrev" : "rElisabeth",
-                    "cluster_databases" : ["rosetta_database_r15286", "rosetta_database_r17289"],
-                 },
-    "seqtolJMB" :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta 3.2 (mini), as published",
-                    "revision" : 39284,
-                    "mini"      : True,
-                    #"backrub" : "backrub_r39284",
-                    #"sequence_tolerance" : "sequence_tolerance_r39284",
-                    #"database"  : "minirosetta_database_r39284",
-                    "clusterrev" : "r39284"
-                 },
-    "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta 3.2.r (mini), as published",
-                    "revision" : 0, 
-                    "mini"      : True,
-                    #"backrub" : "backrub_r", 
-                    #"sequence_tolerance" : "sequence_tolerance_r",
-                    #"database"  : "minirosetta_database_r",
-                    "clusterrev" : "r_"
-                 },
-}
-
-
-def write_file(filename, contents):
-   file = open(filename, 'w')
-   file.write(contents)
-   file.close()
-   return
-
 def getClusterDatabasePath(binary, cluster_database_index = 0):
     if cluster_database_index in range(len(RosettaBinaries[binary]["cluster_databases"])):
-        return "%s/%s/%s" % (rootdir, RosettaBinaries[binary]["clusterrev"], RosettaBinaries[binary]["cluster_databases"][cluster_database_index])
+        return "%s/%s/%s" % (clusterRootDir, RosettaBinaries[binary]["clusterrev"], RosettaBinaries[binary]["cluster_databases"][cluster_database_index])
 
 class ClusterScript:
     
-    def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}):
+    def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}, maxhours = 335, maxmins = 59):
         self.contents = []
         self.tasks = []
-        self.parameters = {"workingdir": workingdir, "taskline": "", "taskparam" : "", "taskvar" : ""}
+        self.parameters = {"workingdir": workingdir, "taskline": "", "taskparam" : "", "taskvar" : "", "maxhours": maxhours, "maxmins": maxmins}
         if numtasks > 0:
             if dataarrays:
                 for arrayname, contents in sorted(dataarrays.iteritems()):
@@ -111,13 +53,21 @@ class ClusterScript:
                 #self.parameters["taskvar"] = 'taskvar=${tasks[$SGE_TASK_ID]}"'
             self.parameters["taskparam"] = "#$ -t 1-%d" % numtasks #len(tasks)
         self.revision = RosettaBinaries[binary]["clusterrev"]
-        self.bindir = "%s/%s" % (rootdir, self.revision)
+        self.bindir = "%s/%s" % (clusterRootDir, self.revision)
         self.workingdir = workingdir
         self.script = None
 
+        global _debugmode
+        if _debugmode: 
+            self.parameters["maxhours"] = 0
+            self.parameters["maxmins"] = 10
+
     # todo: try #$ -l h_rt=40:00:00
     #       and #$ -l mem_free=2G
+    
+
     def _addPreamble(self):
+
         self.contents.insert(0, """\
 #!/bin/bash
 #
@@ -129,7 +79,7 @@ class ClusterScript:
 #$ -j n
 #$ -l arch=lx24-amd64
 #$ -l panqb3=1G,scratch=1G,mem_total=3G
-#$ -l h_rt=335:59:00
+#$ -l h_rt=%(maxhours)d:%(maxmins)d:00
 %(taskparam)s
 %(taskline)s
 %(taskvar)s
@@ -260,7 +210,7 @@ class ClusterTask(object):
                 self._status("Copying prerequisites for %s" % self.name)
                 prereq.copyFiles(self.workingdir, files)
                 
-            write_file(self.filename, self.script)
+            writeFile(self.filename, self.script)
             #print(self.script)
             self.jobid, stdo = sge.qsub_submit(self.filename, self.workingdir, name = self.scriptfilename, showstdout = self.debug)
             self._status("<qsub>%s</qsub>" % stdo, plain = True)

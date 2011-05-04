@@ -15,18 +15,10 @@ import ClusterTask
 import SimpleProfiler
 from rosettahelper import make755Directory, makeTemp755Directory
          
-dsger='''
+todo='''
     We allow directed acylic graphs, not necessarily strongly connected.
-
-    This needs to be fixed.
-    Logic is wrong at present as there are multiple paths to a node
-    Instead, try labelling the nodes with distance from the initial nodes where 
-    distance is the maximum number of connections to an initial node.
-    Break if the distance exceeds the number of nodes as this implies a cycle.
-    After labelling, if there is a path from a node of distance d to a node of distance c, c < d, then error
-    Better still, just use Tarjan's algorithm.
-    http://en.wikipedia.org/wiki/Tarjan%E2%80%99s_strongly_connected_components_algorithm
-    
+    This needs to be fixed. Use Tarjan's algorithm.
+    http://en.wikipedia.org/wiki/Tarjan%E2%80%99s_strongly_connected_components_algorithm    
     CyclicDependencyException
     IncompleteGraphException
     

@@ -133,8 +133,16 @@ class RosettaProtocol:
         return miniAvailable
 
     
+# All cluster binaries should have the same name format based on the clusterrev field in RosettaBinaries: 
+#    i) they are stored in the subdirectory of home named <clusterrev>
+#   ii) they are named <somename>_<clusterrev>_static
+# Furthermore, the related database should be in a subdirectory of the bindir named "rosetta_database"
+# The "static" in the name is a reminder that these binaries must be built statically.
+
 #todo: Ask Greg and Elisabeth for exact revisions
+
 RosettaBinaries = {        
+    # Webserver jobs
     "classic"   :{  # 2.3.0 was released 2008-04-21, this revision dates 2008-12-27
                     "name"      : "Rosetta++ 2.32 (classic), as published",
                     "revision"  : 26316, 
@@ -156,30 +164,40 @@ RosettaBinaries = {
                     "mini"      : False,
                     "backrub" : "ros_052208.gcc",
                  },
-    "seqtolHK"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta++ 2.30 (classic), as published",
-                    "revision" : 24980, 
+    # Cluster jobs
+    "seqtolHK"  :{  "name" : "Rosetta++ 2.30 (classic), as published",
+                    "revision" : 17289,  # based on the sequence tolerance database revision
                     "mini"      : False,
-                    "backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
-                    "sequence_tolerance" : "rosetta_1Oct08.gcc",
-                    "minimize" : "minimization_seqtolhk.gcc",
-                    "database" : "rosetta_database_elisabeth"
+                    # Old binaries
+                    #"backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
+                    #"sequence_tolerance" : "rosetta_1Oct08.gcc",
+                    #"minimize" : "minimization_seqtolhk.gcc",
+                    #"database" : "rosetta_database_elisabeth", #todo: Now defunct
+                    "clusterrev" : "rElisabeth",
+                    "cluster_databases" : ["rosetta_database_r15286", "rosetta_database_r17289"],
                  },
-    "seqtolJMB" :{  # based solely on the date, roughly between revisions 24967 - 24980
+    "seqtolJMB" :{  
+                    # todo: change this. we shouldn't be using this revision
                     "name" : "Rosetta 3.2 (mini), as published",
                     "revision" : 39284,
                     "mini"      : True,
-                    "backrub" : "backrub_r39284",
-                    "sequence_tolerance" : "sequence_tolerance_r39284",
-                    "database"  : "minirosetta_database_r39284"
+                    # Old binaries
+                    #"backrub" : "backrub_r39284",
+                    #"sequence_tolerance" : "sequence_tolerance_r39284",
+                    #"database"  : "minirosetta_database_r39284",
+                    "clusterrev" : "r39284"
                  },
     "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta 3.2 (mini), as published",
+                    "name" : "Rosetta 3.2.r (mini), as published",
                     "revision" : 0, 
                     "mini"      : True,
-                    "backrub" : "backrub_r", 
-                    "sequence_tolerance" : "sequence_tolerance_r",
-                    "database"  : "minirosetta_database_r"
+                    "clusterrev" : "r_"
+                 },
+    "multiseqtol" :{  
+                    "name" : "Rosetta 3.2 (mini), as published",
+                    "revision" : 39284,
+                    "mini"      : True,
+                    "clusterrev" : "r39284"
                  },
 }
 
@@ -232,12 +250,27 @@ class WebserverProtocols(object):
         
         # A flat list of the protocols 
         protocols = []
-        protocols.extend(protocolGroups[0].getProtocols())
-        protocols.extend(protocolGroups[1].getProtocols())
-        protocols.extend(protocolGroups[2].getProtocols())
+        lenPublicProtocolGroups = len(protocolGroups) 
+        for i in range(lenPublicProtocolGroups):
+            protocols.extend(protocolGroups[i].getProtocols())
+        self.lenPublicProtocolGroups = lenPublicProtocolGroups
+        
+        # Private protocols go here
+        #protocolGroups.append(RosettaProtocolGroup("Private Protocols", "#333333"))
+                
+        #proto = RosettaProtocol("Multiple Sequence Tolerance", "multi_sequence_tolerance")
+        #proto.setBinaries("multiseqtol")
+        #proto.setNumStructures(2,100,200)
+        #protocolGroups[3].add(proto)        
+
+        # A flat list of the protocols 
+        #privateProtocols = []
+        #for i in range(lenPublicProtocolGroups, len(protocolGroups)):
+        #    privateProtocols.extend(protocolGroups[i].getProtocols())
         
         self.protocolGroups = protocolGroups
-        self.protocols = protocols        
+        self.protocols = protocols
+        #self.privateProtocols = privateProtocols        
         
     def getProtocols(self):
         return self.protocolGroups, self.protocols
