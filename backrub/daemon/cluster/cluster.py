@@ -6,23 +6,20 @@ import os
 import time
 import traceback
 import pprint
-sys.path.insert(0, "../")
 sys.path.insert(0, "../../common/")
+sys.path.insert(0, "../")
 
-import RosettaTasks
-from rosettahelper import make755Directory, makeTemp755Directory
 from conf_daemon import *
 from rosettahelper import *
+import RosettaTasks
 
 if not os.path.exists(netappRoot):
     make755Directory(netappRoot)
 if not os.path.exists(resultsRoot):
     make755Directory(resultsRoot)
-    
+   
 if __name__ == "__main__":
-    qstatpause = 20
-    
-    test = "1KI1"
+    test = "1KI1analysis"
     try:
         clusterjob = None
         
@@ -49,20 +46,58 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {102 : "A"}},
                 "Designed"          : {"A" : [103, 104]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, resultsRoot)            
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, resultsRoot)
+            clusterjob._analyze()
+            sys.exit(0)
+        
+        if test == "1KI1analysis":
+            mini = "seqtolJMB"
+            ID = 1234
+            pdb_filename = "1ki1.pdb"
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 100
+            allAAsExceptCysteine = ROSETTAWEB_SK_AAinv.keys()
+            allAAsExceptCysteine.sort()
+            allAAsExceptCysteine.remove('C')
+            
+            if CLUSTER_debugmode:
+                nstruct = 2
+                allAAsExceptCysteine = ["A", "D"]
+            
+            params = {
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : 10,
+                "kT"                : 0.228 + 0.021,
+                "numchains"         : 2,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
+                "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
+                }
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSKAnalyzer(params, netappRoot, resultsRoot) 
         
         if test == "1KI1":
             mini = "seqtolJMB"
             ID = 1234
-            pdb_filename = "1KI1.pdb"
+            pdb_filename = "1ki1.pdb"
             output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
             pdb_info = output_handle.read()
             output_handle.close()
-            nstruct = 2
+            nstruct = 100
             allAAsExceptCysteine = ROSETTAWEB_SK_AAinv.keys()
             allAAsExceptCysteine.sort()
             allAAsExceptCysteine.remove('C')
-    
+            
+            if CLUSTER_debugmode:
+                nstruct = 2
+                allAAsExceptCysteine = ["A", "D"]
+            
             params = {
                 "binary"            : mini,
                 "ID"                : ID,
@@ -109,7 +144,7 @@ if __name__ == "__main__":
             
             try:
                 while not(clusterjob.isCompleted()):
-                    time.sleep(qstatpause)
+                    time.sleep(CLUSTER_qstatpause)
             except Exception, e:
                 print("The scheduler failed at some point: %s." % str(e))
                 print(traceback.print_exc())

@@ -12,11 +12,11 @@ import re
 import glob
 from string import join
 
+from conf_daemon import *
 import SimpleProfiler
 import sge
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile
 from RosettaProtocols import *
-from conf_daemon import *
 
 INITIAL_TASK = 0
 INACTIVE_TASK = 1
@@ -57,8 +57,7 @@ class ClusterScript:
         self.workingdir = workingdir
         self.script = None
 
-        global _debugmode
-        if _debugmode: 
+        if CLUSTER_debugmode: 
             self.parameters["maxhours"] = 0
             self.parameters["maxmins"] = 10
 

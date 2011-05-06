@@ -2,16 +2,19 @@
 
 # Set up array jobs for QB3 cluster.
 import sys
+sys.path.insert(0, "../")
 import commands
 import re
 import subprocess
 import time
 from string import join, strip
+from conf_daemon import *
 
+print(clusterRootDir)
 DEBUG = False
 clusterUserAccount = "klabqb3backrub"
 qstatLastCalled = None
-qstatWaitingPeriod = 19.0 # todo - use global for this and cluster.py
+qstatWaitingPeriod = float(CLUSTER_qstatpause) - 0.2
 emptyDict = {}
 
 #scp tempdir/* shaneoconner@chef.compbio.ucsf.edu:/netapp/home/shaneoconner/temp/tempdir
