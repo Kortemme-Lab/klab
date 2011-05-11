@@ -734,7 +734,7 @@ class RosettaHTML(object):
             bgcolor = "#EEEEEE"
             if not jobIsLocal:
                 bgcolor = "#DDDDFF"
-            print(self.script_filename)
+            
             html.append("""<tr align=center bgcolor="%s" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='%s'; this.style.color='#000000';" >""" % (bgcolor, bgcolor))
             if jobIsLocal:
                 link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
