@@ -696,7 +696,7 @@ class RosettaHTML(object):
 # printQueue                                                                                             #
 ###############################################################################################
 
-    def printQueue(self,job_list):
+    def printQueue(self, job_list):
       
         html = []
         html.append("""<td align=center><H1 class="title"> Job queue </H1> <br>
@@ -722,14 +722,24 @@ class RosettaHTML(object):
         
         protocols = self.protocols
         for line in job_list:
+            jobIsLocal = line[0]
+            server = line[1]
+            line = line[2:]
             for p in protocols:
                 if line[9] == p.dbname:
                     task = p.name
                     task_color = p.group.color
                     break
-          
-            html.append("""<tr align=center bgcolor="#EEEEEE" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='#EEEEEE'; this.style.color='#000000';" >""")
-            link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+            
+            bgcolor = "#EEEEEE"
+            if not jobIsLocal:
+                bgcolor = "#DDDDFF"
+            print(self.script_filename)
+            html.append("""<tr align=center bgcolor="%s" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='%s'; this.style.color='#000000';" >""" % (bgcolor, bgcolor))
+            if jobIsLocal:
+                link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+            else:
+                link_to_job = 'onclick="window.location.href=\'https://kortemmelab.ucsf.edu%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
             # write ID
             html.append('<td id="lw" %s>%s </td>' % (link_to_job, str(line[0])))
             # write status 

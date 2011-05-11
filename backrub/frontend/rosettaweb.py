@@ -1165,40 +1165,49 @@ def submit(rosettaHTML, form, SID):
 
 def queue(form, userid):
   
-  output = StringIO()
-  output.write('<TD align="center">')
-  
-  thisserver = ROSETTAWEB_server_name.split('.')[0]
-  
-  sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
-  result1 = DBConnection.execQuery(sql)
-  print("yiyi")
-  if thisserver == 'albana':
-      print("yoyo")
-      KlabDBConnection = rosettadb.RosettaDB("kortemmelab.ucsf.edu", ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
-      sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' ORDER BY backrub.ID DESC" % thisserver #todo add Expired when klab db updated
-      kresult = KlabDBConnection.execQuery(sql)
-      KlabDBConnection.close()
-      kresult.extend(result1)
-      result1 = kresult
+    output = StringIO()
+    output.write('<TD align="center">')
+    
+    #todo: Fix this up with one SQL joined query per server
+    
+    thisserver = ROSETTAWEB_server_name.split('.')[0]
+    
+    sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
+    result1 = DBConnection.execQuery(sql)
+    results = []
+    if thisserver == 'albana':
+        KlabDBConnection = rosettadb.RosettaDB("kortemmelab.ucsf.edu", ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
+        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' ORDER BY backrub.ID DESC" % thisserver #todo add Expired when klab db updated
+        kresult = KlabDBConnection.execQuery(sql)
+    
+        for line in kresult:
+            new_lst = [False, "kortemmelab"]
+            sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
+            result2 = KlabDBConnection.execQuery(sql)
+            new_lst.extend(line)
+            if int(line[3]) == int(userid):
+                new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
+            else:
+                new_lst[5] = result2[0][0]
+            results.append(new_lst)
+        KlabDBConnection.close()
   
   # get user id of logged in user
   # sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
   #   userID1 = DBConnection.execQuery(sql)[0][0]
   
-  results = []
-  for line in result1:
-    new_lst = []
-    sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
-    result2 = DBConnection.execQuery(sql)
-    new_lst.extend(line)
-    if int(line[3]) == int(userid):
-        new_lst[3] = '<b><font color="green">' + result2[0][0] + '</font></b>'
-    else:
-        new_lst[3] = result2[0][0]
-    results.append(new_lst)
-    
-  return results
+    for line in result1:
+        new_lst = [True, thisserver]
+        sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
+        result2 = DBConnection.execQuery(sql)
+        new_lst.extend(line)
+        if int(line[3]) == int(userid):
+            new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
+        else:
+            new_lst[5] = result2[0][0]
+        results.append(new_lst)
+      
+    return results
 
 ########################################## end of queue() ####################################
 
