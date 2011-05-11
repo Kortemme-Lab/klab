@@ -628,7 +628,7 @@ The Kortemme Lab Server Daemon
             self.pdb = pdb.PDB(contents.split('\n'))
             if not os.path.exists(filename):
                 print("Writing file %s:" % filename)
-                #self.pdb.write(filename)
+                self.pdb.write(filename)
             else:
                 print("The file %s already exists. The PDB in the database was not dumped out." % filename)
         else:
