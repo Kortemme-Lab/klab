@@ -5,13 +5,14 @@
 # Constants for the daemon and cluster code
 ########################################
 
-CLUSTER_debugmode = False
+CLUSTER_debugmode = True
 
 clusterRootDir = "/netapp/home/klabqb3backrub"
 netappRoot = "%s/temp" % clusterRootDir
-# todo: change to something sensible
-resultsRoot = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/output"
-inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/"
+
+#todo:
+cluster_dltest = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads"
+cluster_temp = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/cluster"
 
 CLUSTER_qstatpause = 60
 if CLUSTER_debugmode:

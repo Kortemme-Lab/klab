@@ -41,6 +41,9 @@ class RosettaDB:
     data = {}
     store_time = 7 # how long will the stuff be stored
     
+    def close(self):
+        self.connection.close()
+        
     def __init__(self, hostname, database, user, password, port, socket, store_time, numTries = 1):
         self.connection = MySQLdb.Connection( host=hostname, db=database, user=user, passwd=password, 
                                               port=port, unix_socket=socket )

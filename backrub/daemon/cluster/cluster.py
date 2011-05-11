@@ -15,8 +15,10 @@ import RosettaTasks
 
 if not os.path.exists(netappRoot):
     make755Directory(netappRoot)
-if not os.path.exists(resultsRoot):
-    make755Directory(resultsRoot)
+if not os.path.exists(cluster_dltest):
+    make755Directory(cluster_dltest)
+
+inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/"
    
 if __name__ == "__main__":
     test = "1KI1analysis"
@@ -40,15 +42,12 @@ if __name__ == "__main__":
                 "nstruct"           : nstruct,
                 "radius"            : 10,
                 "kT"                : 0.228,
-                "numchains"         : 1,
-                "Partners"          : ["A"],
-                "Weights"           : [0.4, 0.4],
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
                 "Premutated"        : {"A" : {102 : "A"}},
                 "Designed"          : {"A" : [103, 104]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, resultsRoot)
-            clusterjob._analyze()
-            sys.exit(0)
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, cluster_dltest)
         
         if test == "1KI1analysis":
             mini = "seqtolJMB"
@@ -74,14 +73,15 @@ if __name__ == "__main__":
                 "nstruct"           : nstruct,
                 "radius"            : 10,
                 "kT"                : 0.228 + 0.021,
-                "numchains"         : 2,
                 "Partners"          : ["A", "B"],
                 "Weights"           : [0.4, 0.4, 0.4, 1.0],
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSKAnalyzer(params, netappRoot, resultsRoot) 
-        
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSKAnalyzer(params, netappRoot, cluster_dltest) 
+            clusterjob._analyze()
+            sys.exit(0)
+
         if test == "1KI1":
             mini = "seqtolJMB"
             ID = 1234
@@ -106,13 +106,12 @@ if __name__ == "__main__":
                 "nstruct"           : nstruct,
                 "radius"            : 10,
                 "kT"                : 0.228 + 0.021,
-                "numchains"         : 2,
                 "Partners"          : ["A", "B"],
                 "Weights"           : [0.4, 0.4, 0.4, 1.0],
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, netappRoot, resultsRoot)            
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, netappRoot, cluster_dltest)            
                 
         elif test == "HK":
             mini = "seqtolHK"
@@ -135,7 +134,7 @@ if __name__ == "__main__":
                 "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
                 }
             
-            clusterjob = RosettaTasks.SequenceToleranceJobHK(params, netappRoot, resultsRoot)            
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(params, netappRoot, cluster_dltest)            
         
         if clusterjob:
             #todo: testing clusterjob._analyze()

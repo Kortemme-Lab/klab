@@ -25,9 +25,9 @@ from analyze_mini import AnalyzeMini
 from ClusterTask import ClusterTask, ClusterScript, getClusterDatabasePath, FAILED_TASK
 from ClusterScheduler import TaskScheduler, RosettaClusterJob
 
-server_root = '/var/www/html/rosettaweb/backrub/'
-#todo2
-server_root = '/home/oconchus/clustertest110428/rosettawebclustertest/backrub/'
+server_root = rosettahelper.server_root
+specificityRScript = os.path.join(server_root, "daemon", "specificity.R")
+specificity_classicRScript = os.path.join(server_root, "daemon", "specificity_classic.R")
 
 # Helper functions
             
@@ -436,26 +436,29 @@ class BackrubClusterTaskHK(ClusterTask):
         try:
             shutil.copy(wdpath("backrub.resfile"), self.targetdirectory)
 
-            for file in glob.glob(self._workingdir_file_path("*low*.pdb")):
-                self._status('copying %s' % file)
-                shutil.copy(file, self.targetdirectory)
-            for file in glob.glob(self._workingdir_file_path("*last*.pdb")):
-                self._status('copying %s' % file)
-                shutil.copy(file, self.targetdirectory)
+            #for file in glob.glob(self._workingdir_file_path("*low*.pdb")):
+            #    self._status('copying %s' % file)
+            #    shutil.copy(file, self.targetdirectory)
+            #for file in glob.glob(self._workingdir_file_path("*last*.pdb")):
+            #    self._status('copying %s' % file)
+            #    shutil.copy(file, self.targetdirectory)
                 
             # Run the analysis on the originating host
             errors = []
             # check whether files were created
             for x in range(1, int(self.parameters['nstruct'])+1):
-                low_file  = self._targetdir_file_path(getOutputFilenameHK(self.parameters['pdbRootname'], x, "low"))
-                last_file = self._targetdir_file_path(getOutputFilenameHK(self.parameters['pdbRootname'], x, "last"))
+                #low_file  = self._targetdir_file_path(getOutputFilenameHK(self.parameters['pdbRootname'], x, "low"))
+                #last_file = self._targetdir_file_path(getOutputFilenameHK(self.parameters['pdbRootname'], x, "last"))
+                
+                low_file  = self._workingdir_file_path(getOutputFilenameHK(self.parameters['pdbRootname'], x, "low"))
+                last_file = self._workingdir_file_path(getOutputFilenameHK(self.parameters['pdbRootname'], x, "last"))
                 
                 if not os.path.exists( low_file ): 
                     errors.append('%s missing' % low_file)
                 if not os.path.exists( last_file ):
                     errors.append('%s missing' % ( last_file ))
                 
-                shutil.copy( low_file, self.workingdir + '/' + low_file.split('/')[-1] )
+                #shutil.copy( low_file, self.workingdir + '/' + low_file.split('/')[-1] )
 
             # At this stage we are actually done but do not mark ourselves as completed otherwise the scheduler will get confused
             if errors:
@@ -515,7 +518,12 @@ class SequenceToleranceHKClusterTask(ClusterTask):
 
     def retire(self):
         sr = super(SequenceToleranceHKClusterTask, self).retire()
-        self._copyFilesBackToHost(["*"])
+
+        shutil.copy(self._workingdir_file_path("seqtol.resfile"), self.targetdirectory)
+
+        # Only copy stdout and stderr. PDB files are copied by the Job.
+        # self._copyFilesBackToHost(["*_*.cmd.o*.*", "*_*.cmd.e*.*"])
+            
         return sr and True
         #todo: This will copy the files from the cluster submission host back to the originating host
               
@@ -525,7 +533,20 @@ class SequenceToleranceHKClusterTask(ClusterTask):
 class SequenceToleranceJobSK(RosettaClusterJob):
 
     suffix = "seqtolSK"
-
+    flatOutputDirectory = True
+    
+    def _defineOutputFiles(self):
+        self.resultFilemasks.append((".", "stderr*"))
+        self.resultFilemasks.append((".", "stdout*"))
+        self.resultFilemasks.append((".", "timing_profile.txt"))
+        self.resultFilemasks.append((".", "tolerance_*"))
+        self.resultFilemasks.append((".", "*.ga.entities.gz"))
+        self.resultFilemasks.append(("backrub", "*.cmd*"))
+        self.resultFilemasks.append(("backrub", "backrub_scores.dat"))
+        self.resultFilemasks.append(("sequence_tolerance", "*.resfile"))
+        self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
+        self.resultFilemasks.append(("sequence_tolerance", "*low*.pdb"))
+            
     def __init__(self, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
@@ -575,8 +596,8 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         percentile = '.5'
         
         cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                  | /bin/cat %sdaemon/specificity.R - \\
-                  | /usr/bin/R --vanilla''' % ( self.targetdirectory, fitness_coef, thresh_or_temp, type_st, percentile, prefix, server_root)
+                  | /bin/cat %s - \\
+                  | /usr/bin/R --vanilla''' % ( self.targetdirectory, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
                          
         self._status(cmd)
         
@@ -695,6 +716,21 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
     suffix = "seqtolMultiSK"
     horizontaltiles = 4
     
+    def _renamedefineOutputFiles(self):
+        self.resultFilemasks.append((".", "stderr*"))
+        self.resultFilemasks.append((".", "stdout*"))
+        self.resultFilemasks.append((".", "timing_profile.txt"))
+        self.resultFilemasks.append((".", "tolerance_*"))
+        self.resultFilemasks.append((".", "*.ga.entities.gz"))
+        for i in range(self.numberOfRuns):
+            backrubSubdirectory = "backrub%d" % i
+            seqtolSubdirectory = "sequence_tolerance%d" % i
+            self.resultFilemasks.append((backrubSubdirectory, "*.cmd*"))
+            self.resultFilemasks.append((backrubSubdirectory, "backrub_scores.dat"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*.resfile"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))
+            
     def __init__(self, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
@@ -752,7 +788,6 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
                 "nstruct"           : self.parameters["nstruct"],
                 "radius"            : self.parameters["radius"],
                 "kT"                : self.parameters["kT"],
-                "numchains"         : self.parameters["numchains"],
                 "Partners"          : self.parameters["Partners"],
                 "Weights"           : self.parameters["Weights"],
                 "Premutated"        : premutated,
@@ -810,8 +845,8 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
             targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
 
             cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                      | /bin/cat %sdaemon/specificity.R - \\
-                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, server_root)
+                      | /bin/cat %s - \\
+                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
                              
             self._status(cmd)
             
@@ -919,7 +954,7 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceMultiJobSK, self).__init__(parameters, tempdir, targetroot)
+        super(SequenceToleranceMultiJobSKAnalyzer, self).__init__(parameters, tempdir, targetroot)
     
     @staticmethod
     def _tmultiply(biglist, nextlist):
@@ -970,7 +1005,6 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
                 "nstruct"           : self.parameters["nstruct"],
                 "radius"            : self.parameters["radius"],
                 "kT"                : self.parameters["kT"],
-                "numchains"         : self.parameters["numchains"],
                 "Partners"          : self.parameters["Partners"],
                 "Weights"           : self.parameters["Weights"],
                 "Premutated"        : premutated,
@@ -1017,8 +1051,8 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
             targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
 
             cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                      | /bin/cat %sdaemon/specificity.R - \\
-                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, server_root)
+                      | /bin/cat %s - \\
+                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
                              
             self._status(cmd)
             
@@ -1287,10 +1321,10 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         for design_res in list_res:
             parameter += "\'%s\'," % design_res
         parameter = parameter[:-1] + ")" # gets rid of the last ','
-                  
+
         cmd = '''/bin/echo \"plot_specificity_list(%s)\" \\
-                | /bin/cat %sdaemon/specificity_classic.R - > specificity.R ; \\
-                /usr/bin/R CMD BATCH specificity.R''' % ( parameter, server_root )
+                | /bin/cat %s - > specificity.R ; \\
+                /usr/bin/R CMD BATCH specificity.R''' % ( parameter, specificity_classicRScript )
         
         self._status(cmd)
         
@@ -1326,9 +1360,9 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         
         rosettahelper.make755Directory(self._targetdir_file_path("best_scoring_pdb"))
         
-        list_files = []
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "BR*low_*.pdb")):
-            self._status('appending %s' % file)
+        list_files = []        
+        #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "BR*low_*_*.pdb")):
+        for file in glob.glob(os.path.join(self.workingdir, "sequence_tolerance", "BR*low_*_*.pdb")):
             list_files.append(file.split('/')[-1].strip())
         list_files.sort()
         for filename in list_outfiles:
@@ -1353,19 +1387,21 @@ class SequenceToleranceJobHK(RosettaClusterJob):
                     break # break for the first empty line. This means we're done.
             output_handle.close()
             # now sort after score:
-            print(sequences_list)
-            print("**")
             self._filter(sequences_list)
-            print(sequences_list)
             # get all pdb files associated with this run:
             list_this_run = rosettahelper.grep('BR%slow_%04.i_[A-Z]*\.pdb' % (self.parameters['pdbRootname'], si), list_files)
             #best_scoring_pdbs = []
             structure_counter = 0 # ok it seems that not all the sequences have a corresponding pdb file. Therefore we keep the first 10 we can find!
+            
+            print("sequences list:%s\n" % sequences_list)
+            
             for designed_sequence in sequences_list: # keep the 10 best scoring structures
                 best_scoring_pdb = 'BR%slow_%04.i_%s.pdb' % (self.parameters['pdbRootname'], si, designed_sequence[0])
-                if best_scoring_pdb in list_this_run:  
-                    print("todo: scp lauck@chef.compbio.ucsf.edu:~/job_%s/%s . " % (self.parameters["ID"], best_scoring_pdb)) # self.exec_cmd("
-                    shutil.copy(self._taskresultsdir_file_path("sequence_tolerance", best_scoring_pdb), self._targetdir_file_path("best_scoring_pdb"))        
+                if best_scoring_pdb in list_this_run:
+                    print("copying %s back as best_scoring_pdb" % best_scoring_pdb)
+                    #self.stTask._copyFilesBackToHost(best_scoring_pdb)
+                    bspdb = os.path.join(self._workingdir_file_path("sequence_tolerance"), best_scoring_pdb)
+                    shutil.copy(bspdb, self._targetdir_file_path("best_scoring_pdb"))        
                     structure_counter += 1
                 if structure_counter >= 10:
                     break
@@ -1414,9 +1450,11 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         # # self.copy_working_dir('')
         
         # rename a few files
-        print "rename initial PDB files"
-        #self.exec_cmd('mv %s.pdb %s_minimized.pdb' % (self.parameters['pdbRootname'],self.parameters['pdbRootname']) )
-        #self.exec_cmd('mv %s_submission.pdb %s.pdb' % (self.parameters['pdbRootname'],self.parameters['pdbRootname']) )
+        try:
+            shutil.copy(self._taskresultsdir_file_path("minimization", self.parameters['pdb_filename']), self._targetdir_file_path("%s_minimized.pdb" % self.parameters['pdb_filename']))        
+            shutil.copy(self._taskresultsdir_file_path("minimization", "%s_submission.pdb" % self.parameters['pdb_filename']), self._targetdir_file_path(self.parameters['pdb_filename']))        
+        except:
+            print("Exception copying PDBs back.")        
         
     def _filter(self,list_seq):
         """this sorts sequences after fitness score"""

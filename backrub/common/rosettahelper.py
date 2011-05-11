@@ -14,6 +14,10 @@ import string
 import stat
 import tempfile
 
+#todo:
+#server_root = "/var/www/html/rosettaweb"
+server_root = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub"
+
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
                     "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
@@ -24,6 +28,7 @@ for k, v in ROSETTAWEB_SK_AA.items():
     ROSETTAWEB_SK_AAinv[v] = k
 
 permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
+permissions755 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
 
 def readFile(filepath):
     output_handle = open(filepath,'r')

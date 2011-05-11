@@ -35,7 +35,7 @@ from rosettaseqtol_onerun_classic import RosettaSeqTolONE
 from weblogolib import *
 #from molprobity_analysis import MolProbityAnalysis
 
-server_root = '/var/www/html/rosettaweb/backrub/'
+server_root = rosettahelper.server_root
 
 # todo:  Maybe remove this function entirely as it's outside code and is overkill for how it is used by us
 #        e.g. see the differences to pdb.py/make_seqtol_resfile from revisions 227-229 where I removed it
@@ -365,7 +365,7 @@ class RosettaSeqTol(RosettaExec):
     seqtol_parameter = {'resfile': self.workingdir_file_path(self.name_resfile)}
     self.list_outfiles = []
     
-todo - copy the database here for use with seqtol protocol and set in RosettaBinaries
+    #todo - copy the database here for use with seqtol protocol and set in RosettaBinaries
 
     machines = ["xe5345","xe5430","xe5520"]
     run_on = machines[random.randint(0,2)]

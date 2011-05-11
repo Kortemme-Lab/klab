@@ -9,11 +9,12 @@ import shutil
 import re
 from string import join
 import distutils.dir_util
+import fnmatch
 
 import sge
 import ClusterTask  
 import SimpleProfiler
-from rosettahelper import make755Directory, makeTemp755Directory
+from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755
          
 todo='''
     We allow directed acylic graphs, not necessarily strongly connected.
@@ -258,14 +259,15 @@ import pprint
 class RosettaClusterJob(object):
     
     suffix = "job"
+    flatOutputDirectory = False
     
     def __init__(self, parameters, tempdir, targetroot):
         self.parameters = parameters
         self.debug = True
         self.tempdir = tempdir
         self.targetroot = targetroot
-        self._make_workingdir() #todo: This will need to be done on chef itself from the server
-        self._make_targetdir() #todo: This will need to be done on chef itself from the server
+        self._make_workingdir() 
+        self._make_targetdir() 
         self.jobID = self.parameters.get("ID") or 0
         self.filename_stdout = "stdout_%s_%d.txt" % (self.suffix, self.jobID)
         self.filename_stderr = "stderr_%s_%d.txt" % (self.suffix, self.jobID)
@@ -274,7 +276,13 @@ class RosettaClusterJob(object):
         self._initialize()
         self.profiler.PROFILE_STOP("Initialization")
         self.failed = False
-        
+        self.error = None
+        self.resultFilemasks = []
+        self._defineOutputFiles()
+    
+    def _defineOutputFiles(self):
+        pass
+    
     def _initialize(self):
         '''Override this function.'''
         raise Exception
@@ -336,11 +344,20 @@ class RosettaClusterJob(object):
         self._analyze()
         self.profiler.PROFILE_STOP("Analysis")
         return True
+    
+    def saveProfile(self):
+        contents = "<profile>\n%s</profile>" % self.getprofileXML()
+        writeFile(self._targetdir_file_path("timing_profile.txt"), contents)
 
     def _make_workingdir(self):
         """Make a single used working directory inside the temporary directory"""
         # make a tempdir on the host
-        self.workingdir = makeTemp755Directory(self.tempdir, self.suffix) 
+        try:
+            self.workingdir = makeTemp755Directory(self.tempdir, self.suffix)
+        except:
+            # This is a fatal error.
+            print("The cluster daemon could not create the working directory inside %s. Are you running it under the correct user?" % self.tempdir)
+            os._exit(0)
         return self.workingdir
 
     def _targetdir_file_path(self, filename):
@@ -350,11 +367,44 @@ class RosettaClusterJob(object):
     def _make_targetdir(self):
         """Make a single used target directory inside the target directory"""
         # make a tempdir on the host
-        self.targetdirectory = makeTemp755Directory(self.targetroot, self.suffix) 
+        try:
+            self.targetdirectory = makeTemp755Directory(self.targetroot, self.suffix) 
+        except:
+            # This is a fatal error.
+            print("The cluster daemon could not create the target directory inside %s. Are you running it under the correct user?" % self.targetroot)
+            os._exit(0)
         return self.targetdirectory
     
     def _taskresultsdir_file_path(self, taskdir, filename):
         return os.path.join(self.targetdirectory, taskdir, filename)
+
+    def moveFilesTo(self, destpath, permissions = permissions755):
+        destpath = os.path.join(destpath, self.parameters["cryptID"])
+        
+        self._status("Moving files to %s" % destpath)
+        if os.path.exists(destpath):
+            shutil.rmtree(destpath)
+
+        if self.resultFilemasks:
+            make755Directory(destpath)
+            for mask in self.resultFilemasks:
+                #self._status("moving using mask %s\n" % mask[0])
+                fromSubdirectory = os.path.join(self.targetdirectory, mask[0])
+                toSubdirectory = os.path.join(destpath, mask[0])
+                make755Directory(toSubdirectory)
+                for file in os.listdir(fromSubdirectory):
+                    if fnmatch.fnmatch(file, mask[1]):
+                        #self._status("moving %s to %s\n" % (os.path.join(fromSubdirectory, file), toSubdirectory))
+                        shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
+        else:
+            shutil.move(self.targetdirectory, destpath)
+        
+        os.chmod( destpath, permissions )
+        return destpath
+
+    def removeClusterTempDir(self):
+        print("removing %s" % self.workingdir)
+        shutil.rmtree(self.workingdir)
     
     def _make_taskdir(self, dirname, files = []):
         """ Make a subdirectory dirname in the working directory and copy all files into it.

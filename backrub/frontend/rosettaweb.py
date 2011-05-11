@@ -111,7 +111,7 @@ apacheerr = sys.stderr
 
 if ROSETTAWEB_server_name == 'albana.ucsf.edu':
     import profile 
- 
+    
 # open connection to MySQL
 DBConnection = rosettadb.RosettaDB(ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
 ########################################## Setup End ##########################################
@@ -1167,8 +1167,21 @@ def queue(form, userid):
   
   output = StringIO()
   output.write('<TD align="center">')
-  sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE Expired=0 ORDER BY backrub.ID DESC"
+  
+  thisserver = ROSETTAWEB_server_name.split('.')[0]
+  
+  sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
   result1 = DBConnection.execQuery(sql)
+  print("yiyi")
+  if thisserver == 'albana':
+      print("yoyo")
+      KlabDBConnection = rosettadb.RosettaDB("kortemmelab.ucsf.edu", ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
+      sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' ORDER BY backrub.ID DESC" % thisserver #todo add Expired when klab db updated
+      kresult = KlabDBConnection.execQuery(sql)
+      KlabDBConnection.close()
+      kresult.extend(result1)
+      result1 = kresult
+  
   # get user id of logged in user
   # sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
   #   userID1 = DBConnection.execQuery(sql)[0][0]

@@ -264,17 +264,25 @@ class WebserverProtocols(object):
         #protocolGroups[3].add(proto)        
 
         # A flat list of the protocols 
-        #privateProtocols = []
+        privateProtocols = []
         #for i in range(lenPublicProtocolGroups, len(protocolGroups)):
         #    privateProtocols.extend(protocolGroups[i].getProtocols())
         
         self.protocolGroups = protocolGroups
         self.protocols = protocols
-        #self.privateProtocols = privateProtocols        
+        self.privateProtocols = privateProtocols        
         
     def getProtocols(self):
         return self.protocolGroups, self.protocols
 
+    def getProtocolDBNames(self):
+        dbnames = []
+        for p in self.protocols:
+            dbnames.append(p.dbname)
+        for p in self.privateProtocols:
+            dbnames.append(p.dbname)
+        return dbnames
+            
 
 
 

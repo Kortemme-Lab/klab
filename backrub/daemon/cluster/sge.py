@@ -10,7 +10,6 @@ import time
 from string import join, strip
 from conf_daemon import *
 
-print(clusterRootDir)
 DEBUG = False
 clusterUserAccount = "klabqb3backrub"
 qstatLastCalled = None
