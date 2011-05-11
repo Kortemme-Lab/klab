@@ -137,7 +137,7 @@ class RosettaDB:
         """
         pass    
     
-    def execQuery(self, sql):
+    def execQuery(self, sql, parameters = None):
         """execute SQL query"""
         # Note: This loop was always disabled!
         i = 0
@@ -145,7 +145,10 @@ class RosettaDB:
         while i < self.numTries:
             try:    
                 cursor = self.connection.cursor()
-                errcode = cursor.execute(sql)
+                if parameters:
+                    errcode = cursor.execute(sql, parameters)
+                else:
+                    errcode = cursor.execute(sql)
                 #@debug:
                 #if errcode != 1:
                 #    print("%d: %s" %(errcode,traceback.print_stack()))

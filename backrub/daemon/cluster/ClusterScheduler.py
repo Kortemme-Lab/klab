@@ -295,6 +295,7 @@ class RosettaClusterJob(object):
         try:
             self.scheduler.start()
         except TaskSchedulerException, e:
+            self.error = "The job failed during startup"
             self.failed = True
             print(e)
     
@@ -391,7 +392,8 @@ class RosettaClusterJob(object):
                 #self._status("moving using mask %s\n" % mask[0])
                 fromSubdirectory = os.path.join(self.targetdirectory, mask[0])
                 toSubdirectory = os.path.join(destpath, mask[0])
-                make755Directory(toSubdirectory)
+                if not os.path.exists(toSubdirectory):
+                    make755Directory(toSubdirectory)
                 for file in os.listdir(fromSubdirectory):
                     if fnmatch.fnmatch(file, mask[1]):
                         #self._status("moving %s to %s\n" % (os.path.join(fromSubdirectory, file), toSubdirectory))

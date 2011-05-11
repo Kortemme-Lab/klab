@@ -5,7 +5,7 @@
 # Constants for the daemon and cluster code
 ########################################
 
-CLUSTER_debugmode = True
+CLUSTER_debugmode = False
 
 clusterRootDir = "/netapp/home/klabqb3backrub"
 netappRoot = "%s/temp" % clusterRootDir

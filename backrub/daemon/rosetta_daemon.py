@@ -265,7 +265,7 @@ The Kortemme Lab Server Daemon
         return False
     
             
-    def runSQL(self, query, alternateLocks = ""):
+    def runSQL(self, query, alternateLocks = "", parameters = None):
         """ This function should be the only place in this class which executes SQL.
             Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
             Using this function and passing the string in reduces the likelihood of these errors.
@@ -279,7 +279,7 @@ The Kortemme Lab Server Daemon
         try:
             lockstr = alternateLocks or "%s WRITE, Users READ" % self.db_table         
             self.DBConnection.execQuery("LOCK TABLES %s" % lockstr)
-            results = self.DBConnection.execQuery(query)
+            results = self.DBConnection.execQuery(query, parameters)
         except Exception, e:
             self.DBConnection.execQuery("UNLOCK TABLES")
             raise e
@@ -432,10 +432,12 @@ The Kortemme Lab Server Daemon
         mailTXT = ''
         adminTXT = ''
         
-        if error == '':
+        if not error:
             mailTXT = self.email_text_success % (user_name, self.server_name, cryptID, self.server_name, cryptID, ID, self.server_name, cryptID, self.store_time) 
         else:
             mailTXT = self.email_text_error % (user_name, self.server_name, cryptID)
+            if user_name == "Shane": #todo
+                mailTXT = "%s\nerror='%s'" % (mailTXT, str(error))
             if self.server_name == 'albana.ucsf.edu':
                 subject = 'Albana test job %d failed.' % ID
                 adminTXT = 'An error occured during TEST server simulation #%s.' % ID
@@ -1058,14 +1060,36 @@ class ClusterDaemon(RosettaDaemon):
             make755Directory(netappRoot)
         if not os.path.exists(cluster_temp):
             make755Directory(cluster_temp)
-            
-    def run(self):
-        """Runs the daemon, sets the maximal number of parallel simulations"""
+    
+    def recordSuccessfulJob(self, clusterjob):
+        self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, clusterjob.jobID ))
+
+    def recordErrorInJob(self, clusterjob, errormsg):
+        #todo: There is a bett
+        jobID = clusterjob.jobID
+        clusterjob.error = errormsg
+        picklederrormsg = pickle.dumps(errormsg)
+
+        # todo: We shouldn't have to pickle the error message but the db driver is having problems with quotes. fix                 
+        self.runSQL('UPDATE %s SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s', parameters = ( self.db_table, picklederrormsg, jobID ))
+        self.log("Error: The %s job %d failed at some point:" % (clusterjob.suffix, jobID))
+        self.log(errormsg)
         
-        self.runningJobs = [] # list of running processes
-        self.log("%s\tstarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    def run(self):
+        """The main loop and job controller of the daemon."""
+        
         print("Starting daemon.")
-            
+        self.log("%s\tStarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        self.runningJobs = []           # list of running processes
+        self.killPreviouslyRunningJobs()
+        
+        while True:
+            self.writepid()
+            self.checkRunningJobs()
+            self.startNewJobs()
+            time.sleep(CLUSTER_qstatpause)  # todo: We should sleep for less than this once the qstat timer is set up properly
+    
+    def killPreviouslyRunningJobs(self):
         # If there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
         # todo: used to be SELECT ID, status, pid
         results = self.runSQL("SELECT ID, Status FROM %s WHERE Status=1 and (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
@@ -1078,108 +1102,100 @@ class ClusterDaemon(RosettaDaemon):
             #        self.log("%s\t process not killed: ID %s PID %s\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), simulation[0], simulation[2]) )
             #else:
             #    self.runSQL("UPDATE %s SET status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
-            self.log("Job possibly still running in the cluster since we crashed: %s" % simulation)
+            self.log("Job possibly still running in the cluster since we crashed: %s" % str(simulation))
         
-        while True:
-            # this is executed every 30 seconds if the maximum number of jobs is running
-            self.writepid()
-            
-            # Check if jobs are finished
-            completedJobs = []
-            for clusterjob in self.runningJobs:
-                jobID = clusterjob.jobID
-                joberror = None
-                try:
-                    # todo: This is going to call qstat x number of times.
-                    if clusterjob.isCompleted():
-                        completedJobs.append(clusterjob)               
 
-                        clusterjob.analyze()
-                        clusterjob.cleanup()
-                        clusterjob.saveProfile()
-                        
-                        self.end_job(clusterjob)
-                        
-                        #self.log("<profile>")
-                        #self.log(clusterjob.getprofileXML())
-                        #self.log("</profile>")
-                        print("<profile>")
-                        print(clusterjob.getprofileXML())
-                        print("</profile>")
-                        
-                except Exception, e:
-                    self.log("Error: ID %d: The %s job failed at some point:" % (jobID, clusterjob.suffix))
-                    tracebackstr = "%s\n%s" % (str(e), traceback.print_exc()) 
-                    joberror = tracebackstr
-                    self.log(tracebackstr)
+    def checkRunningJobs(self):
+        completedJobs = []
+        failedjobs = []
+        
+        # Remove failed jobs from the list
+        # Any errors should already have been logged in the database
+        for clusterjob in self.runningJobs:
+            if clusterjob.failed:
+                failedjobs.append(clusterjob)
+                self.recordErrorInJob(self, clusterjob, clusterjob.error)
+        for clusterjob in failedjobs:
+            self.runningJobs.remove(clusterjob)
+                    
+        # Check if jobs are finished
+        for clusterjob in self.runningJobs:
+            jobID = clusterjob.jobID
+            try:
+                # todo: This is going to call qstat x number of times.
+                if clusterjob.isCompleted():
+                    completedJobs.append(clusterjob)               
+
+                    clusterjob.analyze()
+                    clusterjob.cleanup()
+                    clusterjob.saveProfile()
                     
                     self.end_job(clusterjob)
-                        
-                    # remove object
-                    res = self.runSQL('SELECT Errors FROM %s WHERE ID=%s' % (self.db_table, jobID))
-                    if res[0][0] != '' and res[0][0] != None:
-                        self.runSQL('UPDATE %s SET Status=4, EndDate=NOW() WHERE ID=%s' % ( self.db_table, jobID ))
-                    elif joberror != '':
-                        self.runSQL('UPDATE %s SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s' % ( self.db_table, joberror, jobID ))
-                    else:
-                        self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, jobID ))
                     
-            # Remove completed jobs from the list
-            for cj in completedJobs:
-                self.runningJobs.remove(cj)
+                    print("<profile>")
+                    print(clusterjob.getprofileXML())
+                    print("</profile>")
+                                                                           
+            except Exception, e:
+                tracebackstr = "%s\n%s" % (str(e), traceback.print_exc()) 
+                self.recordErrorInJob(clusterjob, "Failed. %s" % tracebackstr)
+                self.end_job(clusterjob)
+                            
+        # Remove completed jobs from the list
+        for cj in completedJobs:
+            self.runningJobs.remove(cj)
             
-            # Start more jobs
-            if len(self.runningJobs) < self.MaxClusterJobs:
-                #self.runSQL("LOCK TABLES %s WRITE, Users READ" % self.db_table)
-                
-                # get all jobs in queue
-                #todo change seqtol_parameter to ProtocolParameters after webserver update
-                data = self.runSQL("SELECT ID,Date,Status,PDBComplex,PDBComplexFile,Mini,EnsembleSize,task,seqtol_parameter,cryptID FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
-                try:
-                    if len(data) != 0:
-                        ID = None
-                        for i in range(0, len(data)):
-                            # Set up the parameters. We assume ProtocolParameters keys do not overlap with params.
-                            ID = data[i][0]
-                            task = data[i][7]                            
-                            params = {
-                                "binary"            : data[i][5],
-                                "cryptID"           : data[i][9],
-                                "ID"                : ID,
-                                "pdb_filename"      : data[i][4],
-                                "pdb_info"          : data[i][3],
-                                "nstruct"           : data[i][6],
-                                "task"              : task
-                            }
-                            ProtocolParameters = pickle.loads(data[i][8])
-                            params.update(ProtocolParameters)                            
-                            
-                            # Start the job
-                            clusterjob = self.start_job(task, params)
-                            if clusterjob:
-                                #change status and write start time to DB
-                                self.runningJobs.append(clusterjob)
-                                self.runSQL("UPDATE %s SET Status=1, StartDate=NOW() WHERE ID=%s" % ( self.db_table, ID ))
-                                time.sleep(3) # wait 3 seconds after a job was started
-                            
-                            if len(self.runningJobs) >= self.MaxClusterJobs:
-                                break
-                            
-                except Exception, e:
-                    self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
-                    self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))                  
-
-                #self.runSQL("UNLOCK TABLES")
-            
-            # todo: We should sleep for less than this once the qstat timer is set up properly
-            time.sleep(CLUSTER_qstatpause)
-
+    def startNewJobs(self):
+        # Start more jobs
+        newclusterjob = None
+        if len(self.runningJobs) < self.MaxClusterJobs:            
+            # get all jobs in queue
+            #todo change seqtol_parameter to ProtocolParameters after webserver update
+            data = self.runSQL("SELECT ID,Date,Status,PDBComplex,PDBComplexFile,Mini,EnsembleSize,task,seqtol_parameter,cryptID FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
+            try:
+                if len(data) != 0:
+                    jobID = None
+                    for i in range(0, len(data)):
+                        # Set up the parameters. We assume ProtocolParameters keys do not overlap with params.
+                        jobID = data[i][0]
+                        task = data[i][7]                            
+                        params = {
+                            "binary"            : data[i][5],
+                            "cryptID"           : data[i][9],
+                            "ID"                : jobID,
+                            "pdb_filename"      : data[i][4],
+                            "pdb_info"          : data[i][3],
+                            "nstruct"           : data[i][6],
+                            "task"              : task
+                        }
+                        ProtocolParameters = pickle.loads(data[i][8])
+                        params.update(ProtocolParameters)                            
+                        
+                        # Start the job
+                        newclusterjob = self.start_job(task, params)
+                        if newclusterjob:
+                            #change status and write start time to DB
+                            self.runningJobs.append(newclusterjob)
+                            self.runSQL("UPDATE %s SET Status=1, StartDate=NOW() WHERE ID=%s" % ( self.db_table, jobID ))
+                        
+                        if len(self.runningJobs) >= self.MaxClusterJobs:
+                            break
+                        
+            except Exception, e:
+                if newclusterjob:
+                    self.recordErrorInJob(self, newclusterjob, "Error starting job.\n%s" % traceback.format_exc())
+                    if newclusterjob in self.runningjobs:
+                        self.runningjobs.remove(newclusterjob)
+                else:
+                    self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, str(jobID) ))                                      
+                self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
 
     def start_job(self, task, params):
 
         clusterjob = None
+        jobID = params["ID"]
         try:
-            self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), params["ID"], params["binary"], task) )
+            self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
             if task == "sequence_tolerance":
                 params["radius"] = 5.0
                 clusterjob = RosettaTasks.SequenceToleranceJobHK(params, netappRoot, cluster_temp)   
@@ -1194,32 +1210,44 @@ class ClusterDaemon(RosettaDaemon):
             # Start the job
             clusterjob.start()
         except Exception, e: 
-            print("Exception")
-            print(e)
-            print("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), params["ID"], traceback.format_exc() ) )
-            self.log("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), params["ID"], traceback.format_exc() ) )
+            if clusterjob:
+                self.recordErrorInJob(self, clusterjob, "Error starting job.\n%s\n%s" % (traceback.format_exc(), e))
+            else:
+                self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, str(jobID) ))                                      
+            print("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, traceback.format_exc() ))
+            self.log("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, traceback.format_exc() ))
             clusterjob = None
-            #raise  
+
         return clusterjob
                     
     def end_job(self, clusterjob):
         
-        self.copyAndZipOutputFiles(clusterjob, clusterjob.parameters["task"])
+        try:
+            self.copyAndZipOutputFiles(clusterjob, clusterjob.parameters["task"])
+        except:
+            self.recordErrorInJob(self, clusterjob, "Error archiving files")
         
-        self.removeClusterTempDir(clusterjob)
-        
+        try:
+            self.removeClusterTempDir(clusterjob)
+        except:
+            self.recordErrorInJob(self, clusterjob, "Error removing temporary directory on the cluster")
+            
+        if not clusterjob.error:
+            self.recordSuccessfulJob(clusterjob)
+
         ID = clusterjob.jobID                        
         data = self.runSQL("SELECT u.Email,u.FirstName,b.KeepOutput,b.cryptID,b.task,b.PDBComplexFile,b.EnsembleSize,b.Mini FROM Users AS u JOIN %s AS b on (u.ID=b.UserID) WHERE b.ID=%s" % ( self.db_table, str(ID) ), "Users AS u READ, %s AS b WRITE" % self.db_table)
         cryptID      = data[0][3]
         task         = data[0][4]
         keep_output  = int(data[0][2])
-        status = 2
+        status = 2        
         self.notifyUserOfCompletedJob(data, ID, cryptID, clusterjob.error)
 
     def moveFilesOnJobCompletion(self, clusterjob):
         try:
             return clusterjob.moveFilesTo(cluster_dltest)
         except Exception, e:
+            print("moveFilesOnJobCompletion failure")
             self.log("Error moving files to the download directory.\n")
             self.log("%s\n%s" % (str(e), traceback.print_exc()))        
     
@@ -1251,8 +1279,11 @@ class ClusterDaemon(RosettaDaemon):
                 all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
                 abs_files = get_files('./')
                 print(abs_files)
-                if "timing_profile.txt" in abs_files:
-                    abs_files.remove("timing_profile.txt")
+                #todo: /home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/11f9f52b7bef882fbbb1b94ab0752074/timing_profile.txt"
+                timingprofile = os.path.join(result_dir, "timing_profile.txt")
+                if timingprofile in abs_files:
+                    abs_files.remove(timingprofile)
+                    
                 os.chdir(result_dir)
                 filenames_for_zip = [ string.replace(fn, os.getcwd()+'/','') for fn in abs_files ] # os.listdir(result_dir)
                                         
@@ -1266,9 +1297,9 @@ class ClusterDaemon(RosettaDaemon):
             os.chdir(current_dir)
         except Exception, e:
             self.log("%s\t error: end_job() ID = %s - error moving files\n*******************************\n%s*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, traceback.format_exc() ) )
-            self.runSQL('UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
+            self.runSQL('UPDATE %s SET Errors="Error archiving data", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
             status = 4
-            clusterjob.error = "Error moving files"
+            clusterjob.error = "Error archiving data"
     
     def removeClusterTempDir(self, clusterjob):
         try:
@@ -1455,14 +1486,66 @@ if __name__ == "__main__":
         elif 'test' == sys.argv[1]:
             daemon = ClusterDaemon(os.path.join(temppath, 'testrunning.log'), os.path.join(temppath, 'testrunning.log'))
             UserID = 106
+            if 'db' == sys.argv[2]:
+                Email = "test@bob.co"
+                ProtocolParameters = {}
+                pdb_filename = '3QDO.pdb'
+                output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
+                pdbfile = output_handle.read()
+                output_handle.close()
+                IP = '127.0.0.1'
+                hostname = 'albana'
+                nos = '10'
+                keep_output = 1
+                
+                print("Adding a new sequence tolerance (SK) job:")
+                JobName = "3QDO (Job 1957)"
+                mini = 'seqtolJMB'
+                modus = "sequence_tolerance_SK"
+                ProtocolParameters = {
+                    "kT"                : 0.228,
+                    "Partners"          : ["A", "B"],
+                    "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                    "Premutated"        : {},
+                    "Designed"          : {"B" : [203, 204, 205, 206, 207, 208]}
+                }
+                ProtocolParameters = pickle.dumps(ProtocolParameters)
+                
+                try: 
+                    import random
+                    import md5
+                    print(UserID)
+                    #daemon.runSQL("LOCK TABLES %s WRITE, Users READ" % daemon.db_table)
+                    #todo change seqtol_parameter to ProtocolParameters after webserver update
+                    daemon.runSQL("""INSERT INTO %s ( Status, Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, seqtol_parameter) 
+                                VALUES (2, NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))           
+                    result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))
+                    ID = result[0][0]
+                    print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
+                    # create a unique key as name for directories from the ID, for the case we need to hide the results
+                    # do not just use the ID but also a random sequence
+                    tgb = str(ID) + 'flo' + string.join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
+                    cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
+                    return_vals = (cryptID, "new")
+                    sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
+                    result = daemon.runSQL(sql)
+                except:
+                    print("Error.")
+                    sys.exit(1)
+                sys.exit(0)
+                    # success
+                    
             if 'remove' == sys.argv[2] and sys.argv[3]: 
                 try: 
                     print("Removing job %s:" % sys.argv[3])
                     jobID = int(sys.argv[3])
                     sql = "SELECT ID, Notes FROM %s WHERE ID=%d AND UserID=%d" % (daemon.db_table, jobID, UserID)
                     results = daemon.runSQL(sql)
+                    if not results:
+                        print("Job not found.")
+                        sys.exit(2)
                     print("Deleting jobs: %s" % results)
-                    time.sleep(10)    
+                    time.sleep(5)    
                     sql = "DELETE FROM %s WHERE ID=%d AND UserID=%d" % (daemon.db_table, jobID, UserID)    
                     results = daemon.runSQL(sql)
                     if results:
@@ -1482,7 +1565,7 @@ if __name__ == "__main__":
                 output_handle.close()
                 IP = '127.0.0.1'
                 hostname = 'albana'
-                nos = '2'
+                nos = '100'
                 keep_output = 1
                 
                 ProtocolParameters = {}
@@ -1491,9 +1574,10 @@ if __name__ == "__main__":
                     output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
                     pdbfile = output_handle.read()
                     output_handle.close()
-                    
+                    nos = '100'
+                
                     print("Adding a new sequence tolerance (SK) job:")
-                    JobName = "3QDO (Job 1955)"
+                    JobName = "3QDO (Job 1957)"
                     mini = 'seqtolJMB'
                     modus = "sequence_tolerance_SK"
                     ProtocolParameters = {
@@ -1508,9 +1592,10 @@ if __name__ == "__main__":
                     output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
                     pdbfile = output_handle.read()
                     output_handle.close()
-                    
+                    nos = '100'
+                
                     print("Adding a new sequence tolerance (SK) job:")
-                    JobName = "3QE1 (Job 1956)"
+                    JobName = "3QE1 (Job 1958)"
                     mini = 'seqtolJMB'
                     modus = "sequence_tolerance_SK"
                     ProtocolParameters = {
@@ -1556,7 +1641,7 @@ if __name__ == "__main__":
                                 VALUES (NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))           
                     result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))
                     ID = result[0][0]
-                    print("\tTest job created with ID: %s" % str(ID))
+                    print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
                     # create a unique key as name for directories from the ID, for the case we need to hide the results
                     # do not just use the ID but also a random sequence
                     tgb = str(ID) + 'flo' + string.join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)

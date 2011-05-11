@@ -583,16 +583,17 @@ process_seqtol <- function(dirpath = ".", fitness_coef = c(1/2.5, 1/2.5, 1/2.5, 
 		seqtoloutput <- file.path(dirpath, sub(".ga.entities.*", "_seqtol.out", names(entities)[1]))
 	}
 	if (file.exists(seqtoloutput)) {
-		seqtolcmd <- readLines(seqtoloutput, 2)
+		seqtolcmd <- readLines(seqtoloutput, 20)
 		seqtolcmd <- grep("core.init: command", seqtolcmd, value=TRUE)
 		if (length(seqtolcmd)) {
 			startpdbfile <- gsub("^.+ -s ([^ ]+) .+$", "\\1", seqtolcmd)
+			startpdbfile <- gsub("^.+/(.*)$", "\\1", startpdbfile, perl=TRUE)
+			startpdbfile <- file.path(dirpath, startpdbfile)
+			
 			if (!file.exists(startpdbfile)) {
 				startpdbfile <- paste(startpdbfile, ".gz", sep="")
 			}
 			if (file.exists(startpdbfile)) {
-				print("startpdb:")
-				print(startpdbfile)
 				# Parse the file into a set of unique residue names/position ID pairs (GLU with name A318, ...)
 				pdbseq <- pdb_sequence(startpdbfile)
 				# Index into pdbseq (residue names e.g. GLU named by position ID e.g. A318) with posnames

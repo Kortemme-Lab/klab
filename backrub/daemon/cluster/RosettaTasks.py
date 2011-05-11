@@ -569,7 +569,7 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         targetsubdirectory = "backrub"
         taskdir = self._make_taskdir(targetsubdirectory, [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap])
         brTask = BackrubClusterSKTask(taskdir, os.path.join(self.targetdirectory, targetsubdirectory), self.parameters, self.backrub_resfile, movemap = self.backrub_movemap, name = "Backrub step for sequence tolerance protocol")
-            
+        
         targetsubdirectory = "sequence_tolerance"
         taskdir = self._make_taskdir(targetsubdirectory, [self.seqtol_resfile])
         stTask = SequenceToleranceClusterTask(taskdir, os.path.join(self.targetdirectory,targetsubdirectory), self.parameters, self.seqtol_resfile, name="Sequence tolerance step for sequence tolerance protocol")
@@ -606,6 +606,22 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*ga.entities*")):
             self._status('copying %s' % file)
             shutil.move(file, self.targetdirectory)
+        
+        # Create the standard output file where the R script expects it
+        firststdout = None
+        firstlowfile = None
+        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*.cmd.o*.1")):
+            firststdout = file
+            break
+        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*0001_low.pdb")):
+            firstlowfile = file
+            break
+        if firststdout and firstlowfile:
+            self._status("Copying stdout and lowfile for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+            shutil.copy(firststdout, self._targetdir_file_path("seqtol_1_stdout.txt"))
+            shutil.copy(firstlowfile, self.targetdirectory)
+        else:
+            self._status("Could not find stdout or lowfile for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
                             
         # open files for stderr and stdout 
         self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
@@ -941,6 +957,35 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
             rosettahelper.writeFile(self._workingdir_file_path(backrub_resfile), 'NATAA\nstart\n%s\n' % s)
             self.backrub_resfiles.append(backrub_resfile)
                
+
+class SequenceToleranceJobSKAnalyzer(SequenceToleranceJobSK):
+
+    suffix = "seqtolSK"
+    flatOutputDirectory = True
+                
+    def __init__(self, parameters, tempdir, targetroot):
+        # The tempdir is the one on the submission host e.g. chef
+        # targetdirectory is the one on your host e.g. your PC or the webserver
+        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
+        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+        self.map_res_id = {}
+        super(SequenceToleranceJobSKAnalyzer, self).__init__(parameters, tempdir, targetroot)
+    
+    def _initialize(self):
+        self._status("Creating RosettaSeqTol analyzer.\nWorking dir:%s\nTarget dir: %s." % (self.workingdir, self.targetdirectory))
+        parameters = self.parameters
+        
+        # Create input files
+        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
+        self._write_backrub_resfiles()
+        self._write_seqtol_resfile()
+        self._write_backrub_movemap()
+        
+        self.targetdirectory = "/home/oconchus/1KI1test"
+        
+        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
+        
+        self.scheduler = scheduler
 
 
 class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
@@ -1451,11 +1496,13 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         
         # rename a few files
         try:
-            shutil.copy(self._taskresultsdir_file_path("minimization", self.parameters['pdb_filename']), self._targetdir_file_path("%s_minimized.pdb" % self.parameters['pdb_filename']))        
-            shutil.copy(self._taskresultsdir_file_path("minimization", "%s_submission.pdb" % self.parameters['pdb_filename']), self._targetdir_file_path(self.parameters['pdb_filename']))        
+            shutil.copy(self._taskresultsdir_file_path("minimization", self.parameters['pdb_filename']), self._targetdir_file_path("%s_minimized.pdb" % self.parameters['pdbRootname']))        
+            shutil.copy(self._taskresultsdir_file_path("minimization", "%s_submission.pdb" % self.parameters['pdbRootname']), self._targetdir_file_path(self.parameters['pdb_filename']))        
         except:
             print("Exception copying PDBs back.")        
         
+        return True
+    
     def _filter(self,list_seq):
         """this sorts sequences after fitness score"""
         decimal.getcontext().prec = 1

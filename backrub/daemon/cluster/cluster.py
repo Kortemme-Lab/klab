@@ -21,7 +21,7 @@ if not os.path.exists(cluster_dltest):
 inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/"
    
 if __name__ == "__main__":
-    test = "1KI1analysis"
+    test = "3QDORtest"
     try:
         clusterjob = None
         
@@ -78,10 +78,37 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSKAnalyzer(params, netappRoot, cluster_dltest) 
+            clusterjob = RosettaTasks.SequenceToleranceSKAnalyzer(params, netappRoot, cluster_dltest) 
             clusterjob._analyze()
             sys.exit(0)
 
+        if test == "3QDORtest":            
+            mini = "seqtolJMB"
+            ID = 1234
+            pdb_filename = "3QDO.pdb"    
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 10
+            
+            params = {
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : 10,
+                "kT"                : 0.228,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {},
+                "Designed"          : {"B" : [203, 204, 205, 206, 207, 208]}
+                }
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, "/home/oconchus/1KI1test")
+            clusterjob.targetdirectory = "/home/oconchus/1KI1test"
+            clusterjob._analyze()
+            sys.exit(0)
+            
         if test == "1KI1":
             mini = "seqtolJMB"
             ID = 1234

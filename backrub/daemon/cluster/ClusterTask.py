@@ -56,7 +56,11 @@ class ClusterScript:
         self.bindir = "%s/%s" % (clusterRootDir, self.revision)
         self.workingdir = workingdir
         self.script = None
-
+        if numtasks == 1:
+            #todo when numtasks = 1 the std checking fails. fix this
+            print("Fix: stdout/stderr checking fails for numtasks==1")
+            raise
+        
         if CLUSTER_debugmode: 
             self.parameters["maxhours"] = 0
             self.parameters["maxmins"] = 10
@@ -276,27 +280,29 @@ class ClusterTask(object):
                     filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
                 
                 stderrhasfailed = False
-                    
-                if os.path.exists(self._workingdir_file_path(filename_stdout)):
+                
+                stdoutfile = self._workingdir_file_path(filename_stdout)
+                if os.path.exists(stdoutfile):
                     self.filename_stdout = filename_stdout
-                    self._status('shutil.copy(%s %s")' % (self._workingdir_file_path(filename_stdout), self.targetdirectory))
-                    shutil.copy(self._workingdir_file_path(filename_stdout), self.targetdirectory)
+                    self._status('shutil.copy(%s %s")' % (stdoutfile, self.targetdirectory))
+                    shutil.copy(stdoutfile, self.targetdirectory)
                 else:
-                    self._status("Failed on %s, subtask %d" % (self.name, i))
+                    self._status("Failed on %s, subtask %d. No stdout file %s." % (self.name, i, stdoutfile))
                     filename_stdout = None
                     failedOutput = True
 
-                if os.path.exists(self._workingdir_file_path(filename_stderr )):                    
+                stderrfile = self._workingdir_file_path(filename_stderr)
+                if os.path.exists(stderrfile):                    
                     self.filename_stderr = filename_stderr
-                    self._status('shutil.copy(%s %s")' % (self._workingdir_file_path(filename_stderr), self.targetdirectory))
-                    shutil.copy(self._workingdir_file_path(filename_stderr), self.targetdirectory)
-                    stderrHasFailed = os.path.getsize(self._workingdir_file_path(filename_stderr)) > 0
+                    self._status('shutil.copy(%s %s")' % (stderrfile, self.targetdirectory))
+                    shutil.copy(stderrfile, self.targetdirectory)
+                    stderrHasFailed = os.path.getsize(stderrfile) > 0
                     if self.failOnStdErr and stderrHasFailed:
-                        self._status("Failed on %s, subtask %d" % (self.name, i))
+                        self._status("Failed on %s, subtask %d. stderr file %s has size %d" % (self.name, i, stderrfile, stderrHasFailed))
                         self.state = FAILED_TASK
                         failedOutput = True
                 else:
-                    self._status("Failed on %s, subtask %d" % (self.name, i))
+                    self._status("Failed on %s, subtask %d. No stderr file %s." % (self.name, i, stderrfile))
                     filename_stderr = None
                     failedOutput = True
     
