@@ -338,8 +338,7 @@ def ws():
           jobid = result[0][0]
           status = result[0][1]
           task = result[0][2]
-          
-          mini = RosettaBinaries[result[0][3]]['mini']
+          binary = result[0][3]
           pdb_filename = result[0][4]
       else:
           html_content = "Either an invalid job ID was given or else the job no longer exists in the database."  
@@ -358,7 +357,7 @@ def ws():
         for p in protocols:
             if task == p.dbname:
                 found = True
-                p.getDataDirFunction()(cryptID, jobid, mini, pdb_filename)
+                p.getDataDirFunction()(cryptID, jobid, binary, pdb_filename)
                 break
     if not found:
         html_content = "No data."
@@ -1733,13 +1732,13 @@ class FrontendProtocols(WebserverProtocols):
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceHK)
                 p.setShowResultsFunction(rosettaHTML.showSequenceToleranceHK)
                 p.setStoreFunction(storeSequenceToleranceHK)
-                p.setDataDirFunction(rosettaDD.SequenceTolerance)
+                p.setDataDirFunction(rosettaDD.SequenceToleranceHK)
                 p.setReferences("HumphrisKortemme:2008")
             elif p.dbname == "sequence_tolerance_SK":
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
                 p.setShowResultsFunction(rosettaHTML.showSequenceToleranceSK)
                 p.setStoreFunction(storeSequenceToleranceSK)
-                p.setDataDirFunction(rosettaDD.SequenceTolerance)
+                p.setDataDirFunction(rosettaDD.SequenceToleranceSK)
                 p.setReferences("SmithKortemme:2010")  # todo: "SmithKortemme:2011"
             else:
                 raise 
