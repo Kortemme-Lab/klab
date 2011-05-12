@@ -1201,10 +1201,13 @@ def queue(form, userid):
         sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
         result2 = DBConnection.execQuery(sql)
         new_lst.extend(line)
-        if int(line[3]) == int(userid):
-            new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
+        if not result2:
+            new_lst[5] = '<b><font color="red">BAD USER ID</font></b>'            
         else:
-            new_lst[5] = result2[0][0]
+            if int(line[3]) == int(userid):
+                new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
+            else:
+                new_lst[5] = result2[0][0]
         results.append(new_lst)
       
     return results

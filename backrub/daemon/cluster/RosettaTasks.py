@@ -536,12 +536,15 @@ class SequenceToleranceJobSK(RosettaClusterJob):
     flatOutputDirectory = True
     
     def _defineOutputFiles(self):
+        self.resultFilemasks.append((".", "*.pdb"))
         self.resultFilemasks.append((".", "stderr*"))
         self.resultFilemasks.append((".", "stdout*"))
         self.resultFilemasks.append((".", "timing_profile.txt"))
         self.resultFilemasks.append((".", "tolerance_*"))
         self.resultFilemasks.append((".", "*.ga.entities.gz"))
         self.resultFilemasks.append(("backrub", "*.cmd*"))
+        self.resultFilemasks.append(("backrub", "*.resfile"))
+        self.resultFilemasks.append(("backrub", "*.movemap"))
         self.resultFilemasks.append(("backrub", "backrub_scores.dat"))
         self.resultFilemasks.append(("sequence_tolerance", "*.resfile"))
         self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
@@ -738,11 +741,14 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
         self.resultFilemasks.append((".", "timing_profile.txt"))
         self.resultFilemasks.append((".", "tolerance_*"))
         self.resultFilemasks.append((".", "*.ga.entities.gz"))
+        self.resultFilemasks.append((".", "*.pdb"))
         for i in range(self.numberOfRuns):
             backrubSubdirectory = "backrub%d" % i
             seqtolSubdirectory = "sequence_tolerance%d" % i
             self.resultFilemasks.append((backrubSubdirectory, "*.cmd*"))
             self.resultFilemasks.append((backrubSubdirectory, "backrub_scores.dat"))
+            self.resultFilemasks.append((backrubSubdirectory, "*.resfile"))
+            self.resultFilemasks.append((backrubSubdirectory, "*.movemap"))        
             self.resultFilemasks.append((seqtolSubdirectory, "*.resfile"))
             self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
             self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))

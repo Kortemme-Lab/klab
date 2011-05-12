@@ -1484,11 +1484,12 @@ if __name__ == "__main__":
                 sys.exit(2)
             sys.exit(0)
         elif 'test' == sys.argv[1]:
-            daemon = ClusterDaemon(os.path.join(temppath, 'testrunning.log'), os.path.join(temppath, 'testrunning.log'))
             UserID = 106
-            if 'db' == sys.argv[2]:
+            if 'db' == sys.argv[2] and sys.argv[3]:
+                UserID = 25
                 Email = "test@bob.co"
                 ProtocolParameters = {}
+                inputDirectory = '/home/oconchus/'
                 pdb_filename = '3QDO.pdb'
                 output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
                 pdbfile = output_handle.read()
@@ -1506,35 +1507,50 @@ if __name__ == "__main__":
                     "kT"                : 0.228,
                     "Partners"          : ["A", "B"],
                     "Weights"           : [0.4, 0.4, 0.4, 1.0],
-                    "Premutated"        : {},
-                    "Designed"          : {"B" : [203, 204, 205, 206, 207, 208]}
+                    "Premutated"        : {"A": {}, "B" : {}},
+                    "Designed"          : {"A": {}, "B" : {203 : True, 204 : True, 205 : True, 206 : True, 207 : True, 208 : True}}
                 }
                 ProtocolParameters = pickle.dumps(ProtocolParameters)
                 
                 try: 
                     import random
                     import md5
-                    print(UserID)
                     #daemon.runSQL("LOCK TABLES %s WRITE, Users READ" % daemon.db_table)
                     #todo change seqtol_parameter to ProtocolParameters after webserver update
-                    daemon.runSQL("""INSERT INTO %s ( Status, Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, seqtol_parameter) 
-                                VALUES (2, NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))           
-                    result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))
-                    ID = result[0][0]
-                    print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
-                    # create a unique key as name for directories from the ID, for the case we need to hide the results
-                    # do not just use the ID but also a random sequence
-                    tgb = str(ID) + 'flo' + string.join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
-                    cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
-                    return_vals = (cryptID, "new")
-                    sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
-                    result = daemon.runSQL(sql)
-                except:
-                    print("Error.")
+
+                    db_host                = "localhost"
+                    db_name                = "rosettaweb"
+                    db_user                = "rosettaweb"
+                    db_pw                  = sys.argv[3]
+                    db_port                = 3306
+                    db_socket              = "/var/lib/mysql/mysql.sock"
+                    db_numTries            = 32
+                    DBConnection = rosettadb.RosettaDB(db_host, db_name, db_user, db_pw, db_port, db_socket, 60, db_numTries)
+                    
+                    lockstr = "backrub WRITE, Users READ"         
+                    DBConnection.execQuery("LOCK TABLES %s" % lockstr)
+                    try:
+                        query = """INSERT INTO backrub ( Status, cryptID, Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
+                                    VALUES (2, "shanetest", NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)           
+                        result = DBConnection.execQuery(query)
+                        query = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
+                        result = DBConnection.execQuery(query)
+                        ID = result[0][0]
+                        print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
+                    except Exception, e: 
+                        print("Error.\n%s\n%s" % (e, traceback.format_exc()))
+                        DBConnection.execQuery("UNLOCK TABLES")
+                        sys.exit(1)
+                    DBConnection.execQuery("UNLOCK TABLES")
+
+                except Exception, e:
+                    print("Error.\n%s" % e)
                     sys.exit(1)
+                print("Success")
                 sys.exit(0)
                     # success
-                    
+            
+            daemon = ClusterDaemon(os.path.join(temppath, 'testrunning.log'), os.path.join(temppath, 'testrunning.log'))    
             if 'remove' == sys.argv[2] and sys.argv[3]: 
                 try: 
                     print("Removing job %s:" % sys.argv[3])

@@ -1853,8 +1853,8 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
             
-            list_pdb_files = ['../downloads/%s/%s_0.pdb' % (cryptID, input_id) ]
-            list_pdb_files.extend( [ '../downloads/%s/%s_0_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
+            list_pdb_files = ['../downloads/%s/%s.pdb' % (cryptID, input_id) ]
+            list_pdb_files.extend( [ '../downloads/%s/sequence_tolerance/%s_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
             comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>
                         The query structure is shown in red. 
