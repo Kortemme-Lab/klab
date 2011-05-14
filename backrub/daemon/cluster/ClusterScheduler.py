@@ -1,6 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/python2.4
+# encoding: utf-8
+"""
+ClusterScheduler.py
 
-# Set up array jobs for QB3 cluster.
+Created by Shane O'Connor 2011.
+Copyright (c) 2011 __UCSF__. All rights reserved.
+"""
+
+
 import sys
 import os
 sys.path.insert(0, "../../common/")
@@ -95,9 +102,8 @@ class TaskScheduler(object):
         self.failed = False
         self.started = False
         self.tasks_in_order = []
-        self.statechanged = False
     
-    #todo: Use multiple inheritance for this and task    
+    #todo: Use multiple inheritance for this and ClusterTask and SGEConnection classes    
     def _status(self, message, plain = False):
         if self.debug:
             if plain:
@@ -109,7 +115,6 @@ class TaskScheduler(object):
         self._status("Moving %d (%s) from %s to %s" % (task.jobid, task.getName(), ClusterTask.status.get(oldqueue), ClusterTask.status.get(newqueue)))
         self.tasks[oldqueue].remove(task)
         self.tasks[newqueue].append(task)
-        self.statechanged = True
         
     def _getAllTasks(self):
         tasks = []
@@ -119,6 +124,7 @@ class TaskScheduler(object):
         tasks.extend(self.tasks[ClusterTask.COMPLETED_TASK])
         return tasks        
     
+    # todo: Unused at present. Remove if not used in future. 
     def getAllJIDs(self):
         checkGraphReachability(self._initialtasks)
         tasklist = traverseGraph(self._initialtasks, [])
@@ -173,7 +179,7 @@ class TaskScheduler(object):
             raise exception
                        
     def start(self, sgec, dbID):
-        # todo: Check the reachability and acylicity of the graph here
+        # todo: Check the reachability and acyclicity of the graph here
         self.sgec = sgec
         self.dbID = dbID
         checkGraphReachability(self.tasks[ClusterTask.INITIAL_TASK])
@@ -211,15 +217,11 @@ class TaskScheduler(object):
         # I told you I was sick. Don't step a broken scheduler.
         if self.failed:
              raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The scheduler has failed.") 
-        
-        #todo activeTasksOnCluster = []
-        self.statechanged = False    
-                      
+                              
         # Retire tasks
         activeTasks = self.tasks[ClusterTask.ACTIVE_TASK][:]
         for task in activeTasks:
             tstate = task.getState()
-            #todo activeTasksOnCluster.append(task.getClusterStatus())
             if tstate == ClusterTask.RETIRED_TASK:
                 self._movequeue(task, ClusterTask.ACTIVE_TASK, ClusterTask.RETIRED_TASK)
             elif tstate == ClusterTask.FAILED_TASK:
@@ -254,7 +256,6 @@ class TaskScheduler(object):
                     if started:
                         self.tasks_in_order.append(dependent)
                         del self.pendingtasks[dependent]
-                        self.statechanged = True
                         self.tasks[ClusterTask.ACTIVE_TASK].append(dependent)
 
         
@@ -267,15 +268,7 @@ class TaskScheduler(object):
         # John Hodgman - "Halting problem - solved. You're welcome."
         if self.pendingtasks and not (self.tasks[ClusterTask.ACTIVE_TASK]):
              raise SchedulerDeadlockException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK])
-                            
-        #if self.statechanged:
-        #    for task in activeTasks:
-        #        self._status("%s %d " % (task.getName(), tstate))
-        #    if self.tasks[ClusterTask.ACTIVE_TASK]:
-        #        self._status("<active>%s</active>" % self.tasks[ClusterTask.ACTIVE_TASK])
-        #    if self.tasks[ClusterTask.RETIRED_TASK]:
-        #        self._status("<retired>%s</retired>" % self.tasks[ClusterTask.RETIRED_TASK])
-        
+                                    
         # We are finished when there are no active or retired tasks
         return not(self.tasks[ClusterTask.ACTIVE_TASK] or self.tasks[ClusterTask.RETIRED_TASK]) 
     

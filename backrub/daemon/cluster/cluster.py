@@ -1,6 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/python2.4
+# encoding: utf-8
+"""
+cluster.py
 
-# Set up array jobs for QB3 cluster.
+Created by Shane O'Connor 2011.
+Copyright (c) 2011 __UCSF__. All rights reserved.
+"""
+
+
 import sys
 import os
 import time

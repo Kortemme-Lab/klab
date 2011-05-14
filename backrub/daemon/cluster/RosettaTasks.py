@@ -1,6 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/python2.4
+# encoding: utf-8
+"""
+RosettaTasks.py
 
-# Set up array jobs for QB3 cluster.
+Created by Shane O'Connor 2011.
+Copyright (c) 2011 __UCSF__. All rights reserved.
+"""
+
+
 import sys
 import os
 sys.path.insert(0, "../../common/")
@@ -534,6 +541,7 @@ class SequenceToleranceJobSK(RosettaClusterJob):
 
     suffix = "seqtolSK"
     flatOutputDirectory = True
+    name = "Sequence Tolerance (SK, JMB)"
     
     def _defineOutputFiles(self):
         self.resultFilemasks.append((".", "*.pdb"))
@@ -734,6 +742,7 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
 
     suffix = "seqtolMultiSK"
     horizontaltiles = 4
+    name = "Multiple Sequence Tolerance (SK, JMB)"
     
     def _renamedefineOutputFiles(self):
         self.resultFilemasks.append((".", "stderr*"))
@@ -818,7 +827,8 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
         self.multiparameters = multiparameters
         
     def _initialize(self):
-        self._status("Creating RosettaSeqTol multi object.\nWorking dir:%s\nTarget dir: %s." % (self.workingdir, self.targetdirectory))
+        self.describe()
+        
         parameters = self.parameters
         
         # Create input files
@@ -968,7 +978,8 @@ class SequenceToleranceJobSKAnalyzer(SequenceToleranceJobSK):
 
     suffix = "seqtolSK"
     flatOutputDirectory = True
-                
+    name = "Sequence Tolerance Analyzer (SK, JMB)"
+               
     def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
@@ -978,7 +989,8 @@ class SequenceToleranceJobSKAnalyzer(SequenceToleranceJobSK):
         super(SequenceToleranceJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot)
     
     def _initialize(self):
-        self._status("Creating RosettaSeqTol analyzer.\nWorking dir:%s\nTarget dir: %s." % (self.workingdir, self.targetdirectory))
+        self.describe()
+        
         parameters = self.parameters
         
         # Create input files
@@ -998,6 +1010,7 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
 
     suffix = "seqtolMultiSK"
     horizontaltiles = 4
+    name = "Multiple Sequence Tolerance Analyzer (SK, JMB)"
     
     def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
@@ -1064,7 +1077,8 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
         self.multiparameters = multiparameters
         
     def _initialize(self):
-        self._status("Creating RosettaSeqTol multi object.\nWorking dir:%s\nTarget dir: %s." % (self.workingdir, self.targetdirectory))
+        self.describe()
+        
         parameters = self.parameters
         
         # Create input files
@@ -1203,6 +1217,7 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
 class SequenceToleranceJobHK(RosettaClusterJob):
 
     suffix = "seqtolHK"
+    name = "Sequence Tolerance (HK)"
     
     #todo: Remove after testing / add as test
     def __testinginit__(self, parameters, tempdir, targetroot):
@@ -1241,7 +1256,8 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         super(SequenceToleranceJobHK, self).__init__(sgec, parameters, tempdir, targetroot)
     
     def _initialize(self):
-        self._status("Creating RosettaSeqTol object in %s." % self.targetdirectory)
+        self.describe()
+        
         parameters = self.parameters
       
         # Create input files        

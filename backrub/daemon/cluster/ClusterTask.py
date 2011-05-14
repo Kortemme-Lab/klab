@@ -1,6 +1,13 @@
-#!/usr/bin/env python
+#!/usr/bin/python2.4
+# encoding: utf-8
+"""
+ClusterTask.py
 
-# Set up array jobs for QB3 cluster.
+Created by Shane O'Connor 2011.
+Copyright (c) 2011 __UCSF__. All rights reserved.
+"""
+
+
 import sys
 sys.path.insert(0, "../")
 sys.path.insert(0, "../../common/")
@@ -371,13 +378,6 @@ class ClusterTask(object):
     def getDependents(self):
         return self.dependents
     
-    #todo def getClusterStatus(self):
-    #    if self.state == ACTIVE_TASK:
-    #        status = sge.cachedStatus(self.jobid)
-    #        if status:
-    #            return "%s - %s" % (self.scriptfilename, status)
-    #    return None
-
     def getState(self, allowToRetire = True):
         # ping server
         if self.state == ACTIVE_TASK:
