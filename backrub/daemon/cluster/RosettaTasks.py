@@ -550,16 +550,16 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
         self.resultFilemasks.append(("sequence_tolerance", "*low*.pdb"))
             
-    def __init__(self, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceJobSK, self).__init__(parameters, tempdir, targetroot)
+        super(SequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot)
     
     def _initialize(self):
-        self._status("Creating RosettaSeqTol object in %s." % self.targetdirectory)
+        self.describe()
         
         # Create input files        
         self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
@@ -753,13 +753,13 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
             self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
             self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))
             
-    def __init__(self, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceMultiJobSK, self).__init__(parameters, tempdir, targetroot)
+        super(SequenceToleranceMultiJobSK, self).__init__(sgec, parameters, tempdir, targetroot)
     
     @staticmethod
     def _tmultiply(biglist, nextlist):
@@ -969,13 +969,13 @@ class SequenceToleranceJobSKAnalyzer(SequenceToleranceJobSK):
     suffix = "seqtolSK"
     flatOutputDirectory = True
                 
-    def __init__(self, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceJobSKAnalyzer, self).__init__(parameters, tempdir, targetroot)
+        super(SequenceToleranceJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot)
     
     def _initialize(self):
         self._status("Creating RosettaSeqTol analyzer.\nWorking dir:%s\nTarget dir: %s." % (self.workingdir, self.targetdirectory))
@@ -999,13 +999,13 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
     suffix = "seqtolMultiSK"
     horizontaltiles = 4
     
-    def __init__(self, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceMultiJobSKAnalyzer, self).__init__(parameters, tempdir, targetroot)
+        super(SequenceToleranceMultiJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot)
     
     @staticmethod
     def _tmultiply(biglist, nextlist):
@@ -1229,7 +1229,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             {"stdout" : "seqtol_1234.cmd.o6054336.2", "stderr" : "seqtol_1234.cmd.e6054336.2", "failed" : False}]
             
         
-    def __init__(self, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
@@ -1238,7 +1238,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
         self.failed_runs   = []
         self.executable    = ''
-        super(SequenceToleranceJobHK, self).__init__(parameters, tempdir, targetroot)
+        super(SequenceToleranceJobHK, self).__init__(sgec, parameters, tempdir, targetroot)
     
     def _initialize(self):
         self._status("Creating RosettaSeqTol object in %s." % self.targetdirectory)

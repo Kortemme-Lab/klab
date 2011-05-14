@@ -10,8 +10,9 @@ import re
 from string import join
 import distutils.dir_util
 import fnmatch
+import traceback
 
-import sge
+#import sge
 import ClusterTask  
 import SimpleProfiler
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755
@@ -43,6 +44,15 @@ todo='''
 '''
 def checkGraphReachability(initialtasks):
     pass
+   
+# todo: Can this handle all DAGs?
+def traverseGraph(parenttasks, reachedNodes):
+    for t in parenttasks:
+        if t not in reachedNodes:
+            reachedNodes.append(t)
+            traverseGraph(t.getDependents(), reachedNodes)
+    return reachedNodes
+        
 
 # Scheduler exceptions
 class TaskSchedulerException(Exception):
@@ -70,6 +80,9 @@ class SchedulerStartException(TaskSchedulerException): pass
 class TaskScheduler(object):
 
     def __init__(self, workingdir, files = []):
+        self._initialtasks = []       # As well as the initial queue, we remember the initial tasks so we can generate the dependency graph 
+        self.sgec = None
+        self.dbID = 0
         self.debug = True
         self.tasks = {ClusterTask.INITIAL_TASK: [],
                       ClusterTask.ACTIVE_TASK: [],
@@ -90,10 +103,10 @@ class TaskScheduler(object):
             if plain:
                 print(message)
             else:
-                print('<debug type="task">%s</debug>' % message)
+                print('<debug id="%d" type="task">%s</debug>' % (self.dbID, message))
             
     def _movequeue(self, task, oldqueue, newqueue):
-        self._status("[Moving %s from %d to %d]" % (task.getName(), oldqueue, newqueue))
+        self._status("Moving %d (%s) from %s to %s" % (task.jobid, task.getName(), ClusterTask.status.get(oldqueue), ClusterTask.status.get(newqueue)))
         self.tasks[oldqueue].remove(task)
         self.tasks[newqueue].append(task)
         self.statechanged = True
@@ -105,6 +118,25 @@ class TaskScheduler(object):
         tasks.extend(self.tasks[ClusterTask.RETIRED_TASK])
         tasks.extend(self.tasks[ClusterTask.COMPLETED_TASK])
         return tasks        
+    
+    def getAllJIDs(self):
+        checkGraphReachability(self._initialtasks)
+        tasklist = traverseGraph(self._initialtasks, [])
+        activeJIDs = []
+        for task in tasklist:
+            # Running jobs have a non-zero jobid and a state of ACTIVE_TASK
+            if task.jobid > 0 and task.state == ClusterTask.ACTIVE_TASK:
+                activeJIDs.append(task.jobid)
+        return activeJIDs
+
+    def killAllTasks(self):
+        success = True
+        checkGraphReachability(self._initialtasks)
+        tasklist = traverseGraph(self._initialtasks, [])
+        for task in tasklist:
+            if task.jobid > 0 and task.state == ClusterTask.ACTIVE_TASK:
+                success = task.kill() and success
+        return success
         
     def getprofile(self):
         profile = []
@@ -126,12 +158,13 @@ class TaskScheduler(object):
         
         return profile
         
-    # API
+    # API          
     
     def addInitialTasks(self, *tasks):
         if self.started:
             raise SchedulerTaskAddedAfterStartException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "Exception adding initial task: %s" % task.getName())
         for task in tasks:
+            self._initialtasks.append(task)
             self.tasks[ClusterTask.INITIAL_TASK].append(task)
 
     def raiseFailure(self, exception = None):
@@ -139,8 +172,10 @@ class TaskScheduler(object):
         if exception:
             raise exception
                        
-    def start(self):
+    def start(self, sgec, dbID):
         # todo: Check the reachability and acylicity of the graph here
+        self.sgec = sgec
+        self.dbID = dbID
         checkGraphReachability(self.tasks[ClusterTask.INITIAL_TASK])
             
         tasksToStart = []
@@ -149,12 +184,11 @@ class TaskScheduler(object):
         
         for task in tasksToStart:
             #todo: pass in files?
-            started = task.start()
-            tstate = task.getState()
-            self._status("Started %s %d " % (task.getName(), tstate))
-            if started and tstate != ClusterTask.FAILED_TASK:
+            started = task.start(self.sgec, self.dbID)
+            if started:
+                self._status("Started %d (%s)" % (task.jobid, task.getName()))
                 self.tasks_in_order.append(task)
-                self._movequeue(task, ClusterTask.INITIAL_TASK, tstate)    
+                self._movequeue(task, ClusterTask.INITIAL_TASK, ClusterTask.ACTIVE_TASK)    
             else:
                 self.raiseFailure(SchedulerStartException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "Exception starting: %s" % task.getName()))
                 return False
@@ -170,21 +204,22 @@ class TaskScheduler(object):
     def step(self):
         '''This determines whether the system state changes by checking the 
            state of the individual tasks.
-           We return True iff all tasks are completed.'''
+           We return True iff all tasks are completed.
+           Note that qstat must be called before the scheduler is stepped as otherwise the qstat cached table of job statuses will not exist.
+           '''
         
         # I told you I was sick. Don't step a broken scheduler.
         if self.failed:
              raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The scheduler has failed.") 
         
-        activeTasksOnCluster = []
+        #todo activeTasksOnCluster = []
         self.statechanged = False    
-        alljobs = sge.qstat()
                       
         # Retire tasks
         activeTasks = self.tasks[ClusterTask.ACTIVE_TASK][:]
         for task in activeTasks:
-            tstate = task.getState(alljobs)
-            activeTasksOnCluster.append(task.getClusterStatus(alljobs))
+            tstate = task.getState()
+            #todo activeTasksOnCluster.append(task.getClusterStatus())
             if tstate == ClusterTask.RETIRED_TASK:
                 self._movequeue(task, ClusterTask.ACTIVE_TASK, ClusterTask.RETIRED_TASK)
             elif tstate == ClusterTask.FAILED_TASK:
@@ -198,7 +233,7 @@ class TaskScheduler(object):
             dependents = task.getDependents()
             completed = True
             for dependent in dependents:
-                if dependent.getState(alljobs) != ClusterTask.COMPLETED_TASK:
+                if dependent.getState() != ClusterTask.COMPLETED_TASK:
                     completed = False
                     break
             if completed:
@@ -212,10 +247,10 @@ class TaskScheduler(object):
             # A dependent *should* fire once all its prerequisite tasks have finished
             dependents = task.getDependents()
             for dependent in dependents:
-                if dependent.getState(alljobs) == ClusterTask.INACTIVE_TASK:
+                if dependent.getState() == ClusterTask.INACTIVE_TASK:
                     self.pendingtasks[dependent] = True
                     self._status("Starting %s." % dependent.getName())
-                    started = dependent.start()
+                    started = dependent.start(self.sgec, self.dbID)
                     if started:
                         self.tasks_in_order.append(dependent)
                         del self.pendingtasks[dependent]
@@ -232,20 +267,14 @@ class TaskScheduler(object):
         # John Hodgman - "Halting problem - solved. You're welcome."
         if self.pendingtasks and not (self.tasks[ClusterTask.ACTIVE_TASK]):
              raise SchedulerDeadlockException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK])
-        
-        self._status("<cluster>" % task, plain = True)
-        for task in activeTasksOnCluster:
-            if task:
-                self._status("<task>%s</task>" % task, plain = True)
-        self._status("</cluster>", plain = True)
-                    
-        if self.statechanged:
-            for task in activeTasks:
-                self._status("%s %d " % (task.getName(), tstate))
-            if self.tasks[ClusterTask.ACTIVE_TASK]:
-                self._status("<active>%s</active>" % self.tasks[ClusterTask.ACTIVE_TASK])
-            if self.tasks[ClusterTask.RETIRED_TASK]:
-                self._status("<retired>%s</retired>" % self.tasks[ClusterTask.RETIRED_TASK])
+                            
+        #if self.statechanged:
+        #    for task in activeTasks:
+        #        self._status("%s %d " % (task.getName(), tstate))
+        #    if self.tasks[ClusterTask.ACTIVE_TASK]:
+        #        self._status("<active>%s</active>" % self.tasks[ClusterTask.ACTIVE_TASK])
+        #    if self.tasks[ClusterTask.RETIRED_TASK]:
+        #        self._status("<retired>%s</retired>" % self.tasks[ClusterTask.RETIRED_TASK])
         
         # We are finished when there are no active or retired tasks
         return not(self.tasks[ClusterTask.ACTIVE_TASK] or self.tasks[ClusterTask.RETIRED_TASK]) 
@@ -254,15 +283,18 @@ class TaskScheduler(object):
         tasks = self._getAllTasks()
         for task in tasks:
             task.cleanup()
+                
 
 import pprint
 class RosettaClusterJob(object):
     
     suffix = "job"
     flatOutputDirectory = False
-    
-    def __init__(self, parameters, tempdir, targetroot):
+    name = "Cluster job"
+        
+    def __init__(self, sgec, parameters, tempdir, targetroot):
         self.parameters = parameters
+        self.sgec = sgec
         self.debug = True
         self.tempdir = tempdir
         self.targetroot = targetroot
@@ -280,6 +312,11 @@ class RosettaClusterJob(object):
         self.resultFilemasks = []
         self._defineOutputFiles()
     
+    def describe(self):
+        self._status("Name: %s" % self.name)
+        self._status("Working directory: %s" % self.workingdir)
+        self._status("Target directory: %s" % self.targetdirectory)    
+        
     def _defineOutputFiles(self):
         pass
     
@@ -289,18 +326,34 @@ class RosettaClusterJob(object):
     
     def _status(self, message):
         if self.debug:
-            print('<debug type="job">%s</debug>' % message)
+            print('<debug id="%d" type="job">%s</debug>' % (self.jobID, message))
             
     def start(self):
         try:
-            self.scheduler.start()
+            self.scheduler.start(self.sgec, self.parameters["ID"])
         except TaskSchedulerException, e:
             self.error = "The job failed during startup"
             self.failed = True
             print(e)
     
-    def cleanup(self):
-        self.scheduler.cleanup()
+    def kill(self):
+        success = True
+        
+        dirsToDelete = [(self.tempdir, self.workingdir, "working"), (self.targetroot, self.targetdirectory, "target")]
+        for dirpair in dirsToDelete:
+            # Being a little cautious here
+            try:
+                commonprefix = os.path.commonprefix([dirpair[0], dirpair[1]])
+                if not commonprefix == dirpair[0]:
+                    self._status("Error: Unexpected common prefix %s found when removing %s directory." % (commonprefix, dirpair[2]))
+                    raise
+                else:
+                    self._status("Removing %s directory %s." % (dirpair[2], dirpair[1]))
+                    shutil.rmtree(dirpair[1])
+            except Exception, e:
+                self._status("Error removing %s directory:\n%s\n%s" % (dirpair[2], e, traceback.print_exc()))
+                success = False            
+        return self.scheduler.killAllTasks() and success
     
     def isCompleted(self):
         if not self.failed:
@@ -335,7 +388,7 @@ class RosettaClusterJob(object):
         else:    
             attr = 'succeeded="true"' 
         
-        stats = [('%s %s workingDir="%s" resultsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory), stats)]
+        stats = [('%s %s workingDir="%s" resultsDir="%s" downloadsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory, self.parameters["cryptID"]), stats)]
         SimpleProfiler.sumTuples(stats)
         return stats
         
@@ -405,9 +458,9 @@ class RosettaClusterJob(object):
         return destpath
 
     def removeClusterTempDir(self):
-        print("removing %s" % self.workingdir)
+        self._status("Deleting working directory %s" % self.workingdir)
         shutil.rmtree(self.workingdir)
-    
+            
     def _make_taskdir(self, dirname, files = []):
         """ Make a subdirectory dirname in the working directory and copy all files into it.
             Filenames should be relative to the working directory."""
@@ -424,5 +477,6 @@ class RosettaClusterJob(object):
     def _workingdir_file_path(self, filename):
         """Get the path for a file within the working directory"""
         return os.path.join(self.workingdir, filename)
+    
     
 

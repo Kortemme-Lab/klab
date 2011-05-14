@@ -12,6 +12,7 @@ sys.path.insert(0, "../")
 from conf_daemon import *
 from rosettahelper import *
 import RosettaTasks
+from sge import SGEConnection, SGEXMLPrinter
 
 if not os.path.exists(netappRoot):
     make755Directory(netappRoot)
@@ -21,7 +22,8 @@ if not os.path.exists(cluster_dltest):
 inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/"
    
 if __name__ == "__main__":
-    test = "3QDORtest"
+    test = "1KI1"
+    sgec = SGEConnection()
     try:
         clusterjob = None
         
@@ -47,7 +49,7 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {102 : "A"}},
                 "Designed"          : {"A" : [103, 104]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, cluster_dltest)
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, cluster_dltest)
         
         if test == "1KI1analysis":
             mini = "seqtolJMB"
@@ -78,7 +80,7 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceSKAnalyzer(params, netappRoot, cluster_dltest) 
+            clusterjob = RosettaTasks.SequenceToleranceSKAnalyzer(sgec, params, netappRoot, cluster_dltest) 
             clusterjob._analyze()
             sys.exit(0)
 
@@ -104,7 +106,7 @@ if __name__ == "__main__":
                 "Premutated"        : {},
                 "Designed"          : {"B" : [203, 204, 205, 206, 207, 208]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, "/home/oconchus/1KI1test")
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, "/home/oconchus/1KI1test")
             clusterjob.targetdirectory = "/home/oconchus/1KI1test"
             clusterjob._analyze()
             sys.exit(0)
@@ -138,7 +140,9 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, netappRoot, cluster_dltest)            
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_dltest)
+            print(clusterjob.scheduler.getAllJIDs())
+            sys.exit(0)            
                 
         elif test == "HK":
             mini = "seqtolHK"
@@ -161,7 +165,7 @@ if __name__ == "__main__":
                 "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
                 }
             
-            clusterjob = RosettaTasks.SequenceToleranceJobHK(params, netappRoot, cluster_dltest)            
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(sgec, params, netappRoot, cluster_dltest)            
         
         if clusterjob:
             #todo: testing clusterjob._analyze()
@@ -170,7 +174,7 @@ if __name__ == "__main__":
             
             try:
                 while not(clusterjob.isCompleted()):
-                    time.sleep(CLUSTER_qstatpause)
+                    sgec.qstat(waitForFresh = True)
             except Exception, e:
                 print("The scheduler failed at some point: %s." % str(e))
                 print(traceback.print_exc())

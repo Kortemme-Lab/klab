@@ -25,6 +25,7 @@ from RosettaProtocols import *
 from rbutils import *
 import RosettaTasks
 from conf_daemon import *
+from sge import SGEConnection, SGEXMLPrinter
 
 cwd = str(os.getcwd())
 
@@ -1055,7 +1056,13 @@ class ClusterDaemon(RosettaDaemon):
         self.beProtocols = ClusterProtocols(self)
         self.protocolGroups, self.protocols = self.beProtocols.getProtocols()
         self.setupSQL()
-    
+        self.sgec = SGEConnection()
+        self._clusterjobjuststarted = None
+        
+        # Maintain a list of recent DB jobs started. This is to avoid any logical errors which 
+        # would repeatedly start a job and spam the cluster. This should never happen but let's be cautious. 
+        self.recentDBJobs = []                  
+        
         if not os.path.exists(netappRoot):
             make755Directory(netappRoot)
         if not os.path.exists(cluster_temp):
@@ -1065,13 +1072,11 @@ class ClusterDaemon(RosettaDaemon):
         self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, clusterjob.jobID ))
 
     def recordErrorInJob(self, clusterjob, errormsg):
-        #todo: There is a bett
         jobID = clusterjob.jobID
         clusterjob.error = errormsg
-        picklederrormsg = pickle.dumps(errormsg)
-
-        # todo: We shouldn't have to pickle the error message but the db driver is having problems with quotes. fix                 
-        self.runSQL('UPDATE %s SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s', parameters = ( self.db_table, picklederrormsg, jobID ))
+        clusterjob.failed = True
+        
+        self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, jobID))
         self.log("Error: The %s job %d failed at some point:" % (clusterjob.suffix, jobID))
         self.log(errormsg)
         
@@ -1082,19 +1087,25 @@ class ClusterDaemon(RosettaDaemon):
         self.log("%s\tStarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         self.runningJobs = []           # list of running processes
         self.killPreviouslyRunningJobs()
+        sgec = self.sgec
+        self.statusprinter = SGEXMLPrinter(sgec)
+        self.diffcounter = CLUSTER_printstatusperiod
         
         while True:
             self.writepid()
             self.checkRunningJobs()
             self.startNewJobs()
-            time.sleep(CLUSTER_qstatpause)  # todo: We should sleep for less than this once the qstat timer is set up properly
+            sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
+            self.printStatus()            
     
     def killPreviouslyRunningJobs(self):
         # If there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
         # todo: used to be SELECT ID, status, pid
         results = self.runSQL("SELECT ID, Status FROM %s WHERE Status=1 and (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
         for simulation in results:
-            #todo: Check using qstat whether the job is running (check all children? would mean logging qstat results to db) and either kill it or email the admin and tell them (seeing as jobs take a while and the daemon may have failed rather than the job)              
+            sgec = self.sgec
+            sgec.qstat(force = True) # use of unnecessary force
+            #todo: Check using qstat whether the job is running (check all children? log all qstat results to file. clear that file here and update it at the end of every run loop) and either kill it or email the admin and tell them (seeing as jobs take a while and the daemon may have failed rather than the job)              
             #if os.path.exists("/proc/%s" % simulation[2]): # checks if process is running
             #    if self.kill_process(simulation[2]): # checks if process was killed
             #        self.runSQL("UPDATE %s SET status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
@@ -1114,7 +1125,7 @@ class ClusterDaemon(RosettaDaemon):
         for clusterjob in self.runningJobs:
             if clusterjob.failed:
                 failedjobs.append(clusterjob)
-                self.recordErrorInJob(self, clusterjob, clusterjob.error)
+                self.recordErrorInJob(clusterjob, clusterjob.error)
         for clusterjob in failedjobs:
             self.runningJobs.remove(clusterjob)
                     
@@ -1122,12 +1133,10 @@ class ClusterDaemon(RosettaDaemon):
         for clusterjob in self.runningJobs:
             jobID = clusterjob.jobID
             try:
-                # todo: This is going to call qstat x number of times.
                 if clusterjob.isCompleted():
                     completedJobs.append(clusterjob)               
 
                     clusterjob.analyze()
-                    clusterjob.cleanup()
                     clusterjob.saveProfile()
                     
                     self.end_job(clusterjob)
@@ -1171,66 +1180,109 @@ class ClusterDaemon(RosettaDaemon):
                         ProtocolParameters = pickle.loads(data[i][8])
                         params.update(ProtocolParameters)                            
                         
+                        # Remember that we are about to start this job to avoid repeatedly submitting the same job to the cluster
+                        # This should not happen but just in case.
+                        # Also, never let the list grow too large as the daemon should be able to run a long time                        
+                        if jobID in self.recentDBJobs:
+                            print("Error: Trying to run database job %d multiple times." % jobID) 
+                            self.log("%s\t Error: Trying to run database job %d multiple times.\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID))
+                            raise
+                        self.recentDBJobs.append(jobID)
+                        if len(self.recentDBJobs) > 400:
+                            self.recentDBJobs = self.recentDBJobs[200:]
+                        
                         # Start the job
                         newclusterjob = self.start_job(task, params)
                         if newclusterjob:
                             #change status and write start time to DB
                             self.runningJobs.append(newclusterjob)
                             self.runSQL("UPDATE %s SET Status=1, StartDate=NOW() WHERE ID=%s" % ( self.db_table, jobID ))
-                        
+                                                            
                         if len(self.runningJobs) >= self.MaxClusterJobs:
                             break
                         
             except Exception, e:
+                newclusterjob = newclusterjob or self._clusterjobjuststarted
+                self._clusterjobjuststarted = None
+                print("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
                 if newclusterjob:
-                    self.recordErrorInJob(self, newclusterjob, "Error starting job.\n%s" % traceback.format_exc())
-                    if newclusterjob in self.runningjobs:
-                        self.runningjobs.remove(newclusterjob)
+                    newclusterjob.kill()
+                    self.recordErrorInJob(newclusterjob, "Error starting job.\n%s\n%s" % (traceback.format_exc(), e))
+                    if newclusterjob in self.runningJobs:
+                        self.runningJobs.remove(newclusterjob)
                 else:
-                    self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, str(jobID) ))                                      
+                    self.runSQL('UPDATE %s SET Errors="Start.\n%s\n%s", Status=4 WHERE ID=%s' % ( self.db_table, traceback.format_exc(), e, str(jobID) ))                                      
                 self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
+            self._clusterjobjuststarted = None
 
     def start_job(self, task, params):
 
         clusterjob = None
         jobID = params["ID"]
-        try:
-            self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
-            if task == "sequence_tolerance":
-                params["radius"] = 5.0
-                clusterjob = RosettaTasks.SequenceToleranceJobHK(params, netappRoot, cluster_temp)   
-            elif task == "sequence_tolerance_SK":
-                params["radius"] = 10.0
-                clusterjob = RosettaTasks.SequenceToleranceJobSK(params, netappRoot, cluster_temp)     
-            elif task == "multi_sequence_tolerance":
-                params["radius"] = 10.0
-                clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(params, netappRoot, cluster_temp)            
-            else:
-                raise
-            # Start the job
-            clusterjob.start()
-        except Exception, e: 
-            if clusterjob:
-                self.recordErrorInJob(self, clusterjob, "Error starting job.\n%s\n%s" % (traceback.format_exc(), e))
-            else:
-                self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, str(jobID) ))                                      
-            print("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, traceback.format_exc() ))
-            self.log("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, traceback.format_exc() ))
-            clusterjob = None
-
+        
+        self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
+        if task == "sequence_tolerance":
+            params["radius"] = 5.0
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(self.sgec, params, netappRoot, cluster_temp)   
+        elif task == "sequence_tolerance_SK":
+            params["radius"] = 10.0
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(self.sgec, params, netappRoot, cluster_temp)     
+        elif task == "multi_sequence_tolerance":
+            params["radius"] = 10.0
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(self.sgec, params, netappRoot, cluster_temp)            
+        else:
+            raise
+        
+        # Start the job
+        self._clusterjobjuststarted = clusterjob        # clusterjob will not be returned on exception and the reference will be lost
+        clusterjob.start()
         return clusterjob
-                    
+    
+    def printStatus(self):
+        '''Print the status of all jobs.'''
+        statusprinter = self.statusprinter
+        
+        if self.runningJobs:
+            someoutput = False
+            diff = statusprinter.qdiff()
+            
+            if False: #todo True: # todo self.diffcounter >= CLUSTER_printstatusperiod:
+                sys.stdout.write("\n")
+                if self.sgec.CachedList:
+                    print(self.sgec.CachedList)
+                
+            if diff:
+                sys.stdout.write("\n")
+                self.diffcounter += 1
+                if self.diffcounter >= CLUSTER_printstatusperiod:
+                    # Every x diffs, print a full summary
+                    summary = statusprinter.summary()
+                    statusList = statusprinter.statusList()
+                    if summary:
+                        print(summary)
+                    if statusList:
+                        print(statusList)
+                    self.diffcounter = 0
+                print(diff)
+            else:
+                # Indicate tick
+                sys.stdout.write(".")
+        else:
+            sys.stdout.write(".")
+        sys.stdout.flush()
+            
+            
     def end_job(self, clusterjob):
         
         try:
             self.copyAndZipOutputFiles(clusterjob, clusterjob.parameters["task"])
         except:
-            self.recordErrorInJob(self, clusterjob, "Error archiving files")
+            self.recordErrorInJob(clusterjob, "Error archiving files")
         
         try:
             self.removeClusterTempDir(clusterjob)
         except:
-            self.recordErrorInJob(self, clusterjob, "Error removing temporary directory on the cluster")
+            self.recordErrorInJob(clusterjob, "Error removing temporary directory on the cluster")
             
         if not clusterjob.error:
             self.recordSuccessfulJob(clusterjob)
@@ -1278,8 +1330,8 @@ class ClusterDaemon(RosettaDaemon):
                 filename_zip = "data_%s.zip" % ( ID )
                 all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
                 abs_files = get_files('./')
-                print(abs_files)
-                #todo: /home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/11f9f52b7bef882fbbb1b94ab0752074/timing_profile.txt"
+                
+                # Do not include the timing profile in the zip
                 timingprofile = os.path.join(result_dir, "timing_profile.txt")
                 if timingprofile in abs_files:
                     abs_files.remove(timingprofile)
@@ -1581,8 +1633,8 @@ if __name__ == "__main__":
                 output_handle.close()
                 IP = '127.0.0.1'
                 hostname = 'albana'
-                nos = '100'
                 keep_output = 1
+                nos = None
                 
                 ProtocolParameters = {}
                 if 'cm1' == sys.argv[3]:
@@ -1625,6 +1677,7 @@ if __name__ == "__main__":
                     print("Adding a new sequence tolerance (SK) job:")
                     mini = 'seqtolJMB'
                     modus = "sequence_tolerance_SK"
+                    nos = '2'
                     ProtocolParameters = {
                         "kT"                : 0.228,
                         "Partners"          : ["A", "B"],
@@ -1637,6 +1690,7 @@ if __name__ == "__main__":
                     output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
                     pdbfile = output_handle.read()
                     output_handle.close()
+                    nos = '2'
                     
                     print("Adding a new sequence tolerance (HK) job:")
                     mini = 'seqtolHK'
@@ -1668,7 +1722,7 @@ if __name__ == "__main__":
                     # success
                     
                     #livejobs = daemon.runSQL("SELECT Date,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, seqtol_parameter FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
-                    livejobs = daemon.runSQL("SELECT ID, Notes FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
+                    livejobs = daemon.runSQL("SELECT ID, Status, Notes FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
                     #daemon.runSQL("UNLOCK TABLES")
                     print(livejobs)
                 

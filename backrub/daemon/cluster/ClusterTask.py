@@ -11,10 +11,11 @@ import tempfile
 import re
 import glob
 from string import join
+import traceback
 
 from conf_daemon import *
 import SimpleProfiler
-import sge
+#import sge
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile
 from RosettaProtocols import *
 
@@ -153,7 +154,9 @@ echo "</enddate>"
 class ClusterTask(object):
     prefix = "task"
     
+    # Running jobs have a non-zero jobid and a state of ACTIVE_TASK
     def __init__(self, workingdir, targetdirectory, scriptfilename, parameters = {}, name = ""):
+        self.sgec = None
         self.profiler = SimpleProfiler.SimpleProfiler(name)
         self.profiler.PROFILE_START("Initialization")
         self.parameters = parameters
@@ -202,10 +205,23 @@ class ClusterTask(object):
 
     def getName(self):
         return self.name
+    
+    def kill(self):
+        try:
+            status, output = self.sgec.qdel(self.jobid)
+            self._status(output)
+            if status != 0:
+                raise
+        except Exception, e:
+            self._status("Exception killing task with jid %d.\n%s\n%s" % (self.jobid, e, traceback.print_exc()))
+            return False
+        return True            
+                    
         
-    def start(self):
+    def start(self, sgec, dbID):
         # Our job submission engine is sequential at present so we use one filename
         # todo: use a safe equivalent of tempname
+        self.sgec = sgec
         if self.script:
             self._status("Starting %s" % self.name)
             # Copy files from prerequisites
@@ -215,8 +231,7 @@ class ClusterTask(object):
                 
             writeFile(self.filename, self.script)
             #print(self.script)
-            self.jobid, stdo = sge.qsub_submit(self.filename, self.workingdir, name = self.scriptfilename, showstdout = self.debug)
-            self._status("<qsub>%s</qsub>" % stdo, plain = True)
+            self.jobid, stdo = sgec.qsub_submit(self.filename, self.workingdir, dbID, name = self.scriptfilename, showstdout = self.debug)
             self._status("Job started with id %d." % self.jobid)
             if self.jobid != 0:
                 self.profiler.PROFILE_START("Execution")
@@ -232,9 +247,8 @@ class ClusterTask(object):
     def copyFiles(self, targetdirectory, filemasks = ["*"]):
         for mask in filemasks:
             #todo: This will copy the files to the dependent task's directory on chef
-            self._status('os.system("cp %s/%s %s")' % (self.workingdir, mask, targetdirectory))
+            self._status('Copying %s/%s to %s' % (self.workingdir, mask, self.targetdirectory))
             for file in glob.glob(self._workingdir_file_path(mask)):
-                self._status('copying %s' % file)
                 shutil.copy(file, targetdirectory)
            
     
@@ -242,8 +256,8 @@ class ClusterTask(object):
         if type(filemasks) == type(""):
             filemasks = [filemasks]
         for p in filemasks:
+            self._status('Copying %s/%s to %s' % (self.workingdir, p, self.targetdirectory))
             for file in glob.glob(self._workingdir_file_path(p)):
-                self._status('copying %s' % file)
                 shutil.copy(file, self.targetdirectory)    
         
     def retire(self):
@@ -270,6 +284,7 @@ class ClusterTask(object):
                     
         if self.scriptfilename:
             failedOutput = False
+            self._status('Copying stdout and stderr output to %s' % (self.targetdirectory))        
             for i in range(1, self.numtasks + 1):
             
                 if self.numtasks == 1:
@@ -284,7 +299,6 @@ class ClusterTask(object):
                 stdoutfile = self._workingdir_file_path(filename_stdout)
                 if os.path.exists(stdoutfile):
                     self.filename_stdout = filename_stdout
-                    self._status('shutil.copy(%s %s")' % (stdoutfile, self.targetdirectory))
                     shutil.copy(stdoutfile, self.targetdirectory)
                 else:
                     self._status("Failed on %s, subtask %d. No stdout file %s." % (self.name, i, stdoutfile))
@@ -294,7 +308,6 @@ class ClusterTask(object):
                 stderrfile = self._workingdir_file_path(filename_stderr)
                 if os.path.exists(stderrfile):                    
                     self.filename_stderr = filename_stderr
-                    self._status('shutil.copy(%s %s")' % (stderrfile, self.targetdirectory))
                     shutil.copy(stderrfile, self.targetdirectory)
                     stderrHasFailed = os.path.getsize(stderrfile) > 0
                     if self.failOnStdErr and stderrHasFailed:
@@ -339,14 +352,13 @@ class ClusterTask(object):
             if plain:
                 print(message)
             else:
-                print('<debug type="task">%s</debug>' % message)
+                print('<debug id="%d" type="task">%s</debug>' % (self.jobid, message))
         
     def cleanup(self):
         """this is the place to remove any remaining files left by your application"""
         self._status("Cleaning up %s" % self.name)
         
         if not self.cleanedup:
-            self._status("cleanup: os.remove(%s)" % self.workingdir)
             self.cleanedup = True
     
     def addPrerequisite(self, task, inputfiles = []):
@@ -359,19 +371,18 @@ class ClusterTask(object):
     def getDependents(self):
         return self.dependents
     
-    def getClusterStatus(self, qstatjobs = None):
-        if self.state == ACTIVE_TASK:
-            thisjob, alljobs = sge.qstat(self.jobid, jobs = qstatjobs)
-            if thisjob:
-                return "%s - %s" % (self.scriptfilename, thisjob)
-        return None
+    #todo def getClusterStatus(self):
+    #    if self.state == ACTIVE_TASK:
+    #        status = sge.cachedStatus(self.jobid)
+    #        if status:
+    #            return "%s - %s" % (self.scriptfilename, status)
+    #    return None
 
-    def getState(self, qstatjobs = None, allowToRetire = True):
+    def getState(self, allowToRetire = True):
         # ping server
         if self.state == ACTIVE_TASK:
             # Query the submission host
-            thisjob, alljobs = sge.qstat(self.jobid, jobs = qstatjobs)
-                        
+            thisjob = self.sgec.cachedStatus(self.jobid)
             if not thisjob and allowToRetire:
                 self.state = RETIRED_TASK
                 self.profiler.PROFILE_STOP("Execution")
