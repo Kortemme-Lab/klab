@@ -26,10 +26,40 @@ if not os.path.exists(netappRoot):
 if not os.path.exists(cluster_dltest):
     make755Directory(cluster_dltest)
 
-inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input/"
-   
+inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/test/"
+
+# copied from rosetta_daemon
+def printStatus(sgec, statusprinter, diffcounter):
+    '''Print the status of all jobs.'''
+    someoutput = False
+    diff = statusprinter.qdiff()
+    
+    if False: #todo True: # todo self.diffcounter >= CLUSTER_printstatusperiod:
+        sys.stdout.write("\n")
+        if sgec.CachedList:
+            print(sgec.CachedList)
+        
+    if diff:
+        sys.stdout.write("\n")
+        diffcounter += 1
+        if diffcounter >= CLUSTER_printstatusperiod:
+            # Every x diffs, print a full summary
+            summary = statusprinter.summary()
+            statusList = statusprinter.statusList()
+            if summary:
+                print(summary)
+            if statusList:
+                print(statusList)
+            diffcounter = 0
+        print(diff)
+    else:
+        # Indicate tick
+        sys.stdout.write(".")
+    sys.stdout.flush()
+    return diffcounter
+    
 if __name__ == "__main__":
-    test = "1KI1"
+    test = "PSK"
     sgec = SGEConnection()
     try:
         clusterjob = None
@@ -57,6 +87,31 @@ if __name__ == "__main__":
                 "Designed"          : {"A" : [103, 104]}
                 }
             clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, cluster_dltest)
+        
+        if test == "PSK":
+            mini = "seqtolJMB"
+            ID = 1234
+            pdb_filename = "1MDY_mod.pdb"    
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 2
+            
+            params = {
+                "cryptID"           : "cryptic",
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : 10,
+                "kT"                : 0.228,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"A" : {102 : "A"}},
+                "Designed"          : {"A" : [103, 104]}
+                }
+            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(sgec, params, netappRoot, cluster_dltest)
         
         if test == "1KI1analysis":
             mini = "seqtolJMB"
@@ -176,19 +231,23 @@ if __name__ == "__main__":
         
         if clusterjob:
             #todo: testing clusterjob._analyze()
-            
+
+            statusprinter = SGEXMLPrinter(sgec)
+            diffcounter = CLUSTER_printstatusperiod
+
             clusterjob.start()
+            sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
             
             try:
                 while not(clusterjob.isCompleted()):
                     sgec.qstat(waitForFresh = True)
+                    diffcounter = printStatus(sgec, statusprinter, diffcounter)
+
             except Exception, e:
                 print("The scheduler failed at some point: %s." % str(e))
                 print(traceback.print_exc())
                 
             clusterjob.analyze()
-            clusterjob.cleanup()
-            jobprofile = clusterjob.getprofile()
             
             print("<profile>")
             print(clusterjob.getprofileXML())

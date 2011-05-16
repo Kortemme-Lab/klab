@@ -1226,7 +1226,7 @@ class ClusterDaemon(RosettaDaemon):
             clusterjob = RosettaTasks.SequenceToleranceJobHK(self.sgec, params, netappRoot, cluster_temp)   
         elif task == "sequence_tolerance_SK":
             params["radius"] = 10.0
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(self.sgec, params, netappRoot, cluster_temp)     
+            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(self.sgec, params, netappRoot, cluster_temp)     
         elif task == "multi_sequence_tolerance":
             params["radius"] = 10.0
             clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(self.sgec, params, netappRoot, cluster_temp)            

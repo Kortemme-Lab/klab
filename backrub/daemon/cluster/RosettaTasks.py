@@ -192,10 +192,10 @@ class BackrubClusterSKTask(ClusterTask):
                 "-database %s" % ct.getDatabaseDir(), 
                 "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
                 "-ignore_unrecognized_res", 
+                "-ex1 -ex2", #@todo: ask about score patch and mute options, perturb movemap 
                 "-nstruct %d" % parameters["nstruct"],
-                "-ex1 -ex2", # todo: Check if Colin used these in the publication
                 "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-pivot_atoms CA"]
+                "-pivot_atoms CA"] #@todo: ask why I'm using this
         if self.movemap:
             args.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
         if self.resfile:
@@ -297,17 +297,19 @@ class SequenceToleranceClusterTask(ClusterTask):
                 [ct.getBinary("sequence_tolerance"),  
                 "-database %s" % ct.getDatabaseDir(), 
                 "-s $lowfilesvar",
-                "-packing:resfile %s/%s" % (self.workingdir, self.resfile),
                 "-ex1 -ex2 -extrachi_cutoff 0",
-                "-score:ref_offsets TRP 0.9",  # todo: Ask Colin
+                "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
                 "-ms:generations 5",
                 "-ms:pop_size %d" % parameters["pop_size"],
                 "-ms:pop_from_ss 1",
                 "-ms:checkpoint:prefix $prefixesvar",
                 "-ms:checkpoint:interval 200",
                 "-ms:checkpoint:gz",
-                "-out:prefix $prefixesvar",
-                "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " ") ])]
+                "-ms:numresults", "0",
+                "-out:prefix $prefixesvar", # @todo: ask about the score:weights and score:patch options in backrub_seqtol.py 
+                "-packing:resfile %s/%s" % (self.workingdir, self.resfile),
+                "-score:ref_offsets TRP 0.9"  # @todo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
+                 ])]
         self.script = ct.createScript(commandlines, type="SequenceTolerance")
 
     def retire(self):
@@ -1673,3 +1675,358 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         output_handle.close()
         return
 
+
+class BackrubSequenceToleranceSK(ClusterTask):
+
+    # additional attributes
+    prefix = "brseqtol"
+         
+    def __init__(self, workingdir, targetdirectory, parameters, backrub_resfile, seqtol_resfile, movemap=None, name=""):
+        self.backrub_resfile    = backrub_resfile
+        self.seqtol_resfile     = seqtol_resfile
+        self.movemap            = movemap
+        self.residues           = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
+        self.pivot_res          = []   # list of pivot residues, consecutively numbered from 1 [1,...]
+        self.map_res_id         = {}   # contains the mapping from (chain,resid) to pivot_res
+        
+        super(BackrubSequenceToleranceSK, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name)          
+    
+    def _initialize(self):
+        self._prepare_backrub()
+        parameters = self.parameters
+                
+        self.br_output_prefixes = ["%04i_" % (i + 1) for i in range(parameters["nstruct"])]
+        self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
+        self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
+        self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
+        self.numtasks = parameters["nstruct"]
+        
+        self.parameters["ntrials"] = 10000 # todo: should be 10000 on the live webserver
+        self.parameters["pop_size"] = 2000 # todo: should be 2000 on the live webserver
+        if CLUSTER_debugmode:
+            self.parameters["ntrials"] = 10   
+            self.parameters["pop_size"] = 20
+        
+        # Create script
+        
+        taskarrays = {
+            "broutprefixes" : self.br_output_prefixes, 
+            "lowfiles" : self.low_files, 
+            "prefixes" : self.prefixes}
+        ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = taskarrays)
+        
+        #1MDY_mod_0001_low.pdb missing</error>
+        #<error>/netapp/home/klabqb3backrub/temp/tmpxStwRl_seqtolSK/sequence_tolerance/1MDY_mod_0001_last.pdb missing</error>
+        #<error>/netapp/home/klabqb3backrub/temp/tmpxStwRl_seqtolSK/sequence_tolerance/1MDY_mod_0002_low.pdb missing</error>
+        #<error>/netapp/home/klabqb3backrub/temp/tmpxStwRl_seqtolSK/sequence_tolerance/1MDY_mod_0002_last.pdb
+        
+        # Setup backrub
+        backrubCommand = [
+                ct.getBinary("backrub"),  
+                "-database %s" % ct.getDatabaseDir(), 
+                "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
+                "-ignore_unrecognized_res", 
+                "-ex1 -ex2", #@todo: ask about score patch and mute options, perturb movemap 
+                "-backrub:ntrials %d" % parameters["ntrials"], 
+                "-pivot_atoms CA", #@todo: ask why I'm using this
+                "-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
+                "-out:prefix $broutprefixesvar"
+                ]
+        if self.movemap:
+            backrubCommand.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
+        if len(self.pivot_res) > 0:
+            backrubCommand.append("-pivot_residues")
+            self.pivot_res.sort()
+            backrubCommand.extend([str(resid) for resid in self.pivot_res])
+        backrubCommand = [
+            '# Run backrub', 
+            '', 
+            join(backrubCommand, " "), 
+            '', 
+            'mv ${SGE_TASK_ID4}_%s_0001_low.pdb %s_${SGE_TASK_ID4}_low.pdb' % (parameters["pdbRootname"], parameters["pdbRootname"]),
+            'rm ${SGE_TASK_ID4}_%s_0001_last.pdb' % parameters["pdbRootname"],
+            ''] 
+        
+        # Setup sequence tolerance
+        seqtolCommand = ['# Run sequence tolerance', '',
+            join(
+                [ #"#disable",
+                 ct.getBinary("sequence_tolerance"),   
+                "-database %s" % ct.getDatabaseDir(), 
+                "-s $lowfilesvar",
+                "-ex1 -ex2 -extrachi_cutoff 0",
+                "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
+                "-ms:generations 5",
+                "-ms:pop_size %d" % parameters["pop_size"],
+                "-ms:pop_from_ss 1",
+                "-ms:checkpoint:prefix $prefixesvar",
+                "-ms:checkpoint:interval 200",
+                "-ms:checkpoint:gz",
+                "-ms:numresults", "0",
+                "-out:prefix $prefixesvar", # @todo: ask about the score:weights and score:patch options in backrub_seqtol.py 
+                "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
+                "-score:ref_offsets TRP 0.9"  # @todo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
+                 ])]
+        self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
+ 
+    def _prepare_backrub( self ):
+        """prepare data for a full backbone backrub run"""
+        self.pdb = pdb.PDB(self.parameters["pdb_info"].split('\n'))
+        self.map_res_id = self.parameters["map_res_id"] 
+        self.residue_ids = self.pdb.aa_resids()
+
+        # backrub is applied to all residues: append all residues to the backrub list
+        backrub = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
+        for res in self.residue_ids:
+            x = [ res[0], res[1:].strip() ] # 0: chain ID, 1..: resid
+            if len(x) == 1:
+                backrub.append( ( "_", int(x[0].lstrip())) )
+            else:
+                backrub.append( ( x[0], int(x[1].lstrip())) )
+        
+        # translate resid to absolute mini rosetta res ids
+        for residue in backrub:
+            self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
+                
+    
+    def retire(self):
+        passed = super(BackrubSequenceToleranceSK, self).retire()
+                               
+        try:
+            # Run the analysis on the originating host
+            errors = []
+            # check whether files were created (and write the total scores to a file)
+            for x in range(1, self.parameters['nstruct']+1):
+                low_file   = self._workingdir_file_path(getOutputFilenameSK(self.parameters["pdbRootname"], x, "low"))          
+                if not os.path.exists( low_file ): 
+                    errors.append('%s missing' % low_file)
+                
+            #@todo: should we generate backrub scores for single backrub runs?
+            #if self.filename_stdout and os.path.exists(self._targetdir_file_path( self.filename_stdout )):
+            #    Analysis = AnalyzeMini(filename=self._targetdir_file_path( self.filename_stdout ))
+            #    Analysis.analyze(outfile=self._targetdir_file_path('backrub_scores.dat'))
+            #else:
+            #    errors.append("Standard output is missing; no analysis was performed.")
+            
+            # Copy the files from the cluster submission host back to the originating host
+            self._status('Copying pdb, gz, and resfiles back')
+            self._copyFilesBackToHost(["*.pdb", "*.gz", "*.resfile"])
+        except Exception, e:
+            errors.append(str(e))
+            errors.append(traceback.format_exc())
+            
+        # At this stage we are actually done but do not mark ourselves as completed otherwise the scheduler will get confused
+        if errors:
+            errs = join(errors,"</error>\n\t<error>")
+            print("<errors>\n\t<error>%s</error>\n</errors>" % errs)
+            self.state = FAILED_TASK
+            return False
+          
+        return passed
+    
+    
+class ParallelSequenceToleranceJobSK(RosettaClusterJob):
+
+    suffix = "seqtolSK"
+    flatOutputDirectory = True
+    name = "Sequence Tolerance (SK, JMB)"
+    
+    def _defineOutputFiles(self):
+        self.resultFilemasks.append((".", "*.pdb"))
+        self.resultFilemasks.append((".", "stderr*"))
+        self.resultFilemasks.append((".", "stdout*"))
+        self.resultFilemasks.append((".", "timing_profile.txt"))
+        self.resultFilemasks.append((".", "tolerance_*"))
+        self.resultFilemasks.append((".", "*.ga.entities.gz"))
+        self.resultFilemasks.append(("sequence_tolerance", "*.resfile"))
+        self.resultFilemasks.append(("sequence_tolerance", "*.movemap"))
+        self.resultFilemasks.append(("sequence_tolerance", "backrub_scores.dat"))
+        self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
+        self.resultFilemasks.append(("sequence_tolerance", "*low*.pdb"))
+            
+    def __init__(self, sgec, parameters, tempdir, targetroot):
+        # The tempdir is the one on the submission host e.g. chef
+        # targetdirectory is the one on your host e.g. your PC or the webserver
+        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
+        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+        self.map_res_id = {}
+        super(ParallelSequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot)
+    
+    def _initialize(self):
+        self.describe()
+        
+        # Create input files        
+        self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
+        self._write_backrub_resfile()
+        self._write_seqtol_resfile()
+        self._write_backrub_movemap()
+        
+        scheduler = TaskScheduler(self.workingdir, files = [self.parameters["pdb_filename"], self.seqtol_resfile, self.backrub_resfile, self.backrub_movemap])
+         
+        targetsubdirectory = "sequence_tolerance"
+        inputfiles = [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap, self.seqtol_resfile]
+        taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
+        targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
+        stTask = BackrubSequenceToleranceSK(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name="Sequence tolerance (SK JMB)")
+         
+        scheduler.addInitialTasks(stTask)
+        self.scheduler = scheduler
+
+    def _analyze(self):
+        # Run the analysis on the originating host
+        
+        self._status("Analyzing results")
+        # run Colin's analysis script: filtering and profiles/motifs
+        thresh_or_temp = self.parameters['kT']
+        
+        weights = self.parameters['Weights']
+        fitness_coef = 'c(%s' % weights[0]
+        for i in range(1, len(weights)):
+            fitness_coef += ', %s' % weights[i]
+        fitness_coef += ')'
+        
+        type_st = '\\"boltzmann\\"'
+        prefix  = '\\"tolerance\\"'
+        percentile = '.5'
+        
+        #targetTaskDir =  os.path.join(self.targetdirectory, "sequence_tolerance")
+        # Move any output files to the root so all R output gets located there
+        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*ga.entities*")):
+            self._status('copying %s' % file)
+            shutil.move(file, self.targetdirectory)
+        
+        # Create the standard output file where the R script expects it
+        firststdout = None
+        firstlowfile = None
+        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*.cmd.o*.1")):
+            firststdout = file
+            break
+        for file in glob.glob(self._workingdir_file_path(self.parameters["pdb_filename"])):
+            originalpdb = file
+            break
+        if firststdout and originalpdb:
+            self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+            shutil.copy(firststdout, self._targetdir_file_path("seqtol_1_stdout.txt"))
+            shutil.copy(originalpdb, self.targetdirectory)
+        else:
+            self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+                            
+        # Run the R script and pipe stderr and stdout to file 
+        cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
+                  | /bin/cat %s - \\
+                  | /usr/bin/R --vanilla''' % ( self.targetdirectory, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)                
+        self._status(cmd)
+        self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+        self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+        self.file_stdout.write("*********************** R output ***********************\n")
+        subp = subprocess.Popen(cmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
+                
+        while True:
+            returncode = subp.poll()
+            if returncode != None:
+                if returncode != 0:
+                    sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+                    raise PostProcessingException
+                break;
+            time.sleep(2)
+        self.file_stdout.close()
+        self.file_stderr.close()
+        
+        count = 0
+        if not os.path.exists( self._targetdir_file_path("tolerance_sequences.fasta") ) and count < 10 :
+            time.sleep(1) # make sure the fasta file gets written
+            count += 1
+        
+        #todo: should fail gracefully here if the fasta file still isn't written
+          
+        # create weblogo from the created fasta file
+        seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
+        logo_data = LogoData.from_seqs(seqs)
+        logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
+        logo_options = LogoOptions()
+        logo_options.title = "Sequence profile"
+        logo_options.number_interval = 1
+        logo_options.color_scheme = std_color_schemes["chemistry"]
+        
+        ann = getResIDs(self.parameters)
+        
+        logo_options.annotate = ann
+        
+        logo_format = LogoFormat(logo_data, logo_options)
+        png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
+        
+        # Delete the generation files:
+        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_low.ga.generations.gz")):
+            self._status('deleting %s' % file)
+            os.remove(file)
+        
+        # Delete empty files
+        for file in glob.glob(self._targetdir_file_path("*")):
+            if os.path.getsize(file) == 0:
+                self._status('Deleting empty file %s' % file)
+                os.remove(file)
+        #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*")):
+        #    if os.path.getsize(file) == 0:
+        #       self._status('Deleting empty file %s' % file)
+        #       os.remove(file)
+        
+        # Remove the duplicated stdout file        
+        os.remove(self._targetdir_file_path("seqtol_1_stdout.txt"))
+            
+        
+        return True
+    
+    def _import_pdb(self, filename, contents):
+        """Import a pdb file from the database and write it to the temporary directory"""
+        self.pdb = pdb.PDB(contents.split('\n'))
+      
+        # remove everything but the chosen chains or keep all chains if the list is empty
+        # pdb_content is passed directly to backrub so remove the pruned chain lines before the backrub
+        self.pdb.pruneChains(self.parameters['Partners'])
+        self.pdb.remove_hetatm()  # rosetta doesn't like heteroatoms so let's remove them
+        self.parameters['pdb_info'] = join(self.pdb.lines, '\n')        
+        # internal mini resids don't correspond to the pdb file resids
+        # the pivot residues need to be numbered consecutively from 1 up
+        self.map_res_id = self.pdb.get_residue_mapping()
+        self.parameters["map_res_id"] = self.map_res_id 
+        
+        self.pdb.write(self._workingdir_file_path(filename))
+    
+    def _write_backrub_movemap( self ):
+        """create a movemap minimizing all chi angles"""
+        self.backrub_movemap = "allchi_%s.movemap" % self.parameters["ID"]
+        rosettahelper.writeFile(self._workingdir_file_path(self.backrub_movemap), 'RESIDUE * CHI\n')
+    
+    def _write_backrub_resfile( self ):
+        """create a resfile of premutations for the backrub"""
+               
+        # Write out the premutated residues
+        s = ""
+        params = self.parameters
+        for partner in params['Partners']:
+            if params['Premutated'].get(partner):
+                pm = params['Premutated'][partner]
+                for residue in pm:
+                    #todo: check that residue exists -  # get all residues:  residue_ids     = self.pdb.aa_resids()
+                    s += ("%d %s PIKAA %s\n" % (residue, partner, pm[residue]))
+        
+        # Only create a file if there are any premutations
+        self.backrub_resfile = "backrub_%s.resfile" % self.parameters["ID"]
+        rosettahelper.writeFile(self._workingdir_file_path(self.backrub_resfile), 'NATAA\nstart\n%s\n' % s)
+        
+        
+    def _write_seqtol_resfile( self ):
+        """create a resfile for the chains
+            residues in interface: NATAA (conformation can be changed)
+            residues mutation: PIKAA ADEFGHIKLMNPQRSTVWY (design sequence)"""
+        
+        resfileHasContents, contents = make_seqtol_resfile( self.pdb, self.parameters, self.parameters['radius'], self.pdb.aa_resids())
+                
+        if resfileHasContents:
+            self.seqtol_resfile = "seqtol_%s.resfile" % self.parameters["ID"]
+            rosettahelper.writeFile(self._workingdir_file_path(self.seqtol_resfile), "%s\n" % contents)
+        else:
+            sys.stderr.write("An error occurred during the sequence tolerance execution. The chosen designed residues resulting in an empty resfile and so could not be used.")
+            raise SequenceToleranceException 
+        
+        

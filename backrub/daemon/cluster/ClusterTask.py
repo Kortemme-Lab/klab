@@ -110,10 +110,9 @@ echo "<arch>"
 uname -i
 echo "</arch>"
 
-#setenv TMPDIR /scratch
-#setenv MYTMP `mktemp -d`
-#echo $MYTMP
-#cd $MYTMP
+# 4-character (zero padded) counter
+SGE_TASK_ID4=`printf %%04d $SGE_TASK_ID`
+
 """ % self.parameters)
 
     def _addTask(self, lines, type, attributes):
@@ -301,8 +300,6 @@ class ClusterTask(object):
                     filename_stdout = "%s.o%s.%d" % (self.scriptfilename, self.jobid, i)
                     filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
                 
-                stderrhasfailed = False
-                
                 stdoutfile = self._workingdir_file_path(filename_stdout)
                 if os.path.exists(stdoutfile):
                     self.filename_stdout = filename_stdout
@@ -313,11 +310,14 @@ class ClusterTask(object):
                     failedOutput = True
 
                 stderrfile = self._workingdir_file_path(filename_stderr)
+                stderrHasFailed = False
                 if os.path.exists(stderrfile):                    
                     self.filename_stderr = filename_stderr
-                    shutil.copy(stderrfile, self.targetdirectory)
                     stderrHasFailed = os.path.getsize(stderrfile) > 0
-                    if self.failOnStdErr and stderrHasFailed:
+                    if not stderrHasFailed:
+                        os.remove(stderrfile)
+                    elif self.failOnStdErr:
+                        shutil.copy(stderrfile, self.targetdirectory)
                         self._status("Failed on %s, subtask %d. stderr file %s has size %d" % (self.name, i, stderrfile, stderrHasFailed))
                         self.state = FAILED_TASK
                         failedOutput = True
@@ -325,8 +325,10 @@ class ClusterTask(object):
                     self._status("Failed on %s, subtask %d. No stderr file %s." % (self.name, i, stderrfile))
                     filename_stderr = None
                     failedOutput = True
-    
-                self.outputstreams.append({"stdout" : filename_stdout, "stderr" : filename_stderr, "failed" : stderrhasfailed})
+                if stderrHasFailed:
+                    self.outputstreams.append({"stdout" : filename_stdout, "stderr" : filename_stderr})
+                else:
+                    self.outputstreams.append({"stdout" : filename_stdout})
 
             return not failedOutput
         else:
