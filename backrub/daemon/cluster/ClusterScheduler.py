@@ -453,7 +453,14 @@ class RosettaClusterJob(object):
     def removeClusterTempDir(self):
         self._status("Deleting working directory %s" % self.workingdir)
         shutil.rmtree(self.workingdir)
-            
+
+    def _appendError(self, errmsg):
+        if self.error:
+            self.error = "%s\n%s" % (self.error, errmsg)
+        else:
+            self.error = errmsg
+        self._status(errmsg)
+
     def _make_taskdir(self, dirname, files = []):
         """ Make a subdirectory dirname in the working directory and copy all files into it.
             Filenames should be relative to the working directory."""
@@ -463,7 +470,6 @@ class RosettaClusterJob(object):
         if not os.path.isdir(taskdir):
             raise os.error
         for file in files:
-            #todo: This will copy the files from the webserver to chef
             shutil.copyfile("%s/%s" % (self.workingdir, file), "%s/%s" % (taskdir, file))
         return taskdir
 

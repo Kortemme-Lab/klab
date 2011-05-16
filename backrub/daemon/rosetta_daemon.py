@@ -753,7 +753,6 @@ The Kortemme Lab Server Daemon
 
     def StartMutations(self, ID, pdb_info, pdb_filename, mini, ensemble_size, params):                       
         # create rosetta run
-        #todo: get binaries from RosettaBinaries
         binary = RosettaBinaries[mini]
         usingMini = binary["mini"]
         executable = "%s/%s" % (self.binDir, binary["backrub"])
@@ -1159,7 +1158,7 @@ class ClusterDaemon(RosettaDaemon):
         newclusterjob = None
         if len(self.runningJobs) < self.MaxClusterJobs:            
             # get all jobs in queue
-            #todo change seqtol_parameter to ProtocolParameters after webserver update
+            #@upgradetodo change seqtol_parameter to ProtocolParameters after webserver update
             data = self.runSQL("SELECT ID,Date,Status,PDBComplex,PDBComplexFile,Mini,EnsembleSize,task,seqtol_parameter,cryptID FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
             try:
                 if len(data) != 0:
@@ -1246,7 +1245,7 @@ class ClusterDaemon(RosettaDaemon):
             someoutput = False
             diff = statusprinter.qdiff()
             
-            if False: #todo True: # todo self.diffcounter >= CLUSTER_printstatusperiod:
+            if False: # For debugging
                 sys.stdout.write("\n")
                 if self.sgec.CachedList:
                     print(self.sgec.CachedList)
@@ -1568,7 +1567,7 @@ if __name__ == "__main__":
                     import random
                     import md5
                     #daemon.runSQL("LOCK TABLES %s WRITE, Users READ" % daemon.db_table)
-                    #todo change seqtol_parameter to ProtocolParameters after webserver update
+                    #@upgradetodo change seqtol_parameter to ProtocolParameters after webserver update
 
                     db_host                = "localhost"
                     db_name                = "rosettaweb"
@@ -1706,7 +1705,7 @@ if __name__ == "__main__":
                     import md5
                     print(UserID)
                     #daemon.runSQL("LOCK TABLES %s WRITE, Users READ" % daemon.db_table)
-                    #todo change seqtol_parameter to ProtocolParameters after webserver update
+                    #@upgradetodo change seqtol_parameter to ProtocolParameters after webserver update
                     daemon.runSQL("""INSERT INTO %s ( Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, seqtol_parameter) 
                                 VALUES (NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))           
                     result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))

@@ -33,11 +33,6 @@ def printStatus(sgec, statusprinter, diffcounter):
     '''Print the status of all jobs.'''
     someoutput = False
     diff = statusprinter.qdiff()
-    
-    if False: #todo True: # todo self.diffcounter >= CLUSTER_printstatusperiod:
-        sys.stdout.write("\n")
-        if sgec.CachedList:
-            print(sgec.CachedList)
         
     if diff:
         sys.stdout.write("\n")
@@ -230,7 +225,6 @@ if __name__ == "__main__":
             clusterjob = RosettaTasks.SequenceToleranceJobHK(sgec, params, netappRoot, cluster_dltest)            
         
         if clusterjob:
-            #todo: testing clusterjob._analyze()
 
             statusprinter = SGEXMLPrinter(sgec)
             diffcounter = CLUSTER_printstatusperiod

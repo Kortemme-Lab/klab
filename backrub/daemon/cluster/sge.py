@@ -67,7 +67,7 @@ class SGEConnection(object):
             if len(output) > 2:
                 newmapClusterToDB = {}
                 for line in output[2:]:
-                    # todo: We must ensure our task names contain no spaces for the parsing below to work 
+                    # We assume that our script names contain no spaces for the parsing below to work (this should be ensured by ClusterTask) 
                     tokens = line.split()
                     jid = int(tokens[0])
                     jobstate = tokens[4]

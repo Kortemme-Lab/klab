@@ -182,8 +182,8 @@ class BackrubClusterSKTask(ClusterTask):
         self._prepare_backrub()
         parameters = self.parameters
         
-        self.parameters["ntrials"] = 10000 # todo: should be 10000 on the live webserver
-        if CLUSTER_debugmode: #read_config_file()["server_name"] == 'albana.ucsf.edu':
+        self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
+        if CLUSTER_debugmode:
             self.parameters["ntrials"] = 10   
     
         # Setup backrub
@@ -192,10 +192,10 @@ class BackrubClusterSKTask(ClusterTask):
                 "-database %s" % ct.getDatabaseDir(), 
                 "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
                 "-ignore_unrecognized_res", 
-                "-ex1 -ex2", #@todo: ask about score patch and mute options, perturb movemap 
+                "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
                 "-nstruct %d" % parameters["nstruct"],
                 "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-pivot_atoms CA"] #@todo: ask why I'm using this
+                "-pivot_atoms CA"] #@upgradetodo: ask why I'm using this
         if self.movemap:
             args.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
         if self.resfile:
@@ -231,8 +231,7 @@ class BackrubClusterSKTask(ClusterTask):
     def retire(self):
         passed = super(BackrubClusterSKTask, self).retire()
         
-        #todo: This will copy the files from the cluster submission host back to the originating host
-        self._status('shutil.copytree(%s %s")' % (self.workingdir, self.targetdirectory))
+        self._status('Copying files from %s to %s' % (self.workingdir, self.targetdirectory))
                    
         for file in glob.glob(self._workingdir_file_path("*low.pdb")):
             self._status('copying %s' % file)
@@ -286,8 +285,8 @@ class SequenceToleranceClusterTask(ClusterTask):
         self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
         self.numtasks = parameters["nstruct"]
         
-        parameters["pop_size"] = 2000 # todo: should be 2000 on the live webserver
-        if CLUSTER_debugmode: #read_config_file()["server_name"] == 'albana.ucsf.edu':
+        parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
+        if CLUSTER_debugmode:
             self.parameters["pop_size"] = 20
         
         # Setup backrub
@@ -306,9 +305,9 @@ class SequenceToleranceClusterTask(ClusterTask):
                 "-ms:checkpoint:interval 200",
                 "-ms:checkpoint:gz",
                 "-ms:numresults", "0",
-                "-out:prefix $prefixesvar", # @todo: ask about the score:weights and score:patch options in backrub_seqtol.py 
+                "-out:prefix $prefixesvar", # @upgradetodo: ask about the score:weights and score:patch options in backrub_seqtol.py 
                 "-packing:resfile %s/%s" % (self.workingdir, self.resfile),
-                "-score:ref_offsets TRP 0.9"  # @todo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
+                "-score:ref_offsets TRP 0.9"  # @upgradetodo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
                  ])]
         self.script = ct.createScript(commandlines, type="SequenceTolerance")
 
@@ -392,8 +391,8 @@ class BackrubClusterTaskHK(ClusterTask):
         parameters = self.parameters
         self._prepare_backrub()
                 
-        self.parameters["ntrials"] = 10000 # todo: should be 10000 on the live webserver
-        if CLUSTER_debugmode: #read_config_file()["server_name"] == 'albana.ucsf.edu':
+        self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
+        if CLUSTER_debugmode:
             self.parameters["ntrials"] = 10   
 
         # Setup backrub
@@ -439,9 +438,8 @@ class BackrubClusterTaskHK(ClusterTask):
     def retire(self):
         passed = super(BackrubClusterTaskHK, self).retire()
         
-        #todo: This will copy the files from the cluster submission host back to the originating host
         wdpath = self._workingdir_file_path
-        self._status('shutil.copytree(%s %s")' % (self.workingdir, self.targetdirectory))
+        self._status('Copying files from %s to %s' % (self.workingdir, self.targetdirectory))
         try:
             shutil.copy(wdpath("backrub.resfile"), self.targetdirectory)
 
@@ -497,8 +495,8 @@ class SequenceToleranceHKClusterTask(ClusterTask):
         self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
         self.numtasks = parameters["nstruct"]
         
-        parameters["pop_size"] = 2000 # todo: should be 2000 on the live webserver        
-        if CLUSTER_debugmode: #read_config_file()["server_name"] == 'albana.ucsf.edu':
+        parameters["pop_size"] = 2000 # This should be 2000 on the live webserver        
+        if CLUSTER_debugmode:
             self.parameters["pop_size"] = 60
         
         # Setup backrub
@@ -526,15 +524,10 @@ class SequenceToleranceHKClusterTask(ClusterTask):
         self.script = ct.createScript(commandlines, type="SequenceTolerance")
 
     def retire(self):
+        # PDB files etc. are copied by the Job.
         sr = super(SequenceToleranceHKClusterTask, self).retire()
-
-        shutil.copy(self._workingdir_file_path("seqtol.resfile"), self.targetdirectory)
-
-        # Only copy stdout and stderr. PDB files are copied by the Job.
-        # self._copyFilesBackToHost(["*_*.cmd.o*.*", "*_*.cmd.e*.*"])
-            
+        shutil.copy(self._workingdir_file_path("seqtol.resfile"), self.targetdirectory)            
         return sr and True
-        #todo: This will copy the files from the cluster submission host back to the originating host
               
     
 # Cluster jobs
@@ -658,33 +651,37 @@ class SequenceToleranceJobSK(RosettaClusterJob):
             time.sleep(1) # make sure the fasta file gets written
             count += 1
         
-        #todo: should fail gracefully here if the fasta file still isn't written
-          
         # create weblogo from the created fasta file
-        seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
-        logo_data = LogoData.from_seqs(seqs)
-        logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-        logo_options = LogoOptions()
-        logo_options.title = "Sequence profile"
-        logo_options.number_interval = 1
-        logo_options.color_scheme = std_color_schemes["chemistry"]
+        success = True
+        try:
+            seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
+            logo_data = LogoData.from_seqs(seqs)
+            logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
+            logo_options = LogoOptions()
+            logo_options.title = "Sequence profile"
+            logo_options.number_interval = 1
+            logo_options.color_scheme = std_color_schemes["chemistry"]
+            ann = getResIDs(self.parameters)
+            logo_options.annotate = ann
+            logo_format = LogoFormat(logo_data, logo_options)
+            png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
+        except Exception, e:
+            self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
         
-        ann = getResIDs(self.parameters)
-        
-        logo_options.annotate = ann
-        
-        logo_format = LogoFormat(logo_data, logo_options)
-        png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
-        
-        # let's just quickly delete the *last.pdb and generation files:
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_last.pdb")):
-            self._status('deleting %s' % file)
-            os.remove(file)
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_low.ga.generations.gz")):
-            self._status('deleting %s' % file)
-            os.remove(file)
-        
-        return True
+        # Delete the *last.pdb and generation files:
+        try:
+            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_last.pdb")):
+                self._status('deleting %s' % file)
+                os.remove(file)
+            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_low.ga.generations.gz")):
+                self._status('deleting %s' % file)
+                os.remove(file)
+        except Exception, e:
+            self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
+
+        return success
     
     def _import_pdb(self, filename, contents):
         """Import a pdb file from the database and write it to the temporary directory"""
@@ -874,6 +871,7 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
         prefix  = '\\"tolerance\\"'
         percentile = '.5'
         
+        success = True
         for i in range(self.numberOfRuns):
             
             targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
@@ -905,55 +903,63 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
             if not os.path.exists(os.path.join(targettaskdir, "tolerance_sequences.fasta") ) and count < 10 :
                 time.sleep(1) # make sure the fasta file gets written
                 count += 1
-            
-            #todo: should fail gracefully here if the fasta file still isn't written
               
-            # create weblogo from the created fasta file
-            shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), self._targetdir_file_path("tolerance_sequences%d.fasta" % i))
-            seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences%d.fasta" % i)))
-            logo_data = LogoData.from_seqs(seqs)
-            logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-            logo_options = LogoOptions()
-            logo_options.title = "Sequence profile"
-            logo_options.number_interval = 1
-            logo_options.color_scheme = std_color_schemes["chemistry"]
+            try:
+                # create weblogo from the created fasta file
+                shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), self._targetdir_file_path("tolerance_sequences%d.fasta" % i))
+                seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences%d.fasta" % i)))
+                logo_data = LogoData.from_seqs(seqs)
+                logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
+                logo_options = LogoOptions()
+                logo_options.title = "Sequence profile"
+                logo_options.number_interval = 1
+                logo_options.color_scheme = std_color_schemes["chemistry"]
+                ann = getResIDs(self.parameters)
+                logo_options.annotate = ann    
+                logo_format = LogoFormat(logo_data, logo_options)
+                png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif%d.png" % i), 'w'))
+            except Exception, e:
+                self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
             
-            ann = getResIDs(self.parameters)
-            logo_options.annotate = ann
+            # Delete the *last.pdb and generation files:
+            try:
+                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
+                    self._status('deleting %s' % file)
+                    os.remove(file)
+                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
+                    self._status('deleting %s' % file)
+                    os.remove(file)
+            except Exception, e:
+                self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
+        
+        try:
+            # Generate tolerance motif montage
+            self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
+            montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
+            # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
+            for i in range(self.numberOfRuns):
+                params = self.multiparameters[i]
+                lbl = []
+                for partner in params['Partners']:
+                    if params['Premutated'].get(partner):
+                        pm = params['Premutated'][partner]
+                        for residue in pm:
+                            lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
+                montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
+            montagecmd += "multi_tolerance_motif.png"
+            self._status(montagecmd)
             
-            logo_format = LogoFormat(logo_data, logo_options)
-            png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif%d.png" % i), 'w'))
-            
-            # let's just quickly delete the *last.pdb and generation files:
-            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
-                self._status('deleting %s' % file)
-                os.remove(file)
-            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
-                self._status('deleting %s' % file)
-                os.remove(file)
-        
-        # Generate tolerance motif montage
-        self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
-        montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
-        # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
-        for i in range(self.numberOfRuns):
-            params = self.multiparameters[i]
-            lbl = []
-            for partner in params['Partners']:
-                if params['Premutated'].get(partner):
-                    pm = params['Premutated'][partner]
-                    for residue in pm:
-                        lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
-            montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
-        montagecmd += "multi_tolerance_motif.png"
-        self._status(montagecmd)
-        
-        self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
-        self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
-        self.file_stdout.write("*********************** montage output ***********************\n")
-        subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
-        
-        return True
+            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+            self.file_stdout.write("*********************** montage output ***********************\n")
+            subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
+        except Exception, e:
+            self._appendError("An error occurred creating the motif montage.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
+                
+        return success
             
     def _write_backrub_resfiles( self ):
         """create a resfile of premutations for the backrub"""
@@ -1144,32 +1150,36 @@ class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
             if not os.path.exists(os.path.join(targettaskdir, "tolerance_sequences.fasta") ) and count < 10 :
                 time.sleep(1) # make sure the fasta file gets written
                 count += 1
-            
-            #todo: should fail gracefully here if the fasta file still isn't written
               
-            # create weblogo from the created fasta file
-            shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), self._targetdir_file_path("tolerance_sequences%d.fasta" % i))
-            seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences%d.fasta" % i)))
-            logo_data = LogoData.from_seqs(seqs)
-            logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-            logo_options = LogoOptions()
-            logo_options.title = "Sequence profile"
-            logo_options.number_interval = 1
-            logo_options.color_scheme = std_color_schemes["chemistry"]
+            try:
+                # create weblogo from the created fasta file
+                shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), self._targetdir_file_path("tolerance_sequences%d.fasta" % i))
+                seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences%d.fasta" % i)))
+                logo_data = LogoData.from_seqs(seqs)
+                logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
+                logo_options = LogoOptions()
+                logo_options.title = "Sequence profile"
+                logo_options.number_interval = 1
+                logo_options.color_scheme = std_color_schemes["chemistry"]
+                ann = getResIDs(self.parameters)
+                logo_options.annotate = ann
+                logo_format = LogoFormat(logo_data, logo_options)
+                png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif%d.png" % i), 'w'))
+            except Exception, e:
+                self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
             
-            ann = getResIDs(self.parameters)
-            logo_options.annotate = ann
-            
-            logo_format = LogoFormat(logo_data, logo_options)
-            png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif%d.png" % i), 'w'))
-            
-            # let's just quickly delete the *last.pdb and generation files:
-            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
-                self._status('deleting %s' % file)
-                os.remove(file)
-            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
-                self._status('deleting %s' % file)
-                os.remove(file)
+            try:
+                # Delete the *last.pdb and generation files:
+                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
+                    self._status('deleting %s' % file)
+                    os.remove(file)
+                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
+                    self._status('deleting %s' % file)
+                    os.remove(file)
+            except Exception, e:
+                self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
         
         # Generate tolerance motif montage
         self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
@@ -1701,8 +1711,8 @@ class BackrubSequenceToleranceSK(ClusterTask):
         self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
         self.numtasks = parameters["nstruct"]
         
-        self.parameters["ntrials"] = 10000 # todo: should be 10000 on the live webserver
-        self.parameters["pop_size"] = 2000 # todo: should be 2000 on the live webserver
+        self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
+        self.parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
         if CLUSTER_debugmode:
             self.parameters["ntrials"] = 10   
             self.parameters["pop_size"] = 20
@@ -1726,9 +1736,9 @@ class BackrubSequenceToleranceSK(ClusterTask):
                 "-database %s" % ct.getDatabaseDir(), 
                 "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
                 "-ignore_unrecognized_res", 
-                "-ex1 -ex2", #@todo: ask about score patch and mute options, perturb movemap 
+                "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
                 "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-pivot_atoms CA", #@todo: ask why I'm using this
+                "-pivot_atoms CA", #@upgradetodo: ask why I'm using this
                 "-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
                 "-out:prefix $broutprefixesvar"
                 ]
@@ -1763,9 +1773,9 @@ class BackrubSequenceToleranceSK(ClusterTask):
                 "-ms:checkpoint:interval 200",
                 "-ms:checkpoint:gz",
                 "-ms:numresults", "0",
-                "-out:prefix $prefixesvar", # @todo: ask about the score:weights and score:patch options in backrub_seqtol.py 
+                "-out:prefix $prefixesvar", # @upgradetodo: ask about the score:weights and score:patch options in backrub_seqtol.py 
                 "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
-                "-score:ref_offsets TRP 0.9"  # @todo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
+                "-score:ref_offsets TRP 0.9"  # @upgradetodo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
                  ])]
         self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
  
@@ -1801,7 +1811,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
                 if not os.path.exists( low_file ): 
                     errors.append('%s missing' % low_file)
                 
-            #@todo: should we generate backrub scores for single backrub runs?
+            #@upgradetodo: should we generate backrub scores for single backrub runs?
             #if self.filename_stdout and os.path.exists(self._targetdir_file_path( self.filename_stdout )):
             #    Analysis = AnalyzeMini(filename=self._targetdir_file_path( self.filename_stdout ))
             #    Analysis.analyze(outfile=self._targetdir_file_path('backrub_scores.dat'))
@@ -1871,7 +1881,7 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
          
         scheduler.addInitialTasks(stTask)
         self.scheduler = scheduler
-
+        
     def _analyze(self):
         # Run the analysis on the originating host
         
@@ -1937,44 +1947,39 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
             time.sleep(1) # make sure the fasta file gets written
             count += 1
         
-        #todo: should fail gracefully here if the fasta file still isn't written
-          
-        # create weblogo from the created fasta file
-        seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
-        logo_data = LogoData.from_seqs(seqs)
-        logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-        logo_options = LogoOptions()
-        logo_options.title = "Sequence profile"
-        logo_options.number_interval = 1
-        logo_options.color_scheme = std_color_schemes["chemistry"]
+        success = True
+        try:
+            # create weblogo from the created fasta file
+            seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
+            logo_data = LogoData.from_seqs(seqs)
+            logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
+            logo_options = LogoOptions()
+            logo_options.title = "Sequence profile"
+            logo_options.number_interval = 1
+            logo_options.color_scheme = std_color_schemes["chemistry"]
+            ann = getResIDs(self.parameters)
+            logo_options.annotate = ann
+            logo_format = LogoFormat(logo_data, logo_options)
+            png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
+        except Exception, e:
+            self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
         
-        ann = getResIDs(self.parameters)
-        
-        logo_options.annotate = ann
-        
-        logo_format = LogoFormat(logo_data, logo_options)
-        png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
-        
-        # Delete the generation files:
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_low.ga.generations.gz")):
-            self._status('deleting %s' % file)
-            os.remove(file)
-        
-        # Delete empty files
-        for file in glob.glob(self._targetdir_file_path("*")):
-            if os.path.getsize(file) == 0:
-                self._status('Deleting empty file %s' % file)
+        try:
+            # Delete the generation files, empty files, and duplicated stdout file
+            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_low.ga.generations.gz")):
+                self._status('deleting %s' % file)
                 os.remove(file)
-        #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*")):
-        #    if os.path.getsize(file) == 0:
-        #       self._status('Deleting empty file %s' % file)
-        #       os.remove(file)
+            for file in glob.glob(self._targetdir_file_path("*")):
+                if os.path.getsize(file) == 0:
+                    self._status('Deleting empty file %s' % file)
+                    os.remove(file)
+            os.remove(self._targetdir_file_path("seqtol_1_stdout.txt"))    
+        except Exception, e:
+            self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
         
-        # Remove the duplicated stdout file        
-        os.remove(self._targetdir_file_path("seqtol_1_stdout.txt"))
-            
-        
-        return True
+        return success
     
     def _import_pdb(self, filename, contents):
         """Import a pdb file from the database and write it to the temporary directory"""

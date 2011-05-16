@@ -47,13 +47,6 @@ class SimpleProfiler(object):
             results.append((task, timer[0]))
         return results
             
-        #todo delete
-        for task, timer in self.timers.items():
-            if timer[1] != True:
-                results[task] = "The timer for task %s was never stopped." % task # raise ProfilerException("The timer for task %s was never stopped." % subtask)
-            results[task] = timer[0]
-        return results
-
 indentationsize = 4
 
 def sumTuples(listoftuples):

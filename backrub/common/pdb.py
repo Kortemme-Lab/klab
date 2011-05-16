@@ -146,13 +146,13 @@ class PDB:
         if chainsChosen and (sorted(chainsChosen) != sorted(self.chain_ids())):
             templines = []
             for line in self.lines:
-                # todo: All this looks suboptimal - we read through the lines multiple times with similar string selection
-                if line[0:4] == "ATOM" and line[17:20] in residues and line[26] == ' ':
+                shortRecordName = line[0:4]
+                if shortRecordName == "ATOM" and line[17:20] in residues and line[26] == ' ':
                     chain = line[21:22]
                     if chain in chainsChosen:
                         # Only keep ATOM lines for chosen chains
                         templines.append(line)
-                elif line[0:4] == "TER ":
+                elif shortRecordName == "TER ":
                     chain = line[21:22]
                     if chain in chainsChosen:
                         # Only keep TER lines for chosen chains

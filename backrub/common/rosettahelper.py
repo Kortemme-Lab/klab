@@ -14,9 +14,9 @@ import string
 import stat
 import tempfile
 
-#todo:
-#server_root = "/var/www/html/rosettaweb"
-server_root = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub"
+#@upgradetodo:
+server_root = "/var/www/html/rosettaweb/backrub"
+#server_root = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub"
 
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",

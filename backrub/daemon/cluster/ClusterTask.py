@@ -71,11 +71,7 @@ class ClusterScript:
         
         if CLUSTER_debugmode: 
             self.parameters["maxhours"] = 0
-            self.parameters["maxmins"] = 10
-
-    # todo: try #$ -l h_rt=40:00:00
-    #       and #$ -l mem_free=2G
-    
+            self.parameters["maxmins"] = 10    
 
     def _addPreamble(self):
 
@@ -175,6 +171,8 @@ class ClusterTask(object):
         self.dependents = []
         self.prerequisites = {}
         self.workingdir = workingdir
+        # Do not allow spaces in the script filename so that the SGE qstat parsing works
+        scriptfilename.replace(" ", "_")
         self.scriptfilename = scriptfilename
         self.filename = os.path.join(workingdir, scriptfilename)
         self.cleanedup = False
@@ -225,8 +223,6 @@ class ClusterTask(object):
                     
         
     def start(self, sgec, dbID):
-        # Our job submission engine is sequential at present so we use one filename
-        # todo: use a safe equivalent of tempname
         self.sgec = sgec
         if self.script:
             self._status("Starting %s" % self.name)
@@ -236,7 +232,6 @@ class ClusterTask(object):
                 prereq.copyFiles(self.workingdir, files)
                 
             writeFile(self.filename, self.script)
-            #print(self.script)
             self.jobid, stdo = sgec.qsub_submit(self.filename, self.workingdir, dbID, name = self.scriptfilename, showstdout = self.debug)
             self._status("Job started with id %d." % self.jobid)
             if self.jobid != 0:
@@ -245,14 +240,9 @@ class ClusterTask(object):
                 return self.jobid
         else:
             return 0
-        #print "Submitted. jobid = %d" % jobid
-        # Write jobid to a file.
-        #import subprocess
-        #p = subprocess.call("echo %d >> jobids" % jobid, shell=True)
     
     def copyFiles(self, targetdirectory, filemasks = ["*"]):
         for mask in filemasks:
-            #todo: This will copy the files to the dependent task's directory on chef
             self._status('Copying %s/%s to %s' % (self.workingdir, mask, self.targetdirectory))
             for file in glob.glob(self._workingdir_file_path(mask)):
                 shutil.copy(file, targetdirectory)
@@ -276,7 +266,6 @@ class ClusterTask(object):
             By default, this function creates a target directory on the host and copies all stdout and stderr files to it.
             If any of the stderr files have non-zero size, the default behaviour is to mark the task as failed."""
         
-        #todo: This will copy the output files from the cluster submission host back to the originating host
         self._status("Retiring %s" % self.name)
         
         if not os.path.isdir(self.targetdirectory):

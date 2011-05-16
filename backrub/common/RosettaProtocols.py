@@ -60,7 +60,7 @@ class RosettaProtocolGroup:
     def getName(self):
         return self.name
         
-# todo: I access some of these class members directly - use getters/setters for all
+# todo: At some stage, tidy up all member access with use getters/setters
 # todo: Split this over be/fe like the WebserverProtocols class
 class RosettaProtocol:
     def __init__(self, name, dbname):
@@ -168,24 +168,15 @@ RosettaBinaries = {
     "seqtolHK"  :{  "name" : "Rosetta++ 2.30 (classic), as published",
                     "revision" : 17289,  # based on the sequence tolerance database revision
                     "mini"      : False,
-                    # Old binaries
-                    #"backrub" : "rosetta_classic_elisabeth_backrub.gcc", 
-                    #"sequence_tolerance" : "rosetta_1Oct08.gcc",
-                    #"minimize" : "minimization_seqtolhk.gcc",
-                    #"database" : "rosetta_database_elisabeth", #todo: Now defunct
                     "clusterrev" : "rElisabeth",
                     "cluster_databases" : ["rosetta_database_r15286", "rosetta_database_r17289"],
                  },
     "seqtolJMB" :{  
-                    # todo: change this. we shouldn't be using this revision
+                    # @upgradetodo: change this. we shouldn't be using this revision
                     "name" : "Rosetta 3.2 (mini), as published",
-                    "revision" : 39284,
+                    "revision" : 33910,
                     "mini"      : True,
-                    # Old binaries
-                    #"backrub" : "backrub_r39284",
-                    #"sequence_tolerance" : "sequence_tolerance_r39284",
-                    #"database"  : "minirosetta_database_r39284",
-                    "clusterrev" : "r39284"
+                    "clusterrev" : "r33910"
                  },
     "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
                     "name" : "Rosetta 3.2.r (mini), as published",
@@ -244,7 +235,7 @@ class WebserverProtocols(object):
         protocolGroups[2].add(proto)
         
         proto = RosettaProtocol("Interface / Fold Sequence Tolerance", "sequence_tolerance_SK")
-        proto.setBinaries("seqtolJMB") # todo: "seqtolP1"), see todo above 
+        proto.setBinaries("seqtolJMB") # todo: "seqtolP1") 
         proto.setNumStructures(2,20,100)    #todo: min should be 10 but I've allowed 2 for testing
         protocolGroups[2].add(proto)
         
