@@ -106,8 +106,12 @@ echo "<arch>"
 uname -i
 echo "</arch>"
 
+echo "<taskid>"
+echo "- $SGE_TASK_ID -"
+echo "</taskid>"
+
 # 4-character (zero padded) counter
-SGE_TASK_ID4=`printf %%04d $SGE_TASK_ID`
+if [ "$SGE_TASK_ID" != "undefined" ]; then SGE_TASK_ID4=`printf %%04d $SGE_TASK_ID`; fi
 
 """ % self.parameters)
 
