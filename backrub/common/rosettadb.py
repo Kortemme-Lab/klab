@@ -49,6 +49,9 @@ class RosettaDB:
                                               port=port, unix_socket=socket )
         self.store_time = store_time
         self.numTries = numTries
+        self.cachedvalues = [hostname, database, user, password, port, socket, store_time, numTries] #upgradetodo
+        sys.stderr.write("\n***STARTED NEW DB CONNECTION***\n") #upgradetodo
+
         
     def getData4ID(self, tablename, ID):
         """get the whole row from the database and store it in a dict"""
@@ -142,9 +145,13 @@ class RosettaDB:
         # Note: This loop was always disabled!
         i = 0
         errcode = 0
+        
+        self.numTries = 2
         while i < self.numTries:
-            try:    
+            try:
+                sys.stderr.write("Connection is %s.\n" % str(self.connection))
                 cursor = self.connection.cursor()
+                sys.stderr.write("Cursor is %s.\n" % str(self.connection))
                 if parameters:
                     errcode = cursor.execute(sql, parameters)
                 else:
@@ -153,9 +160,14 @@ class RosettaDB:
                 #if errcode != 1:
                 #    print("%d: %s" %(errcode,traceback.print_stack()))
                 results = cursor.fetchall()
+                sys.stderr.write(results or "No results.")
                 cursor.close()
                 return results
             except MySQLdb.OperationalError, e:
+                self.connection.close()
+                self.connection = MySQLdb.Connection(self.cachedvalues[0], self.cachedvalues[1],self.cachedvalues[2],self.cachedvalues[3],self.cachedvalues[4], self.cachedvalues[5]) 
+                self.cursor = self.connection.cursor()
+                
                 errcode = e[0]
                 # errcode 1100 is an error with table locking
                 # @debug:
