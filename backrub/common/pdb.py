@@ -379,7 +379,6 @@ class PDB:
         return False          
     
     def check_format(self, usingClassic, ableToUseMini):
-        
         warnings = []
         errors = []
         lineidx = 1
@@ -409,7 +408,7 @@ class PDB:
         missingBackboneResidues = False
         lastReadResidue = None
         currentResidue = None
-        bbatoms = ["N", "O", "C", "CA", "CB"]
+        bbatoms = ["N", "O", "C", "CA"]#, "CB"]
         
         # For readability
         NOT_OCCUPIED = -1.0
@@ -417,11 +416,12 @@ class PDB:
         OINDEX = 1
         CINDEX = 2
         CAINDEX = 3
-        CBINDEX = 4
+        #CBINDEX = 4
         missingSomeBBAtoms = False
         someBBAtomsAreUnoccupied = False
         backboneAtoms = {}
-        backboneAtoms[" "] = [0.0, 0.0, 0.0, 0.0, 0.0]
+        backboneAtoms[" "] = [0.0, 0.0, 0.0, 0.0]#, 0.0]
+        commonConformationIsPresent = False
         oldres = ""
         
         # Check for bad resfile input to classic
@@ -433,7 +433,7 @@ class PDB:
         self.lines.append("ATOM   9999  CA  VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
         self.lines.append("ATOM   9999  C   VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
         self.lines.append("ATOM   9999  O   VAL ^ 999       0.000   0.000   0.000  1.00 00.00           O")
-        self.lines.append("ATOM   9999  CB  VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
+        #self.lines.append("ATOM   9999  CB  VAL ^ 999       0.000   0.000   0.000  1.00 00.00           C")
         
         for line in self.lines:
 
@@ -445,7 +445,7 @@ class PDB:
                 currentResidue = line[21:27]
                 classicCurrentResidue = line[21:26] # classic did not handle the insertion code in resfiles until revision 29386
                 occupancy = float(line[54:60])   
-                
+                    
                 if usingClassic and (not allowedResidues.get(residue)):
                     # Check for residues outside the list classic can handle
                     classicErrors.append("Residue %s on line %d is not recognized by classic." % (residue, lineidx))
@@ -461,6 +461,9 @@ class PDB:
                         break
                     lastReadResidue = (residue, lineidx, currentResidue)
                     
+                if lastReadResidue[2] == currentResidue:
+                    if alternateConformation == ' ':
+                        commonConformationIsPresent = True
                 if lastReadResidue[2] != currentResidue:
                     residueNumber += 1
                 
@@ -477,36 +480,44 @@ class PDB:
                                 classicErrors.append("Residue %(currentResidue)s on line %(lineidx)d has the same sequence number (ignoring iCode) as residue %(oldRes)s on line %(oldLine)d." % vars())
                     
                     # Check for missing backbone residues
-                    # Add the backbone atoms common to all alternative conformations to the common conformation 
-                    if not usingClassic:
-                        commonToAllAlternatives = [0, 0, 0, 0, 0]
+                    # Add the backbone atoms common to all alternative conformations to the common conformation
+                    # todo: I've changed this to always take the union in all versions rather than just in Rosetta 3. This was to fix a false positive with 3OGB.pdb on residues A13 and A55 which run fine under point mutation.
+                    #       This may now be too permissive. 
+                    if True or not usingClassic:
+                        commonToAllAlternatives = [0, 0, 0, 0]#, 0]
                         for conformation, bba in backboneAtoms.items():
-                            for atomocc in range(5):
+                            for atomocc in range(CAINDEX + 1):
                                 if conformation != " " and backboneAtoms[conformation][atomocc]:
                                     commonToAllAlternatives[atomocc] += backboneAtoms[conformation][atomocc]
-                        for atomocc in range(5):
+                        for atomocc in range(CAINDEX + 1):
                             backboneAtoms[" "][atomocc] = backboneAtoms[" "][atomocc] or 0
                             backboneAtoms[" "][atomocc] += commonToAllAlternatives[atomocc]
                     
+                    # Check whether the common conformation has all atoms
+                    commonConformationHasAllBBAtoms = True
+                    for atomocc in range(CAINDEX + 1):
+                        commonConformationHasAllBBAtoms = backboneAtoms[" "][atomocc] and commonConformationHasAllBBAtoms                            
+
                     ps = ""
                     for conformation, bba in backboneAtoms.items():
+                        
                         # Add the backbone atoms of the common conformation to all alternatives
                         if not usingClassic:
-                            for atomocc in range(5):
+                            for atomocc in range(CAINDEX + 1):
                                 if backboneAtoms[" "][atomocc]:
                                     backboneAtoms[conformation][atomocc] = backboneAtoms[conformation][atomocc] or 0
                                     backboneAtoms[conformation][atomocc] += backboneAtoms[" "][atomocc]
                         
                         missingBBAtoms = False
-                        for atomocc in range(5):
+                        for atomocc in range(CAINDEX + 1):
                             if not backboneAtoms[conformation][atomocc]:
                                 missingBBAtoms = True
                                 break
-                            
-                        if missingBBAtoms:
+                        
+                        if not commonConformationHasAllBBAtoms and missingBBAtoms:
                             missing = []
                             unoccupied = []
-                            for m in range(5):
+                            for m in range(CAINDEX + 1):
                                 if backboneAtoms[conformation][m] == 0:
                                     unoccupied.append(bbatoms[m])
                                     someBBAtomsAreUnoccupied = True
@@ -524,31 +535,34 @@ class PDB:
                             
                             failedClassic = False
                             haveAllAtoms = True
-                            for atomocc in range(5):
+                            for atomocc in range(CAINDEX + 1):
                                 if backboneAtoms[conformation][atomocc] <= 0 or backboneAtoms[" "][atomocc] <= 0:
                                     haveAllAtoms = False
                                     break
                             if haveAllAtoms:
                                 failedClassic = True
                                 ps = " The common conformation correctly has these atoms."
-                                 
-                            if conformation == " ":
-                                conformation = "common"
                             
-                            if missing:
-                                errstring = "The %s residue %s on line %d is missing the backbone atom%s %s in the %s conformation.%s" % (lastReadResidue[0], lastReadResidue[2], lastReadResidue[1], s1, missing, conformation, ps)
-                                if ps:
-                                    classicErrors.append(errstring)
-                                else:
-                                    errors.append(errstring)
-                            if unoccupied:
-                                errstring = "The %s residue %s on line %d has the backbone atom%s %s set as unoccupied in the %s conformation.%s" % (lastReadResidue[0], lastReadResidue[2], lastReadResidue[1], s2, unoccupied, conformation, ps)
-                                if ps:
-                                    classicErrors.append(errstring)
-                                else:
-                                    errors.append(errstring)
+                            if conformation != " " or commonConformationIsPresent:
+                                # We assume above that the common conformation exists. However, it is valid for it not to exist at all.
+                                if conformation == " ":
+                                    conformation = "common"
+                                
+                                if missing:
+                                    errstring = "The %s residue %s on line %d is missing the backbone atom%s %s in the %s conformation.%s" % (lastReadResidue[0], lastReadResidue[2], lastReadResidue[1], s1, missing, conformation, ps)
+                                    if ps:
+                                        classicErrors.append(errstring)
+                                    else:
+                                        errors.append(errstring)
+                                if unoccupied:
+                                    errstring = "The %s residue %s on line %d has the backbone atom%s %s set as unoccupied in the %s conformation.%s" % (lastReadResidue[0], lastReadResidue[2], lastReadResidue[1], s2, unoccupied, conformation, ps)
+                                    if ps:
+                                        classicErrors.append(errstring)
+                                    else:
+                                        errors.append(errstring)
                     backboneAtoms = {}
                     backboneAtoms[" "] = [None, None, None, None, None]
+                    commonConformationIsPresent = False
                     lastReadResidue = (residue, lineidx, currentResidue)
                 oldres = residue
                 atom = line[12:16]
@@ -562,8 +576,8 @@ class PDB:
                         backboneAtoms[alternateConformation][CINDEX] = occupancy
                     elif atom == ' CA ':
                         backboneAtoms[alternateConformation][CAINDEX] = occupancy
-                    if atom == ' CB ' or residue == 'GLY':
-                        backboneAtoms[alternateConformation][CBINDEX] = occupancy
+                    #if atom == ' CB ' or residue == 'GLY':
+                    #    backboneAtoms[alternateConformation][CBINDEX] = occupancy
                 
             elif line[0:3] == "TER":
                 oldChain = currentChain
@@ -588,7 +602,7 @@ class PDB:
             lineidx = lineidx + 1
 
         # Remove the extra ATOM lines added above
-        self.lines = self.lines[0:len(self.lines) - 5]
+        self.lines = self.lines[0:len(self.lines) - (CAINDEX + 1)]
         
         if not lastReadResidue:
             errors.append("No valid ATOM lines were found.")                
@@ -606,6 +620,11 @@ class PDB:
             errors.append("</ul>")
         
         if errors:
+            if usingClassic:
+                errors.insert(0, "Version: Rosetta++")
+            else: 
+                errors.insert(0, "Version: Rosetta 3") 
+        
             return errors, None
 
         return True, warnings

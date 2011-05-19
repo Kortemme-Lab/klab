@@ -140,8 +140,8 @@ The Kortemme Lab Server Daemon
             # make sure this is written to the disk            
             sys.stdout.flush()
             sys.stderr.flush()
-            os.fsync(sys.stdout)
-            os.fsync(sys.stderr)
+            #os.fsync(sys.stdout)
+            #os.fsync(sys.stderr)
             
             # check if a simulation is finished
             

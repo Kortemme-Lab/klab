@@ -8,6 +8,8 @@ class References:
             "FriedlandEtAl:2009"    :   'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>.<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Computational Biology, May 2009</a>',
             "LauckEtAl:2010"        :   'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design</i>.<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Research, Volume 38, Issue suppl. 2, Pages W569-W575</a>',
             "SmithKortemme:2010"    :   'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains</i>.<br><a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17<sup>th</sup> September 2010, Pages 460-474</a>',
+            #@upgradetodo
+            "SmithKortemme:2011"    :   'Smith CA, Kortemme T. <i>Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using Rosetta Backrub Flexible Backbone Design</i>.<br><a href="" style="font-size: 10pt">Submitted to PLoS ONE.</a>',
         }
     
     def __getitem__(self, index):
@@ -77,6 +79,7 @@ class RosettaProtocol:
         self.startFunction = None
         self.checkFunction = None
         self.endFunction = None
+        self.description = None
         
     # Setters and getters
     def setBackendFunctions(self, startFunction, checkFunction, endFunction):
@@ -84,6 +87,12 @@ class RosettaProtocol:
         self.checkFunction = checkFunction
         self.endFunction = endFunction
     
+    def getDescription(self):
+        return self.description
+
+    def setDescription(self, desc):
+        self.description = desc
+        
     def setStoreFunction(self, storefunction):
         self.StoreFunction = storefunction
     #    
@@ -144,51 +153,64 @@ class RosettaProtocol:
 RosettaBinaries = {        
     # Webserver jobs
     "classic"   :{  # 2.3.0 was released 2008-04-21, this revision dates 2008-12-27
-                    "name"      : "Rosetta++ 2.32 (classic), as published",
+                    "name"      : "Rosetta++, as published", # 2.32
+                    "queuename" : "Rosetta++",
                     "revision"  : 26316, 
                     "mini"      : False,
+                    "runOnCluster"      : False,
                     "backrub"   : "rosetta_20090109.gcc", 
                     "database"  : "rosetta_database"
                  },
     "mini"      :{  # Revision is clear here
-                    "name" : "Rosetta 3.1 (mini)",
-                    "revision" : 32532, 
-                    "mini"      : True,
-                    "backrub" : "backrub_r32532", 
-                    "postprocessing" : "score_jd2_r32532", 
-                    "database"  : "minirosetta_database"
+                    "name"          : "Rosetta 3.1",
+                    "queuename"     : "Rosetta 3.1",
+                    "revision"      : 32532, 
+                    "mini"          : True,
+                    "runOnCluster"      : False,
+                    "backrub"       : "backrub_r32532", 
+                    "postprocessing": "score_jd2_r32532", 
+                    "database"      : "minirosetta_database"
                  },
     "ensemble"  :{  # based solely on the date, roughly between revisions 22709 - 22736
-                    "name" : "Rosetta++ 2.30 (classic), as published",
-                    "revision" : 22736, 
+                    "name"      : "Rosetta++, as published", #  2.30
+                    "queuename" : "Rosetta",
+                    "revision"  : 22736, 
                     "mini"      : False,
-                    "backrub" : "ros_052208.gcc",
+                    "runOnCluster"      : False,
+                    "backrub"   : "ros_052208.gcc",
                  },
-    # Cluster jobs
-    "seqtolHK"  :{  "name" : "Rosetta++ 2.30 (classic), as published",
-                    "revision" : 17289,  # based on the sequence tolerance database revision
-                    "mini"      : False,
-                    "clusterrev" : "rElisabeth",
+    # Cluster jobs Rosetta++ 2.30
+    "seqtolHK"  :{  "name"              : "Rosetta++, as published",
+                    "queuename"         : "Rosetta++",
+                    "revision"          : 17289,  # based on the sequence tolerance database revision
+                    "mini"              : False,
+                    "runOnCluster"      : True,
+                    "clusterrev"        : "rElisabeth",
                     "cluster_databases" : ["rosetta_database_r15286", "rosetta_database_r17289"],
                  },
-    "seqtolJMB" :{  
-                    # @upgradetodo: change this. we shouldn't be using this revision
-                    "name" : "Rosetta 3.2 (mini), as published",
-                    "revision" : 33910,
+    "seqtolJMB" :{  # This is the revision used in the paper
+                    "name"      : "Rosetta 3.1, as published",
+                    "queuename" : "Rosetta 3.1",
+                    "revision"  : 33910,
                     "mini"      : True,
-                    "clusterrev" : "r33910"
+                    "runOnCluster" : True,
+                    "clusterrev": "r33910"
                  },
     "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name" : "Rosetta 3.2.r (mini), as published",
-                    "revision" : 0, 
+                    "name"      : "Rosetta 3.2.r, as published",
+                    "queuename" : "Rosetta 3.2.r",
+                    "revision"  : 0, 
                     "mini"      : True,
-                    "clusterrev" : "r_"
+                    "runOnCluster" : True,
+                    "clusterrev": "r_"
                  },
     "multiseqtol" :{  
-                    "name" : "Rosetta 3.2 (mini), as published",
-                    "revision" : 39284,
+                    "name"      : "Rosetta 3.2",
+                    "queuename" : "Rosetta 3.2",
+                    "revision"  : 39284,
                     "mini"      : True,
-                    "clusterrev" : "r39284"
+                    "runOnCluster" : True,
+                    "clusterrev": "r39284"
                  },
 }
 
@@ -215,7 +237,7 @@ class WebserverProtocols(object):
         proto.setNumStructures(2,10,50)
         protocolGroups[0].add(proto)
         
-        protocolGroups.append(RosettaProtocolGroup("Backrub Ensembles", "#B7FFE0"))
+        protocolGroups.append(RosettaProtocolGroup("Backrub Ensemble", "#B7FFE0"))
         
         proto = RosettaProtocol("Backrub Conformational Ensemble", "no_mutation")
         proto.setBinaries("classic", "mini")
@@ -234,7 +256,7 @@ class WebserverProtocols(object):
         proto.setNumStructures(2,10,50)
         protocolGroups[2].add(proto)
         
-        proto = RosettaProtocol("Interface / Fold Sequence Tolerance", "sequence_tolerance_SK")
+        proto = RosettaProtocol("Generalized Protocol (Fold / Interface) Sequence Tolerance", "sequence_tolerance_SK")
         proto.setBinaries("seqtolJMB") # todo: "seqtolP1") 
         proto.setNumStructures(2,20,100)    #todo: min should be 10 but I've allowed 2 for testing
         protocolGroups[2].add(proto)

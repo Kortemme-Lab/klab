@@ -76,6 +76,7 @@ additionalGUISetup[2][0][1] = showMutationRowAdder
 /************************************
  * Main functions
  ************************************/
+var localquery = 0;
 
 function startup(query)
 {
@@ -91,6 +92,23 @@ function startup(query)
         Nifty("div#box","big transparent fixed-height");
 		protocol = getProtocol();
 		changeApplication(protocol[0], protocol[1], 1, 2 );
+	}	 
+	else if (query == "sampleData")
+	{
+		localquery = query;
+		Nifty("ul#about li","big fixed-height");
+        Nifty("div#box","big transparent fixed-height");
+		protocol = getProtocol();
+		// Hack for the special case for sequence tolerance. todo: Generalize and fix this i.e. "jump to last stage"
+		if (protocol[0] == 2 && protocol[1] == 1)
+		{
+			changeApplication(protocol[0], protocol[1], 2, 2, true );
+		}
+		else
+		{
+			changeApplication(protocol[0], protocol[1], 1, 2 );
+		}
+		set_demo_values(true);
 	}	 
 	else if (query == "index" || query == "login") 
     {
@@ -161,7 +179,7 @@ function changeApplication( app, task, subtask, extra, override )
 	// Display the PDB uploading section
 	// Show the HTML elements for entering parameters and submitting the form
 	showCommonElements(subtask);
-
+	
 	// Select the default binary (which should be defined as position 0)
 	var miniGroup = document.submitform.Mini
 	for (var i = 0; i < miniGroup.length; i++)
@@ -184,7 +202,6 @@ function changeApplication( app, task, subtask, extra, override )
 		new Effect.Fade( thistask + "_step2", { duration: 0.0} );
 	}
 	else if (subtask == 1)
-	//todo: check load demo values if (!override && (!extra || document.getElementById("parameter2_1_step1").style.display == "none"))
 	{
 		setSubmissionButtonsVisibility(true);
 		additionalGUISetup[app][task][1](app, task, [extra, override])
@@ -370,14 +387,14 @@ function ValidateFormEmail()
 }
 
 // Fills in sample data for the protocols when 'Load sample data' is clicked
-function set_demo_values() 
+function set_demo_values(setAllData) 
 {
 	protocol = getProtocol();
 	pgroup = protocol[0];
 	ptask = protocol[1];
 	
 	document.submitform.nos.value = protocolNos[pgroup][ptask][1];
-	setDemoValues[pgroup][ptask]()
+	setDemoValues[pgroup][ptask](setAllData)
 	//return true;
 }
 
@@ -415,13 +432,14 @@ function validateOneMutation()
     return ret;
 }
 
-function demoOneMutation()
+function demoOneMutation(setAllData)
 {
 	var sbmtform = document.submitform;
 	sbmtform.PDBID.value = "1ABE";
 	sbmtform.PM_chain.value = "A";
 	sbmtform.PM_resid.value = "108";
-	sbmtform.PM_newres.value = "L";
+	sbmtform.PM_newres.value = "LEU";
+	sbmtform.JobName.value = "One Mutation sample job"
 }
 
 /************************************
@@ -475,30 +493,34 @@ function validateMultipleMutations()
 	return ret;
 }
 
-function demoMultipleMutations()
+function demoMultipleMutations(setAllData)
 {
 	var sbmtform = document.submitform;
 	sbmtform.PDBID.value = "2PDZ";
-	sbmtform.PM_chain0.value = "A";
-	sbmtform.PM_resid0.value = "17";
-	sbmtform.PM_newres0.value = "A";
-	sbmtform.PM_radius0.value = "6.0";
-	addOneMore();
-	sbmtform.PM_chain1.value = "A";
-	sbmtform.PM_resid1.value = "32";
-	sbmtform.PM_newres1.value = "A";
-	sbmtform.PM_radius1.value = "6.0";
-	addOneMore();
-	sbmtform.PM_chain2.value = "A";
-	sbmtform.PM_resid2.value = "65";
-	sbmtform.PM_newres2.value = "A";
-	sbmtform.PM_radius2.value = "6.0";
-	addOneMore();
-	sbmtform.PM_chain3.value = "A";
-	sbmtform.PM_resid3.value = "72";
-	sbmtform.PM_newres3.value = "A";
-	sbmtform.PM_radius3.value = "6.0";
-	addOneMore();
+	if (numMPM == 1) // This prevents new fields appearing if a user hits load sample data when the sample data has already been loaded
+	{
+		sbmtform.PM_chain0.value = "A";
+		sbmtform.PM_resid0.value = "17";
+		sbmtform.PM_newres0.value = "ALA";
+		sbmtform.PM_radius0.value = "6.0";
+		addOneMore();
+		sbmtform.PM_chain1.value = "A";
+		sbmtform.PM_resid1.value = "32";
+		sbmtform.PM_newres1.value = "ALA";
+		sbmtform.PM_radius1.value = "6.0";
+		addOneMore();
+		sbmtform.PM_chain2.value = "A";
+		sbmtform.PM_resid2.value = "65";
+		sbmtform.PM_newres2.value = "ALA";
+		sbmtform.PM_radius2.value = "6.0";
+		addOneMore();
+		sbmtform.PM_chain3.value = "A";
+		sbmtform.PM_resid3.value = "72";
+		sbmtform.PM_newres3.value = "ALA";
+		sbmtform.PM_radius3.value = "6.0";
+		addOneMore();
+	}
+	sbmtform.JobName.value = "Multiple Mutations sample job"
 }
 
 /************************************
@@ -510,9 +532,11 @@ function validateEnsemble()
 	return true;
 }
 
-function demoEnsemble()
+function demoEnsemble(setAllData)
 {
-	document.submitform.PDBID.value = "1UBQ";
+	var sbmtform = document.submitform;
+	sbmtform.PDBID.value = "1UBQ";
+	sbmtform.JobName.value = "Backrub Conformational Ensemble sample job"
 }
 
 /************************************
@@ -536,13 +560,14 @@ function validateEnsembleDesign()
 	return ret;
 }   
 
-function demoEnsembleDesign()
+function demoEnsembleDesign(setAllData)
 {
 	var sbmtform = document.submitform;
 	sbmtform.PDBID.value = "1UBQ";
 	sbmtform.ENS_temperature.value = "1.2";
-	sbmtform.ENS_num_designs_per_struct.value = "20";
 	sbmtform.ENS_segment_length.value = "12";
+	sbmtform.ENS_num_designs_per_struct.value = "20";
+	sbmtform.JobName.value = "Backrub Ensemble Design sample job"
 }
 
 /************************************
@@ -561,21 +586,24 @@ function validateSeqtolHK()
 	// validateNotEmpty( sbmtform.seqtol_weight_chain1, "Please enter a weight for Partner 1");
     // validateNotEmpty( sbmtform.seqtol_weight_chain2, "Please enter a weight for Partner 2");
     // validateNotEmpty( sbmtform.seqtol_weight_interface, "Please enter a weight for the interface") ;
-    for (var i = 0; i < HK_MaxMutations ; i = i + 1) 
+	
+	for (var i = 0; i < HK_MaxMutations ; i = i + 1) 
     {
     	chain = elems['seqtol_mut_c_' + '' + i];
     	resid = elems['seqtol_mut_r_' + '' + i];
     	
     	// check if row is empty
-    	if ( chain.value == "invalid" && validateElem(resid, emptyExpression)) 
+    	if ( chain.value == "invalid" && validateEmptyElem(resid)) 
     	{
     		break;
     	}
+    	
     	ret = validateElem(chain, chainExpression) && ret;
     	ret = validateElem(resid, integralExpression) && ret;
     }
     
-    var validResidues = getValidResidues();
+	
+	var validResidues = getValidResidues();
 	var validDesigned = validResidues["designed"]
 	// Highlight any invalid designed residue rows
 	for (i = 0; i < validDesigned.length; i++)
@@ -594,20 +622,18 @@ function validateSeqtolHK()
 		markError(elems['seqtol_mut_r_0']);
 		ret = false;
 	}
+	
+
 	return ret;
 }
 
-function demoSeqtolHK()
+function demoSeqtolHK(setAllData)
 {
-	// todo: Fix this up since move to dropdowns + other protocols as well
 	var sbmtform = document.submitform;
 	sbmtform.PDBID.value = "2PDZ";
 	sbmtform.seqtol_chain1.value = "A";
 	sbmtform.seqtol_chain2.value = "B";
-	// sbmtform.seqtol_radius.value = "4.0";
-	// sbmtform.seqtol_weight_chain1.value = "1";
-	// sbmtform.seqtol_weight_chain2.value = "1";      
-	// sbmtform.seqtol_weight_interface.value = "2";
+
 	sbmtform.seqtol_mut_c_0.value = "B";
 	sbmtform.seqtol_mut_r_0.value = "3";
 	addOneMoreSeqtol();
@@ -619,7 +645,7 @@ function demoSeqtolHK()
 	addOneMoreSeqtol();
 	sbmtform.seqtol_mut_c_3.value = "B";
 	sbmtform.seqtol_mut_r_3.value = "6";
-	addOneMoreSeqtol();
+	sbmtform.JobName.value = "Interface Sequence Tolerance sample job"
 }
 
 /************************************
@@ -720,49 +746,66 @@ function validateSeqtolSK()
     return ret;
 }
 
-function demoSeqtolSK()
+function demoSeqtolSK(setAllData)
 {
-	reset_seqtolSKData();
-	changeApplication(2, 1, 2, 2, true);
-	
 	var sbmtform = document.submitform;
-	sbmtform.StoredPDB.value = '';
-    sbmtform.PDBID.value = "2PDZ";
-    // todo: Load sample PDB			
-	elemA = sbmtform.seqtol_SK_chain0
-	elemB = sbmtform.seqtol_SK_chain1
-	elemNumPartners = sbmtform.numPartners
-	// todo: Fix this up using an array
-	for (i = elemA.length; i >= 0; i--)
-	{
-		elemA.options[i] = null;
-	}
-	for (i = elemB.length; i >= 0; i--)
-	{
-		elemB.options[i] = null;
-	}
-	for (i = elemNumPartners.length; i >= 0; i--)
-	{
-		elemNumPartners.options[i] = null;
-	}
-	elemA.options[0] = new Option('A','A')
-	elemB.options[0] = new Option('B','B')
-	elemNumPartners.options[0] = new Option('2 Partners (Interface)','2')
-	elemA.value = "A";
-	elemA.value = "B";
-	//todo: loop here over residues and add choices for A and B
 	
-	//todo: loop here over chains
-	//sbmtform.seqtol_SK_chain2.value = "";
-	sbmtform.seqtol_SK_kP0P0.value = "0.4";
-	sbmtform.seqtol_SK_kP1P1.value = "0.4";
-	sbmtform.seqtol_SK_kP0P1.value = "1.0";
-	//todo: loop here over chains
-	//sbmtform.seqtol_SK_kC.value = "";
-	//sbmtform.seqtol_SK_kAC.value = "";
-	//sbmtform.seqtol_SK_kBC.value = "";
-	//sbmtform.seqtol_SK_Boltzmann.value = SK_InitialBoltzmann;
-	chainsChanged();
+	sbmtform.StoredPDB.value = '';
+	sbmtform.PDBID.value = "@2I0L_A_C_V2006";
+ 
+    if (setAllData)
+    {
+    	elemA = sbmtform.seqtol_SK_chain0
+		elemB = sbmtform.seqtol_SK_chain1
+		elemNumPartners = sbmtform.numPartners
+		
+		// todo: Fix this up using an array
+		// Clear automatically filled values 
+		for (i = elemA.length; i >= 0; i--)
+		{
+			elemA.options[i] = null;
+		}
+		for (i = elemB.length; i >= 0; i--)
+		{
+			elemB.options[i] = null;
+		}
+		for (i = elemNumPartners.length; i >= 0; i--)
+		{
+			elemNumPartners.options[i] = null;
+		}
+		elemA.options[0] = new Option('A','A')
+		elemB.options[0] = new Option('B','B')
+		elemNumPartners.options[0] = new Option('2 Partners (Interface)','2')
+		elemA.value = "A";
+		elemA.value = "B";
+		
+		for (i = 1; i < 6; i++)
+		{
+			new Effect.Appear("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+		}
+		
+		sbmtform.seqtol_SK_mut_c_0.value = "B";
+		sbmtform.seqtol_SK_mut_r_0.value = 2002;
+		
+		sbmtform.seqtol_SK_mut_c_1.value = "B";
+		sbmtform.seqtol_SK_mut_r_1.value = 2003;
+		
+		sbmtform.seqtol_SK_mut_c_2.value = "B";
+		sbmtform.seqtol_SK_mut_r_2.value = 2004;
+		
+		sbmtform.seqtol_SK_mut_c_3.value = "B";
+		sbmtform.seqtol_SK_mut_r_3.value = 2005;
+		
+		sbmtform.seqtol_SK_mut_c_4.value = "B";
+		sbmtform.seqtol_SK_mut_r_4.value = 2006;
+		
+		sbmtform.seqtol_SK_kP0P0.value = "0.4";
+		sbmtform.seqtol_SK_kP1P1.value = "0.4";
+		sbmtform.seqtol_SK_kP0P1.value = "1.0";
+		sbmtform.seqtol_SK_Boltzmann.value = 0.228;
+		chainsChanged();
+    }
+	sbmtform.JobName.value = "Interface Sequence Tolerance sample job"
 }
 
 /************************************
@@ -807,11 +850,11 @@ function addOneMoreSeqtol()
 //todo: Add delete functionality
 function addOneMoreSeqtolSK()
 {
-	new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK);
+	new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK, { duration: 0.0, queue: { scope: 'task' }});
 	numSeqTolSK = numSeqTolSK + 1;
 	if (numSeqTolSK >= SK_MaxMutations)
 	{
-		  new Effect.Fade("addmrow_2_1", { duration: 0.0 } );
+		  new Effect.Fade("addmrow_2_1", { duration: 0.0, queue: { scope: 'task' }});
 	}
 	return true;
 }
@@ -850,7 +893,7 @@ function changeApplicationToSeqtolSK2(app, task, extra)
 	}
 	for (; i < SK_max_seqtol_chains; i++)
 	{
-		new Effect.Fade("seqtol_SK_chainrow_" + "" + i, { duration: 0.0} );
+		new Effect.Fade("seqtol_SK_chainrow_" + "" + i, { duration: 0.0, queue: { scope: 'task' }} );
 	}
 	numSeqTolSKChains = _extra
 	
@@ -860,6 +903,26 @@ function changeApplicationToSeqtolSK2(app, task, extra)
 		reset_seqtolSKData();
 	}
 	new Effect.Appear( "recNumStructures" + app + "_" + task );
+	
+	if (localquery == "sampleData")
+	{
+		// todo
+		numSeqTolSKPremutations = 0;
+		for (i = 0; i < SK_MaxPremutations; i++)
+		{
+			new Effect.Fade("seqtol_SK_pre_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+		}
+		for (i = 0; i < 6; i++)
+		{
+			new Effect.Appear("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+		}
+		for (i = 6; i < SK_MaxMutations; i++)
+		{
+			new Effect.Fade("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+		}
+		new Effect.Appear("addmrow_2_1", { duration: 0.0, queue: { scope: 'task' }});
+	}
+	
 }
 
 function reset_seqtolSKData ()
@@ -1072,6 +1135,22 @@ function validateElem(elem, expression)
 {
 	var val = elem.value
 	if(val.length > 0 && val.match(expression))
+	{
+		elem.style.background="white";
+		return true;
+	}
+	else
+	{
+		elem.focus();
+		elem.style.background="red";
+		return false;
+	}
+}
+
+function validateEmptyElem(elem)
+{
+	var val = elem.value
+	if(val.match(emptyExpression))
 	{
 		elem.style.background="white";
 		return true;

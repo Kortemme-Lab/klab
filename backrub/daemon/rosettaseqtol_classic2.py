@@ -684,7 +684,7 @@ this information may be out of date
     while subp.poll() == None:
       time.sleep(0.2)  
     x = subp.communicate()
-    # if an error occured, print it!
+    # if an error occurred, print it!
     if x[1] != '': print "stderr>>", x[1]
     return x[0]
     

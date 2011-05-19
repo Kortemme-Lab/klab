@@ -15,6 +15,7 @@ from string import join
 import pickle
 from rosettahtml import RosettaHTML
 from rosettahelper import *
+from RosettaProtocols import RosettaBinaries
 
 class RosettaDataDir(RosettaHTML):
 
@@ -83,10 +84,10 @@ class RosettaDataDir(RosettaHTML):
         individual_scores = ''
         
         if usingMini:
-          self.header = '<h1 align="center">Job %s - Point Mutation (mini)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Point Mutation (Rosetta 3)</h1>' % jobid
           individual_scores = '<li>Detailed scores for each residue: <a href="../downloads/%s/scores_residues.txt">scores_residues.txt</a></li>' % cryptID
         else:
-          self.header = '<h1 align="center">Job %s - Point Mutation (classic)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Point Mutation (Rosetta++)</h1>' % jobid
         
         self.html_refs = '<P>%(SmithKortemme:2008)s</P>' % self.refs
         
@@ -122,9 +123,9 @@ class RosettaDataDir(RosettaHTML):
         # and overwrite the parts that don't apply
         usingMini = RosettaBinaries[binary]['mini']
         if usingMini:
-          self.header = '<h1 align="center">Job %s - Multiple Point Mutations (mini)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Multiple Point Mutations (Rosetta 3)</h1>' % jobid
         else:
-          self.header = '<h1 align="center">Job %s - Multiple Point Mutations (classic)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Multiple Point Mutations (Rosetta++)</h1>' % jobid
     
     def Ensemble(self, cryptID, jobid, binary, pdb_filename):
         # let's reuse the point mutation function since the output files are the same
@@ -132,18 +133,18 @@ class RosettaDataDir(RosettaHTML):
         # and overwrite the parts that don't apply
         usingMini = RosettaBinaries[binary]['mini']
         if usingMini:
-          self.header = '<h1 align="center">Job %s - Backrub Ensemble (mini)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Backrub Ensemble (Rosetta 3)</h1>' % jobid
         else:
-          self.header = '<h1 align="center">Job %s - Backrub Ensemble (classic)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Backrub Ensemble (Rosetta++)</h1>' % jobid
     
     def EnsembleDesign(self, cryptID, jobid, binary, pdb_filename):
         
         usingMini = RosettaBinaries[binary]['mini']
         self.jobid = jobid
         if usingMini:
-          self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (mini)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (Rosetta 3)</h1>' % jobid
         else:
-          self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (classic)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Backrub Ensemble Design (Rosetta++)</h1>' % jobid
         
         self.html_refs = '<P>%(FriedlandEtAl:2009)s</P>' % self.refs
         
@@ -177,7 +178,7 @@ class RosettaDataDir(RosettaHTML):
     def SequenceToleranceHK(self, cryptID, jobid, binary, pdb_filename):
     
         self.jobid = jobid
-        self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (classic)</h1>' % jobid
+        self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (Rosetta++)</h1>' % jobid
         self.html_refs = '<P>%(HumphrisKortemme:2008)s</P>' % self.refs
         
         # individual boxplots
@@ -226,7 +227,7 @@ class RosettaDataDir(RosettaHTML):
     
         self.jobid = jobid
         if binary == "seqtolJMB":
-          self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (mini)</h1>' % jobid
+          self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (Rosetta 3)</h1>' % jobid
           self.html_refs = '<P>%(SmithKortemme:2010)s</P>' % self.refs
         else:
           self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction</h1>' % jobid

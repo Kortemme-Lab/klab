@@ -68,7 +68,7 @@ class RosettaHTML(object):
                         "tt_Temp":          "header=[Temperature] body=[at which backrub is carried out.] %s" % tooltip_parameter,
                         "tt_NSeq":          "header=[Number of Sequences] body=[The number of designed sequences for each ensemble structure.] %s" % tooltip_parameter,
                         "tt_SegLength":     "header=[Maximal segment length for backrub] body=[Limit the length of the segment to which the backrub move is applied to. (3-12)] %s" % tooltip_parameter,
-                        "tt_error":         "header=[Rosetta Error</b></font><br>Rosetta (classic and mini) fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occures for your structure please check the correctness of the PDB file.] %s" % tooltip_parameter,
+                        "tt_error":         "header=[Rosetta Error</b></font><br>Both Rosetta++ and Rosetta 3 fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occurs for your structure please check the correctness of the PDB file.] %s" % tooltip_parameter,
                         "tt_seqtol_partner":"header=[Partner] body=[Define the two chains that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_SK_partner":"header=[Partner] body=[@upgradetodo: Define the chain(s) that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
                         "tt_seqtol_SK_weighting":"header=[Score reweighting] body=[@upgradetodo: Define the intramolecular energies / self energy (e.g. k<sub>A</sub>) and the intermolecular / interaction energies (e.g. k<sub>AB</sub>).] %s" % tooltip_parameter,
@@ -77,7 +77,7 @@ class RosettaHTML(object):
                         "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
                         "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
                         "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
-                        "tt_seqtol_premutated": "header=[Residues for design] body=[@upgradetodo:] %s" % tooltip_parameter,
+                        "tt_seqtol_premutated": "header=[Premutated residues] body=[@upgradetodo:] %s" % tooltip_parameter,
                         "tt_click":         "body=[Click on the link to read the description.] %s" % tooltip_parameter,
                         "ROSETTAWEB_SK_RecommendedNumStructures":   ROSETTAWEB_SK_RecommendedNumStructures,
                         }
@@ -171,7 +171,7 @@ class RosettaHTML(object):
 # submit()
 ###############################################################################################
 
-    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='', extraValues = ''):
+    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='', extraValues = '', loadSampleData = False):
           # this function uses javascript functions from jscript.js
             # if you change the application tabler here, please make sure to change jscript.js accordingly
             # calling the function with parameters will load those into the form. #not implemented yet
@@ -224,7 +224,8 @@ class RosettaHTML(object):
        
         protocolGroups = self.protocolGroups
         numProtocolGroups = len(protocolGroups)
-                         
+        
+        #@todo: create this via a loop    
         html.append('''<td align="center">
     <H1 class="title">Submit a new job</H1>
     %(errors)s
@@ -244,21 +245,21 @@ class RosettaHTML(object):
               <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>            
               <p id="menu_1" style="text-align:left; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td id="protocolarrow0_0" width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 0); ">One mutation</a></td></tr>
-                  <tr><td id="protocolarrow0_1" width="30" style="text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 1); ">Multiple mutations</a></td></tr>
+                  <tr><td id="protocolarrow0_0" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 0); ">One mutation</a></td></tr>
+                  <tr><td id="protocolarrow0_1" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 1); ">Multiple mutations</a></td></tr>
                   </table>
               </p>
             </li>
             <li id="ab3">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Backrub Ensembles</A>
+              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Backrub Ensemble</A>
               <p id="menu_2" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td id="protocolarrow1_0"  width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow1_0"  width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(1, 0); ">
                           <font style="font-size:10pt">Backrub Conformational Ensemble</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>
                       </td></tr>
-                  <tr><td id="protocolarrow1_1"  width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow1_1"  width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(1, 1); ">
                           <font style="font-size:10pt">Backrub Ensemble Design</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 8pt">Friedland et. al., 2008</a> ]</font>
@@ -271,15 +272,16 @@ class RosettaHTML(object):
               
               <p id="menu_3" style="text-align:right; margin:0px;">
                   <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td id="protocolarrow2_0" width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow2_0" width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(2, 0); ">
                           <font style="font-size:10pt">Interface Sequence Tolerance</font></a><br>
                           <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
                       </td></tr>
-                  <tr><td id="protocolarrow2_1" width="30" style="text-align:right;">&#8680;</td>
+                  <tr><td id="protocolarrow2_1" width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
                       <td><a href="javascript:void(0)" onclick="changeApplication(2, 1); ">
-                          <font style="font-size:10pt">Interface / Fold Sequence Tolerance</font></a><br>
-                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 8pt">Smith and Kortemme, 2010</a> ]</font>
+                          <font style="font-size:10pt">Generalized Protocol<br>(Fold / Interface)<br>Sequence Tolerance</font></a><br>
+                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 8pt">Smith and Kortemme, 2010</a> ]</font><br>
+                          <font style="font-size:8pt">[ <a href="" style="font-size: 8pt">Smith and Kortemme, 2011</a> ]</font>
                       </td></tr>
                   </table>
               </p>
@@ -303,7 +305,7 @@ class RosettaHTML(object):
           <!-- description -->
             <p id="textintro" style="text-align:justify;">
               Choose one of the applications on the left. Each application will give you a short explanation and a set of parameters that can be adjusted.<br><br>
-              A <a href="../wiki/Tutorial">tutorial</a> on how to submit a job can be found in the <a href="../wiki">documentation</a>. For a brief explanation of each parameter move your mouse to the question mark symbol. The button "Check form" can be used to highlight fields with invalid entries in red; this is also shown when "Submit" is clicked.
+              A <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Tutorial">tutorial</a> on how to submit a job can be found in the <a href="https://kortemmelab.ucsf.edu/backrub/wiki">documentation</a>. For a brief explanation of each parameter move your mouse to the question mark symbol. The button "Check form" can be used to highlight fields with invalid entries in red; this is also shown when "Submit" is clicked.
             </p>''')
         
         for i in range(numProtocolGroups):
@@ -357,7 +359,6 @@ class RosettaHTML(object):
             html.append('''
                     <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s" onChange="document.submitform.MiniTextValue.value = '%s'"/> %s%s</div>
                     ''' % (desc, desc, bnamevalue, bname, recommendation))
-            
             
             i += 1
         
@@ -451,7 +452,7 @@ class RosettaHTML(object):
         
         html.append('''     
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
-              <input type="button" value="Load sample data" onClick="set_demo_values();">
+              <input type="button" value="Load sample data" onClick="set_demo_values(false); document.submitform.query.value = 'sampleData'; document.submitform.submit();">
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="ValidateForm();"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="reset_form();"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit"></span>
@@ -472,7 +473,7 @@ class RosettaHTML(object):
                 
                 # Hack to show a warning to avoid crashes of point mutation with classic
                 if i == 0:
-                    html.append('''<br><br><span><sup>*</sup>For details, see <a href="/backrub/wiki/" target="_blank">documentation</a>.</span>''')
+                    html.append('''<br><br><span><sup>*</sup>For details, see <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Rosetta.2B-.2B-_specific_PDB_errors_on_upload" target="_blank">documentation</a>.</span>''')
 
                 html.append('</p>')
 
@@ -495,7 +496,10 @@ class RosettaHTML(object):
         
         html.append(' <INPUT TYPE="hidden" NAME="protocolgroup" VALUE="%s"> ' % activeProtocol[0])
         html.append(' <INPUT TYPE="hidden" NAME="protocoltask" VALUE="%s"> ' % activeProtocol[1])
-        html.append(extraValues)
+        
+        for key, value in extraValues.iteritems():
+            html.append('''<INPUT TYPE="hidden" NAME="%s" VALUE="%s">''' % (key, value))
+
         html.append('''
             <INPUT TYPE="hidden" NAME="StoredPDB"  VALUE="%s">
             <INPUT TYPE="hidden" NAME="MiniTextValue" VALUE="none">
@@ -530,9 +534,10 @@ class RosettaHTML(object):
     def submitted(self, jobname, cryptID, remark, warnings):
       
       if remark == 'new':
+        #upgradetodo: check this link on webserver todo Setup and add https:// onto albana 
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
-                    Raw data files:<br><a class="blacklink" href="https://%s%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
+                    Raw data files:<br><a class="blacklink" href="%s%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
                     </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
 #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
@@ -545,7 +550,7 @@ class RosettaHTML(object):
                     </td></tr></table>''' % ( self.script_filename, cryptID, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
       else:
         # I don't think this can happen but best to be safe
-        box = '<font color="red">An error occured, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
+        box = '<font color="red">An error occurred, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
       if warnings:
           warnings = "<li>" + join(warnings, "</li><li>") + "</li>"
@@ -781,6 +786,7 @@ class RosettaHTML(object):
             miniVersion = "classic"
             if RosettaBinaries[line[6]]["mini"]:
                 miniVersion = "mini"
+            miniVersion = RosettaBinaries[line[6]]["queuename"]
             html.append('<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
 
             # write size of ensemble
@@ -829,7 +835,7 @@ class RosettaHTML(object):
         return join(html, "")
 
     def _defaultParameters(self, ID, jobname, status, hostname, date_submit, date_start, date_end, time_computation, date_expiration, time_expiration, mini, error, delete=False, restart=False ):
-        # print the first part of the result table  
+        # display the first part of the result table  
     
         qcolors = {
             "in queue" : "orange",
@@ -1080,7 +1086,7 @@ class RosettaHTML(object):
                     <P>
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
                     The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al.<a href="#refDavisEtAl:2006"><sup id="ref">%(DavisEtAl:2006)d</sup></a>, 
-                    for flexible protein backbone modeling implemented in <a href="/backrub/wiki/Rosetta">Rosetta</a><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>.</P>
+                    for flexible protein backbone modeling implemented in <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Rosetta">Rosetta</a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d,</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d,</sup></a><a href="#refSmithKortemme:2011"><sup id="ref">%(SmithKortemme:2011)d</sup></a>.</P>
 
                     <!--<P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
                     prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.
@@ -1095,8 +1101,8 @@ class RosettaHTML(object):
                     <li><b>Sequence tolerance</b><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">,%(HumphrisKortemme:2008)d</sup></a>: predicts sequences tolerated for proteins and protein-protein interfaces using flexible backbone design methods.  Example applications are the generation of sequence libraries for experimental screening and prediction of protein or peptide interaction specificity.</P>
                     </ul>
 
-                    <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="/backrub/wiki/" target="_blank">documentation</a>.
-            Please also check for <a href="/backrub/wiki/" target="_blank">current announcements</a>. 
+                    <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">documentation</a> and the references below.
+            Please also check for <a href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">current announcements</a>. 
                     </P>""" % refIDs)
         
         html.append("""
@@ -1137,11 +1143,14 @@ class RosettaHTML(object):
 
     def loggedIn(self, username):
         self.username = username
+        ps = ""
+        if username == "guest":
+            ps = "<br>Please note that if you register an account for the website then this allows us to contact you directly if there are any problems in your jobs and suggest solutions. It also helps us to improve the website based on your feedback. Additionally, job details and results for registered users are stored for a longer period on the server.<br>" 
         html = """ <div id="login_box"></div>
-                   <td align="center">You have successfully logged in as %s. <br> <br> \n 
+                   <td align="center">You have successfully logged in as %s. <br> %s <br>  
                    From here you can proceed to the <A href="%s?query=submit">submission page</A> to <A href="%s?query=submit">submit a new job</A> <br>
                    or navigate to the <A href="%s?query=queue">queue</A> to check for submitted, running or finished jobs. <br><br> </td>
-                   """ % ( username, self.script_filename, self.script_filename, self.script_filename )
+                   """ % ( username, ps, self.script_filename, self.script_filename, self.script_filename )
         return html
 
 
@@ -1633,7 +1642,7 @@ class RosettaHTML(object):
         if numChainsAvailable > 1:
             html.append('''
                             <option value="2">2 Partners (Interface)</option> ''')
-            numChainsAllowed = min(ROSETTAWEB_max_seqtol_SK_chains, numChainsAvailable)
+            numChainsAllowed = min(ROSETTAWEB_SK_Max_Chains, numChainsAvailable)
             for j in range(3, numChainsAllowed + 1):
                 html.append(''' <option value="%s">%s Partners</option> ''' % (j, j))
         
@@ -1655,7 +1664,7 @@ class RosettaHTML(object):
                   <td>Chain <select name="seqtol_SK_chain%d" onChange="chainsChanged();" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">%s</select></td>
                   </tr>
                   ''' % (i, i+1, tt, i, chainOptions))
-        for i in range(numChainsAvailable, ROSETTAWEB_max_seqtol_SK_chains):
+        for i in range(numChainsAvailable, ROSETTAWEB_SK_Max_Chains):
             html.append('''
                 <tr id="seqtol_SK_chainrow_%d">
                   <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
@@ -1738,14 +1747,14 @@ class RosettaHTML(object):
                       <tr align="center" bgcolor="#828282" style="color:white;" >
                         <td bgcolor="#EEEEEE"></td>
                         <td>Self Energy</td>
-                ''' % (ROSETTAWEB_max_seqtol_SK_chains - 1))
+                ''' % (ROSETTAWEB_SK_Max_Chains - 1))
         
-        for i in range(1, ROSETTAWEB_max_seqtol_SK_chains):
+        for i in range(1, ROSETTAWEB_SK_Max_Chains):
             html.append('''<td class="seqtol_SK_kP%d" style="display:none">Partner %d</td>''' % (i - 1, i))
         
         html.append('''</tr>''')
         
-        for i in range(0, ROSETTAWEB_max_seqtol_SK_chains):
+        for i in range(0, ROSETTAWEB_SK_Max_Chains):
             html.append('''   <tr align="center" id="seqtol_SK_weight_%d" style="display:none">                    
                           <td align="left">Partner %d</td>
                           <td><input type="text" name="seqtol_SK_kP%dP%d" maxlength=5 SIZE=4 VALUE="0.4"></td>
@@ -1754,7 +1763,7 @@ class RosettaHTML(object):
             for j in range(0, i):
                 html.append('''<td class="seqtol_SK_kP%d"><input type="text" name="seqtol_SK_kP%dP%d" maxlength=5 SIZE=4 VALUE="1.0"></td>''' % (j, j, i))                           
             
-            for j in range(i, ROSETTAWEB_max_seqtol_SK_chains - 1):
+            for j in range(i, ROSETTAWEB_SK_Max_Chains - 1):
                 html.append('''<td class="seqtol_SK_kP%d"></td>''' % j)   
             
             html.append("</tr>")
@@ -1881,7 +1890,7 @@ class RosettaHTML(object):
              
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
-            #todo: text
+            #@upgradetodo: ask Colin
             html.append('''<tr><td align="left" bgcolor="#FFFCD8">A ranked table of amino acid types for each position.<br>
                               Download the table as 
                               <a href="../downloads/%s/tolerance_seqrank.png">PNG</a>, <a href="../downloads/%s/tolerance_seqrank.pdf">PDF</a>.<br>
@@ -1987,7 +1996,7 @@ class RosettaHTML(object):
                         const SK_MaxMutations = %d;
                         const SK_MaxPremutations = %d;
                         const MaxMultiplePointMutations = %d;
-                    """ % (ROSETTAWEB_HK_MaxMutations, ROSETTAWEB_max_seqtol_SK_chains, ROSETTAWEB_SK_InitialBoltzmann, 
+                    """ % (ROSETTAWEB_HK_MaxMutations, ROSETTAWEB_SK_Max_Chains, ROSETTAWEB_SK_InitialBoltzmann, 
                            ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations, 
                            ROSETTAWEB_MaxMultiplePointMutations))
         JS.append('//]]></script>')
@@ -2039,7 +2048,7 @@ class RosettaHTML(object):
         html = """
                 <tr><td align=center>
                     [&nbsp;<A class="nav" href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A class="nav" href="../wiki/" target="_blank">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
+                    [&nbsp;<A class="nav" href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;]
                 </td></tr>
                 <tr><td align=center> %s %s \n</td></tr>""" % (self.script_filename,self.script_filename, s1, s2)
@@ -2049,7 +2058,7 @@ class RosettaHTML(object):
     def _showLegalInfo(self):
         html = """<td style="border:1px solid black; padding:10px" bgcolor="#FFFFE0">
                     <p style="text-align:left; font-size: 10pt">
-                      For questions, please read our <A href="../wiki/">documentation</A>, see the reference below, or contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.
+                      For questions, please read our <A href="https://kortemmelab.ucsf.edu/backrub/wiki/">documentation</A>, see the references below, or contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.
                     </p>
                     %s
                   </td>""" % self.html_refs
@@ -2070,7 +2079,7 @@ class RosettaHTML(object):
                     <tr>
                     <td align="left">
                     "RosettaBackrub" is available for NON-COMMERCIAL USE ONLY at this time. 
-                    [&nbsp;<A class="nav" href="/backrub/wiki/TermsOfService" >Terms of Service</A>&nbsp;]<br>
+                    [&nbsp;<A class="nav" href="https://kortemmelab.ucsf.edu/backrub/wiki/TermsOfService" >Terms of Service</A>&nbsp;]<br>
                     <font style="font-size: 9pt">Copyright &copy; 2009 Tanja Kortemme, Florian Lauck and the Regents of the University of California San Francisco</font>
                     </td>
                     <td align="center">

@@ -78,7 +78,7 @@ parameter = read_config_file()
 from pdb import PDB
 # todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
 ROSETTAWEB_base_dir = parameter["base_dir"]
-sys.path.insert(0, "%sdaemon/" % ROSETTAWEB_base_dir)
+sys.path.insert(0, os.path.join(ROSETTAWEB_base_dir, "daemon"))
 from rosettaseqtol import make_seqtol_resfile
 
 ROSETTAWEB_db_host = parameter['db_host']
@@ -111,7 +111,8 @@ apacheerr = sys.stderr
 
 if ROSETTAWEB_server_name == 'albana.ucsf.edu':
     import profile 
-    
+ROSETTAWEB_short_server_name = split(ROSETTAWEB_server_name, ".")[0]
+
 # open connection to MySQL
 DBConnection = rosettadb.RosettaDB(ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
 ########################################## Setup End ##########################################
@@ -120,6 +121,8 @@ DBConnection = rosettadb.RosettaDB(ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTA
 errors = []
 warnings = []
 
+def getKlabDBConnection():
+    return rosettadb.RosettaDB("kortemmelab.ucsf.edu", ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
 
 def fixFilename(filename):
     filename = filename.replace(' ', '_')
@@ -149,6 +152,7 @@ def saveTempPDB(SID, pdb_object, pdb_filename):
         return True, filepath
     except:
         estring = traceback.format_exc()
+        errors.append(estring)
         if estring.find("IOError: [Errno 13] Permission denied") != -1:
             estring = "Write permission was denied when creating the file. If this persists, please contact support@kortemmelab.ucsf.edu."
         else:
@@ -158,31 +162,19 @@ def saveTempPDB(SID, pdb_object, pdb_filename):
         errors.append(estring)
         return False, ''
 
-def getRosettaVersion(form):
-    if form.has_key("ChosenBinary"):
+# Used on submission. ChosenBinary should be set by uploading the PDB and be propagated down to this stage
+def getRosettaVersion(form):   
+    if form.has_key("ChosenBinary") and form["ChosenBinary"].value:
         return form["ChosenBinary"].value
     else:
-        return None    #if "protocol" in form:
+        return None
    
+# Used on parsing the PDB. Mini should be set by the Rosetta version select group
 def usingMini(form):
-    if form.has_key("ChosenBinary"):
-        return RosettaBinaries[form["ChosenBinary"].value]["mini"]
-    elif form.has_key("Mini"):
+    if form.has_key("Mini"):
         return RosettaBinaries[form["Mini"].value]["mini"]
     else:
-        return None    #if "protocol" in form:
-    #    print("proto: %s" % str(form['protocol'].value))
-    #else:
-    #    print("no protocol")
-              
-    #if form['protocolgroup'].value == '2' and form['protocoltask'].value == '1':
-    #    return 'mini'
-    #if form.has_key("Mini"):
-    #    return form["Mini"].value # this is either 'mini' or 'classic'
-    #elif modus == 4 or modus == 'ensemble': # we're fine and don't need a binary, so let's set a default
-    #    return "classic"
-    #else:
-    #    return None          
+        return None    
 
 ###############################################################################################
 # ws()                                                                                        #
@@ -273,7 +265,7 @@ def ws():
         sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
         result = DBConnection.execQuery(sql)
         # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
-        if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB"]:
+        if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]:
           query_type = form["query"].value
         
           sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
@@ -371,7 +363,12 @@ def ws():
   # if query_type == "index":
   #   html_content = rosettaHTML.index()
   #   title = 'Home'
-
+  propagatedValues = ['ChosenBinary']
+  extraValues = {}
+  for pv in propagatedValues:
+      if form.has_key(pv):
+          extraValues[pv] = form[pv].value
+  
   if query_type == "login" or query_type == "index":
     login_return = login(form, my_session, t)
     if login_return == True:
@@ -380,7 +377,7 @@ def ws():
     elif login_return in ['no_password', 'wrong_password', 'wrong_username']:
       html_content = rosettaHTML.login(message='Wrong username or password. Please try again.')
     elif login_return == 'logged_in':
-      html_content = rosettaHTML.login(message='You\'re already logged in.', login_disabled=True)
+      html_content = rosettaHTML.login(message='You are already logged in.', login_disabled=True)
     else:
       html_content = rosettaHTML.login()
     title = 'Home'
@@ -395,7 +392,7 @@ def ws():
       html_content = rosettaHTML.index()
     title = 'Logout'
 
-  elif query_type == "parsePDB":
+  elif query_type == "parsePDB" or query_type == "sampleData":
       #html_content = rosettaHTML.submit(jobname='')
       #form
       
@@ -406,24 +403,24 @@ def ws():
       if not pdb_okay:
           # reset the query for the JS startup function
           query_type = "submit"
-          html_content = rosettaHTML.submit(jobname='', errors=errors, activeProtocol = protocol)
+          html_content = rosettaHTML.submit(jobname='', errors=errors, activeProtocol = protocol, extraValues = extraValues)
       else:              
           saveSucceeded, newfilepath = saveTempPDB(SID, pdb_object, pdb_filename)
           if not saveSucceeded:
               # reset the query for the JS startup function
               query_type = "submit"
-              html_content = rosettaHTML.submit(jobname='', errors=errors)
+              html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
           else:
               PDBchains = pdb_object.chain_ids() 
               numPDBchains = len(PDBchains)
               
               
-              if numPDBchains > ROSETTAWEB_max_seqtol_SK_chains:
-                  errors.append('The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_max_seqtol_SK_chains))
+              if numPDBchains > ROSETTAWEB_SK_Max_Chains:
+                  errors.append('The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_SK_Max_Chains))
               
-              extraValues = '<INPUT TYPE="hidden" NAME="ChosenBinary" VALUE="%s">' % form["Mini"].value
-
-              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value, extraValues)
+              extraValues['ChosenBinary'] = form["Mini"].value
+                  
+              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value, extraValues, query_type == "sampleData")
               title = 'Submission Form'
       
   elif query_type == "submitted":    
@@ -432,11 +429,11 @@ def ws():
         html_content = rosettaHTML.submitted('', return_val[0], return_val[1], warnings)
         title = 'Job submitted'
     else: # no data was submitted/there is an error
-        html_content = rosettaHTML.submit(jobname='', errors=errors)
+        html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
         title = 'Submission Form'
 
   elif query_type == "submit":
-    html_content = rosettaHTML.submit(jobname='')
+    html_content = rosettaHTML.submit(jobname='', extraValues = extraValues)
     title = 'Submission Form'
 
   elif query_type == "queue":
@@ -843,18 +840,16 @@ def check_pdb(pdb_object, pdb_filename, usingClassic, ableToUseMini):
     # check the number of atoms/residues/chains;
     # numbers are derived from 1KYO wich is huge: {'models': 0, 'chains': 23, 'residues': 4459, 'atoms': 35248}
     counts = pdb_object.get_stats()
-    #todo: Parameterize these constants in rwebhelper
-    if counts["atoms"] > 10000:
+    if counts["atoms"] > ROSETTAWEB_PDB_MAX_ATOMS:
         errors.append("Maximum number of atoms exceeded;<br>The maximum is %d, the PDB contained %d." % (10000, counts["atoms"]))
         return False
-    elif counts["residues"] > 1500:
+    elif counts["residues"] > ROSETTAWEB_PDB_MAX_RESIDUES:
         errors.append("Maximum number of residues exceeded;<br>The maximum is %d, the PDB contained %d." % (500, counts["residues"]))
         return False
-    # todo: This value used to be 4 but ROSETTAWEB_max_seqtol_SK_chains is currently greater than 4 so we use that
-    elif counts["chains"] > ROSETTAWEB_max_seqtol_SK_chains:
-        errors.append("Maximum number of chains exceeded;<br>The maximum is %d, the PDB contained %d." % (ROSETTAWEB_max_seqtol_SK_chains, counts["chains"]))
+    elif counts["chains"] > ROSETTAWEB_PDB_MAX_CHAINS:
+        errors.append("Maximum number of chains exceeded;<br>The maximum is %d, the PDB contained %d." % (ROSETTAWEB_SK_Max_Chains, counts["chains"]))
         return False
-    elif counts["cys"] > 50:
+    elif counts["cys"] > ROSETTAWEB_PDB_MAX_CYSTEINE:
         errors.append("Maximum number of Cysteine residues exceeded;<br>The maximum is %d, the PDB contained %d." % (50, counts["cys"]))
         return False
     else:
@@ -900,18 +895,30 @@ def parsePDB(rosettaHTML, form):
             pdb_okay = False
     
     elif form.has_key("PDBID") and form["PDBID"].value != '':
-        try:
-            pdb_filename = form["PDBID"].value.upper() + '.pdb'
-            url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
-            req = urllib2.Request(url)
-            response = urllib2.urlopen(req)
-            pdbfile = response.read()
-            if len(pdbfile) <= 2:
+        pdb_filename = form["PDBID"].value.upper() + '.pdb'
+        if pdb_filename[0] == '@':
+            # This indicates that the file is locally stored 
+            pdb_filename = pdb_filename[1:]
+            try:
+                F = open(os.path.join(ROSETTAWEB_base_dir, "test", pdb_filename), "r") 
+                pdbfile = F.read()
+                F.close()
+            except Exception, e:
+                errors.append("An I/O error (%s) occurred reading the uploaded file. Please contact support@kortemmelab.ucsf.edu." % e)
+                pdb_okay = False
+        else:
+            try:
+                pdb_filename = form["PDBID"].value.upper() + '.pdb'
+                url = "http://www.pdb.org/pdb/files/%s" % pdb_filename
+                req = urllib2.Request(url)
+                response = urllib2.urlopen(req)
+                pdbfile = response.read()
+                if len(pdbfile) <= 2:
+                    errors.append("Invalid PDB identifier.")
+                    pdb_okay = False
+            except:
                 errors.append("Invalid PDB identifier.")
                 pdb_okay = False
-        except:
-            errors.append("Invalid PDB identifier.")
-            pdb_okay = False
     elif form.has_key("StoredPDB"):
         # We should have gotten here from a ParsePDB generated webpage
         # The filename in StoredPDB should have been created by saveTempPDB 
@@ -920,7 +927,7 @@ def parsePDB(rosettaHTML, form):
             # The filename should be generated from always match this if SID is alphanumeric
             try:
                 pdb_filename = sPDB
-                F = open("%s%s" % (ROSETTAWEB_temp_dir, pdb_filename), "r") 
+                F = open(os.path.join(ROSETTAWEB_temp_dir, pdb_filename), "r") 
                 pdbfile = F.read()
                 F.close()
             except Exception, e:
@@ -1015,6 +1022,7 @@ def submit(rosettaHTML, form, SID):
                 keep_output = 1 # ALWAYS KEEP OUTPUT FOR NOW
             
             mini = getRosettaVersion(form)
+
             if mini == None:
                 # this is preselected in HTML code, so this case should never occur, we still make sure!
                 errors.append("No Rosetta binary selected.")
@@ -1030,12 +1038,21 @@ def submit(rosettaHTML, form, SID):
                         return False   
             
             # todo: output where the time is going on Albana
-            # todo: add test input button which tests submit but does not add a job to the db
+            # @upgradetodo: check test input button which tests submit but does not add a job to the db
             ProtocolParameters = pickle.dumps(ProtocolParameters)
             
             return_vals = (cryptID, "new") # true we processed the data
         
             if not errors:
+                # Cluster jobs are stored in the kortemmelab database
+                # That database will not have access to fields in the local one e.g. different set of UserIDs messes up the UserNames, Email fields            
+                RemoteInformation = {}    
+                StorageDBConnection = DBConnection            
+                if ROSETTAWEB_short_server_name != "kortemmelab" and RosettaBinaries[mini]["runOnCluster"]:
+                   RemoteInformation = {"UserName": UserName, "Email": Email}
+                   StorageDBConnection = getKlabDBConnection()
+                RemoteInformation = pickle.dumps(RemoteInformation)
+                   
                 # if we're good to go, create new job
                 # get ip addr hostname
                 IP = os.environ['REMOTE_ADDR']
@@ -1046,7 +1063,7 @@ def submit(rosettaHTML, form, SID):
                     hostname = IP
                 # lock table
                 sql = "LOCK TABLES backrub WRITE, Users READ"
-                DBConnection.execQuery(sql)
+                StorageDBConnection.execQuery(sql)
                 # write information to database
                 
                 # Strip the path information from  the pdb
@@ -1055,14 +1072,14 @@ def submit(rosettaHTML, form, SID):
                     pdb_filename = m.group(1)
                 
                 # Add a dummy hashkey as this field should not be NULL
-                sql = """INSERT INTO backrub ( Date,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
-                                VALUES (NOW(), "0", "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (Email, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)
-                  
+                sql = """INSERT INTO backrub ( Date,RemoteInformation,BackrubServer,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
+                                VALUES (NOW(), "%s", "%s", "0", "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (RemoteInformation, ROSETTAWEB_short_server_name, Email, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)
+                
                 try: 
                     import random
-                    DBConnection.execQuery(sql)
+                    StorageDBConnection.execQuery(sql)
                     sql = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
-                    result = DBConnection.execQuery(sql)
+                    result = StorageDBConnection.execQuery(sql)
                     ID = result[0][0]
                     # create a unique key as name for directories from the ID, for the case we need to hide the results
                     # do not just use the ID but also a random sequence
@@ -1070,26 +1087,26 @@ def submit(rosettaHTML, form, SID):
                     cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
                     return_vals = (cryptID, "new")
                     sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
-                    result = DBConnection.execQuery(sql)
+                    result = StorageDBConnection.execQuery(sql)
                     # success
                     
-                    hash_key = DBConnection.generateHash(ID)
+                    hash_key = StorageDBConnection.generateHash(ID)
             
                     # now find if there's a key like that already:
                     sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
-                    result = DBConnection.execQuery(sql)
+                    result = StorageDBConnection.execQuery(sql)
                     # print sql, result
                     for r in result:
                         if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
                             shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
-                            result = DBConnection.execQuery(sql)
+                            result = StorageDBConnection.execQuery(sql)
                             return_vals = (cryptID, "old")
                             break
                     
                     # otherwise, see if there are already two similar jobs in the queue to avoid server spamming
                     sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND Status="0" AND ID!="%s"''' % (hash_key, ID)
-                    results = DBConnection.execQuery(sql)
+                    results = StorageDBConnection.execQuery(sql)
                     if results and len(results) > 0:
                         job = results[0]
                         #similarJobs = []
@@ -1098,24 +1115,31 @@ def submit(rosettaHTML, form, SID):
                         #join(map(str,similarJobs),", ")
                         errors.append('''There is already a job (<a href="%s?query=jobinfo&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, job[1], job[0]))
                         sql = """DELETE FROM backrub WHERE ID="%s" """ % ID
-                        result = DBConnection.execQuery(sql)
+                        result = StorageDBConnection.execQuery(sql)
                         return False
                      
                         
                 except _mysql_exceptions.OperationalError, e:
-                    html = '<H1 class="title">New Job not submitted</H1>'
-                    if e[0] == 1153:
-                        html += """<P>We are sorry but the size of the PDB file exceeds the upload limit. 
-                        Please revise your file and delete unneccessary entries (e.g. copies of chains, MODELS, etc.).</P>
-                        <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>"""
-                    else:
-                        html += """<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.</P>"""
+                    # This html is not used
                     errors.append("Database error.")
+                    html = '<H1 class="title">New Job not submitted</H1>'
+                    if e[0] == 1054:
+                        errors.append("""An error occurred submitting the job.<br>SQL Error - please contact the website administrator.""")# %d: %s % (e[0], e[1]))
+                        print(e[1])
+                    elif e[0] == 1153:
+                        errors.append("""<P>We are sorry but the size of the PDB file exceeds the upload limit. 
+                        Please revise your file and delete unneccessary entries (e.g. copies of chains, MODELS, etc.).</P>
+                        <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>""")
+                    else:
+                        errors.append("""<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.</P>""")
+                    
+                       
+                    #errors.append(str(e))
                     return_vals = False
             
                 # unlock tables
                 sql = "UNLOCK TABLES"
-                DBConnection.execQuery(sql)
+                StorageDBConnection.execQuery(sql)
                 
                 return return_vals
           
@@ -1160,8 +1184,7 @@ def submit(rosettaHTML, form, SID):
 # queue()                                                                                     #
 # this function shows active, pending and finished jobs                                       #
 ###############################################################################################
-
-
+        
 def queue(form, userid):
   
     output = StringIO()
@@ -1169,14 +1192,16 @@ def queue(form, userid):
     
     #todo: Fix this up with one SQL joined query per server
     
-    thisserver = ROSETTAWEB_server_name.split('.')[0]
+    thisserver = ROSETTAWEB_short_server_name
     
+    # Get all jobs for this server only which have not expired
     sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
     result1 = DBConnection.execQuery(sql)
     results = []
     if thisserver == 'albana':
-        KlabDBConnection = rosettadb.RosettaDB("kortemmelab.ucsf.edu", ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
-        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' ORDER BY backrub.ID DESC" % thisserver #todo add Expired when klab db updated
+        # Get all jobs on kortemmelab from albana which have not expired
+        KlabDBConnection = getKlabDBConnection()
+        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver #upgradetodo add Expired when klab db updated
         kresult = KlabDBConnection.execQuery(sql)
     
         for line in kresult:
@@ -1291,7 +1316,7 @@ def checkResidues(pdb_object, chainsreslists):
                 resid = "%s%4.i" % (chain, int(res_no))
                 if not resid in all_resids:
                     success = False
-                    errors.append("Residue not found: %s.<br>Valid residues (displaying at most 1000) are:" % resid)
+                    errors.append("Residue %s not found.<br>Valid residues (displaying at most 1000) are:" % resid)
                     rnumber = 0
                     validres = ""
                     for r in all_resids:
@@ -1505,7 +1530,7 @@ def storeSequenceToleranceSK(form, pdb_object):
         # We order the weights to match the command-line input format e.g. Other A B A-B, or A B C A-B A-C B-C, etc.                
         
         # Add the Other energy
-        # todo: Check this value w/Colin or mention in tooltips
+        # upgradetodo: Check this value w/Colin or mention in tooltips
         Weights.append("0.4") 
             
         # Add the self-energies
@@ -1625,7 +1650,7 @@ def SequenceToleranceSKChecks(params, pdb_object):
     success = checkResidues(pdb_object, chainsreslists)
 
     # Test to see if the seqtol resfile would be empty before proceeding 
-    # todo: Tidy this logic up with rosettaseqtol.py        
+    # todo: Tidy this logic up with rosettaseqtol.py and with analysis function of seqtol SK job       
     all_resids = pdb_object.aa_resids() # todo: Calling this twice (in checkResidues as well)
     resfileHasContents, contents = make_seqtol_resfile(pdb_object, params, ROSETTAWEB_SK_Radius, all_resids)
     
@@ -1644,64 +1669,6 @@ class FrontendProtocols(WebserverProtocols):
         refIDs = rosettaHTML.refs.getReferences()
         protocolGroups = self.protocolGroups
         protocols = self.protocols
-        
-        for pgroup in protocolGroups:
-            if pgroup.name == "Point Mutation":
-                pgroup.setDescription('''
-                This function utilizes the backrub protocol implemented in Rosetta and applies it to the neighborhood of a mutated amino acid residue to model conformational changes in this region.
-                There are two options.
-                <dl style="text-align:left;">
-                    <dt><b>One Mutation</b></dt><dd>
-                        A single amino acid residue will be substituted and the neighboring residues within a radius of 6&#197; of the mutated residues 
-                        will be allowed to change their side-chain conformations (\"repacked\"). 
-                        The method, choice of parameters and benchmarking are described in [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd><br>
-                    <dt><b>Multiple Mutations</b></dt><dd>Up to 30 residues can be mutated and their neighborhoods repacked.
-                                                          The modeling protocol is as described above for single mutations (but has not been benchmarked yet).</dd>
-                    <!-- dt>Upload List</dt><dd>Upload a list with single residue mutations.</dd -->
-                </dl>''' % refIDs)
-            elif pgroup.name == "Backrub Ensembles":
-                pgroup.setDescription('''
-                This function utilizes backrub and design protocols implemented in Rosetta. 
-                There are two options.
-                <dl style="text-align:left;">
-                    <dt><b>Backrub Conformational Ensemble</b></dt>
-                        <dd>Backrub is applied to the entire input structure to generate a flexible backbone ensemble of modeled protein conformations. 
-                        Near-native ensembles made using this method have been shown to be consistent with measures of protein dynamics by 
-                        Residual Dipolar Coupling measurements on Ubiquitin [<a href="#refSmithKortemme:2008">%(SmithKortemme:2008)d</a>].</dd><br>
-                    <dt><b>Backrub Ensemble Design</b></dt>
-                      <dd>This method first creates an ensemble of structures to model protein flexibility. 
-                          In a second step, the generated protein structures are used to predict an ensemble of low-energy sequences consistent with the input structures, 
-                          using computational design implemented in Rosetta. The output is a sequence profile of this family of structures. 
-                          For ubiquitin, the predicted conformational and sequence ensembles resemble those of the natural occurring protein family [<a href="#refFriedlandEtAl:2009">%(FriedlandEtAl:2009)d</a>].</dd>
-                </dl>''' % refIDs)
-            elif pgroup.name == "Sequence Tolerance":
-                pgroup.setDescription('''
-                
-                This function utilizes backrub and design protocols in Rosetta. 
-
-                There are two implementations:
-                <dl style="text-align:left;">
-                    <dt><b>Generalized RosettaBackrub sequence tolerance method</b> [<a href="#refSmithKortemme:2010">%(SmithKortemme:2010)d</a>]</dt>
-                        <dd>Predicts tolerated sequences for proteins or protein-protein interfaces.  This is the most recent protocol based on Rosetta 3.0.</dd><br>
-                    <dt><b>Interface sequence plasticity method</b> [<a href="#refHumphrisKortemme:2008">%(HumphrisKortemme:2008)d</a>]
-                         <dd>Predicts tolerated sequence space for up to 10 positions in protein-protein interfaces.  This method is based on Rosetta 2.0.</dd>
-                </dl>
-
-                Both implementations first apply the RosettaBackrub method to generate a conformational ensemble, design sequences consistent with the members in the ensemble, and then combine the sequences to build a predicted profile.
-
-                <!--This function utilizes backrub and design protocols implemented in Rosetta.
-                There are two options.
-                <dl style="text-align:left;">
-                    <dt><b>Interface Sequence Tolerance</b></dt>
-                        <dd>First, the backrub algorithm is applied to the uploaded protein-protein complex to generate a flexible backbone conformational ensemble of the entire complex. 
-                        Then, for each of the resulting structure, residue positions given by the user (up to 10) are subjected to protein design, using a genetic algorithm implemented in Rosetta. 
-                        All generated sequences are ranked by their Rosetta force field score. 
-                        Sequences with favorable scores both for the total protein complex and the interaction interface are used to build a sequence profile, as described and benchmarked in [<a href="#refHumphrisKortemme:2008">%(HumphrisKortemme:2008)d</a>].</dd>
-                    <dt><b>Interface / Fold Sequence Tolerance</b></dt>
-                        <dd> Insert text.[<a href="#refSmithKortemme:2010">%(SmithKortemme:2010)d</a>]</dd>
-                </dl>-->''' % refIDs) 
-            else:
-                raise
 
         for p in protocols:
             if p.dbname == "point_mutation":
@@ -1710,38 +1677,123 @@ class FrontendProtocols(WebserverProtocols):
                 p.setStoreFunction(storePointMutation)
                 p.setDataDirFunction(rosettaDD.PointMutation)
                 p.setReferences("SmithKortemme:2008")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ",")
+                p.setDescription('''A single amino acid residue will be substituted and the neighboring 
+                                    residues within a radius of 6&#197; of the mutated residues will be 
+                                    allowed to change their side-chain conformations (\"repacked\"). 
+                                    The method, choice of parameters and benchmarking are described 
+                                    in [%s].''' % refstring)
+                p.specialname = None
+                        
             elif p.dbname == "multiple_mutation":
                 p.setSubmitFunction(rosettaHTML.submitformMultiplePointMutations)
                 p.setShowResultsFunction(rosettaHTML.resultsMultiplePointMutations)
                 p.setStoreFunction(storeMultiplePointMutations)
                 p.setDataDirFunction(rosettaDD.MultiplePointMutations)
                 p.setReferences("SmithKortemme:2008")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ",")
+                p.setDescription('''Up to 30 residues can be mutated and their neighborhoods repacked. 
+                                    The modeling protocol is as described above for single mutations (but
+                                     has not been benchmarked yet).''')
+                p.specialname = None
+
             elif p.dbname == "no_mutation":
                 p.setSubmitFunction(rosettaHTML.submitformEnsemble)
                 p.setShowResultsFunction(rosettaHTML.showEnsemble)    
                 p.setStoreFunction(storeEnsemble)
                 p.setDataDirFunction(rosettaDD.Ensemble)
                 p.setReferences("SmithKortemme:2008")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ",")                
+                p.setDescription('''Backrub is applied to the entire input structure to generate a 
+                                    flexible backbone ensemble of modeled protein conformations. Near-native 
+                                    ensembles made using this method have been shown to be consistent 
+                                    with measures of protein dynamics by Residual Dipolar Coupling 
+                                    measurements on Ubiquitin [%s].''' % refstring)
+                p.specialname = None
+                                
             elif p.dbname == "ensemble":
                 p.setSubmitFunction(rosettaHTML.submitformEnsembleDesign)
                 p.setShowResultsFunction(rosettaHTML.showEnsembleDesign)
                 p.setStoreFunction(storeEnsembleDesign)
                 p.setDataDirFunction(rosettaDD.EnsembleDesign)
                 p.setReferences("FriedlandEtAl:2009")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ",")                
+                p.setDescription('''This method first creates an ensemble of structures to model 
+                                protein flexibility. In a second step, the generated protein structures 
+                                are used to predict an ensemble of low-energy sequences consistent with 
+                                the input structures, using computational design implemented in Rosetta. 
+                                The output is a sequence profile of this family of structures. For 
+                                ubiquitin, the predicted conformational and sequence ensembles resemble 
+                                those of the natural occurring protein family [%s].''' % refstring)
+                p.specialname = None
+                          
             elif p.dbname == "sequence_tolerance":
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceHK)
                 p.setShowResultsFunction(rosettaHTML.showSequenceToleranceHK)
                 p.setStoreFunction(storeSequenceToleranceHK)
                 p.setDataDirFunction(rosettaDD.SequenceToleranceHK)
                 p.setReferences("HumphrisKortemme:2008")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ",")                
+                p.setDescription('''Predicts tolerated sequence space for up to 10 positions in protein-protein 
+                                    interfaces.  This method is based on Rosetta 2.0.''')
+                p.specialname = "Interface sequence plasticity method [%s]" % refstring
+            
             elif p.dbname == "sequence_tolerance_SK":
+                # Test server-specific hack to override minimum number of structures for shorter runs
+                if ROSETTAWEB_server_name == 'albana.ucsf.edu':
+                    nos = p.getNumStructures()
+                    p.setNumStructures(2, nos[1], nos[2])
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
                 p.setShowResultsFunction(rosettaHTML.showSequenceToleranceSK)
                 p.setStoreFunction(storeSequenceToleranceSK)
                 p.setDataDirFunction(rosettaDD.SequenceToleranceSK)
-                p.setReferences("SmithKortemme:2010")  # todo: "SmithKortemme:2011"
+                p.setReferences("SmithKortemme:2010", "SmithKortemme:2011")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ", ")                
+                p.setDescription('''Predicts tolerated sequences for proteins or protein-protein 
+                            interfaces.  This is the most recent protocol based on Rosetta 3.0.''')
+                p.specialname = "Generalized RosettaBackrub sequence tolerance method [%s]"  % refstring
+                
             else:
                 raise 
+        
+        for pgroup in protocolGroups:
+            if pgroup.name == "Point Mutation":
+                desc = '''
+                    This function utilizes the backrub protocol implemented in Rosetta and applies it to the neighborhood of a mutated amino acid residue to model conformational changes in this region.
+                    There are two options.
+                    <dl style="text-align:left;">'''
+                for i in range(pgroup.getSize()):
+                    p = pgroup[i] 
+                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                desc += '''</dl>'''
+                pgroup.setDescription(desc)
+            elif pgroup.name == "Backrub Ensemble":
+                desc = '''
+                    This function utilizes backrub and design protocols implemented in Rosetta. 
+                    There are two options.
+                    <dl style="text-align:left;">'''
+                for i in range(pgroup.getSize()):
+                    p = pgroup[i] 
+                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                desc += '''</dl>'''
+                pgroup.setDescription(desc)
+            elif pgroup.name == "Sequence Tolerance":
+                desc = '''               
+                    This function utilizes backrub and design protocols in Rosetta.
+                    There are two implementations:
+                    <dl style="text-align:left;">'''
+                # Add them backwards
+                for i in range(pgroup.getSize() - 1, -1, -1):
+                    p = pgroup[i] 
+                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                desc += '''</dl>                
+                    Both implementations first apply the RosettaBackrub method to generate 
+                    a conformational ensemble, design sequences consistent with the members 
+                    in the ensemble, and then combine the sequences to build a predicted sequence profile.'''
+                pgroup.setDescription(desc)
+            else:
+                raise
+                      
         # Create references for the HTML generators    
         rosettaDD.protocolGroups = protocolGroups
         rosettaHTML.protocolGroups = protocolGroups
@@ -1752,6 +1804,10 @@ class FrontendProtocols(WebserverProtocols):
 try:
     ws()
 except Exception, e:
-    traceback.print_exc()
-    print "An error occured. Please check your input and contact us if the problem persists."
+    #@upgradetodo
+    print(e)
+    print("<br>")
+    print(str(traceback.print_exc()).replace("\n", "<br>"))
+    print("*<br>")
+    print "An error occurred. Please check your input and contact us if the problem persists."
 

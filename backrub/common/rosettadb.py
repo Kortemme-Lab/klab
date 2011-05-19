@@ -161,8 +161,8 @@ class RosettaDB:
                 # @debug:
                 # sys.stderr.write("\nSQL execution error.")
                 # sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
-                traceback.print_exc()
-                raise MySQLdb.OperationalError
+                #traceback.print_exc()
+                raise e
                 break
             except:                
                 traceback.print_exc()

@@ -49,14 +49,14 @@ class Daemon(object):
         #redirect standard file descriptors
         # if not self.debug:
         # # this discards any output.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        si = file(self.stdin, 'r')
-        so = file(self.stdout, 'w', 1) # so = file(self.stdout, 'a+', 1)
-        se = file(self.stderr, 'w', 1) # se = file(self.stderr, 'a+', 1)
-        os.dup2(si.fileno(), sys.stdin.fileno())
-        os.dup2(so.fileno(), sys.stdout.fileno())
-        os.dup2(se.fileno(), sys.stderr.fileno())
+        #sys.stdout.flush()
+        #sys.stderr.flush()
+        #si = file(self.stdin, 'r')
+        #so = file(self.stdout, 'w', 1) # so = file(self.stdout, 'a+', 1)
+        #se = file(self.stderr, 'w', 1) # se = file(self.stderr, 'a+', 1)
+        #os.dup2(si.fileno(), sys.stdin.fileno())
+        #os.dup2(so.fileno(), sys.stdout.fileno())
+        #os.dup2(se.fileno(), sys.stderr.fileno())
 
         # write pidfile
         atexit.register(self.delpid)
