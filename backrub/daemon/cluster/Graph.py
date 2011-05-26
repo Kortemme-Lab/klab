@@ -17,9 +17,13 @@ import ClusterTask
 
 #upgradetodo use this to pretty print the JSON import simplejson
 
-JITSpaceTree = readFile("JITSpaceTree.js")
-JITForceDirected = readFile("JITForceDirected.js")
-JITHTML = readFile("JIThtml.html")
+msubdir = "cluster/"
+if __name__ == "__main__":
+    msubdir = ""
+    
+JITSpaceTree = readFile("%sJITSpaceTree.js" % msubdir)
+JITForceDirected = readFile("%sJITForceDirected.js" % msubdir)
+JITHTML = readFile("%sJIThtml.html" % msubdir)
 
 # todo: move all color constants into one file
 green = "#00FF00"                
@@ -66,7 +70,15 @@ class Node(object):
         self.exclusiveTime = self.inclusiveTime
         if initial:
             self.shape = self.schema[ClusterTask.INITIAL_TASK][2]
-                
+
+def getHTMLLegend():
+    for state in ClusterTask.status:
+        scheme = Node.schema[state]
+        htmlcolor = scheme[1]
+        statusname = scheme[0]
+        html.append('''<font color='%s'>&#9632</font>&nbsp;%s<br>''' % (htmlcolor, statusname))
+    return join(html, "\n")
+            
 class ExpectedException(Exception): pass  
     
 class Graph(object):
@@ -82,18 +94,6 @@ class Graph(object):
         self.vertices["init"].exclusiveTime = max([self.vertices[t].exclusiveTime for t in tasks] or [0]) or 0     
         self._isATree = True
     
-    def _getLegend(self):
-        root = self.vertices["init"]
-        html = ["<h4>Legend</h4><p>"] 
-        for state in ClusterTask.status:
-            scheme = root.schema[state]
-            htmlcolor = scheme[1]
-            statusname = scheme[0]
-            html.append('''<font color='%s'>&#9632</font>&nbsp;%s<br>''' % (htmlcolor, statusname))
-            #html.append('''<font color='%s'><li type=square></font>%s''' % (htmlcolor, statusname))
-        html.append("</p>")
-        return join(html, "\n")
-
     def isATree(self):
         self.tt = {}
         self._isATree = True
@@ -226,7 +226,7 @@ class JITGraph(Graph):
             str.append(join(nodestr,""))
         
         JITdata = "var json = [\n%s\n];" % join(str, ",\n")
-        return JITForceDirected % JITdata
+        return (self.getHTML(), JITForceDirected % JITdata)
 
     def _getSpaceTreeNode(self, parent, indent):
         vs = self.vertices
@@ -274,10 +274,11 @@ class JITGraph(Graph):
             #upgradetodo: we need to embed the html here as well
             return self.getForceDirected()
         JITdata = "var json = %s;" % self._getSpaceTreeNode("init", "  ")
-        return JITSpaceTree % JITdata
+        return (self.getHTML(), JITSpaceTree % JITdata)
     
     def getHTML(self):
-        return JITHTML % self._getLegend()
+        legend = "<h4>Legend</h4><p>%s</p>" % getHTMLLegend()        
+        return JITHTML % legend
     
         
 if __name__ == "__main__":
@@ -304,7 +305,6 @@ if __name__ == "__main__":
     allAAsExceptCysteine.remove('C')
     sgec = None
     netappRoot = None
-    cluster_dltest = None
     #allAAsExceptCysteine = ['A', 'D']
     params = {
         "cryptID"           : "cryptic",
@@ -320,7 +320,7 @@ if __name__ == "__main__":
         "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
         "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
         }
-    clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_dltest, testonly = True)
+    clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_dldir, testonly = True)
     
     ts = clusterjob.scheduler._getAllTasks()       
         
