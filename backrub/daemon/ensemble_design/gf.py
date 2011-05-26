@@ -3,7 +3,7 @@
 import commands, re, time, os, sys, glob, datetime, math, os.path, shelve
 #import scipy.stats
 
-# read table info from a file
+# read table info from a file 
 # default separator is any blank space
 def read_table(fn, sep=None):
     lines = open(fn).read().split("\n")
