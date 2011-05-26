@@ -37,14 +37,16 @@ class SimpleProfiler(object):
             raise ProfilerException("The timer was task %s was attempted to be stopped before it was created." % task)
         self.timers[task] = (time.time() - starttime[0], True)
     
-    def PROFILE_STATS(self):
+    def PROFILE_STATS(self, warn = True):
         results = []
         for task in self.order_of_timers:
             timer = self.timers[task]
             if timer[1] != True:
-                task = "The timer for task %s was never stopped." % task # raise ProfilerException("The timer for task %s was never stopped." % subtask)
+                if warn:
+                    task = "%s_(not_stopped)" % task # raise ProfilerException("The timer for task %s was never stopped." % subtask)
                 results.append((task, time.time() - timer[0]))
-            results.append((task, timer[0]))
+            else:
+                results.append((task, timer[0]))
         return results
             
 indentationsize = 4

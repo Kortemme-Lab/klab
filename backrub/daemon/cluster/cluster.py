@@ -20,6 +20,7 @@ from conf_daemon import *
 from rosettahelper import *
 import RosettaTasks
 from sge import SGEConnection, SGEXMLPrinter
+from Graph import JITGraph
 
 if not os.path.exists(netappRoot):
     make755Directory(netappRoot)
@@ -54,7 +55,7 @@ def printStatus(sgec, statusprinter, diffcounter):
     return diffcounter
     
 if __name__ == "__main__":
-    test = "PSK"
+    test = "1KI1"
     sgec = SGEConnection()
     try:
         clusterjob = None
@@ -169,7 +170,7 @@ if __name__ == "__main__":
             sys.exit(0)
             
         if test == "1KI1":
-            mini = "seqtolJMB"
+            mini = "multiseqtol"
             ID = 1234
             pdb_filename = "1ki1.pdb"
             output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
@@ -181,10 +182,11 @@ if __name__ == "__main__":
             allAAsExceptCysteine.remove('C')
             
             if CLUSTER_debugmode:
-                nstruct = 2
+                nstruct = 10
                 allAAsExceptCysteine = ["A", "D"]
             
             params = {
+                "cryptID"           : "cryptic",
                 "binary"            : mini,
                 "ID"                : ID,
                 "pdb_filename"      : pdb_filename,
@@ -198,8 +200,6 @@ if __name__ == "__main__":
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
             clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_dltest)
-            print(clusterjob.scheduler.getAllJIDs())
-            sys.exit(0)            
                 
         elif test == "HK":
             mini = "seqtolHK"
@@ -236,12 +236,18 @@ if __name__ == "__main__":
                 while not(clusterjob.isCompleted()):
                     sgec.qstat(waitForFresh = True)
                     diffcounter = printStatus(sgec, statusprinter, diffcounter)
-
+                    clusterjob.dumpJITGraph()
+                    
+                clusterjob.dumpJITGraph()
+                clusterjob.analyze()
+            
             except Exception, e:
                 print("The scheduler failed at some point: %s." % str(e))
                 print(traceback.print_exc())
-                
-            clusterjob.analyze()
+                if clusterjob:
+                    # This should delete the working and target directories so comment this line out for testing
+                    clusterjob.kill()
+                print("Killed jobs")    
             
             print("<profile>")
             print(clusterjob.getprofileXML())

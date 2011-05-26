@@ -22,6 +22,8 @@ import traceback
 #import sge
 import ClusterTask  
 import SimpleProfiler
+from Graph import JITGraph
+
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755
          
 todo='''
@@ -91,6 +93,7 @@ class TaskScheduler(object):
         self.sgec = None
         self.dbID = 0
         self.debug = True
+        # todo: The task states here have different meanings to those of ClusterTask. Maybe separate them entirely.
         self.tasks = {ClusterTask.INITIAL_TASK: [],
                       ClusterTask.ACTIVE_TASK: [],
                       ClusterTask.RETIRED_TASK: [],
@@ -102,6 +105,7 @@ class TaskScheduler(object):
         self.failed = False
         self.started = False
         self.tasks_in_order = []
+        self.graph = None
     
     #todo: Use multiple inheritance for this and ClusterTask and SGEConnection classes    
     def _status(self, message, plain = False):
@@ -130,8 +134,7 @@ class TaskScheduler(object):
         tasklist = traverseGraph(self._initialtasks, [])
         activeJIDs = []
         for task in tasklist:
-            # Running jobs have a non-zero jobid and a state of ACTIVE_TASK
-            if task.jobid > 0 and task.state == ClusterTask.ACTIVE_TASK:
+            if task.isActiveOnCluster():
                 activeJIDs.append(task.jobid)
         return activeJIDs
 
@@ -140,7 +143,7 @@ class TaskScheduler(object):
         checkGraphReachability(self._initialtasks)
         tasklist = traverseGraph(self._initialtasks, [])
         for task in tasklist:
-            if task.jobid > 0 and task.state == ClusterTask.ACTIVE_TASK:
+            if task.isActiveOnCluster():
                 success = task.kill() and success
         return success
         
@@ -177,7 +180,16 @@ class TaskScheduler(object):
         self.failed = True
         if exception:
             raise exception
-                       
+            
+    def getJITGraph(self):
+        # Write the progress to file
+        g = JITGraph(self._initialtasks)                        
+        if g.isATree():
+            #print(g.getSpaceTree())
+            return g.getSpaceTree()
+        else:
+            return g.getForceDirected()
+                   
     def start(self, sgec, dbID):
         # todo: Check the reachability and acyclicity of the graph here
         self.sgec = sgec
@@ -192,7 +204,7 @@ class TaskScheduler(object):
             #todo: pass in files?
             started = task.start(self.sgec, self.dbID)
             if started:
-                self._status("Started %d (%s)" % (task.jobid, task.getName()))
+                self._status("Queued %d (%s)" % (task.jobid, task.getName()))
                 self.tasks_in_order.append(task)
                 self._movequeue(task, ClusterTask.INITIAL_TASK, ClusterTask.ACTIVE_TASK)    
             else:
@@ -285,14 +297,19 @@ class RosettaClusterJob(object):
     flatOutputDirectory = False
     name = "Cluster job"
         
-    def __init__(self, sgec, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot, testonly = False):
         self.parameters = parameters
         self.sgec = sgec
         self.debug = True
         self.tempdir = tempdir
         self.targetroot = targetroot
-        self._make_workingdir() 
-        self._make_targetdir() 
+        self.testonly = testonly
+        if not testonly:
+            self._make_workingdir() 
+            self._make_targetdir()
+        else:
+            self.workingdir = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/test" #todo
+            self.targetdirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/test"
         self.jobID = self.parameters.get("ID") or 0
         self.filename_stdout = "stdout_%s_%d.txt" % (self.suffix, self.jobID)
         self.filename_stderr = "stderr_%s_%d.txt" % (self.suffix, self.jobID)
@@ -464,18 +481,21 @@ class RosettaClusterJob(object):
     def _make_taskdir(self, dirname, files = []):
         """ Make a subdirectory dirname in the working directory and copy all files into it.
             Filenames should be relative to the working directory."""
-        taskdir = "%s/%s" % (self.workingdir, dirname)
-        if not os.path.isdir(taskdir):
-            make755Directory(taskdir)
-        if not os.path.isdir(taskdir):
-            raise os.error
-        for file in files:
-            shutil.copyfile("%s/%s" % (self.workingdir, file), "%s/%s" % (taskdir, file))
-        return taskdir
+        if not self.testonly:
+            taskdir = "%s/%s" % (self.workingdir, dirname)
+            if not os.path.isdir(taskdir):
+                make755Directory(taskdir)
+            if not os.path.isdir(taskdir):
+                raise os.error
+            for file in files:
+                shutil.copyfile("%s/%s" % (self.workingdir, file), "%s/%s" % (taskdir, file))
+            return taskdir
+        return self.workingdir
 
     def _workingdir_file_path(self, filename):
         """Get the path for a file within the working directory"""
         return os.path.join(self.workingdir, filename)
     
-    
-
+    def dumpJITGraph(self):
+        contents = self.scheduler.getJITGraph()
+        writeFile("/var/www/html/rosettaweb/backrub/images/JIT/Examples/Spacetree/example1.js", contents)

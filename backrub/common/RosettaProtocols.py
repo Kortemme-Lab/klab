@@ -191,10 +191,10 @@ RosettaBinaries = {
     "seqtolJMB" :{  # This is the revision used in the paper
                     "name"      : "Rosetta 3.1, as published",
                     "queuename" : "Rosetta 3.1",
-                    "revision"  : 33910,
+                    "revision"  : 33982,
                     "mini"      : True,
                     "runOnCluster" : True,
-                    "clusterrev": "r33910"
+                    "clusterrev": "r33982"
                  },
     "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
                     "name"      : "Rosetta 3.2.r, as published",

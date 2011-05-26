@@ -17,7 +17,7 @@ import shutil
 import tempfile
 import re
 import glob
-from string import join
+from string import join, split
 import traceback
 
 from conf_daemon import *
@@ -26,22 +26,24 @@ import SimpleProfiler
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile
 from RosettaProtocols import *
 
-INITIAL_TASK = 0
-INACTIVE_TASK = 1
-ACTIVE_TASK = 2
-RETIRED_TASK = 3
-COMPLETED_TASK = 4
-FAILED_TASK = 5
+INITIAL_TASK    = 0
+INACTIVE_TASK   = 1
+QUEUED_TASK     = 2
+ACTIVE_TASK     = 3
+RETIRED_TASK    = 4
+COMPLETED_TASK  = 5
+FAILED_TASK     = 6
 
 status = {
     INITIAL_TASK    : "pending",
     INACTIVE_TASK   : "pending",
+    QUEUED_TASK     : "queued",
     ACTIVE_TASK     : "active",
     RETIRED_TASK    : "retired",
     COMPLETED_TASK  : "completed",
     FAILED_TASK     : "failed",
     }
-
+    
 def getClusterDatabasePath(binary, cluster_database_index = 0):
     if cluster_database_index in range(len(RosettaBinaries[binary]["cluster_databases"])):
         return "%s/%s/%s" % (clusterRootDir, RosettaBinaries[binary]["clusterrev"], RosettaBinaries[binary]["cluster_databases"][cluster_database_index])
@@ -160,8 +162,9 @@ echo "</enddate>"
 class ClusterTask(object):
     prefix = "task"
     
-    # Running jobs have a non-zero jobid and a state of ACTIVE_TASK
-    def __init__(self, workingdir, targetdirectory, scriptfilename, parameters = {}, name = ""):
+    # SGE-Queued jobs have a non-zero jobid and a state of QUEUED_TASK
+    # SGE-Running jobs have a non-zero jobid and a state of ACTIVE_TASK
+    def __init__(self, workingdir, targetdirectory, scriptfilename, parameters = {}, name = "", numtasks = 1):
         self.sgec = None
         self.profiler = SimpleProfiler.SimpleProfiler(name)
         self.profiler.PROFILE_START("Initialization")
@@ -178,12 +181,14 @@ class ClusterTask(object):
         # Do not allow spaces in the script filename so that the SGE qstat parsing works
         scriptfilename.replace(" ", "_")
         self.scriptfilename = scriptfilename
+        self.shortname = split(scriptfilename, ".")[0] # todo: do this better
+        self.shortname = split(scriptfilename, "_")[0] # todo: do this better
         self.filename = os.path.join(workingdir, scriptfilename)
         self.cleanedup = False
         self.filename_stdout = None
         self.filename_stderr = None
         self.name = name or "unnamed"
-        self.numtasks = 1
+        self.numtasks = numtasks
         self.outputstreams = []
         if parameters.get("pdb_filename"):
             parameters["pdbRootname"] = parameters["pdb_filename"][:-4]
@@ -214,6 +219,10 @@ class ClusterTask(object):
     def getName(self):
         return self.name
     
+    def isActiveOnCluster(self):
+        # Running jobs have a non-zero jobid and a state of ACTIVE_TASK or QUEUED_TASK
+        return self.jobid > 0 and (self.state == ACTIVE_TASK or self.state == QUEUED_TASK)
+        
     def kill(self):
         try:
             status, output = self.sgec.qdel(self.jobid)
@@ -240,7 +249,7 @@ class ClusterTask(object):
             self._status("Job started with id %d." % self.jobid)
             if self.jobid != 0:
                 self.profiler.PROFILE_START("Execution")
-                self.state = ACTIVE_TASK
+                self.state = QUEUED_TASK
                 return self.jobid
         else:
             return 0
@@ -346,8 +355,8 @@ class ClusterTask(object):
         self.profiler.PROFILE_STOP("Completion")
         return result
     
-    def getprofile(self):
-        return self.profiler.PROFILE_STATS()
+    def getprofile(self, warn = True):
+        return self.profiler.PROFILE_STATS(warn)
 
     def _status(self, message, plain = False):
         if self.debug:
@@ -373,8 +382,46 @@ class ClusterTask(object):
     def getDependents(self):
         return self.dependents
     
+    def getStatus(self):
+        # Returns the current progress of the task as a triple (state, tasks completed, number of tasks)
+        # On failure, both numbers are set to -1.
+        st = self.state
+        profile = self.profiler.PROFILE_STATS(warn = False)
+        tasksCompleted = 0
+        numtasks = self.numtasks
+        
+        if st == ACTIVE_TASK:
+            if (numtasks > 1):
+                thisjob = self.sgec.cachedStatus(self.jobid)
+                if not thisjob:
+                    tasksCompleted = numtasks
+                else:
+                    print("numtasks: %d" % self.numtasks)
+                    print("len(thisjob): %d" % len(thisjob))
+                    tasksCompleted = numtasks - len(thisjob)
+        elif st == RETIRED_TASK or st == COMPLETED_TASK:
+            tasksCompleted = numtasks
+        elif st == FAILED_TASK:
+            tasksCompleted = -1
+        
+        print((self.shortname, st, tasksCompleted, numtasks))
+        return (self.name, self.shortname, st, profile, tasksCompleted, numtasks)
+
     def getState(self, allowToRetire = True):
+        # Note: This function actually steps the task and can cause a state transition
         # ping server
+        if self.state == QUEUED_TASK:
+            thisjob = self.sgec.cachedStatus(self.jobid)
+            # Check to see if we've either finished or finished queuing. If so, fall down into the next case                
+            if not thisjob:
+                self.state = ACTIVE_TASK
+            else:
+                if len(thisjob) != 1:
+                    self.state = ACTIVE_TASK
+                elif thisjob.get(0) and thisjob[0].get("state"):
+                    if thisjob[0]["state"] != "qw":
+                        self.state = ACTIVE_TASK
+            
         if self.state == ACTIVE_TASK:
             # Query the submission host
             thisjob = self.sgec.cachedStatus(self.jobid)

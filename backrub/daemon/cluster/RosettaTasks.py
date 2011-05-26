@@ -263,7 +263,6 @@ class BackrubClusterSKTask(ClusterTask):
             errs = join(errors,"</error>\n\t<error>")
             print("<errors>\n\t<error>%s</error>\n</errors>" % errs)
             self.state = FAILED_TASK
-            printException(e)
             return False
           
         return passed
@@ -275,7 +274,7 @@ class SequenceToleranceClusterTask(ClusterTask):
        
     def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
         self.resfile = resfile
-        super(SequenceToleranceClusterTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name)          
+        super(SequenceToleranceClusterTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
 
     def _initialize(self):
         parameters = self.parameters
@@ -283,11 +282,10 @@ class SequenceToleranceClusterTask(ClusterTask):
         self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
         self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
         self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
-        self.numtasks = parameters["nstruct"]
         
         parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
         if CLUSTER_debugmode:
-            self.parameters["pop_size"] = 20
+            self.parameters["pop_size"] = 200
         
         # Setup backrub
         ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = {"lowfiles" : self.low_files, "prefixes" : self.prefixes})
@@ -486,14 +484,13 @@ class SequenceToleranceHKClusterTask(ClusterTask):
        
     def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
         self.resfile = resfile
-        super(SequenceToleranceHKClusterTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name)          
+        super(SequenceToleranceHKClusterTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
     
     def _initialize(self):
         parameters = self.parameters
         
         self.low_files = [getOutputFilenameHK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
         self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
-        self.numtasks = parameters["nstruct"]
         
         parameters["pop_size"] = 2000 # This should be 2000 on the live webserver        
         if CLUSTER_debugmode:
@@ -553,22 +550,23 @@ class SequenceToleranceJobSK(RosettaClusterJob):
         self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
         self.resultFilemasks.append(("sequence_tolerance", "*low*.pdb"))
             
-    def __init__(self, sgec, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot, testonly = False):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot)
+        super(SequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot, testonly)
     
     def _initialize(self):
         self.describe()
         
         # Create input files        
-        self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
-        self._write_backrub_resfile()
-        self._write_seqtol_resfile()
-        self._write_backrub_movemap()
+        if not testonly:
+            self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
+            self._write_backrub_resfile()
+            self._write_seqtol_resfile()
+            self._write_backrub_movemap()
         
         scheduler = TaskScheduler(self.workingdir, files = [self.parameters["pdb_filename"], self.seqtol_resfile, self.backrub_resfile, self.backrub_movemap])
         
@@ -761,13 +759,13 @@ class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
             self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
             self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))
             
-    def __init__(self, sgec, parameters, tempdir, targetroot):
+    def __init__(self, sgec, parameters, tempdir, targetroot, testonly = False):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceMultiJobSK, self).__init__(sgec, parameters, tempdir, targetroot)
+        super(SequenceToleranceMultiJobSK, self).__init__(sgec, parameters, tempdir, targetroot, testonly)
     
     @staticmethod
     def _tmultiply(biglist, nextlist):
@@ -1699,7 +1697,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
         self.pivot_res          = []   # list of pivot residues, consecutively numbered from 1 [1,...]
         self.map_res_id         = {}   # contains the mapping from (chain,resid) to pivot_res
         
-        super(BackrubSequenceToleranceSK, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name)          
+        super(BackrubSequenceToleranceSK, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
     
     def _initialize(self):
         self._prepare_backrub()
@@ -1709,7 +1707,6 @@ class BackrubSequenceToleranceSK(ClusterTask):
         self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
         self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
         self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
-        self.numtasks = parameters["nstruct"]
         
         self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
         self.parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
