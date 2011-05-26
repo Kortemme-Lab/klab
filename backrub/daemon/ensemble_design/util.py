@@ -1,5 +1,5 @@
 #!/usr/bin/python
-### UTITLITY FUNCTIONS ###
+### UTITLITY FUNCTIONS ### 
 
 import commands, os.path, time, os, sys, traceback, types, shelve
 from math import floor
