@@ -10,10 +10,8 @@ Copyright (c) 2011 __UCSF__. All rights reserved.
 import sys
 sys.path.insert(0, "../")
 sys.path.insert(0, "../../common/")
-print(sys.path)
 import traceback
 from string import join
-import rosettahelper
 from rosettahelper import readFile, writeFile
 import ClusterTask  
 

@@ -1137,6 +1137,7 @@ class ClusterDaemon(RosettaDaemon):
         # Check if jobs are finished
         for clusterjob in self.runningJobs:
             jobID = clusterjob.jobID
+            clusterjob.dumpJITGraph(cluster_dldir)
             try:
                 if clusterjob.isCompleted():
                     completedJobs.append(clusterjob)               
@@ -1300,7 +1301,7 @@ class ClusterDaemon(RosettaDaemon):
 
     def moveFilesOnJobCompletion(self, clusterjob):
         try:
-            return clusterjob.moveFilesTo(cluster_dltest)
+            return clusterjob.moveFilesTo(cluster_dldir)
         except Exception, e:
             print("moveFilesOnJobCompletion failure")
             self.log("Error moving files to the download directory.\n")
@@ -1534,11 +1535,11 @@ if __name__ == "__main__":
             sys.exit(0)
         elif 'test' == sys.argv[1]:
             UserID = 106
+            inputDirectory = os.path.join(server_root, "test")
             if 'db' == sys.argv[2] and sys.argv[3]:
                 UserID = 25
                 Email = "test@bob.co"
                 ProtocolParameters = {}
-                inputDirectory = '/home/oconchus/'
                 pdb_filename = '3QDO.pdb'
                 output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
                 pdbfile = output_handle.read()
@@ -1622,7 +1623,6 @@ if __name__ == "__main__":
             
             if 'add' == sys.argv[2]:
                 JobName = "Cluster test"
-                inputDirectory = '/home/oconchus/clustertest110428/rosettawebclustertest/backrub/daemon/cluster/input'
                 pdb_filename = '1MDY_mod.pdb'
                 output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
                 pdbfile = output_handle.read()

@@ -14,7 +14,8 @@ from rosettahelper import server_root
 CLUSTER_debugmode = True
 
 # Local directories
-cluster_dltest = os.path.join(server_root, "downloads")
+cluster_dldir = os.path.join(server_root, "downloads")
+cluster_dldir = "/var/www/html/rosettaweb/backrub/downloads2/" #@upgradetodo
 cluster_temp = os.path.join(server_root, "temp/cluster")
 
 # Cluster netapp directories

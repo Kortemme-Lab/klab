@@ -187,6 +187,7 @@ class TaskScheduler(object):
         if g.isATree():
             #print(g.getSpaceTree())
             return g.getSpaceTree()
+
         else:
             return g.getForceDirected()
                    
@@ -446,11 +447,10 @@ class RosettaClusterJob(object):
         destpath = os.path.join(destpath, self.parameters["cryptID"])
         
         self._status("Moving files to %s" % destpath)
-        if os.path.exists(destpath):
-            shutil.rmtree(destpath)
-
-        if self.resultFilemasks:
+        if not os.path.exists(destpath):
             make755Directory(destpath)
+            
+        if self.resultFilemasks:
             for mask in self.resultFilemasks:
                 #self._status("moving using mask %s\n" % mask[0])
                 fromSubdirectory = os.path.join(self.targetdirectory, mask[0])
@@ -495,7 +495,15 @@ class RosettaClusterJob(object):
     def _workingdir_file_path(self, filename):
         """Get the path for a file within the working directory"""
         return os.path.join(self.workingdir, filename)
-    
-    def dumpJITGraph(self):
+
+    def dumpJITGraph(self, destpath):
+        destpath = os.path.join(destpath, self.parameters["cryptID"])
+        rootname = os.path.join(destpath, "progress")
+        JIThtml = "%s.html" % rootname 
+        JITjs = "%s.js" % rootname 
         contents = self.scheduler.getJITGraph()
-        writeFile("/var/www/html/rosettaweb/backrub/images/JIT/Examples/Spacetree/example1.js", contents)
+        if os.path.exists(destpath):
+            shutil.rmtree(destpath)
+        make755Directory(destpath)
+        writeFile(JIThtml, contents[0])
+        writeFile(JITjs, contents[1])
