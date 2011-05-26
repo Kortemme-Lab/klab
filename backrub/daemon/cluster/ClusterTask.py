@@ -9,8 +9,6 @@ Copyright (c) 2011 __UCSF__. All rights reserved.
 
 
 import sys
-sys.path.insert(0, "../")
-sys.path.insert(0, "../../common/")
 import os
 import time
 import shutil

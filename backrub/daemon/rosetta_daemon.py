@@ -1239,6 +1239,12 @@ class ClusterDaemon(RosettaDaemon):
         
         # Start the job
         self._clusterjobjuststarted = clusterjob        # clusterjob will not be returned on exception and the reference will be lost
+
+        # Remove any old files in the same target location
+        destpath = os.path.join(cluster_dldir, params["cryptID"])
+        if os.path.exists(destpath):
+            shutil.rmtree(destpath)
+        
         clusterjob.start()
         return clusterjob
     

@@ -10,8 +10,6 @@ Copyright (c) 2011 __UCSF__. All rights reserved.
 
 import sys
 import os
-sys.path.insert(0, "../../common/")
-sys.path.insert(1, "../")
 import time
 import shutil
 import glob

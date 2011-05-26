@@ -14,7 +14,7 @@ import time
 import traceback
 import pprint
 sys.path.insert(0, "../../common/")
-sys.path.insert(0, "../")
+sys.path.insert(1, "../")
 
 from conf_daemon import *
 from rosettahelper import *
@@ -234,6 +234,10 @@ if __name__ == "__main__":
             clusterjob.start()
             sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
             
+            destpath = os.path.join(cluster_dldir, params["cryptID"])
+            if os.path.exists(destpath):
+                shutil.rmtree(destpath)
+
             try:
                 while not(clusterjob.isCompleted()):
                     sgec.qstat(waitForFresh = True)

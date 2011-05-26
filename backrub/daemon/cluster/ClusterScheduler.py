@@ -10,7 +10,6 @@ Copyright (c) 2011 __UCSF__. All rights reserved.
 
 import sys
 import os
-sys.path.insert(0, "../../common/")
 import time
 import shutil
 import re
@@ -502,8 +501,7 @@ class RosettaClusterJob(object):
         JIThtml = "%s.html" % rootname 
         JITjs = "%s.js" % rootname 
         contents = self.scheduler.getJITGraph()
-        if os.path.exists(destpath):
-            shutil.rmtree(destpath)
-        make755Directory(destpath)
+        if not os.path.exists(destpath):
+            make755Directory(destpath)
         writeFile(JIThtml, contents[0])
         writeFile(JITjs, contents[1])

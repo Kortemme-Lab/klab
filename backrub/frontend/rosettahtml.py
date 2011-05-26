@@ -8,16 +8,13 @@
 #
 
 import sys, os
-sys.path.insert(0, "../common/")
-#sys.path.insert(0, "../daemon/cluster") # For Graph.py
-
 import cgi
 import cgitb; cgitb.enable()
 from string import join
 from string import find
 import pickle
 import gzip
-#@upgradetodo import Graph
+import Graph
 
 from rwebhelper import *
 from RosettaProtocols import *
@@ -820,9 +817,6 @@ class RosettaHTML(object):
                     <div id="jobinfo">
                     
                     <script language="javascript" type="text/javascript" src="../downloads/%(cryptID)s/progress.js"></script>
-                    <!-- CSS Files -->
-                    <!--<link type="text/css" href="/javascripts/JIT/css/base.css" rel="stylesheet"></link>
-                    <link type="text/css" href="/javascripts/JIT/css/Spacetree.css" rel="stylesheet"></link>-->
                     <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
                     <!-- JIT Library File -->
                     <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>
@@ -843,7 +837,6 @@ class RosettaHTML(object):
                 html.extend(showFn(status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters))   
                 break
         
-        upgradetodo = ""
         html.append('''
 <tr>
     <td align="left" bgcolor="#FFFCD8">
@@ -864,7 +857,7 @@ class RosettaHTML(object):
             </tr>
         </table>
     </td>                   
-</tr>''' % upgradetodo) #@upgradetodo Graph.getHTMLLegend())
+</tr>''' % Graph.getHTMLLegend())
 
         html.append('''</table>
                             <script language="javascript" type="text/javascript">init();</script>

@@ -36,6 +36,8 @@ import sys, os
 #sys.path.append(os.environ['DOCUMENT_ROOT'])
 
 sys.path.insert(0, "../common/")
+sys.path.insert(1, "../daemon/")
+sys.path.insert(2, "../daemon/cluster/")
 import shutil
 import sha, time
 import cgi
@@ -78,7 +80,6 @@ parameter = read_config_file()
 from pdb import PDB
 # todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
 ROSETTAWEB_base_dir = parameter["base_dir"]
-sys.path.insert(0, os.path.join(ROSETTAWEB_base_dir, "daemon"))
 from rosettaseqtol import make_seqtol_resfile
 
 ROSETTAWEB_db_host = parameter['db_host']

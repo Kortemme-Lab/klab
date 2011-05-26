@@ -6,7 +6,6 @@
 ########################################
 import sys
 import os
-sys.path.insert(0, "../common/")
 from rosettahelper import server_root
 
 #@upgradetodo Change this to False for the live webserver

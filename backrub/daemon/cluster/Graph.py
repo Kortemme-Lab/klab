@@ -8,22 +8,22 @@ Copyright (c) 2011 __UCSF__. All rights reserved.
 """
 
 import sys
-sys.path.insert(0, "../")
-sys.path.insert(0, "../../common/")
+import os
 import traceback
 from string import join
-from rosettahelper import readFile, writeFile
-import ClusterTask  
+from rosettahelper import readFile, writeFile, server_root
 
+import ClusterTask  
 #upgradetodo use this to pretty print the JSON import simplejson
 
 msubdir = "cluster/"
 if __name__ == "__main__":
     msubdir = ""
-    
-JITSpaceTree = readFile("%sJITSpaceTree.js" % msubdir)
-JITForceDirected = readFile("%sJITForceDirected.js" % msubdir)
-JITHTML = readFile("%sJIThtml.html" % msubdir)
+
+thisloc = os.path.join(server_root, "daemon", "cluster")   
+JITSpaceTree = readFile(os.path.join(thisloc, "JITSpaceTree.js"))
+JITForceDirected = readFile(os.path.join(thisloc, "JITForceDirected.js"))
+JITHTML = readFile(os.path.join(thisloc, "JIThtml.html"))
 
 # todo: move all color constants into one file
 green = "#00FF00"                
@@ -72,6 +72,7 @@ class Node(object):
             self.shape = self.schema[ClusterTask.INITIAL_TASK][2]
 
 def getHTMLLegend():
+    html = []
     for state in ClusterTask.status:
         scheme = Node.schema[state]
         htmlcolor = scheme[1]

@@ -9,7 +9,8 @@ Copyright (c) 2011 __UCSF__. All rights reserved.
 
 
 import sys
-sys.path.insert(0, "../")
+if __name__ == "__main__":
+    sys.path.insert(0, "../")
 import commands
 import re
 import subprocess
