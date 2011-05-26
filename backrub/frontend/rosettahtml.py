@@ -9,12 +9,15 @@
 
 import sys, os
 sys.path.insert(0, "../common/")
+#sys.path.insert(0, "../daemon/cluster") # For Graph.py
+
 import cgi
 import cgitb; cgitb.enable()
 from string import join
 from string import find
 import pickle
 import gzip
+#@upgradetodo import Graph
 
 from rwebhelper import *
 from RosettaProtocols import *
@@ -130,11 +133,11 @@ class RosettaHTML(object):
 
 <!-- Header --> <tr> %s </tr>
 
-<!-- Warning --> <tr> %s </tr>
+<!-- Warning --> <tr><td>%s</td></tr>
 
 <!-- Login Status --> <tr> %s </tr>
 
-<!-- Menu --> <tr> %s </tr>
+<!-- Menu --> %s
         <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
 <!-- Content --> <tr> %s </tr>
         <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
@@ -813,9 +816,18 @@ class RosettaHTML(object):
         if endOfName != -1:
             miniVersion = miniVersion[0:endOfName]
         
-        html = ["""<td align="center"><H1 class="title">Job %s</H1>
+        html = ["""<td align="center"><H1 class="title">Job %(ID)s</H1>
                     <div id="jobinfo">
-                    <table border=0 cellpadding=2 cellspacing=1>""" % ( parameter['ID'] )]
+                    
+                    <script language="javascript" type="text/javascript" src="../downloads/%(cryptID)s/progress.js"></script>
+                    <!-- CSS Files -->
+                    <!--<link type="text/css" href="/javascripts/JIT/css/base.css" rel="stylesheet"></link>
+                    <link type="text/css" href="/javascripts/JIT/css/Spacetree.css" rel="stylesheet"></link>-->
+                    <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
+                    <!-- JIT Library File -->
+                    <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>
+
+                    <table border=0 cellpadding=2 cellspacing=1>""" % parameter]
         
         html.extend(self._defaultParameters( parameter['ID'], parameter['Notes'], status, parameter['Host'], parameter['Date'], parameter['StartDate'], 
                                     parameter['EndDate'], parameter['time_computation'], parameter['date_expiration'], parameter['time_expiration'], miniVersion, parameter['Errors'], delete=False, restart=False ))
@@ -830,8 +842,33 @@ class RosettaHTML(object):
                 showFn = p.getShowResultsFunction()
                 html.extend(showFn(status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters))   
                 break
-                
-        html.append('</table><br></div></td>\n')
+        
+        upgradetodo = ""
+        html.append('''
+<tr>
+    <td align="left" bgcolor="#FFFCD8">
+    Job progress
+    </td>
+                       <!--<td align="center" bgcolor="#FFFCD8">-->
+    <td>
+        <table>
+            <tr style="height:400px;">   
+                <td colspan="2" id="infovis" style="width:1000px; background-color:#222;"></td>
+            </tr>
+            <tr>
+                <td id="right-container" style="background-color:#aaaaaa;"></td>
+                <td align="left" id="left-container" style="vertical-align:top; width:90px; background-color:#aaaaaa;"> 
+                    <h4>Legend</h4> 
+                %s
+                </td>
+            </tr>
+        </table>
+    </td>                   
+</tr>''' % upgradetodo) #@upgradetodo Graph.getHTMLLegend())
+
+        html.append('''</table>
+                            <script language="javascript" type="text/javascript">init();</script>
+<br></div></td>\n''')
         return join(html, "")
 
     def _defaultParameters(self, ID, jobname, status, hostname, date_submit, date_start, date_end, time_computation, date_expiration, time_expiration, mini, error, delete=False, restart=False ):
@@ -852,7 +889,7 @@ class RosettaHTML(object):
             status_html = '''<font color="FF0000">Error:</font> <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation">%s</a> <br>
                               We are sorry but your simulation failed. Please refer to 
                               <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation">Errors during the simulation</a> 
-                              in the documentation and contact us via <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15"> if necessary.
+                              in the documentation and contact us via <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15" alt="support"> if necessary.
                           ''' % error
         
         html = ["""
@@ -907,7 +944,7 @@ class RosettaHTML(object):
                 if status == 'error':
                     html += 'Please follow <a href="../downloads/%s/">this link</a> to see which files were created.' % cryptID
                 else:
-                    html += '''<A href="%s?query=datadir&job=%s"><b>View</b></A> individual files.
+                    html += '''<A href="%s?query=datadir&amp;job=%s"><b>View</b></A> individual files.
                                 <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, cryptID, cryptID, jobnumber )
                 # if extended:
                 #     html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
@@ -964,7 +1001,7 @@ class RosettaHTML(object):
             html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
           html += '''                                      </ul>
                         </td>
-                      <td bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre><a></td></tr>
+                      <td bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre></a></td></tr>
               ''' % ( score_file, join(handle.readlines()[:7], '') + '...\n' )
           handle.close()
           
@@ -1022,17 +1059,16 @@ class RosettaHTML(object):
                         
             # html code
             html = """
-                    <form>
                      <tr><td align="justify" bgcolor="#FFFCD8">%s<br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.</td>
-                         <td bgcolor="#FFFCD8">
+                         <td bgcolor="#FFFCD8"> 
                             <script type="text/javascript">
                               jmolInitialize("../../jmol"); 
                               jmolApplet(400, "set appendNew false;" + %s "%s %s frame all;" ); 
-                            </script><br>
-                            <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href=http://www.jmol.org/><small>www.jmol.org</small></a>
+                            </script>
+                            <br>
+                            <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href="http://www.jmol.org"><small>www.jmol.org</small></a>
                          </td>
                     </tr>
-                    </form>
                     """ % ( comment, jmol_cmd, jmol_cmd_mutation, jmol_cmd_designed )
         else:
             html = '<tr><td align="center" bgcolor="#FFFCD8" colspan=2>no structures found</td></tr>'
@@ -1051,16 +1087,17 @@ class RosettaHTML(object):
                 jmol_style = 'cartoon; color cartoon temperature;'
             
         html = """
-            <form>
+            
              <tr><td align="justify" bgcolor="#FFFCD8">%s</td>
                  <td bgcolor="#FFFCD8">
                     <script type="text/javascript">
                       jmolInitialize("../../jmol"); 
                       jmolApplet(400, "load %s; cpk off; wireframe off; %s");
-                    </script><br>
-                    <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href=http://www.jmol.org/><small>www.jmol.org</small></a>
+                    </script>
+                    <br>
+                    <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href="http://www.jmol.org"><small>www.jmol.org</small></a>
                   </td>
-            </form>""" % ( comment, filename, jmol_style )
+            """ % ( comment, filename, jmol_style )
        
         return html
 
@@ -2004,7 +2041,7 @@ class RosettaHTML(object):
                     
     def _showHeader(self):
         html = '''<td align=center style="border-bottom:1px solid gray;"> 
-                    <A href="../"><img src="../images/header.png" border="0" usemap="#links"></A> 
+                    <A href="../"><img src="../images/header.png" border="0" usemap="#links" alt="kortemmelab"></A> 
                   </td>
                   '''
         return html
