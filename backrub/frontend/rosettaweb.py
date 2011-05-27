@@ -104,6 +104,7 @@ ROSETTAWEB_cookie_expiration = 60 * 60
 
 ROSETTAWEB_bin_sendmail = parameter['bin_sendmail']
 ROSETTAWEB_download_dir = parameter['rosetta_dl']
+ROSETTAWEB_remote_download_dir = parameter['rosetta_remotedl']
 
 ROSETTAWEB_temp_dir = parameter["rosetta_tmp"]
 
@@ -326,7 +327,15 @@ def ws():
     if form.has_key("job"):
       cryptID = form["job"].value
       sql = 'SELECT ID,Status,task,mini,PDBComplexFile FROM backrub WHERE cryptID="%s"' % (cryptID)
-      result = DBConnection.execQuery(sql)
+      
+      if form.has_key("local") and form["local"].value == "false":
+          isLocal = False
+          rosettaDD.download_dir = ROSETTAWEB_remote_download_dir
+          rosettaDD.ddir = "../remotedownloads"
+          result = getKlabDBConnection().execQuery(sql)
+      else:
+          result = DBConnection.execQuery(sql)
+          
       if len(result) > 0:
           jobid = result[0][0]
           status = result[0][1]
@@ -356,7 +365,7 @@ def ws():
         html_content = "No data."
 
     s.write(rosettaDD.main(html_content))
-
+          
     s.close()
     return
 
@@ -445,7 +454,7 @@ def ws():
   elif query_type == "jobinfo":
     parameter = jobinfo(form, SID)
     if parameter[0]:
-        html_content = rosettaHTML.jobinfo(parameter[1])
+        html_content = rosettaHTML.jobinfo(parameter[1], parameter[2])
     else:
         html_content = '<td align="center">No Data<br><br></td>'
     title = 'Job Info'
@@ -1082,9 +1091,9 @@ def submit(rosettaHTML, form, SID):
                     sql = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
                     result = StorageDBConnection.execQuery(sql)
                     ID = result[0][0]
-                    # create a unique key as name for directories from the ID, for the case we need to hide the results
+                    # create a unique key as name for directories from the ID and host, for the case we need to hide the results
                     # do not just use the ID but also a random sequence
-                    tgb = str(ID) + 'flo' + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
+                    tgb = str(ID) + ROSETTAWEB_db_host + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '')
                     cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
                     return_vals = (cryptID, "new")
                     sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
@@ -1126,7 +1135,7 @@ def submit(rosettaHTML, form, SID):
                     html = '<H1 class="title">New Job not submitted</H1>'
                     if e[0] == 1054:
                         errors.append("""An error occurred submitting the job.<br>SQL Error - please contact the website administrator.""")# %d: %s % (e[0], e[1]))
-                        print(e[1])
+                        #print(e[1])
                     elif e[0] == 1153:
                         errors.append("""<P>We are sorry but the size of the PDB file exceeds the upload limit. 
                         Please revise your file and delete unneccessary entries (e.g. copies of chains, MODELS, etc.).</P>
@@ -1292,14 +1301,18 @@ def deletejob(form, SID):
 def jobinfo(form, SID):
     if form.has_key("jobnumber"):
         cryptID = form["jobnumber"].value
-        
-        parameter = DBConnection.getData4cryptID('backrub', cryptID)
+        isLocal = True
+        if form.has_key("local") and form["local"].value == "false":
+            isLocal = False
+            parameter = getKlabDBConnection().getData4cryptID('backrub', cryptID)
+        else:        
+            parameter = DBConnection.getData4cryptID('backrub', cryptID)
         # for x,y in parameter.iteritems():
         #   print x, y, '<br>'
         if len(parameter) > 0:
-            return (True, parameter)
+            return (True, parameter, isLocal)
     
-    return (False, None)
+    return (False, None, True)
 
 ########################################## end of jobinfo() ###################################
 

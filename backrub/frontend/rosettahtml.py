@@ -744,7 +744,9 @@ class RosettaHTML(object):
             if jobIsLocal:
                 link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
             else:
-                link_to_job = 'onclick="window.location.href=\'https://kortemmelab.ucsf.edu%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+                link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&local=false&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+                #link_to_job = 'onclick="window.location.href=\'https://kortemmelab.ucsf.edu%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+            
             # write ID
             html.append('<td id="lw" %s>%s </td>' % (link_to_job, str(line[0])))
             # write status 
@@ -801,11 +803,11 @@ class RosettaHTML(object):
 # This function creates the HTML for the Job Info page accessed by clicking a job in the queue
 ###############################################################################################
 
-    def jobinfo(self, parameter):
+    def jobinfo(self, parameter, isLocal):
         """this function decides what _showFunction to pick"""
         
         self._referenceAll()
-                
+        
         statuslist = ['in queue', 'active', 'done', 'unknown', 'error', 'sample'] 
         status = statuslist[int(parameter['Status'])]
         miniVersion = RosettaBinaries[parameter['Mini']]['name']
@@ -813,36 +815,43 @@ class RosettaHTML(object):
         if endOfName != -1:
             miniVersion = miniVersion[0:endOfName]
         
+        runOnCluster = RosettaBinaries[parameter['Mini']]['runOnCluster']
+        
+        if isLocal:
+            parameter["rootdir"] = "../downloads"
+        else:
+            parameter["rootdir"] = "../remotedownloads"
+        
         html = ["""<td align="center"><H1 class="title">Job %(ID)s</H1>
-                    <div id="jobinfo">
-                    
-                    <script language="javascript" type="text/javascript" src="../downloads/%(cryptID)s/progress.js"></script>
+                    <div id="jobinfo">""" % parameter]
+        
+        if runOnCluster:
+            html.append("""
+                    <script language="javascript" type="text/javascript" src="%(rootdir)s/%(cryptID)s/progress.js"></script>
                     <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
                     <!-- JIT Library File -->
-                    <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>
+                    <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>""" % parameter)
 
-                    <table border=0 cellpadding=2 cellspacing=1>""" % parameter]
+        html.append("""<table border=0 cellpadding=2 cellspacing=1>""")
         
         html.extend(self._defaultParameters( parameter['ID'], parameter['Notes'], status, parameter['Host'], parameter['Date'], parameter['StartDate'], 
                                     parameter['EndDate'], parameter['time_computation'], parameter['date_expiration'], parameter['time_expiration'], miniVersion, parameter['Errors'], delete=False, restart=False ))
         
         
-        html.append(self._showDownloadLinks(status, parameter['KeepOutput'], parameter['cryptID'], parameter['ID']))
+        html.append(self._showDownloadLinks(status, isLocal, parameter["rootdir"], parameter['KeepOutput'], parameter['cryptID'], parameter['ID']))
         ProtocolParameters = pickle.loads(parameter['ProtocolParameters'])
         
         protocols = self.protocols
         for p in protocols:
             if parameter['task'] == p.dbname:
                 showFn = p.getShowResultsFunction()
-                html.extend(showFn(status, parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters))   
+                html.extend(showFn(status, parameter["rootdir"], parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters))   
                 break
-        
-        html.append('''
+    
+        if runOnCluster:    
+            html.append('''
 <tr>
-    <td align="left" bgcolor="#FFFCD8">
-    Job progress
-    </td>
-                       <!--<td align="center" bgcolor="#FFFCD8">-->
+    <td align="left" bgcolor="#FFFCD8">Job progress</td>
     <td>
         <table>
             <tr style="height:400px;">   
@@ -926,19 +935,20 @@ class RosettaHTML(object):
         
         return html
     
-    def _showDownloadLinks(self, status, extended, cryptID, jobnumber):
+    def _showDownloadLinks(self, status, isLocal, rootdir, extended, cryptID, jobnumber):
     
         html = ''
-
+        localstr = ''
+        if not isLocal:
+            localstr = "&amp;local=false"
         if status == "done" or status == 'sample' or status == 'error':
             html += '<tr><td align=right bgcolor="#B7FFE0"><b>Results</b>:</td><td bgcolor="#B7FFE0">'
-            
-            if os.path.exists( '%s%s/' % (self.download_dir, cryptID) ): # I could also remove this since rosettadatadir.py is taking care of this
+            if os.path.exists( '%s/%s/' % (rootdir, cryptID) ): # I could also remove this since rosettadatadir.py is taking care of this
                 if status == 'error':
-                    html += 'Please follow <a href="../downloads/%s/">this link</a> to see which files were created.' % cryptID
+                    html += 'Please follow <a href=%s/%s/">this link</a> to see which files were created.' % (rootdir, cryptID)
                 else:
-                    html += '''<A href="%s?query=datadir&amp;job=%s"><b>View</b></A> individual files.
-                                <A href="../downloads/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, cryptID, cryptID, jobnumber )
+                    html += '''<A href="%s?query=datadir%s&amp;job=%s"><b>View</b></A> individual files.
+                                <A href="%s/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, localstr, cryptID, rootdir, cryptID, jobnumber )
                 # if extended:
                 #     html += ', <A href="../downloads/%s/input.resfile">view Resfile</A>, <A href="../downloads/%s/stdout_%s.dat">view raw output</A>' % ( cryptID, cryptID, jobnumber )
             else:
@@ -1415,7 +1425,7 @@ class RosettaHTML(object):
             </p>
             ''' % self.tooltips], ""
     
-    def showEnsemble(self, status, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showEnsemble(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
         html = ["""
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Backrub Conformational Ensemble</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
@@ -1457,7 +1467,7 @@ class RosettaHTML(object):
             </p>
             ''' % self.tooltips], ""
             
-    def showEnsembleDesign(self, status, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showEnsembleDesign(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
         temperature = ProtocolParameters["Temperature"]
         seq_per_struct = ProtocolParameters["NumDesignsPerStruct"]
         len_of_seg = ProtocolParameters["SegmentLength"]
@@ -1575,7 +1585,7 @@ class RosettaHTML(object):
             
         return html, ""
     
-    def showSequenceToleranceHK(self, status, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showSequenceToleranceHK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
 
         seqtol_chain1 = ProtocolParameters["Partners"][0]
         seqtol_chain2 = ProtocolParameters["Partners"][1]
@@ -1601,7 +1611,7 @@ class RosettaHTML(object):
         input_id = input_filename[:-4] # filename without suffix
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
-            
+                        
             list_pdb_files = ['../downloads/%s/%s.pdb' % (cryptID, input_id) ]
             list_files = os.listdir( self.download_dir+'/'+cryptID )
             list_files.sort()
@@ -1819,7 +1829,7 @@ class RosettaHTML(object):
 
         return html, postscript
     
-    def showSequenceToleranceSK(self, status, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showSequenceToleranceSK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
 
         html = ["""
               <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Tolerance Prediction (Smith, Kortemme 2010)</td></tr>
@@ -1835,13 +1845,13 @@ class RosettaHTML(object):
         for partner in ProtocolParameters["Partners"]:
             numActive += 1
             html.append('Partner %d: Chain %s<br>' % (numActive, partner))
-            plist = ProtocolParameters["Premutated"][partner]
+            plist = ProtocolParameters["Premutated"].get(partner)
             if plist:
                 html.append('<table><tr><td>&nbsp;&nbsp;</td><td><i>Premutated residues at positions:</i></td><td></td><td>')
                 for k,v in sorted(plist.items()):
                     html.append('%s (%s) ' % (k, ROSETTAWEB_SK_AAinv[v]))
                 html.append('</td></tr></table>')
-            dlist = ProtocolParameters["Designed"][partner]
+            dlist = ProtocolParameters["Designed"].get(partner)
             if dlist:
                 html.append('<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(map(str, dlist.keys()),' ')))
         
@@ -1892,8 +1902,8 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
             
-            list_pdb_files = ['../downloads/%s/%s.pdb' % (cryptID, input_id) ]
-            list_pdb_files.extend( [ '../downloads/%s/sequence_tolerance/%s_%04.i_low.pdb' % (cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
+            list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
+            list_pdb_files.extend( [ '%s/%s/sequence_tolerance/%s_%04.i_low.pdb' % (rootdir, cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
             comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>
                         The query structure is shown in red. 
@@ -1906,7 +1916,7 @@ class RosettaHTML(object):
             designed_res = []
             designed = {}
             for partner in ProtocolParameters["Partners"]:
-                reslist = ProtocolParameters["Designed"][partner]
+                reslist = ProtocolParameters["Designed"].get(partner)
                 if reslist:
                     designed[partner] = reslist.keys() 
                     designed_chains += [partner for res in reslist.keys()]
@@ -1914,7 +1924,7 @@ class RosettaHTML(object):
         
             premutated = {}
             for partner in ProtocolParameters["Partners"]:
-                reslist = ProtocolParameters["Premutated"][partner]
+                reslist = ProtocolParameters["Premutated"].get(partner)
                 if reslist:
                     premutated[partner] = reslist.keys()
              
@@ -1923,39 +1933,39 @@ class RosettaHTML(object):
             #@upgradetodo: ask Colin
             html.append('''<tr><td align="left" bgcolor="#FFFCD8">A ranked table of amino acid types for each position.<br>
                               Download the table as 
-                              <a href="../downloads/%s/tolerance_seqrank.png">PNG</a>, <a href="../downloads/%s/tolerance_seqrank.pdf">PDF</a>.<br>
+                              <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.<br>
                               </td>
                            <td bgcolor="#FFFCD8">
-                    ''' % ( cryptID, cryptID ))
+                    ''' % ( rootdir, cryptID, rootdir, cryptID ))
                     
                     # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
                     # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
-            html.append('''<a href="../downloads/%s/tolerance_seqrank.png"><img src="../downloads/%s/tolerance_seqrank.png" alt="image file not available" width="400"></a><br>
+            html.append('''<a href="%s/%s/tolerance_seqrank.png"><img src="%s/%s/tolerance_seqrank.png" alt="image file not available" width="400"></a><br>
                         </td>
                         </tr>
                         <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
-                              Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
-                              <a href="../downloads/%s/tolerance_boxplot.png">PNG</a>, <a href="../downloads/%s/tolerance_boxplot.pdf">PDF</a>.<br>
+                              Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="%s/%s/tolerance_boxplot.png">PNG</a>, <a href="%s/%s/tolerance_boxplot.pdf">PDF</a>.<br>
                               </td>
-                           <td bgcolor="#FFFCD8">''' % ( cryptID, cryptID, cryptID, cryptID, cryptID ))
+                           <td bgcolor="#FFFCD8">''' % ( rootdir, cryptID, rootdir, cryptID, rootdir, cryptID, rootdir, cryptID, rootdir, cryptID ))
                     
                     # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
                     # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
             for (chain, resid) in zip(designed_chains, designed_res):
-              html.append('''<a href="../downloads/%s/tolerance_boxplot_%s%s.png"><img src="../downloads/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
-                    ''' % ( cryptID, chain, resid, cryptID, chain, resid ))
+              html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                    ''' % ( rootdir, cryptID, chain, resid, rootdir, cryptID, chain, resid ))
                             
             
             #todo: I arbitrarily chose the image size below.
             WebLogoText = self.WebLogoText
             html.append('''</td></tr>
-                        <tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="../downloads/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
-                             <td align="center" bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/tolerance_motif.png">
-                                                   <img height="250" src="../downloads/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
+                        <tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="%(rootdir)s/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                             <td align="center" bgcolor="#FFFCD8"><a href="%(rootdir)s/%(cryptID)s/tolerance_motif.png">
+                                                   <img height="250" src="%(rootdir)s/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
                              %(WebLogoText)s
                              </td></tr> ''' % vars())
 

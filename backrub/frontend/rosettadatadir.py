@@ -26,7 +26,8 @@ class RosettaDataDir(RosettaHTML):
         self.content         = ''
         self.header          = ''
         self.html_refs       = ''
-        self.legal_info      = ''  
+        self.legal_info      = ''
+        self.ddir            = "../downloads"
       
     def main(self, text=''):
     
@@ -78,13 +79,22 @@ class RosettaDataDir(RosettaHTML):
     
     def PointMutation(self, cryptID, jobid, binary, pdb_filename):
     
+        jobdatadir = os.path.join(self.ddir, cryptID)
+        
         usingMini = RosettaBinaries[binary]['mini']  
         self.jobid = jobid
-        individual_scores = ''
         
+        score_residues = os.path.join(jobdatadir, "scores_residues.txt")
+        inputpdb = os.path.join(jobdatadir, pdb_filename)
+        inputresfile = os.path.join(jobdatadir, "input.resfile")
+        scorefile = os.path.join(jobdatadir, "score.sc")
+        overall_scores = os.path.join(jobdatadir, scores_overall.txt)
+        detailed_scores = os.path.join(jobdatadir, scores_detailed.txt)
+        
+        individual_scores = ''
         if usingMini:
           self.header = '<h1 align="center">Job %s - Point Mutation (Rosetta 3)</h1>' % jobid
-          individual_scores = '<li>Detailed scores for each residue: <a href="../downloads/%s/scores_residues.txt">scores_residues.txt</a></li>' % cryptID
+          individual_scores = '<li>Detailed scores for each residue: <a href="%s">scores_residues.txt</a></li>' % score_residues
         else:
           self.header = '<h1 align="center">Job %s - Point Mutation (Rosetta++)</h1>' % jobid
         
@@ -94,25 +104,25 @@ class RosettaDataDir(RosettaHTML):
         <p>
         Input files:
           <ul>
-            <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>
-            <li>Rosetta Residue file: <a href="../downloads/%s/input.resfile">input.resfile</a></li>
+            <li>Input PDB file: <a href="%(inputpdb)s">%(pdb_filename)s</a></li>
+            <li>Rosetta Residue file: <a href="%(inputresfile)s">input.resfile</a></li>
           </ul>
         </p>
         <p>
         Output files:
           <ul>
-            <!-- li><a href="../downloads/%s/score.sc">score.sc</a></li -->
-            <li>Total score for each structure: <a href="../downloads/%s/scores_overall.txt">scores_overall.txt</a></li>
-            <li>Detailed scores for each structure: <a href="../downloads/%s/scores_detailed.txt">scores_detailed.txt</a></li>
-            %s
+            <!-- li><a href="%(scorefile)s">score.sc</a></li -->
+            <li>Total score for each structure: <a href="%(overall_scores)s">scores_overall.txt</a></li>
+            <li>Detailed scores for each structure: <a href="%(detailed_scores)s">scores_detailed.txt</a></li>
+            %(individual_scores)s
           </ul>
         Individual PDB files:
           <ul>
-        ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, cryptID, cryptID, cryptID, individual_scores )
+        ''' % vars()
         
         for fn_pdb in self._get_pdb_files(cryptID):
           if fn_pdb != pdb_filename:
-            self.content += '<li><a href="../downloads/%s/%s">%s</a>' % (cryptID, fn_pdb, fn_pdb)
+            self.content += '<li><a href="%s/%s">%s</a>' % (jobdatadir, fn_pdb, fn_pdb)
         
         self.content += "</ul></p>"
   
@@ -138,6 +148,8 @@ class RosettaDataDir(RosettaHTML):
     
     def EnsembleDesign(self, cryptID, jobid, binary, pdb_filename):
         
+        jobdatadir = os.path.join(self.ddir, cryptID)
+        
         usingMini = RosettaBinaries[binary]['mini']
         self.jobid = jobid
         if usingMini:
@@ -147,35 +159,42 @@ class RosettaDataDir(RosettaHTML):
         
         self.html_refs = '<P>%(FriedlandEtAl:2009)s</P>' % self.refs
         
-        self.content = '''
-        <p>
-        Input files:
-          <ul>
-            <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>
-          </ul>
-        </p>
-        Output files:
-          <ul>
-            <li>Core residues: <a href="../downloads/%s/core.txt">core.txt</a></li>
-            <li>Amino Acid Frequency of core residues: <a href="../downloads/%s/seq_pop_core.txt">seq_pop_core.txt</a></li>
-            <li>Designed sequences of core residues: <a href="../downloads/%s/designs_core.fasta">designs_core.fasta</a></li>
-            <li>Sequence profile of core residues: <a href="../downloads/%s/logo_core.png">logo_core.png</a></li>
-            <li>Amino acid frequencies of all residues: <a href="../downloads/%s/seq_pop.txt">seq_pop.txt</a></li>
-            <li>Designed sequences of all residues: <a href="../downloads/%s/designs.fasta">designs.fasta</a></li>
-            <li>Sequence profile of all residues: <a href="../downloads/%s/logo.png">logo.png</a></li>
-            <li>C&alpha; atom distance matrix: <a href="../downloads/%s/ca_dist_difference_matrix.dat">ca_dist_difference_matrix.dat</a></li>
-            <li>C&alpha; atom distance matrix: <a href="../downloads/%s/ca_dist_difference_1D_plot.png">ca_dist_difference_1D_plot.png</a></li>
-            <li>C&alpha; atom distance matrix: <a href="../downloads/%s/ca_dist_difference_2D_plot.png">ca_dist_difference_2D_plot.png</a></li>
-          </ul>
-        PDB files:
-          <ul>
-            <li>C&alpha; distances mapped onto the input structure (b-factor values): <a href="../downloads/%s/ca_dist_difference_bfactors.pdb">ca_dist_difference_bfactors.pdb</a></li>
-            <li>Structures of the designed ensemble: <a href="../downloads/%s/ensemble.pdb">ensemble.pdb</a></li>
-          <ul>
-        ''' % ( cryptID, pdb_filename, pdb_filename, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID, cryptID )
+        ensemble_pdb                = "ensemble.pdb"
+        bfactors                    = "ca_dist_difference_bfactors.pdb"
+        InputPDB                    = os.path.join(jobdatadir, pdb_filename)
+        CaDistDifferenceBfactors    = os.path.join(jobdatadir, bfactors)
+        EnsemblePDB                 = os.path.join(jobdatadir, ensemble_pdb)
+        OutputFiles = [
+            ("Core residues",                           "core.txt")
+            ("Amino Acid Frequency of core residues",   "seq_pop_core.txt")
+            ("Designed sequences of core residues",     "designs_core.fasta")
+            ("Sequence profile of core residues",       "logo_core.png")
+            ("Amino acid frequencies of all residues",  "seq_pop.txt")
+            ("Designed sequences of all residues",      "designs.fasta")
+            ("Sequence profile of all residues",        "logo.png")
+            ("C&alpha; atom distance matrix",           "ca_dist_difference_matrix.dat")
+            ("C&alpha; atom distance matrix",           "ca_dist_difference_1D_plot.png")
+            ("C&alpha; atom distance matrix",           "ca_dist_difference_2D_plot.png")
+        ]
+        
+        html = ['''\n<p>Input files:<ul><li>Input PDB file: <a href="%(InputPDB)s">%(pdb_filename)s</a></li></ul></p>
+                          \nOutput files:<ul>''']
+
+        for outputfile in OutputFiles:
+            html.append('<li>%s: <a href="%s">%s</a></li>' % (outputfile[0], os.path.join(jobdatadir, outputfile[1]), outputfile[1]))
+        
+        html.append('''
+          </ul>\nPDB files:<ul>\n
+            <li>C&alpha; distances mapped onto the input structure (b-factor values): <a href="%(CaDistDifferenceBfactors)s">%(bfactors)s</a></li>
+            <li>Structures of the designed ensemble: <a href="%(EnsemblePDB)s">%(ensemble_pdb)s</a></li>
+          <ul> ''' % vars())
+        
+        self.content = join(html, "\n")
     
     def SequenceToleranceHK(self, cryptID, jobid, binary, pdb_filename):
     
+        jobdatadir = os.path.join(self.ddir, cryptID)
+        
         self.jobid = jobid
         self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (Rosetta++)</h1>' % jobid
         self.html_refs = '<P>%(HumphrisKortemme:2008)s</P>' % self.refs
@@ -188,26 +207,26 @@ class RosettaDataDir(RosettaHTML):
           <p>
           Input files:
             <ul>
-              <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>''' % (cryptID, pdb_filename, pdb_filename)
+              <li>Input PDB file: <a href="%s/%s">%s</a></li>''' % (jobdatadir, pdb_filename, pdb_filename)
               
         for br_resfile in grep('backrub_[0-9]+\.resfile',list_files):
             self.content += '''
-              <li>Backrub premutations residue file: <a href="../downloads/%s/%s">%s</a></li>
-                ''' % (cryptID, br_resfile, br_resfile)
+              <li>Backrub premutations residue file: <a href="%s/%s">%s</a></li>
+                ''' % (jobdatadir, br_resfile, br_resfile)
                 
         self.content += '''
             </ul>
           </p>
           Output files:
             <ul>
-              <li><a href="../downloads/%(cryptID)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
-              <li><a href="../downloads/%(cryptID)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
-              <li><a href="../downloads/%(cryptID)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
-                  <a href="../downloads/%(cryptID)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
+              <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
+              <li><a href="%(jobdatadir)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
+              <li><a href="%(jobdatadir)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
+                  <a href="%(jobdatadir)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
               <li> Boxplot for each position: <BR>
           ''' % vars()        
         for png_fn in grep('tolerance_boxplot_[A-Z][0-9]*\.png',list_files):
-          self.content += '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="../downloads/%s/%s">%s</a><br>' % ( cryptID, png_fn, png_fn )
+          self.content += '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="%s/%s">%s</a><br>' % ( jobdatadir, png_fn, png_fn )
         
         self.content += '''
               </li>
@@ -218,12 +237,13 @@ class RosettaDataDir(RosettaHTML):
           
         for fn_pdb in self._get_pdb_files(cryptID):
           if fn_pdb != pdb_filename:
-            self.content += '<li><a href="../downloads/%s/%s">%s</a>' % (cryptID, fn_pdb, fn_pdb)
+            self.content += '<li><a href="%s/%s">%s</a>' % (jobdatadir, fn_pdb, fn_pdb)
     
         self.content += "</ul></p>"      
 
     def SequenceToleranceSK(self, cryptID, jobid, binary, pdb_filename):
     
+        jobdatadir = os.path.join(self.ddir, cryptID)
         self.jobid = jobid
         if binary == "seqtolJMB":
           self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (Rosetta 3)</h1>' % jobid
@@ -231,7 +251,7 @@ class RosettaDataDir(RosettaHTML):
         else:
           self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction</h1>' % jobid
           self.html_refs = '<P>%(HumphrisKortemme:2008)s</P>' % self.refs
-          self.content = '<p>The logic to create data directory is missing.</p>'
+          self.content = '<p>The logic to create dat../downloadsa directory is missing.</p>'
           return
       
         # individual boxplots
@@ -243,32 +263,33 @@ class RosettaDataDir(RosettaHTML):
           <p>
           Input files:
             <ul>
-              <li>Input PDB file: <a href="../downloads/%s/%s">%s</a></li>''' % (cryptID, pdb_filename, pdb_filename))
+              <li>Input PDB file: <a href="%s/%s">%s</a></li>''' % (jobdatadir, pdb_filename, pdb_filename))
               
         for br_resfile in grep('backrub_[0-9]+\.resfile',list_files):
-            self.content.append('''<li>Backrub premutations residue file: <a href="../downloads/%(cryptID)s/%(br_resfile)s">%(br_resfile)s</a></li>''' % vars())
+            self.content.append('''<li>Backrub premutations residue file: <a href="%(jobdatadir)s/%(br_resfile)s">%(br_resfile)s</a></li>''' % vars())
         
         for st_resfile in grep('seqtol_[0-9]+\.resfile',list_files):
-            self.content.append('''<li>Sequence tolerance residue file: <a href="../downloads/%(cryptID)s/%(st_resfile)s">%(st_resfile)s</a></li>''' % vars())
+            self.content.append('''<li>Sequence tolerance residue file: <a href="%(jobdatadir)s/%(st_resfile)s">%(st_resfile)s</a></li>''' % vars())
             
+        #@upgradetodo: Ask Colin about backrub scores
         self.content.append('''
             </ul>
           </p>
           Output files:
             <ul>
-                <li><a href="../downloads/%(cryptID)s/backrub/backrub_scores.dat">backrub_scores.dat</a> - Backrub scores</li> 
-                <li><a href="../downloads/%(cryptID)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
-                <li><a href="../downloads/%(cryptID)s/tolerance_seqrank.png">tolerance_seqrank.png</a>, 
-                               <a href="../downloads/%(cryptID)s/tolerance_seqrank.pdf">tolerance_seqrank.pdf</a> - ranked table of amino acid types for each position</li>
-                <li><a href="../downloads/%(cryptID)s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>
-              <li><a href="../downloads/%(cryptID)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
-              <li><a href="../downloads/%(cryptID)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
-                  <a href="../downloads/%(cryptID)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
+                <!--<li><a href="%(jobdatadir)s/sequence_tolerance/backrub_scores.dat">backrub_scores.dat</a> - Backrub scores</li>--> 
+                <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
+                <li><a href="%(jobdatadir)s/tolerance_seqrank.png">tolerance_seqrank.png</a>, 
+                               <a href="%(jobdatadir)s/tolerance_seqrank.pdf">tolerance_seqrank.pdf</a> - ranked table of amino acid types for each position</li>
+                <li><a href="%(jobdatadir)s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>
+              <li><a href="%(jobdatadir)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
+              <li><a href="%(jobdatadir)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
+                  <a href="%(jobdatadir)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
               <li> Boxplot for each position: <BR>''' % vars())
  
     
         for png_fn in grep('tolerance_boxplot_[A-Z][0-9]*\.png',list_files):
-            self.content.append('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="../downloads/%s/%s">%s</a><br>' % ( cryptID, png_fn, png_fn ))
+            self.content.append('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="%(jobdatadir)s/%(png_fn)s">%(png_fn)s</a><br>' % vars())
         
         self.content.append('''
               </li>
@@ -280,7 +301,7 @@ class RosettaDataDir(RosettaHTML):
           
         for fn_pdb in self._get_pdb_files(cryptID, subdir="sequence_tolerance"):
           if fn_pdb != pdb_filename:
-            self.content.append('<li><a href="../downloads/%(cryptID)s/%(fn_pdb)s">%(fn_pdb)s</a>' % vars())
+            self.content.append('<li><a href="%(jobdatadir)s/sequence_tolerance/%(fn_pdb)s">%(fn_pdb)s</a>' % vars())
     
         self.content.append("</ul></p>")
         self.content = join(self.content, "")    
