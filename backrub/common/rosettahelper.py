@@ -104,6 +104,7 @@ def grep(string, list):
   expr = re.compile(string)
   results = filter(expr.search, [str(line) for line in list])
   return results
+  
 class RosettaError(Exception):
     def __init__(self, task, ID):
         self.task = task

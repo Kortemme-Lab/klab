@@ -297,13 +297,14 @@ class RosettaClusterJob(object):
     flatOutputDirectory = False
     name = "Cluster job"
         
-    def __init__(self, sgec, parameters, tempdir, targetroot, testonly = False):
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
         self.parameters = parameters
         self.sgec = sgec
         self.debug = True
         self.tempdir = tempdir
         self.targetroot = targetroot
         self.testonly = testonly
+        self.dldir = os.path.join(dldir, parameters["cryptID"])
         if not testonly:
             self._make_workingdir() 
             self._make_targetdir()
@@ -442,8 +443,8 @@ class RosettaClusterJob(object):
     def _taskresultsdir_file_path(self, taskdir, filename):
         return os.path.join(self.targetdirectory, taskdir, filename)
 
-    def moveFilesTo(self, destpath, permissions = permissions755):
-        destpath = os.path.join(destpath, self.parameters["cryptID"])
+    def moveFilesTo(self, permissions = permissions755):
+        destpath = self.dldir
         
         self._status("Moving files to %s" % destpath)
         if not os.path.exists(destpath):
@@ -495,8 +496,8 @@ class RosettaClusterJob(object):
         """Get the path for a file within the working directory"""
         return os.path.join(self.workingdir, filename)
 
-    def dumpJITGraph(self, destpath):
-        destpath = os.path.join(destpath, self.parameters["cryptID"])
+    def dumpJITGraph(self):
+        destpath = self.dldir
         rootname = os.path.join(destpath, "progress")
         JIThtml = "%s.html" % rootname 
         JITjs = "%s.js" % rootname 

@@ -1137,7 +1137,7 @@ class ClusterDaemon(RosettaDaemon):
         # Check if jobs are finished
         for clusterjob in self.runningJobs:
             jobID = clusterjob.jobID
-            clusterjob.dumpJITGraph(cluster_dldir)
+            clusterjob.dumpJITGraph()
             try:
                 if clusterjob.isCompleted():
                     completedJobs.append(clusterjob)               
@@ -1164,7 +1164,7 @@ class ClusterDaemon(RosettaDaemon):
         newclusterjob = None
         if len(self.runningJobs) < self.MaxClusterJobs:            
             # get all jobs in queue
-            data = self.runSQL("SELECT ID,Date,Status,PDBComplex,PDBComplexFile,Mini,EnsembleSize,task,ProtocolParameters,cryptID FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
+            data = self.runSQL("SELECT ID,Date,Status,PDBComplex,PDBComplexFile,Mini,EnsembleSize,task,ProtocolParameters,cryptID,BackrubServer FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
             try:
                 if len(data) != 0:
                     jobID = None
@@ -1196,7 +1196,7 @@ class ClusterDaemon(RosettaDaemon):
                             self.recentDBJobs = self.recentDBJobs[200:]
                         
                         # Start the job
-                        newclusterjob = self.start_job(task, params)
+                        newclusterjob = self.start_job(task, params, data[i][9])
                         if newclusterjob:
                             #change status and write start time to DB
                             self.runningJobs.append(newclusterjob)
@@ -1219,21 +1219,27 @@ class ClusterDaemon(RosettaDaemon):
                 self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
             self._clusterjobjuststarted = None
 
-    def start_job(self, task, params):
+    def start_job(self, task, params, server):
 
         clusterjob = None
         jobID = params["ID"]
         
+        # Leave the results for remote jobs in a different directory 
+        if server == split(self.server_name, ".")[0]:
+            dldir = cluster_dldir
+        else:
+            dldir = cluster_remotedldir
+            
         self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
         if task == "sequence_tolerance":
             params["radius"] = 5.0
-            clusterjob = RosettaTasks.SequenceToleranceJobHK(self.sgec, params, netappRoot, cluster_temp)   
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(self.sgec, params, netappRoot, cluster_temp, dldir)   
         elif task == "sequence_tolerance_SK":
             params["radius"] = 10.0
-            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(self.sgec, params, netappRoot, cluster_temp)     
+            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(self.sgec, params, netappRoot, cluster_temp, dldir)     
         elif task == "multi_sequence_tolerance":
             params["radius"] = 10.0
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(self.sgec, params, netappRoot, cluster_temp)            
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(self.sgec, params, netappRoot, cluster_temp, dldir)            
         else:
             raise
         
@@ -1241,7 +1247,7 @@ class ClusterDaemon(RosettaDaemon):
         self._clusterjobjuststarted = clusterjob        # clusterjob will not be returned on exception and the reference will be lost
 
         # Remove any old files in the same target location
-        destpath = os.path.join(cluster_dldir, params["cryptID"])
+        destpath = os.path.join(clusterjob.dldir, params["cryptID"])
         if os.path.exists(destpath):
             shutil.rmtree(destpath)
         
@@ -1307,7 +1313,7 @@ class ClusterDaemon(RosettaDaemon):
 
     def moveFilesOnJobCompletion(self, clusterjob):
         try:
-            return clusterjob.moveFilesTo(cluster_dldir)
+            return clusterjob.moveFilesTo()
         except Exception, e:
             print("moveFilesOnJobCompletion failure")
             self.log("Error moving files to the download directory.\n")
@@ -1685,7 +1691,7 @@ if __name__ == "__main__":
                         "Partners"          : ["A", "B"],
                         "Weights"           : [0.4, 0.4, 0.4, 1.0],
                         "Premutated"        : {"A" : {102 : "A"}},
-                        "Designed"          : {"A" : [103, 104]}
+                        "Designed"          : {"A" : {103 : True, 104 : True}}
                     }
                 elif 'hk' == sys.argv[3]:
                     pdb_filename = 'hktest.pdb'
