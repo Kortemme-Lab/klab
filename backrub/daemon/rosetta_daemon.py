@@ -1140,6 +1140,7 @@ class ClusterDaemon(RosettaDaemon):
             clusterjob.dumpJITGraph()
             try:
                 if clusterjob.isCompleted():
+                    clusterjob.dumpJITGraph()
                     completedJobs.append(clusterjob)               
 
                     clusterjob.analyze()
@@ -1225,7 +1226,7 @@ class ClusterDaemon(RosettaDaemon):
         jobID = params["ID"]
         
         # Leave the results for remote jobs in a different directory 
-        if server == split(self.server_name, ".")[0]:
+        if server == self.server_name.split('.')[0]:
             dldir = cluster_dldir
         else:
             dldir = cluster_remotedldir
