@@ -394,15 +394,12 @@ class ClusterTask(object):
                 if not thisjob:
                     tasksCompleted = numtasks
                 else:
-                    print("numtasks: %d" % self.numtasks)
-                    print("len(thisjob): %d" % len(thisjob))
                     tasksCompleted = numtasks - len(thisjob)
         elif st == RETIRED_TASK or st == COMPLETED_TASK:
             tasksCompleted = numtasks
         elif st == FAILED_TASK:
             tasksCompleted = -1
         
-        print((self.shortname, st, tasksCompleted, numtasks))
         return (self.name, self.shortname, st, profile, tasksCompleted, numtasks)
 
     def getState(self, allowToRetire = True):

@@ -115,6 +115,7 @@ class TaskScheduler(object):
                 print('<debug id="%d" type="task">%s</debug>' % (self.dbID, message))
             
     def _movequeue(self, task, oldqueue, newqueue):
+        # todo: The active queue actually contains both queued and active jobs w.r.t. the cluster head node 
         self._status("Moving %d (%s) from %s to %s" % (task.jobid, task.getName(), ClusterTask.status.get(oldqueue), ClusterTask.status.get(newqueue)))
         self.tasks[oldqueue].remove(task)
         self.tasks[newqueue].append(task)
@@ -327,6 +328,7 @@ class RosettaClusterJob(object):
         self._status("Name: %s" % self.name)
         self._status("Working directory: %s" % self.workingdir)
         self._status("Target directory: %s" % self.targetdirectory)    
+        self._status("Download directory: %s" % self.dldir)    
         
     def _defineOutputFiles(self):
         pass
@@ -350,6 +352,17 @@ class RosettaClusterJob(object):
     def kill(self):
         success = True
         
+        # Move the files to the dl directory
+        destpath = self.dldir
+        self._status("Copying files to %s" % destpath)
+        try:
+            if os.path.exists(destpath):
+                shutil.rmtree(destpath)
+            shutil.copytree(self.workingdir, destpath)
+        except Exception, e:
+            self._status("Error copying files:\n%s\n%s" % (e, traceback.print_exc()))
+            success = False   
+                
         dirsToDelete = [(self.tempdir, self.workingdir, "working"), (self.targetroot, self.targetdirectory, "target")]
         for dirpair in dirsToDelete:
             # Being a little cautious here
@@ -499,10 +512,8 @@ class RosettaClusterJob(object):
     def dumpJITGraph(self):
         destpath = self.dldir
         rootname = os.path.join(destpath, "progress")
-        JIThtml = "%s.html" % rootname 
         JITjs = "%s.js" % rootname 
         contents = self.scheduler.getJITGraph()
         if not os.path.exists(destpath):
             make755Directory(destpath)
-        writeFile(JIThtml, contents[0])
-        writeFile(JITjs, contents[1])
+        writeFile(JITjs, contents)

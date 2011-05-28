@@ -22,12 +22,16 @@ import RosettaTasks
 from sge import SGEConnection, SGEXMLPrinter
 from Graph import JITGraph
 
+dlDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/clustertest"
+
 if not os.path.exists(netappRoot):
     make755Directory(netappRoot)
 if not os.path.exists(cluster_dldir):
     make755Directory(cluster_dldir)
 if not os.path.exists(cluster_temp):
     make755Directory(cluster_temp)
+if not os.path.exists(dlDirectory):
+    make755Directory(dlDirectory)
 
 inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/test/"
 
@@ -57,7 +61,7 @@ def printStatus(sgec, statusprinter, diffcounter):
     return diffcounter
     
 if __name__ == "__main__":
-    test = "1KI1"
+    test = "PSK"
     sgec = SGEConnection()
     try:
         clusterjob = None
@@ -84,7 +88,7 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {102 : "A"}},
                 "Designed"          : {"A" : [103, 104]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, cluster_temp)
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, cluster_temp, dlDirectory)
         
         if test == "PSK":
             mini = "seqtolJMB"
@@ -109,7 +113,7 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {102 : "A"}},
                 "Designed"          : {"A" : [103, 104]}
                 }
-            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(sgec, params, netappRoot, cluster_temp)
+            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(sgec, params, netappRoot, cluster_temp, dlDirectory)
         
         if test == "1KI1analysis":
             mini = "seqtolJMB"
@@ -166,7 +170,7 @@ if __name__ == "__main__":
                 "Premutated"        : {},
                 "Designed"          : {"B" : [203, 204, 205, 206, 207, 208]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, "/home/oconchus/1KI1test")
+            clusterjob = RosettaTasks.SequenceToleranceJobSK(sgec, params, netappRoot, "/home/oconchus/1KI1test", dlDirectory)
             clusterjob.targetdirectory = "/home/oconchus/1KI1test"
             clusterjob._analyze()
             sys.exit(0)
@@ -201,7 +205,7 @@ if __name__ == "__main__":
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_temp)
+            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_temp, dlDirectory)
                 
         elif test == "HK":
             mini = "seqtolHK"
@@ -224,7 +228,7 @@ if __name__ == "__main__":
                 "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
                 }
             
-            clusterjob = RosettaTasks.SequenceToleranceJobHK(sgec, params, netappRoot, cluster_temp)            
+            clusterjob = RosettaTasks.SequenceToleranceJobHK(sgec, params, netappRoot, cluster_temp, dlDirectory)            
         
         if clusterjob:
 
@@ -242,9 +246,9 @@ if __name__ == "__main__":
                 while not(clusterjob.isCompleted()):
                     sgec.qstat(waitForFresh = True)
                     diffcounter = printStatus(sgec, statusprinter, diffcounter)
-                    clusterjob.dumpJITGraph(cluster_dldir)
+                    clusterjob.dumpJITGraph()
                     
-                clusterjob.dumpJITGraph(cluster_dldir)
+                clusterjob.dumpJITGraph()
                 clusterjob.analyze()
             
             except Exception, e:

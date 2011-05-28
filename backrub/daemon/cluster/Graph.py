@@ -275,7 +275,7 @@ class JITGraph(Graph):
             #upgradetodo: we need to embed the html here as well
             return self.getForceDirected()
         JITdata = "var json = %s;" % self._getSpaceTreeNode("init", "  ")
-        return (self.getHTML(), JITSpaceTree % JITdata)
+        return JITSpaceTree % JITdata
     
     def getHTML(self):
         legend = "<h4>Legend</h4><p>%s</p>" % getHTMLLegend()        

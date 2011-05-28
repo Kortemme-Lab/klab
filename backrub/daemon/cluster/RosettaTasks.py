@@ -1732,17 +1732,14 @@ class BackrubSequenceToleranceSK(ClusterTask):
                 "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
                 "-ignore_unrecognized_res", 
                 "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
-                "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-pivot_atoms CA", #@upgradetodo: ask why I'm using this
+                "-extrachi_cutoff 0", 
+                 "-backrub:ntrials %d" % parameters["ntrials"], 
                 "-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
                 "-out:prefix $broutprefixesvar"
                 ]
         if self.movemap:
             backrubCommand.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
-        if len(self.pivot_res) > 0:
-            backrubCommand.append("-pivot_residues")
-            self.pivot_res.sort()
-            backrubCommand.extend([str(resid) for resid in self.pivot_res])
+
         backrubCommand = [
             '# Run backrub', 
             '', 
@@ -1770,10 +1767,11 @@ class BackrubSequenceToleranceSK(ClusterTask):
                 "-ms:numresults", "0",
                 "-out:prefix $prefixesvar", # @upgradetodo: ask about the score:weights and score:patch options in backrub_seqtol.py 
                 "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
-                "-score:ref_offsets TRP 0.9"  # @upgradetodo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
+                "-score:ref_offsets HIS 1.2"  
                  ])]
         self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
- 
+        #upgradetodo : diff standard_NO_HB_ENV_DEP.wts against the 33892 database and maek sure the only difference is no HBN depth line [sp.]
+        
     def _prepare_backrub( self ):
         """prepare data for a full backbone backrub run"""
         self.pdb = pdb.PDB(self.parameters["pdb_info"].split('\n'))
