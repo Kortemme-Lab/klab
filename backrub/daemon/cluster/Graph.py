@@ -14,7 +14,7 @@ from string import join
 from rosettahelper import readFile, writeFile, server_root
 
 import ClusterTask  
-#upgradetodo use this to pretty print the JSON import simplejson
+#todo: use this package to pretty-print the JSON : import simplejson
 
 msubdir = "cluster/"
 if __name__ == "__main__":
@@ -272,7 +272,6 @@ class JITGraph(Graph):
         
     def getSpaceTree(self):
         if not self.isATree():
-            #upgradetodo: we need to embed the html here as well
             return self.getForceDirected()
         JITdata = "var json = %s;" % self._getSpaceTreeNode("init", "  ")
         return JITSpaceTree % JITdata

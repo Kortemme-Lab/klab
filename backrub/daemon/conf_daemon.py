@@ -15,7 +15,7 @@ CLUSTER_debugmode = True
 # Local directories
 cluster_dldir = os.path.join(server_root, "downloads")
 cluster_remotedldir = os.path.join(server_root, "remotedownloads")
-cluster_remotedldir = "/var/www/html/rosettaweb/backrub/remotedownloads" #@upgradetodo
+cluster_remotedldir = "/var/www/html/rosettaweb/backrub/remotedownloads"
 cluster_temp = os.path.join(server_root, "temp/cluster")
 
 # Cluster netapp directories

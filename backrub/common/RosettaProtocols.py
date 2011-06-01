@@ -9,7 +9,7 @@ class References:
             "LauckEtAl:2010"        :   'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design</i>.<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Research, Volume 38, Issue suppl. 2, Pages W569-W575</a>',
             "SmithKortemme:2010"    :   'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains</i>.<br><a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17<sup>th</sup> September 2010, Pages 460-474</a>',
             #@upgradetodo
-            "SmithKortemme:2011"    :   'Smith CA, Kortemme T. <i>Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using Rosetta Backrub Flexible Backbone Design</i>.<br><a href="" style="font-size: 10pt">Submitted to PLoS ONE.</a>',
+            "SmithKortemme:2011"    :   'Smith CA, Kortemme T. <i>Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using Rosetta Backrub Flexible Backbone Design</i>.<br><a href="" style="font-size: 10pt">Accepted to PLoS ONE.</a>',
         }
     
     def __getitem__(self, index):
@@ -188,21 +188,22 @@ RosettaBinaries = {
                     "clusterrev"        : "rElisabeth",
                     "cluster_databases" : ["rosetta_database_r15286", "rosetta_database_r17289"],
                  },
-    "seqtolJMB" :{  # This is the revision used in the paper
-                    "name"      : "Rosetta 3.1, as published",
-                    "queuename" : "Rosetta 3.1",
-                    "revision"  : 33982, #39284, #@upgradetodo 33982
+    "seqtolJMB" :{  # This is the revision used in the paper. 
+                    # Note: The backrub binary used is the backrub_pilot application, not the backrub application.
+                    "name"      : "JMB 2010 (PDZ-optimized)",
+                    "queuename" : "JMB 2010",
+                    "revision"  : 33982,
                     "mini"      : True,
                     "runOnCluster" : True,
-                    "clusterrev": "r33982" #"r39284" # r33982
+                    "clusterrev": "r33982"
                  },
-    "seqtolP1"  :{  # based solely on the date, roughly between revisions 24967 - 24980
-                    "name"      : "Rosetta 3.2.r, as published",
-                    "queuename" : "Rosetta 3.2.r",
-                    "revision"  : 0, 
+    "seqtolP1"  :{  # This is the revision used in the paper. 
+                    "name"      : "PLoS One 2011 (generalized)",
+                    "queuename" : "PLoS One 2011",
+                    "revision"  : 39284, 
                     "mini"      : True,
                     "runOnCluster" : True,
-                    "clusterrev": "r_"
+                    "clusterrev": "r39284"
                  },
     "multiseqtol" :{  
                     "name"      : "Rosetta 3.2",
@@ -257,7 +258,7 @@ class WebserverProtocols(object):
         protocolGroups[2].add(proto)
         
         proto = RosettaProtocol("Generalized Protocol (Fold / Interface) Sequence Tolerance", "sequence_tolerance_SK")
-        proto.setBinaries("seqtolJMB") # todo: "seqtolP1") 
+        proto.setBinaries("seqtolJMB", "seqtolP1") 
         proto.setNumStructures(2,20,100)    #todo: min should be 10 but I've allowed 2 for testing
         protocolGroups[2].add(proto)
         

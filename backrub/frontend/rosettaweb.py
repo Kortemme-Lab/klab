@@ -1544,7 +1544,6 @@ def storeSequenceToleranceSK(form, pdb_object):
         # We order the weights to match the command-line input format e.g. Other A B A-B, or A B C A-B A-C B-C, etc.                
         
         # Add the Other energy
-        # upgradetodo: Check this value w/Colin or mention in tooltips
         Weights.append("0.4") 
             
         # Add the self-energies

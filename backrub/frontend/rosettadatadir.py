@@ -271,13 +271,11 @@ class RosettaDataDir(RosettaHTML):
         for st_resfile in grep('seqtol_[0-9]+\.resfile',list_files):
             self.content.append('''<li>Sequence tolerance residue file: <a href="%(jobdatadir)s/%(st_resfile)s">%(st_resfile)s</a></li>''' % vars())
             
-        #@upgradetodo: Ask Colin about backrub scores
         self.content.append('''
             </ul>
           </p>
           Output files:
             <ul>
-                <!--<li><a href="%(jobdatadir)s/sequence_tolerance/backrub_scores.dat">backrub_scores.dat</a> - Backrub scores</li>--> 
                 <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
                 <li><a href="%(jobdatadir)s/tolerance_seqrank.png">tolerance_seqrank.png</a>, 
                                <a href="%(jobdatadir)s/tolerance_seqrank.pdf">tolerance_seqrank.pdf</a> - ranked table of amino acid types for each position</li>

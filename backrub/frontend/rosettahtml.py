@@ -42,11 +42,13 @@ class RosettaHTML(object):
         self.lowest_structs  = []
         self.html_refs       = ''
         self.refs = References()
-                            
+        
+        refIDs = self.refs.getReferences()
+        
         #self.server = { 'Structure Prediction Backrub': 'http://%s/backrub' % self.server_url,
                         #'Interface Alanine Scanning' : 'http://%s/alascan/' % self.server_url,
                         #'more server soon' : 'http://kortemmelab.ucsf.edu/' }
-                        # THIS gets to complicated
+                        # THIS gets to complicated 
         tooltip_parameter = "offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltip] cssheader=[tth] delay=[250]"
         self.tooltips = { 
                         "tt_empty":         "header=[] body=[] %s" % tooltip_parameter,
@@ -57,7 +59,7 @@ class RosettaHTML(object):
                         "tt_AtomOccupancy": "header=[Set atom occupancy] body=[Rosetta will ignore any ATOM records in the PDB file with zero occupancy. You can choose to upload the PDB as is (default), remove records with empty occupancy, or set these records with an occupancy of 1.0.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_PDBID":         "header=[PDB identifier] body=[Enter the 4-digit PDB identifier of the structure file. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
-                        "tt_RVersion":      "header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or the new Rosetta 3 (\'mini\'). Some applications only work with one version.] %s" % tooltip_parameter,
+                        "tt_RVersion":      """header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or Rosetta 3 (\'mini\'). Some applications only work with one version.<br><br>Both of the generalized sequence tolerance protocols use Rosetta 3; see 'Designed Position Sequence Scoring' in the Methods section upgradetodo link of Smith and Kortemme 2011 <a href='#refSmithKortemme:2011'>(%d)</a> for a description of the differences.] %s""" % (refIDs["SmithKortemme:2011"], tooltip_parameter),
                         "tt_NStruct":       "header=[Number of Structures] body=[Number of generated structures or size of ensemble. We recommend to create 10 structures at a time.] %s" % tooltip_parameter,
                         "tt_ROutput":       "header=[Rosetta output] body=[If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.] %s" % tooltip_parameter,
                         "tt_SelApp":        "header=[Select Application] body=[Click to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.] %s" % tooltip_parameter,
@@ -70,14 +72,14 @@ class RosettaHTML(object):
                         "tt_SegLength":     "header=[Maximal segment length for backrub] body=[Limit the length of the segment to which the backrub move is applied to. (3-12)] %s" % tooltip_parameter,
                         "tt_error":         "header=[Rosetta Error</b></font><br>Both Rosetta++ and Rosetta 3 fail for some PDB files that have inconsistent residue numbering or miss residues. If an error occurs for your structure please check the correctness of the PDB file.] %s" % tooltip_parameter,
                         "tt_seqtol_partner":"header=[Partner] body=[Define the two chains that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
-                        "tt_seqtol_SK_partner":"header=[Partner] body=[@upgradetodo: Define the chain(s) that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
-                        "tt_seqtol_SK_weighting":"header=[Score reweighting] body=[@upgradetodo: Define the intramolecular energies / self energy (e.g. k<sub>A</sub>) and the intermolecular / interaction energies (e.g. k<sub>AB</sub>).] %s" % tooltip_parameter,
-                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[@upgradetodo: Define the Boltzmann factor kT. If the cited value is chosen then kT will be set as (0.228 + n * 0.021) where n is the number of valid premutated residues.] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_partner":"header=[Partner] body=[Define the chain(s) that form the protein-protein interface. For example: Partner 1: A; Partner 2: B] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_weighting":"header=[Score reweighting] body=[Define the: <ul><li>self energies (i.e. intramolecular or intrachain)</li><li> interaction energies (i.e. intermolecular or interchain)</li></ul>.] %s" % tooltip_parameter,
+                        "tt_seqtol_SK_Boltzmann":"header=[Boltzmann Factor] body=[Define the Boltzmann factor kT. If the cited value is chosen then kT will be set as (0.228 + n * 0.021) where n is the number of premutated residues.<br><br>It is used for converting the list of sequence fitness scores into a position weight matrix (PWM).] %s" % tooltip_parameter,
                         "tt_seqtol_list":   "header=[List] body=[List of residue-IDs of <b>Chain 2</b> that are subject to mutations. Enter residue-IDs seperated by a space.] %s" % tooltip_parameter,
                         "tt_seqtol_radius": "header=[Radius] body=[Defines the size of the interface. A residue is considered to be part of the interface if at least one of its atoms is within a sphere of radius r from any atom of the other chain.] %s" % tooltip_parameter,
                         "tt_seqtol_weights":"header=[Weights] body=[Describes how much the algorithm emphazises the energetic terms of this entity. The default of 1,1,2 emphasizes the energetic contributions of the interface. The interface is weighted with 2, while the energies of partner 1 and partner 2 are weighted with 1, respectively.] %s" % tooltip_parameter,
-                        "tt_seqtol_design": "header=[Residues for design] body=[Rosetta is going to substitute these residues in order to find energetically stable sequences.] %s" % tooltip_parameter,
-                        "tt_seqtol_premutated": "header=[Premutated residues] body=[@upgradetodo:] %s" % tooltip_parameter,
+                        "tt_seqtol_design": "header=[Residues for design] body=[Rosetta predicts a distribution of amino acid frequencies at each of these positions.] %s" % tooltip_parameter,
+                        "tt_seqtol_premutated": "header=[Premutated residues] body=[Amino acids that are mutated prior to backrub ensemble generation and often remain fixed. (These are uncommon.)] %s" % tooltip_parameter,
                         "tt_click":         "body=[Click on the link to read the description.] %s" % tooltip_parameter,
                         "ROSETTAWEB_SK_RecommendedNumStructures":   ROSETTAWEB_SK_RecommendedNumStructures,
                         }
@@ -332,6 +334,9 @@ class RosettaHTML(object):
               <TR>
                 <TD align=right style="width:300px">Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
                 <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">''' % self.tooltips)
+        #upgradetodo ask Tanja - change Rosetta Version for seqtolsk, link to the text from PLoS One -
+         
+
         
         i = 0
         # As it happens, alphabetical ordering of RosettaBinaries co-incides with revision ordering 
@@ -343,7 +348,7 @@ class RosettaHTML(object):
             if desc == "seqtolJMB":
                 bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
             elif desc == "seqtolP1":
-                bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
+                bname += '<a href="#refSmithKortemme:2011"><sup id="ref">%(SmithKortemme:2011)d</sup></a>' % refIDs
             
             # Escape the name so we can pass it to javascript
             bnamevalue = bname
@@ -1905,7 +1910,7 @@ class RosettaHTML(object):
             list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
             list_pdb_files.extend( [ '%s/%s/sequence_tolerance/%s_%04.i_low.pdb' % (rootdir, cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>
+            comment1 = """Backbone representation of the best scoring designs for up to 10 different initial backrub structures.<br>
                         The query structure is shown in red. 
                         The designed residues and premutated residues are shown in balls-and-stick representation.
                         Residues which are designed but not mutated have green backbone atoms.
@@ -1930,19 +1935,26 @@ class RosettaHTML(object):
              
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
-            #@upgradetodo: ask Colin
-            html.append('''<tr><td align="left" bgcolor="#FFFCD8">A ranked table of amino acid types for each position.<br>
-                              Download the table as 
-                              <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.<br>
+            #@upgradetodo: change image size based on table size do not resize if width < 400
+            #upgradetodo: Weblogo 3.0 font size
+            #upgradetodo: get doi from Colin
+            refIDs = self.refs.getReferences()
+            reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
+            
+            #@upgradetodo: fix [Figure 2B] and [Table 1]
+            html.append('''<tr><td align="left" bgcolor="#FFFCD8"><p>A ranked table of amino acid types for each position. <br><br>This is similar to upgradetodo hlink [Figure 2B] in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
+                              <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See [Table 1] in %s.</p>
+                              <p>Download the table as 
+                              <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.</p>
                               </td>
                            <td bgcolor="#FFFCD8">
-                    ''' % ( rootdir, cryptID, rootdir, cryptID ))
+                    ''' % ( reftext, reftext, rootdir, cryptID, rootdir, cryptID ))
                     
                     # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
                     # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
-            html.append('''<a href="%s/%s/tolerance_seqrank.png"><img src="%s/%s/tolerance_seqrank.png" alt="image file not available" width="400"></a><br>
+            html.append('''<a href="%s/%s/tolerance_seqrank.png"><img src="%s/%s/tolerance_seqrank.png" alt="image file not available" ></a><br>
                         </td>
                         </tr>
                         <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>

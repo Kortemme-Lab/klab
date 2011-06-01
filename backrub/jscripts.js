@@ -9,7 +9,7 @@ const numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/;
 const alphaExpression 		= /^[A-Za-z]+$/;
 const chainExpression 		= /^[A-Za-z]$/;
 const emptyExpression 		= /^\s*$/;
-const PDBExpression 		= /^[A-Za-z0-9]+$/;
+const PDBExpression 		= /^[@]?[A-Z_a-z0-9]+$/;
 const StoredPDBExpression 	= /^pdbs\/[A-Za-z0-9\/]+[^\.]+\.pdb$/i;
 const CysteineExpression 	= /^CYS$/i;
 const CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in mini Rosetta."
@@ -317,7 +317,7 @@ function ValidateForm()
 	    }
 		else if ( sbmtform.PDBID.value.length < 4 ) 
     	{
-    		sbmtform.PDBID.style.background="red";
+			sbmtform.PDBID.style.background="red";
     		ret = false;
     	}
     	else
