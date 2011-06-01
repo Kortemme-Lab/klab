@@ -9,10 +9,10 @@ const numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/;
 const alphaExpression 		= /^[A-Za-z]+$/;
 const chainExpression 		= /^[A-Za-z]$/;
 const emptyExpression 		= /^\s*$/;
-const PDBExpression 		= /^[@]?[A-Z_a-z0-9]+$/;
-const StoredPDBExpression 	= /^pdbs\/[A-Za-z0-9\/]+[^\.]+\.pdb$/i;
+const PDBExpression 		=   /^[@]?[-()\sA-Z_a-z0-9]+$/;
+const StoredPDBExpression 	= /^pdbs\/[-()\sA-Z_a-z0-9\/]+[^\.]+\.pdb$/i;
 const CysteineExpression 	= /^CYS$/i;
-const CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in mini Rosetta."
+const CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in Rosetta 3."
 
 /* Protocol variables */
 // Multiple Point Mutations

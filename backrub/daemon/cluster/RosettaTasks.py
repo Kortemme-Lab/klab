@@ -177,6 +177,9 @@ class BackrubSequenceToleranceSK(ClusterTask):
         self.pivot_res          = []   # list of pivot residues, consecutively numbered from 1 [1,...]
         self.map_res_id         = {}   # contains the mapping from (chain,resid) to pivot_res
         
+        if not parameters.get("binary") or not(parameters["binary"] == "seqtolJMB" or parameters["binary"] == "seqtolP1"):
+            raise
+                        
         super(BackrubSequenceToleranceSK, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
     
     def _initialize(self):
@@ -202,57 +205,85 @@ class BackrubSequenceToleranceSK(ClusterTask):
             "prefixes" : self.prefixes}
         ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = taskarrays)
         
-        #1MDY_mod_0001_low.pdb missing</error>
-        #<error>/netapp/home/klabqb3backrub/temp/tmpxStwRl_seqtolSK/sequence_tolerance/1MDY_mod_0001_last.pdb missing</error>
-        #<error>/netapp/home/klabqb3backrub/temp/tmpxStwRl_seqtolSK/sequence_tolerance/1MDY_mod_0002_low.pdb missing</error>
-        #<error>/netapp/home/klabqb3backrub/temp/tmpxStwRl_seqtolSK/sequence_tolerance/1MDY_mod_0002_last.pdb
-        
+
+        # See the backrub_seqtol.py file in the RosettaCon repository: RosettaCon2010/protocol_capture/protocol_capture/backrub_seqtol/scripts/backrub_seqtol.py        
+        if parameters["binary"] == "seqtolJMB":
+            #upgradetodo : diff standard_NO_HB_ENV_DEP.wts against the 33892 database and make sure the only difference is no HBN depth line [sp.]
+            diffOfStandardAndstandard_NO_HB_ENV_DEP.wtsIs='''
+15,18c15,18
+< dslf_ss_dst 1.0
+< dslf_cs_ang 1.0
+< dslf_ss_dih 1.0
+< dslf_ca_dih 1.0
+---
+> dslf_ss_dst 0.5
+> dslf_cs_ang 2
+> dslf_ss_dih 5
+> dslf_ca_dih 5
+19a20
+> NO_HB_ENV_DEP'''
+
+            no_hb_env_dep_weights_file = os.path.join(ct.getWorkingDir(), "standard_NO_HB_ENV_DEP.wts")
+            score_weights = no_hb_env_dep_weights_file
+            score_patch = ""
+            ref_offsets = "HIS 1.2"
+        elif parameters["binary"] == "seqtolP1":
+            score_weights = "standard"
+            score_patch = "score12"
+            ref_offsets = "HIS 1.2"
+            
         # Setup backrub
         backrubCommand = [
-                ct.getBinary("backrub"),  
-                "-database %s" % ct.getDatabaseDir(), 
-                "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
-                "-ignore_unrecognized_res", 
-                "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
-                "-extrachi_cutoff 0", 
-                 "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
-                "-out:prefix $broutprefixesvar"
-                ]
+            ct.getBinary("backrub"),  
+            "-database %s" % ct.getDatabaseDir(), 
+            "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
+            "-ignore_unrecognized_res", 
+            "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
+            "-extrachi_cutoff 0", 
+             "-backrub:ntrials %d" % parameters["ntrials"], 
+            "-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
+            "-out:prefix $broutprefixesvar",
+            "-score_weights", score_weights,
+            "-score:patch", score_patch
+            ]
         if self.movemap:
             backrubCommand.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
 
         backrubCommand = [
-            '# Run backrub', 
-            '', 
-            join(backrubCommand, " "), 
-            '', 
+            '# Run backrub', '', 
+            join(backrubCommand, " "), '', 
             'mv ${SGE_TASK_ID4}_%s_0001_low.pdb %s_${SGE_TASK_ID4}_low.pdb' % (parameters["pdbRootname"], parameters["pdbRootname"]),
-            'rm ${SGE_TASK_ID4}_%s_0001_last.pdb' % parameters["pdbRootname"],
-            ''] 
+            'rm ${SGE_TASK_ID4}_%s_0001_last.pdb' % parameters["pdbRootname"], ''] 
         
         # Setup sequence tolerance
-        seqtolCommand = ['# Run sequence tolerance', '',
-            join(
-                [ #"#disable",
-                 ct.getBinary("sequence_tolerance"),   
-                "-database %s" % ct.getDatabaseDir(), 
-                "-s $lowfilesvar",
-                "-ex1 -ex2 -extrachi_cutoff 0",
-                "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
-                "-ms:generations 5",
-                "-ms:pop_size %d" % parameters["pop_size"],
-                "-ms:pop_from_ss 1",
-                "-ms:checkpoint:prefix $prefixesvar",
-                "-ms:checkpoint:interval 200",
-                "-ms:checkpoint:gz",
-                "-ms:numresults", "0",
-                "-out:prefix $prefixesvar", 
-                "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
-                "-score:ref_offsets HIS 1.2"  
-                 ])]
+        seqtolCommand = [
+            ct.getBinary("sequence_tolerance"),   
+            "-database %s" % ct.getDatabaseDir(), 
+            "-s $lowfilesvar",
+            "-ex1 -ex2 -extrachi_cutoff 0",
+            "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
+            "-ms:generations 5",
+            "-ms:pop_size %d" % parameters["pop_size"],
+            "-ms:pop_from_ss 1",
+            "-ms:checkpoint:prefix $prefixesvar",
+            "-ms:checkpoint:interval 200",
+            "-ms:checkpoint:gz",
+            "-ms:numresults", "0",
+            "-out:prefix $prefixesvar", 
+            "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
+            "-score:ref_offsets HIS 1.2",
+            "-score_weights", score_weights,
+            "-score:patch", score_patch]
+
+        if ref_offsets:
+            seqtol_args.append("-score:ref_offsets %s" % ref_offsets)
+        
+        
+        seqtolCommand = [
+            '# Run sequence tolerance', '', 
+            join(seqtolCommand, " ")]        
+        
         self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
-        #upgradetodo : diff standard_NO_HB_ENV_DEP.wts against the 33892 database and maek sure the only difference is no HBN depth line [sp.]
         
     def _prepare_backrub( self ):
         """prepare data for a full backbone backrub run"""

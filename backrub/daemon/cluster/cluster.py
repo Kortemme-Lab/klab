@@ -22,7 +22,7 @@ import RosettaTasks
 from sge import SGEConnection, SGEXMLPrinter
 from Graph import JITGraph
 
-dlDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/clustertest"
+dlDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/clusterstandalone"
 
 if not os.path.exists(netappRoot):
     make755Directory(netappRoot)
@@ -92,6 +92,31 @@ if __name__ == "__main__":
         
         if test == "PSK":
             mini = "seqtolJMB"
+            ID = 1234
+            pdb_filename = "1MDY_mod.pdb"    
+            output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
+            pdb_info = output_handle.read()
+            output_handle.close()
+            nstruct = 2
+            
+            params = {
+                "cryptID"           : "cryptic",
+                "binary"            : mini,
+                "ID"                : ID,
+                "pdb_filename"      : pdb_filename,
+                "pdb_info"          : pdb_info,
+                "nstruct"           : nstruct,
+                "radius"            : 10,
+                "kT"                : 0.228,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"A" : {102 : "A"}},
+                "Designed"          : {"A" : [103, 104]}
+                }
+            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(sgec, params, netappRoot, cluster_temp, dlDirectory)
+        
+        if test == "PSKP1":
+            mini = "seqtolP1"
             ID = 1234
             pdb_filename = "1MDY_mod.pdb"    
             output_handle = open(os.path.join(inputDirectory, pdb_filename),'r')
