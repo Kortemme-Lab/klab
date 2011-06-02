@@ -15,11 +15,18 @@ import string
 import traceback
 from weblogolib import *
 
-for i in range(1, 10):
+#len(designed_res)
+            
+for i in range(1, 20):
     s = []
     for j in range(1, 101):
         s.append(">%d" % j)
         s.append("L" * i)
+    
+    widths = [83, 92, 91, 92, 92]
+    widthOfFive = sum(widths)
+    imagewidth = 367 + (int(float(i) / 5.0) * widthOfFive) + sum(widths[0:(i % 5)])
+    print("Creating logo with %d position(s) and image width %d." % (i, imagewidth))
     
     fastafile = "tolerance_sequences%d.fasta" % i
     motiffile = "tolerance_motif%d.png" % i

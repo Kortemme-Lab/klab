@@ -538,12 +538,16 @@ class RosettaHTML(object):
             
     def submitted(self, jobname, cryptID, remark, warnings):
       
-      if remark == 'new':
-        #upgradetodo: check this link on webserver todo Setup and add https:// onto albana 
+      if remark == 'new':        
+        # todo: hack to get around albana not using https
+        httptype = "https"
+        if split(self.server_url, ".")[0] == 'albana':
+            httptype = "http"
+        
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
-                    Raw data files:<br><a class="blacklink" href="%s%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
-                    </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
+                    Raw data files:<br><a class="blacklink" href="%s%s?query=datadir&job=%s" target="_blank">%s://%s%s?query=datadir&job=%s</a>
+                    </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, httptype, self.server_url, self.script_filename, cryptID )
 #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
       elif remark == 'old':
@@ -1936,8 +1940,16 @@ class RosettaHTML(object):
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
             #@upgradetodo: change image size based on table size do not resize if width < 400
-            #upgradetodo: Weblogo 3.0 font size
             #upgradetodo: get doi from Colin
+            
+            # This seems to be the pattern in which the weblogo image grows based on our settings
+            # e.g. 1 residue  => 367 + 0 + 83 = 450 pixels wide
+            #      7 residues => 367 + 1*(83+92+91+92+92) + (83 + 92) = 992 pixels wide
+            numDesignedResidues = len(designed_res)
+            widths = [83, 92, 91, 92, 92]
+            widthOfFive = sum(widths)
+            WeblogoImageWidth = 367 + (int(float(numDesignedResidues) / 5.0) * widthOfFive) + sum(widths[0:(numDesignedResidues % 5)])
+                       
             refIDs = self.refs.getReferences()
             reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
             
