@@ -151,8 +151,11 @@ echo "</enddate>"
     def getBinary(self, binname):
         return "%s/%s_%s_static" % (self.bindir, binname, self.revision)
     
+    def getBinaryDir(self):
+        return self.bindir
+
     def getDatabaseDir(self):
-        return "%s/rosetta_database/" % self.bindir
+        return os.path.join(self.bindir, "rosetta_database")
     
     def getWorkingDir(self):
         return self.workingdir

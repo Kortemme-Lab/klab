@@ -154,7 +154,12 @@ class SGEConnection(object):
         command.append('%s' % command_filename)
         
         # Submit the job and capture output.
-        subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
+        try:
+            subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
+        except Exception, e:
+            print('<sge message="Failed running qsub command: %s in cwd %s"/>' % (command, workingdir))
+            raise
+        
         waitfor = 0
         errorcode = subp.wait()
         file_stdout.close()

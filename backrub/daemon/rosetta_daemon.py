@@ -1335,7 +1335,7 @@ class ClusterDaemon(RosettaDaemon):
         self.exec_cmd('find . -size 0 -exec rm {} \";\"', result_dir)
         
         # store all files also in a zip file, to make it easier accessible
-        if False and task == 'sequence_tolerance': #upgradetodo fix
+        if False and task == 'sequence_tolerance': #postupgradetodo fix
             flist = []
             flist.append()
             flist.append("minimization/*.resfile backrub/*.resfile sequence_tolerance/*.pdb")

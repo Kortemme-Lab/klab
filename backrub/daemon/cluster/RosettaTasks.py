@@ -208,22 +208,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
 
         # See the backrub_seqtol.py file in the RosettaCon repository: RosettaCon2010/protocol_capture/protocol_capture/backrub_seqtol/scripts/backrub_seqtol.py        
         if parameters["binary"] == "seqtolJMB":
-            #upgradetodo : diff standard_NO_HB_ENV_DEP.wts against the 33892 database and make sure the only difference is no HBN depth line [sp.]
-            diffOfStandardAndstandard_NO_HB_ENV_DEP.wtsIs='''
-15,18c15,18
-< dslf_ss_dst 1.0
-< dslf_cs_ang 1.0
-< dslf_ss_dih 1.0
-< dslf_ca_dih 1.0
----
-> dslf_ss_dst 0.5
-> dslf_cs_ang 2
-> dslf_ss_dih 5
-> dslf_ca_dih 5
-19a20
-> NO_HB_ENV_DEP'''
-
-            no_hb_env_dep_weights_file = os.path.join(ct.getWorkingDir(), "standard_NO_HB_ENV_DEP.wts")
+            no_hb_env_dep_weights_file = os.path.join(ct.getBinaryDir(), "standard_NO_HB_ENV_DEP.wts")
             score_weights = no_hb_env_dep_weights_file
             score_patch = ""
             ref_offsets = "HIS 1.2"
@@ -238,12 +223,12 @@ class BackrubSequenceToleranceSK(ClusterTask):
             "-database %s" % ct.getDatabaseDir(), 
             "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
             "-ignore_unrecognized_res", 
-            "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
+            "-ex1 -ex2",  
             "-extrachi_cutoff 0", 
              "-backrub:ntrials %d" % parameters["ntrials"], 
             "-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
             "-out:prefix $broutprefixesvar",
-            "-score_weights", score_weights,
+            "-score:weights", score_weights,
             "-score:patch", score_patch
             ]
         if self.movemap:
@@ -272,11 +257,11 @@ class BackrubSequenceToleranceSK(ClusterTask):
             "-out:prefix $prefixesvar", 
             "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
             "-score:ref_offsets HIS 1.2",
-            "-score_weights", score_weights,
+            "-score:weights", score_weights,
             "-score:patch", score_patch]
 
         if ref_offsets:
-            seqtol_args.append("-score:ref_offsets %s" % ref_offsets)
+            seqtolCommand.append("-score:ref_offsets %s" % ref_offsets)
         
         
         seqtolCommand = [
@@ -334,7 +319,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
         return passed
     
     
-#@upgradetodo Remove this class
+#@finalupgradetodo Remove this class
 class BackrubClusterSKTask(ClusterTask):
 
     # additional attributes
@@ -362,10 +347,10 @@ class BackrubClusterSKTask(ClusterTask):
                 "-database %s" % ct.getDatabaseDir(), 
                 "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
                 "-ignore_unrecognized_res", 
-                "-ex1 -ex2", #@upgradetodo: ask about score patch and mute options, perturb movemap 
+                "-ex1 -ex2", 
                 "-nstruct %d" % parameters["nstruct"],
                 "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-pivot_atoms CA"] #@upgradetodo: ask why I'm using this
+                "-pivot_atoms CA"] 
         if self.movemap:
             args.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
         if self.resfile:
@@ -438,7 +423,7 @@ class BackrubClusterSKTask(ClusterTask):
         return passed
         
             
-#@upgradetodo Remove this class
+#@finalupgradetodo Remove this class
 class SequenceToleranceClusterTask(ClusterTask):
            
     prefix = "seqtol"
@@ -474,9 +459,9 @@ class SequenceToleranceClusterTask(ClusterTask):
                 "-ms:checkpoint:interval 200",
                 "-ms:checkpoint:gz",
                 "-ms:numresults", "0",
-                "-out:prefix $prefixesvar", # @upgradetodo: ask about the score:weights and score:patch options in backrub_seqtol.py 
+                "-out:prefix $prefixesvar", 
                 "-packing:resfile %s/%s" % (self.workingdir, self.resfile),
-                "-score:ref_offsets TRP 0.9"  # @upgradetodo: Ask Colin: this is HIS 1.2 in backrub_seqtol.py
+                "-score:ref_offsets TRP 0.9" 
                  ])]
         self.script = ct.createScript(commandlines, type="SequenceTolerance")
 
@@ -1896,7 +1881,16 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         inputfiles = [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap, self.seqtol_resfile]
         taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
         targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
-        stTask = BackrubSequenceToleranceSK(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name="Sequence tolerance (SK JMB)")
+        
+        if self.parameters["binary"] == "seqtolJMB":
+            jobname = "Sequence tolerance (SK JMB)"
+        elif self.parameters["binary"] == "seqtolP1":
+            jobname = "Sequence tolerance (SK PLoS One)"
+        else:
+            self._status('Unrecognised binary passed as parameter to cluster job: %s' % self.parameters["binary"])
+            raise
+        
+        stTask = BackrubSequenceToleranceSK(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name=jobname)
          
         scheduler.addInitialTasks(stTask)
         self.scheduler = scheduler
@@ -1978,6 +1972,18 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
             logo_options.color_scheme = std_color_schemes["chemistry"]
             ann = getResIDs(self.parameters)
             logo_options.annotate = ann
+            
+            # Change the logo size of the X-axis for readability
+            logo_options.number_fontsize = 3.5
+            
+            # Change the logo size of the Weblogo 'fineprint' - the default Weblogo text
+            logo_options.small_fontsize = 4
+            
+            # Move the Weblogo fineprint to the left hand side for readability
+            fineprinttabs = "\t" * (int(2.7 * float(len(ann))))
+            logo_options.fineprint = "%s\t%s" % (logo_options.fineprint, fineprinttabs)
+
+
             logo_format = LogoFormat(logo_data, logo_options)
             png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
         except Exception, e:

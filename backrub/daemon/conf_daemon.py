@@ -8,7 +8,7 @@ import sys
 import os
 from rosettahelper import server_root
 
-#@upgradetodo Change this to False for the live webserver
+#@finalupgradetodo Change this to False for the live webserver
 # Cluster debug mode. Sets jobs to use short iterations for quick testing
 CLUSTER_debugmode = True
 

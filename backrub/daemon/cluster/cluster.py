@@ -61,7 +61,7 @@ def printStatus(sgec, statusprinter, diffcounter):
     return diffcounter
     
 if __name__ == "__main__":
-    test = "PSK"
+    test = "PSKP1"
     sgec = SGEConnection()
     try:
         clusterjob = None
@@ -282,6 +282,7 @@ if __name__ == "__main__":
                 if clusterjob:
                     # This should delete the working and target directories so comment this line out for testing
                     clusterjob.kill()
+                    pass
                 print("Killed jobs")    
             
             print("<profile>")

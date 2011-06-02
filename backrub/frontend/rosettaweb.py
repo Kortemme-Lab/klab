@@ -1211,7 +1211,7 @@ def queue(form, userid):
     if thisserver == 'albana':
         # Get all jobs on kortemmelab from albana which have not expired
         KlabDBConnection = getKlabDBConnection()
-        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver #upgradetodo add Expired when klab db updated
+        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver 
         kresult = KlabDBConnection.execQuery(sql)
     
         for line in kresult:
@@ -1817,7 +1817,7 @@ class FrontendProtocols(WebserverProtocols):
 try:
     ws()
 except Exception, e:
-    #@upgradetodo
+    #@finalupgradetodo
     print(e)
     print("<br>")
     print(str(traceback.print_exc()).replace("\n", "<br>"))
