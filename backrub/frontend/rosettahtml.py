@@ -1939,17 +1939,9 @@ class RosettaHTML(object):
              
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
-            #@upgradetodo: change image size based on table size do not resize if width < 400
             #upgradetodo: get doi from Colin
+            #@postupgradetodo: change image size based on table size - need more input data and then I can use the code below for the Weblogo
             
-            # This seems to be the pattern in which the weblogo image grows based on our settings
-            # e.g. 1 residue  => 367 + 0 + 83 = 450 pixels wide
-            #      7 residues => 367 + 1*(83+92+91+92+92) + (83 + 92) = 992 pixels wide
-            numDesignedResidues = len(designed_res)
-            widths = [83, 92, 91, 92, 92]
-            widthOfFive = sum(widths)
-            WeblogoImageWidth = 367 + (int(float(numDesignedResidues) / 5.0) * widthOfFive) + sum(widths[0:(numDesignedResidues % 5)])
-                       
             refIDs = self.refs.getReferences()
             reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
             
@@ -1983,13 +1975,26 @@ class RosettaHTML(object):
               html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( rootdir, cryptID, chain, resid, rootdir, cryptID, chain, resid ))
                             
-            
-            #todo: I arbitrarily chose the image size below.
+            # This seems to be the pattern in which the weblogo image grows based on our settings
+            # e.g. 1 residue  => 367 + 0 + 83 = 450 pixels wide
+            #      7 residues => 367 + 1*(83+92+91+92+92) + (83 + 92) = 992 pixels wide
+            # The height is always 592 pixels.
+            #
+            # We scale vertically by 0.5 (296 pixels) and horizontally by 0.5 when numDesignedResidues does not exceed 7,
+            # For larger values of numDesignedResidues we fix the width at 500 so the table size does not expand.
+            numDesignedResidues = len(designed_res)
+            widths = [83, 92, 91, 92, 92]
+            widthOfFive = sum(widths)
+            WeblogoImageWidth = 367 + (int(float(numDesignedResidues) / 5.0) * widthOfFive) + sum(widths[0:(numDesignedResidues % 5)])
+            halfWidth = int(WeblogoImageWidth / 2)
+            if i > 7:
+                    halfWidth = 500
+                
             WebLogoText = self.WebLogoText
             html.append('''</td></tr>
                         <tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="%(rootdir)s/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
                              <td align="center" bgcolor="#FFFCD8"><a href="%(rootdir)s/%(cryptID)s/tolerance_motif.png">
-                                                   <img height="250" src="%(rootdir)s/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
+                                                   <img width="%(halfWidth)d" height="296" src="%(rootdir)s/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
                              %(WebLogoText)s
                              </td></tr> ''' % vars())
 
