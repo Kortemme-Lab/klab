@@ -30,6 +30,7 @@ http://albana.ucsf.edu/backrub/cgi-bin/rosettaweb.py?query=index
 - Check the page loaded okay with the correct default binary
 - Check the correct reference is loaded
 - submit a:
+
 -- demo run
 --- Click on Load sample data
 --- Click Reset form
@@ -38,9 +39,19 @@ http://albana.ucsf.edu/backrub/cgi-bin/rosettaweb.py?query=index
 --- Click Check form
 --- Change the number of structures to be low
 --- Click on submit
+
+-- Test
 --- Click on Load sample data
 --- Click Reset form
---- Click on Submit 
+--- Click on Submit
+
+-- Test
+--- Click on Load sample data
+--- Change a residue to a non-existing number e.g. 9999 
+--- Click on Submit
+--- The error message should make sense
+
+
 -- actual run (see example parameters below)
 
 Having submitted a demo job and another job for each protocol, go back to the...

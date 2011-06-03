@@ -30,6 +30,8 @@ class RosettaHTML(object):
         super(RosettaHTML, self).__init__()
         
         self.server_url      = server_url
+        self.server_shortname= split(server_url, ".")[0]
+        
         self.server_title    = server_title
         self.script_filename = script_filename
         self.contact_name    = contact_name
@@ -182,11 +184,18 @@ class RosettaHTML(object):
         else:
             JSCommand = 'HREF="javascript:history.go(-1)"'   
         
+        if self.server_shortname == 'albana':
+            prunederrors = []
+            for error in errors:
+                if not error.startswith("[Admin]"):
+                    prunederrors.append(error)
+            errors = prunederrors
+        
         if errors:
             errors = '''<div align="center" style="width:300pt; background:lightgrey; margin:15pt; padding:15px; border-color:black; border-style:solid; border-width:2px;">
-                          Your job could not be submitted:<br><font style="color:red;"><b>%s</b></font><br>
-                          <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_submission" target="_blank">More Information</a>. <a %s>Return</a> to the form. 
-                       </div>''' % (join(errors, '<br>'), JSCommand)           
+                      Your job could not be submitted:<br><font style="color:red;"><b>%s</b></font><br>
+                      <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_submission" target="_blank">More Information</a>. <a %s>Return</a> to the form. 
+                   </div>''' % (join(errors, '<br>'), JSCommand)           
         else:
             errors = ''
              
@@ -541,7 +550,8 @@ class RosettaHTML(object):
       if remark == 'new':        
         # todo: hack to get around albana not using https
         httptype = "https"
-        if split(self.server_url, ".")[0] == 'albana':
+        
+        if self.server_shortname == 'albana':
             httptype = "http"
         
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">

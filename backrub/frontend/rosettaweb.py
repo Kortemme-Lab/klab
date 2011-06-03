@@ -1044,7 +1044,7 @@ def submit(rosettaHTML, form, SID):
                 if protocol.dbname == modus:
                     ProtocolParameters = protocol.StoreFunction(form, pdb_object)
                     if not ProtocolParameters:
-                        errors.append("Server error: The store procedure for the protocol %s failed." % modus)
+                        errors.append("[Admin] Server error: The store procedure for the protocol %s failed." % modus)
                         return False   
             
             # todo: output where the time is going on Albana
