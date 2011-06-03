@@ -88,8 +88,8 @@ class RosettaDataDir(RosettaHTML):
         inputpdb = os.path.join(jobdatadir, pdb_filename)
         inputresfile = os.path.join(jobdatadir, "input.resfile")
         scorefile = os.path.join(jobdatadir, "score.sc")
-        overall_scores = os.path.join(jobdatadir, scores_overall.txt)
-        detailed_scores = os.path.join(jobdatadir, scores_detailed.txt)
+        overall_scores = os.path.join(jobdatadir, "scores_overall.txt")
+        detailed_scores = os.path.join(jobdatadir, "scores_detailed.txt")
         
         individual_scores = ''
         if usingMini:
@@ -246,13 +246,16 @@ class RosettaDataDir(RosettaHTML):
         jobdatadir = os.path.join(self.ddir, cryptID)
         self.jobid = jobid
         if binary == "seqtolJMB":
-          self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction (Rosetta 3)</h1>' % jobid
-          self.html_refs = '<P>%(SmithKortemme:2010)s</P>' % self.refs
+            self.header = '<h1 align="center">Job %s - Generalized Sequence Tolerance Protocol (JMB 2010)</h1>' % jobid
+            self.html_refs = '<P>%(SmithKortemme:2010)s</P>' % self.refs
+        elif binary == "seqtolP1":
+            self.header = '<h1 align="center">Job %s - Generalized Sequence Tolerance Protocol (PLoS ONE 2011)</h1>' % jobid
+            self.html_refs = '<P>%(SmithKortemme:2011)s</P>' % self.refs
         else:
-          self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction</h1>' % jobid
-          self.html_refs = '<P>%(HumphrisKortemme:2008)s</P>' % self.refs
-          self.content = '<p>The logic to create dat../downloadsa directory is missing.</p>'
-          return
+            self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction</h1>' % jobid
+            self.html_refs = '<P>Error: Reference missing</P>' % self.refs
+            self.content = '<p>The logic to create the data directory is missing.</p>'
+            return
       
         # individual boxplots
         list_files = os.listdir( self.download_dir+'/'+cryptID )
@@ -307,7 +310,7 @@ class RosettaDataDir(RosettaHTML):
     def _showLegalInfo(self):
         html = """<td style="border:1px solid black; padding:10px" bgcolor="#FFFFE0">
                     <p style="text-align:left; font-size: 10pt">
-                      For questions, please read our <A href="../wiki/">documentation</A>, see the reference below, or contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.
+                      For questions, please read our <A href="https://kortemmelab.ucsf.edu/backrub/wiki">documentation</A>, see the reference below, or contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.
                     </p>
                     <p>
                       If you are using these data please cite:                  

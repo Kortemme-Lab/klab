@@ -1438,10 +1438,28 @@ function allWhite()
 
 function reset_form ()
 {
+	// Remember the binary selection
+	// This avoids problems when a user loads sample data then resets the form then loads sample data again
+	selectedMini = -1
+	Mini = document.submitform.Mini;
+	for (var i = 0 ; i < Mini.length ; i++)
+	{
+		if (Mini[i].checked)
+		{
+			selectedMini = i
+		}
+	}
+
 	document.submitform.reset();
 	allWhite();
 	chainsChanged();
 	reset_seqtolSKData();
+	
+	// Re-enter binary selection
+	if (selectedMini >= 0)
+	{
+		Mini[selectedMini].checked = true
+	}
 }
 
 /************************************

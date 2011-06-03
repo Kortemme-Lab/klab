@@ -10,7 +10,7 @@
 import sys, os
 import cgi
 import cgitb; cgitb.enable()
-from string import join
+from string import join, split
 from string import find
 import pickle
 import gzip
@@ -85,7 +85,7 @@ class RosettaHTML(object):
                         }
         self.WebLogoText = '''
             <small>Crooks GE, Hon G, Chandonia JM, Brenner SE,                                           
-            <a href="Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>,                                           
+            <a href="http://weblogo.berkeley.edu/Crooks-2004-GR-WebLogo.pdf"><small>WebLogo: A sequence <br>logo generator</small></a>,                                           
             <em>Genome Research</em>, 14:1188-1190, (2004)</small>
             [<a href="http://weblogo.berkeley.edu/"><small>website</small></a>]'''
     
@@ -478,7 +478,7 @@ class RosettaHTML(object):
                 
                 # Hack to show a warning to avoid crashes of point mutation with classic
                 if i == 0:
-                    html.append('''<br><br><span><sup>*</sup>For details, see <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Rosetta.2B-.2B-_specific_PDB_errors_on_upload" target="_blank">documentation</a>.</span>''')
+                    html.append('''<br><br><span><sup>*</sup>For details, see <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_submission" target="_blank">documentation</a>.</span>''')
 
                 html.append('</p>')
 
@@ -860,7 +860,7 @@ class RosettaHTML(object):
         if runOnCluster:    
             html.append('''
 <tr>
-    <td align="left" bgcolor="#FFFCD8">Job progress</td>
+    <td align="left" bgcolor="#FFFCD8"><p>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
     <td>
         <table>
             <tr style="height:400px;">   
@@ -954,7 +954,7 @@ class RosettaHTML(object):
             html += '<tr><td align=right bgcolor="#B7FFE0"><b>Results</b>:</td><td bgcolor="#B7FFE0">'
             if os.path.exists( '%s/%s/' % (rootdir, cryptID) ): # I could also remove this since rosettadatadir.py is taking care of this
                 if status == 'error':
-                    html += 'Please follow <a href=%s/%s/">this link</a> to see which files were created.' % (rootdir, cryptID)
+                    html += 'Please follow <a href="%s/%s/">this link</a> to see which files were created.' % (rootdir, cryptID)
                 else:
                     html += '''<A href="%s?query=datadir%s&amp;job=%s"><b>View</b></A> individual files.
                                 <A href="%s/%s/data_%s.zip"><b>Download</b></A> all results (zip).''' % ( self.script_filename, localstr, cryptID, rootdir, cryptID, jobnumber )
@@ -1131,7 +1131,7 @@ class RosettaHTML(object):
         refIDs = self.refs.getReferences()        
         html = []
         html.append("""<td align="center">
-                  <H1 class="title">Welcome to RosettaBackrub</A> </H1> 
+                  <H1 class="title">Welcome to RosettaBackrub</H1> 
                     <P>
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
                     The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al.<a href="#refDavisEtAl:2006"><sup id="ref">%(DavisEtAl:2006)d</sup></a>, 
@@ -1143,13 +1143,13 @@ class RosettaHTML(object):
                     near-native structural ensembles of protein backbone conformations<a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d</sup></a> 
                     and designed sequences using flexible backbone computational protein design<a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>.</P>-->
 
-                    <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) in PDB format uploaded by the user or obtained directly from the PDB plus some application-specific parameters. The server <b>output</b> is dependent on the application: 
-                    <ul align="justify">
+                    <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) in PDB format uploaded by the user or obtained directly from the PDB plus some application-specific parameters. The server <b>output</b> is dependent on the application:</P> 
+                    <ul style = "text-align:justify;">
                     <li><b>Point mutation</b><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d</sup></a>: generates modeled structures and Rosetta scores for single and multiple point mutants in monomeric proteins;
                     <li style="margin-top:.5em; margin-bottom:.5em;"><b>Backbone ensemble</b><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d</sup></a>: creates near-native structural ensembles of protein backbone conformations (for monomeric proteins) and sequences consistent with those ensembles;
-                    <li><b>Sequence tolerance</b><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">,%(HumphrisKortemme:2008)d</sup></a>: predicts sequences tolerated for proteins and protein-protein interfaces using flexible backbone design methods.  Example applications are the generation of sequence libraries for experimental screening and prediction of protein or peptide interaction specificity.</P>
+                    <li><b>Sequence tolerance</b><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a><a href="#refSmithKortemme:2011"><sup id="ref">,%(SmithKortemme:2011)d</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">,%(HumphrisKortemme:2008)d</sup></a>: predicts sequences tolerated for proteins and protein-protein interfaces using flexible backbone design methods.  Example applications are the generation of sequence libraries for experimental screening and prediction of protein or peptide interaction specificity.
                     </ul>
-
+                    
                     <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">documentation</a> and the references below.
             Please also check for <a href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">current announcements</a>. 
                     </P>""" % refIDs)
@@ -1311,7 +1311,7 @@ class RosettaHTML(object):
      
         return html, ""
     
-    def resultsPointMutation(self, status, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showPointMutation(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
     
         chain = ProtocolParameters["Mutations"][0][0]
         resid = ProtocolParameters["Mutations"][0][1]
@@ -1378,7 +1378,7 @@ class RosettaHTML(object):
         return html, ""
     
     
-    def resultsMultiplePointMutations(self, status, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showMultiplePointMutations(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
     
         list_chains = []
         list_resids = []

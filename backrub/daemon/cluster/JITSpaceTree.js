@@ -1,4 +1,5 @@
-// Copyright (c) 2010, Nicolas Garcia Belmonte. This code has been modified by Shane O'Connor.
+// Copyright (c) 2010, Nicolas Garcia Belmonte. 
+// This code has been modified from the JIT examples for use on the RosettaBackrub server by Shane O'Connor.
 
 /*
   Copyright (c) 2010, Nicolas Garcia Belmonte

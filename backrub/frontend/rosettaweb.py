@@ -725,7 +725,7 @@ def register(form, SID):
     return (True, 'updated')
   else:
     process_data = False
-    
+    return (False, )
   if process_data:
     # transmit values to database
     # check whether each parameter has a value and if so append it to the database string
@@ -1107,7 +1107,7 @@ def submit(rosettaHTML, form, SID):
                     result = StorageDBConnection.execQuery(sql)
                     # print sql, result
                     for r in result:
-                        if str(r[0]) != str(ID): # if there is a OTHER FINISHED simulation with the same hash
+                        if str(r[0]) != str(ID): # if there is ANOTHER, FINISHED simulation with the same hash
                             shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
                             result = StorageDBConnection.execQuery(sql)
@@ -1686,7 +1686,7 @@ class FrontendProtocols(WebserverProtocols):
         for p in protocols:
             if p.dbname == "point_mutation":
                 p.setSubmitFunction(rosettaHTML.submitformPointMutation)
-                p.setShowResultsFunction(rosettaHTML.resultsPointMutation)
+                p.setShowResultsFunction(rosettaHTML.showPointMutation)
                 p.setStoreFunction(storePointMutation)
                 p.setDataDirFunction(rosettaDD.PointMutation)
                 p.setReferences("SmithKortemme:2008")
@@ -1700,7 +1700,7 @@ class FrontendProtocols(WebserverProtocols):
                         
             elif p.dbname == "multiple_mutation":
                 p.setSubmitFunction(rosettaHTML.submitformMultiplePointMutations)
-                p.setShowResultsFunction(rosettaHTML.resultsMultiplePointMutations)
+                p.setShowResultsFunction(rosettaHTML.showMultiplePointMutations)
                 p.setStoreFunction(storeMultiplePointMutations)
                 p.setDataDirFunction(rosettaDD.MultiplePointMutations)
                 p.setReferences("SmithKortemme:2008")

@@ -198,8 +198,8 @@ RosettaBinaries = {
                     "clusterrev": "r33982"
                  },
     "seqtolP1"  :{  # This is the revision used in the paper. 
-                    "name"      : "PLoS One 2011 (generalized)",
-                    "queuename" : "PLoS One 2011",
+                    "name"      : "PLoS ONE 2011 (generalized)",
+                    "queuename" : "PLoS ONE 2011",
                     "revision"  : 39284, 
                     "mini"      : True,
                     "runOnCluster" : True,
@@ -259,7 +259,7 @@ class WebserverProtocols(object):
         
         proto = RosettaProtocol("Generalized Protocol (Fold / Interface) Sequence Tolerance", "sequence_tolerance_SK")
         proto.setBinaries("seqtolJMB", "seqtolP1") 
-        proto.setNumStructures(2,20,100)    #todo: min should be 10 but I've allowed 2 for testing
+        proto.setNumStructures(2,20,100)    #upgradetodo: min should be 10 but I've allowed 2 for testing
         protocolGroups[2].add(proto)
         
         # A flat list of the protocols 
