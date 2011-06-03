@@ -1140,13 +1140,13 @@ class ClusterDaemon(RosettaDaemon):
             clusterjob.dumpJITGraph()
             try:
                 if clusterjob.isCompleted():
-                    clusterjob.dumpJITGraph()
                     completedJobs.append(clusterjob)               
 
                     clusterjob.analyze()
                     clusterjob.saveProfile()
                     
                     self.end_job(clusterjob)
+                    clusterjob.dumpJITGraph()
                     
                     print("<profile>")
                     print(clusterjob.getprofileXML())
