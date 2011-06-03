@@ -173,7 +173,7 @@ RosettaBinaries = {
                  },
     "ensemble"  :{  # based solely on the date, roughly between revisions 22709 - 22736
                     "name"      : "Rosetta++, as published", #  2.30
-                    "queuename" : "Rosetta",
+                    "queuename" : "Rosetta++",
                     "revision"  : 22736, 
                     "mini"      : False,
                     "runOnCluster"      : False,
@@ -240,7 +240,7 @@ class WebserverProtocols(object):
         
         protocolGroups.append(RosettaProtocolGroup("Backrub Ensemble", "#B7FFE0"))
         
-        proto = RosettaProtocol("Backrub Conformational Ensemble", "no_mutation")
+        proto = RosettaProtocol("Backrub Ensemble", "no_mutation")
         proto.setBinaries("classic", "mini")
         proto.setNumStructures(2,10,50)
         protocolGroups[1].add(proto)

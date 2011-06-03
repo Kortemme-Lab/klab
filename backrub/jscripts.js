@@ -698,6 +698,7 @@ function validateSeqtolSK()
     	ret = validateElem(sbmtform.seqtol_SK_Boltzmann, numericExpression) && ret;
 	}
 	
+	
 	var validResidues = getValidResidues();
 	var validPremutations = validResidues["premutated"]
 	var validDesigned = validResidues["designed"]
@@ -730,7 +731,7 @@ function validateSeqtolSK()
 		markError(elems['seqtol_SK_mut_r_0']);
 		ret = false;
 	}
-            
+	    
     // Highlight any missing weights
     for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
     {
@@ -743,6 +744,7 @@ function validateSeqtolSK()
         	}	
         }
     }
+    
     return ret;
 }
 

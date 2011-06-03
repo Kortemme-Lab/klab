@@ -1057,10 +1057,12 @@ def submit(rosettaHTML, form, SID):
                 # Cluster jobs are stored in the kortemmelab database
                 # That database will not have access to fields in the local one e.g. different set of UserIDs messes up the UserNames, Email fields            
                 RemoteInformation = {}    
-                StorageDBConnection = DBConnection            
+                StorageDBConnection = DBConnection
+                localJob = True            
                 if ROSETTAWEB_short_server_name != "kortemmelab" and RosettaBinaries[mini]["runOnCluster"]:
                    RemoteInformation = {"UserName": UserName, "Email": Email}
                    StorageDBConnection = getKlabDBConnection()
+                   localJob = False
                 RemoteInformation = pickle.dumps(RemoteInformation)
                    
                 # if we're good to go, create new job
@@ -1108,7 +1110,10 @@ def submit(rosettaHTML, form, SID):
                     # print sql, result
                     for r in result:
                         if str(r[0]) != str(ID): # if there is ANOTHER, FINISHED simulation with the same hash
-                            shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
+                            if localJob:
+                                shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
+                            else:
+                                shutil.copytree(os.path.join(ROSETTAWEB_remote_download_dir, r[1]), os.path.join(ROSETTAWEB_remote_download_dir, cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
                             result = StorageDBConnection.execQuery(sql)
                             return_vals = (cryptID, "old")

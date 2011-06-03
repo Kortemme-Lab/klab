@@ -165,20 +165,20 @@ class RosettaDataDir(RosettaHTML):
         CaDistDifferenceBfactors    = os.path.join(jobdatadir, bfactors)
         EnsemblePDB                 = os.path.join(jobdatadir, ensemble_pdb)
         OutputFiles = [
-            ("Core residues",                           "core.txt")
-            ("Amino Acid Frequency of core residues",   "seq_pop_core.txt")
-            ("Designed sequences of core residues",     "designs_core.fasta")
-            ("Sequence profile of core residues",       "logo_core.png")
-            ("Amino acid frequencies of all residues",  "seq_pop.txt")
-            ("Designed sequences of all residues",      "designs.fasta")
-            ("Sequence profile of all residues",        "logo.png")
-            ("C&alpha; atom distance matrix",           "ca_dist_difference_matrix.dat")
-            ("C&alpha; atom distance matrix",           "ca_dist_difference_1D_plot.png")
+            ("Core residues",                           "core.txt"),
+            ("Amino Acid Frequency of core residues",   "seq_pop_core.txt"),
+            ("Designed sequences of core residues",     "designs_core.fasta"),
+            ("Sequence profile of core residues",       "logo_core.png"),
+            ("Amino acid frequencies of all residues",  "seq_pop.txt"),
+            ("Designed sequences of all residues",      "designs.fasta"),
+            ("Sequence profile of all residues",        "logo.png"),
+            ("C&alpha; atom distance matrix",           "ca_dist_difference_matrix.dat"),
+            ("C&alpha; atom distance matrix",           "ca_dist_difference_1D_plot.png"),
             ("C&alpha; atom distance matrix",           "ca_dist_difference_2D_plot.png")
         ]
         
         html = ['''\n<p>Input files:<ul><li>Input PDB file: <a href="%(InputPDB)s">%(pdb_filename)s</a></li></ul></p>
-                          \nOutput files:<ul>''']
+                          \nOutput files:<ul>''' % vars()]
 
         for outputfile in OutputFiles:
             html.append('<li>%s: <a href="%s">%s</a></li>' % (outputfile[0], os.path.join(jobdatadir, outputfile[1]), outputfile[1]))

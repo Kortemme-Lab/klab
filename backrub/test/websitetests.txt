@@ -1,0 +1,72 @@
+Todo:
+Fix citation for SK:2011.
+Test link on main page.
+Update tutorial
+
+The following are tests to run on the website UI:
+
+* Main Page *
+http://albana.ucsf.edu/backrub/cgi-bin/rosettaweb.py?query=index
+
+- Make sure the page looks okay.
+- Check references
+- Check reference links
+- Check all links work
+- Log in as guest and go to the...
+
+* Guest welcome page *
+- Test all links work and go to the...
+
+* Queue *
+- Make sure the page looks okay
+- Line up some jobs by going to the...
+
+* Submission page *
+- On the main page, check all links, text, and tooltips
+- Click on each protocol group heading and check pages look okay.
+- Next on to...
+
+* Protocol-specific submission page (repeat for each protocol) *
+- Check the page loaded okay with the correct default binary
+- Check the correct reference is loaded
+- submit a:
+-- demo run
+--- Click on Load sample data
+--- Click Reset form
+--- Click on Load sample data
+--- Click on Load sample data again
+--- Click Check form
+--- Change the number of structures to be low
+--- Click on submit
+--- Click on Load sample data
+--- Click Reset form
+--- Click on Submit 
+-- actual run (see example parameters below)
+
+Having submitted a demo job and another job for each protocol, go back to the...
+
+* Queue *
+- Click on jobs of all types (and on Albana, on some remote jobs) and go to the...
+
+* Job Info page (repeat for each protocol) *
+- Make sure the page looks okay
+- Check all links
+- If there is an error:
+-- Click on the hyperlink after Error.
+-- Click on "Please follow this link to see which files were created." 
+- Else:
+-- Check the JMOL model.
+-- Check the links and images.
+-- Click on "Download all results (zip)". 
+-- Click on "View individual files" to see the...
+
+* Data Directory page (repeat for each protocol) *
+- Make sure the page looks okay
+- Check to make sure the correct references are shown
+- Check all links
+
+* Registration *
+- Make sure you can register a new user
+- Log in as that user
+- Log out
+- Request forgotten password

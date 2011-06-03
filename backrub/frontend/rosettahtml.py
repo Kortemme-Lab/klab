@@ -390,7 +390,7 @@ class RosettaHTML(object):
               <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR>
                 <TD align=right>4-digit PDB identifier <img src="../images/qm_s.png" title="%(tt_PDBID)s"></TD>
-                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="4" onkeydown="if (event.keyCode == 13 && document.submitform.PDBID.value.length == 4){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
+                <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="15" onkeydown="if (event.keyCode == 13 && document.submitform.PDBID.value.length == 4){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
                 <span><input type="button" value="Load PDB" onClick="if (document.submitform.PDBID.value.length == 4) {document.submitform.query.value = 'parsePDB'; document.submitform.submit();}"></span>
                 </TD>
               </TR>
@@ -835,11 +835,12 @@ class RosettaHTML(object):
                     <div id="jobinfo">""" % parameter]
         
         if runOnCluster:
-            html.append("""
-                    <script language="javascript" type="text/javascript" src="%(rootdir)s/%(cryptID)s/progress.js"></script>
-                    <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
-                    <!-- JIT Library File -->
-                    <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>""" % parameter)
+            if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
+                html.append("""
+                        <script language="javascript" type="text/javascript" src="%(rootdir)s/%(cryptID)s/progress.js"></script>
+                        <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
+                        <!-- JIT Library File -->
+                        <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>""" % parameter)
 
         html.append("""<table border=0 cellpadding=2 cellspacing=1>""")
         
@@ -858,24 +859,25 @@ class RosettaHTML(object):
                 break
     
         if runOnCluster:    
-            html.append('''
-<tr>
-    <td align="left" bgcolor="#FFFCD8"><p>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
-    <td>
-        <table>
-            <tr style="height:400px;">   
-                <td colspan="2" id="infovis" style="width:1000px; background-color:#222;"></td>
-            </tr>
-            <tr>
-                <td id="right-container" style="background-color:#aaaaaa;"></td>
-                <td align="left" id="left-container" style="vertical-align:top; width:90px; background-color:#aaaaaa;"> 
-                    <h4>Legend</h4> 
-                %s
-                </td>
-            </tr>
-        </table>
-    </td>                   
-</tr>''' % Graph.getHTMLLegend())
+            if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
+                html.append('''
+    <tr>
+        <td align="left" width="200" bgcolor="#FFFCD8"><p>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
+        <td>
+            <table>
+                <tr style="height:400px;">   
+                    <td colspan="2" id="infovis" style="width:1000px; background-color:#222;"></td>
+                </tr>
+                <tr>
+                    <td id="right-container" style="background-color:#aaaaaa;"></td>
+                    <td align="left" id="left-container" style="vertical-align:top; width:90px; background-color:#aaaaaa;"> 
+                        <h4>Legend</h4> 
+                    %s
+                    </td>
+                </tr>
+            </table>
+        </td>                   
+    </tr>''' % Graph.getHTMLLegend())
 
         html.append('''</table>
                             <script language="javascript" type="text/javascript">init();</script>
@@ -975,7 +977,6 @@ class RosettaHTML(object):
             list_pdb_files = []
             
             list_id_lowest_structs = [ x[0] for x in self.lowest_structs ]
-            
             for filename in list_files:
                 if filename.find(key) != -1:
                     if self.lowest_structs != []: # if the list contains anything
@@ -983,7 +984,7 @@ class RosettaHTML(object):
                             list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
                     else:
                         list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-            list_pdb_files.sort()
+            #list_pdb_files.sort()
             
             # Add the original PDB at the beginning of the list
             list_pdb_files.insert(0, '../downloads/%s/' % cryptID + input_filename)
@@ -1024,6 +1025,8 @@ class RosettaHTML(object):
           handle = open(score_file,'r')
           import operator
           L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' ]
+          for line in L:
+              line[1] = float(line[1])
           self.lowest_structs = sorted(L,key=operator.itemgetter(1))[:9]
           handle.close()
         
@@ -1061,7 +1064,7 @@ class RosettaHTML(object):
                     for residue in residues:
                         jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )        
             jmol_cmd_designed = ''
-            if designed: 
+            if designed:
                 for chain, residues in designed.iteritems():
                     for residue in residues:
                         # Not the most efficient but numbers should be small
@@ -1624,8 +1627,8 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
                         
-            list_pdb_files = ['../downloads/%s/%s.pdb' % (cryptID, input_id) ]
-            list_files = os.listdir( self.download_dir+'/'+cryptID )
+            list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
+            list_files = os.listdir(os.path.join(rootdir, cryptID, "best_scoring_pdb" ))
             list_files.sort()
             list_all_pdbs = grep('BR%slow_[0-9][0-9][0-9][0-9]_[A-Z]*\.pdb' % (input_id) ,list_files)
             # we don't know at this point what the best scoring structures are. for each backrub structure, let's take the first we can find.
@@ -1636,29 +1639,29 @@ class RosettaHTML(object):
                     list_structure_shown.append(pdb_fn)
                 seq_before = pdb_fn.split('_')[1]
                 
-            list_pdb_files.extend( [ '../downloads/%s/%s' % ( cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
+            list_pdb_files.extend( [ '%s/%s/best_scoring_pdb/%s' % ( rootdir, cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
               
             comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
-            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = ProtocolParameters["Designed"])) # only the first 10 structures are shown
+            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], designed = ProtocolParameters["Designed"])) # only the first 10 structures are shown
                            
             html.append('''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
-                              Download <a href="../downloads/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
-                              <a href="../downloads/%s/tolerance_boxplot.png">PNG</a>, <a href="../downloads/%s/tolerance_boxplot.pdf">PDF</a>.<br>
+                              Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="%s/%s/tolerance_boxplot.png">PNG</a>, <a href="%s/%s/tolerance_boxplot.pdf">PDF</a>.<br>
                               </td>
                            <td bgcolor="#FFFCD8">
-                    ''' % ( cryptID, cryptID, cryptID ))
+                    ''' % ( rootdir, cryptID, rootdir, cryptID, rootdir, cryptID ))
                     
                     # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
                     # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
             for resid in seqtol_list_1:
-              html.append('''<a href="../downloads/%s/tolerance_boxplot_%s%s.png"><img src="../downloads/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
-                    ''' % ( cryptID, seqtol_chain1, resid, cryptID, seqtol_chain1, resid ))
+              html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                    ''' % ( rootdir, cryptID, seqtol_chain1, resid, rootdir, cryptID, seqtol_chain1, resid ))
             for resid in seqtol_list_2:
-              html.append('''<a href="../downloads/%s/tolerance_boxplot_%s%s.png"><img src="../downloads/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
-                    ''' % ( cryptID, seqtol_chain2, resid, cryptID, seqtol_chain2, resid ))
+              html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                    ''' % ( rootdir, cryptID, seqtol_chain2, resid, rootdir, cryptID, seqtol_chain2, resid ))
             
             html.append(self._show_molprobity( cryptID ))
             
