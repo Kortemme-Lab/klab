@@ -968,35 +968,35 @@ class RosettaHTML(object):
 
     def _getPDBfiles(self, input_filename, cryptID, key):
         
-        dir_results = '%s%s/' % (self.download_dir, cryptID)
+        dir_results = os.path.join(self.download_dir, cryptID)
         
         if os.path.exists( dir_results ):
-      
-          list_files = os.listdir( dir_results )
-          list_pdb_files = ['../downloads/%s/' % cryptID + input_filename]
-          
-          list_id_lowest_structs = [ x[0] for x in self.lowest_structs ]
-          
-          for filename in list_files:
-            if filename.find(key) != -1:
-              if self.lowest_structs != []: # if the list contains anything
-                if filename[-8:-4] in list_id_lowest_structs or filename[-12:-9] : # if the filename is one of the 10 lowest structures, use it
-                  list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-              else:
-                list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-          list_pdb_files.sort()
-          
-          for pdb_file in list_pdb_files:
-            pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
-            if not os.path.exists(pdb_file_path + '.gz'):
-              f_in = open(pdb_file_path, 'rb')
-              f_out = gzip.open(pdb_file_path + '.gz', 'wb')
-              f_out.writelines(f_in)
-              f_out.close()
-              f_in.close()
-            pdb_file += '.gz'
-          
-          return list_pdb_files
+            list_files = os.listdir( dir_results )
+            list_pdb_files = [os.path.join(dir_results, input_filename)]
+            
+            list_id_lowest_structs = [ x[0] for x in self.lowest_structs ]
+            
+            for filename in list_files:
+                if filename.find(key) != -1:
+                    if self.lowest_structs != []: # if the list contains anything
+                        if filename[-8:-4] in list_id_lowest_structs or filename[-12:-9] : # if the filename is one of the 10 lowest structures, use it
+                            list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
+                    else:
+                        list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
+            list_pdb_files.sort()
+            
+            for pdb_file in list_pdb_files:
+                pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
+                if not pdb_file_path.endswith(".gz"):
+                    if not os.path.exists(pdb_file_path + '.gz'):
+                        f_in = open(pdb_file_path, 'rb')
+                        f_out = gzip.open(pdb_file_path + '.gz', 'wb')
+                        f_out.writelines(f_in)
+                        f_out.close()
+                        f_in.close()
+                    pdb_file += '.gz'
+            
+            return list_pdb_files
         else:
             return None
             
@@ -1329,7 +1329,7 @@ class RosettaHTML(object):
           html.append('<tr><td align=right></td><td></td></tr>')
           html.append(self._show_scores_file(cryptID))
           comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
-        
+          
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutated = {chain : [resid]}))
           html.append(self._show_molprobity( cryptID ))
           
