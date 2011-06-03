@@ -1409,10 +1409,10 @@ def storeMultiplePointMutations(form, pdb_object):
         
     # Build up the chain/residues lists then check for matches within the pdb structure
     if Mutations:
-        for p, residues in chainres:
+        for p, residues in chainres.iteritems():
             chainsreslists.append((p, residues, False))        
-        if checkResidues(pdb_object, chainsreslists):    
-            return {"Mutations" : Mutations.sort()} # sort the tuples
+        if checkResidues(pdb_object, chainsreslists):
+            return {"Mutations" : sorted(Mutations)} # sort the tuples
     return None
 
 def storeEnsemble(form, pdb_object):

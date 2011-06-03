@@ -546,8 +546,8 @@ class RosettaHTML(object):
         
         box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
                     <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
-                    Raw data files:<br><a class="blacklink" href="%s%s?query=datadir&job=%s" target="_blank">%s://%s%s?query=datadir&job=%s</a>
-                    </td></tr></table>''' % ( self.server_url, self.script_filename, cryptID, httptype, self.server_url, self.script_filename, cryptID )
+                    Raw data files:<br><a class="blacklink" href="%s://%s%s?query=datadir&job=%s" target="_blank">%s://%s%s?query=datadir&job=%s</a>
+                    </td></tr></table>''' % ( httptype, self.server_url, self.script_filename, cryptID, httptype, self.server_url, self.script_filename, cryptID )
 #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
       elif remark == 'old':
@@ -972,7 +972,7 @@ class RosettaHTML(object):
         
         if os.path.exists( dir_results ):
             list_files = os.listdir( dir_results )
-            list_pdb_files = [os.path.join(dir_results, input_filename)]
+            list_pdb_files = []
             
             list_id_lowest_structs = [ x[0] for x in self.lowest_structs ]
             
@@ -984,6 +984,9 @@ class RosettaHTML(object):
                     else:
                         list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
             list_pdb_files.sort()
+            
+            # Add the original PDB at the beginning of the list
+            list_pdb_files.insert(0, '../downloads/%s/' % cryptID + input_filename)
             
             for pdb_file in list_pdb_files:
                 pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
@@ -1386,13 +1389,13 @@ class RosettaHTML(object):
         list_radius = []
         mutated = {}
         for entry in ProtocolParameters["Mutations"]:
-            chain = ProtocolParameters["Mutations"][0]
-            resid = ProtocolParameters["Mutations"][1] 
+            chain = entry[0]
+            resid = entry[1] 
             list_chains.append(chain)
             list_resids.append(resid)
-            list_newres.append(ProtocolParameters["Mutations"][2])
-            list_radius.append(ProtocolParameters["Mutations"][3])
-            mutated[chain] = mutated[chain] or []
+            list_newres.append(entry[2])
+            list_radius.append(entry[3])
+            mutated[chain] = mutated.get(chain) or []
             mutated[chain].append(resid)
             
         multiple_mutations_html = ''
@@ -1615,7 +1618,7 @@ class RosettaHTML(object):
                       Designed residues of Partner 1: %s<br>
                       Designed residues of Partner 2: %s<br>
                   </td>
-              </tr>""" % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(seqtol_list_1,' '), join(seqtol_list_2,' ')) ]
+              </tr>""" % ( input_filename, size_of_ensemble, seqtol_chain1, seqtol_chain2, join(map(str, seqtol_list_1),' '), join(map(str, seqtol_list_2),' ')) ]
                                                   
         input_id = input_filename[:-4] # filename without suffix
         if status == 'done' or status == 'sample':

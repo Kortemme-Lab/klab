@@ -460,10 +460,10 @@ class RosettaClusterJob(object):
         destpath = self.dldir
         
         self._status("Moving files to %s" % destpath)
-        if not os.path.exists(destpath):
-            make755Directory(destpath)
             
         if self.resultFilemasks:
+            if not os.path.exists(destpath):
+                make755Directory(destpath)
             for mask in self.resultFilemasks:
                 #self._status("moving using mask %s\n" % mask[0])
                 fromSubdirectory = os.path.join(self.targetdirectory, mask[0])
@@ -475,6 +475,8 @@ class RosettaClusterJob(object):
                         #self._status("moving %s to %s\n" % (os.path.join(fromSubdirectory, file), toSubdirectory))
                         shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
         else:
+            if not os.path.exists(destpath):
+                shutil.rmtree(destpath)
             shutil.move(self.targetdirectory, destpath)
         
         os.chmod( destpath, permissions )

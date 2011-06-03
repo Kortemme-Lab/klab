@@ -227,6 +227,9 @@ class JITGraph(Graph):
             str.append(join(nodestr,""))
         
         JITdata = "var json = [\n%s\n];" % join(str, ",\n")
+        
+        # Reading here allows us to change the Javascript on the fly
+        JITForceDirected = readFile(os.path.join(thisloc, "JITForceDirected.js"))
         return (self.getHTML(), JITForceDirected % JITdata)
 
     def _getSpaceTreeNode(self, parent, indent):
@@ -239,6 +242,10 @@ class JITGraph(Graph):
         pstr = ""
         if n.progress:
             pstr = "\n%s$progress: %f," % (indent3, n.progress)
+        pstr += "\n%s$tasksdone: %f," % (indent3, int(n.tasksdone))
+        pstr += "\n%s$totaltasks: %f," % (indent3, int(n.totaltasks))
+            
+            
         pexct = ""
         if n.exclusiveTime != n.inclusiveTime:
             pexct = "\n%s$exclusive: %f," % (indent3, n.exclusiveTime)
@@ -274,6 +281,9 @@ class JITGraph(Graph):
         if not self.isATree():
             return self.getForceDirected()
         JITdata = "var json = %s;" % self._getSpaceTreeNode("init", "  ")
+        
+        # Reading here allows us to change the Javascript on the fly
+        JITSpaceTree = readFile(os.path.join(thisloc, "JITSpaceTree.js"))
         return JITSpaceTree % JITdata
     
     def getHTML(self):

@@ -178,7 +178,7 @@ function init(){
         //set animation transition type
         transition: $jit.Trans.Quart.easeInOut,
         //set distance between node and its children
-        levelDistance: 75,
+        levelDistance: 25,
         //enable panning
         Navigation: {
           enable:true,
@@ -247,10 +247,10 @@ function init(){
                   if(!node) return;
                   
                   // little hack to get the centering to the left of the root on load but then reset to the JIT default on the first user click
-                  if (clicknum == 1)
-                  {
-                	  st.canvas.translate(150, 0)
-                  }
+                  //if (clicknum == 1)
+                  //{
+                  //	  st.canvas.translate(150, 0)
+                  //}
                   clicknum += 1;
                   //
                   
@@ -299,6 +299,11 @@ function init(){
                   {
                 	  html += "<br>Exclusive time: " + parsetime(node.data.$exclusive);
                   }
+                  if (node.data.$totaltasks > 1)
+                  {
+                	  html += "<br>Tasks completed: " + node.data.$tasksdone + "/" + node.data.$totaltasks);
+                  }
+                	  
                   html += "</font></p>"
 
                   // profile details
@@ -385,7 +390,7 @@ function init(){
     //emulate a click on the root node.
     st.onClick(st.root);
     // shift canvas to the left - little hack, see above
-    st.canvas.translate(-150, 0)
+    //st.canvas.translate(-150, 0)
     // click the root label to populate the right panel
     st.labels.getLabel("start0").onclick()
     
