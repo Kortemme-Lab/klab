@@ -1188,6 +1188,7 @@ class ClusterDaemon(RosettaDaemon):
                         # Remember that we are about to start this job to avoid repeatedly submitting the same job to the cluster
                         # This should not happen but just in case.
                         # Also, never let the list grow too large as the daemon should be able to run a long time                        
+                        print(jobID)
                         if jobID in self.recentDBJobs:
                             print("Error: Trying to run database job %d multiple times." % jobID) 
                             self.log("%s\t Error: Trying to run database job %d multiple times.\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID))

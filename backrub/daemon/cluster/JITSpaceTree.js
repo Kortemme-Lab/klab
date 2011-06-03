@@ -98,6 +98,7 @@ function parsetime(timeinsec)
 	return tm;	
 }
 
+var st;
 function init(){
     //init data
     %s
@@ -168,7 +169,7 @@ function init(){
     //end
     //init Spacetree
     //Create a new ST instance
-    var st = new $jit.ST({
+    st = new $jit.ST({
         //id of viz container element
         injectInto: 'infovis',
         //set duration for the animation
@@ -301,7 +302,7 @@ function init(){
                   }
                   if (node.data.$totaltasks > 1)
                   {
-                	  html += "<br>Tasks completed: " + node.data.$tasksdone + "/" + node.data.$totaltasks);
+                	  html += "<br>Tasks completed: " + node.data.$tasksdone + "/" + node.data.$totaltasks;
                   }
                 	  
                   html += "</font></p>"
@@ -391,8 +392,11 @@ function init(){
     st.onClick(st.root);
     // shift canvas to the left - little hack, see above
     //st.canvas.translate(-150, 0)
+
     // click the root label to populate the right panel
-    st.labels.getLabel("start0").onclick()
+    // the timeout seems to be necessary from what I'm guessing is a threading issue
+    // the graph isn't always set up properly by this stage
+    setTimeout('st.labels.getLabel("start0").onclick()', 1000)
     
     //end
 

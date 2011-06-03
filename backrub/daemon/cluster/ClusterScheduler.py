@@ -475,7 +475,7 @@ class RosettaClusterJob(object):
                         #self._status("moving %s to %s\n" % (os.path.join(fromSubdirectory, file), toSubdirectory))
                         shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
         else:
-            if not os.path.exists(destpath):
+            if os.path.exists(destpath):
                 shutil.rmtree(destpath)
             shutil.move(self.targetdirectory, destpath)
         
