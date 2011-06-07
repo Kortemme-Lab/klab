@@ -114,7 +114,6 @@ The Kortemme Lab Server Daemon
         self.log("%s\tstarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
         # if there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
-        #self.runSQL("LOCK TABLES %s WRITE, Users READ" % self.db_table)
         try:
             results = self.runSQL("SELECT ID, Status, pid FROM %s WHERE Status=1 ORDER BY Date" % self.db_table)
             for simulation in results:
@@ -127,7 +126,6 @@ The Kortemme Lab Server Daemon
                     self.runSQL("UPDATE %s SET Status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
         except TypeError: # iteration over non-sequence, i.e. results is empty
             pass
-        #self.runSQL("UNLOCK TABLES")
                         
         while True:
             # this is executed every 30 seconds if the maximum number of jobs is running
@@ -165,7 +163,6 @@ The Kortemme Lab Server Daemon
                     
                     # remove object
                     completedJobs.append(rosetta_object)
-                    #self.runSQL("LOCK TABLES %s WRITE, Users READ" % self.db_table)
                     res = self.runSQL('SELECT Errors FROM %s WHERE ID=%s' % (self.db_table, ID))
                     if res[0][0] != '' and res[0][0] != None:
                         self.runSQL('UPDATE %s SET Status=4, EndDate=NOW() WHERE ID=%s' % ( self.db_table, ID ))
@@ -173,7 +170,6 @@ The Kortemme Lab Server Daemon
                         self.runSQL('UPDATE %s SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s' % ( self.db_table,error,ID ))
                     else:
                         self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, ID ))
-                    #self.runSQL("UNLOCK TABLES")
                     
             # Remove completed jobs
             for cj in completedJobs:
@@ -187,15 +183,11 @@ The Kortemme Lab Server Daemon
                 #sys.exit(2)
             if len(self.list_RosettaPP) < self.max_processes:
                 #print "check for new job"
-                # get job from db
-                # first lock tables, no surprises!
-                #self.runSQL("LOCK TABLES %s WRITE, Users READ" % self.db_table)
-                                    
+                # get job from db                    
                 # get all jobs in queue                            vvv 0
                 try:
                     data = self.runSQL("SELECT ID,Date,Status,task FROM %s WHERE Status=0 ORDER BY Date" % self.db_table)
                     if len(data) == 0:
-                        #self.runSQL("UNLOCK TABLES")
                         time.sleep(10) # wait 10 seconds if there's no job in queue
                         continue
                     else:
@@ -217,15 +209,10 @@ The Kortemme Lab Server Daemon
                                 if pid:
                                     self.runSQL("UPDATE %s SET Status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID ))
                                     break
-
-                        # don't forget to unlock the tables!
-                        #self.runSQL("UNLOCK TABLES")
-                        
                         time.sleep(3) # wait 3 seconds after a job was started
                 except Exception, e:
                     self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
                     self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))                  
-                    #self.runSQL("UNLOCK TABLES")
                     time.sleep(10)
 
             else:
@@ -1579,8 +1566,7 @@ if __name__ == "__main__":
                 try: 
                     import random
                     import md5
-                    #daemon.runSQL("LOCK TABLES %s WRITE, Users READ" % daemon.db_table)
-
+                    
                     db_host                = "localhost"
                     db_name                = "rosettaweb"
                     db_user                = "rosettaweb"
@@ -1715,7 +1701,6 @@ if __name__ == "__main__":
                     import random
                     import md5
                     print(UserID)
-                    #daemon.runSQL("LOCK TABLES %s WRITE, Users READ" % daemon.db_table)
                     daemon.runSQL("""INSERT INTO %s ( Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
                                 VALUES (NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))           
                     result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))
@@ -1732,12 +1717,10 @@ if __name__ == "__main__":
                     
                     #livejobs = daemon.runSQL("SELECT Date,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
                     livejobs = daemon.runSQL("SELECT ID, Status, Notes FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
-                    #daemon.runSQL("UNLOCK TABLES")
                     print(livejobs)
                 
                     print("Success.")
                 except Exception, e:
-                    #daemon.runSQL("UNLOCK TABLES")
                     print("\tError: %s\n%s" % (str(e), traceback.print_exc())) 
                     print("Failed.")
                     sys.exit(2)

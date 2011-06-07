@@ -75,14 +75,26 @@ class PDB:
         self.lines = [line for line in self.lines if line[0:4] != "ATOM" or
                                                      line[21:26] not in resid_set or
                                                      line[12:16].strip() in backbone_atoms]
-
-    def removeUnoccupied(self):
-        self.lines = [line for line in self.lines if not (line.startswith("ATOM") and float(line[54:60]) == 0)]
     
+    @staticmethod
+    def getOccupancy(line):
+        ''' Handles the cases of missing occupancy by omission '''
+        occstring = line[54:60]
+        if not(occstring):
+            return 0
+        else:
+            try:
+                return float(occstring)
+            except ValueError, TypeError:
+                return 0                          
+        
+    def removeUnoccupied(self):
+        self.lines = [line for line in self.lines if not (line.startswith("ATOM") and PDB.getOccupancy(line) == 0)]
+
     def fillUnoccupied(self):
         for i in xrange(len(self.lines)):
             line = self.lines[i]
-            if line.startswith("ATOM") and float(line[54:60]) == 0:
+            if line.startswith("ATOM") and PDB.getOccupancy(line) == 0:
                 self.lines[i] = line[:54] + "  1.00" + line[60:]
 
     # Unused function
@@ -92,7 +104,7 @@ class PDB:
     
         for i in xrange(len(self.lines)):
             line = self.lines[i]
-            if line.startswith("ATOM") and line[12:16].strip() in backbone_atoms and float(line[54:60]) == 0:
+            if line.startswith("ATOM") and line[12:16].strip() in backbone_atoms and PDB.getOccupancy(line) == 0:
                 self.lines[i] = line[:54] + "  1.00" + line[60:]
                 
     def fix_chain_id(self):
@@ -444,7 +456,8 @@ class PDB:
                 currentChain = line[21]
                 currentResidue = line[21:27]
                 classicCurrentResidue = line[21:26] # classic did not handle the insertion code in resfiles until revision 29386
-                occupancy = float(line[54:60])   
+                
+                occupancy = PDB.getOccupancy(line)
                     
                 if usingClassic and (not allowedResidues.get(residue)):
                     # Check for residues outside the list classic can handle

@@ -436,7 +436,7 @@ def ws():
   elif query_type == "submitted":    
     return_val = submit(rosettaHTML, form, SID)
     if return_val: # data was submitted and written to the database
-        html_content = rosettaHTML.submitted('', return_val[0], return_val[1], warnings)
+        html_content = rosettaHTML.submitted('', return_val[0], return_val[1], return_val[2], warnings)
         title = 'Job submitted'
     else: # no data was submitted/there is an error
         html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
@@ -1051,20 +1051,18 @@ def submit(rosettaHTML, form, SID):
             # @upgradetodo: check test input button which tests submit but does not add a job to the db
             ProtocolParameters = pickle.dumps(ProtocolParameters)
             
-            return_vals = (cryptID, "new") # true we processed the data
-        
             if not errors:
                 # Cluster jobs are stored in the kortemmelab database
                 # That database will not have access to fields in the local one e.g. different set of UserIDs messes up the UserNames, Email fields            
                 RemoteInformation = {}    
                 StorageDBConnection = DBConnection
-                localJob = True            
+                isLocalJob = True            
                 if ROSETTAWEB_short_server_name != "kortemmelab" and RosettaBinaries[mini]["runOnCluster"]:
                    RemoteInformation = {"UserName": UserName, "Email": Email}
                    StorageDBConnection = getKlabDBConnection()
-                   localJob = False
+                   isLocalJob = False
                 RemoteInformation = pickle.dumps(RemoteInformation)
-                   
+                
                 # if we're good to go, create new job
                 # get ip addr hostname
                 IP = os.environ['REMOTE_ADDR']
@@ -1073,16 +1071,16 @@ def submit(rosettaHTML, form, SID):
                     hostname = sock.gethostbyaddr(IP)[0]
                 except:
                     hostname = IP
-                # lock table
-                sql = "LOCK TABLES backrub WRITE, Users READ"
-                StorageDBConnection.execQuery(sql)
-                # write information to database
                 
                 # Strip the path information from  the pdb
                 m = re.match("pdbs/[A-Z\d]+/([^\\/]+\.pdb)", pdb_filename, re.IGNORECASE)
                 if m:
                     pdb_filename = m.group(1)
                 
+                # lock table
+                StorageDBConnection.execQuery("LOCK TABLES backrub WRITE")
+                
+                # write information to database
                 # Add a dummy hashkey as this field should not be NULL
                 sql = """INSERT INTO backrub ( Date,RemoteInformation,BackrubServer,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
                                 VALUES (NOW(), "%s", "%s", "0", "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (RemoteInformation, ROSETTAWEB_short_server_name, Email, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)
@@ -1097,7 +1095,8 @@ def submit(rosettaHTML, form, SID):
                     # do not just use the ID but also a random sequence
                     tgb = str(ID) + ROSETTAWEB_db_host + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '')
                     cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
-                    return_vals = (cryptID, "new")
+                    return_vals = (cryptID, "new", isLocalJob)
+           
                     sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
                     result = StorageDBConnection.execQuery(sql)
                     # success
@@ -1110,13 +1109,13 @@ def submit(rosettaHTML, form, SID):
                     # print sql, result
                     for r in result:
                         if str(r[0]) != str(ID): # if there is ANOTHER, FINISHED simulation with the same hash
-                            if localJob:
+                            if isLocalJob:
                                 shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
                             else:
                                 shutil.copytree(os.path.join(ROSETTAWEB_remote_download_dir, r[1]), os.path.join(ROSETTAWEB_remote_download_dir, cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
                             result = StorageDBConnection.execQuery(sql)
-                            return_vals = (cryptID, "old")
+                            return_vals = (cryptID, "old", isLocalJob)
                             break
                     
                     # otherwise, see if there are already two similar jobs in the queue to avoid server spamming
@@ -1128,12 +1127,16 @@ def submit(rosettaHTML, form, SID):
                         #for job in results:
                         #    similarJobs.append(job[0])
                         #join(map(str,similarJobs),", ")
-                        errors.append('''There is already a job (<a href="%s?query=jobinfo&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, job[1], job[0]))
+                        if isLocalJob:
+                            localstr = ""
+                        else:
+                            localstr = "&local=false"
+                            
+                        errors.append('''There is already a job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, localstr, job[1], job[0]))
                         sql = """DELETE FROM backrub WHERE ID="%s" """ % ID
                         result = StorageDBConnection.execQuery(sql)
                         return False
                      
-                        
                 except _mysql_exceptions.OperationalError, e:
                     # This html is not used
                     errors.append("Database error.")
@@ -1147,8 +1150,7 @@ def submit(rosettaHTML, form, SID):
                         <P><A href="rosettaweb.py?query=submit">Submit</A> a new job.</P>""")
                     else:
                         errors.append("""<P>An error occurred. Please revise your data and <A href="rosettaweb.py?query=submit">submit</A> a new job. If you keep getting error messages please contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.</P>""")
-                    
-                       
+
                     #errors.append(str(e))
                     return_vals = False
             
@@ -1157,18 +1159,20 @@ def submit(rosettaHTML, form, SID):
                 StorageDBConnection.execQuery(sql)
                 
                 return return_vals
-          
+            else:
+                return False
         else:
             form['error_msg'] = 'wrong mode for submit()'
             return False
     except Exception, e:
         excinfo = sys.exc_info()
         estring = traceback.format_exc()
-        # todo: Maybe just log this to file and give the user less information
-        errors.append("An exception occurred: %s." % estring)
+        # todo: Log this to file
+        errors.append("An error occurred during submission.")
+        errors.append("[Admin] Server error: An exception occurred: %s." % estring)
+        
         return False
-    
-    return (True, cryptID, "new")
+    #return (True, cryptID, "new")
                     
 
 ########################################## end of submit() ####################################

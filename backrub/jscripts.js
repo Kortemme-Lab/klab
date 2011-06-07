@@ -99,7 +99,7 @@ function startup(query)
 		Nifty("ul#about li","big fixed-height");
         Nifty("div#box","big transparent fixed-height");
 		protocol = getProtocol();
-		// Hack for the special case for sequence tolerance. todo: Generalize and fix this i.e. "jump to last stage"
+		// @js1: Special case for sequence tolerance. Generalize and fix this i.e. "jump to last stage"
 		if (protocol[0] == 2 && protocol[1] == 1)
 		{
 			changeApplication(protocol[0], protocol[1], 2, 2, true );
@@ -187,7 +187,6 @@ function changeApplication( app, task, subtask, extra, override )
 		if (miniGroup[i].value == protocolBins[app][task][0])
 		{
 			miniGroup[i].checked = true;
-			//alert(miniGroup[i].value)
 			miniGroup[i].onchange();		// Set the MiniVersion form value
 		}
 	}
@@ -322,6 +321,12 @@ function ValidateForm()
     	}
     	else
     	{
+    		if (sbmtform.PDBID.value.length != 4 && sbmtform.PDBID.value[0] != '@')
+			{
+    			sbmtform.PDBID.style.background="red";
+        		alert("Invalid PDB ID " + sbmtform.PDBID.value + ". Please try uploading the file again.");
+    			ret = false;
+			}
     		ret = validateElem(sbmtform.PDBID, PDBExpression) && ret;
     	}
     }
@@ -697,8 +702,7 @@ function validateSeqtolSK()
 	{		
     	ret = validateElem(sbmtform.seqtol_SK_Boltzmann, numericExpression) && ret;
 	}
-	
-	
+
 	var validResidues = getValidResidues();
 	var validPremutations = validResidues["premutated"]
 	var validDesigned = validResidues["designed"]
@@ -761,7 +765,7 @@ function demoSeqtolSK(setAllData)
 		elemB = sbmtform.seqtol_SK_chain1
 		elemNumPartners = sbmtform.numPartners
 		
-		// todo: Fix this up using an array
+		// @js2
 		// Clear automatically filled values 
 		for (i = elemA.length; i >= 0; i--)
 		{
@@ -781,11 +785,12 @@ function demoSeqtolSK(setAllData)
 		elemA.value = "A";
 		elemA.value = "B";
 		
-		for (i = 1; i < 6; i++)
+		for (i = 1; i < 5; i++)
 		{
 			new Effect.Appear("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
 		}
-		
+		numSeqTolSK = 5
+
 		sbmtform.seqtol_SK_mut_c_0.value = "B";
 		sbmtform.seqtol_SK_mut_r_0.value = 2002;
 		
@@ -814,12 +819,12 @@ function demoSeqtolSK(setAllData)
  * Protocol-specific GUI functions 
  ************************************/
 
-// todo - The addOneMore functions could be merged
+// @js3 
 
 /* Multiple point mutations */
 
 //Adds a residue input field 
-//todo: Add delete functionality
+// @js4
 function addOneMore()
 {
 	new Effect.Appear("row_PM" + "" + numMPM);
@@ -834,7 +839,7 @@ function addOneMore()
 /* Sequence Tolerance HK */
 
 //Adds a residue input field
-//todo: Add delete functionality and fade add button
+// @js5 
 function addOneMoreSeqtol()
 {
 	new Effect.Appear("seqtol_row_" + "" + numSeqTol);
@@ -849,7 +854,7 @@ function addOneMoreSeqtol()
 /* Sequence Tolerance SK */
 
 //Adds a residue input field
-//todo: Add delete functionality
+//@js6 
 function addOneMoreSeqtolSK()
 {
 	new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK, { duration: 0.0, queue: { scope: 'task' }});
@@ -908,7 +913,7 @@ function changeApplicationToSeqtolSK2(app, task, extra)
 	
 	if (localquery == "sampleData")
 	{
-		// todo
+		// @js7
 		numSeqTolSKPremutations = 0;
 		for (i = 0; i < SK_MaxPremutations; i++)
 		{
@@ -980,8 +985,8 @@ function buildSKColumns()
 
 		if (document.getElementsByClassName == undefined)
 		{
-			//todo: test this
-			alert("here")
+			alert("Javascript functionality missing. Please try another browser.")
+			return
 			var integralExpression = /^[0-9]+$/;
 						
 			var tds = document.getElementsByTagName("td");
@@ -994,10 +999,9 @@ function buildSKColumns()
 					if (checkValue(idx, integralExpression))
 					{
 						idx = parseInt(idx);
-						//columnElements[][]
 						if (idx < SK_max_seqtol_chains - 1)
 						{
-							alert("add " + columnElements[idx].className + " to list " + idx)
+							// add columnElements[idx].className to list idx
 						}
 					}
 				}
@@ -1007,7 +1011,7 @@ function buildSKColumns()
 		{
 			for (i = 0; i < SK_max_seqtol_chains - 1 ; i = i + 1)
 			{
-				// todo: Could optimize this by asking for elements of table rather than document
+				// @js8
 				columnElements[i] = document.getElementsByClassName("seqtol_SK_kP" + i)
 			}
 		}
@@ -1181,7 +1185,7 @@ function validateNotEmpty(elem)
 
 function validChain(c)
 {
-	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
+	// @js9 
 	if (checkValue(c, chainExpression))
 	{
 		var elems = document.submitform.elements;
@@ -1196,10 +1200,10 @@ function validChain(c)
 	return false;
 }
 
-// todo: Unify and remove this function
+// @js10
 function validChainHK(c)
 {
-	// todo: The use of this function by callers is pretty inefficient. Consider return an associative array of chains instead.
+	// @js11
 	if (checkValue(c, chainExpression))
 	{
 		var elems = document.submitform.elements;
@@ -1215,12 +1219,12 @@ function validChainHK(c)
 	return false;
 }
 
-// todo: Use PDB to determine validity of chain (pass pdb info from Python to JS)
+// @js12
 
 // *** Sequence Tolerance *** 
 // Returns an array of two arrays.
 // The first array maps the displayed (numSeqTolSKPremutations) premutation indices to one of the values (true, false, "").
-// 		true means that the premutation is valid (todo: check against actual PDB - at present we just check the syntax and existing chains)
+// 		true means that the premutation is valid
 //		false means that the premutation is invalid
 //		-1 means that the premutation fields are empty
 // The second array holds similar information for the designed residues
@@ -1290,7 +1294,7 @@ function getValidResidues()
 			}
 		}
 	}
-	// todo: Unify this logic when HK is changed to behave as above (using invalid for default chain in dropdown box)
+	// @js13
 	else if (isProtocol(2, 0))
 	{
 		for (i = 0; i < numSeqTol ; i = i + 1) 
@@ -1354,7 +1358,6 @@ function clearFormFields()
 	{
 		if (elems[k])
 		{
-			//alert(previousValues[k]);
 			elems[k].value = previousValues[k];
 		}
 	}

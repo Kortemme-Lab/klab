@@ -467,7 +467,7 @@ class RosettaHTML(object):
         html.append('''     
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values(false); document.submitform.query.value = 'sampleData'; document.submitform.submit();">
-              <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="ValidateForm();"></span>
+              <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="if (ValidateForm()){alert('The parameters are valid.');}else{alert('The parameters are valid.');}"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="reset_form();"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit"></span>
             </p>
@@ -545,57 +545,67 @@ class RosettaHTML(object):
 # submitted                                                                                             #
 ###############################################################################################
             
-    def submitted(self, jobname, cryptID, remark, warnings):
+    def submitted(self, jobname, cryptID, remark, isLocalJob, warnings):
       
-      if remark == 'new':        
         # todo: hack to get around albana not using https
         httptype = "https"
-        
         if self.server_shortname == 'albana':
             httptype = "http"
         
-        box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
-                    <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
-                    Raw data files:<br><a class="blacklink" href="%s://%s%s?query=datadir&job=%s" target="_blank">%s://%s%s?query=datadir&job=%s</a>
-                    </td></tr></table>''' % ( httptype, self.server_url, self.script_filename, cryptID, httptype, self.server_url, self.script_filename, cryptID )
-#                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
+        hostserver = self.server_url
+        if isLocalJob:
+            localstr = ""
+        else:
+            localstr = "&local=false"
+            
+        documentRoot = "%s://%s%s" % (httptype, hostserver, self.script_filename)
+        jobinfoPage = "%s?query=jobinfo%s&jobnumber=%s"  % (documentRoot, localstr, cryptID)
+        datadirPage = "%s?query=datadir%s&job=%s" % (documentRoot, localstr, cryptID)
+            
+        if remark == 'new':        
+                          
+            box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
+                      <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
+                      <a class="blacklink" href="%(datadirPage)s" target="_blank"><u>Raw data files</u></a>
+                      </td></tr></table>''' % vars()
+        #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
-      elif remark == 'old':
-        box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#53D04F;">
-                    <font color="black" style="font-weight: bold; text-decoration:blink;">A job with the same parameters has already been processed. 
-                                                                                          Please use one of the following links to go to the results:</font><br>
-                     <br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">Job Info page</a> or Raw data files:<br>
-                         <a class="blacklink" href="%s?query=datadir&job=%s" target="_blank">https://%s%s?query=datadir&job=%s</a>
-                    </td></tr></table>''' % ( self.script_filename, cryptID, self.script_filename, cryptID, self.server_url, self.script_filename, cryptID )
-      else:
-        # I don't think this can happen but best to be safe
-        box = '<font color="red">An error occurred, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
+        elif remark == 'old':
+            box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#53D04F;">
+                      <font color="black" style="font-weight: bold; text-decoration:blink;">A job with the same parameters has already been processed. 
+                                                                                            Please use one of the following links to go to the results:</font><br>
+                       <br><a class="blacklink" href="%(jobinfoPage)s" target="_blank"><u>Job Info page</u></a> or <a class="blacklink" href="%(datadirPage)s" target="_blank"><u>Raw data files.</u></a>
+              </td></tr></table>''' % vars()
+        else:
+            # I don't think this can happen but best to be safe
+            box = '<font color="red">An error occurred, please <a HREF="javascript:history.go(-1)">go back</a> and try again</font>'
       
-      if warnings:
-          warnings = "<li>" + join(warnings, "</li><li>") + "</li>"
-          warningsbox = '''
-              <table width="550" style="background-color:#ccccff;" frame="border" bordercolor="black">
-                  <tr><td align="center"><font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings/messages:</font></td></tr>
-                  <tr></tr>
-                  <tr><td align="left"><ul>%s</ul></td></tr>
-              </table>''' % ( warnings )
-      else:
-          warningsbox = ''
-      
-      html = """<td align="center"><H1 class="title">New Job successfully submitted</H1>
-                  %s<br>
-                  %s<br>
-                  <P>Once your request has been processed the results are accessible via the above URL. You can also access your data via the <A href="%s?query=queue">job queue</A> at any time.<br>
-                  If you <b>are not</b> registered and use the guest access please bookmark this link. Your data will be stored for 10 days.<br>
-                  If you are registered and logged in we will send you an email with this information once the job is finished. 
-                  In this case you will be able to access your data for 60 days.<br>
-                  </P>
-                  From here you can proceed to the <a href="%s?query=jobinfo&jobnumber=%s">job info page</a>, 
-                  <a HREF="javascript:history.go(-1)">submit a new job</a>.
-                  <br><br>
-                  </td>\n"""  % ( box, warningsbox, self.script_filename, self.script_filename, cryptID )
-                     #% (UserName, JobName, pdbfile.filename) )
-      return html
+        if warnings:
+            warnings = "<li>" + join(warnings, "</li><li>") + "</li>"
+            warningsbox = '''
+                <table width="550" style="background-color:#ccccff;" frame="border" bordercolor="black">
+                    <tr><td align="center"><font color="black" style="font-weight: bold; text-decoration:blink;">The job submission raised the following warnings/messages:</font></td></tr>
+                    <tr></tr>
+                    <tr><td align="left"><ul>%(warnings)s</ul></td></tr>
+                </table>''' % vars()
+        else:
+            warningsbox = ''
+        
+        script_filename = self.script_filename
+        html = """<td align="center"><H1 class="title">New Job successfully submitted</H1>
+                    %(box)s<br>
+                    %(warningsbox)s<br>
+                    <P>Once your request has been processed the results are accessible via the above URL. You can also access your data via the <A href="%(script_filename)s?query=queue">job queue</A> at any time.<br>
+                    If you <b>are not</b> registered and use the guest access please bookmark this link. Your data will be stored for 10 days.<br>
+                    If you are registered and logged in we will send you an email with this information once the job is finished. 
+                    In this case you will be able to access your data for 60 days.<br>
+                    </P>
+                    From here you can proceed to the <a href="%(jobinfoPage)s">job info page</a>, 
+                    <a HREF="javascript:history.go(-1)">submit a new job</a>.
+                    <br><br>
+                    </td>\n"""  % vars()
+                       #% (UserName, JobName, pdbfile.filename) )
+        return html
 
 ###############################################################################################
 # register                                                                                             #
