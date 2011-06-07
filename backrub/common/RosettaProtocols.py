@@ -80,6 +80,7 @@ class RosettaProtocol:
         self.checkFunction = None
         self.endFunction = None
         self.description = None
+        self.progressDisplayHeight = None
         
     # Setters and getters
     def setBackendFunctions(self, startFunction, checkFunction, endFunction):

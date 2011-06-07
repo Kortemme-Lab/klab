@@ -1248,7 +1248,12 @@ def queue(form, userid):
             else:
                 new_lst[5] = result2[0][0]
         results.append(new_lst)
-      
+    
+    # Sort the jobs by date rather than ID since they come from multiple databases
+    # On the live server, we rely on the ID just in case the date gets messed up
+    if thisserver != 'kortemmelab':
+        results.sort(key = lambda x:x[6], reverse = True) 
+        
     return results
 
 ########################################## end of queue() ####################################
@@ -1755,7 +1760,8 @@ class FrontendProtocols(WebserverProtocols):
                 p.setDescription('''Predicts tolerated sequence space for up to 10 positions in protein-protein 
                                     interfaces.  This method is based on Rosetta 2.0.''')
                 p.specialname = "Interface sequence plasticity method [%s]" % refstring
-            
+                p.progressDisplayHeight = "100px"
+
             elif p.dbname == "sequence_tolerance_SK":
                 # Test server-specific hack to override minimum number of structures for shorter runs
                 if ROSETTAWEB_server_name == 'albana.ucsf.edu':
@@ -1770,6 +1776,7 @@ class FrontendProtocols(WebserverProtocols):
                 p.setDescription('''Predicts tolerated sequences for proteins or protein-protein 
                             interfaces.  This is the most recent protocol based on Rosetta 3.0.''')
                 p.specialname = "Generalized RosettaBackrub sequence tolerance method [%s]"  % refstring
+                p.progressDisplayHeight = "100px"
                 
             else:
                 raise 

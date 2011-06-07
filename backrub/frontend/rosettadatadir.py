@@ -74,7 +74,7 @@ class RosettaDataDir(RosettaHTML):
         directory = os.path.join(self.download_dir, cryptID, subdir)
         list_files = os.listdir(directory)
         list_files.sort()
-        return grep('.pdb',list_files)
+        return grep('[.]pdb',list_files)
     
     
     def PointMutation(self, cryptID, jobid, binary, pdb_filename):
@@ -213,13 +213,19 @@ class RosettaDataDir(RosettaHTML):
             self.content += '''
               <li>Backrub premutations residue file: <a href="%s/%s">%s</a></li>
                 ''' % (jobdatadir, br_resfile, br_resfile)
+
+        minimizedFile = ""
+        for fn_pdb in self._get_pdb_files(cryptID):
+            if fn_pdb == "%s_minimized.pdb" % pdb_filename[:pdb_filename.rfind(".")]:
+                minimizedFile = '<li><a href="%s/%s">%s</a> - Structure file from the backrub run' % (jobdatadir, fn_pdb, fn_pdb)
                 
         self.content += '''
             </ul>
           </p>
           Output files:
             <ul>
-              <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
+              %(minimizedFile)s
+              <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - Up to 10 best scoring sequences for each backrub structure</li>
               <li><a href="%(jobdatadir)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
               <li><a href="%(jobdatadir)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
                   <a href="%(jobdatadir)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
@@ -231,14 +237,13 @@ class RosettaDataDir(RosettaHTML):
         self.content += '''
               </li>
             </ul>
-            Individual PDB files:<br>
-                &nbsp;&nbsp;&nbsp; Structure file from the backrub run along with the structures of up to 10 best scoring designed sequences.
+            The structures of up to 10 best scoring designed sequences:<br>
             <ul>'''
           
-        for fn_pdb in self._get_pdb_files(cryptID):
+        for fn_pdb in self._get_pdb_files(cryptID, subdir = "best_scoring_pdb"):
           if fn_pdb != pdb_filename:
             self.content += '<li><a href="%s/%s">%s</a>' % (jobdatadir, fn_pdb, fn_pdb)
-    
+
         self.content += "</ul></p>"      
 
     def SequenceToleranceSK(self, cryptID, jobid, binary, pdb_filename):
@@ -296,8 +301,8 @@ class RosettaDataDir(RosettaHTML):
               </li>
             </ul>
             Individual PDB files: <br>
-                &nbsp;&nbsp;&nbsp;"low" PDB files are the result of the backrub run, <br>
-                &nbsp;&nbsp;&nbsp;"low_ms" PDB files contain the lowest scoring designed sequence based on this backrub run.
+                &nbsp;&nbsp;&nbsp;"low" PDB files are the result of the backrub run. <br>
+                <!--&nbsp;&nbsp;&nbsp;"low_ms" PDB files contain the lowest scoring designed sequence based on this backrub run.-->
                 <ul>''')
           
         for fn_pdb in self._get_pdb_files(cryptID, subdir="sequence_tolerance"):

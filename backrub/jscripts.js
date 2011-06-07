@@ -1512,3 +1512,34 @@ function usingMini()
 	alert("Rosetta version unidentified.")
 	return false;
 }
+
+/************************************
+ * Jmol functions 
+ ************************************/
+
+function updateJmol()
+{
+	//for all structure checkboxes
+	displayString = ""
+	var displayString = []
+	                     
+	for (i = 0; i < document.getElementsByName("JmolStructures").length; i++)
+	{
+		if (document.getElementsByName("JmolStructures")[i].checked)
+		{
+			displayString.push(document.getElementsByName("JmolStructures")[i].value)
+		}
+	}
+	if (displayString.length == 0)
+	{
+		document.getElementsByName("JmolStructures")[0].checked = true
+		jmolScript("frame all; display 1.0")		
+	}
+	else
+	{
+		jmolScript("frame all; display " + displayString.join())
+	}
+
+}
+
+

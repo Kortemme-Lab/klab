@@ -184,7 +184,7 @@ class RosettaHTML(object):
         else:
             JSCommand = 'HREF="javascript:history.go(-1)"'   
         
-        if self.server_shortname == 'albana':
+        if self.server_shortname == 'kortemmelab':
             prunederrors = []
             for error in errors:
                 if not error.startswith("[Admin]"):
@@ -865,6 +865,7 @@ class RosettaHTML(object):
         for p in protocols:
             if parameter['task'] == p.dbname:
                 showFn = p.getShowResultsFunction()
+                progressDisplayHeight = p.progressDisplayHeight
                 html.extend(showFn(status, parameter["rootdir"], parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters))   
                 break
     
@@ -872,14 +873,14 @@ class RosettaHTML(object):
             if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
                 html.append('''
     <tr>
-        <td align="left" width="200" bgcolor="#FFFCD8"><p>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
+        <td style="text-align:left;vertical-align:top" width="200" bgcolor="#FFFCD8"><p><br>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
         <td>
-            <table>
-                <tr style="height:400px;">   
+            <table bgcolor="#FFFCD8">
+                <tr style="height:%s;">   
                     <td colspan="2" id="infovis" style="width:1000px; background-color:#222;"></td>
                 </tr>
                 <tr>
-                    <td id="right-container" style="background-color:#aaaaaa;"></td>
+                    <td id="right-container" style="background-color:#aaa;"></td>
                     <td align="left" id="left-container" style="vertical-align:top; width:90px; background-color:#aaaaaa;"> 
                         <h4>Legend</h4> 
                     %s
@@ -887,7 +888,7 @@ class RosettaHTML(object):
                 </tr>
             </table>
         </td>                   
-    </tr>''' % Graph.getHTMLLegend())
+    </tr>''' % (progressDisplayHeight, Graph.getHTMLLegend()))
 
         html.append('''</table>
                             <script language="javascript" type="text/javascript">init();</script>
@@ -978,29 +979,29 @@ class RosettaHTML(object):
         
         return html
 
-    def _getPDBfiles(self, input_filename, cryptID, key):
+    def _getPDBfiles(self, input_filename, cryptID):
         
         dir_results = os.path.join(self.download_dir, cryptID)
         
         if os.path.exists( dir_results ):
             list_files = os.listdir( dir_results )
-            list_pdb_files = []
-            
-            list_id_lowest_structs = [ x[0] for x in self.lowest_structs ]
-            for filename in list_files:
-                if filename.find(key) != -1:
-                    if self.lowest_structs != []: # if the list contains anything
-                        if filename[-8:-4] in list_id_lowest_structs or filename[-12:-9] : # if the filename is one of the 10 lowest structures, use it
-                            list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-                    else:
-                        list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-            #list_pdb_files.sort()
             
             # Add the original PDB at the beginning of the list
-            list_pdb_files.insert(0, '../downloads/%s/' % cryptID + input_filename)
+            list_pdb_files = ['../downloads/%s/' % cryptID + input_filename]
             
+            if self.lowest_structs != []:
+                rootname = input_filename[0:input_filename.rfind(".")]
+                for x in self.lowest_structs:
+                    id = x[0]
+                    lowfile = "%s_%s_low.pdb" % (rootname, id)
+                    list_pdb_files.append('../downloads/%s/%s' % (cryptID, lowfile))
+            else:
+                for filename in list_files:
+                    if filename.endswith("_low.pdb"):
+                        list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
+                        
             for pdb_file in list_pdb_files:
-                pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
+                pdb_file_path = pdb_file.replace('../downloads/', self.download_dir) # build absolute path to the file
                 if not pdb_file_path.endswith(".gz"):
                     if not os.path.exists(pdb_file_path + '.gz'):
                         f_in = open(pdb_file_path, 'rb')
@@ -1014,13 +1015,50 @@ class RosettaHTML(object):
         else:
             return None
             
+    def _getPDBfilesForEnsemble(self, input_filename, cryptID):
+        # todo: unify with function above
+        dir_results = os.path.join(self.download_dir, cryptID)
+        
+        if os.path.exists( dir_results ):
+            list_files = os.listdir( dir_results )
+            
+            # Add the original PDB at the beginning of the list
+            list_pdb_files = ['../downloads/%s/' % cryptID + input_filename]
+            
+            if self.lowest_structs != []:
+                rootname = input_filename[0:input_filename.rfind(".")]
+                for x in self.lowest_structs:
+                    id = x[0]
+                    lowfile = "BR%slow_%s.pdb" % (rootname, id)
+                    list_pdb_files.append('../downloads/%s/%s' % (cryptID, lowfile))
+            else:
+                lowfileregex = re.compile(".*low_\d{4}.pdb$")
+                for filename in list_files:
+                    if lowfileregex.match(filename):
+                        list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
+                        
+            for pdb_file in list_pdb_files:
+                pdb_file_path = pdb_file.replace('../downloads/', self.download_dir) # build absolute path to the file
+                if not pdb_file_path.endswith(".gz"):
+                    if not os.path.exists(pdb_file_path + '.gz'):
+                        f_in = open(pdb_file_path, 'rb')
+                        f_out = gzip.open(pdb_file_path + '.gz', 'wb')
+                        f_out.writelines(f_in)
+                        f_out.close()
+                        f_in.close()
+                    pdb_file += '.gz'
+            
+            return list_pdb_files
+        else:
+            return None
+        
     def _show_scores_file(self, cryptID):
         score_file     = '../downloads/%s/scores_overall.txt' % cryptID
         score_file_res = '../downloads/%s/scores_residues.txt' % cryptID
         html = ''
         if os.path.exists( score_file ):
           handle = open(score_file,'r')
-          html = '''<tr><td align="left" bgcolor="#FFFCD8">Total scores for the generated structures. Download files:<br>
+          html = '''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Total scores for the generated structures. Download files:<br>
                                                             <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
                                                                 <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>''' % (cryptID, cryptID)
           if os.path.exists( score_file_res ):
@@ -1028,16 +1066,17 @@ class RosettaHTML(object):
           html += '''                                      </ul>
                         </td>
                       <td bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre></a></td></tr>
-              ''' % ( score_file, join(handle.readlines()[:7], '') + '...\n' )
+              ''' % ( score_file, join(handle.readlines()[:10], '') + '...\n' )
           handle.close()
           
           # the next 5 lines get the 10 best scoring structures from the overall energies file
           handle = open(score_file,'r')
           import operator
           L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' ]
-          for line in L:
-              line[1] = float(line[1])
-          self.lowest_structs = sorted(L,key=operator.itemgetter(1))[:9]
+          
+          L.sort(key = lambda x:float(x[1]))
+          self.lowest_structs = L[:10] #todo: declare as constant
+          #print(self.lowest_structs)
           handle.close()
         
         return html
@@ -1084,20 +1123,43 @@ class RosettaHTML(object):
                             jmol_cmd_designed += 'select %s:%s; color backbone yellow; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )
                         else:
                             jmol_cmd_designed += 'select %s:%s; color backbone green; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )
-                        
+
+            jmolModelSelectors = ['<script type="text/javascript">jmolCheckbox("frame all; display %d.0", "frame all; hide %d.0", "%s", true, "%s", "title");</script><br>' % (i + 1, i + 1, split(list_pdb_files[i], "/")[-1], split(list_pdb_files[i], "/")[-1]) for i in range(0, min(len(list_pdb_files), 11))]
+            
+            jmolModelSelectors = []
+            
+            for i in range(0, min(len(list_pdb_files), 11)):
+                filename = split(list_pdb_files[i], "/")[-1]
+                rindex = filename.rfind(".pdb")
+                filename = filename[:rindex]
+                jmolModelSelectors.append('''<input type="checkbox" name="JmolStructures" checked="checked" value="%d.0" onClick="updateJmol();"><a href="%s">%s</a><br>\n''' % (i + 1, list_pdb_files[i], filename))
+            
+            #print(list_pdb_files)
+                    
             # html code
             html = """
-                     <tr><td align="justify" bgcolor="#FFFCD8">%s<br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.</td>
-                         <td bgcolor="#FFFCD8"> 
-                            <script type="text/javascript">
-                              jmolInitialize("../../jmol"); 
-                              jmolApplet(400, "set appendNew false;" + %s "%s %s frame all;" ); 
-                            </script>
-                            <br>
-                            <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href="http://www.jmol.org"><small>www.jmol.org</small></a>
+                     <tr>
+                     <td style="text-align:justify;vertical-align:top" bgcolor="#FFFCD8" style="min-width:200px">%s<br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.
+                     <br><!--Input file and the ten best-scoring structures<br>--><hr>
+                     %s
+                                     
+                     </td>
+                         <td bgcolor="#FFFCD8">
+                             <table>
+                                 <tr>
+                                     <td> 
+                                        <script type="text/javascript">
+                                          jmolInitialize("../../jmol");
+                                          jmolApplet(400, "set appendNew false;" + %s "%s %s frame all;" ); 
+                                        </script>
+                                        <br>
+                                        <small>Jmol: an open-source Java viewer for chemical structures in 3D.</small><br><a href="http://www.jmol.org"><small>www.jmol.org</small></a>
+                                     </td>
+                                 </tr>
+                             </table>
                          </td>
                     </tr>
-                    """ % ( comment, jmol_cmd, jmol_cmd_mutation, jmol_cmd_designed )
+                    """ % ( comment, join(jmolModelSelectors,"\n"), jmol_cmd, jmol_cmd_mutation, jmol_cmd_designed)
         else:
             html = '<tr><td align="center" bgcolor="#FFFCD8" colspan=2>no structures found</td></tr>'
                 
@@ -1116,7 +1178,7 @@ class RosettaHTML(object):
             
         html = """
             
-             <tr><td align="justify" bgcolor="#FFFCD8">%s</td>
+             <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>%s</td>
                  <td bgcolor="#FFFCD8">
                     <script type="text/javascript">
                       jmolInitialize("../../jmol"); 
@@ -1344,9 +1406,9 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
           html.append(self._show_scores_file(cryptID))
-          comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
+          comment = '<br>Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
           
-          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutated = {chain : [resid]}))
+          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID), mutated = {chain : [resid]}))
           html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1434,9 +1496,9 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
           html.append(self._show_scores_file(cryptID))
-          comment = 'Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
+          comment = '<br>Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
-          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low'), mutated = mutated ))
+          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID), mutated = mutated ))
           html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1461,8 +1523,8 @@ class RosettaHTML(object):
             html.append('<tr><td align=right></td><td></td></tr>')
             html.append(self._show_scores_file(cryptID))        
         
-            comment = 'Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
-            html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, 'low')))
+            comment = '<br>Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
+            html.append(self._showApplet4MultipleFiles( comment, self._getPDBfilesForEnsemble(input_filename, cryptID)))
             html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1498,7 +1560,7 @@ class RosettaHTML(object):
         len_of_seg = ProtocolParameters["SegmentLength"]
         
         html = ["""
-                <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Backrub Ensemble Design</td></tr>
+                <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td style="min-width:500px" bgcolor="#EEEEFF">Backrub Ensemble Design</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Temperature: %s<br>Sequences per Structure: %s<br>Length of Segment: %s</td></tr>
@@ -1522,19 +1584,19 @@ class RosettaHTML(object):
           
             WebLogoText = self.WebLogoText
             html.append("""
-                <tr><td align="right" bgcolor="#FFFCD8">Mean C&alpha; difference distance values</td>                 
+                <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Mean C&alpha; difference distance values</td>                 
                     <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/ca_dist_difference_1D_plot.png">
                                           <img src="../downloads/%(cryptID)s/ca_dist_difference_1D_plot.png" alt="image file not available" width="400"></a></td></tr>
               
-                <tr><td align="right" bgcolor="#FFFCD8">Pairwise C&alpha; difference distance values [ <a href="../downloads/%(cryptID)s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
+                <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Pairwise C&alpha; difference distance values [ <a href="../downloads/%(cryptID)s/ca_dist_difference_matrix.dat">matrix file</a> ]</td>                
                     <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/ca_dist_difference_2D_plot.png">
                                           <img src="../downloads/%(cryptID)s/ca_dist_difference_2D_plot.png" alt="image file not available" width="400"></a></td></tr>
                 
-                <tr><td align="right" bgcolor="#FFFCD8">Mean RMSD of C&alpha; atoms for individual residues</td>
+                <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Mean RMSD of C&alpha; atoms for individual residues</td>
                     <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/rmsd_plot.png"><img src="../downloads/%(cryptID)s/rmsd_plot.png" alt="image file not available" width="400"></a></td></tr>                          
                                           
-                <tr><td align="center" colspan="2" bgcolor="#FFFCD8">Design results:</td></tr>
-                <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for core residues<br><br>
+                <tr><td align="center" colspan="2" bgcolor="#FFFCD8"><br><h2>Design results:</h2><br></td></tr>
+                <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Frequency of amino acids for core residues<br><br>
                                                         Sequences [ <a href="../downloads/%(cryptID)s/designs_core.fasta">fasta formated file</a> ]<br>
                                                         Sequence population matrix [ <a href="../downloads/%(cryptID)s/seq_pop_core.txt">matrix file</a> ]</td> 
                     <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/logo_core.png"><img src="../downloads/%(cryptID)s/logo_core.png" alt="image file not available" width="400"></a><br>
@@ -1542,7 +1604,7 @@ class RosettaHTML(object):
                     </td>
                 </tr>
                 
-                <tr><td align="right" bgcolor="#FFFCD8">Frequency of amino acids for all residues<br><br>
+                <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Frequency of amino acids for all residues<br><br>
                                                         Sequences [ <a href="../downloads/%(cryptID)s/designs.fasta">fasta formated file</a> ]<br>
                                                         Sequence population matrix [ <a href="../downloads/%(cryptID)s/seq_pop.txt">matrix file</a> ]</td>
                     <td bgcolor="#FFFCD8"><a href="../downloads/%(cryptID)s/logo.png"><img src="../downloads/%(cryptID)s/logo.png" alt="image file not available" width="400"></a><br>
@@ -1651,12 +1713,12 @@ class RosettaHTML(object):
                 
             list_pdb_files.extend( [ '%s/%s/best_scoring_pdb/%s' % ( rootdir, cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
               
-            comment1 = """Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """<br>Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], designed = ProtocolParameters["Designed"])) # only the first 10 structures are shown
                            
-            html.append('''<tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
-                              Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
+            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Individual boxplots of the predicted frequencies at each mutated site.<br>
+                              <br>Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
                               <a href="%s/%s/tolerance_boxplot.png">PNG</a>, <a href="%s/%s/tolerance_boxplot.pdf">PDF</a>.<br>
                               </td>
                            <td bgcolor="#FFFCD8">
@@ -1930,7 +1992,7 @@ class RosettaHTML(object):
             list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
             list_pdb_files.extend( [ '%s/%s/sequence_tolerance/%s_%04.i_low.pdb' % (rootdir, cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """Backbone representation of the best scoring designs for up to 10 different initial backrub structures.<br>
+            comment1 = """<br>Backbone representation of the low files for up to 10 different initial backrub structures.<br><br>
                         The query structure is shown in red. 
                         The designed residues and premutated residues are shown in balls-and-stick representation.
                         Residues which are designed but not mutated have green backbone atoms.
@@ -1962,7 +2024,7 @@ class RosettaHTML(object):
             reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
             
             #@upgradetodo: fix [Figure 2B] and [Table 1]
-            html.append('''<tr><td align="left" bgcolor="#FFFCD8"><p>A ranked table of amino acid types for each position. <br><br>This is similar to upgradetodo hlink [Figure 2B] in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
+            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to upgradetodo hlink [Figure 2B] in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
                               <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See [Table 1] in %s.</p>
                               <p>Download the table as 
                               <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.</p>
@@ -1977,7 +2039,7 @@ class RosettaHTML(object):
             html.append('''<a href="%s/%s/tolerance_seqrank.png"><img src="%s/%s/tolerance_seqrank.png" alt="image file not available" ></a><br>
                         </td>
                         </tr>
-                        <tr><td align="left" bgcolor="#FFFCD8">Individual boxplots of the predicted frequencies at each mutated site.<br>
+                        <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Individual boxplots of the predicted frequencies at each mutated site.<br>
                               Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
                               <a href="%s/%s/tolerance_boxplot.png">PNG</a>, <a href="%s/%s/tolerance_boxplot.pdf">PDF</a>.<br>
                               </td>
@@ -2008,7 +2070,7 @@ class RosettaHTML(object):
                 
             WebLogoText = self.WebLogoText
             html.append('''</td></tr>
-                        <tr><td align="left" bgcolor="#FFFCD8">Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="%(rootdir)s/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                        <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="%(rootdir)s/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
                              <td align="center" bgcolor="#FFFCD8"><a href="%(rootdir)s/%(cryptID)s/tolerance_motif.png">
                                                    <img width="%(halfWidth)d" height="296" src="%(rootdir)s/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
                              %(WebLogoText)s
