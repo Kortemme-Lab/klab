@@ -1048,7 +1048,6 @@ def submit(rosettaHTML, form, SID):
                         return False   
             
             # todo: output where the time is going on Albana
-            # @upgradetodo: check test input button which tests submit but does not add a job to the db
             ProtocolParameters = pickle.dumps(ProtocolParameters)
             
             if not errors:

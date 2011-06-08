@@ -468,7 +468,7 @@ class RosettaHTML(object):
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values(false); document.submitform.query.value = 'sampleData'; document.submitform.submit();">
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="if (ValidateForm()){alert('The parameters are valid.');}else{alert('The parameters are valid.');}"></span>
-              <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset Form" onClick="reset_form();"></span>
+              <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset form" onClick="reset_form();"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit"></span>
             </p>
             <!-- end parameter form -->''')

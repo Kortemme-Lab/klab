@@ -49,6 +49,7 @@ class Daemon(object):
         #redirect standard file descriptors
         # if not self.debug:
         # # this discards any output.
+        #@upgradetodo
         #sys.stdout.flush()
         #sys.stderr.flush()
         #si = file(self.stdin, 'r')
