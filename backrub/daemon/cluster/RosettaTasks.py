@@ -1494,7 +1494,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             s = ""
             for fn in failed_runs:
                 s += "%s\n" % self.stTask.getExpectedOutputFileNames()[fn]
-            print(s)
+            self._status(s)
             rosettahelper.writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
             
         self._status("Analyzing results")
@@ -1587,71 +1587,73 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.file_stderr.close()
         
         # CREATE SEQUENCE MOTIF    ## this all would be better off in the postprocessing of the onerun class
-        print "\tCreate Sequence Motif\n\t+-- copy PDB files from cluster"
-        # 1st, get the data
-        sequences_list_total = []
+        self._status("\tCreate Sequence Motif\n\t+-- copy PDB files from cluster")
+        
+        sequences_list_total = {}
         
         rosettahelper.make755Directory(self._targetdir_file_path("best_scoring_pdb"))
-        
         list_files = []        
         #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "BR*low_*_*.pdb")):
         for file in glob.glob(os.path.join(self.workingdir, "sequence_tolerance", "BR*low_*_*.pdb")):
             list_files.append(file.split('/')[-1].strip())
         list_files.sort()
+        
         for filename in list_outfiles:
-            print(filename)
             si = int(filename.split('.')[-1]) # get the run id
             sequences_list = []
             output_handle = open(filename, 'r')
-            # read only last generation "Generation 5"
+            
+            
             for line in output_handle:
-                if line[0:13] == "Generation  5":
-                    # sequences_list.append( line.split()[5] )
-                    break                                    # and break
+                if line.find("Done with initialization.  Starting individual sequence calculations"):
+                    break
+        
+            for line in output_handle:            
+                if line[0:10] == "Generation":
+                    GenNumber = int(line[12:13])
+                    break
             # now the stuff we actually need to read in:
             for line in output_handle:
                 if line[0:10] == "Generation":
-                    # sequences_list.append( line.split()[5] )
+                    GenNumber = int(line[12:13])
                     pass
-                elif len(line) > 1:                        # normal line is not empty and the sequence is at the beginning
+                elif len(line) > 1:          # normal line is not empty and the sequence is at the beginning
                     data_line = line.split() # (sequence, fitness, interface score, complex score)
-                    sequences_list.append( (data_line[0], data_line[2]) )
+                    # Index over both score and sequence to remove any duplicates
+                    sequences_list_total[(float(data_line[2]), data_line[0])] = (GenNumber, si)
                 else:
                     break # break for the first empty line. This means we're done.
-            output_handle.close()
-            # now sort after score:
-            self._filter(sequences_list)
-            # get all pdb files associated with this run:
-            list_this_run = rosettahelper.grep('BR%slow_%04.i_[A-Z]*\.pdb' % (self.parameters['pdbRootname'], si), list_files)
-            #best_scoring_pdbs = []
-            structure_counter = 0 # ok it seems that not all the sequences have a corresponding pdb file. Therefore we keep the first 10 we can find!
-            
-            print("sequences list:%s\n" % sequences_list)
-            
-            for designed_sequence in sequences_list: # keep the 10 best scoring structures
-                best_scoring_pdb = 'BR%slow_%04.i_%s.pdb' % (self.parameters['pdbRootname'], si, designed_sequence[0])
-                if best_scoring_pdb in list_this_run:
-                    print("copying %s back as best_scoring_pdb" % best_scoring_pdb)
-                    #self.stTask._copyFilesBackToHost(best_scoring_pdb)
-                    bspdb = os.path.join(self._workingdir_file_path("sequence_tolerance"), best_scoring_pdb)
-                    shutil.copy(bspdb, self._targetdir_file_path("best_scoring_pdb"))        
-                    structure_counter += 1
-                if structure_counter >= 10:
-                    break
+            output_handle.close()        
         
-            sequences_list_total.extend(sequences_list[0:10]) # add 10 best scoring to the total list
+        # get all pdb files associated with this run:
+        list_this_run = rosettahelper.grep('BR%slow_%04.i_[A-Z]*\.pdb' % (self.parameters['pdbRootname'], si), list_files)
+        structure_counter = 0 # ok it seems that not all the sequences have a corresponding pdb file. Therefore we keep the first 10 we can find!
         
+        self._status("sequences list:%s\n" % sequences_list)
+
+        # keep the 10 best scoring structures
+        for designed_sequence, origin in sorted(sequences_list_total.iteritems()):
+            best_scoring_pdb = 'BR%slow_%04.i_%s.pdb' % (self.parameters['pdbRootname'], si, designed_sequence[1])
+            if best_scoring_pdb in list_this_run:
+                self._status("copying %s back as best_scoring_pdb" % best_scoring_pdb)
+                #self.stTask._copyFilesBackToHost(best_scoring_pdb)
+                bspdb = os.path.join(self._workingdir_file_path("sequence_tolerance"), best_scoring_pdb)
+                shutil.copy(bspdb, self._targetdir_file_path("best_scoring_pdb"))        
+                structure_counter += 1
+            if structure_counter >= 10:
+                break
+            
         # write the actual fasta file with the 10 best scoring sequences of each run
         if not sequences_list_total:
             sys.stderr.write("There were no sequences for the fasta file. Try increasing the value of pop_size.")
             raise PostProcessingException
-                
+          
         fasta_file = self._targetdir_file_path("tolerance_sequences.fasta")
         handle_fasta = open(fasta_file, 'w')
         i = 0
-        for sequence in sequences_list_total:
+        for designed_sequence, origin in sorted(sequences_list_total.iteritems()):
             i += 1
-            handle_fasta.write('>%s\n%s\n' % (i, sequence[0]))
+            handle_fasta.write('>%s\n%s\n' % (i, designed_sequence[1]))
         handle_fasta.close()
         
         # 3rd, create the motif
@@ -1690,13 +1692,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             print("Exception copying PDBs back.")        
         
         return True
-    
-    def _filter(self,list_seq):
-        """this sorts sequences after fitness score"""
-        decimal.getcontext().prec = 1
-        list_seq.sort(lambda x,y: cmp(decimal.Decimal(x[1]), decimal.Decimal(y[1])), reverse=True)
-        return list_seq
-    
+        
     def _import_pdb(self, filename, contents):
         """Import a pdb file from the database and write it to the temporary directory"""
               

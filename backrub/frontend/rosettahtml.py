@@ -1117,11 +1117,15 @@ class RosettaHTML(object):
                         
             # jmol command to show mutation as balls'n'stick
             # todo: the coercion to string for the residue is a hangover from the old codebase. Remove when it always passes  
+            jmolJSDesigned = []
+            jmolJSMutations = []
             jmol_cmd_mutation = ''
             if mutated:
                 for chain, residues in mutated.iteritems():
                     for residue in residues:
-                        jmol_cmd_mutation += 'select %s:%s; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )        
+                        residue = str(residue)
+                        jmolJSMutations.append("%s:%s" % (residue, chain))     
+                        jmol_cmd_mutation += 'select %s:%s; color backbone yellow; cartoon off; backbone on; wireframe 0.25; ' % ( residue, chain )        
             jmol_cmd_designed = ''
             if designed:
                 for chain, residues in designed.iteritems():
@@ -1129,36 +1133,61 @@ class RosettaHTML(object):
                         # Not the most efficient but numbers should be small
                         # Display residues which are designed but not mutated using green
                         # Display residues which are designed and mutated using yellow 
-                        if mutated and mutated[chain] and (residue in mutated[chain]):
-                            jmol_cmd_designed += 'select %s:%s; color backbone yellow; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )
-                        else:
-                            jmol_cmd_designed += 'select %s:%s; color backbone green; cartoon off; backbone on; wireframe 0.3; ' % ( str(residue), chain )
-
-            jmolModelSelectors = ['<script type="text/javascript">jmolCheckbox("frame all; display %d.0", "frame all; hide %d.0", "%s", true, "%s", "title");</script><br>' % (i + 1, i + 1, split(list_pdb_files[i], "/")[-1], split(list_pdb_files[i], "/")[-1]) for i in range(0, min(len(list_pdb_files), 11))]
+                        residue = str(residue)
+                        #if mutated and mutated[chain] and (residue in mutated[chain]):
+                        #    color = "yellow"
+                        #else:
+                        #    color = "green"
+                        jmolJSDesigned.append("%s:%s" % (residue, chain))     
+                        jmol_cmd_designed += 'select %s:%s; color backbone green; cartoon off; backbone on; wireframe 0.25; ' % ( residue, chain)
+                        #jmolJSDesigned.append(("%s:%s" % (residue, chain), color))     
+                        
+            numstructures = min(len(list_pdb_files), 11)
             
-            jmolModelSelectors = []
+            #jmolModelSelectors = ['<script type="text/javascript">jmolCheckbox("frame all; display %d.0", "frame all; hide %d.0", "%s", true, "%s", "title");</script><br>' % (i + 1, i + 1, split(list_pdb_files[i], "/")[-1], split(list_pdb_files[i], "/")[-1]) for i in range(0, min(len(list_pdb_files), 11))]
+            jmolJSVariables = "jmolDesignedResidues = %s;\njmolMutatedResidues = %s;\n" % (str(jmolJSDesigned), str(jmolJSMutations))
             
-            for i in range(0, min(len(list_pdb_files), 11)):
+            cols = 1
+            jmolModelSelectors = ['<table class="jmoltable"><tr><th>Model</th>']
+            if mutated and numstructures > 0:
+                jmolModelSelectors.append('<th>Premutated</th>')
+                cols += 1
+            if designed and numstructures > 0:
+                jmolModelSelectors.append('<th>Designed</th>')
+                cols += 1
+            jmolModelSelectors.append('</tr><tr><td colspan="%d"><hr></td></tr>' % cols)           
+            for i in range(0, numstructures):
                 filename = split(list_pdb_files[i], "/")[-1]
                 rindex = filename.rfind(".pdb")
                 filename = filename[:rindex]
-                jmolModelSelectors.append('''<input type="checkbox" name="JmolStructures" checked="checked" value="%d.0" onClick="updateJmol();"><a href="%s">%s</a><br>\n''' % (i + 1, list_pdb_files[i], filename))
+                premcode = ("","")
+                descode = premcode
+                if mutated and i > 0:
+                    premcode = ('''document.getElementsByName('JmolPremutated')[%d].disabled = this.checked != true;'''  % (i - 1),
+                                '''<td><input type="checkbox" name="JmolPremutated" checked="checked" value="%d.0" onClick="updateJmol();"></td>''' % (i + 1))
+                if designed and i > 0:
+                    descode = ('''document.getElementsByName('JmolDesigned')[%d].disabled = this.checked != true;'''  % (i - 1),
+                                '''<td><input type="checkbox" name="JmolDesigned" checked="checked" value="%d.0" onClick="updateJmol();"></td>''' % (i + 1))
+                jmolModelSelectors.append('''<tr><td><input type="checkbox" name="JmolStructures" checked="checked" value="%d.0" onClick="updateJmol(); %s %s"><a href="%s">%s</a></td>%s%s''' % (i + 1, premcode[0], descode[0], list_pdb_files[i], filename, premcode[1], descode[1]))                
+
+                jmolModelSelectors.append("</tr>")
+            jmolModelSelectors.append("</table>")
             
             #print(list_pdb_files)
-                    
             # html code
             html = """
                      <tr>
                      <td style="text-align:justify;vertical-align:top" bgcolor="#FFFCD8" style="min-width:200px">%s<br><br>Please wait, it may take a few moments to load the C&alpha; trace representation.
-                     <br><!--Input file and the ten best-scoring structures<br>--><hr>
-                     %s
-                                     
+                     <br><!--Input file and the ten best-scoring structures<br>--><br>
+                     %s             
+                     <br>If a model is not selected, its residues will be hidden as well. Note that changes made in the Jmol menu will not be reflected in the table above.
                      </td>
                          <td bgcolor="#FFFCD8">
                              <table>
                                  <tr>
                                      <td> 
                                         <script type="text/javascript">
+                                          %s
                                           jmolInitialize("../../jmol");
                                           jmolApplet(400, "set appendNew false;" + %s "%s %s frame all;" ); 
                                         </script>
@@ -1169,7 +1198,7 @@ class RosettaHTML(object):
                              </table>
                          </td>
                     </tr>
-                    """ % ( comment, join(jmolModelSelectors,"\n"), jmol_cmd, jmol_cmd_mutation, jmol_cmd_designed)
+                    """ % ( comment, join(jmolModelSelectors,"\n"), jmolJSVariables, jmol_cmd, jmol_cmd_mutation, jmol_cmd_designed)
         else:
             html = '<tr><td align="center" bgcolor="#FFFCD8" colspan=2>no structures found</td></tr>'
                 
@@ -1416,7 +1445,7 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
           html.append(self._show_scores_file(cryptID))
-          comment = '<br>Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
+          comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
           
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID), mutated = {chain : [resid]}))
           html.append(self._show_molprobity( cryptID ))
@@ -1506,7 +1535,7 @@ class RosettaHTML(object):
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
           html.append(self._show_scores_file(cryptID))
-          comment = '<br>Backbone representation of up to 10 of the best scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
+          comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID), mutated = mutated ))
           html.append(self._show_molprobity( cryptID ))
@@ -1533,7 +1562,7 @@ class RosettaHTML(object):
             html.append('<tr><td align=right></td><td></td></tr>')
             html.append(self._show_scores_file(cryptID))        
         
-            comment = '<br>Backbone representation of the 10 best scoring structures. The query structure is shown in red.'
+            comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red.'
             html.append(self._showApplet4MultipleFiles( comment, self._getPDBfilesForEnsemble(input_filename, cryptID)))
             html.append(self._show_molprobity( cryptID ))
           
@@ -1723,7 +1752,7 @@ class RosettaHTML(object):
                 
             list_pdb_files.extend( [ '%s/%s/best_scoring_pdb/%s' % ( rootdir, cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
               
-            comment1 = """<br>Backbone representation of the best scoring designs for 10 different initial backrub structures.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
+            comment1 = """<br>Structural models for up to 10 low-energy sequences.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], designed = ProtocolParameters["Designed"])) # only the first 10 structures are shown
                            
@@ -2002,11 +2031,11 @@ class RosettaHTML(object):
             list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
             list_pdb_files.extend( [ '%s/%s/sequence_tolerance/%s_%04.i_low.pdb' % (rootdir, cryptID, input_id, i) for i in range(1,size_of_ensemble+1) ] )
             
-            comment1 = """<br>Backbone representation of the low files for up to 10 different initial backrub structures.<br><br>
+            comment1 = """<br>Structural models for up to 10 low-energy initial backrub structures.<br><br>
                         The query structure is shown in red. 
                         The designed residues and premutated residues are shown in balls-and-stick representation.
-                        Residues which are designed but not mutated have green backbone atoms.
-                        Residues which are designed <i>and</i> mutated have yellow backbone atoms.
+                        Residues which are designed have green backbone atoms.
+                        Residues which are premutated have yellow backbone atoms.
                         """
              
             designed_chains = []

@@ -1519,19 +1519,91 @@ function usingMini()
 /************************************
  * Jmol functions 
  ************************************/
+function __updateResidues(resstring, n, residues)
+{
+	if (residues.length > 0)
+	{
+		var numres = residues.length;
+		residueString = []
+		for (j = 0; j < residues.length; j++)
+		{
+			residueString.push(residues[j] + "/" + n + " ")
+		}
+		jmolScript(resstring + residueString.join())
+	}
+}
+
+function _updateResidues(strarray, n, residues)
+{
+	if (residues.length > 0)
+	{
+		var numres = residues.length;
+		residueString = []
+		for (j = 0; j < residues.length; j++)
+		{
+			residueString.push(residues[j] + "/" + n + " ")
+		}
+		strarray.push(residueString.join())
+	}
+}
+
+function updateJmolResidues(thischeckbox)
+{
+	resstring = thischeckbox.checked ? "display displayed or" : "hide hidden or ";
+	n = thischeckbox.value
+	_updateResidues(resstring, n, jmolDesignedResidues);
+	_updateResidues(resstring, n, jmolMutatedResidues);
+}
 
 function updateJmol()
 {
 	//for all structure checkboxes
+	
 	displayString = ""
-	var displayString = []
-	                     
+	var displayString = [];
+	var hideString = [];
+	var residueString = [];
+	designedCheckboxes = document.getElementsByName("JmolDesigned")
+	premutatedCheckboxes = document.getElementsByName("JmolPremutated")	
+		                                      	
+	// Display / hide structures
 	for (i = 0; i < document.getElementsByName("JmolStructures").length; i++)
 	{
-		if (document.getElementsByName("JmolStructures")[i].checked)
+		var showStructure = document.getElementsByName("JmolStructures")[i].checked;
+		
+		index = document.getElementsByName("JmolStructures")[i].value
+		if (showStructure)
 		{
-			displayString.push(document.getElementsByName("JmolStructures")[i].value)
+			displayString.push(index)
 		}
+		else
+		{
+			hideString.push(index)
+		}
+		
+		if (i > 0 && premutatedCheckboxes.length > 0)
+		{
+			if (premutatedCheckboxes[i - 1].checked && showStructure)
+			{
+				_updateResidues(displayString, index, jmolMutatedResidues);
+			}
+			else
+			{
+				_updateResidues(hideString, index, jmolMutatedResidues);
+			}
+		}
+		if (i > 0 && designedCheckboxes.length > 0)
+		{
+			if (designedCheckboxes[i - 1].checked && showStructure)
+			{
+				_updateResidues(displayString, index, jmolDesignedResidues);
+			}
+			else
+			{
+				_updateResidues(hideString, index, jmolDesignedResidues);
+			}
+		}
+		
 	}
 	if (displayString.length == 0)
 	{
@@ -1540,9 +1612,8 @@ function updateJmol()
 	}
 	else
 	{
-		jmolScript("frame all; display " + displayString.join())
+		jmolScript("frame all; display " + displayString.join() + "; hide " + hideString.join())
 	}
-
 }
 
 

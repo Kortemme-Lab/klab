@@ -63,6 +63,12 @@ a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size:
 .activeRT { border-right:1px solid black; border-top:1px solid black; border-bottom:1px solid black; }
 .inactiveRT { border-left:1px solid black; }
 
+table.jmoltable th { font-size: 10pt; }
+table.jmoltable th:first-child { text-align: left; }
+table.jmoltable td:first-child { text-align: left; }
+table.jmoltable td:first-child+td { text-align: center; }
+table.jmoltable td:first-child+td+td { text-align: center; }
+		
 div#box{float:right; width: 440px; padding: 20px; margin:0px auto; color:#000; }
 div#login_box{float:center; width: 600px; padding: 20px; margin:0px auto; color:#000; background-color:#DCE9F4; }
 div#queue_bg{float:center; width: 700px; padding: 20px; margin:0px auto; color:#000; background-color:#EEEEEE; }
