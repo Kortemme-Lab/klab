@@ -1129,8 +1129,8 @@ class ClusterDaemon(RosettaDaemon):
                 if clusterjob.isCompleted():
                     completedJobs.append(clusterjob)               
 
-                    clusterjob.analyze()
                     clusterjob.saveProfile()
+                    clusterjob.analyze()
                     
                     self.end_job(clusterjob)
                     clusterjob.dumpJITGraph()
@@ -1142,6 +1142,7 @@ class ClusterDaemon(RosettaDaemon):
             except Exception, e:
                 self.recordErrorInJob(clusterjob, "Failed.", traceback.format_exc(), e)
                 self.end_job(clusterjob)
+                clusterjob.dumpJITGraph()
                             
         # Remove completed jobs from the list
         for cj in completedJobs:
@@ -1254,7 +1255,7 @@ class ClusterDaemon(RosettaDaemon):
             if False: # For debugging
                 sys.stdout.write("\n")
                 if self.sgec.CachedList:
-                    print(self.sgec.CachedList)
+                    sys.stdout.write(self.sgec.CachedList)
                 
             if diff:
                 sys.stdout.write("\n")
@@ -1264,11 +1265,11 @@ class ClusterDaemon(RosettaDaemon):
                     summary = statusprinter.summary()
                     statusList = statusprinter.statusList()
                     if summary:
-                        print(summary)
+                        sys.stdout.write(summary)
                     if statusList:
-                        print(statusList)
+                        sys.stdout.write(statusList)
                     self.diffcounter = 0
-                print(diff)
+                sys.stdout.write(diff)
             else:
                 # Indicate tick
                 sys.stdout.write(".")
