@@ -200,7 +200,7 @@ class TaskScheduler(object):
         tasksToStart = []
         for task in self.tasks[ClusterTask.INITIAL_TASK]:
             tasksToStart.append(task)
-        
+            
         for task in tasksToStart:
             #todo: pass in files?
             started = task.start(self.sgec, self.dbID)
@@ -344,6 +344,7 @@ class RosettaClusterJob(object):
     def start(self):
         try:
             self.scheduler.start(self.sgec, self.parameters["ID"])
+            self.dumpJITGraph()
         except TaskSchedulerException, e:
             self.error = "The job failed during startup"
             self.failed = True
@@ -412,16 +413,17 @@ class RosettaClusterJob(object):
         else:    
             attr = 'succeeded="true"' 
         
-        stats = [('%s %s workingDir="%s" resultsDir="%s" downloadsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory, self.parameters["cryptID"]), stats)]
+        stats = [('%s %s workingDir="%s" targetDir="%s" downloadsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory, self.parameters["cryptID"]), stats)]
         SimpleProfiler.sumTuples(stats)
         return stats
         
     def analyze(self):
         '''Any final output can be generated here. We assume here that all necessary files have been copied in place.'''
         self.profiler.PROFILE_START("Analysis")
-        self._analyze()
+        result = self._analyze()
         self.profiler.PROFILE_STOP("Analysis")
-        return True
+        if not result:
+            raise
     
     def saveProfile(self):
         contents = "<profile>\n%s</profile>" % self.getprofileXML()

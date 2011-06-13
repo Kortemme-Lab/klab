@@ -121,6 +121,30 @@ def getResIDs(params, justification = 0):
                 design.append('%s%s' % (partner, str(residue).rjust(justification)))
     return design
 
+def createSequenceMotif(infasta, annotations, outpng):
+    # create weblogo from the created fasta file
+    seqs = read_seq_data(open(infasta))
+    logo_data = LogoData.from_seqs(seqs)
+    logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
+    logo_options = LogoOptions()
+    logo_options.title = "Sequence profile"
+    logo_options.number_interval = 1
+    logo_options.color_scheme = std_color_schemes["chemistry"]
+    logo_options.annotate = annotations
+    
+    # Change the logo size of the X-axis for readability
+    logo_options.number_fontsize = 3.5
+    
+    # Change the logo size of the Weblogo 'fineprint' - the default Weblogo text
+    logo_options.small_fontsize = 4
+    
+    # Move the Weblogo fineprint to the left hand side for readability
+    fineprinttabs = "\t" * (int(2.7 * float(len(annotations))))
+    logo_options.fineprint = "%s\t%s" % (logo_options.fineprint, fineprinttabs)
+
+    logo_format = LogoFormat(logo_data, logo_options)
+    png_print_formatter(logo_data, logo_format, open(outpng, 'w'))
+
 def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
     """create a resfile for the chains
        Returns True, contents_of_resfile if a non-empty sequence tolerance residue file is made 
@@ -163,11 +187,12 @@ def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
     return True, contents
 
 
+# Sequence Tolerance SK Tasks        
 
 class BackrubSequenceToleranceSK(ClusterTask):
 
     # additional attributes
-    prefix = "Seq.Tolerance"
+    prefix = "SeqTolerance"
          
     def __init__(self, workingdir, targetdirectory, parameters, backrub_resfile, seqtol_resfile, movemap=None, name=""):
         self.backrub_resfile    = backrub_resfile
@@ -177,8 +202,8 @@ class BackrubSequenceToleranceSK(ClusterTask):
         self.pivot_res          = []   # list of pivot residues, consecutively numbered from 1 [1,...]
         self.map_res_id         = {}   # contains the mapping from (chain,resid) to pivot_res
         
-        if not parameters.get("binary") or not(parameters["binary"] == "seqtolJMB" or parameters["binary"] == "seqtolP1"):
-            raise
+        if not parameters.get("binary") or not(parameters["binary"] == "seqtolJMB" or parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol"):
+            raise Exception
                         
         super(BackrubSequenceToleranceSK, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
     
@@ -212,7 +237,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
             score_weights = no_hb_env_dep_weights_file
             score_patch = ""
             ref_offsets = "HIS 1.2"
-        elif parameters["binary"] == "seqtolP1":
+        elif parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol":
             score_weights = "standard"
             score_patch = "score12"
             ref_offsets = "HIS 1.2"
@@ -317,165 +342,6 @@ class BackrubSequenceToleranceSK(ClusterTask):
             return False
           
         return passed
-    
-    
-#@finalupgradetodo Remove this class
-class BackrubClusterSKTask(ClusterTask):
-
-    # additional attributes
-    prefix = "backrub"
-    
-    def __init__(self, workingdir, targetdirectory, parameters, resfile, movemap=None, name=""):
-        self.resfile       = resfile
-        self.movemap       = movemap
-        self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
-        self.pivot_res     = []   # list of pivot residues, consecutively numbered from 1 [1,...]
-        self.map_res_id    = {}   # contains the mapping from (chain,resid) to pivot_res
-        super(BackrubClusterSKTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name)          
-    
-    def _initialize(self):
-        self._prepare_backrub()
-        parameters = self.parameters
-        
-        self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
-        if CLUSTER_debugmode:
-            self.parameters["ntrials"] = 10   
-    
-        # Setup backrub
-        ct = ClusterScript(self.workingdir, parameters["binary"])
-        args = [ct.getBinary("backrub"),  
-                "-database %s" % ct.getDatabaseDir(), 
-                "-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
-                "-ignore_unrecognized_res", 
-                "-ex1 -ex2", 
-                "-nstruct %d" % parameters["nstruct"],
-                "-backrub:ntrials %d" % parameters["ntrials"], 
-                "-pivot_atoms CA"] 
-        if self.movemap:
-            args.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
-        if self.resfile:
-            args.append("-resfile %s/%s" % (ct.getWorkingDir(), self.resfile))
-        if len(self.pivot_res) > 0:
-            args.append("-pivot_residues")
-            self.pivot_res.sort()
-            args.extend([str(resid) for resid in self.pivot_res])
-
-        commandline = join(args, " ")
-        self.script = ct.createScript([commandline], type="Backrub")
-
-    def _prepare_backrub( self ):
-        """prepare data for a full backbone backrub run"""
-        self.pdb = pdb.PDB(self.parameters["pdb_info"].split('\n'))
-        self.map_res_id = self.parameters["map_res_id"] 
-        self.residue_ids = self.pdb.aa_resids()
-
-        # backrub is applied to all residues: append all residues to the backrub list
-        backrub = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
-        for res in self.residue_ids:
-            x = [ res[0], res[1:].strip() ] # 0: chain ID, 1..: resid
-            if len(x) == 1:
-                backrub.append( ( "_", int(x[0].lstrip())) )
-            else:
-                backrub.append( ( x[0], int(x[1].lstrip())) )
-        
-        # translate resid to absolute mini rosetta res ids
-        for residue in backrub:
-            self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
-                
-    
-    def retire(self):
-        passed = super(BackrubClusterSKTask, self).retire()
-        
-        self._status('Copying files from %s to %s' % (self.workingdir, self.targetdirectory))
-                   
-        for file in glob.glob(self._workingdir_file_path("*low.pdb")):
-            self._status('copying %s' % file)
-            shutil.copy(file, self.targetdirectory)
-        for file in glob.glob(self._workingdir_file_path("*last.pdb")):
-            self._status('copying %s' % file)
-            shutil.copy(file, self.targetdirectory)
-            
-        # Run the analysis on the originating host
-        errors = []
-        # check whether files were created (and write the total scores to a file)
-        for x in range(1, self.parameters['nstruct']+1):
-            low_file   = self._targetdir_file_path(getOutputFilenameSK(self.parameters["pdbRootname"], x, "low"))          
-            last_file  = self._targetdir_file_path(getOutputFilenameSK(self.parameters["pdbRootname"], x, "last"))          
-
-            if not os.path.exists( low_file ): 
-                errors.append('%s missing' % low_file)
-            if not os.path.exists( last_file ):
-                errors.append('%s missing' % ( last_file ))
-        
-        if self.filename_stdout and os.path.exists(self._targetdir_file_path( self.filename_stdout )):
-            Analysis = AnalyzeMini(filename=self._targetdir_file_path( self.filename_stdout ))
-            Analysis.analyze(outfile=self._targetdir_file_path('backrub_scores.dat'))
-        else:
-            errors.append("Standard output is missing; no analysis was performed.")
-                    
-        # At this stage we are actually done but do not mark ourselves as completed otherwise the scheduler will get confused
-        if errors:
-            errs = join(errors,"</error>\n\t<error>")
-            print("<errors>\n\t<error>%s</error>\n</errors>" % errs)
-            self.state = FAILED_TASK
-            return False
-          
-        return passed
-        
-            
-#@finalupgradetodo Remove this class
-class SequenceToleranceClusterTask(ClusterTask):
-           
-    prefix = "seqtol"
-       
-    def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
-        self.resfile = resfile
-        super(SequenceToleranceClusterTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
-
-    def _initialize(self):
-        parameters = self.parameters
-        
-        self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
-        self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
-        self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
-        
-        parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
-        if CLUSTER_debugmode:
-            self.parameters["pop_size"] = 200
-        
-        # Setup backrub
-        ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = {"lowfiles" : self.low_files, "prefixes" : self.prefixes})
-        commandlines = ['# Run sequence tolerance', '',
-            join(
-                [ct.getBinary("sequence_tolerance"),  
-                "-database %s" % ct.getDatabaseDir(), 
-                "-s $lowfilesvar",
-                "-ex1 -ex2 -extrachi_cutoff 0",
-                "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
-                "-ms:generations 5",
-                "-ms:pop_size %d" % parameters["pop_size"],
-                "-ms:pop_from_ss 1",
-                "-ms:checkpoint:prefix $prefixesvar",
-                "-ms:checkpoint:interval 200",
-                "-ms:checkpoint:gz",
-                "-ms:numresults", "0",
-                "-out:prefix $prefixesvar", 
-                "-packing:resfile %s/%s" % (self.workingdir, self.resfile),
-                "-score:ref_offsets TRP 0.9" 
-                 ])]
-        self.script = ct.createScript(commandlines, type="SequenceTolerance")
-
-    def retire(self):
-        #try:
-            sr = super(SequenceToleranceClusterTask, self).retire()
-            self._copyFilesBackToHost(["*.pdb", "*.gz", "*.resfile"])
-            return sr
-        #except Exception, e:
-        #    self.state = FAILED_TASK
-        #    printException(e)
-        #    raise
-        #    return False
-        
         
 # Sequence Tolerance HK Tasks        
 
@@ -483,7 +349,7 @@ class SequenceToleranceClusterTask(ClusterTask):
 
 class MinimizationSeqTolHKClusterTask(ClusterTask):
                      
-    prefix = "minimization"
+    prefix = "Minimization"
                      
     def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
         self.resfile = resfile
@@ -535,7 +401,7 @@ class MinimizationSeqTolHKClusterTask(ClusterTask):
 
 class BackrubClusterTaskHK(ClusterTask):
 
-    prefix = "backrub"
+    prefix = "Backrub"
                 
     def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
         self.resfile = resfile
@@ -636,7 +502,7 @@ class BackrubClusterTaskHK(ClusterTask):
 
 class SequenceToleranceHKClusterTask(ClusterTask):
     
-    prefix = "seqtol"
+    prefix = "SeqTolerance"
        
     def __init__(self, workingdir, targetdirectory, parameters, resfile, name=""):
         self.resfile = resfile
@@ -683,702 +549,7 @@ class SequenceToleranceHKClusterTask(ClusterTask):
         return sr and True
               
     
-# Cluster jobs
-
-class SequenceToleranceJobSK(RosettaClusterJob):
-
-    suffix = "seqtolSK"
-    flatOutputDirectory = True
-    name = "Sequence Tolerance (SK, JMB)"
-    
-    def _defineOutputFiles(self):
-        self.resultFilemasks.append((".", "*.pdb"))
-        self.resultFilemasks.append((".", "stderr*"))
-        self.resultFilemasks.append((".", "stdout*"))
-        self.resultFilemasks.append((".", "timing_profile.txt"))
-        self.resultFilemasks.append((".", "tolerance_*"))
-        self.resultFilemasks.append((".", "*.ga.entities.gz"))
-        self.resultFilemasks.append(("backrub", "*.cmd*"))
-        self.resultFilemasks.append(("backrub", "*.resfile"))
-        self.resultFilemasks.append(("backrub", "*.movemap"))
-        self.resultFilemasks.append(("backrub", "backrub_scores.dat"))
-        self.resultFilemasks.append(("sequence_tolerance", "*.resfile"))
-        self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
-        self.resultFilemasks.append(("sequence_tolerance", "*low*.pdb"))
-            
-    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
-        # The tempdir is the one on the submission host e.g. chef
-        # targetdirectory is the one on your host e.g. your PC or the webserver
-        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
-        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
-        self.map_res_id = {}
-        super(SequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
-    
-    def _initialize(self):
-        self.describe()
-        
-        # Create input files        
-        if not testonly:
-            self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
-            self._write_backrub_resfile()
-            self._write_seqtol_resfile()
-            self._write_backrub_movemap()
-        
-        scheduler = TaskScheduler(self.workingdir, files = [self.parameters["pdb_filename"], self.seqtol_resfile, self.backrub_resfile, self.backrub_movemap])
-        
-        targetsubdirectory = "backrub"
-        taskdir = self._make_taskdir(targetsubdirectory, [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap])
-        brTask = BackrubClusterSKTask(taskdir, os.path.join(self.targetdirectory, targetsubdirectory), self.parameters, self.backrub_resfile, movemap = self.backrub_movemap, name = "Backrub step for sequence tolerance protocol")
-        
-        targetsubdirectory = "sequence_tolerance"
-        taskdir = self._make_taskdir(targetsubdirectory, [self.seqtol_resfile])
-        stTask = SequenceToleranceClusterTask(taskdir, os.path.join(self.targetdirectory,targetsubdirectory), self.parameters, self.seqtol_resfile, name="Sequence tolerance step for sequence tolerance protocol")
-        stTask.addPrerequisite(brTask, [getOutputFilenameSK(self.parameters["pdbRootname"], i + 1, "low") for i in range(self.parameters["nstruct"])])
-         
-        scheduler.addInitialTasks(brTask)
-        self.scheduler = scheduler
-
-    def _analyze(self):
-        # Run the analysis on the originating host
-        
-        self._status("Analyzing results")
-        # run Colin's analysis script: filtering and profiles/motifs
-        thresh_or_temp = self.parameters['kT']
-        
-        weights = self.parameters['Weights']
-        fitness_coef = 'c(%s' % weights[0]
-        for i in range(1, len(weights)):
-            fitness_coef += ', %s' % weights[i]
-        fitness_coef += ')'
-        
-        type_st = '\\"boltzmann\\"'
-        prefix  = '\\"tolerance\\"'
-        percentile = '.5'
-        
-        cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                  | /bin/cat %s - \\
-                  | /usr/bin/R --vanilla''' % ( self.targetdirectory, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
-                         
-        self._status(cmd)
-        
-        #targetTaskDir =  os.path.join(self.targetdirectory, "sequence_tolerance")
-        # Move any output files to the root so all R output gets located there
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*ga.entities*")):
-            self._status('copying %s' % file)
-            shutil.move(file, self.targetdirectory)
-        
-        # Create the standard output file where the R script expects it
-        firststdout = None
-        firstlowfile = None
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*.cmd.o*.1")):
-            firststdout = file
-            break
-        for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*0001_low.pdb")):
-            firstlowfile = file
-            break
-        if firststdout and firstlowfile:
-            self._status("Copying stdout and lowfile for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
-            shutil.copy(firststdout, self._targetdir_file_path("seqtol_1_stdout.txt"))
-            shutil.copy(firstlowfile, self.targetdirectory)
-        else:
-            self._status("Could not find stdout or lowfile for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
-                            
-        # open files for stderr and stdout 
-        self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
-        self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
-        self.file_stdout.write("*********************** R output ***********************\n")
-        subp = subprocess.Popen(cmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
-                
-        while True:
-            returncode = subp.poll()
-            if returncode != None:
-                if returncode != 0:
-                    sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
-                    raise PostProcessingException
-                break;
-            time.sleep(2)
-        self.file_stdout.close()
-        self.file_stderr.close()
-        
-        count = 0
-        if not os.path.exists( self._targetdir_file_path("tolerance_sequences.fasta") ) and count < 10 :
-            time.sleep(1) # make sure the fasta file gets written
-            count += 1
-        
-        # create weblogo from the created fasta file
-        success = True
-        try:
-            seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
-            logo_data = LogoData.from_seqs(seqs)
-            logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-            logo_options = LogoOptions()
-            logo_options.title = "Sequence profile"
-            logo_options.number_interval = 1
-            logo_options.color_scheme = std_color_schemes["chemistry"]
-            ann = getResIDs(self.parameters)
-            logo_options.annotate = ann
-            logo_format = LogoFormat(logo_data, logo_options)
-            png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
-        except Exception, e:
-            self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
-            success = False
-        
-        # Delete the *last.pdb and generation files:
-        try:
-            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_last.pdb")):
-                self._status('deleting %s' % file)
-                os.remove(file)
-            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*_low.ga.generations.gz")):
-                self._status('deleting %s' % file)
-                os.remove(file)
-        except Exception, e:
-            self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
-            success = False
-
-        return success
-    
-    def _import_pdb(self, filename, contents):
-        """Import a pdb file from the database and write it to the temporary directory"""
-        self.pdb = pdb.PDB(contents.split('\n'))
-      
-        # remove everything but the chosen chains or keep all chains if the list is empty
-        # pdb_content is passed directly to backrub so remove the pruned chain lines before the backrub
-        self.pdb.pruneChains(self.parameters['Partners'])
-        self.pdb.remove_hetatm()  # rosetta doesn't like heteroatoms so let's remove them
-        self.parameters['pdb_info'] = join(self.pdb.lines, '\n')        
-        # internal mini resids don't correspond to the pdb file resids
-        # the pivot residues need to be numbered consecutively from 1 up
-        self.map_res_id = self.pdb.get_residue_mapping()
-        self.parameters["map_res_id"] = self.map_res_id 
-        
-        self.pdb.write(self._workingdir_file_path(filename))
-    
-    def _write_backrub_movemap( self ):
-        """create a movemap minimizing all chi angles"""
-        self.backrub_movemap = "allchi_%s.movemap" % self.parameters["ID"]
-        rosettahelper.writeFile(self._workingdir_file_path(self.backrub_movemap), 'RESIDUE * CHI\n')
-    
-    def _write_backrub_resfile( self ):
-        """create a resfile of premutations for the backrub"""
-               
-        # Write out the premutated residues
-        s = ""
-        params = self.parameters
-        for partner in params['Partners']:
-            if params['Premutated'].get(partner):
-                pm = params['Premutated'][partner]
-                for residue in pm:
-                    #todo: check that residue exists -  # get all residues:  residue_ids     = self.pdb.aa_resids()
-                    s += ("%d %s PIKAA %s\n" % (residue, partner, pm[residue]))
-        
-        # Only create a file if there are any premutations
-        self.backrub_resfile = "backrub_%s.resfile" % self.parameters["ID"]
-        rosettahelper.writeFile(self._workingdir_file_path(self.backrub_resfile), 'NATAA\nstart\n%s\n' % s)
-        
-        
-    def _write_seqtol_resfile( self ):
-        """create a resfile for the chains
-            residues in interface: NATAA (conformation can be changed)
-            residues mutation: PIKAA ADEFGHIKLMNPQRSTVWY (design sequence)"""
-        
-        resfileHasContents, contents = make_seqtol_resfile( self.pdb, self.parameters, self.parameters['radius'], self.pdb.aa_resids())
-                
-        if resfileHasContents:
-            self.seqtol_resfile = "seqtol_%s.resfile" % self.parameters["ID"]
-            rosettahelper.writeFile(self._workingdir_file_path(self.seqtol_resfile), "%s\n" % contents)
-        else:
-            sys.stderr.write("An error occurred during the sequence tolerance execution. The chosen designed residues resulting in an empty resfile and so could not be used.")
-            raise SequenceToleranceException          
-
-import pprint
-class SequenceToleranceMultiJobSK(SequenceToleranceJobSK):
-
-    suffix = "seqtolMultiSK"
-    horizontaltiles = 4
-    name = "Multiple Sequence Tolerance (SK, JMB)"
-    
-    def _renamedefineOutputFiles(self):
-        self.resultFilemasks.append((".", "stderr*"))
-        self.resultFilemasks.append((".", "stdout*"))
-        self.resultFilemasks.append((".", "timing_profile.txt"))
-        self.resultFilemasks.append((".", "tolerance_*"))
-        self.resultFilemasks.append((".", "*.ga.entities.gz"))
-        self.resultFilemasks.append((".", "*.pdb"))
-        for i in range(self.numberOfRuns):
-            backrubSubdirectory = "backrub%d" % i
-            seqtolSubdirectory = "sequence_tolerance%d" % i
-            self.resultFilemasks.append((backrubSubdirectory, "*.cmd*"))
-            self.resultFilemasks.append((backrubSubdirectory, "backrub_scores.dat"))
-            self.resultFilemasks.append((backrubSubdirectory, "*.resfile"))
-            self.resultFilemasks.append((backrubSubdirectory, "*.movemap"))        
-            self.resultFilemasks.append((seqtolSubdirectory, "*.resfile"))
-            self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
-            self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))
-            
-    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
-        # The tempdir is the one on the submission host e.g. chef
-        # targetdirectory is the one on your host e.g. your PC or the webserver
-        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
-        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
-        self.map_res_id = {}
-        super(SequenceToleranceMultiJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
-    
-    @staticmethod
-    def _tmultiply(biglist, nextlist):
-        e = []
-        for aa in nextlist[2]:
-            e.append([(nextlist[0], nextlist[1], aa)])
-        if biglist == []:
-            return e
-        else:
-            newlist = []
-            for x in biglist:
-                for y in e:
-                    el = []
-                    if type(x) == type(e):
-                        el.extend(x)
-                    else:
-                        el.append(x)
-                    el.extend(y)
-                    newlist.append(el)
-            return newlist
-
-    def _expandParameters(self):
-        # Expand out the premutations
-        premut = []
-        for chain, reslist in self.parameters["Premutated"].iteritems():
-            for resid, premutations in reslist.iteritems():
-                premut.append((chain, resid, premutations))
-        choices = []
-        for i in range(len(premut)):
-            choices = SequenceToleranceMultiJobSK._tmultiply(choices, premut[i])
-        
-        # Create an array of parameters
-        multiparameters = []
-        numberOfRuns = len(choices)
-        self.numberOfRuns = numberOfRuns
-        for i in range(numberOfRuns):
-            premutated = {}
-            for premutation in choices[i]:
-                if not premutated.get(premutation[0]):
-                    premutated[premutation[0]] = {}
-                premutated[premutation[0]][premutation[1]] = premutation[2]
-                
-            multiparameters.append({
-                "binary"            : self.parameters["binary"],
-                "ID"                : self.parameters["ID"],
-                "pdb_filename"      : self.parameters["pdb_filename"],
-                #"pdb_info"          : self.parameters["pdb_info"],
-                "nstruct"           : self.parameters["nstruct"],
-                "radius"            : self.parameters["radius"],
-                "kT"                : self.parameters["kT"],
-                "Partners"          : self.parameters["Partners"],
-                "Weights"           : self.parameters["Weights"],
-                "Premutated"        : premutated,
-                "Designed"          : self.parameters["Designed"],
-                })
-        self.multiparameters = multiparameters
-        
-    def _initialize(self):
-        self.describe()
-        
-        parameters = self.parameters
-        
-        # Create input files
-        self._expandParameters()
-        
-        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
-        self._write_backrub_resfiles()
-        self._write_seqtol_resfile()
-        self._write_backrub_movemap()
-        
-        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
-        
-        for i in range(self.numberOfRuns):
-            targetsubdirectory = "backrub%d" % i
-            taskdir = self._make_taskdir(targetsubdirectory, [parameters["pdb_filename"], self.backrub_resfiles[i], self.backrub_movemap])
-            brTask = BackrubClusterSKTask(taskdir, os.path.join(self.targetdirectory, targetsubdirectory), parameters, self.backrub_resfiles[i], movemap = self.backrub_movemap, name="Backrub step for run %d of the sequence tolerance protocol" % i)
-                
-            targetsubdirectory = "sequence_tolerance%d" % i
-            taskdir = self._make_taskdir(targetsubdirectory, [self.seqtol_resfile])
-            stTask = SequenceToleranceClusterTask(taskdir, os.path.join(self.targetdirectory,targetsubdirectory), parameters, self.seqtol_resfile, name="Sequence tolerance step for run %d of the sequence tolerance protocol" % i)
-            stTask.addPrerequisite(brTask, [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])])
-             
-            scheduler.addInitialTasks(brTask)
-        
-        self.scheduler = scheduler
-        
-    def _analyze(self):
-                # Run the analysis on the originating host
-        
-        self._status("Analyzing results")
-        # run Colin's analysis script: filtering and profiles/motifs
-        thresh_or_temp = self.parameters['kT']
-        
-        weights = self.parameters['Weights']
-        fitness_coef = 'c(%s' % weights[0]
-        for i in range(1, len(weights)):
-            fitness_coef += ', %s' % weights[i]
-        fitness_coef += ')'
-        
-        type_st = '\\"boltzmann\\"'
-        prefix  = '\\"tolerance\\"'
-        percentile = '.5'
-        
-        success = True
-        for i in range(self.numberOfRuns):
-            
-            targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
-
-            cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                      | /bin/cat %s - \\
-                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
-                             
-            self._status(cmd)
-            
-            # open files for stderr and stdout 
-            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
-            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
-            self.file_stdout.write("*********************** R output ***********************\n")
-            subp = subprocess.Popen(cmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=targettaskdir, shell=True, executable='/bin/bash')
-                    
-            while True:
-                returncode = subp.poll()
-                if returncode != None:
-                    if returncode != 0:
-                        sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
-                        raise PostProcessingException
-                    break;
-                time.sleep(2)
-            self.file_stdout.close()
-            self.file_stderr.close()
-            
-            count = 0
-            if not os.path.exists(os.path.join(targettaskdir, "tolerance_sequences.fasta") ) and count < 10 :
-                time.sleep(1) # make sure the fasta file gets written
-                count += 1
-              
-            try:
-                # create weblogo from the created fasta file
-                shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), self._targetdir_file_path("tolerance_sequences%d.fasta" % i))
-                seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences%d.fasta" % i)))
-                logo_data = LogoData.from_seqs(seqs)
-                logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-                logo_options = LogoOptions()
-                logo_options.title = "Sequence profile"
-                logo_options.number_interval = 1
-                logo_options.color_scheme = std_color_schemes["chemistry"]
-                ann = getResIDs(self.parameters)
-                logo_options.annotate = ann    
-                logo_format = LogoFormat(logo_data, logo_options)
-                png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif%d.png" % i), 'w'))
-            except Exception, e:
-                self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
-                success = False
-            
-            # Delete the *last.pdb and generation files:
-            try:
-                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
-                    self._status('deleting %s' % file)
-                    os.remove(file)
-                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
-                    self._status('deleting %s' % file)
-                    os.remove(file)
-            except Exception, e:
-                self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
-                success = False
-        
-        try:
-            # Generate tolerance motif montage
-            self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
-            montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
-            # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
-            for i in range(self.numberOfRuns):
-                params = self.multiparameters[i]
-                lbl = []
-                for partner in params['Partners']:
-                    if params['Premutated'].get(partner):
-                        pm = params['Premutated'][partner]
-                        for residue in pm:
-                            lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
-                montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
-            montagecmd += "multi_tolerance_motif.png"
-            self._status(montagecmd)
-            
-            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
-            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
-            self.file_stdout.write("*********************** montage output ***********************\n")
-            subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
-        except Exception, e:
-            self._appendError("An error occurred creating the motif montage.\n%s\n%s" % (str(e), traceback.format_exc()))
-            success = False
-                
-        return success
-            
-    def _write_backrub_resfiles( self ):
-        """create a resfile of premutations for the backrub"""
-        
-        # Write out the premutated residues
-        self.backrub_resfiles = []
-        for i in range(self.numberOfRuns):
-            s = ""
-            params = self.multiparameters[i]
-            for partner in params['Partners']:
-                if params['Premutated'].get(partner):
-                    pm = params['Premutated'][partner]
-                    for residue in pm:
-                        #todo: check that residue exists -  # get all residues:  residue_ids     = self.pdb.aa_resids()
-                        s += ("%d %s PIKAA %s\n" % (residue, partner, pm[residue]))
-            
-            # Only create a file if there are any premutations
-            backrub_resfile = ("backrub_%s_%d.resfile" % (self.parameters["ID"], i))
-            rosettahelper.writeFile(self._workingdir_file_path(backrub_resfile), 'NATAA\nstart\n%s\n' % s)
-            self.backrub_resfiles.append(backrub_resfile)
-               
-
-class SequenceToleranceJobSKAnalyzer(SequenceToleranceJobSK):
-
-    suffix = "seqtolSK"
-    flatOutputDirectory = True
-    name = "Sequence Tolerance Analyzer (SK, JMB)"
-               
-    def __init__(self, sgec, parameters, tempdir, targetroot, dldir):
-        # The tempdir is the one on the submission host e.g. chef
-        # targetdirectory is the one on your host e.g. your PC or the webserver
-        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
-        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
-        self.map_res_id = {}
-        super(SequenceToleranceJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
-    
-    def _initialize(self):
-        self.describe()
-        
-        parameters = self.parameters
-        
-        # Create input files
-        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
-        self._write_backrub_resfiles()
-        self._write_seqtol_resfile()
-        self._write_backrub_movemap()
-        
-        self.targetdirectory = "/home/oconchus/1KI1test"
-        
-        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
-        
-        self.scheduler = scheduler
-
-
-class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceJobSK):
-
-    suffix = "seqtolMultiSK"
-    horizontaltiles = 4
-    name = "Multiple Sequence Tolerance Analyzer (SK, JMB)"
-    
-    def __init__(self, sgec, parameters, tempdir, targetroot, dldir):
-        # The tempdir is the one on the submission host e.g. chef
-        # targetdirectory is the one on your host e.g. your PC or the webserver
-        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
-        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
-        self.map_res_id = {}
-        super(SequenceToleranceMultiJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
-    
-    @staticmethod
-    def _tmultiply(biglist, nextlist):
-        e = []
-        for aa in nextlist[2]:
-            e.append([(nextlist[0], nextlist[1], aa)])
-        if biglist == []:
-            return e
-        else:
-            newlist = []
-            for x in biglist:
-                for y in e:
-                    el = []
-                    if type(x) == type(e):
-                        el.extend(x)
-                    else:
-                        el.append(x)
-                    el.extend(y)
-                    newlist.append(el)
-            return newlist
-
-    def _expandParameters(self):
-        # Expand out the premutations
-        premut = []
-        for chain, reslist in self.parameters["Premutated"].iteritems():
-            for resid, premutations in reslist.iteritems():
-                premut.append((chain, resid, premutations))
-        choices = []
-        for i in range(len(premut)):
-            choices = SequenceToleranceMultiJobSK._tmultiply(choices, premut[i])
-        
-        # Create an array of parameters
-        multiparameters = []
-        numberOfRuns = len(choices)
-        self.numberOfRuns = numberOfRuns
-        for i in range(numberOfRuns):
-            premutated = {}
-            for premutation in choices[i]:
-                if not premutated.get(premutation[0]):
-                    premutated[premutation[0]] = {}
-                premutated[premutation[0]][premutation[1]] = premutation[2]
-                
-            multiparameters.append({
-                "binary"            : self.parameters["binary"],
-                "ID"                : self.parameters["ID"],
-                "pdb_filename"      : self.parameters["pdb_filename"],
-                #"pdb_info"          : self.parameters["pdb_info"],
-                "nstruct"           : self.parameters["nstruct"],
-                "radius"            : self.parameters["radius"],
-                "kT"                : self.parameters["kT"],
-                "Partners"          : self.parameters["Partners"],
-                "Weights"           : self.parameters["Weights"],
-                "Premutated"        : premutated,
-                "Designed"          : self.parameters["Designed"],
-                })
-        self.multiparameters = multiparameters
-        
-    def _initialize(self):
-        self.describe()
-        
-        parameters = self.parameters
-        
-        # Create input files
-        self._expandParameters()
-        
-        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
-        self._write_backrub_resfiles()
-        self._write_seqtol_resfile()
-        self._write_backrub_movemap()
-        
-        self.targetdirectory = "/home/oconchus/1KI1"
-        
-        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
-        
-        self.scheduler = scheduler
-        
-    def _analyze(self):
-                # Run the analysis on the originating host
-        
-        self._status("Analyzing results")
-        # run Colin's analysis script: filtering and profiles/motifs
-        thresh_or_temp = self.parameters['kT']
-        
-        weights = self.parameters['Weights']
-        fitness_coef = 'c(%s' % weights[0]
-        for i in range(1, len(weights)):
-            fitness_coef += ', %s' % weights[i]
-        fitness_coef += ')'
-        
-        type_st = '\\"boltzmann\\"'
-        prefix  = '\\"tolerance\\"'
-        percentile = '.5'
-        
-        for i in range(self.numberOfRuns):
-            targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
-
-            cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
-                      | /bin/cat %s - \\
-                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
-                             
-            self._status(cmd)
-            
-            # open files for stderr and stdout 
-            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
-            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
-            self.file_stdout.write("*********************** R output ***********************\n")
-            subp = subprocess.Popen(cmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=targettaskdir, shell=True, executable='/bin/bash')
-                    
-            while True:
-                returncode = subp.poll()
-                if returncode != None:
-                    if returncode != 0:
-                        sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
-                        raise PostProcessingException
-                    break;
-                time.sleep(2)
-            self.file_stdout.close()
-            self.file_stderr.close()
-            
-            count = 0
-            if not os.path.exists(os.path.join(targettaskdir, "tolerance_sequences.fasta") ) and count < 10 :
-                time.sleep(1) # make sure the fasta file gets written
-                count += 1
-              
-            try:
-                # create weblogo from the created fasta file
-                shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), self._targetdir_file_path("tolerance_sequences%d.fasta" % i))
-                seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences%d.fasta" % i)))
-                logo_data = LogoData.from_seqs(seqs)
-                logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-                logo_options = LogoOptions()
-                logo_options.title = "Sequence profile"
-                logo_options.number_interval = 1
-                logo_options.color_scheme = std_color_schemes["chemistry"]
-                ann = getResIDs(self.parameters)
-                logo_options.annotate = ann
-                logo_format = LogoFormat(logo_data, logo_options)
-                png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif%d.png" % i), 'w'))
-            except Exception, e:
-                self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
-                success = False
-            
-            try:
-                # Delete the *last.pdb and generation files:
-                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
-                    self._status('deleting %s' % file)
-                    os.remove(file)
-                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
-                    self._status('deleting %s' % file)
-                    os.remove(file)
-            except Exception, e:
-                self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
-                success = False
-        
-        # Generate tolerance motif montage
-        self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
-        montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
-        # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
-        for i in range(self.numberOfRuns):
-            params = self.multiparameters[i]
-            lbl = []
-            for partner in params['Partners']:
-                if params['Premutated'].get(partner):
-                    pm = params['Premutated'][partner]
-                    for residue in pm:
-                        lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
-            montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
-        montagecmd += "multi_tolerance_motif.png"
-        self._status(montagecmd)
-        
-        self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
-        self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
-        self.file_stdout.write("*********************** montage output ***********************\n")
-        subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
-        
-        return True
-            
-    def _write_backrub_resfiles( self ):
-        """create a resfile of premutations for the backrub"""
-        
-        # Write out the premutated residues
-        self.backrub_resfiles = []
-        for i in range(self.numberOfRuns):
-            s = ""
-            params = self.multiparameters[i]
-            for partner in params['Partners']:
-                if params['Premutated'].get(partner):
-                    pm = params['Premutated'][partner]
-                    for residue in pm:
-                        #todo: check that residue exists -  # get all residues:  residue_ids     = self.pdb.aa_resids()
-                        s += ("%d %s PIKAA %s\n" % (residue, partner, pm[residue]))
-            
-            # Only create a file if there are any premutations
-            backrub_resfile = ("backrub_%s_%d.resfile" % (self.parameters["ID"], i))
-            rosettahelper.writeFile(self._workingdir_file_path(backrub_resfile), 'NATAA\nstart\n%s\n' % s)
-            self.backrub_resfiles.append(backrub_resfile)
-               
-
+# Cluster jobs    
         
 class SequenceToleranceJobHK(RosettaClusterJob):
 
@@ -1409,7 +580,6 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             {"stdout" : "seqtol_1234.cmd.o6054336.1", "stderr" : "seqtol_1234.cmd.e6054336.1", "failed" : False},
             {"stdout" : "seqtol_1234.cmd.o6054336.2", "stderr" : "seqtol_1234.cmd.e6054336.2", "failed" : False}]
             
-        
     def __init__(self, sgec, parameters, tempdir, targetroot, dldir):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
@@ -1417,7 +587,6 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
         self.backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
-        self.failed_runs   = []
         self.executable    = ''
         super(SequenceToleranceJobHK, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
     
@@ -1425,7 +594,13 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.describe()
         
         parameters = self.parameters
-      
+        
+        # Fill in missing parameters to avoid bad key lookups
+        designed = parameters['Designed']
+        partners = parameters['Partners']
+        designed[partners[0]] = designed.get(partners[0]) or [] 
+        designed[partners[1]] = designed.get(partners[1]) or [] 
+
         # Create input files        
         self.minimization_resfile = "minimize.resfile" 
         self.backrub_resfile = "backrub.resfile"
@@ -1459,18 +634,31 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         
         scheduler.addInitialTasks(minTask)
         self.scheduler = scheduler
-        
+    
+    # *** Analysis functions ***
     def _analyze(self):
         """ this recreates Elisabeth's analysis scripts in /kortemmelab/shared/publication_data/ehumphris/Structure_2008/CODE/SCRIPTS """
+                
+        operations = [
+             ("checking output",                self._checkOutput),
+             ("writing amino acid frequencies", self._writeAminoAcidFrequencies),
+             ("running the R script",           self._runRScript),
+             ("parsing output files",           self._parseOutputFiles),
+             ("copying the best scoring pdbs",  self._copyBestScoringPDBs),
+             ("creating the sequence motif",    self._createSequenceMotif),
+             ("renaming initial PDBs",          self._renameInitialPDBs)]
         
-        parameters = self.parameters
-        partner0 = parameters['Partners'][0]
-        partner1 = parameters['Partners'][1]
-        designed = parameters['Designed']        
-        designed[partner0] = designed.get(partner0) or [] # todo: Only needed for testing separately 
-        designed[partner1] = designed.get(partner1) or [] 
-        
-        self._status("Checking output")
+        for op in operations:
+            try:
+                self._status(op[0])
+                op[1]()
+            except Exception, e:
+                self._status("An exception occured while %s.\n%s\n%s" % (op[0], str(e), traceback.format_exc()))
+                return False
+                
+        return True
+    
+    def _checkOutput(self):
         successFSA = re.compile("DONE ::\s+\d+ starting structures built\s+\d+ \(nstruct\) times")
         streams = self.stTask.getOutputStreams()
         failed_runs = []
@@ -1496,39 +684,39 @@ class SequenceToleranceJobHK(RosettaClusterJob):
                 s += "%s\n" % self.stTask.getExpectedOutputFileNames()[fn]
             self._status(s)
             rosettahelper.writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
-            
-        self._status("Analyzing results")
-        handle_err = open( self._targetdir_file_path( 'error.log' ), 'a+' )
-        # AMINO ACID FREQUENCIES
-        self._status("\tAmino Acid frequencies")
-        list_res = []
-        for x in designed[partner0]:
-            list_res.append(partner0 + str(x))
-        for x in designed[partner1]:
-            list_res.append(partner1 + str(x))
         
+        self.list_outfiles = list_outfiles
+    
+    def _writeAminoAcidFrequencies(self):
+        
+        parameters = self.parameters
+        partners = parameters['Partners']
+        designed = parameters['Designed']
+        
+        self._status("Analyzing results")
+        # AMINO ACID FREQUENCIES
+        self._status("Amino Acid frequencies")
+        list_res = []
+        for i in range(2):
+            for x in (designed[partners[i]]):
+                list_res.append(partners[i] + str(x))
+        
+        handle_err = open( self._targetdir_file_path( 'error.log' ), 'a+' )
         # this does the same as get_data.pl
         for design_res in list_res:
             one_pos = []
-            for filename in list_outfiles:
+            for filename in self.list_outfiles:
                 handle = open(filename,'r')
-                # print "grep:", 
-                # print '^ %s' % self.map_chainres2seq[design_res], "result: "
                 grep_result = rosettahelper.grep('^ %s' % self.map_chainres2seq[design_res], handle)
-                # print 'list:',  grep_result
-                # print 'string', grep_result[0]
-                # print 'split:', grep_result[0].split()
-                # print grep_result
                 if grep_result != []:
                     one_pos.append( grep_result[0].split() )
                 else:
-                    handle_err.write('Single sequence tolerance prediction run failed: see %s for details\n' % filename)
+                    self.handle_err.write('Single sequence tolerance prediction run failed: see %s for details\n' % filename)
                 handle.close()
             
             # sort and transpose the data of one_pos table: invert_textfiles.pl
-            # the values are in the following order:
+            # the values are in the following order whereas they should be in res_order
             order = ['id','A','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-            # they should be in this order:
             res_order = ['W','F','Y','M','L','I','V','A','G','S','T','R','K','H','N','Q','D','E','P']
             # transpose:
             dict_res2values = {}
@@ -1548,27 +736,24 @@ class SequenceToleranceJobHK(RosettaClusterJob):
                 handle2.write('\n')
             handle2.write('\n')
             handle2.close()
+        handle_err.close()
         
-        # run the R script for all positions and create the boxplots 
-        parameter = "c("
+        Rparameter = "c("
+        if not list_res:
+            self._status("No residues to process.")
+            raise Exception
         for design_res in list_res:
-            parameter += "\'%s\'," % design_res
-        parameter = parameter[:-1] + ")" # gets rid of the last ','
-
+            Rparameter += "\'%s\'," % design_res
+        self.Rparameter = Rparameter[:-1] + ")" # gets rid of the last ','
+    
+    def _runRScript(self):
+        # run the R script for all positions and create the boxplots 
         cmd = '''/bin/echo \"plot_specificity_list(%s)\" \\
                 | /bin/cat %s - > specificity.R ; \\
-                /usr/bin/R CMD BATCH specificity.R''' % ( parameter, specificity_classicRScript )
+                /usr/bin/R CMD BATCH specificity.R''' % ( self.Rparameter, specificity_classicRScript )
         
         self._status(cmd)
         
-        # Move all output files to the root so all R output gets located there
-        #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*.pdb")):
-        #    self._status('copying %s' % file)
-        #    shutil.move(file, self.targetdirectory)
-        #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*.pdb")):
-        #    self._status('copying %s' % file)
-        #    shutil.move(file, self.targetdirectory)
-                            
         # open files for stderr and stdout 
         self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
         self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
@@ -1579,40 +764,37 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             returncode = subp.poll()
             if returncode != None:
                 if returncode != 0:
-                    sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+                    self._status("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
                     raise PostProcessingException
                 break;
             time.sleep(2)
         self.file_stdout.close()
         self.file_stderr.close()
-        
+    
+    def _parseOutputFiles(self):
         # CREATE SEQUENCE MOTIF    ## this all would be better off in the postprocessing of the onerun class
-        self._status("\tCreate Sequence Motif\n\t+-- copy PDB files from cluster")
-        
         sequences_list_total = {}
         
         rosettahelper.make755Directory(self._targetdir_file_path("best_scoring_pdb"))
         list_files = []        
-        #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "BR*low_*_*.pdb")):
         for file in glob.glob(os.path.join(self.workingdir, "sequence_tolerance", "BR*low_*_*.pdb")):
             list_files.append(file.split('/')[-1].strip())
         list_files.sort()
         
-        for filename in list_outfiles:
+        for filename in self.list_outfiles:
             si = int(filename.split('.')[-1]) # get the run id
-            sequences_list = []
             output_handle = open(filename, 'r')
             
-            
+            # Skip down until we get to the sequence tables
             for line in output_handle:
                 if line.find("Done with initialization.  Starting individual sequence calculations"):
                     break
-        
             for line in output_handle:            
                 if line[0:10] == "Generation":
                     GenNumber = int(line[12:13])
                     break
-            # now the stuff we actually need to read in:
+                
+            # Now the stuff we actually need to read in:
             for line in output_handle:
                 if line[0:10] == "Generation":
                     GenNumber = int(line[12:13])
@@ -1623,76 +805,67 @@ class SequenceToleranceJobHK(RosettaClusterJob):
                     sequences_list_total[(float(data_line[2]), data_line[0])] = (GenNumber, si)
                 else:
                     break # break for the first empty line. This means we're done.
-            output_handle.close()        
+            output_handle.close() 
         
-        # get all pdb files associated with this run:
-        list_this_run = rosettahelper.grep('BR%slow_%04.i_[A-Z]*\.pdb' % (self.parameters['pdbRootname'], si), list_files)
-        structure_counter = 0 # ok it seems that not all the sequences have a corresponding pdb file. Therefore we keep the first 10 we can find!
+        self.sequences_list_total = sequences_list_total
+        self.list_files = list_files
+    
+    def _copyBestScoringPDBs(self):
+        '''Get the best scoring pdb files associated with this job.'''
         
-        self._status("sequences list:%s\n" % sequences_list)
+        structure_counter = 0 
+        self._status("sequences list:%s\n" % sorted(self.sequences_list_total.iteritems()))
 
         # keep the 10 best scoring structures
-        for designed_sequence, origin in sorted(sequences_list_total.iteritems()):
-            best_scoring_pdb = 'BR%slow_%04.i_%s.pdb' % (self.parameters['pdbRootname'], si, designed_sequence[1])
-            if best_scoring_pdb in list_this_run:
-                self._status("copying %s back as best_scoring_pdb" % best_scoring_pdb)
-                #self.stTask._copyFilesBackToHost(best_scoring_pdb)
+        bestScoringOrder = []
+        for designed_sequence, origin in sorted(self.sequences_list_total.iteritems()):
+            GenNumber = origin[0]
+            structureIndex = origin[1]
+            sequence = designed_sequence[1]
+            interfaceScore = designed_sequence[0]
+            best_scoring_pdb = 'BR%slow_%04.i_%s.pdb' % (self.parameters['pdbRootname'], structureIndex, sequence)
+            
+            if best_scoring_pdb in self.list_files:
                 bspdb = os.path.join(self._workingdir_file_path("sequence_tolerance"), best_scoring_pdb)
+                self._status("copying %s (%f) from run %d, generation %d back as best_scoring_pdb" % (best_scoring_pdb, interfaceScore, structureIndex, GenNumber))
                 shutil.copy(bspdb, self._targetdir_file_path("best_scoring_pdb"))        
+                bestScoringOrder.append(best_scoring_pdb)
                 structure_counter += 1
             if structure_counter >= 10:
                 break
-            
-        # write the actual fasta file with the 10 best scoring sequences of each run
-        if not sequences_list_total:
+        JmolOrder = os.path.join(self._targetdir_file_path("best_scoring_pdb"), "order.txt")
+        rosettahelper.writeFile(JmolOrder, join(bestScoringOrder, "\n")) 
+        
+    def _createSequenceMotif(self):
+        '''Write the fasta file with the 50 best scoring sequences overall.'''
+        parameters = self.parameters
+        partners = parameters['Partners']
+        designed = parameters['Designed']
+        
+        if not self.sequences_list_total:
             sys.stderr.write("There were no sequences for the fasta file. Try increasing the value of pop_size.")
             raise PostProcessingException
           
         fasta_file = self._targetdir_file_path("tolerance_sequences.fasta")
         handle_fasta = open(fasta_file, 'w')
         i = 0
-        for designed_sequence, origin in sorted(sequences_list_total.iteritems()):
+        for designed_sequence, origin in sorted(self.sequences_list_total.iteritems()):
             i += 1
             handle_fasta.write('>%s\n%s\n' % (i, designed_sequence[1]))
+            if i > 50:
+                break
         handle_fasta.close()
-        
-        # 3rd, create the motif
-        count = 0
-        if not os.path.exists( self._targetdir_file_path("tolerance_sequences.fasta") ) and count < 10 :
-            time.sleep(1) # make sure the fasta file gets written
-            count += 1
-        # create weblogo from the created fasta file
-        seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
-        logo_data = LogoData.from_seqs(seqs)
-        logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-        logo_options = LogoOptions()
-        logo_options.title = "Sequence profile"
-        logo_options.number_interval = 1
-        logo_options.color_scheme = std_color_schemes["chemistry"]
-        logo_options.annotate = [partner0 + str(resid) for resid in designed[partner0]] + [partner1 + str(resid) for resid in designed[partner1]] #res_nums this is for Gregs hacked version that I don't have
-        logo_format = LogoFormat(logo_data, logo_options)
-        png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
-        
-        # clean up and remove backrub directory
-        #shutil.rmtree( self.workingdir_file_path("backrub") )
-        
-        # end analysis
-        handle_err.close()
-        # stdout = open(self.workingdir_file_path( self.filename_stdout ),'r')
-        # for x in stdout.readlines():
-        #   print x,
-        # stdout.close()
-        # # self.copy_working_dir('')
-        
-        # rename a few files
-        try:
-            shutil.copy(self._taskresultsdir_file_path("minimization", self.parameters['pdb_filename']), self._targetdir_file_path("%s_minimized.pdb" % self.parameters['pdbRootname']))        
-            shutil.copy(self._taskresultsdir_file_path("minimization", "%s_submission.pdb" % self.parameters['pdbRootname']), self._targetdir_file_path(self.parameters['pdb_filename']))        
-        except:
-            print("Exception copying PDBs back.")        
-        
-        return True
-        
+   
+        annotations = [partners[0] + str(resid) for resid in designed[partners[0]]] + [partners[1] + str(resid) for resid in designed[partners[1]]]
+        createSequenceMotif(fasta_file, annotations, self._targetdir_file_path( "tolerance_motif.png" ))
+    
+    def _renameInitialPDBs(self):
+        parameters = self.parameters
+        shutil.copy(self._taskresultsdir_file_path("minimization", parameters['pdb_filename']), self._targetdir_file_path("%s_minimized.pdb" % parameters['pdbRootname']))        
+        shutil.copy(self._taskresultsdir_file_path("minimization", "%s_submission.pdb" % parameters['pdbRootname']), self._targetdir_file_path(parameters['pdb_filename']))        
+    
+    # *** End of analysis functions ***
+    
     def _import_pdb(self, filename, contents):
         """Import a pdb file from the database and write it to the temporary directory"""
               
@@ -1788,15 +961,13 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             residues in interface: NATAA (conformation can be changed)
             residues mutation: PIKAA ADEFGHIKLMNPQRSTVWY (design sequence)"""
         
-        # turn list of ints in chainid, resid strings
-        partner0 = self.parameters['Partners'][0]
-        partner1 = self.parameters['Partners'][1]
-        designed = self.parameters['Designed']        
-        designed[partner0] = designed.get(partner0) or [] 
-        designed[partner1] = designed.get(partner1) or [] 
-                                        
-        self.design =  [ '%s%s' % (partner0, str(residue).rjust(4)) for residue in designed[partner0] ]
-        self.design += [ '%s%s' % (partner1, str(residue).rjust(4)) for residue in designed[partner1] ]
+        parameters = self.parameters
+        partners = parameters['Partners']
+        designed = parameters['Designed']
+
+        # turn list of ints in chainid, resid strings                                
+        self.design =  [ '%s%s' % (partners[0], str(residue).rjust(4)) for residue in designed[partners[0]] ]
+        self.design += [ '%s%s' % (partners[1], str(residue).rjust(4)) for residue in designed[partners[1]] ]
         
         output_handle = open( self._workingdir_file_path(self.seqtol_resfile), 'w')
         output_handle.write(resfileheader)
@@ -1835,11 +1006,12 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         output_handle.close()
         return
 
+        
 class ParallelSequenceToleranceJobSK(RosettaClusterJob):
 
     suffix = "seqtolSK"
     flatOutputDirectory = True
-    name = "Sequence Tolerance (SK, JMB)"
+    name = "Sequence Tolerance (SK, JMB/PLoS ONE)"
     
     def _defineOutputFiles(self):
         self.resultFilemasks.append((".", "*.pdb"))
@@ -1853,17 +1025,18 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         self.resultFilemasks.append(("sequence_tolerance", "backrub_scores.dat"))
         self.resultFilemasks.append(("sequence_tolerance", "*.cmd*"))
         self.resultFilemasks.append(("sequence_tolerance", "*low*.pdb"))
-            
-    def __init__(self, sgec, parameters, tempdir, targetroot, dldir):
+         
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(ParallelSequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
-    
+        super(ParallelSequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+
     def _initialize(self):
         self.describe()
+        self._checkBinaries()
         
         # Create input files        
         self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
@@ -1877,16 +1050,8 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         inputfiles = [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap, self.seqtol_resfile]
         taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
         targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
-        
-        if self.parameters["binary"] == "seqtolJMB":
-            jobname = "Sequence tolerance (SK JMB)"
-        elif self.parameters["binary"] == "seqtolP1":
-            jobname = "Sequence tolerance (SK PLoS One)"
-        else:
-            self._status('Unrecognised binary passed as parameter to cluster job: %s' % self.parameters["binary"])
-            raise
-        
-        stTask = BackrubSequenceToleranceSK(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name=jobname)
+                
+        stTask = BackrubSequenceToleranceSK(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name=self.jobname)
          
         scheduler.addInitialTasks(stTask)
         self.scheduler = scheduler
@@ -1951,37 +1116,10 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         self.file_stdout.close()
         self.file_stderr.close()
         
-        count = 0
-        if not os.path.exists( self._targetdir_file_path("tolerance_sequences.fasta") ) and count < 10 :
-            time.sleep(1) # make sure the fasta file gets written
-            count += 1
-        
         success = True
         try:
-            # create weblogo from the created fasta file
-            seqs = read_seq_data(open(self._targetdir_file_path("tolerance_sequences.fasta")))
-            logo_data = LogoData.from_seqs(seqs)
-            logo_data.alphabet = std_alphabets['protein'] # this seems to affect the coloring, but not the actual motif
-            logo_options = LogoOptions()
-            logo_options.title = "Sequence profile"
-            logo_options.number_interval = 1
-            logo_options.color_scheme = std_color_schemes["chemistry"]
-            ann = getResIDs(self.parameters)
-            logo_options.annotate = ann
-            
-            # Change the logo size of the X-axis for readability
-            logo_options.number_fontsize = 3.5
-            
-            # Change the logo size of the Weblogo 'fineprint' - the default Weblogo text
-            logo_options.small_fontsize = 4
-            
-            # Move the Weblogo fineprint to the left hand side for readability
-            fineprinttabs = "\t" * (int(2.7 * float(len(ann))))
-            logo_options.fineprint = "%s\t%s" % (logo_options.fineprint, fineprinttabs)
-
-
-            logo_format = LogoFormat(logo_data, logo_options)
-            png_print_formatter(logo_data, logo_format, open(self._targetdir_file_path( "tolerance_motif.png" ), 'w'))
+            fasta_file = self._targetdir_file_path("tolerance_sequences.fasta")                
+            createSequenceMotif(fasta_file, getResIDs(self.parameters), self._targetdir_file_path( "tolerance_motif.png" ))
         except Exception, e:
             self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
             success = False
@@ -2054,5 +1192,327 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         else:
             sys.stderr.write("An error occurred during the sequence tolerance execution. The chosen designed residues resulting in an empty resfile and so could not be used.")
             raise SequenceToleranceException 
+
+    def _checkBinaries(self):
+        if self.parameters["binary"] == "seqtolJMB":
+            self.jobname = "Sequence tolerance (SK JMB)"
+        elif self.parameters["binary"] == "seqtolP1":
+            self.jobname = "Sequence tolerance (SK PLoS One)"
+        else:
+            self._status('Unrecognised binary passed as parameter to cluster job: %s' % self.parameters["binary"])
+            raise Exception
+
+#todo: fix this with new task class
+import pprint
+class SequenceToleranceMultiJobSK(ParallelSequenceToleranceJobSK):
+
+    suffix = "seqtolMultiSK"
+    horizontaltiles = 4
+    name = "Multiple Sequence Tolerance (SK, JMB)"
+    
+    def _renamedefineOutputFiles(self):
+        self.resultFilemasks.append((".", "stderr*"))
+        self.resultFilemasks.append((".", "stdout*"))
+        self.resultFilemasks.append((".", "timing_profile.txt"))
+        self.resultFilemasks.append((".", "tolerance_*"))
+        self.resultFilemasks.append((".", "*.ga.entities.gz"))
+        self.resultFilemasks.append((".", "*.pdb"))
+        for i in range(self.numberOfRuns):
+            backrubSubdirectory = "backrub%d" % i
+            seqtolSubdirectory = "sequence_tolerance%d" % i
+            self.resultFilemasks.append((backrubSubdirectory, "*.cmd*"))
+            self.resultFilemasks.append((backrubSubdirectory, "backrub_scores.dat"))
+            self.resultFilemasks.append((backrubSubdirectory, "*.resfile"))
+            self.resultFilemasks.append((backrubSubdirectory, "*.movemap"))        
+            self.resultFilemasks.append((seqtolSubdirectory, "*.resfile"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))
+
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
+        # The tempdir is the one on the submission host e.g. chef
+        # targetdirectory is the one on your host e.g. your PC or the webserver
+        # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
+        # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+        self.map_res_id = {}
+        super(SequenceToleranceMultiJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+    
+    @staticmethod
+    def _tmultiply(biglist, nextlist):
+        e = []
+        for aa in nextlist[2]:
+            e.append([(nextlist[0], nextlist[1], aa)])
+        if biglist == []:
+            return e
+        else:
+            newlist = []
+            for x in biglist:
+                for y in e:
+                    el = []
+                    if type(x) == type(e):
+                        el.extend(x)
+                    else:
+                        el.append(x)
+                    el.extend(y)
+                    newlist.append(el)
+            return newlist
+
+    def _expandParameters(self):
+        # Expand out the premutations
+        premut = []
+        for chain, reslist in self.parameters["Premutated"].iteritems():
+            for resid, premutations in reslist.iteritems():
+                premut.append((chain, resid, premutations))
+        choices = []
+        for i in range(len(premut)):
+            choices = SequenceToleranceMultiJobSK._tmultiply(choices, premut[i])
         
+        # Create an array of parameters
+        multiparameters = []
+        numberOfRuns = len(choices)
+        self.numberOfRuns = numberOfRuns
+        for i in range(numberOfRuns):
+            premutated = {}
+            for premutation in choices[i]:
+                if not premutated.get(premutation[0]):
+                    premutated[premutation[0]] = {}
+                premutated[premutation[0]][premutation[1]] = premutation[2]
+                
+            multiparameters.append({
+                "binary"            : self.parameters["binary"],
+                "ID"                : self.parameters["ID"],
+                "pdb_filename"      : self.parameters["pdb_filename"],
+                #"pdb_info"          : self.parameters["pdb_info"],
+                "nstruct"           : self.parameters["nstruct"],
+                "radius"            : self.parameters["radius"],
+                "kT"                : self.parameters["kT"],
+                "Partners"          : self.parameters["Partners"],
+                "Weights"           : self.parameters["Weights"],
+                "Premutated"        : premutated,
+                "Designed"          : self.parameters["Designed"],
+                })
+        self.multiparameters = multiparameters
+            
+    def _initialize(self):
+         
+        self.describe()
+        self._checkBinaries()
         
+        # Create input files
+        parameters = self.parameters
+        self._expandParameters()
+
+        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
+        self._write_backrub_resfiles()
+        self._write_seqtol_resfile()
+        self._write_backrub_movemap()
+        
+        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
+        
+        for i in range(self.numberOfRuns):
+            targetsubdirectory = "sequence_tolerance%d" % i
+            inputfiles = [self.parameters["pdb_filename"], self.backrub_resfiles[i], self.backrub_movemap, self.seqtol_resfile]
+            taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
+            targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
+            
+            stTask = BackrubSequenceToleranceSK(taskdir, targetdir, parameters, self.backrub_resfiles[i], self.seqtol_resfile, movemap = self.backrub_movemap, name=self.jobname + "for run %d of the sequence tolerance protocol" % i)
+            scheduler.addInitialTasks(stTask)
+        
+        self.scheduler = scheduler
+        
+    def _analyze(self):
+        # Run the analysis on the originating host
+        
+        self._status("Analyzing results")
+        # run Colin's analysis script: filtering and profiles/motifs
+        thresh_or_temp = self.parameters['kT']
+        
+        weights = self.parameters['Weights']
+        fitness_coef = 'c(%s' % weights[0]
+        for i in range(1, len(weights)):
+            fitness_coef += ', %s' % weights[i]
+        fitness_coef += ')'
+        
+        type_st = '\\"boltzmann\\"'
+        prefix  = '\\"tolerance\\"'
+        percentile = '.5'
+        
+        success = True
+        
+        for i in range(self.numberOfRuns):
+            
+            # Run the R script inside the subdirectory otherwise the recursive search will find output files from the other runs
+            targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
+            
+            # Create the standard output file where the R script expects it
+            firststdout = None
+            firstlowfile = None
+            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*.cmd.o*.1")):
+                firststdout = file
+                break
+            for file in glob.glob(self._workingdir_file_path(self.parameters["pdb_filename"])):
+                originalpdb = file
+                break
+            if firststdout and originalpdb:
+                self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+                shutil.copy(firststdout, self._taskresultsdir_file_path("sequence_tolerance%d" % i, "seqtol_1_stdout.txt"))
+                shutil.copy(originalpdb, targettaskdir)
+            else:
+                self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+                
+            
+            cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
+                      | /bin/cat %s - \\
+                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
+                             
+            self._status(cmd)
+            
+            # open files for stderr and stdout 
+            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+            self.file_stdout.write("*********************** R output ***********************\n")
+            subp = subprocess.Popen(cmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=targettaskdir, shell=True, executable='/bin/bash')
+                    
+            while True:
+                returncode = subp.poll()
+                if returncode != None:
+                    if returncode != 0:
+                        sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+                        raise PostProcessingException
+                    break;
+                time.sleep(2)
+            self.file_stdout.close()
+            self.file_stderr.close()
+               
+            success = True           
+            try:
+                # create weblogo from the created fasta file
+                fasta_file = self._targetdir_file_path("tolerance_sequences%d.fasta" % i)                
+                shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), fasta_file)
+                createSequenceMotif(fasta_file, getResIDs(self.parameters), self._targetdir_file_path( "tolerance_motif%d.png" % i))
+            except Exception, e:
+                self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
+            
+            # Delete the *last.pdb and generation files:
+            try:
+                for file in glob.glob(self._targetdir_file_path("*")):
+                    if os.path.getsize(file) == 0:
+                        self._status('Deleting empty file %s' % file)
+                        os.remove(file)
+                #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
+                #    self._status('deleting %s' % file)
+                #    os.remove(file)
+                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
+                    self._status('deleting %s' % file)
+                    os.remove(file)
+                #os.remove(self._targetdir_file_path("seqtol_1_stdout.txt"))
+            except Exception, e:
+                self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
+        
+        try:
+            # Generate tolerance motif montage
+            self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
+            montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
+            # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
+            for i in range(self.numberOfRuns):
+                params = self.multiparameters[i]
+                lbl = []
+                for partner in params['Partners']:
+                    if params['Premutated'].get(partner):
+                        pm = params['Premutated'][partner]
+                        for residue in pm:
+                            lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
+                montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
+            montagecmd += "multi_tolerance_motif.png"
+            self._status(montagecmd)
+            
+            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+            self.file_stdout.write("*********************** montage output ***********************\n")
+            subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
+        except Exception, e:
+            self._appendError("An error occurred creating the motif montage.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
+                
+        return success
+            
+    def _write_backrub_resfiles( self ):
+        """create a resfile of premutations for the backrub"""
+        
+        # Write out the premutated residues
+        self.backrub_resfiles = []
+        for i in range(self.numberOfRuns):
+            s = ""
+            params = self.multiparameters[i]
+            for partner in params['Partners']:
+                if params['Premutated'].get(partner):
+                    pm = params['Premutated'][partner]
+                    for residue in pm:
+                        #todo: check that residue exists -  # get all residues:  residue_ids     = self.pdb.aa_resids()
+                        s += ("%d %s PIKAA %s\n" % (residue, partner, pm[residue]))
+            
+            # Only create a file if there are any premutations
+            backrub_resfile = ("backrub_%s_%d.resfile" % (self.parameters["ID"], i))
+            rosettahelper.writeFile(self._workingdir_file_path(backrub_resfile), 'NATAA\nstart\n%s\n' % s)
+            self.backrub_resfiles.append(backrub_resfile)
+
+    def _checkBinaries(self):
+        if self.parameters["binary"] != "multiseqtol":
+            self._status('Unrecognised binary passed as parameter to cluster job: %s' % self.parameters["binary"])
+            raise Exception
+        self.jobname = "Sequence tolerance (SK JMB)"
+
+# Analysis classes for quick testing of the analysis functions. No cluster jobs are submitted so these rely on existing data for analysis
+               
+class ParallelSequenceToleranceJobSKAnalyzer(ParallelSequenceToleranceJobSK):
+               
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, directoryToAnalyse):
+        self.directoryToAnalyse = directoryToAnalyse 
+        super(ParallelSequenceToleranceJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
+    
+    def _initialize(self):
+        self.describe()
+        self._checkBinaries()
+        
+        parameters = self.parameters
+        
+        # Create input files
+        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
+        self._write_backrub_resfile()
+        self._write_seqtol_resfile()
+        self._write_backrub_movemap()
+        
+        self.targetdirectory = self.directoryToAnalyse
+        
+        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_resfile, self.backrub_movemap])
+        
+        self.scheduler = scheduler
+        
+class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceMultiJobSK):
+        
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, directoryToAnalyse, testonly = False):
+        self.directoryToAnalyse = directoryToAnalyse
+        print("***")
+        print(directoryToAnalyse)
+        super(SequenceToleranceMultiJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+        
+    def _initialize(self):
+        self.describe()
+        
+        parameters = self.parameters
+        
+        # Create input files
+        self._expandParameters()
+        
+        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
+        self._write_backrub_resfiles()
+        self._write_seqtol_resfile()
+        self._write_backrub_movemap()
+        
+        # Change this to the target directory for analysis
+        self.targetdirectory = self.directoryToAnalyse
+        
+        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
+        
+        self.scheduler = scheduler

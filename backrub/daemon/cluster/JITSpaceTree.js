@@ -1,8 +1,5 @@
-// Copyright (c) 2010, Nicolas Garcia Belmonte. 
-// This code has been modified from the JIT examples for use on the RosettaBackrub server by Shane O'Connor.
-
 /*
-  Copyright (c) 2010, Nicolas Garcia Belmonte
+  Copyright (c) 2010, Nicolas Garcia Belmonte. 
   All rights reserved
 
   > Redistribution and use in source and binary forms, with or without
@@ -26,12 +23,16 @@
   >  ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
   >  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
   >  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- */
+
+  This code has been modified from the original JIT examples for use on the RosettaBackrub
+  server by Shane O'Connor. To see the original code, look at the SpaceTree examples on the
+  JIT website, http://thejit.org/.
+*/
 
 var labelType, useGradients, nativeTextSupport, animate;
 
-var kortemmelabBlue = '#00b5f9';
-var kortemmelabShadow = '#002d3d';
+var kortemmelabBlue		= '#00b5f9';
+var kortemmelabShadow	= '#002d3d';
 
 (function() {
   var ua = navigator.userAgent,
@@ -99,6 +100,38 @@ function parsetime(timeinsec)
 }
 
 var st;
+
+function getMidChild(n, level)
+{
+	subnodes = [];
+	// todo: Find out if there is a standard getter to list the immediate children
+    n.eachSubnode(
+    		function(adj)
+          	{
+    			subnodes.push(adj);
+          	});
+    var midnode = subnodes[(subnodes.length / 2) | 0]; // division returning an integer
+    
+	if (level > 1)
+	{
+		return getMidChild(midnode, level - 1);
+	}
+	else
+	{
+		return midnode;
+	}
+}
+
+function clickMidChild()
+{
+	// This simulates a click on the middle child of (the middle child  of, if it exists) the root node to better center the graph
+	// It then simulates a click on the label of the root node to populate the data div
+    rootnode = st.graph.getNode(st.root);
+    midnode = getMidChild(rootnode, 1)
+    st.onClick(midnode.id) 							// re-center the graph
+    st.labels.getLabel(rootnode.id).onclick()		// display the data for the root        
+}
+
 function init(){
     //init data
     %s
@@ -164,7 +197,6 @@ function init(){
         }
 
     });
-    var clicknum = 0;
     
     //end
     //init Spacetree
@@ -246,15 +278,7 @@ function init(){
             label.onclick = function(){
                   st.onClick(node.id);
                   if(!node) return;
-                  
-                  // little hack to get the centering to the left of the root on load but then reset to the JIT default on the first user click
-                  //if (clicknum == 1)
-                  //{
-                  //	  st.canvas.translate(150, 0)
-                  //}
-                  clicknum += 1;
-                  //
-                  
+                                    
                   // Build the right column relations list.
                   // This is done by traversing the clicked node connections.
                   
@@ -330,7 +354,6 @@ function init(){
                   }
                         
                   //append connections information
-                  //$jit.id('inner-details').innerHTML = html
                   $jit.id('right-container').innerHTML = html
                 
             };
@@ -390,14 +413,9 @@ function init(){
     st.geom.translate(new $jit.Complex(-200, 0), "current");
     //emulate a click on the root node.
     st.onClick(st.root);
-    // shift canvas to the left - little hack, see above
-    //st.canvas.translate(-150, 0)
-
+    
     // click the root label to populate the right panel
     // the timeout seems to be necessary from what I'm guessing is a threading issue
     // the graph isn't always set up properly by this stage
-    setTimeout('st.labels.getLabel("start0").onclick()', 1000)
-    
-    //end
-
+	setTimeout('clickMidChild()', 1000)
 }
