@@ -16,6 +16,7 @@ import pickle
 import gzip
 import Graph
 
+from rosettahelper import readFile
 from rwebhelper import *
 from RosettaProtocols import *
 
@@ -565,8 +566,8 @@ class RosettaHTML(object):
         if remark == 'new':        
                           
             box = '''<table width="550"><tr><td class="linkbox" align="center" style="background-color:#aaaadd;">
-                      <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark this link to retrieve your results later!</font><br>
-                      <a class="blacklink" href="%(datadirPage)s" target="_blank"><u>Raw data files</u></a>
+                      <font color="black" style="font-weight: bold; text-decoration:blink;">If you are a guest user bookmark these links to retrieve your results later!</font><br>
+                      <br><a class="blacklink" href="%(jobinfoPage)s" target="_blank"><u>Job Info page</u></a>, <a class="blacklink" href="%(datadirPage)s" target="_blank"><u>Raw data files.</u></a>
                       </td></tr></table>''' % vars()
         #                     Job Info page:<br><a class="blacklink" href="%s?query=jobinfo&jobnumber=%s" target="_blank">https://%s?query=jobinfo&jobnumber=%s</a><br> % ( self.script_filename, cryptID, self.script_filename, cryptID )
                     
@@ -853,7 +854,6 @@ class RosettaHTML(object):
         
         html = ["""<td align="center"><H1 class="title">Job %(ID)s</H1>
                     <div id="jobinfo">""" % parameter]
-        
         if runOnCluster:
             if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
                 html.append("""
@@ -1739,22 +1739,20 @@ class RosettaHTML(object):
             html.append('<tr><td align=right></td><td></td></tr>')
                         
             list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
-            list_files = os.listdir(os.path.join(rootdir, cryptID, "best_scoring_pdb" ))
-            list_files.sort()
-            list_all_pdbs = grep('BR%slow_[0-9][0-9][0-9][0-9]_[A-Z]*\.pdb' % (input_id) ,list_files)
-            # we don't know at this point what the best scoring structures are. for each backrub structure, let's take the first we can find.
-            list_structure_shown = []
-            seq_before = ''
-            for pdb_fn in list_all_pdbs:
-                if seq_before != pdb_fn.split('_')[1]:
-                    list_structure_shown.append(pdb_fn)
-                seq_before = pdb_fn.split('_')[1]
-                
-            list_pdb_files.extend( [ '%s/%s/best_scoring_pdb/%s' % ( rootdir, cryptID, fn_pdb ) for fn_pdb in list_structure_shown ] )
-              
+            bestScoringPDBdir = os.path.join(rootdir, cryptID, "best_scoring_pdb")
+            list_files = []
+            if os.path.exists(bestScoringPDBdir):
+                orderFile = os.path.join(bestScoringPDBdir, "order.txt")
+                if os.path.exists(orderFile):
+                    list_files = readFile(orderFile).split("\n")
+                    list_pdb_files.extend([os.path.join(bestScoringPDBdir, _pdb) for _pdb in list_files])
+                else:
+                    list_files = os.listdir(bestScoringPDBdir)
+                    list_files.sort()
+                                          
             comment1 = """<br>Structural models for up to 10 low-energy sequences.<br>The query structure is shown in red. The designed residues are shown in balls-and-stick representation."""
             
-            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], designed = ProtocolParameters["Designed"])) # only the first 10 structures are shown
+            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:11], designed = ProtocolParameters["Designed"])) # only the first 10 structures are shown
                            
             html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Individual boxplots of the predicted frequencies at each mutated site.<br>
                               <br>Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
@@ -1777,6 +1775,7 @@ class RosettaHTML(object):
             html.append(self._show_molprobity( cryptID ))
             
             html.append("</td></tr>")
+            
         return html      
     
     def submitformSequenceToleranceSK(self, chainOptions, aminoAcidOptions, numChainsAvailable):
