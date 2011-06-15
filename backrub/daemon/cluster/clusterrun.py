@@ -82,7 +82,7 @@ def testSequenceToleranceSK(extraparams):
                 "Designed"          : {"A" : [103, 104]}
                 }
     setupParameters(extraparams, 1234, "1MDY_mod.pdb", 2, params)            
-    return RosettaTasks.ParallelSequenceToleranceJobSK(sgec, params, netappRoot, cluster_temp, dlDirectory)
+    return RosettaTasks.SequenceToleranceSKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
     
 def testMultiSequenceToleranceSKCommon(extraparams):
     nstruct = 100
@@ -104,13 +104,22 @@ def testMultiSequenceToleranceSKCommon(extraparams):
     setupParameters("multiseqtol", 1234, "1ki1.pdb", nstruct, params)
     return params  
 
+def testSequenceToleranceHKAnalysis(extraparams):
+    params = {
+                "radius"            : 5.0,  #todo: Set this in the constants file instead
+                "Partners"          : ["A", "B"],
+                "Designed"          : {"A" : [], "B" : [3, 4, 5, 6]} # todo: Test when "A" not defined
+                }
+    setupParameters("seqtolHK", 1934, "2PDZ.pdb", 49, params)            
+    return RosettaTasks.SequenceToleranceHKJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
+
 def testMultiSequenceToleranceSKAnalysis(extraparams):
     params = testMultiSequenceToleranceSKCommon(extraparams) 
-    return RosettaTasks.SequenceToleranceMultiJobSKAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
+    return RosettaTasks.SequenceToleranceSKMultiJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
 
 def testMultiSequenceToleranceSK(extraparams):
     params = testMultiSequenceToleranceSKCommon(extraparams) 
-    return RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_temp, dlDirectory)
+    return RosettaTasks.SequenceToleranceSKMultiJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
 
 def testSequenceToleranceHK(extraparams):
     params = {
@@ -119,11 +128,12 @@ def testSequenceToleranceHK(extraparams):
                 "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
                 }
     setupParameters("seqtolHK", 1234, "hktest.pdb", 2, params)            
-    return RosettaTasks.SequenceToleranceJobHK(sgec, params, netappRoot, cluster_temp, dlDirectory)
+    return RosettaTasks.SequenceToleranceHKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
 
 def run():
     tests = {
         "HK"           : {"testfn" : testSequenceToleranceHK,               "analysisOnly" : False, "extraparams" : None},
+        "HKAnalysis"   : {"testfn" : testSequenceToleranceHKAnalysis,       "analysisOnly" : True,  "extraparams" : ("/var/www/html/rosettaweb/backrub/remotedownloads/74cf257f89c8795d18c9b193afd4442a", 6185056)},
         "SKJMB"        : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : "seqtolJMB"},
         "SKP1"         : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : "seqtolP1"},
         "1KI1"         : {"testfn" : testMultiSequenceToleranceSK,          "analysisOnly" : False, "extraparams" : None},
@@ -176,5 +186,5 @@ def run():
                     print(traceback.print_exc())
                     print(e)
      
-test = "1KI1analysis"       
+test = "HKAnalysis"       
 run()

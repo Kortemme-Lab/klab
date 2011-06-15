@@ -1223,13 +1223,13 @@ class ClusterDaemon(RosettaDaemon):
         self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
         if task == "sequence_tolerance":
             params["radius"] = 5.0
-            clusterjob = RosettaTasks.SequenceToleranceJobHK(self.sgec, params, netappRoot, cluster_temp, dldir)   
+            clusterjob = RosettaTasks.SequenceToleranceHKJob(self.sgec, params, netappRoot, cluster_temp, dldir)   
         elif task == "sequence_tolerance_SK":
             params["radius"] = 10.0
-            clusterjob = RosettaTasks.ParallelSequenceToleranceJobSK(self.sgec, params, netappRoot, cluster_temp, dldir)     
+            clusterjob = RosettaTasks.SequenceToleranceSKJob(self.sgec, params, netappRoot, cluster_temp, dldir)     
         elif task == "multi_sequence_tolerance":
             params["radius"] = 10.0
-            clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(self.sgec, params, netappRoot, cluster_temp, dldir)            
+            clusterjob = RosettaTasks.SequenceToleranceSKMultiJob(self.sgec, params, netappRoot, cluster_temp, dldir)            
         else:
             raise
         

@@ -189,7 +189,7 @@ def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
 
 # Sequence Tolerance SK Tasks        
 
-class BackrubSequenceToleranceSK(ClusterTask):
+class SequenceToleranceSKTask(ClusterTask):
 
     # additional attributes
     prefix = "SeqTolerance"
@@ -205,7 +205,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
         if not parameters.get("binary") or not(parameters["binary"] == "seqtolJMB" or parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol"):
             raise Exception
                         
-        super(BackrubSequenceToleranceSK, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
+        super(SequenceToleranceSKTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
     
     def _initialize(self):
         self._prepare_backrub()
@@ -316,7 +316,7 @@ class BackrubSequenceToleranceSK(ClusterTask):
                 
     
     def retire(self):
-        passed = super(BackrubSequenceToleranceSK, self).retire()
+        passed = super(SequenceToleranceSKTask, self).retire()
                                
         try:
             # Run the analysis on the originating host
@@ -551,7 +551,7 @@ class SequenceToleranceHKClusterTask(ClusterTask):
     
 # Cluster jobs    
         
-class SequenceToleranceJobHK(RosettaClusterJob):
+class SequenceToleranceHKJob(RosettaClusterJob):
 
     suffix = "seqtolHK"
     name = "Sequence Tolerance (HK)"
@@ -580,7 +580,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             {"stdout" : "seqtol_1234.cmd.o6054336.1", "stderr" : "seqtol_1234.cmd.e6054336.1", "failed" : False},
             {"stdout" : "seqtol_1234.cmd.o6054336.2", "stderr" : "seqtol_1234.cmd.e6054336.2", "failed" : False}]
             
-    def __init__(self, sgec, parameters, tempdir, targetroot, dldir):
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
@@ -588,7 +588,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
         self.backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
         self.executable    = ''
-        super(SequenceToleranceJobHK, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
+        super(SequenceToleranceHKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
     
     def _initialize(self):
         self.describe()
@@ -683,7 +683,8 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             for fn in failed_runs:
                 s += "%s\n" % self.stTask.getExpectedOutputFileNames()[fn]
             self._status(s)
-            rosettahelper.writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
+            if not self.testonly:
+                rosettahelper.writeFile(self._targetdir_file_path("failed_jobs.txt"), s)
         
         self.list_outfiles = list_outfiles
     
@@ -747,7 +748,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.Rparameter = Rparameter[:-1] + ")" # gets rid of the last ','
     
     def _runRScript(self):
-        # run the R script for all positions and create the boxplots 
+        '''Run the R script for all positions and create the boxplots. Depends on _writeAminoAcidFrequencies.''' 
         cmd = '''/bin/echo \"plot_specificity_list(%s)\" \\
                 | /bin/cat %s - > specificity.R ; \\
                 /usr/bin/R CMD BATCH specificity.R''' % ( self.Rparameter, specificity_classicRScript )
@@ -772,10 +773,12 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.file_stderr.close()
     
     def _parseOutputFiles(self):
+        '''Read the output files to read in the sequences. Depends on _checkOutput.'''
         # CREATE SEQUENCE MOTIF    ## this all would be better off in the postprocessing of the onerun class
         sequences_list_total = {}
         
-        rosettahelper.make755Directory(self._targetdir_file_path("best_scoring_pdb"))
+        if not self.testonly:
+            rosettahelper.make755Directory(self._targetdir_file_path("best_scoring_pdb"))
         list_files = []        
         for file in glob.glob(os.path.join(self.workingdir, "sequence_tolerance", "BR*low_*_*.pdb")):
             list_files.append(file.split('/')[-1].strip())
@@ -811,10 +814,10 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         self.list_files = list_files
     
     def _copyBestScoringPDBs(self):
-        '''Get the best scoring pdb files associated with this job.'''
+        '''Get the best scoring pdb files associated with this job. Depends on _parseOutputFiles.'''
         
         structure_counter = 0 
-        self._status("sequences list:%s\n" % sorted(self.sequences_list_total.iteritems()))
+        #self._status("sequences list:%s\n" % sorted(self.sequences_list_total.iteritems()))
 
         # keep the 10 best scoring structures
         bestScoringOrder = []
@@ -828,16 +831,18 @@ class SequenceToleranceJobHK(RosettaClusterJob):
             if best_scoring_pdb in self.list_files:
                 bspdb = os.path.join(self._workingdir_file_path("sequence_tolerance"), best_scoring_pdb)
                 self._status("copying %s (%f) from run %d, generation %d back as best_scoring_pdb" % (best_scoring_pdb, interfaceScore, structureIndex, GenNumber))
-                shutil.copy(bspdb, self._targetdir_file_path("best_scoring_pdb"))        
+                if not self.testonly:
+                    shutil.copy(bspdb, self._targetdir_file_path("best_scoring_pdb"))        
                 bestScoringOrder.append(best_scoring_pdb)
                 structure_counter += 1
             if structure_counter >= 10:
                 break
-        JmolOrder = os.path.join(self._targetdir_file_path("best_scoring_pdb"), "order.txt")
-        rosettahelper.writeFile(JmolOrder, join(bestScoringOrder, "\n")) 
-        
+        if not self.testonly:
+            JmolOrder = os.path.join(self._targetdir_file_path("best_scoring_pdb"), "order.txt")
+            rosettahelper.writeFile(JmolOrder, join(bestScoringOrder, "\n"))
+            
     def _createSequenceMotif(self):
-        '''Write the fasta file with the 50 best scoring sequences overall.'''
+        '''Write the fasta file with the 50 best scoring sequences overall. Depends on _parseOutputFiles.'''
         parameters = self.parameters
         partners = parameters['Partners']
         designed = parameters['Designed']
@@ -1007,7 +1012,7 @@ class SequenceToleranceJobHK(RosettaClusterJob):
         return
 
         
-class ParallelSequenceToleranceJobSK(RosettaClusterJob):
+class SequenceToleranceSKJob(RosettaClusterJob):
 
     suffix = "seqtolSK"
     flatOutputDirectory = True
@@ -1032,7 +1037,7 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(ParallelSequenceToleranceJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+        super(SequenceToleranceSKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
 
     def _initialize(self):
         self.describe()
@@ -1051,7 +1056,7 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
         taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
         targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
                 
-        stTask = BackrubSequenceToleranceSK(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name=self.jobname)
+        stTask = SequenceToleranceSKTask(taskdir, targetdir, self.parameters, self.backrub_resfile, self.seqtol_resfile, movemap = self.backrub_movemap, name=self.jobname)
          
         scheduler.addInitialTasks(stTask)
         self.scheduler = scheduler
@@ -1204,7 +1209,7 @@ class ParallelSequenceToleranceJobSK(RosettaClusterJob):
 
 #todo: fix this with new task class
 import pprint
-class SequenceToleranceMultiJobSK(ParallelSequenceToleranceJobSK):
+class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
 
     suffix = "seqtolMultiSK"
     horizontaltiles = 4
@@ -1234,7 +1239,7 @@ class SequenceToleranceMultiJobSK(ParallelSequenceToleranceJobSK):
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        super(SequenceToleranceMultiJobSK, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+        super(SequenceToleranceSKMultiJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
     
     @staticmethod
     def _tmultiply(biglist, nextlist):
@@ -1264,7 +1269,7 @@ class SequenceToleranceMultiJobSK(ParallelSequenceToleranceJobSK):
                 premut.append((chain, resid, premutations))
         choices = []
         for i in range(len(premut)):
-            choices = SequenceToleranceMultiJobSK._tmultiply(choices, premut[i])
+            choices = SequenceToleranceSKMultiJob._tmultiply(choices, premut[i])
         
         # Create an array of parameters
         multiparameters = []
@@ -1314,7 +1319,7 @@ class SequenceToleranceMultiJobSK(ParallelSequenceToleranceJobSK):
             taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
             targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
             
-            stTask = BackrubSequenceToleranceSK(taskdir, targetdir, parameters, self.backrub_resfiles[i], self.seqtol_resfile, movemap = self.backrub_movemap, name=self.jobname + "for run %d of the sequence tolerance protocol" % i)
+            stTask = SequenceToleranceSKTask(taskdir, targetdir, parameters, self.backrub_resfiles[i], self.seqtol_resfile, movemap = self.backrub_movemap, name=self.jobname + "for run %d of the sequence tolerance protocol" % i)
             scheduler.addInitialTasks(stTask)
         
         self.scheduler = scheduler
@@ -1464,12 +1469,95 @@ class SequenceToleranceMultiJobSK(ParallelSequenceToleranceJobSK):
         self.jobname = "Sequence tolerance (SK JMB)"
 
 # Analysis classes for quick testing of the analysis functions. No cluster jobs are submitted so these rely on existing data for analysis
+
+class SequenceToleranceHKJobAnalyzer(SequenceToleranceHKJob):
                
-class ParallelSequenceToleranceJobSKAnalyzer(ParallelSequenceToleranceJobSK):
+    def __init__(self, sgec, parameters, tempdir, targetroot, dldir, (directoryToAnalyse, jobid)):
+        self.directoryToAnalyse = directoryToAnalyse 
+        self.jobid = jobid
+        super(SequenceToleranceHKJobAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly = True)
+    
+    def _initialize(self):
+        self.describe()
+        
+        parameters = self.parameters
+        
+        # Fill in missing parameters to avoid bad key lookups
+        designed = parameters['Designed']
+        partners = parameters['Partners']
+        designed[partners[0]] = designed.get(partners[0]) or [] 
+        designed[partners[1]] = designed.get(partners[1]) or [] 
+
+        # Create input files        
+        self.minimization_resfile = "minimize.resfile" 
+        self.backrub_resfile = "backrub.resfile"
+        self.seqtol_resfile = "seqtol.resfile"
+        
+        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
+        self._prepare_backrub_resfile() # fills in self.backrub for resfile creation
+        self._write_resfile( "NATRO", {}, [], self.minimization_resfile)
+        self._write_resfile( "NATAA", {}, self.backrub, self.backrub_resfile )
+        self._write_seqtol_resfile()
+        
+        self.targetdirectory = self.directoryToAnalyse
+        self.workingdir = self.directoryToAnalyse
+        
+        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.minimization_resfile, self.backrub_resfile, self.seqtol_resfile])
+        self.stTask = SequenceToleranceHKClusterTask(self.targetdirectory, self.targetdirectory, parameters, self.seqtol_resfile, name="Sequence tolerance step for sequence tolerance protocol")
+        numtasks = parameters["nstruct"] 
+        for i in range(1, numtasks + 1):
+            if numtasks == 1:
+                filename_stdout = "%s.o%s" % (self.stTask.scriptfilename, self.jobid)
+                filename_stderr = "%s.e%s" % (self.stTask.scriptfilename, self.jobid)
+            else:
+                filename_stdout = "%s.o%s.%d" % (self.stTask.scriptfilename, self.jobid, i)
+                filename_stderr = "%s.e%s.%d" % (self.stTask.scriptfilename, self.jobid, i)
+            self.stTask.outputstreams.append({"stdout" : filename_stdout, "stderr" : filename_stderr})
+        
+        self.scheduler = scheduler
+    
+    # *** Analysis functions ***
+    def _analyze(self):
+        """ This recreates Elisabeth's analysis scripts in /kortemmelab/shared/publication_data/ehumphris/Structure_2008/CODE/SCRIPTS """
+        
+        operations = [
+             ("checking output",                    self._checkOutput),
+             ("parsing output files",               self._parseOutputFiles),
+             ("determining the best scoring pdbs",  self._copyBestScoringPDBs),
+             ("printing out the best scoring",      self._printbestscoring)]
+        
+        for op in operations:
+            try:
+                self._status(op[0])
+                op[1]()
+            except Exception, e:
+                self._status("An exception occured while %s.\n%s\n%s" % (op[0], str(e), traceback.format_exc()))
+                return False
+                
+        return True
+    
+    def _printbestscoring(self):
+        bestscoring = ["\n\n", "Score\t\tSequence\tGeneration\tRun#", "*******\t\t********\t**********\t****"]
+        frequency = {}
+        for k,v in sorted(self.sequences_list_total.iteritems()):
+            location = "Run%03d-Gen%d:%.2f" % (v[1], v[0], k[0])
+            if frequency.get(k[1]):
+                frequency[k[1]] = (frequency[k[1]][0] + 1, frequency[k[1]][1] + [location])
+            else:
+                frequency[k[1]] = (1, [location])
+            bestscoring.append("%.3f\t\t%s\t\t%d\t\t%d" % (k[0], k[1], v[0], v[1]))
+        print("Sequences with a frequency greater than 1:")
+        for k, v in sorted(frequency.iteritems(), key=lambda(k,v): (v[0], k)):
+            if v[0] > 1:
+                print("%s, %d, %s" % (k, v[0], sorted(v[1])))
+        print(join(bestscoring[:150], "\n"))
+        
+               
+class SequenceToleranceSKJobAnalyzer(SequenceToleranceSKJob):
                
     def __init__(self, sgec, parameters, tempdir, targetroot, dldir, directoryToAnalyse):
         self.directoryToAnalyse = directoryToAnalyse 
-        super(ParallelSequenceToleranceJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
+        super(SequenceToleranceSKJobAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir)
     
     def _initialize(self):
         self.describe()
@@ -1489,13 +1577,13 @@ class ParallelSequenceToleranceJobSKAnalyzer(ParallelSequenceToleranceJobSK):
         
         self.scheduler = scheduler
         
-class SequenceToleranceMultiJobSKAnalyzer(SequenceToleranceMultiJobSK):
+class SequenceToleranceSKMultiJobAnalyzer(SequenceToleranceSKMultiJob):
         
     def __init__(self, sgec, parameters, tempdir, targetroot, dldir, directoryToAnalyse, testonly = False):
         self.directoryToAnalyse = directoryToAnalyse
         print("***")
         print(directoryToAnalyse)
-        super(SequenceToleranceMultiJobSKAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+        super(SequenceToleranceSKMultiJobAnalyzer, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
         
     def _initialize(self):
         self.describe()

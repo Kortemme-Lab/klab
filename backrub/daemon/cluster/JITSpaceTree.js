@@ -79,21 +79,28 @@ function hex2Rgb(hex) {
 function parsetime(timeinsec)
 {
 	tm = ""
-	if (timeinsec > 60*60*24)
+	timeinsec = parseFloat(timeinsec)
+	
+	day = parseFloat(60.0 * 60.0 * 24.0)
+	if (timeinsec > day)
 	{
-		tm += Math.floor(timeinsec / 60*60*24) + "d ";
-		timeinsec = timeinsec %% 60*60*24;
+		tm += Math.floor(timeinsec / day) + "d ";
+		timeinsec = timeinsec %% day;
 	}
-	if (timeinsec > 60*60)
+	
+	hour = parseFloat(60.0 * 60.0)
+	if (timeinsec > hour)
 	{
-		tm += Math.floor(timeinsec / 60*60) + "h ";
-		timeinsec = timeinsec %% 60*60;
+		tm += Math.floor(timeinsec / hour) + "h ";
+		timeinsec = timeinsec %% hour;
 	}
-	if (timeinsec > 60)
+	
+	if (timeinsec > 60.0)
 	{
-		tm += Math.floor(timeinsec / 60) + "m ";
-		timeinsec = timeinsec %% 60;
+		tm += Math.floor(timeinsec / 60.0) + "m ";
+		timeinsec = timeinsec %% 60.0;
 	}
+	
 	if (timeinsec > 0)
 	{
 		tm += Math.floor(timeinsec) + "s";

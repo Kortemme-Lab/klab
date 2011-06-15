@@ -327,7 +327,7 @@ if __name__ == "__main__":
         "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
         "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
         }
-    clusterjob = RosettaTasks.SequenceToleranceMultiJobSK(sgec, params, netappRoot, cluster_dldir, testonly = True)
+    clusterjob = RosettaTasks.SequenceToleranceSKMultiJob(sgec, params, netappRoot, cluster_dldir, testonly = True)
     
     ts = clusterjob.scheduler._getAllTasks()       
         
