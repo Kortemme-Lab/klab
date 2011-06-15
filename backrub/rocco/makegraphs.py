@@ -7,12 +7,18 @@ import sys
 from optparse import OptionParser
 import os.path, numpy
 import util, pool, PDBlite
-
+import traceback
+import time
 # Added 05/19/11
 starting_pdb_file = sys.argv[1]
 #experimental_list = sys.argv[1]
 ensemble_list = sys.argv[2]
 prefix = sys.argv[3] 
+
+F = open(util.logfile, "w")
+F.close()   
+
+starttime = time.time()
 
 #starting_pdb_file = "1A8G.pdb"
 print "Starting PDB is: %s" % (starting_pdb_file)
@@ -24,27 +30,72 @@ CA_DIST_DIFF_BFACT_PDB_FILE = "ca_dist_difference_bfactors-%s.pdb" % (prefix)
 RMSD_PLOT_FILE = "rmsd_plot-%s.png" % (prefix)
 CA_DIST_DIFF_2D_PLOT_FILE = "ca_dist_difference_2D_plot-%s.png" % (prefix)
 CA_DIST_DIFF_1D_PLOT_FILE = "ca_dist_difference_1D_plot-%s.png" % (prefix)
+
+#util.PRINTHEAP("before loading starting pdb")
+
 starting_pdb = PDBlite.PDB(open(starting_pdb_file).readlines())
+
+#util.PRINTHEAP("after loading starting pdb")
+
 br_traj = PDBlite.PDBTrajectory(ensemble_list)
+
+#util.PRINTHEAP("after loading ensemble list")
+
 #br_traj = PDBlite.PDBTrajectory("ensemble.lst")
 open(CA_DIST_DIFF_MATRIX_FILE, "w").write(br_traj.get_diff_dist_matrix_str())
 
+util.PRINTHEAP("after computing ca dist diff matrix")
+
 # calculate the RMSDs at each residue
 # 05/19/11: What datatype is rmsds? rmsds is an array of size ? --Rocco
-rmsds = br_traj.calc_rmsd_over_sequence(starting_pdb, ["CA"])
+rmsds = None
+try:
+    #rmsds1 = br_traj.calc_rmsd_over_sequence(starting_pdb)
+    #util.PRINTHEAP("after computing ca dist diff matrix")
+    #util.LOG(str(rmsds1))
+
+    rmsds2 = br_traj.calc_CA_rmsd_over_sequence_lessmem(starting_pdb)
+    util.PRINTHEAP("after computing ca dist diff matrix")
+    util.LOG(str(rmsds2))
+    rmsds = rmsds2
+    
+    #if len(rmsds1) != len(rmsds2):
+    #    raise Exception("Lists should be the same size")
+
+    #for i in range(len(rmsds1)):
+    #    if rmsds1[i] != rmsds2[i]:
+    #        raise Exception("Lists differ at index %d: %f vs. %f" % (i, rmsds1[i], rmsds2[i]))
+    
+except Exception, e:
+    util.PRINTHEAP("exception computing calc_rmsd_over_sequence")
+    print(e)
+    print(traceback.print_exc())
+    sys.exit(1)
+
 #print "length of rmsds",len(rmsds),"\n"
 
+util.PRINTHEAP("after calc_rmsd_over_sequence")
 
 # load the CA distance difference results
 A = numpy.loadtxt(CA_DIST_DIFF_MATRIX_FILE)
+
+util.PRINTHEAP("after loadtxt(CA_DIST_DIFF_MATRIX_FILE")
+
 vals_str = util.run("grep MEAN %(CA_DIST_DIFF_MATRIX_FILE)s | tr ' ' '\t' | cut -f4-" % vars()).replace("\t",",")
+
+util.PRINTHEAP("after grep MEAN %(CA_DIST_DIFF_MATRIX_FILE)")
+
 ca_dist_diff_means = numpy.array(map(float, vals_str.split(",")))
+
+util.PRINTHEAP("after ca_dist_diff_means")
 
 #print "length of ca_dist_diff_means: %d" % (len(ca_dist_diff_means))
 #sys.exit()
 
 # add CA-distance difference values into bfactor of a new pdb file
 open(CA_DIST_DIFF_BFACT_PDB_FILE, 'w').write(starting_pdb.get_pdb_set_bfactor_str(list(ca_dist_diff_means)))
+
+util.PRINTHEAP("CA_DIST_DIFF_BFACT_PDB_FILE")
 
 # The "Pairwise Cα difference distance values" graph is generated with the following:
 # (The variable A is created above)
@@ -100,3 +151,6 @@ pylab.ylabel('RMSD (Angstroms)')
 xlabels = ax.get_xticklabels()
 pylab.setp(xlabels, rotation=-90, fontsize=5)
 pylab.savefig(RMSD_PLOT_FILE, dpi=300)
+
+util.PRINTHEAP("Before exit")
+print("Total time: %.2fs" % (time.time() - starttime))

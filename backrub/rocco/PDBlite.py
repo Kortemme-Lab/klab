@@ -16,6 +16,7 @@ def make_pdb_atom_str(atomNum, atomName, resName, chain, resNum, x, y, z, altLoc
 def get_resid(chain, res_num): return chain+"@"+str(res_num)
 def parse_resid(resid): return resid.split("@")
 
+    
 # from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/498246
 # where the input matrix shape is (nres x 3)
 def calc_distance_matrix(nDimPoints):
@@ -375,14 +376,14 @@ class PDBResidue:
     def calc_rmsd(self, res2, atom_names=None):
         sum, count = 0., 0.
         for atom in self.iter_atoms():
-	    if atom_names == None or atom.atomName in atom_names:
-	        atom2 = res2.get_atom(atom.atomName)
-		#print atom, atom2
-		if atom2 == None: raise Exception("ERROR PDBlite.calc_rmsd:  can't find atom '%s %s' in pdb '%s'" % (res2, atom.atomName, pdb2))
-		sum += atom.calc_dist2(atom2)
-		count += 1
+            if atom_names == None or atom.atomName in atom_names:
+                atom2 = res2.get_atom(atom.atomName)
+                #print atom, atom2
+                if atom2 == None: raise Exception("ERROR PDBlite.calc_rmsd:  can't find atom '%s %s' in pdb '%s'" % (res2, atom.atomName, pdb2))
+                sum += atom.calc_dist2(atom2)
+                count += 1
         rmsd = math.sqrt(sum/count)
-	return rmsd
+        return rmsd
 
 class PDB:
     # ignores hydrogen atoms by default because they slow things down and are usually not used
@@ -816,27 +817,69 @@ class PDBTrajectory:
     # chain1 is where to take residues from, chain2 is the chain id of these residues in chain 2
     def calc_rmsd_over_sequence(self, ref_pdb, atom_names=["CA"]):
         ref_residues = [res for res in ref_pdb.iter_residues()]
-	residue_map = {}
-	for pdb in self.get_next_pdb():
-	    res_ind = 0
-	    for res in pdb.iter_residues():
-	        residue_map.setdefault(res_ind, []).append(res)
-		res_ind += 1
-	nres = len(residue_map.keys())
-		
-	rmsds = []
-	for res_ind in sorted(residue_map.keys()):
-	    rmsd = num.mean([ref_residues[res_ind].calc_rmsd(res, atom_names) for res in residue_map[res_ind]])
-	    rmsds.append(rmsd)
+        residue_map = {}
+        i = 0
+        for pdb in self.get_next_pdb():
+            i += 1
+            print("Reading PDB %d for RMSD calculation" % i)
+            res_ind = 0
+            for res in pdb.iter_residues():
+                residue_map.setdefault(res_ind, []).append(res)
+                res_ind += 1
+        nres = len(residue_map.keys())
+
+        util.PRINTHEAP("*** Finished reading %i PDBs. Starting RMSD calculation ***" % i)
+        
+        rmsds = []
+        for res_ind in sorted(residue_map.keys()):            
+            rmsd = num.mean([ref_residues[res_ind].calc_rmsd(res, atom_names) for res in residue_map[res_ind]])
+            rmsds.append(rmsd)
+        return rmsds
+
+    def calc_CA_rmsd_over_sequence_lessmem(self, ref_pdb):
+        ref_residues = [res for res in ref_pdb.iter_residues()]
+        
+        numResidues = len(ref_residues)
+        residue_map = []
+        nres = len(ref_residues)
+        for i in range(nres):
+            residue_map.append([])
+        
+        i = 0
+        for pdb in self.get_next_pdb():
+            i += 1
+            if i % 10 == 0:
+                print("**** Reading PDB #%d for RMSD calculation ****" % i)
+            if len(pdb._res_order) != numResidues:
+                raise Exception("ERROR: %s does not have the expected number (%d) of residues" % (pdb.fn, nres))
+            
+            res_ind = 0
+            for resid in pdb._res_order:
+                CAatom = pdb._residues[resid]._atoms["CA"]
+                residue_map[res_ind].append((CAatom.x, CAatom.y, CAatom.z))
+                res_ind += 1
+                    
+        util.PRINTHEAP("Finished reading %i PDBs. Starting RMSD calculation" % i)
+        
+        rmsds = []
+        for res_ind in range(nres):
+            sequence_residues = residue_map[res_ind]
+            referenceCA = ref_residues[res_ind]._atoms["CA"]    
+            tmplist = [math.sqrt(((referenceCA.x - CApos[0])**2) + ((referenceCA.y - CApos[1])**2) + ((referenceCA.z - CApos[2])**2)) for CApos in sequence_residues]
+            rmsd = num.mean(tmplist)
+            rmsds.append(rmsd)
         return rmsds
 
     def get_diff_dist_matrix_str(self, res_range=None, scaled=False):
+        util.PRINTHEAP("*** Diff dist matrix str start *** ")
         s = "# TRAJECTORY: " + self.name + "\n"
-	diff_dist_matrix = self.diff_dist_matrix(res_range, scaled=False)
-	s += "#" + str(diff_dist_matrix.shape) + "\n"
-	s += "# 1D MEAN" + util.fmt_floats(num.mean(diff_dist_matrix, axis=0), digits=6) + "\n"
-	s += util.arr2str2(diff_dist_matrix, precision=6) + "\n"
-	return s
+        diff_dist_matrix = self.diff_dist_matrix(res_range, scaled=False)
+        util.PRINTHEAP("*** Diff dist matrix str computation ended *** ")
+        s += "#" + str(diff_dist_matrix.shape) + "\n"
+        s += "# 1D MEAN" + util.fmt_floats(num.mean(diff_dist_matrix, axis=0), digits=6) + "\n"
+        s += util.arr2str2(diff_dist_matrix, precision=6) + "\n"
+        util.PRINTHEAP("*** Diff dist matrix str end *** ")
+        return s
 
     # calculate the difference distance matrix
     # 1) calculate distance matrices for each structure
@@ -852,6 +895,8 @@ class PDBTrajectory:
             dist_matrix = calc_distance_matrix(ca_xyz)
             dist_matrices.append(dist_matrix)
 
+        util.PRINTHEAP("All PDBs read")
+        util.PRINTHEAP("len(dist_matrices %d" % len(dist_matrices))
         scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
         count = 0
         for i in range(len(dist_matrices)):

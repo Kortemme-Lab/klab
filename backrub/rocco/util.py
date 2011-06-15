@@ -12,6 +12,34 @@ UTIL_NFS_WAIT_TIME = 30   # how long to wait for NFS to give us our files before
 
 pushd_stack = []
 
+import gc
+from guppy import hpy
+import time
+starttime = time.time()
+logfile = "heapprint.log"
+
+def LOG(msg):
+    print(msg)
+    F = open(logfile, "a")
+    F.write(msg)
+    F.close()
+    
+def PRINTHEAP(msg):
+    global starttime
+    newtime = time.time()
+    print("**** %s. Time since last heap printout : %.2fs ****" % (msg or "", (newtime - starttime)))
+    starttime = newtime 
+    gc.collect()
+    gc.collect()
+    h = hpy()
+    F = open(logfile, "a")
+    print h.heap()
+    print("\n")
+    F.write(str(h.heap()))
+    F.write("\n")
+    F.close()
+
+
 def flatten(lst):
     result = []
     for el in lst:
