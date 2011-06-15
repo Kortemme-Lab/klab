@@ -927,7 +927,7 @@ class RosettaHTML(object):
                           ''' % error
         
         html = ["""
-                <tr><td align=right bgcolor="#EEEEFF">Job Name:       </td><td bgcolor="#EEEEFF">%s</td></tr>
+                <tr><td style="min-width:300px" align=right bgcolor="#EEEEFF">Job Name:       </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Status:         </td><td bgcolor="#EEEEFF">%s</td></tr>
                 <tr><td align=right></td><td></td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Submitted from: </td><td bgcolor="#EEEEFF">%s</td></tr>
@@ -1155,11 +1155,19 @@ class RosettaHTML(object):
             if designed and numstructures > 0:
                 jmolModelSelectors.append('<th>Designed</th>')
                 cols += 1
-            jmolModelSelectors.append('</tr><tr><td colspan="%d"><hr></td></tr>' % cols)           
+            jmolModelSelectors.append('</tr><tr><td colspan="%d"><hr></td></tr>' % cols)
+            
+            HKnamestr = re.compile(r"BR(.{4})low_(\d{4})_(.{4})")           
             for i in range(0, numstructures):
                 filename = split(list_pdb_files[i], "/")[-1]
                 rindex = filename.rfind(".pdb")
                 filename = filename[:rindex]
+                matches = HKnamestr.match(filename)
+                if matches:
+                    try:
+                        filename = "%s (Structure #%d)" % (matches.groups(0)[2], int(matches.groups(0)[1]))
+                    except:
+                        filename = filename[:rindex]
                 premcode = ("","")
                 descode = premcode
                 if mutated and i > 0:
