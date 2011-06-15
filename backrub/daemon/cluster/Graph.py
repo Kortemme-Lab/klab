@@ -87,8 +87,7 @@ class Graph(object):
     def __init__(self, tasks, testonly = False):
         self.vertices = {}
         self.edges = {}
-        #initv = {"id" :0, "edges"[], "start", "initial", "#FFFFFF", "doublecircle", 1, 1, "start")
-        self.vertices["init"] = Node(0, "start", "start", ClusterTask.INITIAL_TASK, 1, 1, [], True)
+        self.vertices["init"] = Node(0, "Job", "Job", ClusterTask.INITIAL_TASK, 1, 1, [], True)
         self.edges["init"] = tasks
         self.numvertices = 1
         self._assimilate(tasks, testonly, initial = True) # Get exclusive time
@@ -292,8 +291,6 @@ class JITGraph(Graph):
     
         
 if __name__ == "__main__":
-    #initv = (0, "start", "initial", "#FFFFFF", "doublecircle", 1, 1, "start")
-    #self.vertices[t] = (self.numvertices, cshortname, cstatus, ccolor, cshape, cdonetasks, ctotaltasks, clongname)
     import os
     import ClusterScheduler
     import RosettaTasks

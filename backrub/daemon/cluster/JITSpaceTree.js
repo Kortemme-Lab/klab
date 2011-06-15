@@ -33,6 +33,8 @@ var labelType, useGradients, nativeTextSupport, animate;
 
 var kortemmelabBlue		= '#00b5f9';
 var kortemmelabShadow	= '#002d3d';
+var nodeHeight			= 27;
+var nodeWidth			= 80;
 
 (function() {
   var ua = navigator.userAgent,
@@ -110,16 +112,26 @@ function getMidChild(n, level)
           	{
     			subnodes.push(adj);
           	});
-    var midnode = subnodes[(subnodes.length / 2) | 0]; // division returning an integer
     
-	if (level > 1)
-	{
-		return getMidChild(midnode, level - 1);
-	}
-	else
-	{
-		return midnode;
-	}
+    if (subnodes.length == 0)
+    {
+    	// There are no children so our last midnode was the best to choose
+    	return n;
+    }
+    else
+    {
+    	// recurse or return
+	    var midnode = subnodes[(subnodes.length / 2) | 0]; // division returning an integer
+	    
+		if (level > 1)
+		{
+			return getMidChild(midnode, level - 1);
+		}
+		else
+		{
+			return midnode;
+		}
+    }
 }
 
 function clickMidChild()
@@ -127,7 +139,7 @@ function clickMidChild()
 	// This simulates a click on the middle child of (the middle child  of, if it exists) the root node to better center the graph
 	// It then simulates a click on the label of the root node to populate the data div
     rootnode = st.graph.getNode(st.root);
-    midnode = getMidChild(rootnode, 1)
+    midnode = getMidChild(rootnode, 2)
     st.onClick(midnode.id) 							// re-center the graph
     st.labels.getLabel(rootnode.id).onclick()		// display the data for the root        
 }
@@ -221,8 +233,8 @@ function init(){
         //set overridable=true for styling individual
         //nodes or edges
         Node: { 
-            height: 27,
-            width: 80,
+            height: nodeHeight,
+            width: nodeWidth,
             type: 'stroke-rect',
             overridable: true,
             //canvas specific styles
@@ -361,14 +373,14 @@ function init(){
             var style = label.style;
             
             CSSStyleDeclaration
-            style.width = 60 + 'px';
-            style.height = 17 + 'px';            
+            style.width = nodeWidth + 'px';
+            style.height = nodeHeight + 'px';            
             style.cursor = 'pointer';
             style.color = node.getData('textcolor')
             style.fontSize = '0.9em';
             style.fontFamily = 'times';
             style.textAlign= 'center';
-            style.paddingTop = '3px';
+            style.paddingTop = '6px';
         },
         
         //This method is called right before plotting
