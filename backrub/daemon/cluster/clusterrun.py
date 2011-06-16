@@ -125,9 +125,9 @@ def testSequenceToleranceHK(extraparams):
     params = {
                 "radius"            : 5.0,  #todo: Set this in the constants file instead
                 "Partners"          : ["A", "B"],
-                "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]} # todo: Test when "A" not defined
+                "Designed"          : {"A" : [], "B" : [3, 4, 5, 6]} # todo: Test when "A" not defined
                 }
-    setupParameters("seqtolHK", 1234, "hktest.pdb", 2, params)            
+    setupParameters("seqtolHK", 1934, "2PDZ.pdb", 49, params)            
     return RosettaTasks.SequenceToleranceHKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
 
 def run():
@@ -156,7 +156,7 @@ def run():
                     clusterjob.start()
                     sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
                     
-                    destpath = os.path.join(cluster_dldir, params["cryptID"])
+                    destpath = os.path.join(cluster_dldir, clusterjob.parameters["cryptID"])
                     if os.path.exists(destpath):
                         shutil.rmtree(destpath)
         
@@ -186,5 +186,5 @@ def run():
                     print(traceback.print_exc())
                     print(e)
      
-test = "HKAnalysis"       
+test = "HK"       
 run()

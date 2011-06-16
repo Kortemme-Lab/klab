@@ -48,7 +48,7 @@ def getClusterDatabasePath(binary, cluster_database_index = 0):
 
 class ClusterScript:
     
-    def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}, maxhours = 335, maxmins = 59):
+    def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}, maxhours = CLUSTER_maxhoursforjob, maxmins = CLUSTER_maxminsforjob):
         self.contents = []
         self.tasks = []
         self.parameters = {"workingdir": workingdir, "taskline": "", "taskparam" : "", "taskvar" : "", "maxhours": maxhours, "maxmins": maxmins}
@@ -69,10 +69,6 @@ class ClusterScript:
             print("Fix: stdout/stderr checking fails for numtasks==1")
             raise
         
-        if CLUSTER_debugmode: 
-            self.parameters["maxhours"] = 0
-            self.parameters["maxmins"] = 10    
-
     def _addPreamble(self):
 
         self.contents.insert(0, """\

@@ -857,7 +857,7 @@ class SequenceToleranceHKJob(RosettaClusterJob):
         for designed_sequence, origin in sorted(self.sequences_list_total.iteritems()):
             i += 1
             handle_fasta.write('>%s\n%s\n' % (i, designed_sequence[1]))
-            if i > 50:
+            if i >= 50:
                 break
         handle_fasta.close()
    
@@ -1537,15 +1537,17 @@ class SequenceToleranceHKJobAnalyzer(SequenceToleranceHKJob):
         return True
     
     def _printbestscoring(self):
-        bestscoring = ["\n\n", "Score\t\tSequence\tGeneration\tRun#", "*******\t\t********\t**********\t****"]
+        bestscoring = ["\n\n", "     Score\t\tSequence\tGeneration\tRun#", "     *******\t\t********\t**********\t****"]
         frequency = {}
+        counter = 1
         for k,v in sorted(self.sequences_list_total.iteritems()):
             location = "Run%03d-Gen%d:%.2f" % (v[1], v[0], k[0])
             if frequency.get(k[1]):
                 frequency[k[1]] = (frequency[k[1]][0] + 1, frequency[k[1]][1] + [location])
             else:
                 frequency[k[1]] = (1, [location])
-            bestscoring.append("%.3f\t\t%s\t\t%d\t\t%d" % (k[0], k[1], v[0], v[1]))
+            bestscoring.append("%03d: %.3f\t\t%s\t\t%d\t\t%d" % (counter, k[0], k[1], v[0], v[1]))
+            counter += 1
         print("Sequences with a frequency greater than 1:")
         for k, v in sorted(frequency.iteritems(), key=lambda(k,v): (v[0], k)):
             if v[0] > 1:

@@ -148,6 +148,9 @@ class SGEConnection(object):
         if name:
             command.append('-N')
             command.append('%s' % name)
+        if CLUSTER_debugmode:
+            command.append('-q')
+            command.append('short.q')
         if hold_jobid:
             command.append('-hold_jid')
             command.append('%d' % hold_jobid)
@@ -155,6 +158,7 @@ class SGEConnection(object):
         
         # Submit the job and capture output.
         try:
+            print(command)
             subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
         except Exception, e:
             print('<sge message="Failed running qsub command: %s in cwd %s"/>' % (command, workingdir))
@@ -181,7 +185,10 @@ class SGEConnection(object):
             jobid = -1
         
         output = output.replace('"', "'")
-        print('<sge message="%s"/>' % output)
+        msg = '<sge message="%s"/>' % output
+        if output.startswith("qsub: ERROR"):
+            raise Exception(msg)            
+        print(msg)
             
         return jobid, output
         
