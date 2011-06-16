@@ -24,6 +24,7 @@
 #   All and core only sequence populations tables:     seq_pop.txt, seq_pop_core.txt
 
 import sys
+import time
 
 sys.path.insert(1, "../../common/")
 from RosettaProtocols import RosettaBinaries
@@ -62,6 +63,13 @@ import os.path, numpy
 sys.path.append("/kortemmelab/home/gfriedla/scripts/python")
 
 import util, pool, PDBlite
+
+starttime = time.time()
+def LOGTIME(msg):
+    global starttime
+    currenttime = time.time()
+    print("%ds has elapsed.\n%s\n" % (currenttime - starttime, msg))
+    starttime = currenttime
 
 # takes a list of sequence strings and retunrs an array of populations of each AA over the sequence (nres x 20)
 def calc_seq_populations(sequences):
@@ -108,6 +116,8 @@ try:
     num_structs, maxres, num_steps, kt, num_designs_per_bb = int(num_structs), int(maxres), int(num_steps), float(kt), int(num_designs_per_bb)
     num_designs = num_structs * num_designs_per_bb
     
+    LOGTIME("Reading the starting PDB file.")
+    
     # get the residue numbers
     starting_pdb = PDBlite.PDB(open(starting_pdb_file).readlines()) # hier gehts schief
     res_nums = [int(res.res_num) for res in starting_pdb.iter_residues()]
@@ -120,14 +130,15 @@ try:
 except Exception:
     if options.verbose >=1: util.print_last_exception()
     parser.error("Invalid number or type of arguments: %s")
-
 # find the core residues
 try:
     util.mkdir_cd("repack")
+    LOGTIME("Running backrub xx.")
     util.run("rm -f *pdb; %(ROSETTA_BIN)s xx %(ens_name)s _ -design -onlypack -s %(starting_pdb_file)s -read_all_chains -paths %(PATHS_FILE)s > repack.log" % vars()).split()
     repacked_pdb_files = util.run("find $PWD -noleaf  -name '*pdb'" % vars()).split()
     assert(len(repacked_pdb_files) == 1)
     repacked_pdb_file = repacked_pdb_files[0]
+    LOGTIME("Parsing neighbors.")
     num_neighbors = map(int, util.run("%(PARSE_NEIGHBOR_SCRIPT)s %(repacked_pdb_file)s" % vars()).strip().split())
     assert(len(res_nums) == len(num_neighbors))
     coreres = []
@@ -145,6 +156,7 @@ except Exception, e:
 try:
     # make backrub resfile
     br_resfile = os.path.abspath(ens_name + "_br.res")
+    LOGTIME("Making resfile.")
     util.run("%(MAKE_RESFILE_SCRIPT)s -pdb %(starting_pdb_file)s | sed 's/NATRO /NATAAB/' > %(br_resfile)s" % vars())
         
     backrub_log = os.path.abspath("backrub.log")
@@ -159,6 +171,7 @@ try:
                 util.cd("..")
             cmdPool.run()
         else:
+            LOGTIME("Running backrub br.")
             cmd_mult = "%(ROSETTA_BIN)s br 0001 _ -paths %(PATHS_FILE)s -pose1 -backrub_mc -fa_input -find_disulf -norepack_disulf -s %(starting_pdb_file)s -resfile %(br_resfile)s -ex1 -ex2 -extrachi_cutoff 0 -ntrials %(num_steps)d -max_res %(maxres)d -only_bb .5 -only_rot .5 -nstruct %(num_structs)d -mc_temp %(kt)f -bond_angle_params bond_angle_amber_rosetta -read_all_chains -use_pdb_numbering >& %(backrub_log)s" % vars()
             util.run(cmd_mult)
     util.run("find $PWD -noleaf -name 'br*.pdb' | grep -v last | xargs rm -f") # remove low and initial backrub output files
@@ -186,6 +199,7 @@ try:
         br_logfile = os.path.abspath(br_file_name + "_" + str(br_file_num) + ".log")
         if not DEBUG:
             util.mkdir_cd(str(br_file_num))
+            LOGTIME("Running design.")
             cmd = "%(ROSETTA_BIN)s -design -fixbb -read_all_chains -fa_input -ex2 -ex1aro -ex1 -try_both_his_tautomers -ndruns %(num_designs_per_bb)d -resfile %(des_resfile)s -s %(br_file)s -paths %(PATHS_FILE)s -output_pdb %(br_file_name)s -output_pdb_gz -use_pdb_numbering > %(br_logfile)s" % vars()
             if options.cluster: cmdPool.queue(cmd)
             else: util.run(cmd)
@@ -199,13 +213,17 @@ try:
 
     # output the sequences to fasta files and reformat the sequence names to something user-intelligible
     designs_traj = PDBlite.PDBTrajectory(DESIGNED_PDBS_LIST_FILE)
+    LOGTIME("Making fasta.")
     open(DESIGNS_FASTA_FILE, 'w').write(designs_traj.get_fasta_str().replace("br0001last_","Structure-").replace("_","; Sequence-").replace(".pdb.gz",""))
+    LOGTIME("Making fasta for cores.")
     open(DESIGNS_CORERES_FASTA_FILE, 'w').write(designs_traj.get_fasta_str(coreres).replace("br0001last_","Structure-").replace("_","; Sequence-").replace(".pdb.gz",""))
 
     sequences = util.run("cat %(DESIGNS_FASTA_FILE)s | grep -v \>" % vars()).split("\n")
     sequences_core = util.run("cat %(DESIGNS_CORERES_FASTA_FILE)s | grep -v \>" % vars()).split("\n")
+    LOGTIME("Calculating sequence populations.")
     open(DESIGNS_SEQ_POP_FILE, 'w').write(util.arr2str2(calc_seq_populations(sequences), precision=2, length=4, col_names=AAS, row_names=map(str, res_nums)))
     try:
+      LOGTIME("Calculating sequence populations for cores.")
       open(DESIGNS_CORERES_SEQ_POP_FILE, 'w').write(util.arr2str2(calc_seq_populations(sequences_core), precision=2, length=4, col_names=AAS, row_names=map(str, coreres)))
     except:
       pass
@@ -216,11 +234,13 @@ except Exception, e:
 # make the ca-distance difference matrix, plot and output in pdb file format
 try:
     br_traj = PDBlite.PDBTrajectory(BR_PDBS_LIST_FILE)
+    LOGTIME("Computing the distance matrix.")
     open(CA_DIST_DIFF_MATRIX_FILE, "w").write(br_traj.get_diff_dist_matrix_str())
     #util.run("python %(PDBLITE_SCRIPT)s -t %(BR_PDBS_LIST_FILE)s --diff_dist_matrix > %(CA_DIST_DIFF_MATRIX_FILE)s" % vars())
 
     # calcualte the RMSDs at each residue
     #pdb_traj = PDBlite.PDBTrajectory(BR_PDBS_LIST_FILE)
+    LOGTIME("Computing the RMSD.")
     rmsds = br_traj.calc_rmsd_over_sequence(starting_pdb, ["CA"])
 
     # load the CA distance difference results
@@ -229,12 +249,15 @@ try:
     ca_dist_diff_means = numpy.array(map(float, vals_str.split(",")))
 
     # add CA-distance difference values into bfactor of a new pdb file
+    LOGTIME("Computing the CA-distance difference values.")
     open(CA_DIST_DIFF_BFACT_PDB_FILE, 'w').write(starting_pdb.get_pdb_set_bfactor_str(list(ca_dist_diff_means)))
                                 
     #starting_pdb_list_file = "starting_pdb.lst"
     #open(starting_pdb_list_file, "w").write(starting_pdb_file)
     #util.run("python %(PDBLITE_SCRIPT)s -t %(starting_pdb_list_file)s --set_bfactors='%(vals_str)s' > %(CA_DIST_DIFF_BFACT_PDB_FILE)s" % vars())
 
+    LOGTIME("Creating the matplots.")
+    
     # init plotting
     import matplotlib
     matplotlib.use('Agg') # so plots aren't made interactively
@@ -287,6 +310,7 @@ except Exception, e:
 # make the sequence logos using the berkeley weblogo library
 try:
     from weblogolib import *
+    LOGTIME("Creating the weblogos.")
     seqs = read_seq_data(open(DESIGNS_FASTA_FILE))
     logo_data = LogoData.from_seqs(seqs)
     logo_options = LogoOptions()
@@ -311,3 +335,5 @@ except Exception, e:
     if options.verbose >=1: util.print_last_exception()
     raise Exception("Error creating logo plot: %s" % e)
 
+LOGTIME("Completed.")
+    

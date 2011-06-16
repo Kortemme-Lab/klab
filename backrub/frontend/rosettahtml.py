@@ -835,7 +835,6 @@ class RosettaHTML(object):
 
     def jobinfo(self, parameter, isLocal):
         """this function decides what _showFunction to pick"""
-        
         self._referenceAll()
         
         statuslist = ['in queue', 'active', 'done', 'unknown', 'error', 'sample'] 
@@ -876,7 +875,7 @@ class RosettaHTML(object):
             if parameter['task'] == p.dbname:
                 showFn = p.getShowResultsFunction()
                 progressDisplayHeight = p.progressDisplayHeight
-                html.extend(showFn(status, parameter["rootdir"], parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters))   
+                html.extend(showFn(status, parameter["rootdir"], parameter['cryptID'], parameter['PDBComplexFile'], parameter['EnsembleSize'], ProtocolParameters, parameter))   
                 break
     
         if runOnCluster:    
@@ -989,7 +988,7 @@ class RosettaHTML(object):
         
         return html
 
-    def _getPDBfiles(self, input_filename, cryptID):
+    def _getPDBfiles(self, input_filename, cryptID, parameters):
         
         dir_results = os.path.join(self.download_dir, cryptID)
         
@@ -1003,13 +1002,15 @@ class RosettaHTML(object):
                 rootname = input_filename[0:input_filename.rfind(".")]
                 for x in self.lowest_structs:
                     id = x[0]
-                    lowfile = "%s_%s_low.pdb" % (rootname, id)
+                    if parameters['Mini'] == 'classic':  
+                        lowfile = "BR%slow_%s.pdb" % (rootname, id)
+                    else:
+                        lowfile = "%s_%s_low.pdb" % (rootname, id)
                     list_pdb_files.append('../downloads/%s/%s' % (cryptID, lowfile))
             else:
                 for filename in list_files:
                     if filename.endswith("_low.pdb"):
                         list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-                        
             for pdb_file in list_pdb_files:
                 pdb_file_path = pdb_file.replace('../downloads/', self.download_dir) # build absolute path to the file
                 if not pdb_file_path.endswith(".gz"):
@@ -1025,7 +1026,7 @@ class RosettaHTML(object):
         else:
             return None
             
-    def _getPDBfilesForEnsemble(self, input_filename, cryptID):
+    def _getPDBfilesForEnsemble(self, input_filename, cryptID, parameters):
         # todo: unify with function above
         dir_results = os.path.join(self.download_dir, cryptID)
         
@@ -1034,12 +1035,14 @@ class RosettaHTML(object):
             
             # Add the original PDB at the beginning of the list
             list_pdb_files = ['../downloads/%s/' % cryptID + input_filename]
-            
             if self.lowest_structs != []:
                 rootname = input_filename[0:input_filename.rfind(".")]
                 for x in self.lowest_structs:
                     id = x[0]
-                    lowfile = "BR%slow_%s.pdb" % (rootname, id)
+                    if parameters['Mini'] == 'classic':  
+                        lowfile = "BR%slow_%s.pdb" % (rootname, id)
+                    else:
+                        lowfile = "%s_%s_low.pdb" % (rootname, id)
                     list_pdb_files.append('../downloads/%s/%s' % (cryptID, lowfile))
             else:
                 lowfileregex = re.compile(".*low_\d{4}.pdb$")
@@ -1075,7 +1078,7 @@ class RosettaHTML(object):
             html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
           html += '''                                      </ul>
                         </td>
-                      <td bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre></a></td></tr>
+                      <td style="width=100px;" bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre></a></td></tr>
               ''' % ( score_file, join(handle.readlines()[:10], '') + '...\n' )
           handle.close()
           
@@ -1436,8 +1439,8 @@ class RosettaHTML(object):
      
         return html, ""
     
-    def showPointMutation(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
-    
+    def showPointMutation(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
+        
         chain = ProtocolParameters["Mutations"][0][0]
         resid = ProtocolParameters["Mutations"][0][1]
         newaa = ProtocolParameters["Mutations"][0][2]
@@ -1455,7 +1458,7 @@ class RosettaHTML(object):
           html.append(self._show_scores_file(cryptID))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
           
-          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID), mutated = {chain : [resid]}))
+          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = {chain : [resid]}))
           html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1503,7 +1506,7 @@ class RosettaHTML(object):
         return html, ""
     
     
-    def showMultiplePointMutations(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showMultiplePointMutations(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
     
         list_chains = []
         list_resids = []
@@ -1545,7 +1548,7 @@ class RosettaHTML(object):
           html.append(self._show_scores_file(cryptID))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
-          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID), mutated = mutated ))
+          html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = mutated ))
           html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1559,7 +1562,7 @@ class RosettaHTML(object):
             </p>
             ''' % self.tooltips], ""
     
-    def showEnsemble(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showEnsemble(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
         html = ["""
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Backrub Conformational Ensemble</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
@@ -1571,7 +1574,7 @@ class RosettaHTML(object):
             html.append(self._show_scores_file(cryptID))        
         
             comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red.'
-            html.append(self._showApplet4MultipleFiles( comment, self._getPDBfilesForEnsemble(input_filename, cryptID)))
+            html.append(self._showApplet4MultipleFiles( comment, self._getPDBfilesForEnsemble(input_filename, cryptID, parameters)))
             html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1601,7 +1604,7 @@ class RosettaHTML(object):
             </p>
             ''' % self.tooltips], ""
             
-    def showEnsembleDesign(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showEnsembleDesign(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
         temperature = ProtocolParameters["Temperature"]
         seq_per_struct = ProtocolParameters["NumDesignsPerStruct"]
         len_of_seg = ProtocolParameters["SegmentLength"]
@@ -1719,7 +1722,7 @@ class RosettaHTML(object):
             
         return html, ""
     
-    def showSequenceToleranceHK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showSequenceToleranceHK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
 
         seqtol_chain1 = ProtocolParameters["Partners"][0]
         seqtol_chain2 = ProtocolParameters["Partners"][1]
@@ -1962,7 +1965,7 @@ class RosettaHTML(object):
 
         return html, postscript
     
-    def showSequenceToleranceSK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters):
+    def showSequenceToleranceSK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
 
         html = ["""
               <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Tolerance Prediction (Smith, Kortemme 2010)</td></tr>
@@ -2061,7 +2064,7 @@ class RosettaHTML(object):
                 if reslist:
                     premutated[partner] = reslist.keys()
              
-            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:10], mutated = premutated, designed=designed)) # only the first 10 structures are shown
+            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:11], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
             #upgradetodo: get doi from Colin
             #@postupgradetodo: change image size based on table size - need more input data and then I can use the code below for the Weblogo

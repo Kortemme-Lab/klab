@@ -541,7 +541,7 @@ function demoEnsemble(setAllData)
 {
 	var sbmtform = document.submitform;
 	sbmtform.PDBID.value = "1UBQ";
-	sbmtform.JobName.value = "Backrub Conformational Ensemble sample job"
+	sbmtform.JobName.value = "Backrub Conformational Ensemble sample"
 }
 
 /************************************
@@ -1417,6 +1417,7 @@ function hideInactiveProtocols(app, task)
 				thistask = ptask
 				new Effect.Appear(ptask, { duration: 0.0, queue: { scope: 'task' }} )
 				new Effect.Appear( "ref" + i + "_" + j, { duration: 0.0, queue: { scope: 'task' }} )
+				new Effect.Appear( "recNumStructures" + i + "_" + j, { duration: 0.0 } );
 				arrowstyle.color = "#d55414"
 				arrowstyle.fontWeight = "bold"
 			}

@@ -1118,7 +1118,7 @@ def submit(rosettaHTML, form, SID):
                             break
                     
                     # otherwise, see if there are already two similar jobs in the queue to avoid server spamming
-                    sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND Status="0" AND ID!="%s"''' % (hash_key, ID)
+                    sql = '''SELECT ID, cryptID, PDBComplexFile, Status FROM backrub WHERE backrub.hashkey="%s" AND (Status="0" OR Status="1") AND ID!="%s"''' % (hash_key, ID)
                     results = StorageDBConnection.execQuery(sql)
                     if results and len(results) > 0:
                         job = results[0]
@@ -1131,7 +1131,12 @@ def submit(rosettaHTML, form, SID):
                         else:
                             localstr = "&local=false"
                             
-                        errors.append('''There is already a job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, localstr, job[1], job[0]))
+                        if job[3] == 0:
+                            errors.append('''There is a job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, localstr, job[1], job[0]))
+                        elif job[3] == 1:
+                            errors.append('''There is an active job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) running with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, localstr, job[1], job[0]))
+                        else:
+                            errors.append('''Server error checking the job status.''')
                         sql = """DELETE FROM backrub WHERE ID="%s" """ % ID
                         result = StorageDBConnection.execQuery(sql)
                         return False
