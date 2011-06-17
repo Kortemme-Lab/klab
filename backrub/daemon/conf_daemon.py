@@ -8,9 +8,8 @@ import sys
 import os
 from rosettahelper import server_root
 
-#@finalupgradetodo Change this to False for the live webserver
 # Cluster debug mode. Sets jobs to use short iterations for quick testing
-CLUSTER_debugmode = True
+CLUSTER_debugmode = False
 
 # Local directories
 cluster_dldir = os.path.join(server_root, "downloads")

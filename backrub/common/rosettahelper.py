@@ -14,7 +14,6 @@ import string
 import stat
 import tempfile
 
-#@finalupgradetodo:
 server_root = "/var/www/html/rosettaweb/backrub"
 #server_root = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub"
 

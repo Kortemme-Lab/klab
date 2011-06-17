@@ -62,7 +62,7 @@ class RosettaHTML(object):
                         "tt_AtomOccupancy": "header=[Set atom occupancy] body=[Rosetta will ignore any ATOM records in the PDB file with zero occupancy. You can choose to upload the PDB as is (default), remove records with empty occupancy, or set these records with an occupancy of 1.0.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_PDBID":         "header=[PDB identifier] body=[Enter the 4-digit PDB identifier of the structure file. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
-                        "tt_RVersion":      """header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or Rosetta 3 (\'mini\'). Some applications only work with one version.<br><br>Both of the generalized sequence tolerance protocols use Rosetta 3; see 'Designed Position Sequence Scoring' in the Methods section upgradetodo link of Smith and Kortemme 2011 <a href='#refSmithKortemme:2011'>(%d)</a> for a description of the differences.] %s""" % (refIDs["SmithKortemme:2011"], tooltip_parameter),
+                        "tt_RVersion":      """header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or Rosetta 3 (\'mini\'). Some applications only work with one version.<br><br>Both of the generalized sequence tolerance protocols use Rosetta 3; see 'Designed Position Sequence Scoring' in the Methods section of <a href='#refSmithKortemme:2011'>(%d)</a> for a description of the differences.] %s""" % (refIDs["SmithKortemme:2011"], tooltip_parameter), #upgradetodo
                         "tt_NStruct":       "header=[Number of Structures] body=[Number of generated structures or size of ensemble. We recommend to create 10 structures at a time.] %s" % tooltip_parameter,
                         "tt_ROutput":       "header=[Rosetta output] body=[If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.] %s" % tooltip_parameter,
                         "tt_SelApp":        "header=[Select Application] body=[Click to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.] %s" % tooltip_parameter,
@@ -2071,9 +2071,9 @@ class RosettaHTML(object):
             refIDs = self.refs.getReferences()
             reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
             
-            #@upgradetodo: fix [Figure 2B] and [Table 1]
-            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to upgradetodo hlink [Figure 2B] in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
-                              <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See [Table 1] in %s.</p>
+            #@upgradetodo: hlink [Figure 2B] and [Table 1]
+            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to Figure 2B in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
+                              <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See Table 1 in %s.</p>
                               <p>Download the table as 
                               <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.</p>
                               </td>

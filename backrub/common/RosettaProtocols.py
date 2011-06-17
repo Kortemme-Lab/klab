@@ -260,7 +260,7 @@ class WebserverProtocols(object):
         
         proto = RosettaProtocol("Generalized Protocol (Fold / Interface) Sequence Tolerance", "sequence_tolerance_SK")
         proto.setBinaries("seqtolJMB", "seqtolP1") 
-        proto.setNumStructures(2,20,100)    #upgradetodo: min should be 10 but I've allowed 2 for testing
+        proto.setNumStructures(10,20,100)
         protocolGroups[2].add(proto)
         
         # A flat list of the protocols 
