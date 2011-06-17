@@ -47,7 +47,7 @@ setDemoValues =
 ]
 
 // An array of functions to handle protocol-specific GUI setup
-const numSubTasks = 3
+var numSubTasks = 3; // const
 function noop(app, task, extra){}
 additionalGUISetup = new Array(protocolTasks.length)
 for (var i = 0; i < protocolTasks.length; i++)

@@ -200,7 +200,7 @@ class RosettaDataDir(RosettaHTML):
         self.html_refs = '<P>%(HumphrisKortemme:2008)s</P>' % self.refs
         
         # individual boxplots
-        list_files = os.listdir( self.download_dir+'/'+cryptID )
+        list_files = os.listdir((os.path.join(self.download_dir, cryptID )))
         list_files.sort()
     
         self.content = '''
@@ -263,7 +263,7 @@ class RosettaDataDir(RosettaHTML):
             return
       
         # individual boxplots
-        list_files = os.listdir( self.download_dir+'/'+cryptID )
+        list_files = os.listdir(os.path.join(self.download_dir, cryptID ))
         list_files.sort()
     
         self.content = []

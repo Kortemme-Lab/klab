@@ -69,6 +69,9 @@ from cgi import escape
 import string
 import pickle
 
+# Set this to the machine you are debugging from
+DEVELOPMENT_HOST = "cabernet.ucsf.edu"
+
 #todo: Test this for debugging import cgitb
 
 ###############################################################################################
@@ -303,7 +306,7 @@ def ws():
       warning = 'Backend not running. Jobs will not be processed immediately.'
     else:
       warning = '' #'Backend not running. Jobs will not be processed immediately.'
-
+  
   rosettaDD = RosettaDataDir(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir)
   rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning)
   
@@ -725,7 +728,7 @@ def register(form, SID):
     return (True, 'updated')
   else:
     process_data = False
-    return (False, )
+    return (False, None)
   if process_data:
     # transmit values to database
     # check whether each parameter has a value and if so append it to the database string
@@ -775,7 +778,7 @@ The Kortemme Lab Server Daemon
 
     sendMail(ROSETTAWEB_bin_sendmail, ROSETTAWEB_admin_email, ROSETTAWEB_admin_email, "[Kortemme Lab Server] New Account created", text_to_admin)
 
-  return (process_data)
+  return (process_data, None)
 
 
 ################################### end register() ############################################
@@ -997,6 +1000,7 @@ def submit(rosettaHTML, form, SID):
     pgroup = None
     ptask = None
     
+    IDtoDelete = None
     try:
         # 2 modes: check and show form
         if form.has_key("mode") and form["mode"].value == "check":
@@ -1090,6 +1094,7 @@ def submit(rosettaHTML, form, SID):
                     sql = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
                     result = StorageDBConnection.execQuery(sql)
                     ID = result[0][0]
+                    IDtoDelete = ID
                     # create a unique key as name for directories from the ID and host, for the case we need to hide the results
                     # do not just use the ID but also a random sequence
                     tgb = str(ID) + ROSETTAWEB_db_host + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '')
@@ -1103,9 +1108,8 @@ def submit(rosettaHTML, form, SID):
                     hash_key = StorageDBConnection.generateHash(ID)
             
                     # now find if there's a key like that already:
-                    sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND ID!="%s"''' % (hash_key, ID)
+                    sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND BackrubServer="%s" AND ID!="%s"''' % (hash_key, ROSETTAWEB_short_server_name, ID)
                     result = StorageDBConnection.execQuery(sql)
-                    # print sql, result
                     for r in result:
                         if str(r[0]) != str(ID): # if there is ANOTHER, FINISHED simulation with the same hash
                             if isLocalJob:
@@ -1159,8 +1163,7 @@ def submit(rosettaHTML, form, SID):
                     return_vals = False
             
                 # unlock tables
-                sql = "UNLOCK TABLES"
-                StorageDBConnection.execQuery(sql)
+                StorageDBConnection.execQuery("UNLOCK TABLES")
                 
                 return return_vals
             else:
@@ -1170,7 +1173,15 @@ def submit(rosettaHTML, form, SID):
             return False
     except Exception, e:
         excinfo = sys.exc_info()
-        estring = traceback.format_exc()
+        estring = traceback.format_exc()        
+        
+        if IDtoDelete:
+            sql = """DELETE FROM backrub where ID=%d""" % IDtoDelete
+            result = StorageDBConnection.execQuery(sql)    
+        StorageDBConnection.execQuery("UNLOCK TABLES")
+        
+        if hostname == DEVELOPMENT_HOST:
+            errors.append("Server error: An exception occurred: %s." % estring)
         # todo: Log this to file
         errors.append("An error occurred during submission.")
         errors.append("[Admin] Server error: An exception occurred: %s." % estring)
@@ -1842,7 +1853,9 @@ try:
     except:
         hostname = IP
 
-    if hostname == "cabernet.ucsf.edu":
+    # Change True to False here to display the maintenance page
+    # The maintenance page should be updated before doing so e.g. go to the website, copy the source, paste into maintenance.html, and edit to remove links etc.
+    if True or hostname == DEVELOPMENT_HOST: 
         ws()
     else:
         F=open("maintenance.html")
@@ -1851,13 +1864,12 @@ try:
         sys.stdout.write("Content-type: text/html\n\n")
         sys.stdout.write(contents)
         sys.stdout.close()        
-    #ws()
 except Exception, e:
     try:
         hostname = sock.gethostbyaddr(IP)[0]
     except:
         hostname = IP
-    if hostname == "cabernet.ucsf.edu":
+    if hostname == DEVELOPMENT_HOST:
         cgitb.handler()
         #print(e)
         #print("<br>")

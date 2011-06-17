@@ -249,7 +249,7 @@ function init(){
               strokeStyle: kortemmelabBlue,
               lineWidth: 2,
               shadowColor: kortemmelabShadow,
-              shadowBlur: 4,
+              shadowBlur: 4
              }
         },
         
@@ -379,7 +379,7 @@ function init(){
             //set label styles
             var style = label.style;
             
-            CSSStyleDeclaration
+            // CSS Style Declaration
             style.width = nodeWidth + 'px';
             style.height = nodeHeight + 'px';            
             style.cursor = 'pointer';

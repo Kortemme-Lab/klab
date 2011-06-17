@@ -1202,7 +1202,7 @@ class ClusterDaemon(RosettaDaemon):
                             self.recentDBJobs = self.recentDBJobs[200:]
                         
                         # Start the job
-                        newclusterjob = self.start_job(task, params, data[i][9])
+                        newclusterjob = self.start_job(task, params, data[i][10])
                         if newclusterjob:
                             #change status and write start time to DB
                             self.runningJobs.append(newclusterjob)

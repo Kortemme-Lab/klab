@@ -176,7 +176,7 @@ class RosettaHTML(object):
 # submit()
 ###############################################################################################
 
-    def submit(self, jobname='', errors=None, activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='', extraValues = '', loadSampleData = False):
+    def submit(self, jobname='', errors=[], activeProtocol = (-1, -1), UploadedPDB='', StoredPDB='', listOfChains = [], MiniVersion='', extraValues = '', loadSampleData = False):
           # this function uses javascript functions from jscript.js
             # if you change the application tabler here, please make sure to change jscript.js accordingly
             # calling the function with parameters will load those into the form. #not implemented yet
@@ -772,46 +772,46 @@ class RosettaHTML(object):
             
             html.append("""<tr align=center bgcolor="%s" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='%s'; this.style.color='#000000';" >""" % (bgcolor, bgcolor))
             if jobIsLocal:
-                link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+                link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&amp;jobnumber=%s\'"' % ( self.script_filename, line[1] )
             else:
-                link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&local=false&jobnumber=%s\'"' % ( self.script_filename, line[1] )
+                link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&amp;local=false&amp;jobnumber=%s\'"' % ( self.script_filename, line[1] )
                 #link_to_job = 'onclick="window.location.href=\'https://kortemmelab.ucsf.edu%s?query=jobinfo&jobnumber=%s\'"' % ( self.script_filename, line[1] )
             
             # write ID
-            html.append('<td id="lw" %s>%s </td>' % (link_to_job, str(line[0])))
+            html.append('<td class="lw" %s>%s </td>' % (link_to_job, str(line[0])))
             # write status 
             status = int(line[2])
             
             if status == 0:
-                html.append('<td id="lw" %s><font color="orange">in queue</font></td>' % link_to_job)
+                html.append('<td class="lw" %s><font color="orange">in queue</font></td>' % link_to_job)
             elif status == 1:
-                html.append('<td id="lw" %s><font color="green">active</font></td>' % link_to_job)
+                html.append('<td class="lw" %s><font color="green">active</font></td>' % link_to_job)
             elif status == 2:
-                html.append('<td id="lw" %s><font color="black">done</font></td>' % link_to_job) # <font color="darkblue" %s></font>
+                html.append('<td class="lw" %s><font color="black">done</font></td>' % link_to_job) # <font color="darkblue" %s></font>
             elif status == 5:
-                html.append('<td id="lw" style="background-color: #AFE2C2;" %s><font color="darkblue">sample</font></td>' % link_to_job)
+                html.append('<td class="lw" style="background-color: #AFE2C2;" %s><font color="darkblue">sample</font></td>' % link_to_job)
             else:
               # write error
               if  str(line[8]) != '' and line[8] != None:
                 # onclick="window.open('https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation','backrub_wiki')"
                 #                        onmouseover="this.style.background='#447DAE'; this.style.color='#000000'"
                 #                        onmouseout="this.style.background='#EEEEEE';"
-                html.append('''<td id="lw">
+                html.append('''<td class="lw">
                               <font color="FF0000">error</font>
                               (<a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation" target="_blank"
                                  onmouseover="this.style.color='#FFFFFF'" onmouseout="this.style.color='#365a79'">%s</a>)</td>''' % str(line[8]))
               else:
-                html.append('<td id="lw"><font color="FF0000">error</font></td>')
+                html.append('<td class="lw"><font color="FF0000">error</font></td>')
                 
             # write username
-            html.append('<td id="lw" %s>%s</td>' % (link_to_job, str(line[3])))
+            html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[3])))
             # write date
-            html.append('<td id="lw" style="font-size:small;" %s>%s</td>' % (link_to_job, str(line[4])))
+            html.append('<td class="lw" style="font-size:small;" %s>%s</td>' % (link_to_job, str(line[4])))
             # write jobname or "notes"
             if len(str(line[5])) < 26:
-                html.append('<td id="lw" %s>%s</td>' % (link_to_job, str(line[5])))
+                html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[5])))
             else:
-                html.append('<td id="lw" %s>%s</td>' % (link_to_job, str(line[5])[0:23] + "..."))
+                html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[5])[0:23] + "..."))
             
             # Rosetta version
             # todo: the mini/classic distinction is somewhat deprecated with the new seqtol protocol
@@ -819,10 +819,10 @@ class RosettaHTML(object):
             if RosettaBinaries[line[6]]["mini"]:
                 miniVersion = "mini"
             miniVersion = RosettaBinaries[line[6]]["queuename"]
-            html.append('<td id="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
+            html.append('<td class="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
 
             # write size of ensemble
-            html.append('<td id="lw" %s >%s</td></tr>\n' % (link_to_job, str(line[7])))
+            html.append('<td class="lw" %s >%s</td></tr>\n' % (link_to_job, str(line[7])))
                 
         html.append('</table> </div><br> </td>')
         
@@ -856,10 +856,12 @@ class RosettaHTML(object):
         if runOnCluster:
             if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
                 html.append("""
+                        <!--[if !IE]><!-->
                         <script language="javascript" type="text/javascript" src="%(rootdir)s/%(cryptID)s/progress.js"></script>
                         <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
                         <!-- JIT Library File -->
-                        <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>""" % parameter)
+                        <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>
+                        <!--<![endif]-->""" % parameter)
 
         html.append("""<table border=0 cellpadding=2 cellspacing=1>""")
         
@@ -881,6 +883,7 @@ class RosettaHTML(object):
         if runOnCluster:    
             if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
                 html.append('''
+    <!--[if !IE]><!-->
     <tr>
         <td style="text-align:left;vertical-align:top" width="200" bgcolor="#FFFCD8"><p><br>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
         <td>
@@ -897,7 +900,8 @@ class RosettaHTML(object):
                 </tr>
             </table>
         </td>                   
-    </tr>''' % (progressDisplayHeight, Graph.getHTMLLegend()))
+    </tr>
+    <!--<![endif]-->''' % (progressDisplayHeight, Graph.getHTMLLegend()))
 
         html.append('''</table>
                             <script language="javascript" type="text/javascript">init();</script>
@@ -1322,8 +1326,7 @@ class RosettaHTML(object):
         ps = ""
         if username == "guest":
             ps = "<br>Please note that if you register an account for the website then this allows us to contact you directly if there are any problems in your jobs and suggest solutions. It also helps us to improve the website based on your feedback. Additionally, job details and results for registered users are stored for a longer period on the server.<br>" 
-        html = """ <div id="login_box"></div>
-                   <td align="center">You have successfully logged in as %s. <br> %s <br>  
+        html = """<td align="center">You have successfully logged in as %s. <br> %s <br>  
                    From here you can proceed to the <A href="%s?query=submit">submission page</A> to <A href="%s?query=submit">submit a new job</A> <br>
                    or navigate to the <A href="%s?query=queue">queue</A> to check for submitted, running or finished jobs. <br><br> </td>
                    """ % ( username, ps, self.script_filename, self.script_filename, self.script_filename )
@@ -2184,13 +2187,15 @@ class RosettaHTML(object):
         JS.append(bversion)
         
         # Embed the Python constants into the Javascript
-        JS.append("""   const HK_MaxMutations = %d;
-                        const SK_max_seqtol_chains = %d;
-                        const SK_InitialBoltzmann = %f;
-                        const SK_BoltzmannIncrease = %f;
-                        const SK_MaxMutations = %d;
-                        const SK_MaxPremutations = %d;
-                        const MaxMultiplePointMutations = %d;
+        # Ideally we would use const here but IE does not support it as of writing this
+        JS.append("""
+var HK_MaxMutations = %d;
+var SK_max_seqtol_chains = %d;
+var SK_InitialBoltzmann = %f;
+var SK_BoltzmannIncrease = %f;
+var SK_MaxMutations = %d;
+var SK_MaxPremutations = %d;
+var MaxMultiplePointMutations = %d;
                     """ % (ROSETTAWEB_HK_MaxMutations, ROSETTAWEB_SK_Max_Chains, ROSETTAWEB_SK_InitialBoltzmann, 
                            ROSETTAWEB_SK_BoltzmannIncrease, ROSETTAWEB_SK_MaxMutations, ROSETTAWEB_SK_MaxPremutations, 
                            ROSETTAWEB_MaxMultiplePointMutations))
