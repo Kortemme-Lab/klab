@@ -4,15 +4,15 @@
  ************************************/
 
 // Constants used by validation functions
-const integralExpression 	= /^[0-9]+$/;
-const numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/;
-const alphaExpression 		= /^[A-Za-z]+$/;
-const chainExpression 		= /^[A-Za-z]$/;
-const emptyExpression 		= /^\s*$/;
-const PDBExpression 		=   /^[@]?[-()\sA-Z_a-z0-9]+$/;
-const StoredPDBExpression 	= /^pdbs\/[-()\sA-Z_a-z0-9\/]+[^\.]+\.pdb$/i;
-const CysteineExpression 	= /^CYS$/i;
-const CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in Rosetta 3."
+var integralExpression 	= /^[0-9]+$/; //const 
+var numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/; //const
+var alphaExpression 		= /^[A-Za-z]+$/; //const
+var chainExpression 		= /^[A-Za-z]$/; //const
+var emptyExpression 		= /^\s*$/; //const
+var PDBExpression 		=   /^[@]?[-()\sA-Z_a-z0-9]+$/; //const
+var StoredPDBExpression 	= /^pdbs\/[-()\sA-Z_a-z0-9\/]+[^\.]+\.pdb$/i; //const
+var CysteineExpression 	= /^CYS$/i; //const
+var CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in Rosetta 3." //const
 
 /* Protocol variables */
 // Multiple Point Mutations
@@ -26,9 +26,9 @@ var numSeqTolSK = 1; // Mutations
 var numSeqTolSKPremutations = 0; // Premutations
 var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains
 var columnElements;
-const initNumSeqTolSKChains = 1;
-const minSeqTolSKMutations = 1;
-const minSeqTolSKPremutations = 0;
+var initNumSeqTolSKChains = 1; //const
+var minSeqTolSKMutations = 1; //const
+var minSeqTolSKPremutations = 0; //const
 
 // An array of validation functions for the protocols
 protocolValidators = 
