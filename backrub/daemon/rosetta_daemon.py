@@ -1539,8 +1539,8 @@ if __name__ == "__main__":
                 sys.exit(2)
             sys.exit(0)
         elif 'cluster' == sys.argv[1]:
-            #daemon = ClusterDaemon(os.path.join(temppath, 'qb3running.log'), os.path.join(temppath, 'qb3running.log'))
-            daemon = ClusterDaemon('/dev/stdout','/dev/stderr')
+            daemon = ClusterDaemon(os.path.join(temppath, 'qb3running.log'), os.path.join(temppath, 'qb3running.log'))
+            #daemon = ClusterDaemon('/dev/stdout','/dev/stderr')
             if 'start' == sys.argv[2]:
                 daemon.start()
             elif 'stop' == sys.argv[2]:
