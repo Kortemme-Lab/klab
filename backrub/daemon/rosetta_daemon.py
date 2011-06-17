@@ -186,7 +186,8 @@ The Kortemme Lab Server Daemon
                 # get job from db                    
                 # get all jobs in queue                            vvv 0
                 try:
-                    data = self.runSQL("SELECT ID,Date,Status,task FROM %s WHERE Status=0 ORDER BY Date" % self.db_table)
+                    data = self.runSQL("SELECT ID,Date,Status,task,PDBComplex,PDBComplexFile,Mini,EnsembleSize,ProtocolParameters,cryptID,BackrubServer FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
+                    #data = self.runSQL("SELECT ID,Date,Status,task FROM %s WHERE Status=0 ORDER BY Date" % self.db_table)
                     if len(data) == 0:
                         time.sleep(10) # wait 10 seconds if there's no job in queue
                         continue
@@ -195,7 +196,8 @@ The Kortemme Lab Server Daemon
                         for i in range(0,len(data)):
                             # if this is a sequence_tolerance job, but the limit is already being processed
                             if (data[i][3] == 'sequence_tolerance' or data[i][3] == 'sequence_tolerance_SK'): 
-                                continue # skip it
+                                self.log("ERROR IN SQL LOGIC IN RUN")
+                                continue # we should never get here but skip it just in case
                             else:
                                 # get first job
                                 ID = data[i][0]
@@ -589,8 +591,8 @@ The Kortemme Lab Server Daemon
             hashkeys[simulation[0]] = simulation[1]
             newhash = dbconnection.generateHash(simulation[0], debug = True) # Change debug to False to enable updating 
             #Used for testing when the update query in turned off
-            #if hashkeys[simulation[0]] == newhash:
-            #    print("unchanged: %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
+            if hashkeys[simulation[0]] == newhash:
+                print("unchanged: %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
             
         results = self.runSQL("SELECT ID, hashkey FROM %s" % self.db_table)
         
@@ -605,9 +607,15 @@ The Kortemme Lab Server Daemon
     def dbcheck(self):
         results = self.runSQL("SELECT ID, ProtocolParameters, task FROM %s" % self.db_table)
         for simulation in results:
-            protoparams = pickle.loads((simulation[1]))
             task = simulation[2]
-            if len(str(protoparams)) == 2 and task != "no_mutation":
+            if simulation[1]:
+                protoparams = pickle.loads((simulation[1]))
+                if len(str(protoparams)) == 2 and task != "no_mutation":
+                    print("Job number %d (%s) is missing parameters." % (simulation[0], task))
+                else:
+                    pass
+                    #print("Job number %d is fine." % simulation[0])
+            else:
                 print("Job number %d (%s) is missing parameters." % (simulation[0], task))
     
     def dbdumpPDB(self, jobID):
@@ -718,19 +726,27 @@ The Kortemme Lab Server Daemon
                         if len(str(seqtol_parameter)) != 2:
                             errors.append("%d: This simulation has bad data set: seqtol data exists %s, %d\n" % (id, str(seqtol_parameter), d))
                 
-                if task != "no_mutation" and task != "sequence_tolerance_SK" and not update:
-                    protoparams = pickle.loads(simulation[10])
-                    if len(str(seqtol_parameter)) == 2:
-                        errors.append("%d: This simulation %s has no data. %s\n" % (id, task, protoparams))
+                if task == "no_mutation" and not simulation[10]:
+                    ProtocolParameters = {}
+                    update = True
                 
-                if update and len(str(pickle.loads(simulation[10]))) ==2:
+                if task != "no_mutation" and task != "sequence_tolerance_SK" and not update:
+                    if simulation[10]:
+                        protoparams = pickle.loads(simulation[10])
+                        if len(str(seqtol_parameter)) == 2:
+                            errors.append("%d: This simulation %s has no data. %s\n" % (id, task, protoparams))
+                    else:
+                        errors.append("%d: This simulation %s has no data.\n" % (id, task))
+                    update = True
+                
+                if update and (simulation[10] == None or len(str(pickle.loads(simulation[10]))) == 2):
                     ProtocolParameters = pickle.dumps(ProtocolParameters)
                     updatesql = 'UPDATE %s SET ProtocolParameters="%s" WHERE ID=%s' % (self.db_table, ProtocolParameters, simulation[0])
                     sqlupdates.append(updatesql)
-                    if self.runSQL(updatesql) == None:
+                    if False and self.runSQL(updatesql) == None: # Enable this line to update the database
                         print("Update failed on record %d" % id)
                     
-            #print(string.join(sqlupdates,"\n"))
+            print(string.join(sqlupdates,"\n"))
             print(string.join(errors,"\n"))
                     
         except: # iteration over non-sequence, i.e. results is empty

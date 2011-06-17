@@ -41,7 +41,7 @@ sys.path.insert(2, "../daemon/cluster/")
 import shutil
 import sha, time
 import cgi
-# import cgitb; cgitb.enable()
+import cgitb; cgitb.enable()
 import Cookie
 # set Python egg dir MscOSX only
 if os.uname()[0] == 'Darwin':
@@ -1835,12 +1835,33 @@ class FrontendProtocols(WebserverProtocols):
         
 # run Forest run!
 try:
-    ws()
+    IP = os.environ['REMOTE_ADDR']
+    sock = socket
+    try:
+        hostname = sock.gethostbyaddr(IP)[0]
+    except:
+        hostname = IP
+
+    if hostname == "cabernet.ucsf.edu":
+        ws()
+    else:
+        F=open("maintenance.html")
+        contents = F.read()
+        F.close()
+        sys.stdout.write("Content-type: text/html\n\n")
+        sys.stdout.write(contents)
+        sys.stdout.close()        
+    #ws()
 except Exception, e:
-    #@finalupgradetodo
-    print(e)
-    print("<br>")
-    print(str(traceback.print_exc()).replace("\n", "<br>"))
-    print("*<br>")
+    try:
+        hostname = sock.gethostbyaddr(IP)[0]
+    except:
+        hostname = IP
+    if hostname == "cabernet.ucsf.edu":
+        cgitb.handler()
+        #print(e)
+        #print("<br>")
+        #print(str(traceback.print_exc()).replace("\n", "<br>"))
+        #print("*<br>")
     print "An error occurred. Please check your input and contact us if the problem persists."
 

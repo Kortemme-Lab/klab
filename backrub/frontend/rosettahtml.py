@@ -1021,7 +1021,6 @@ class RosettaHTML(object):
                         f_out.close()
                         f_in.close()
                     pdb_file += '.gz'
-            
             return list_pdb_files
         else:
             return None
@@ -1065,7 +1064,7 @@ class RosettaHTML(object):
         else:
             return None
         
-    def _show_scores_file(self, cryptID):
+    def _show_scores_file(self, cryptID, size_of_ensemble):
         score_file     = '../downloads/%s/scores_overall.txt' % cryptID
         score_file_res = '../downloads/%s/scores_residues.txt' % cryptID
         html = ''
@@ -1086,7 +1085,7 @@ class RosettaHTML(object):
           handle = open(score_file,'r')
           import operator
           L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' ]
-          
+          L = L[:size_of_ensemble]
           L.sort(key = lambda x:float(x[1]))
           self.lowest_structs = L[:10] #todo: declare as constant
           #print(self.lowest_structs)
@@ -1455,7 +1454,7 @@ class RosettaHTML(object):
                 
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
-          html.append(self._show_scores_file(cryptID))
+          html.append(self._show_scores_file(cryptID, size_of_ensemble))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
           
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = {chain : [resid]}))
@@ -1545,7 +1544,7 @@ class RosettaHTML(object):
         
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
-          html.append(self._show_scores_file(cryptID))
+          html.append(self._show_scores_file(cryptID, size_of_ensemble))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = mutated ))
@@ -1571,7 +1570,7 @@ class RosettaHTML(object):
         
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
-            html.append(self._show_scores_file(cryptID))        
+            html.append(self._show_scores_file(cryptID, size_of_ensemble))        
         
             comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red.'
             html.append(self._showApplet4MultipleFiles( comment, self._getPDBfilesForEnsemble(input_filename, cryptID, parameters)))
