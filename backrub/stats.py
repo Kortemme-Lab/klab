@@ -9,7 +9,7 @@ def execute(command):
 
 output_ps = execute('ps -o user,pid,ppid,command ax')
 # print output_ps.split('\n')
-expr = re.compile("rosetta_daemon.py")
+expr = re.compile("rosetta_daemon")
 line = filter(expr.search,[line.rstrip() for line in output_ps.split('\n')])
 # print line
 
