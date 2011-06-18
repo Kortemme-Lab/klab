@@ -201,11 +201,7 @@ class RosettaHTML(object):
             errors = ''
              
         self.tooltips.update({'username':self.username, 'jobname':jobname, 'script':self.script_filename, 'errors':errors})
-        
-        # <li id="ab1">
-        #   [ <A href="/alascan/" class="nav" target="_blank">Interface Alanine Scanning</A> ]<br><center><small>opens in a new window</small></center>
-        # </li>
-        
+                
         self._referenceAll()
         
         # This string holds options for comboboxes to select chains
@@ -251,53 +247,46 @@ class RosettaHTML(object):
         <tr>
 <!-- left column = menu -->
           <td id="columnLeft" align="right" style="vertical-align:top; margin:0px;">
-          <ul id="about">
-            <li id="ab2">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('0'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Point Mutation</A><br>
-              <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>            
-              <p id="menu_1" style="text-align:left; margin:0px;">
-                  <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td id="protocolarrow0_0" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 0); ">One mutation</a></td></tr>
-                  <tr><td id="protocolarrow0_1" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td><a href="javascript:void(0)" onclick="changeApplication(0, 1); ">Multiple mutations</a></td></tr>
-                  </table>
-              </p>
-            </li>
-            <li id="ab3">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('1'); "><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Backrub Ensemble</A>
-              <p id="menu_2" style="text-align:right; margin:0px;">
-                  <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td id="protocolarrow1_0"  width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
-                      <td><a href="javascript:void(0)" onclick="changeApplication(1, 0); ">
-                          <font style="font-size:10pt">Backrub Conformational Ensemble</font></a><br>
-                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2008.05.023" style="font-size: 8pt">Smith and Kortemme, 2008</a> ]</font>
-                      </td></tr>
-                  <tr><td id="protocolarrow1_1"  width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
-                      <td><a href="javascript:void(0)" onclick="changeApplication(1, 1); ">
-                          <font style="font-size:10pt">Backrub Ensemble Design</font></a><br>
-                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 8pt">Friedland et. al., 2008</a> ]</font>
-                      </td></tr>
-                  </table>
-              </p>
-            </li>
-            <li id="ab4">
-              <A href="javascript:void(0)" class="nav" onclick="showMenu('2');"><img src="../images/qm_s.png" border="0" title="%(tt_click)s"> Sequence Tolerance</A>
-              
-              <p id="menu_3" style="text-align:right; margin:0px;">
-                  <table style="border:0px; padding:0px; margin:0px;">
-                  <tr><td id="protocolarrow2_0" width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
-                      <td><a href="javascript:void(0)" onclick="changeApplication(2, 0); ">
-                          <font style="font-size:10pt">Interface Sequence Tolerance</font></a><br>
-                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.str.2008.09.012" style="font-size: 8pt">Humphris and Kortemme, 2008</a> ]</font>
-                      </td></tr>
-                  <tr><td id="protocolarrow2_1" width="30" style="vertical-align:top; text-align:right;">&#8680;</td>
-                      <td><a href="javascript:void(0)" onclick="changeApplication(2, 1); ">
-                          <font style="font-size:10pt">Generalized Protocol<br>(Fold / Interface)<br>Sequence Tolerance</font></a><br>
-                          <font style="font-size:8pt">[ <a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 8pt">Smith and Kortemme, 2010</a> ]</font><br>
-                          <font style="font-size:8pt">[ <a href="" style="font-size: 8pt">Smith and Kortemme, 2011</a> ]</font>
-                      </td></tr>
-                  </table>
-              </p>
-            </li>
+          <ul id="about">''' % self.tooltips)
+        
+        # Add the left-hand side menu for protocol selection
+        # We display references under the group if they are the same for all protocols
+        # Otherwise, we group them under the individual protocols
+        for i in range(numProtocolGroups):
+            pgroup = protocolGroups[i]
+            protocolsHaveSeparateReferences = False
+            references = []
+            references.extend([pgroup[0].getReferences()])
+            for j in range(1, protocolGroups[i].getSize()):
+                references.extend([pgroup[j].getReferences()])
+                if pgroup[j].getReferences() != pgroup[j - 1].getReferences():
+                    protocolsHaveSeparateReferences = True
+            if not protocolsHaveSeparateReferences:
+                references = [references[0]]
+                            
+            html.append('''<li style="background-color:%s"><A href="javascript:void(0)" class="nav" onclick="showMenu('%d');"><img src="../images/qm_s.png" border="0" title="%s"> %s</A><br>''' % (pgroup.color, i, self.tooltips["tt_click"], pgroup.name))
+            if not protocolsHaveSeparateReferences:
+                refs = []
+                for reflist in references:
+                    for ref in reflist:
+                        r = self.refs.refsDOIs[ref]
+                        refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
+                html.append(join(refs, "<br>"))
+            html.append('''<p id="menu_%d" style="text-align:left; margin:0px;"><table style="border:0px; padding:0px; margin:0px;">''' % (i + 1))
+            for j in range(protocolGroups[i].getSize()):
+                refstr = ""
+                if protocolsHaveSeparateReferences:
+                    refs = []
+                    for ref in references[j]:
+                        r = self.refs.refsDOIs[ref]
+                        refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
+                        refstr = "<br>%s" % join(refs, "<br>")
+                    
+                html.append('''<tr><td id="protocolarrow%d_%d" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td>
+                                <a href="javascript:void(0)" onclick="changeApplication(%d, %d); ">%s</a>%s</td></tr>''' % (i, j, i, j, protocolGroups[i][j].name, refstr))
+            html.append('''</table></p></li>''')            
+        
+        html.append('''
           </ul>
           </td>
 <!-- end left column -->

@@ -11,6 +11,18 @@ class References:
             #@upgradetodo
             "SmithKortemme:2011"    :   'Smith CA, Kortemme T. <i>Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using Rosetta Backrub Flexible Backbone Design</i>.<br><a href="" style="font-size: 10pt">Accepted to PLoS ONE.</a>',
         }
+        
+        # todo: This was hacked in. Really the refs table above should be separated out to look as below using tuples
+        self.refsDOIs = {
+            "DavisEtAl:2006"        :   ('Davis et al.', 'http://dx.doi.org/10.1016/j.str.2005.10.007'),
+            "SmithKortemme:2008"    :   ('Smith and Kortemme, 2008', 'http://dx.doi.org/10.1016/j.jmb.2008.05.023'),
+            "HumphrisKortemme:2008" :   ('Humphris and Kortemme, 2008', 'http://dx.doi.org/10.1016/j.str.2008.09.012'),
+            "FriedlandEtAl:2009"    :   ('Friedland et al., 2008', 'http://dx.doi.org/10.1371/journal.pcbi.1000393'),
+            "LauckEtAl:2010"        :   ('Lauck et al., 2010', 'http://dx.doi.org/10.1093/nar/gkq369'),
+            "SmithKortemme:2010"    :   ('Smith and Kortemme, 2010', 'http://dx.doi.org/10.1016/j.jmb.2010.07.032'),
+            #@upgradetodo
+            "SmithKortemme:2011"    :   ('Smith and Kortemme, 2011', ''),
+        }
     
     def __getitem__(self, index):
         return self.refs[index]
@@ -65,9 +77,10 @@ class RosettaProtocolGroup:
 # todo: At some stage, tidy up all member access with use getters/setters
 # todo: Split this over be/fe like the WebserverProtocols class
 class RosettaProtocol:
-    def __init__(self, name, dbname):
+    def __init__(self, name, dbname, public = True):
         self.name = name
         self.dbname = dbname
+        self.public = public
         self.group = None
         self.datadirfunction = None
         self.submitfunction = None
@@ -258,38 +271,30 @@ class WebserverProtocols(object):
         proto.setNumStructures(2,10,50)
         protocolGroups[2].add(proto)
         
-        proto = RosettaProtocol("Generalized Protocol (Fold / Interface) Sequence Tolerance", "sequence_tolerance_SK")
+        proto = RosettaProtocol("Generalized Protocol<br>(Fold / Interface)<br>Sequence Tolerance", "sequence_tolerance_SK", True)
         proto.setBinaries("seqtolJMB", "seqtolP1") 
         proto.setNumStructures(10,20,100)
         protocolGroups[2].add(proto)
         
-        # A flat list of the protocols 
-        protocols = []
-        lenPublicProtocolGroups = len(protocolGroups) 
-        for i in range(lenPublicProtocolGroups):
-            protocols.extend(protocolGroups[i].getProtocols())
-        self.lenPublicProtocolGroups = lenPublicProtocolGroups
-        
-        # Private protocols go here
-        #protocolGroups.append(RosettaProtocolGroup("Private Protocols", "#333333"))
+        # Private protocols for the lab go here
+        protocolGroups.append(RosettaProtocolGroup("Private Protocols", "#ffe2ba"))
                 
-        #proto = RosettaProtocol("Multiple Sequence Tolerance", "multi_sequence_tolerance")
-        #proto.setBinaries("multiseqtol")
-        #proto.setNumStructures(2,100,200)
-        #protocolGroups[3].add(proto)        
+        proto = RosettaProtocol("Multiple Sequence Tolerance", "multi_sequence_tolerance", public = False)
+        proto.setBinaries("multiseqtol")
+        proto.setNumStructures(2,100,200)
+        protocolGroups[3].add(proto)        
 
         # A flat list of the protocols 
-        privateProtocols = []
-        #for i in range(lenPublicProtocolGroups, len(protocolGroups)):
-        #    privateProtocols.extend(protocolGroups[i].getProtocols())
-        
+        protocols = []
+        for i in range(len(protocolGroups)):
+            protocols.extend(protocolGroups[i].getProtocols())
+                
         self.protocolGroups = protocolGroups
         self.protocols = protocols
-        self.privateProtocols = privateProtocols        
         
     def getProtocols(self):
         return self.protocolGroups, self.protocols
-
+    
     def getProtocolDBNames(self):
         dbnames = []
         for p in self.protocols:

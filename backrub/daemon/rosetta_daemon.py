@@ -106,12 +106,11 @@ The Kortemme Lab Server Daemon
     def run(self):
         """runs the daemon, sets the maximal number of parallel simulations"""
         
-        self.list_RosettaPP = [] # list of running processes
-        self.running_P = 0 # total no of jobs
-        self.running_S = 0 # sequence tolerance
+        self.list_RosettaPP = []    # list of running processes
+        self.running_P = 0          # total no of jobs
+        self.running_S = 0          # sequence tolerance
         
-        # logfile
-        self.log("%s\tstarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        self.log("%s\tStarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         
         # if there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
         try:
@@ -138,8 +137,6 @@ The Kortemme Lab Server Daemon
             # make sure this is written to the disk            
             sys.stdout.flush()
             sys.stderr.flush()
-            #os.fsync(sys.stdout)
-            #os.fsync(sys.stderr)
             
             # check if a simulation is finished
             
@@ -180,41 +177,27 @@ The Kortemme Lab Server Daemon
                 self.delete_data()
             except Exception, e:
                 self.log("%s\t error: self.delete()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
-                #sys.exit(2)
             if len(self.list_RosettaPP) < self.max_processes:
-                #print "check for new job"
-                # get job from db                    
-                # get all jobs in queue                            vvv 0
+                # Start any queued jobs
+                ID = None
                 try:
                     data = self.runSQL("SELECT ID,Date,Status,task,PDBComplex,PDBComplexFile,Mini,EnsembleSize,ProtocolParameters,cryptID,BackrubServer FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
-                    #data = self.runSQL("SELECT ID,Date,Status,task FROM %s WHERE Status=0 ORDER BY Date" % self.db_table)
                     if len(data) == 0:
                         time.sleep(10) # wait 10 seconds if there's no job in queue
                         continue
-                    else:
-                        ID = None
-                        for i in range(0,len(data)):
-                            # if this is a sequence_tolerance job, but the limit is already being processed
-                            if (data[i][3] == 'sequence_tolerance' or data[i][3] == 'sequence_tolerance_SK'): 
-                                self.log("ERROR IN SQL LOGIC IN RUN")
-                                continue # we should never get here but skip it just in case
-                            else:
-                                # get first job
-                                ID = data[i][0]
-                                                                               
-                                # get pdb file
-                                job_data = self.runSQL("SELECT PDBComplex,PDBComplexFile,Mini,EnsembleSize,task, ProtocolParameters FROM %s WHERE ID=%s" % ( self.db_table, ID ))
-                            
-                                #start the job
-                                pid = self.start_job(ID,job_data[0][0],job_data[0][1],job_data[0][2],job_data[0][3],job_data[0][4],job_data[0][5])
-                                #change status and write starttime to DB
-                                if pid:
-                                    self.runSQL("UPDATE %s SET Status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID ))
-                                    break
-                        time.sleep(3) # wait 3 seconds after a job was started
+                    
+                    for i in range(0,len(data)):
+                        #start the job, change status and write starttime to DB
+                        ID = data[i][0]
+                        pid = self.start_job(data[i][4],data[i][5],data[i][6],data[i][7],data[i][3],data[i][8])
+                        if pid:
+                            self.runSQL("UPDATE %s SET Status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID ))
+                            break
+                    time.sleep(3) # wait 3 seconds after a job was started
                 except Exception, e:
                     self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
-                    self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))                  
+                    if ID:
+                        self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))                  
                     time.sleep(10)
 
             else:
@@ -391,7 +374,6 @@ The Kortemme Lab Server Daemon
         if os.path.exists( result_dir ):
             shutil.rmtree( result_dir )
         shutil.move( rosetta_object.workingdir, result_dir ) ## does NOT overwrite destination
-        #shutil.rename( rosetta_object.workingdir, result_dir )
         # make it readable
         os.chmod( result_dir, 0777 )
         # remember directory
@@ -1238,13 +1220,10 @@ class ClusterDaemon(RosettaDaemon):
             
         self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
         if task == "sequence_tolerance":
-            params["radius"] = 5.0
             clusterjob = RosettaTasks.SequenceToleranceHKJob(self.sgec, params, netappRoot, cluster_temp, dldir)   
         elif task == "sequence_tolerance_SK":
-            params["radius"] = 10.0
             clusterjob = RosettaTasks.SequenceToleranceSKJob(self.sgec, params, netappRoot, cluster_temp, dldir)     
         elif task == "multi_sequence_tolerance":
-            params["radius"] = 10.0
             clusterjob = RosettaTasks.SequenceToleranceSKMultiJob(self.sgec, params, netappRoot, cluster_temp, dldir)            
         else:
             raise
@@ -1376,7 +1355,7 @@ class ClusterDaemon(RosettaDaemon):
             self.log("Error removing the temporary directory on the cluster.\n")
             self.log("%s\n%s" % (str(e), traceback.print_exc()))        
 
-    #todo: Add these to the scheduler
+    #upgradetodo: Add these to the scheduler
     def EndSequenceToleranceHK(self, rosetta_object, pdb_id, ensembleSize, state, ID):
         state["keep_output"] = True
         self.running_S -= 1
@@ -1419,24 +1398,7 @@ class ClusterDaemon(RosettaDaemon):
             self.log("%s\t warning: ID %s SEQTOL RUNS TERMINATED %s\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, no_failed ) )
             self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
 
-    def CheckSequenceTolerance(self, r_object, ensembleSize, pdb_id, job_id, task, binaryName):
-        #todo: fix this up       
-        handle = open(r_object.workingdir_file_path(r_object.filename_stdout),'r')
-        if len(grep("Running Postprocessing and Analysis.", handle.readlines())) < 1:
-            # AAAAAAAHHHH MESSY CODE!
-            ID = r_object.get_ID()
-            self.log("%s\t error: end_job() ID %s - error during simulation\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
-            self.runSQL('UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
-        
-            handle.close()
-            return True # to not raise the RosettaError and trigger additional error handling. Yikes!
-        
-        if len(grep("Success!", handle.readlines())) < 1:
-            handle.close()
-            return True
-        handle.close()
-        return True
-
+    #upgradetodo: Add these to the scheduler
     def EndSequenceToleranceSK(self, rosetta_object, pdb_id, ensembleSize, state, ID):
         state["keep_output"] = True
         self.running_S -= 1
@@ -1499,12 +1461,9 @@ class ClusterProtocols(WebserverProtocols):
         
         # Add backend specific information
         removelist = []
+        whitelist = ["sequence_tolerance", "sequence_tolerance_SK", "multi_sequence_tolerance"]
         for p in protocols:
-            if p.dbname == "sequence_tolerance":
-                p.setBackendFunctions(None, clusterDaemon.CheckSequenceTolerance, clusterDaemon.EndSequenceToleranceHK)
-            elif p.dbname == "sequence_tolerance_SK":
-                p.setBackendFunctions(None, clusterDaemon.CheckSequenceTolerance, clusterDaemon.EndSequenceToleranceSK)
-            else:
+            if p.dbname not in whitelist:
                 removelist.append(p)
         
         # Prune the protocols list

@@ -587,7 +587,7 @@ class SequenceToleranceHKJob(RosettaClusterJob):
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
         self.backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
-        self.executable    = ''
+        self.parameters["radius"] = 10.0        
         super(SequenceToleranceHKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
     
     def _initialize(self):
@@ -1037,13 +1037,14 @@ class SequenceToleranceSKJob(RosettaClusterJob):
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
+        self.parameters["radius"] = 10.0        
         super(SequenceToleranceSKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
 
     def _initialize(self):
         self.describe()
         self._checkBinaries()
         
-        # Create input files        
+        # Create input files
         self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
         self._write_backrub_resfile()
         self._write_seqtol_resfile()

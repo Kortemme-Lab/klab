@@ -1796,9 +1796,23 @@ class FrontendProtocols(WebserverProtocols):
                             interfaces.  This is the most recent protocol based on Rosetta 3.0.''')
                 p.specialname = "Generalized RosettaBackrub sequence tolerance method [%s]"  % refstring
                 p.progressDisplayHeight = "100px"
-                
+            elif p.dbname == "multi_sequence_tolerance":
+                # Test server-specific hack to override minimum number of structures for shorter runs
+                if ROSETTAWEB_server_name == 'albana.ucsf.edu':
+                    nos = p.getNumStructures()
+                    p.setNumStructures(2, nos[1], nos[2])
+                p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
+                p.setShowResultsFunction(rosettaHTML.showSequenceToleranceSK)
+                p.setStoreFunction(storeSequenceToleranceSK)
+                p.setDataDirFunction(rosettaDD.SequenceToleranceSK)
+                p.setReferences("SmithKortemme:2010", "SmithKortemme:2011")
+                refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ", ")                
+                p.setDescription('''Predicts tolerated sequences for proteins or protein-protein 
+                            interfaces. This does multiple runs of the PLoS ONE Sequence Tolerance protocol.''')
+                p.specialname = "Generalized RosettaBackrub sequence tolerance method (multi) [%s]"  % refstring
+                p.progressDisplayHeight = "400px"
             else:
-                raise 
+                raise
         
         for pgroup in protocolGroups:
             if pgroup.name == "Point Mutation":
@@ -1834,6 +1848,17 @@ class FrontendProtocols(WebserverProtocols):
                     Both implementations first apply the RosettaBackrub method to generate 
                     a conformational ensemble, design sequences consistent with the members 
                     in the ensemble, and then combine the sequences to build a predicted sequence profile.'''
+                pgroup.setDescription(desc)
+            elif pgroup.name == "Private Protocols":
+                desc = '''
+                    Private protocols for the lab go here. 
+                    There is currently one option.
+                    <dl style="text-align:left;">'''
+                for i in range(pgroup.getSize()):
+                    p = pgroup[i] 
+                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                desc += '''</dl>
+                    Tell Shane to add yours!'''
                 pgroup.setDescription(desc)
             else:
                 raise
