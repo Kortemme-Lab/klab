@@ -1035,11 +1035,11 @@ class ClusterDaemon(RosettaDaemon):
     
     MaxClusterJobs    = 3
     logfname          = "ClusterDaemon.log"
-    pidfile           = '/tmp/rosettaweb-testingclusterdaemon.pid'
+    pidfile           = '/tmp/rosettaweb-clusterdaemon.pid'
     
     def __init__(self, stdout, stderr):
         super(ClusterDaemon, self).__init__(stdout, stderr)        
-        self.rosetta_tmp = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp"
+        #self.rosetta_tmp = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp"
         self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
         self.beProtocols = ClusterProtocols(self)
         self.protocolGroups, self.protocols = self.beProtocols.getProtocols()

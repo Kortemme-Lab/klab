@@ -483,7 +483,7 @@ class RosettaClusterJob(object):
 
     def removeClusterTempDir(self):
         self._status("Deleting working directory %s" % self.workingdir)
-        #upgradetodo shutil.rmtree(self.workingdir)
+        shutil.rmtree(self.workingdir)
 
     def _appendError(self, errmsg):
         if self.error:

@@ -1435,7 +1435,7 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
                         for residue in pm:
                             lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
                 montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
-            montagecmd += "multi_tolerance_motif.png; ls"
+            montagecmd += "multi_tolerance_motif.png;"
             self._status(montagecmd)
             
             self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
