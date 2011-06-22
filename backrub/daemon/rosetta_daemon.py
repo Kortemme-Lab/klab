@@ -1035,10 +1035,11 @@ class ClusterDaemon(RosettaDaemon):
     
     MaxClusterJobs    = 3
     logfname          = "ClusterDaemon.log"
-    pidfile           = '/tmp/rosettaweb-clusterdaemon.pid'
+    pidfile           = '/tmp/rosettaweb-testingclusterdaemon.pid'
     
     def __init__(self, stdout, stderr):
         super(ClusterDaemon, self).__init__(stdout, stderr)        
+        self.rosetta_tmp = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp"
         self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
         self.beProtocols = ClusterProtocols(self)
         self.protocolGroups, self.protocols = self.beProtocols.getProtocols()
@@ -1054,6 +1055,7 @@ class ClusterDaemon(RosettaDaemon):
             make755Directory(netappRoot)
         if not os.path.exists(cluster_temp):
             make755Directory(cluster_temp)
+    
     
     def recordSuccessfulJob(self, clusterjob):
         self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, clusterjob.jobID ))
@@ -1183,7 +1185,7 @@ class ClusterDaemon(RosettaDaemon):
                         if len(self.recentDBJobs) > 400:
                             self.recentDBJobs = self.recentDBJobs[200:]
                         
-                        # Start the job
+                        # Start the job                        
                         newclusterjob = self.start_job(task, params, data[i][10])
                         if newclusterjob:
                             #change status and write start time to DB
@@ -1275,6 +1277,19 @@ class ClusterDaemon(RosettaDaemon):
             
     def end_job(self, clusterjob):
         
+        ID = clusterjob.jobID                  
+        
+        try:
+            if clusterjob.parameters["task"] == "multi_sequence_tolerance":                
+                data = self.runSQL('SELECT ProtocolParameters FROM backrub WHERE ID="%s"' % ID)
+                if data:
+                    ProtocolParameters = pickle.loads(data[0][0])
+                    ProtocolParameters["multiparameters"] = clusterjob.multiparameters
+                    ProtocolParameters = pickle.dumps(ProtocolParameters)
+                    data = self.runSQL('UPDATE backrub SET ProtocolParameters="%s" WHERE ID="%s"' % (ProtocolParameters, ID))
+        except Exception, e:
+            self.recordErrorInJob(clusterjob, "Error recording multiparameters.", traceback.format_exc(), e)
+        
         try:
             self.copyAndZipOutputFiles(clusterjob, clusterjob.parameters["task"])
         except Exception, e:
@@ -1284,11 +1299,10 @@ class ClusterDaemon(RosettaDaemon):
             self.removeClusterTempDir(clusterjob)
         except Exception, e:
             self.recordErrorInJob(clusterjob, "Error removing temporary directory on the cluster", traceback.format_exc(), e)
-            
+        
         if not clusterjob.error:
             self.recordSuccessfulJob(clusterjob)
 
-        ID = clusterjob.jobID                        
         data = self.runSQL("SELECT u.Email,u.FirstName,b.KeepOutput,b.cryptID,b.task,b.PDBComplexFile,b.EnsembleSize,b.Mini FROM Users AS u JOIN %s AS b on (u.ID=b.UserID) WHERE b.ID=%s" % ( self.db_table, str(ID) ), "Users AS u READ, %s AS b WRITE" % self.db_table)
         cryptID      = data[0][3]
         task         = data[0][4]

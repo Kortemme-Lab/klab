@@ -299,8 +299,6 @@ class WebserverProtocols(object):
         dbnames = []
         for p in self.protocols:
             dbnames.append(p.dbname)
-        for p in self.privateProtocols:
-            dbnames.append(p.dbname)
         return dbnames
             
 

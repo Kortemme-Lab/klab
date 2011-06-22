@@ -183,11 +183,9 @@ class TaskScheduler(object):
             
     def getJITGraph(self):
         # Write the progress to file
-        g = JITGraph(self._initialtasks)                        
+        g = JITGraph(self._initialtasks, self.dbID)                        
         if g.isATree():
-            #print(g.getSpaceTree())
-            return g.getSpaceTree()
-
+            return (g.getSpaceTree(), g.getHTML())
         else:
             return g.getForceDirected()
                    
@@ -467,14 +465,13 @@ class RosettaClusterJob(object):
             if not os.path.exists(destpath):
                 make755Directory(destpath)
             for mask in self.resultFilemasks:
-                #self._status("moving using mask %s\n" % mask[0])
+                self._status("moving using mask (%s, %s)\n" % (mask[0], mask[1]))
                 fromSubdirectory = os.path.join(self.targetdirectory, mask[0])
                 toSubdirectory = os.path.join(destpath, mask[0])
                 if not os.path.exists(toSubdirectory):
                     make755Directory(toSubdirectory)
                 for file in os.listdir(fromSubdirectory):
                     if fnmatch.fnmatch(file, mask[1]):
-                        #self._status("moving %s to %s\n" % (os.path.join(fromSubdirectory, file), toSubdirectory))
                         shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
         else:
             if os.path.exists(destpath):
@@ -486,7 +483,7 @@ class RosettaClusterJob(object):
 
     def removeClusterTempDir(self):
         self._status("Deleting working directory %s" % self.workingdir)
-        shutil.rmtree(self.workingdir)
+        #upgradetodo shutil.rmtree(self.workingdir)
 
     def _appendError(self, errmsg):
         if self.error:
@@ -517,7 +514,9 @@ class RosettaClusterJob(object):
         destpath = self.dldir
         rootname = os.path.join(destpath, "progress")
         JITjs = "%s.js" % rootname 
+        JIThtml = "%s.html" % rootname 
         contents = self.scheduler.getJITGraph()
         if not os.path.exists(destpath):
             make755Directory(destpath)
-        writeFile(JITjs, contents)
+        writeFile(JITjs, contents[0])
+        writeFile(JIThtml, contents[1])

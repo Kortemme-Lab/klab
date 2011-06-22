@@ -49,6 +49,7 @@ class RosettaDB:
                                               port=port, unix_socket=socket )
         self.store_time = store_time
         self.numTries = numTries
+                        
         
     def getData4ID(self, tablename, ID):
         """get the whole row from the database and store it in a dict"""
@@ -142,6 +143,7 @@ class RosettaDB:
         # Note: This loop was always disabled!
         i = 0
         errcode = 0
+        caughte = None
         while i < self.numTries:
             try:    
                 cursor = self.connection.cursor()
@@ -162,12 +164,14 @@ class RosettaDB:
                 # sys.stderr.write("\nSQL execution error.")
                 # sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
                 #traceback.print_exc()
-                raise e
-                break
+                self.connection.ping(True)
+                caughte = e
+                continue
             except:                
                 traceback.print_exc()
                 break
-        return None
+        raise MySQLdb.OperationalError(caughte)
+        #return None
 
     def _getFieldsInDB(self, tablename):
         """get all the fields from a specific table"""

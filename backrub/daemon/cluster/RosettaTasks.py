@@ -1037,9 +1037,9 @@ class SequenceToleranceSKJob(RosettaClusterJob):
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
-        self.parameters["radius"] = 10.0        
         super(SequenceToleranceSKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
-
+        self.parameters["radius"] = 10.0        
+        
     def _initialize(self):
         self.describe()
         self._checkBinaries()
@@ -1216,30 +1216,32 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
     horizontaltiles = 4
     name = "Multiple Sequence Tolerance (SK, JMB)"
     
-    def _renamedefineOutputFiles(self):
+    def _defineOutputFiles(self):
+        self.resultFilemasks.append((".", "*.pdb"))
+        self.resultFilemasks.append((".", "*.png"))
         self.resultFilemasks.append((".", "stderr*"))
         self.resultFilemasks.append((".", "stdout*"))
         self.resultFilemasks.append((".", "timing_profile.txt"))
         self.resultFilemasks.append((".", "tolerance_*"))
         self.resultFilemasks.append((".", "*.ga.entities.gz"))
-        self.resultFilemasks.append((".", "*.pdb"))
         for i in range(self.numberOfRuns):
-            backrubSubdirectory = "backrub%d" % i
             seqtolSubdirectory = "sequence_tolerance%d" % i
-            self.resultFilemasks.append((backrubSubdirectory, "*.cmd*"))
-            self.resultFilemasks.append((backrubSubdirectory, "backrub_scores.dat"))
-            self.resultFilemasks.append((backrubSubdirectory, "*.resfile"))
-            self.resultFilemasks.append((backrubSubdirectory, "*.movemap"))        
             self.resultFilemasks.append((seqtolSubdirectory, "*.resfile"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*.movemap"))        
+            self.resultFilemasks.append((seqtolSubdirectory, "backrub_scores.dat"))
             self.resultFilemasks.append((seqtolSubdirectory, "*.cmd*"))
             self.resultFilemasks.append((seqtolSubdirectory, "*low*.pdb"))
-
+            self.resultFilemasks.append((seqtolSubdirectory, "*.png"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*.pdf"))
+            self.resultFilemasks.append((seqtolSubdirectory, "*.txt"))
+        
     def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
         # The tempdir is the one on the submission host e.g. chef
         # targetdirectory is the one on your host e.g. your PC or the webserver
         # The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
+        self.radius = 10.0
         super(SequenceToleranceSKMultiJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
     
     @staticmethod
@@ -1263,6 +1265,8 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
             return newlist
 
     def _expandParameters(self):
+        self.parameters["radius"] = self.radius
+        
         # Expand out the premutations
         premut = []
         for chain, reslist in self.parameters["Premutated"].iteritems():
@@ -1357,6 +1361,7 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
                 break
             for file in glob.glob(self._workingdir_file_path(self.parameters["pdb_filename"])):
                 originalpdb = file
+                shutil.copy(originalpdb, self.targetdirectory)
                 break
             if firststdout and originalpdb:
                 self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
@@ -1430,13 +1435,25 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
                         for residue in pm:
                             lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
                 montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
-            montagecmd += "multi_tolerance_motif.png"
+            montagecmd += "multi_tolerance_motif.png; ls"
             self._status(montagecmd)
             
             self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
             self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
             self.file_stdout.write("*********************** montage output ***********************\n")
             subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
+            
+            while True:
+                returncode = subp.poll()
+                if returncode != None:
+                    if returncode != 0:
+                        sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+                        raise PostProcessingException
+                    break;
+                time.sleep(2)
+            self.file_stdout.close()
+            self.file_stderr.close()
+
         except Exception, e:
             self._appendError("An error occurred creating the motif montage.\n%s\n%s" % (str(e), traceback.format_exc()))
             success = False

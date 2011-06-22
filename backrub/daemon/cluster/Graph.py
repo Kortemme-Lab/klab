@@ -77,14 +77,15 @@ def getHTMLLegend():
         scheme = Node.schema[state]
         htmlcolor = scheme[1]
         statusname = scheme[0]
-        html.append('''<font color='%s'>&#9632</font>&nbsp;%s<br>''' % (htmlcolor, statusname))
+        html.append('''<font color='%s'>&#9632;</font>&nbsp;%s<br>''' % (htmlcolor, statusname))
     return join(html, "\n")
             
 class ExpectedException(Exception): pass  
     
 class Graph(object):
     
-    def __init__(self, tasks, testonly = False):
+    def __init__(self, tasks, dbID, testonly = False):
+        self.dbID = dbID
         self.vertices = {}
         self.edges = {}
         self.vertices["init"] = Node(0, "Job", "Job", ClusterTask.INITIAL_TASK, 1, 1, [], True)
@@ -286,8 +287,10 @@ class JITGraph(Graph):
         return JITSpaceTree % JITdata
     
     def getHTML(self):
+        # Reading here allows us to change the HTML on the fly
+        JITHTML = readFile(os.path.join(thisloc, "JIThtml.html"))
         legend = "<h4>Legend</h4><p>%s</p>" % getHTMLLegend()        
-        return JITHTML % legend
+        return JITHTML % (str(self.dbID), legend)
     
         
 if __name__ == "__main__":
