@@ -32,6 +32,7 @@ class RosettaHTML(object):
         
         self.server_url      = server_url
         self.server_shortname= split(server_url, ".")[0]
+        self.isPrivateServer = (self.server_shortname != "kortemmelab")
         
         self.server_title    = server_title
         self.script_filename = script_filename
@@ -121,6 +122,7 @@ class RosettaHTML(object):
         html.append(join(self.JS,"\n"))
                     
         html.append("""        <script src="/backrub/jscripts.js" type="text/javascript"></script>
+                               <script src="/backrub/frontend/rosettahtml.js" type="text/javascript"></script>
             </head>
 
             <body bgcolor="#ffffff" onload="startup( \'%s\' );">
@@ -238,7 +240,7 @@ class RosettaHTML(object):
     <H1 class="title">Submit a new job</H1>
     %(errors)s
 <!-- Start Submit Form -->
-    <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data">
+    <FORM NAME="submitform" method="POST" onsubmit="return ValidateForm();" enctype="multipart/form-data"> 
       <table border=0 cellpadding=0 cellspacing=0>
         <colgroup>
           <col width="230">
@@ -247,44 +249,45 @@ class RosettaHTML(object):
         <tr>
 <!-- left column = menu -->
           <td id="columnLeft" align="right" style="vertical-align:top; margin:0px;">
-          <ul id="about">''' % self.tooltips)
+          <ul id="about">''' % self.tooltips) #todo: add ACTION for form
         
         # Add the left-hand side menu for protocol selection
         # We display references under the group if they are the same for all protocols
         # Otherwise, we group them under the individual protocols
         for i in range(numProtocolGroups):
             pgroup = protocolGroups[i]
-            protocolsHaveSeparateReferences = False
-            references = []
-            references.extend([pgroup[0].getReferences()])
-            for j in range(1, protocolGroups[i].getSize()):
-                references.extend([pgroup[j].getReferences()])
-                if pgroup[j].getReferences() != pgroup[j - 1].getReferences():
-                    protocolsHaveSeparateReferences = True
-            if not protocolsHaveSeparateReferences:
-                references = [references[0]]
-                            
-            html.append('''<li style="background-color:%s"><A href="javascript:void(0)" class="nav" onclick="showMenu('%d');"><img src="../images/qm_s.png" border="0" title="%s"> %s</A><br>''' % (pgroup.color, i, self.tooltips["tt_click"], pgroup.name))
-            if not protocolsHaveSeparateReferences:
-                refs = []
-                for reflist in references:
-                    for ref in reflist:
-                        r = self.refs.refsDOIs[ref]
-                        refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
-                html.append(join(refs, "<br>"))
-            html.append('''<p id="menu_%d" style="text-align:left; margin:0px;"><table style="border:0px; padding:0px; margin:0px;">''' % (i + 1))
-            for j in range(protocolGroups[i].getSize()):
-                refstr = ""
-                if protocolsHaveSeparateReferences:
+            if self.isPrivateServer or pgroup.public:
+                protocolsHaveSeparateReferences = False
+                references = []
+                references.extend([pgroup[0].getReferences()])
+                for j in range(1, protocolGroups[i].getSize()):                
+                    references.extend([pgroup[j].getReferences()])
+                    if pgroup[j].getReferences() != pgroup[j - 1].getReferences():
+                        protocolsHaveSeparateReferences = True
+                if not protocolsHaveSeparateReferences:
+                    references = [references[0]]
+                                
+                html.append('''<li style="background-color:%s"><A href="javascript:void(0)" class="nav" onclick="showMenu('%d');"><img alt="tooltip" src="../images/qm_s.png" border="0" title="%s"> %s</A><br>''' % (pgroup.color, i, self.tooltips["tt_click"], pgroup.name))
+                if not protocolsHaveSeparateReferences:
                     refs = []
-                    for ref in references[j]:
-                        r = self.refs.refsDOIs[ref]
-                        refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
-                        refstr = "<br>%s" % join(refs, "<br>")
-                    
-                html.append('''<tr><td id="protocolarrow%d_%d" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td>
-                                <a href="javascript:void(0)" onclick="changeApplication(%d, %d); ">%s</a>%s</td></tr>''' % (i, j, i, j, protocolGroups[i][j].name, refstr))
-            html.append('''</table></p></li>''')            
+                    for reflist in references:
+                        for ref in reflist:
+                            r = self.refs.refsDOIs[ref]
+                            refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
+                    html.append(join(refs, "<br>"))
+                html.append('''<div id="menu_%d" style="text-align:left; margin:0px;"><table style="border:0px; padding:0px; margin:0px;">''' % (i + 1))
+                for j in range(protocolGroups[i].getSize()):
+                    refstr = ""
+                    if protocolsHaveSeparateReferences:
+                        refs = []
+                        for ref in references[j]:
+                            r = self.refs.refsDOIs[ref]
+                            refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
+                            refstr = "<br>%s" % join(refs, "<br>")
+                        
+                    html.append('''<tr><td id="protocolarrow%d_%d" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td>
+                                    <a href="javascript:void(0)" onclick="changeApplication(%d, %d); ">%s</a>%s</td></tr>''' % (i, j, i, j, protocolGroups[i][j].name, refstr))
+                html.append('''</table></div></li>''')            
         
         html.append('''
           </ul>
@@ -296,10 +299,11 @@ class RosettaHTML(object):
           <!-- pictures for the different applications -->''' % self.tooltips)
         
         for i in range(len(self.protocolGroups)):
-            html.append('''
-            <p id="pic%d" style="display:none; text-align:center;">
-              <img src="../images/logo%d.png" width="85%%" alt="logo%d" border=0>
-            </p>''' % (i, i, i))
+            if self.isPrivateServer or protocolGroups[i].public:
+                html.append('''
+                    <p id="pic%d" style="display:none; text-align:center;">
+                      <img src="../images/logo%d.png" width="85%%" alt="logo%d" border=0>
+                    </p>''' % (i, i, i))
             
         html.append('''
           <!-- end pictures -->
@@ -310,7 +314,9 @@ class RosettaHTML(object):
             </p>''')
         
         for i in range(numProtocolGroups):
-            html.append('<div id="text%d" style="display:none; opacity:0.0; text-align:justify;">%s</div>' % (i, protocolGroups[i].getDescription()))
+            pgroup = protocolGroups[i]
+            if self.isPrivateServer or pgroup.public:
+                html.append('<div id="text%d" style="display:none; opacity:0.0; text-align:justify;">%s</div>' % (i, pgroup.getDescription()))
         
         html.append("<!-- end description -->")
         
@@ -331,7 +337,7 @@ class RosettaHTML(object):
               </TR>-->
               <TR><td></td></TR>
               <TR>
-                <TD align=right style="width:300px">Rosetta Version <img src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
+                <TD align=right style="width:300px">Rosetta Version <img alt="tooltip" src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
                 <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">''' % self.tooltips)
         #upgradetodo ask Tanja - change Rosetta Version for seqtolsk, link to the text from PLoS One -
          
@@ -345,9 +351,9 @@ class RosettaHTML(object):
             # This is a hack to add show which of the two Sequence Tolerance papers the binary references
             bname = details["name"]
             if desc == "seqtolJMB":
-                bname += '<a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
+                bname += '<a href="#refSmithKortemme:2010"><sup class="ref">%(SmithKortemme:2010)d</sup></a>' % refIDs
             elif desc == "seqtolP1":
-                bname += '<a href="#refSmithKortemme:2011"><sup id="ref">%(SmithKortemme:2011)d</sup></a>' % refIDs
+                bname += '<a href="#refSmithKortemme:2011"><sup class="ref">%(SmithKortemme:2011)d</sup></a>' % refIDs
             
             # Escape the name so we can pass it to javascript
             bnamevalue = bname
@@ -361,7 +367,7 @@ class RosettaHTML(object):
                 recommendation = '''<span id='pointMutationRecommendation' style="display:none;">, recommended<sup>*</sup></span>'''
             
             html.append('''
-                    <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s" onChange="document.submitform.MiniTextValue.value = '%s'"/> %s%s</div>
+                    <div id="rv%s" style="display:none;" class="bin_revisions"><input type="radio" name="Mini" value="%s" onChange="document.submitform.MiniTextValue.value = '%s'"> %s%s</div>
                     ''' % (desc, desc, bnamevalue, bname, recommendation))
             
             i += 1
@@ -370,7 +376,7 @@ class RosettaHTML(object):
              </TD>
               </TR>
               <tr>
-                  <td align=right>Atom occupancy <img src="../images/qm_s.png" title="%(tt_AtomOccupancy)s"></td>
+                  <td align=right>Atom occupancy <img alt="tooltip" src="../images/qm_s.png" title="%(tt_AtomOccupancy)s"></td>
                   <td align=left>
                     &nbsp;
                     <select name="AtomOccupancy"> 
@@ -381,14 +387,14 @@ class RosettaHTML(object):
                   </td>
               </tr>
               <TR>
-                <TD align=right>Upload Structure <img src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
+                <TD align=right>Upload Structure <img alt="tooltip" src="../images/qm_s.png" title="%(tt_Structure)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" >
                 <INPUT id="PDBComplex" TYPE="file" NAME="PDBComplex" size="20" onChange="document.submitform.query.value = 'parsePDB'; document.submitform.submit();">
                 </TD>
               </TR>
               <TR><TD align="center" colspan="2" style="padding-bottom:0pt; padding-top:0pt;">or</TD></TR>
               <TR>
-                <TD align=right>4-digit PDB identifier <img src="../images/qm_s.png" title="%(tt_PDBID)s"></TD>
+                <TD align=right>4-digit PDB identifier <img alt="tooltip" src="../images/qm_s.png" title="%(tt_PDBID)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;" > <INPUT TYPE="text" NAME="PDBID" size="4" maxlength="15" onkeydown="if (event.keyCode == 13 && document.submitform.PDBID.value.length == 4){document.submitform.query.value = 'parsePDB'; document.submitform.submit();}">
                 <span><input type="button" value="Load PDB" onClick="if (document.submitform.PDBID.value.length == 4) {document.submitform.query.value = 'parsePDB'; document.submitform.submit();}"></span>
                 </TD>
@@ -425,39 +431,46 @@ class RosettaHTML(object):
                 <TD align="center" colspan=2 style="border-bottom:1pt dashed black">General Settings</TD>
               </TR>
               <TR>
-                <TD align=right>Job Name <img src="../images/qm_s.png" title="%(tt_JobName)s"></TD>
+                <TD align=right>Job Name <img alt="tooltip" src="../images/qm_s.png" title="%(tt_JobName)s"></TD>
                 <TD align=left style="padding-left:5pt; padding-top:5pt;"><INPUT TYPE="text" maxlength=40 SIZE=31 NAME="JobName" VALUE="%(jobname)s"></TD>
               </TR>
               <TR>
-                <TD align=right style="width:155px">Number of structures <img src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
+                <TD align=right style="width:155px">Number of structures <img alt="tooltip" src="../images/qm_s.png" title="%(tt_NStruct)s"></TD>
                 <TD style="padding-left:5pt; padding-top:5pt;"> <input type="text" name="nos" maxlength=3 SIZE=5 VALUE="%(ROSETTAWEB_SK_RecommendedNumStructures)s">
                  ''' % self.tooltips)
         
         for i in range(numProtocolGroups):
-            numProtocols = protocolGroups[i].getSize()
-            for j in range(numProtocols):
-                html.append('''<span id="recNumStructures%d_%d" style="display:none; opacity:0.0;">(%d-%d, recommended %d)</span>
-                    ''' %(i, j, protocolGroups[i][j].nos[0], protocolGroups[i][j].nos[2], protocolGroups[i][j].nos[1]))
+            pgroup = protocolGroups[i]
+            if self.isPrivateServer or pgroup.public:
+                numProtocols = pgroup.getSize()
+                for j in range(numProtocols):
+                    html.append('''<span id="recNumStructures%d_%d" style="display:none; opacity:0.0;">(%d-%d, recommended %d)</span>
+                        ''' %(i, j, pgroup[j].nos[0], pgroup[j].nos[2], pgroup[j].nos[1]))
 
         html.append('''
                </TD>
                </TR>
               <TR><TD align=left><br></TD></TR>
               <TR>
-                <TD align="center" colspan=2 style="border-bottom:1pt dashed black">Application Specific Settings <img src="../images/qm_s.png" border="0" title="%(tt_specific)s"></TD>
+                <TD align="center" colspan=2 style="border-bottom:1pt dashed black">Application Specific Settings <img alt="tooltip" src="../images/qm_s.png" border="0" title="%(tt_specific)s"></TD>
               </TR> 
             </TABLE>''' % self.tooltips)
         
+        functionsCalled = []
         for protocol in self.protocols:
-            protocolForm = protocol.getSubmitfunction()
-            htmlcode, ps = protocolForm(chainOptions, aminoAcidOptions, numChainsAvailable)
-            html.extend(htmlcode)
-            postscripts.append(ps)                                  
+            if self.isPrivateServer or protocol.group.public:
+                protocolForm = protocol.getSubmitfunction()
+                # Only call each function once in case we reuse them
+                if not (protocolForm in functionsCalled):
+                    htmlcode, ps = protocolForm(chainOptions, aminoAcidOptions, numChainsAvailable)
+                    html.extend(htmlcode)
+                    postscripts.append(ps)
+                    functionsCalled.append(protocolForm)                                  
         
         html.append('''     
             <p id="parameter_submit" style="display:none; opacity:0.0; text-align:center;">
               <input type="button" value="Load sample data" onClick="set_demo_values(false); document.submitform.query.value = 'sampleData'; document.submitform.submit();">
-              <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="if (ValidateForm()){alert('The parameters are valid.');}else{alert('The parameters are valid.');}"></span>
+              <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Check form" onClick="if (ValidateForm()){alert('The parameters are valid.');}else{alert('The parameters are invalid.');}"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<input type="button" value="Reset form" onClick="reset_form();"></span>
               <span class="allStepsShown" style="display:none;">&nbsp;&nbsp;&nbsp;&nbsp;<INPUT TYPE="Submit" VALUE="Submit"></span>
             </p>
@@ -874,7 +887,7 @@ class RosettaHTML(object):
                 html.append('''
     <!--[if !IE]><!-->
     <tr>
-        <td style="text-align:left;vertical-align:top" width="200" bgcolor="#FFFCD8"><p><br>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p></td>
+        <td style="text-align:left;vertical-align:top" width="200" bgcolor="#FFFCD8"><p><br>Job progress.</p><p>This graph shows the job progress running on the QB3 cluster. Each node in the graph represents a cluster job. If you click on a node, a rough timing profile will appear in the bottom-left.</p><p>Click <a href="%s">here</a> to view an updating graph.</p></td>
         <td>
             <table bgcolor="#FFFCD8">
                 <tr style="height:%s;">   
@@ -890,8 +903,7 @@ class RosettaHTML(object):
             </table>
         </td>                   
     </tr>
-    <!--<![endif]-->''' % (progressDisplayHeight, Graph.getHTMLLegend()))
-
+    <!--<![endif]-->''' % (os.path.join(parameter["rootdir"], parameter['cryptID'], "progress.html"), progressDisplayHeight, Graph.getHTMLLegend()))
         html.append('''</table>
                             <script language="javascript" type="text/javascript">init();</script>
 <br></div></td>\n''')
@@ -1098,7 +1110,7 @@ class RosettaHTML(object):
       html = '' #todo: this is turned off!
       return html
   
-    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutated = None, designed = None):
+    def _showApplet4MultipleFiles(self, comment, list_pdb_files, mutated = None, designed = None, descriptions = None):
         """This shows the Jmol applet for an ensemble of structures with their point mutation(s)"""
        
         # todo: Maybe think about color-scheme selector w.r.t. color blindness         
@@ -1171,7 +1183,11 @@ class RosettaHTML(object):
                 if designed and i > 0:
                     descode = ('''document.getElementsByName('JmolDesigned')[%d].disabled = this.checked != true;'''  % (i - 1),
                                 '''<td><input type="checkbox" name="JmolDesigned" checked="checked" value="%d.0" onClick="updateJmol();"></td>''' % (i + 1))
-                jmolModelSelectors.append('''<tr><td><input type="checkbox" name="JmolStructures" checked="checked" value="%d.0" onClick="updateJmol(); %s %s"><a href="%s">%s</a></td>%s%s''' % (i + 1, premcode[0], descode[0], list_pdb_files[i], filename, premcode[1], descode[1]))                
+                description = ""
+                if descriptions:
+                    description = " (%s)" % descriptions[i]
+                    
+                jmolModelSelectors.append('''<tr><td><input type="checkbox" name="JmolStructures" checked="checked" value="%d.0" onClick="updateJmol(); %s %s"><a href="%s">%s%s</a></td>%s%s''' % (i + 1, premcode[0], descode[0], list_pdb_files[i], filename, description, premcode[1], descode[1]))                
 
                 jmolModelSelectors.append("</tr>")
             jmolModelSelectors.append("</table>")
@@ -1254,20 +1270,20 @@ class RosettaHTML(object):
                   <H1 class="title">Welcome to RosettaBackrub</H1> 
                     <P>
                     This is the flexible backbone protein structure modeling and design server of the Kortemme Lab. 
-                    The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al.<a href="#refDavisEtAl:2006"><sup id="ref">%(DavisEtAl:2006)d</sup></a>, 
-                    for flexible protein backbone modeling implemented in <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Rosetta">Rosetta</a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d,</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d,</sup></a><a href="#refSmithKortemme:2011"><sup id="ref">%(SmithKortemme:2011)d</sup></a>.</P>
+                    The server utilizes the \"<b>backrub</b>\" method, first described by Davis et al.<a href="#refDavisEtAl:2006"><sup class="ref">%(DavisEtAl:2006)d</sup></a>, 
+                    for flexible protein backbone modeling implemented in <a href="https://kortemmelab.ucsf.edu/backrub/wiki/Rosetta">Rosetta</a><a href="#refFriedlandEtAl:2009"><sup class="ref">%(FriedlandEtAl:2009)d,</sup></a><a href="#refHumphrisKortemme:2008"><sup class="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2008"><sup class="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup class="ref">%(SmithKortemme:2010)d,</sup></a><a href="#refSmithKortemme:2011"><sup class="ref">%(SmithKortemme:2011)d</sup></a>.</P>
 
                     <!--<P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) uploaded by the user and a choice of parameters and modeling method: 
                     prediction of point mutant structures, creation of conformational ensembles given the input protein structure and flexible backbone design.
-                    The server <b>output</b>, dependent on the application, consists of: structures of point mutants<a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d</sup></a> and their Rosetta force field scores, 
-                    near-native structural ensembles of protein backbone conformations<a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d</sup></a> 
-                    and designed sequences using flexible backbone computational protein design<a href="#refHumphrisKortemme:2008"><sup id="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a>.</P>-->
+                    The server <b>output</b>, dependent on the application, consists of: structures of point mutants<a href="#refSmithKortemme:2008"><sup class="ref">%(SmithKortemme:2008)d</sup></a> and their Rosetta force field scores, 
+                    near-native structural ensembles of protein backbone conformations<a href="#refSmithKortemme:2008"><sup class="ref">%(SmithKortemme:2008)d,</sup></a><a href="#refFriedlandEtAl:2009"><sup class="ref">%(FriedlandEtAl:2009)d</sup></a> 
+                    and designed sequences using flexible backbone computational protein design<a href="#refHumphrisKortemme:2008"><sup class="ref">%(HumphrisKortemme:2008)d,</sup></a><a href="#refSmithKortemme:2010"><sup class="ref">%(SmithKortemme:2010)d</sup></a>.</P>-->
 
                     <P>The server <b>input</b> is a protein structure (a single protein or a protein-protein complex) in PDB format uploaded by the user or obtained directly from the PDB plus some application-specific parameters. The server <b>output</b> is dependent on the application:</P> 
                     <ul style = "text-align:justify;">
-                    <li><b>Point mutation</b><a href="#refSmithKortemme:2008"><sup id="ref">%(SmithKortemme:2008)d</sup></a>: generates modeled structures and Rosetta scores for single and multiple point mutants in monomeric proteins;
-                    <li style="margin-top:.5em; margin-bottom:.5em;"><b>Backbone ensemble</b><a href="#refFriedlandEtAl:2009"><sup id="ref">%(FriedlandEtAl:2009)d</sup></a>: creates near-native structural ensembles of protein backbone conformations (for monomeric proteins) and sequences consistent with those ensembles;
-                    <li><b>Sequence tolerance</b><a href="#refSmithKortemme:2010"><sup id="ref">%(SmithKortemme:2010)d</sup></a><a href="#refSmithKortemme:2011"><sup id="ref">,%(SmithKortemme:2011)d</sup></a><a href="#refHumphrisKortemme:2008"><sup id="ref">,%(HumphrisKortemme:2008)d</sup></a>: predicts sequences tolerated for proteins and protein-protein interfaces using flexible backbone design methods.  Example applications are the generation of sequence libraries for experimental screening and prediction of protein or peptide interaction specificity.
+                    <li><b>Point mutation</b><a href="#refSmithKortemme:2008"><sup class="ref">%(SmithKortemme:2008)d</sup></a>: generates modeled structures and Rosetta scores for single and multiple point mutants in monomeric proteins;
+                    <li style="margin-top:.5em; margin-bottom:.5em;"><b>Backbone ensemble</b><a href="#refFriedlandEtAl:2009"><sup class="ref">%(FriedlandEtAl:2009)d</sup></a>: creates near-native structural ensembles of protein backbone conformations (for monomeric proteins) and sequences consistent with those ensembles;
+                    <li><b>Sequence tolerance</b><a href="#refSmithKortemme:2010"><sup class="ref">%(SmithKortemme:2010)d</sup></a><a href="#refSmithKortemme:2011"><sup class="ref">,%(SmithKortemme:2011)d</sup></a><a href="#refHumphrisKortemme:2008"><sup class="ref">,%(HumphrisKortemme:2008)d</sup></a>: predicts sequences tolerated for proteins and protein-protein interfaces using flexible backbone design methods.  Example applications are the generation of sequence libraries for experimental screening and prediction of protein or peptide interaction specificity.
                     </ul>
                     
                     <P>For a <b>tutorial</b> on how to submit a job and interpret the results see the <a href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">documentation</a> and the references below.
@@ -1315,7 +1331,8 @@ class RosettaHTML(object):
         ps = ""
         if username == "guest":
             ps = "<br>Please note that if you register an account for the website then this allows us to contact you directly if there are any problems in your jobs and suggest solutions. It also helps us to improve the website based on your feedback. Additionally, job details and results for registered users are stored for a longer period on the server.<br>" 
-        html = """<td align="center">You have successfully logged in as %s. <br> %s <br>  
+        html = """<div id="login_box" style="display:none;"></div>
+                   <td align="center">You have successfully logged in as %s. <br> %s <br>  
                    From here you can proceed to the <A href="%s?query=submit">submission page</A> to <A href="%s?query=submit">submit a new job</A> <br>
                    or navigate to the <A href="%s?query=queue">queue</A> to check for submitted, running or finished jobs. <br><br> </td>
                    """ % ( username, ps, self.script_filename, self.script_filename, self.script_filename )
@@ -1404,7 +1421,7 @@ class RosettaHTML(object):
     def submitformPointMutation(self, chainOptions, aminoAcidOptions, numChainsAvailable):
         html = ['''
          <!-- Backrub - Point Mutation -->
-            <p id="parameter0_0" style="display:none; opacity:0.0; text-align:justify;">
+            <div id="parameter0_0" style="display:none; opacity:0.0; text-align:justify;">
             
                 <table id="parameter0_0_step1" style="display:none;" bgcolor="#EEEEEE" align="center">
                     <tr bgcolor="#828282" style="color:white;">
@@ -1418,14 +1435,14 @@ class RosettaHTML(object):
                     <tr style="">
                         <td style="text-align:center;">1</td>
                         <td style="text-align:center;"><select name="PM_chain">%s</select></td>
-                        <td style="text-align:center;"><input name="PM_resid" maxlength="4" size="5" type="text"/></td>
+                        <td style="text-align:center;"><input name="PM_resid" maxlength="4" size="5" type="text"></td>
                         <td style="text-align:center;"><select name="PM_newres" style="text-align:center;">%s</select></td>
                         <td><INPUT TYPE="hidden" NAME="PM_radius" VALUE="6.0"></td>
                     </tr>
                 </table>
-                <span id="parameter0_0_step2" style="display:none;"/>
+                <span id="parameter0_0_step2" style="display:none;"></span>
                 <br>
-            </p>
+            </div>
             ''' % (chainOptions, aminoAcidOptions))
      
         return html, ""
@@ -1457,7 +1474,7 @@ class RosettaHTML(object):
     def submitformMultiplePointMutations(self, chainOptions, aminoAcidOptions, numChainsAvailable):
         html = ['''
             <!-- Backrub - Multiple Point Mutation -->
-            <p id="parameter0_1" style="display:none; opacity:0.0; text-align:justify;">
+            <div id="parameter0_1" style="display:none; opacity:0.0; text-align:justify;">
                 <table id="parameter0_1_step1" style="display:none;" bgcolor="#EEEEEE" align="center">
                     <tr bgcolor="#828282" style="color:white;">
                         <td align="center">#</td>
@@ -1472,9 +1489,9 @@ class RosettaHTML(object):
                     <tr id="row_PM0" style="">
                         <td style="text-align:center;">1</td>
                         <td style="text-align:center;"><select name="PM_chain0">%s</select></td>
-                        <td style="text-align:center;"><input name="PM_resid0" maxlength="4" size="5" type="text"/></td>
+                        <td style="text-align:center;"><input name="PM_resid0" maxlength="4" size="5" type="text"></td>
                         <td style="text-align:center;"><select name="PM_newres0" style="text-align:center;">%s</select></td>
-                        <td style="text-align:center;"><input name="PM_radius0" maxlength="4" size="7" type="text" value="6.0"/></td>
+                        <td style="text-align:center;"><input name="PM_radius0" maxlength="4" size="7" type="text" value="6.0"></td>
                     </tr>
                 ''' % (chainOptions, aminoAcidOptions))    
         
@@ -1483,17 +1500,17 @@ class RosettaHTML(object):
                     <tr id="row_PM%d" style="display:none">
                         <td style="text-align:center;">%d</td>
                         <td style="text-align:center;"><select name="PM_chain%d">%s</select></td>
-                        <td style="text-align:center;"><input name="PM_resid%d" maxlength="4" size="5" type="text"/></td>
+                        <td style="text-align:center;"><input name="PM_resid%d" maxlength="4" size="5" type="text"></td>
                         <td style="text-align:center;"><select name="PM_newres%d" style="text-align:center;">%s</select></td>
-                        <td style="text-align:center;"><input name="PM_radius%d" maxlength="4" size="7" type="text" value="6.0"/></td>
+                        <td style="text-align:center;"><input name="PM_radius%d" maxlength="4" size="7" type="text" value="6.0"></td>
                     </tr>''' % (i, i + 1, i, chainOptions, i, i, aminoAcidOptions, i))
             
         
         html.append('''    
                     <tr><td align="center" colspan="4"><div id="addmrow_0_1" style="display:none"><a href="javascript:void(0)" onclick="addOneMore();">Click here to add a residue</a></div></td></tr>
                 </table>
-                <span id="parameter0_1_step2" style="display:none;"/>
-            </p>''')
+                <span id="parameter0_1_step2" style="display:none;"></span>
+            </div>''')
         return html, ""
     
     
@@ -1547,10 +1564,10 @@ class RosettaHTML(object):
     def submitformEnsemble(self, chainOptions, aminoAcidOptions, numChainsAvailable):
         return ['''
             <!-- Ensemble - simple -->
-            <p id="parameter1_0" style="display:none; opacity:0.0; text-align:center;">
+            <div id="parameter1_0" style="display:none; opacity:0.0; text-align:center;">
             <span id="parameter1_0_step1" style="display:none;">no options</span>
-            <span id="parameter1_0_step2" style="display:none;"/>            
-            </p>
+            <span id="parameter1_0_step2" style="display:none;"></span>            
+            </div>
             ''' % self.tooltips], ""
     
     def showEnsemble(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
@@ -1573,26 +1590,26 @@ class RosettaHTML(object):
     def submitformEnsembleDesign(self, chainOptions, aminoAcidOptions, numChainsAvailable):
         return ['''
             <!-- Ensemble - design -->
-            <p id="parameter1_1" bgcolor="#EEEEEE"style="display:none; opacity:0.0; text-align:center;">
+            <div id="parameter1_1" style="background-color:#EEEEEE; display:none; opacity:0.0; text-align:center;">
                 <table id="parameter1_1_step1" bgcolor="#EEEEEE" style="display:none;" align="center">
                 <tr>
-                    <td align="right" style="color:white;" bgcolor="#828282">Temperature [kT] <img src="../images/qm_s.png" title="%(tt_Temp)s"></td>
+                    <td align="right" style="color:white;" bgcolor="#828282">Temperature [kT] <img alt="tooltip" src="../images/qm_s.png" title="%(tt_Temp)s"></td>
                     <td><input type="text" name="ENS_temperature" maxlength=3 SIZE=5 VALUE="1.2"></td>
                     <td bgcolor="#DDDDDD">(max 4.8, recommended 1.2)</td>
                 </tr>
                 <tr>
-                    <td align="right" style="color:white;" bgcolor="#828282">Max. segment length <img src="../images/qm_s.png" title="%(tt_SegLength)s"></td>
+                    <td align="right" style="color:white;" bgcolor="#828282">Max. segment length <img alt="tooltip" src="../images/qm_s.png" title="%(tt_SegLength)s"></td>
                     <td><input type="text" name="ENS_segment_length" maxlength=2 SIZE=5 VALUE="12"></td>
                     <td bgcolor="#DDDDDD">(max 12, recommended 12)</td>
                 </tr>
                 <tr>
-                    <td align="right" style="color:white;" bgcolor="#828282">No. of sequences <img src="../images/qm_s.png" title="%(tt_NSeq)s"></td>
+                    <td align="right" style="color:white;" bgcolor="#828282">No. of sequences <img alt="tooltip" src="../images/qm_s.png" title="%(tt_NSeq)s"></td>
                     <td><input type="text" name="ENS_num_designs_per_struct" maxlength=4 SIZE=5 VALUE="20"></td>
                     <td bgcolor="#DDDDDD">(max 20, recommended 20)</td>
                 </tr>
                 </table>
-                <span id="parameter1_1_step2" style="display:none"/>            
-            </p>
+                <span id="parameter1_1_step2" style="display:none"></span>            
+            </div>
             ''' % self.tooltips], ""
             
     def showEnsembleDesign(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
@@ -1661,10 +1678,10 @@ class RosettaHTML(object):
         ttd = self.tooltips["tt_seqtol_design"]                   
         html = ['''
             <!-- Library Design -->
-            <p id="parameter2_0" style="display:none; opacity:0.0; text-align:center;">
+            <div id="parameter2_0" style="display:none; opacity:0.0; text-align:center;">
             <table id="parameter2_0_step1" style="display:none;" align="center">
               <tr>
-                  <td style="vertical-align:top" align="right">Partners <img src="../images/qm_s.png" title="%(ttc)s"></td>
+                  <td style="vertical-align:top" align="right">Partners <img alt="tooltip" src="../images/qm_s.png" title="%(ttc)s"></td>
                   <td>
                       <table bgcolor="#EEEEEE">
                           <tr bgcolor="#828282" style="color:white;">
@@ -1683,7 +1700,7 @@ class RosettaHTML(object):
                     </td>
                 </tr>
                 <tr>
-                  <td style="vertical-align:top" align="right">Residues for design<img src="../images/qm_s.png" title="%(ttd)s"></td>
+                  <td style="vertical-align:top" align="right">Residues for design<img alt="tooltip" src="../images/qm_s.png" title="%(ttd)s"></td>
                   <td>
                     <table bgcolor="#EEEEEE">
                       <tr bgcolor="#828282" style="color:white;">
@@ -1708,8 +1725,8 @@ class RosettaHTML(object):
                   </td>
                 </tr>
             </table>
-            <span id="parameter2_0_step2" style="display:none;"/>            
-            </p>''')
+            <span id="parameter2_0_step2" style="display:none;"></span>            
+            </div>''')
             
         return html, ""
     
@@ -1791,16 +1808,24 @@ class RosettaHTML(object):
             #Designed residues: A 318 B
         
         postscript = ""
-        html = ['''<p id="parameter2_1" style="display:none; opacity:0.0; text-align:center;">''']
+        html = ['''
+<span id="parameter2_1" style="display:none;"></span>
+<span id="parameter2_1_step1" style="display:none;"></span>
+<span id="parameter2_1_step2" style="display:none;"></span>
+<span id="parameter3_0" style="display:none;"></span>
+<span id="parameter3_0_step1" style="display:none;"></span>
+<span id="parameter3_0_step2" style="display:none;"></span>''']
+        
+        html.append('''<div id="parameterSeqtolSK" style="display:none; opacity:0.0; text-align:center;">''')
         
          # Header
 
-        html.append('''<table id="parameter2_1_step1"  style="display:none; opacity:0.0; text-align:center;">
+        html.append('''<table id="parameterSeqtolSK_step1" style="display:none; opacity:0.0; text-align:center;">
                     <tr>
                     <td>
                     <select id="numPartners" name="numPartners" onfocus="this.valueatfocus=this.value" 
-                        onChange="if ((this.value != this.valueatfocus) && (this.value != 'x')) {changeApplication(2, 1, 2, this.selectedIndex);} " 
-                        onblur  ="if ((this.value != this.valueatfocus) && (this.value != 'x')) {changeApplication(2, 1, 2, this.selectedIndex);} "                        
+                        onChange="if ((this.value != this.valueatfocus) && (this.value != 'x')) {changeSubApplication(2, this.selectedIndex);} " 
+                        onblur  ="if ((this.value != this.valueatfocus) && (this.value != 'x')) {changeSubApplication(2, this.selectedIndex);} "                        
                     >
                         <option value="x">Select the number of partners</option>
                         <option value="1">1 Partner (Fold stability)</option>                    
@@ -1816,7 +1841,7 @@ class RosettaHTML(object):
         html.append('''</select></td></tr><tr><td height="10"></td></tr></table>''')
         
         # Body
-        html.append('''<table align="center" id="parameter2_1_step2" style="display:none;">''')
+        html.append('''<table align="center" id="parameterSeqtolSK_step2" style="display:none;">''')
         
         # Chains
         tt = self.tooltips["tt_seqtol_SK_partner"]
@@ -1827,14 +1852,14 @@ class RosettaHTML(object):
         for i in range(numChainsAvailable):
             html.append('''
               <tr id="seqtol_SK_chainrow_%d">
-                  <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
+                  <td align="left">Partner %d <img alt="tooltip" src="../images/qm_s.png" title="%s"></td>
                   <td>Chain <select name="seqtol_SK_chain%d" onChange="chainsChanged();" onfocus="this.valueatfocus=this.value" onblur="if (this.value != this.valueatfocus) chainsChanged()">%s</select></td>
                   </tr>
                   ''' % (i, i+1, tt, i, chainOptions))
         for i in range(numChainsAvailable, ROSETTAWEB_SK_Max_Chains):
             html.append('''
                 <tr id="seqtol_SK_chainrow_%d">
-                  <td align="left">Partner %d <img src="../images/qm_s.png" title="%s"></td>
+                  <td align="left">Partner %d <img alt="tooltip" src="../images/qm_s.png" title="%s"></td>
                   <td>Chain <select name="seqtol_SK_chain%d"><option value="ignore" selected>Select a chain</option></select></td>
                   </tr>
                   ''' % (i, i+1, tt, i))
@@ -1843,9 +1868,9 @@ class RosettaHTML(object):
         html.append('''
               <tr><td height="10"></td></tr>
                 <tr>
-                  <td align="left" valign="top">Premutated residues<img src="../images/qm_s.png" title="%(tt_seqtol_premutated)s"></td>
+                  <td align="left" valign="top">Premutated residues<img alt="tooltip" src="../images/qm_s.png" title="%(tt_seqtol_premutated)s"></td>
                   <td>
-                    <table bgcolor="#EEEEEE">
+                    <table bgcolor="#EEEEEE" id="seqtolSK_premutated" style="display:none;">
                       <tr bgcolor="#828282" style="color:white;">
                         <td>#</td><td>Chain ID</td><td>Residue Number</td><td>Target amino acid</td>
                       </tr>
@@ -1858,9 +1883,46 @@ class RosettaHTML(object):
                             <td><input type="text" name="seqtol_SK_pre_mut_r_%d" maxlength=4 SIZE=4 onChange="updateBoltzmann();"></td>
                             <td><select name="premutatedAA%d" style="text-align:center;" onChange="updateBoltzmann();">%s</select>
                            </tr>''' % (i, i+1, i, chainOptions, i, i, aminoAcidOptions))
-            
+         
+        AAs = sorted(ROSETTAWEB_SK_AAinv.keys())
+        AAs.remove("C")
+        numAAs = len(AAs)
+        AAheaders = join(["<td>%s</td>" % aa for aa in AAs],"")
         html.append('''
                       <tr align="center"><td colspan="3"><div id="seqtol_SK_pre_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSKPremutated();">Click here to add a residue</a></div></td></tr>
+                      </table>
+                      
+                      <table bgcolor="#EEEEEE" id="seqtolSKMulti_premutated" style="display:none;padding:0px;">
+                      <tr bgcolor="#828282" style="color:white;">
+                        <td>#</td><td>Chain ID</td><td>Residue Number</td><td colspan="7">Target amino acids</td>
+                      </tr>''' % self.tooltips)              
+              
+        for i in range(0, ROSETTAWEB_SK_MaxPremutations):
+            #style="display:none"
+            html.append('''<tr style="vertical-align:top; margin-left:0px;margin-right:0px" align="center" id="seqtol_SKMulti_pre_row_%d"> 
+                            <td>%d</td>
+                            <td><select name="seqtol_SKMulti_pre_mut_c_%d" style="text-align:center;" onChange="updateBoltzmann();">%s</select></td>            
+                            <td><input type="text" name="seqtol_SKMulti_pre_mut_r_%d" maxlength=4 SIZE=4 onChange="updateBoltzmann();"></td>''' % (i, i+1, i, chainOptions, i))
+            html.append('''<td><table><tr>''')
+            for j in range(0, 7):
+                html.append('''<td>%s<input type="checkbox" name="premutatedAAMulti%d" value="%s" checked="checked"></td>''' % (AAs[j], i, AAs[j]))
+            html.append('</tr><tr>') 
+            
+            for j in range(7, 14):
+                html.append('''<td>%s<input type="checkbox" name="premutatedAAMulti%d" value="%s" checked="checked"></td>''' % (AAs[j], i, AAs[j]))
+            html.append('</tr><tr>') 
+            
+            for j in range(14, numAAs):
+                html.append('''<td>%s<input type="checkbox" name="premutatedAAMulti%d" value="%s" checked="checked"></td>''' % (AAs[j], i, AAs[j]))
+
+            html.append('</tr><tr>') 
+            html.append('''<td colspan="7"><button type="button" name="premutatedAAMultiAll%d"  value="%d" onclick="selectAminoAcids(this, true)">All</button>''' % (i, i))
+            html.append('''                <button type="button" name="premutatedAAMultiNone%d" value="%d" onclick="selectAminoAcids(this, false)">None</button></td>''' % (i, i))
+                
+            html.append('</tr></table></td></tr>') 
+            
+        html.append('''
+                      <tr align="center"><td colspan="3"><div id="seqtol_SKMulti_pre_addrow"><a href="javascript:void(0)" onclick="addOneMoreSeqtolSKMultiPremutated();">Click here to add a residue</a></div></td></tr>
                       </table>
                   </td>
                 </tr>
@@ -1870,7 +1932,7 @@ class RosettaHTML(object):
         html.append('''
               <tr><td height="10"></td></tr>
                 <tr>
-                  <td align="left" valign="top">Residues for design<img src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
+                  <td align="left" valign="top">Residues for design<img alt="tooltip" src="../images/qm_s.png" title="%(tt_seqtol_design)s"></td>
                   <td>
                     <table bgcolor="#EEEEEE">
                       <tr bgcolor="#828282" style="color:white;">
@@ -1900,7 +1962,7 @@ class RosettaHTML(object):
         html.append('''               
               <tr><td height="10"></td></tr>
               <tr>
-                  <td align="left">Score Reweighting<img src="../images/qm_s.png" title="%(tt_seqtol_SK_weighting)s"></td>
+                  <td align="left">Score Reweighting<img alt="tooltip" src="../images/qm_s.png" title="%(tt_seqtol_SK_weighting)s"></td>
               ''' % self.tooltips)
         
         html.append('''
@@ -1937,24 +1999,25 @@ class RosettaHTML(object):
         
         
         # Boltzmann factor
-        html.append('''</tr>
+        html.append('''
                 </table>
                 </td>
                 </tr>
                 <tr><td height="10"></td></tr>
                 <tr>
-                  <td align="left">Boltzmann Factor (kT)<img src="../images/qm_s.png" title="%(tt_seqtol_SK_Boltzmann)s"></td>
+                  <td align="left">Boltzmann Factor (kT)<img alt="tooltip" src="../images/qm_s.png" title="%(tt_seqtol_SK_Boltzmann)s"></td>
                   <td>
-                  <input type="text" name="seqtol_SK_Boltzmann" disabled="true" maxlength=5 SIZE=5 VALUE="">                                 
+                  <input type="text" name="seqtol_SK_Boltzmann" disabled="disabled" maxlength=5 SIZE=5 VALUE="">                                 
                   </td>
                 </tr>
                 <tr>
                 <td></td><td><input type="checkbox" name="customBoltzmann" checked="checked" value="Milk" onClick="set_Boltzmann();">Use published value</td>
                 </tr>                   
             </table>
-            </p>''' % self.tooltips)
+            </div>''' % self.tooltips)
 
         return html, postscript
+    
     
     def showSequenceToleranceSK(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
 
@@ -2118,6 +2181,149 @@ class RosettaHTML(object):
 
         return html  
 
+    def showSequenceToleranceSKMulti(self, status, rootdir, cryptID, input_filename, size_of_ensemble, ProtocolParameters, parameters):
+
+        html = ["""
+              <tr><td align=right bgcolor="#EEEEFF">Task:         </td><td bgcolor="#EEEEFF">Interface Sequence Tolerance Prediction (Smith, Kortemme 2010)</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">Input file:   </td><td bgcolor="#EEEEFF">%s</td></tr>
+              <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
+              <tr><td align=right valign=top bgcolor="#EEEEFF">Parameters:   </td>
+                  <td bgcolor="#EEEEFF">
+                      """ % ( input_filename, size_of_ensemble)]
+        
+        seqid = [""]
+        if ProtocolParameters.get("multiparameters"):
+            numberOfRuns = len(ProtocolParameters["multiparameters"])
+            seqid = [""]
+            for i in range(numberOfRuns):
+                tstr = []
+                premutations = ProtocolParameters["multiparameters"][i]["Premutated"]
+                for partner in ProtocolParameters["Partners"]:
+                    if premutations.get(partner):
+                        tstr.append("%s%s" % (partner, join(["%s:%s" % (k,v) for k,v in premutations[partner].iteritems()])))
+                seqid.append(join(tstr))
+            
+        # Note:  We use get here rather than direct dictionary access as we choose not to 
+        #        store empty keys in the parameter to save space
+        numActive = 0
+        for partner in ProtocolParameters["Partners"]:
+            numActive += 1
+            html.append('Partner %d: Chain %s<br>' % (numActive, partner))
+            plist = ProtocolParameters["Premutated"].get(partner)
+            if plist:
+                html.append('<table><tr><td>&nbsp;&nbsp;</td><td><i>Premutated residues at positions:</i></td><td></td><td>')
+                for k,v in sorted(plist.items()):
+                    html.append('%s: %s<br>' % (k, join([ROSETTAWEB_SK_AAinv[aa] for aa in v], ", ")))
+                html.append('</td></tr></table>')
+            dlist = ProtocolParameters["Designed"].get(partner)
+            if dlist:
+                html.append('<table><tr><td>&nbsp;&nbsp;</td><td><i>Designed residues at positions:</i></td><td></td><td> %s</td></tr></table>' % (join(map(str, dlist.keys()),' ')))
+        html.append('''<br>Boltzmann factor: %f 
+                    <br><br>
+                    Score Reweighting<br>
+                    <table><tr>
+                      <td> 
+                        <table><thead>
+                            <tr bgcolor="#828282" style="color:white;">
+                            <td bgcolor="#EEEEFF"></td>
+                            <td>Self Energy (k<sub>_</sub>)</td>''' % (ProtocolParameters["kT"]))
+
+        for i in range(numActive - 1):
+            html.append("<td>k<sub>P<sub>%s</sub></sub>_</td>" % (ProtocolParameters["Partners"][i]))
+        
+        html.append("</thead></tr><tbody bgcolor='#F4F4FF'>")
+    
+        weights = ProtocolParameters["Weights"]
+        
+        lweights = []
+        offset = 0
+        idx = 1 + numActive
+        
+        for i in range(numActive):
+            numweights = numActive - i - 1
+            if numweights:
+                lweights.append(weights[idx : idx + numweights])
+            idx += numweights
+        
+        for i in range(numActive):
+            html.append("""
+                    <tr align="left" border=1>                    
+                          <td bgcolor="#828282" style="color:white; align="left">%s</td>
+                          <td>%s</td>""" % (ProtocolParameters["Partners"][i], ProtocolParameters["Weights"][i+1]))
+            for h in range(numActive - 1):
+                if h < i:
+                    html.append("<td>%s</td>" % lweights[h][i - h - 1])
+                else:
+                    html.append("<td bgcolor='#EEEEFF'></td>")
+            html.append("</tr>")
+
+        html.append("</tbody></table></td></tr></table>") 
+        html.append("</td></tr>")
+        
+        #todo: if status == 'done' or status == 'sample':
+        input_id = input_filename[:-4] # filename without suffix
+        if status == 'done' or status == 'sample':
+            html.append('<tr><td align=right></td><td></td></tr>')
+            
+            list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
+            
+            seqtoldirs = [os.path.join(rootdir, cryptID, "sequence_tolerance%d" % i) for i in range(numberOfRuns)]
+            list_pdb_files.extend( [ os.path.join(seqtoldir, '%s_0001_low.pdb' % input_id) for seqtoldir in seqtoldirs] )
+            
+            comment1 = """<br>Structural models for up to 10 low-energy initial backrub structures.<br><br>
+                        The query structure is shown in red. 
+                        The designed residues and premutated residues are shown in balls-and-stick representation.
+                        Residues which are designed have green backbone atoms.
+                        Residues which are premutated have yellow backbone atoms.
+                        """
+            designed_chains = []
+            designed_res = []
+            designed = {}
+            for partner in ProtocolParameters["Partners"]:
+                reslist = ProtocolParameters["Designed"].get(partner)
+                if reslist:
+                    designed[partner] = reslist.keys() 
+                    designed_chains += [partner for res in reslist.keys()]
+                    designed_res += reslist.keys()
+        
+            premutated = {}
+            for partner in ProtocolParameters["Partners"]:
+                reslist = ProtocolParameters["Premutated"].get(partner)
+                if reslist:
+                    premutated[partner] = reslist.keys()
+             
+            html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:11], mutated = premutated, designed=designed, descriptions = seqid)) # only the first 10 structures are shown
+            
+            #upgradetodo: get doi from Colin
+            #@postupgradetodo: change image size based on table size - need more input data and then I can use the code below for the Weblogo
+            
+            refIDs = self.refs.getReferences()
+            reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
+            
+            # This seems to be the pattern in which the weblogo image grows based on our settings
+            # e.g. 1 residue  => 367 + 0 + 83 = 450 pixels wide
+            #      7 residues => 367 + 1*(83+92+91+92+92) + (83 + 92) = 992 pixels wide
+            # The height is always 592 pixels.
+            #
+            # We scale vertically by 0.5 (296 pixels) and horizontally by 0.5 when numDesignedResidues does not exceed 7,
+            # For larger values of numDesignedResidues we fix the width at 500 so the table size does not expand.
+            numDesignedResidues = len(designed_res)
+            widths = [83, 92, 91, 92, 92]
+            widthOfFive = sum(widths)
+            WeblogoImageWidth = 367 + (int(float(numDesignedResidues) / 5.0) * widthOfFive) + sum(widths[0:(numDesignedResidues % 5)])
+            
+            halfWidth = int(WeblogoImageWidth / (2))
+            if i > 7:
+                    halfWidth = 500
+                
+            WebLogoText = self.WebLogoText
+            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Predicted sequence tolerance of the mutated residues for each permutation of premutations.<br>.</td>
+                             <td align="center" bgcolor="#FFFCD8"><a href="%(rootdir)s/%(cryptID)s/multi_tolerance_motif.png">
+                                                   <img width="%(halfWidth)d" height="296" src="%(rootdir)s/%(cryptID)s/multi_tolerance_motif.png" alt="image file not available" ></a><br>
+                             %(WebLogoText)s
+                             </td></tr> ''' % vars())
+
+        return html  
 
 #########################################################
 # Private functions mainly called by __init__ and main 
@@ -2143,18 +2349,20 @@ class RosettaHTML(object):
         colors = "colors = ["           # The background colors for the protocol groups
         protocolGroups = self.protocolGroups
         for i in range(len(protocolGroups)):
-            pglen = len(protocolGroups[i].getProtocols())
-            pts += "%d," % pglen
-            colors += "'%s'," % protocolGroups[i].color
-            pbs += "["
-            pnos += "["
-            for j in range(pglen):
-                pbs += str(protocolGroups[i][j].binaries) + ","
-                pnos += str(protocolGroups[i][j].nos) + ","
-            pbs = pbs[0:len(pbs) - 1]
-            pnos = pnos[0:len(pnos) - 1]
-            pnos += "],"
-            pbs += "],"
+            pgroup = protocolGroups[i]
+            if self.isPrivateServer or pgroup.public:
+                pglen = len(pgroup.getProtocols())
+                pts += "%d," % pglen
+                colors += "'%s'," % pgroup.color
+                pbs += "["
+                pnos += "["
+                for j in range(pglen):
+                    pbs += str(pgroup[j].binaries) + ","
+                    pnos += str(pgroup[j].nos) + ","
+                pbs = pbs[0:len(pbs) - 1]
+                pnos = pnos[0:len(pnos) - 1]
+                pnos += "],"
+                pbs += "],"
         
         bversion = "bversion = new Array();\n"
         for binname, v in RosettaBinaries.items():
@@ -2247,7 +2455,7 @@ var MaxMultiplePointMutations = %d;
     def _showLegalInfo(self):
         html = """<td style="border:1px solid black; padding:10px" bgcolor="#FFFFE0">
                     <p style="text-align:left; font-size: 10pt">
-                      For questions, please read our <A href="https://kortemmelab.ucsf.edu/backrub/wiki/">documentation</A>, see the references below, or contact <img src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.
+                      For questions, please read our <A href="https://kortemmelab.ucsf.edu/backrub/wiki/">documentation</A>, see the references below, or contact <img alt="support" src="../images/support_email.png" style="vertical-align:text-bottom;" height="15">.
                     </p>
                     %s
                   </td>""" % self.html_refs

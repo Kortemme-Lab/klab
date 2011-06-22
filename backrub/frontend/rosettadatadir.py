@@ -77,7 +77,7 @@ class RosettaDataDir(RosettaHTML):
         return grep('[.]pdb',list_files)
     
     
-    def PointMutation(self, cryptID, jobid, binary, pdb_filename):
+    def PointMutation(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
     
         jobdatadir = os.path.join(self.ddir, cryptID)
         
@@ -126,7 +126,7 @@ class RosettaDataDir(RosettaHTML):
         
         self.content += "</ul></p>"
   
-    def MultiplePointMutations(self, cryptID, jobid, binary, pdb_filename):
+    def MultiplePointMutations(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
         # let's reuse the point mutation function since the output files are the same
         self.PointMutation( cryptID, jobid, binary, pdb_filename )
         # and overwrite the parts that don't apply
@@ -136,7 +136,7 @@ class RosettaDataDir(RosettaHTML):
         else:
           self.header = '<h1 align="center">Job %s - Multiple Point Mutations (Rosetta++)</h1>' % jobid
     
-    def Ensemble(self, cryptID, jobid, binary, pdb_filename):
+    def Ensemble(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
         # let's reuse the point mutation function since the output files are the same
         self.PointMutation( cryptID, jobid, binary, pdb_filename )
         # and overwrite the parts that don't apply
@@ -146,7 +146,7 @@ class RosettaDataDir(RosettaHTML):
         else:
           self.header = '<h1 align="center">Job %s - Backrub Ensemble (Rosetta++)</h1>' % jobid
     
-    def EnsembleDesign(self, cryptID, jobid, binary, pdb_filename):
+    def EnsembleDesign(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
         
         jobdatadir = os.path.join(self.ddir, cryptID)
         
@@ -191,7 +191,7 @@ class RosettaDataDir(RosettaHTML):
         
         self.content = join(html, "\n")
     
-    def SequenceToleranceHK(self, cryptID, jobid, binary, pdb_filename):
+    def SequenceToleranceHK(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
     
         jobdatadir = os.path.join(self.ddir, cryptID)
         
@@ -246,7 +246,7 @@ class RosettaDataDir(RosettaHTML):
 
         self.content += "</ul></p>"      
 
-    def SequenceToleranceSK(self, cryptID, jobid, binary, pdb_filename):
+    def SequenceToleranceSK(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
     
         jobdatadir = os.path.join(self.ddir, cryptID)
         self.jobid = jobid
@@ -308,6 +308,105 @@ class RosettaDataDir(RosettaHTML):
         for fn_pdb in self._get_pdb_files(cryptID, subdir="sequence_tolerance"):
           if fn_pdb != pdb_filename:
             self.content.append('<li><a href="%(jobdatadir)s/sequence_tolerance/%(fn_pdb)s">%(fn_pdb)s</a>' % vars())
+    
+        self.content.append("</ul></p>")
+        self.content = join(self.content, "")    
+
+    def SequenceToleranceSKMulti(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
+    
+        junk="""
+         #@upgradetodo: hlink [Figure 2B] and [Table 1]
+            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to Figure 2B in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
+                              <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See Table 1 in %s.</p>
+                              <p>Download the table as 
+                              <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.</p>
+                              </td>
+                           <td bgcolor="#FFFCD8">
+                    ''' % ( reftext, reftext, rootdir, cryptID, rootdir, cryptID ))
+                    
+                    # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
+                    # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # the <a href="../wiki/" target="_blank">wiki</a>.
+            
+            tolerance_seqrank.pdf, tolerance_seqrank.png
+            tolerance_boxplot_B1376.png  tolerance_boxplot.png  
+
+            html.append('''<a href="%s/%s/tolerance_seqrank.png"><img src="%s/%s/tolerance_seqrank.png" alt="image file not available" ></a><br>
+                        </td>
+                        </tr>
+                        <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Individual boxplots of the predicted frequencies at each mutated site.<br>
+                              Download <a href="%s/%s/tolerance_pwm.txt">weight matrix</a> or file with all plots as 
+                              <a href="%s/%s/tolerance_boxplot.png">PNG</a>, <a href="%s/%s/tolerance_boxplot.pdf">PDF</a>.<br>
+                              </td>
+                           <td bgcolor="#FFFCD8">''' % ( rootdir, cryptID, rootdir, cryptID, rootdir, cryptID, rootdir, cryptID, rootdir, cryptID ))
+                    
+                    # To rerun the analysis we provide the <a href="../downloads/specificity.R">R-script</a> that was used to analyze this data. 
+                    # A <a href="../wiki/SequenceTolerancePrediction" target="_blank">tutorial</a> on how to use the R-script can be found on 
+                    # the <a href="../wiki/" target="_blank">wiki</a>.
+            
+            for (chain, resid) in zip(designed_chains, designed_res):
+              html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                    ''' % ( rootdir, cryptID, chain, resid, rootdir, cryptID, chain, resid ))
+            html.append('''</td></tr>''')
+            """
+        jobdatadir = os.path.join(self.ddir, cryptID)
+        self.jobid = jobid
+        if binary == "multiseqtol":
+            self.header = '<h1 align="center">Job %s - Generalized Sequence Tolerance Protocol (PLoS ONE 2011)</h1>' % jobid
+            self.html_refs = '<P>%(SmithKortemme:2011)s</P>' % self.refs
+        else:
+            self.header = '<h1 align="center">Job %s - Interface Sequence Tolerance Prediction</h1>' % jobid
+            self.html_refs = '<P>Error: Reference missing</P>' % self.refs
+            self.content = '<p>The logic to create the data directory is missing.</p>'
+            return
+      
+        # individual boxplots
+        list_files = os.listdir(os.path.join(self.download_dir, cryptID ))
+        list_files.sort()
+        
+        self.content = []
+        self.content.append('''
+          <p>
+          Input files:
+            <ul>
+              <li>Input PDB file: <a href="%s/%s">%s</a></li>''' % (jobdatadir, pdb_filename, pdb_filename))
+        
+        
+        for br_resfile in grep('backrub_[0-9]+\.resfile',list_files):
+            self.content.append('''<li>Backrub premutations residue file: <a href="%(jobdatadir)s/%(br_resfile)s">%(br_resfile)s</a></li>''' % vars())
+        
+        for st_resfile in grep('seqtol_[0-9]+\.resfile',list_files):
+            self.content.append('''<li>Sequence tolerance residue file: <a href="%(jobdatadir)s/%(st_resfile)s">%(st_resfile)s</a></li>''' % vars())
+        if False: 
+            self.content.append('''
+                </ul>
+              </p>
+              Output files:
+                <ul>
+                    <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - up to 10 best scoring sequences for each backrub structure</li>
+                    <li><a href="%(jobdatadir)s/tolerance_seqrank.png">tolerance_seqrank.png</a>, 
+                                   <a href="%(jobdatadir)s/tolerance_seqrank.pdf">tolerance_seqrank.pdf</a> - ranked table of amino acid types for each position</li>
+                    <li><a href="%(jobdatadir)s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>
+                  <li><a href="%(jobdatadir)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
+                  <li><a href="%(jobdatadir)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
+                      <a href="%(jobdatadir)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
+                  <li> Boxplot for each position: <BR>''' % vars())
+     
+        
+            for png_fn in grep('tolerance_boxplot_[A-Z][0-9]*\.png',list_files):
+                self.content.append('&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<a href="%(jobdatadir)s/%(png_fn)s">%(png_fn)s</a><br>' % vars())
+            
+            self.content.append('''
+                  </li>
+                </ul>
+                Individual PDB files: <br>
+                    &nbsp;&nbsp;&nbsp;"low" PDB files are the result of the backrub run. <br>
+                    <!--&nbsp;&nbsp;&nbsp;"low_ms" PDB files contain the lowest scoring designed sequence based on this backrub run.-->
+                    <ul>''')
+              
+            for fn_pdb in self._get_pdb_files(cryptID, subdir="sequence_tolerance"):
+              if fn_pdb != pdb_filename:
+                self.content.append('<li><a href="%(jobdatadir)s/sequence_tolerance/%(fn_pdb)s">%(fn_pdb)s</a>' % vars())
     
         self.content.append("</ul></p>")
         self.content = join(self.content, "")    

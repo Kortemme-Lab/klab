@@ -1,18 +1,17 @@
-/************************************
- * Constants and globals
- * Note: some constants are passed in by rosettahtml.py 
- ************************************/
+/*******************************************************************************
+ * Constants and globals Note: some constants are passed in by rosettahtml.py
+ ******************************************************************************/
 
 // Constants used by validation functions
-var integralExpression 	= /^[0-9]+$/; //const 
-var numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/; //const
-var alphaExpression 		= /^[A-Za-z]+$/; //const
-var chainExpression 		= /^[A-Za-z]$/; //const
-var emptyExpression 		= /^\s*$/; //const
-var PDBExpression 		=   /^[@]?[-()\sA-Z_a-z0-9]+$/; //const
-var StoredPDBExpression 	= /^pdbs\/[-()\sA-Z_a-z0-9\/]+[^\.]+\.pdb$/i; //const
-var CysteineExpression 	= /^CYS$/i; //const
-var CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in Rosetta 3." //const
+var integralExpression 	= /^[0-9]+$/; // const
+var numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/; // const
+var alphaExpression 		= /^[A-Za-z]+$/; // const
+var chainExpression 		= /^[A-Za-z]$/; // const
+var emptyExpression 		= /^\s*$/; // const
+var PDBExpression 		=   /^[@]?[-()\sA-Z_a-z0-9]+$/; // const
+var StoredPDBExpression 	= /^pdbs\/[-()\sA-Z_a-z0-9\/]+[^\.]+\.pdb$/i; // const
+var CysteineExpression 	= /^CYS$/i; // const
+var CysteinMutationError = "We are sorry but mutation to Cysteine is not allowed in Rosetta 3." // const
 
 /* Protocol variables */
 // Multiple Point Mutations
@@ -24,27 +23,36 @@ var numSeqTol = 1;	// Mutations
 // SeqTolSK
 var numSeqTolSK = 1; // Mutations
 var numSeqTolSKPremutations = 0; // Premutations
+var initNumSeqTolSKChains = 1; // const
 var numSeqTolSKChains = initNumSeqTolSKChains; // Initial number of chains
 var columnElements;
-var initNumSeqTolSKChains = 1; //const
-var minSeqTolSKMutations = 1; //const
-var minSeqTolSKPremutations = 0; //const
+var minSeqTolSKMutations = 1; // const
+var minSeqTolSKPremutations = 0; // const
+
+// SeqTolSK
+var numSeqTolSKMultiPremutations = 0; // Premutations
+var minSeqTolSKMultiPremutations = 0; // const
+
 
 // An array of validation functions for the protocols
 protocolValidators = 
 [ 
 	[validateOneMutation, validateMultipleMutations],
 	[validateEnsemble, validateEnsembleDesign],
-	[validateSeqtolHK, validateSeqtolSK]
+	[validateSeqtolHK, validateSeqtolSK],
+	[validateSeqtolSKMulti]
 ]
 
-//An array of functions to set demo values for the protocols
+// An array of functions to set demo values for the protocols
 setDemoValues = 
 [ 
 	[demoOneMutation, demoMultipleMutations],
 	[demoEnsemble, demoEnsembleDesign],
-	[demoSeqtolHK, demoSeqtolSK]
+	[demoSeqtolHK, demoSeqtolSK],
+	[demoSeqtolSKMulti]
 ]
+
+otherParameterForms = ["parameterSeqtolSK"]
 
 // An array of functions to handle protocol-specific GUI setup
 var numSubTasks = 3; // const
@@ -70,12 +78,14 @@ function showMutationRowAdder(app, task, extra)
 }
 additionalGUISetup[2][1][1] = changeApplicationToSeqtolSK1
 additionalGUISetup[2][1][2] = changeApplicationToSeqtolSK2
+additionalGUISetup[3][0][1] = changeApplicationToSeqtolSK1
+additionalGUISetup[3][0][2] = changeApplicationToSeqtolSK2
 additionalGUISetup[0][1][1] = showMutationRowAdder
 additionalGUISetup[2][0][1] = showMutationRowAdder
 
-/************************************
+/*******************************************************************************
  * Main functions
- ************************************/
+ ******************************************************************************/
 var localquery = 0;
 
 function startup(query)
@@ -99,8 +109,13 @@ function startup(query)
 		Nifty("ul#about li","big fixed-height");
         Nifty("div#box","big transparent fixed-height");
 		protocol = getProtocol();
-		// @js1: Special case for sequence tolerance. Generalize and fix this i.e. "jump to last stage"
+		// @js1: Special case for sequence tolerance. Generalize and fix this
+		// i.e. "jump to last stage"
 		if (protocol[0] == 2 && protocol[1] == 1)
+		{
+			changeApplication(protocol[0], protocol[1], 2, 2, true );
+		}
+		else if (protocol[0] == 3 && protocol[1] == 0)
 		{
 			changeApplication(protocol[0], protocol[1], 2, 2, true );
 		}
@@ -124,9 +139,16 @@ function startup(query)
     }
 }
 
-//This function shows the input form for the protocol <_task> of protocol series <app>.
-//This includes a logo and parameter fields for the protocol.
-//The _override parameter is used for the demo data 
+function changeSubApplication(subtask, extra, override )
+{
+	proto = getProtocol()
+	changeApplication( proto[0], proto[1], subtask, extra, override );
+}
+
+// This function shows the input form for the protocol <_task> of protocol
+// series <app>.
+// This includes a logo and parameter fields for the protocol.
+// The _override parameter is used for the demo data
 function changeApplication( app, task, subtask, extra, override ) 
 {
 	// Reset to the start on protocol change
@@ -151,13 +173,15 @@ function changeApplication( app, task, subtask, extra, override )
 		new Effect.Fade( "pointMutationRecommendation", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
 	}
 	
-	// Hide the descriptions of the protocol series and the descriptions of other protocol tasks
+	// Hide the descriptions of the protocol series and the descriptions of
+	// other protocol tasks
 	thistask = hideInactiveProtocols(app, task);
 		
 	// Hide the common submission page text
 	new Effect.Fade( "textintro", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
 		
-	// Fix up the default Rosetta versions for the different protocols and hide non-applicable versions
+	// Fix up the default Rosetta versions for the different protocols and hide
+	// non-applicable versions
 	revisionFields = document.getElementsByClassName("bin_revisions");
 	showRevisions = new Array(); 
 	for ( i = 0; i < protocolBins[app][task].length; i++ )
@@ -199,6 +223,14 @@ function changeApplication( app, task, subtask, extra, override )
 		setSubmissionButtonsVisibility(false);
 		new Effect.Fade( thistask + "_step1" );
 		new Effect.Fade( thistask + "_step2", { duration: 0.0} );
+		
+		runningSeqtolSK = isProtocol(2, 1) || isProtocol(3, 0);
+		if (runningSeqtolSK)
+		{
+			new Effect.Fade( "parameterSeqtolSK_step1", { duration: 0.0, queue: { scope: 'task' }} );		
+			new Effect.Fade( "parameterSeqtolSK_step2", { duration: 0.0, queue: { scope: 'task' }} );
+		}
+
 	}
 	else if (subtask == 1)
 	{
@@ -229,15 +261,17 @@ function setSubmissionButtonsVisibility(visible)
 		}
 	}
 }
-//This function shows the preliminary screen for each protocol series.
-//This includes a logo and descriptive text but no input form.
+// This function shows the preliminary screen for each protocol series.
+// This includes a logo and descriptive text but no input form.
 function showMenu( menu_id ) {
 	
 	document.submitform.reset();
 	/* This function extends or hides the menu on the left */	
 
-	// box contains the pici, texti, common parameters, parameteri_j, parameter submission, and refi elements where i = menu_id
-	// Essentially, it is the right column in the description (resp. submission pages) for protocol series (resp. protocols)   
+	// box contains the pici, texti, common parameters, parameteri_j, parameter
+	// submission, and refi elements where i = menu_id
+	// Essentially, it is the right column in the description (resp. submission
+	// pages) for protocol series (resp. protocols)
 	// Set the color as above and the minimum height.
 	mycolor = colors[menu_id];
 	document.getElementById("box").style.background = mycolor;
@@ -247,12 +281,13 @@ function showMenu( menu_id ) {
 	// Hide the common submission page text
 	new Effect.Fade( "textintro", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
 	  
-	// Display any elements pic and text suffixed with menu_id and hide all others
+	// Display any elements pic and text suffixed with menu_id and hide all
+	// others
 	for ( i = 0; i < protocolTasks.length; i++ )
 	{
 		if (i == menu_id)
 		{
-			// This will display the logo and descriptive text. 
+			// This will display the logo and descriptive text.
 			new Effect.Appear( "pic"  + i);
 			new Effect.Appear( "text" + i);
 		}
@@ -269,12 +304,16 @@ function showMenu( menu_id ) {
 			new Effect.Fade( "parameter" + i + "_" + j, {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
 		}
 	}
- 
+	
 	// Hide all other parameter fields (used on the submission pages)
 	parameterDivs = new Array("PrePDBParameters", "PostPDBParameters", "parameter_submit");
 	for ( i = 0; i < parameterDivs.length; i++ )
 	{
 		new Effect.Fade( parameterDivs[i], {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
+	}
+	for (i = 0; i < otherParameterForms.length; i++)
+	{
+		new Effect.Fade( otherParameterForms[i], {duration: 0.0, queue: {position: '0', scope: 'parameter'} } );
 	}
 	     
 	return true;
@@ -400,18 +439,21 @@ function set_demo_values(setAllData)
 	
 	document.submitform.nos.value = protocolNos[pgroup][ptask][1];
 	setDemoValues[pgroup][ptask](setAllData)
-	//return true;
+	// return true;
 }
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions
- ************************************/
+ ******************************************************************************/
 
-/* All protocol-specific functions are defined here. Define at least the validator and demo value setter */
+/*
+ * All protocol-specific functions are defined here. Define at least the
+ * validator and demo value setter
+ */
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions - Point Mutation
- ************************************/
+ ******************************************************************************/
 
 function validateOneMutation()
 {
@@ -447,9 +489,9 @@ function demoOneMutation(setAllData)
 	sbmtform.JobName.value = "One Mutation sample job"
 }
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions - Multiple Mutations
- ************************************/
+ ******************************************************************************/
 
 function validateMultipleMutations()
 {
@@ -464,7 +506,8 @@ function validateMultipleMutations()
 		newres = elems['PM_newres' + i];
 		radius = elems['PM_radius' + i];
 		
-		// break the loop on the first empty row (the radius is filled in automatically and not checked)
+		// break the loop on the first empty row (the radius is filled in
+		// automatically and not checked)
         if ((chain.value == "invalid") && (resid.value.length == 0) && (newres.value.length == 0)) 
         {
            if ( i == 0 ) 
@@ -478,7 +521,8 @@ function validateMultipleMutations()
            break;
         }
 
-        // if not empty, check if ALL values are entered correctly.=, including the radius
+        // if not empty, check if ALL values are entered correctly.=, including
+		// the radius
         if (chain.value == "invalid")
         {
         	ret = false;
@@ -502,7 +546,9 @@ function demoMultipleMutations(setAllData)
 {
 	var sbmtform = document.submitform;
 	sbmtform.PDBID.value = "2PDZ";
-	if (numMPM == 1) // This prevents new fields appearing if a user hits load sample data when the sample data has already been loaded
+	if (numMPM == 1) // This prevents new fields appearing if a user hits
+						// load sample data when the sample data has already
+						// been loaded
 	{
 		sbmtform.PM_chain0.value = "A";
 		sbmtform.PM_resid0.value = "17";
@@ -528,9 +574,9 @@ function demoMultipleMutations(setAllData)
 	sbmtform.JobName.value = "Multiple Mutations sample job"
 }
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions - Backrub Conformational Ensemble
- ************************************/
+ ******************************************************************************/
 
 function validateEnsemble()
 {
@@ -544,9 +590,9 @@ function demoEnsemble(setAllData)
 	sbmtform.JobName.value = "Backrub Conformational Ensemble sample"
 }
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions - Backrub Ensemble Design
- ************************************/
+ ******************************************************************************/
 
 function validateEnsembleDesign()
 {
@@ -575,9 +621,9 @@ function demoEnsembleDesign(setAllData)
 	sbmtform.JobName.value = "Backrub Ensemble Design sample job"
 }
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions -Sequence Tolerance HK
- ************************************/
+ ******************************************************************************/
 
 function validateSeqtolHK()
 {
@@ -588,9 +634,12 @@ function validateSeqtolHK()
 	ret = validateElem(sbmtform.seqtol_chain1, chainExpression) && ret;
 	ret = validateElem(sbmtform.seqtol_chain2, chainExpression) && ret;
 	
-	// validateNotEmpty( sbmtform.seqtol_weight_chain1, "Please enter a weight for Partner 1");
-    // validateNotEmpty( sbmtform.seqtol_weight_chain2, "Please enter a weight for Partner 2");
-    // validateNotEmpty( sbmtform.seqtol_weight_interface, "Please enter a weight for the interface") ;
+	// validateNotEmpty( sbmtform.seqtol_weight_chain1, "Please enter a weight
+	// for Partner 1");
+    // validateNotEmpty( sbmtform.seqtol_weight_chain2, "Please enter a weight
+	// for Partner 2");
+    // validateNotEmpty( sbmtform.seqtol_weight_interface, "Please enter a
+	// weight for the interface") ;
 	
 	for (var i = 0; i < HK_MaxMutations ; i = i + 1) 
     {
@@ -621,7 +670,8 @@ function validateSeqtolHK()
         }
 	}
 	// Require at least one designed residue
-	if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
+	if (validDesigned[-1] == 0) // if the number of valid designed residues is
+								// zero
 	{
 		markError(elems['seqtol_mut_c_0']);
 		markError(elems['seqtol_mut_r_0']);
@@ -653,9 +703,9 @@ function demoSeqtolHK(setAllData)
 	sbmtform.JobName.value = "Interface Sequence Tolerance sample job"
 }
 
-/************************************
+/*******************************************************************************
  * Protocol-specific functions - Sequence Tolerance SK
- ************************************/
+ ******************************************************************************/
 
 function validateSeqtolSK()
 {
@@ -729,7 +779,8 @@ function validateSeqtolSK()
         }
 	}
 	// Require at least one designed residue
-	if (validDesigned[-1] == 0) // if the number of valid designed residues is zero 
+	if (validDesigned[-1] == 0) // if the number of valid designed residues is
+								// zero
 	{
 		markError(elems['seqtol_SK_mut_c_0']);
 		markError(elems['seqtol_SK_mut_r_0']);
@@ -766,7 +817,7 @@ function demoSeqtolSK(setAllData)
 		elemNumPartners = sbmtform.numPartners
 		
 		// @js2
-		// Clear automatically filled values 
+		// Clear automatically filled values
 		for (i = elemA.length; i >= 0; i--)
 		{
 			elemA.options[i] = null;
@@ -815,15 +866,184 @@ function demoSeqtolSK(setAllData)
 	sbmtform.JobName.value = "Interface Sequence Tolerance sample job"
 }
 
-/************************************
- * Protocol-specific GUI functions 
- ************************************/
+/*******************************************************************************
+ * Protocol-specific functions - Sequence Tolerance SK Multi
+ ******************************************************************************/
 
-// @js3 
+function validateSeqtolSKMulti()
+{
+	ret = true;
+	var sbmtform = document.submitform;
+	var elems = sbmtform.elements;
+	// Highlight Partner 1 if no partners are specified
+	var allempty = true;
+	chainList = new Array();
+
+	// iterate through the displayed chains only
+	for (i = 0; i < numSeqTolSKChains ; i = i + 1) 
+	{
+		var c = elems["seqtol_SK_chain" + i];
+		var cval = c.value;
+		
+		var cIsEmpty = (cval.length == 0);
+		allempty = allempty && cIsEmpty;
+		
+		// require unique chain names
+		if (!cIsEmpty)
+		{
+			if (cval == "invalid")
+			{
+				markError(c);
+				ret = false;
+			}
+			else if (cval != "ignore" && chainList[cval])
+			{
+				markError(c);
+				ret = false;
+			}
+			chainList[cval] = true;
+		}
+	}
+	
+	if (allempty == true)
+	{
+		ret = validateElem(sbmtform.seqtol_SK_chain0, alphaExpression) && ret;
+	}
+
+	// Highlight Boltzmann factor if missing or invalid
+	if (!elems["customBoltzmann"].checked)
+	{		
+    	ret = validateElem(sbmtform.seqtol_SK_Boltzmann, numericExpression) && ret;
+	}
+
+	var validResidues = getValidResidues();
+	var validPremutations = validResidues["premutated"]
+	var validDesigned = validResidues["designed"]
+	
+	// Highlight any invalid premutation rows
+	for (i = 0; i < validPremutations.length; i++)
+	{
+		if (!validPremutations[i])
+		{
+			markError(elems['seqtol_SKMulti_pre_mut_c_' + i]);
+			markError(elems['seqtol_SKMulti_pre_mut_r_' + i]);
+			ret = false;
+        }
+	}
+	// Highlight any invalid designed residue rows
+	for (i = 0; i < validDesigned.length; i++)
+	{
+		if (!validDesigned[i])
+		{
+			markError(elems['seqtol_SK_mut_c_' + i]);
+			markError(elems['seqtol_SK_mut_r_' + i]);
+			ret = false;
+        }
+	}
+	// Require at least one designed residue
+	if (validDesigned[-1] == 0) // if the number of valid designed residues is
+								// zero
+	{
+		markError(elems['seqtol_SK_mut_c_0']);
+		markError(elems['seqtol_SK_mut_r_0']);
+		ret = false;
+	}
+	    
+    // Highlight any missing weights
+    for (i = 0; i < SK_max_seqtol_chains ; i = i + 1) 
+    {
+    	for (j = i; j < SK_max_seqtol_chains ; j = j + 1) 
+        {
+    		var c = elems["seqtol_SK_kP" + i + "P" + j]; 
+    		if (c.style.background == "white")
+        	{
+    			ret = validateElem(c, numericExpression) && ret;
+        	}	
+        }
+    }
+
+    return ret;
+}
+
+function demoSeqtolSKMulti(setAllData)
+{
+	var sbmtform = document.submitform;
+	
+	sbmtform.StoredPDB.value = '';
+	sbmtform.PDBID.value = "@1KI1";
+	
+	// upgradetodo"Premutated" : {"A" : {56 : allAAsExceptCysteine}},
+    
+    if (setAllData)
+    {
+    	elemA = sbmtform.seqtol_SK_chain0
+		elemB = sbmtform.seqtol_SK_chain1
+		elemNumPartners = sbmtform.numPartners
+		
+		// @js2
+		// Clear automatically filled values
+		for (i = elemA.length; i >= 0; i--)
+		{
+			elemA.options[i] = null;
+		}
+		for (i = elemB.length; i >= 0; i--)
+		{
+			elemB.options[i] = null;
+		}
+		for (i = elemNumPartners.length; i >= 0; i--)
+		{
+			elemNumPartners.options[i] = null;
+		}
+		elemA.options[0] = new Option('A','A')
+		elemB.options[0] = new Option('B','B')
+		elemNumPartners.options[0] = new Option('2 Partners (Interface)','2')
+		elemA.value = "A";
+		elemA.value = "B";
+		
+		for (i = 0; i < 1; i++)
+		{
+			new Effect.Appear("seqtol_SKMulti_pre_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+		}
+		numSeqTolSKMultiPremutations = 1
+		sbmtform.seqtol_SKMulti_pre_mut_c_0.value = "A";
+		sbmtform.seqtol_SKMulti_pre_mut_r_0.value = 56;
+		
+		for (i = 1; i < 4; i++)
+		{
+			new Effect.Appear("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+		}
+		numSeqTolSK = 4
+
+		sbmtform.seqtol_SK_mut_c_0.value = "B";
+		sbmtform.seqtol_SK_mut_r_0.value = 1369;
+		
+		sbmtform.seqtol_SK_mut_c_1.value = "B";
+		sbmtform.seqtol_SK_mut_r_1.value = 1373;
+		
+		sbmtform.seqtol_SK_mut_c_2.value = "B";
+		sbmtform.seqtol_SK_mut_r_2.value = 1376;
+		
+		sbmtform.seqtol_SK_mut_c_3.value = "B";
+		sbmtform.seqtol_SK_mut_r_3.value = 1380;
+				
+		sbmtform.seqtol_SK_kP0P0.value = "0.4";
+		sbmtform.seqtol_SK_kP1P1.value = "0.4";
+		sbmtform.seqtol_SK_kP0P1.value = "1.0";
+		sbmtform.seqtol_SK_Boltzmann.value = 0.228 + 0.021;
+		chainsChanged();
+    }
+	sbmtform.JobName.value = "Sequence Tolerance Multi sample job"
+}
+
+/*******************************************************************************
+ * Protocol-specific GUI functions
+ ******************************************************************************/
+
+// @js3
 
 /* Multiple point mutations */
 
-//Adds a residue input field 
+// Adds a residue input field
 // @js4
 function addOneMore()
 {
@@ -838,8 +1058,8 @@ function addOneMore()
 
 /* Sequence Tolerance HK */
 
-//Adds a residue input field
-// @js5 
+// Adds a residue input field
+// @js5
 function addOneMoreSeqtol()
 {
 	new Effect.Appear("seqtol_row_" + "" + numSeqTol);
@@ -851,10 +1071,11 @@ function addOneMoreSeqtol()
 	return true;
 }
 
+
 /* Sequence Tolerance SK */
 
-//Adds a residue input field
-//@js6 
+// Adds a residue input field
+// @js6
 function addOneMoreSeqtolSK()
 {
 	new Effect.Appear("seqtol_SK_row_" + "" + numSeqTolSK, { duration: 0.0, queue: { scope: 'task' }});
@@ -877,10 +1098,24 @@ function addOneMoreSeqtolSKPremutated()
 	return true;
 }
 
+function addOneMoreSeqtolSKMultiPremutated()
+{
+	new Effect.Appear("seqtol_SKMulti_pre_row_" + "" + numSeqTolSKMultiPremutations);
+	numSeqTolSKMultiPremutations = numSeqTolSKMultiPremutations + 1;
+	if (numSeqTolSKMultiPremutations >= SK_MaxPremutations)
+	{
+		new Effect.Fade("seqtol_SKMulti_pre_addrow", { duration: 0.0 } );
+	}
+	return true;
+}
+
 function changeApplicationToSeqtolSK1(app, task, extra)
 {
 	new Effect.Fade( "recNumStructures" + app + "_" + task );
 	setSubmissionButtonsVisibility(false);
+	
+	new Effect.Appear( "parameterSeqtolSK_step1", { duration: 0.0, queue: { scope: 'task' }} );		
+	new Effect.Fade(   "parameterSeqtolSK_step2", { duration: 0.0, queue: { scope: 'task' }} );
 }
 
 function changeApplicationToSeqtolSK2(app, task, extra)
@@ -889,6 +1124,16 @@ function changeApplicationToSeqtolSK2(app, task, extra)
 	_override = extra[1]
 	                          	 
 	var i;
+	new Effect.Appear( "parameterSeqtolSK_step2", { duration: 0.0, queue: { scope: 'task' }} );	
+	if ((app == 2) && (task == 1))
+	{
+		new Effect.Appear( "seqtolSK_premutated", { duration: 0.0, queue: { scope: 'task' }} );
+	}
+	else if ((app == 3) && (task == 0))
+	{
+		new Effect.Appear( "seqtolSKMulti_premutated", { duration: 0.0, queue: { scope: 'task' }} );
+	}		
+	
 	setSubmissionButtonsVisibility(true);
 	if (_extra < initNumSeqTolSKChains)
 	{
@@ -914,23 +1159,38 @@ function changeApplicationToSeqtolSK2(app, task, extra)
 	if (localquery == "sampleData")
 	{
 		// @js7
-		numSeqTolSKPremutations = 0;
-		for (i = 0; i < SK_MaxPremutations; i++)
+		var mutationsUpTo = 0;
+		if (isProtocol(2, 1))
 		{
-			new Effect.Fade("seqtol_SK_pre_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+			numSeqTolSKPremutations = 0;
+			for (i = 0; i < SK_MaxPremutations; i++)
+			{
+				new Effect.Fade("seqtol_SK_pre_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+			}
+			mutationsUpTo = 6;
 		}
-		for (i = 0; i < 6; i++)
+		if (isProtocol(3, 0))
+		{
+			new Effect.Appear("seqtol_SKMulti_pre_row_0", { duration: 0.0, queue: { scope: 'task' }});
+			for (i = 1; i < SK_MaxPremutations; i++)
+			{
+				new Effect.Fade("seqtol_SKMulti_pre_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
+			}
+			mutationsUpTo = 5;
+		}
+				
+		for (i = 0; i < mutationsUpTo; i++)
 		{
 			new Effect.Appear("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
 		}
-		for (i = 6; i < SK_MaxMutations; i++)
+		for (i = mutationsUpTo; i < SK_MaxMutations; i++)
 		{
 			new Effect.Fade("seqtol_SK_row_" + "" + i, { duration: 0.0, queue: { scope: 'task' }});
 		}
 		new Effect.Appear("addmrow_2_1", { duration: 0.0, queue: { scope: 'task' }});
-	}
-	
+	}	
 }
+
 
 function reset_seqtolSKData ()
 {
@@ -950,6 +1210,20 @@ function reset_seqtolSKData ()
 	new Effect.Appear("seqtol_SK_pre_addrow");
 	numSeqTolSKPremutations = minSeqTolSKPremutations;
 	
+	// Premutations for design (Multi)
+	for (i = 0; i < minSeqTolSKMultiPremutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SKMulti_pre_mut_c_" + i].value = "";
+		new Effect.Appear( "seqtol_SKMulti_pre_row_" + i, { duration: 0.0 } );
+	}
+	for (i = minSeqTolSKMultiPremutations; i < SK_MaxPremutations; i++)
+	{
+		oSubmitForm.elements["seqtol_SKMulti_pre_mut_c_" + i].value = "";
+		new Effect.Fade( "seqtol_SKMulti_pre_row_" + i, { duration: 0.0 } );
+	}
+	new Effect.Appear("seqtol_SKMulti_pre_addrow");
+	numSeqTolSKMultiPremutations = minSeqTolSKMultiPremutations;
+	
 	// Mutations for design
 	for (i = 0; i < minSeqTolSKMutations; i++)
 	{
@@ -968,9 +1242,9 @@ function reset_seqtolSKData ()
 	for (i = initNumSeqTolSKChains; i < SK_max_seqtol_chains; i++)
 	{
 		oSubmitForm.elements["seqtol_SK_chain" + i].value = "";
-		//new Effect.Fade( "seqtol_SK_chainrow_" + i, { duration: 0.0 } );
+		// new Effect.Fade( "seqtol_SK_chainrow_" + i, { duration: 0.0 } );
 	}
-	//numSeqTolSKChains = initNumSeqTolSKChains;
+	// numSeqTolSKChains = initNumSeqTolSKChains;
 }
 
 function buildSKColumns()
@@ -1124,13 +1398,25 @@ function set_Boltzmann()
 	}
 }
 
-/************************************
+/* Sequence Tolerance SK Multi */
+
+function selectAminoAcids(elem, selection)
+{
+	var n = elem.value;
+	for (i = 0; i < document.getElementsByName("premutatedAAMulti" + n).length; i++)
+	{
+		document.getElementsByName("premutatedAAMulti" + n)[i].checked = selection;
+	}
+	
+}
+
+/*******************************************************************************
  * Validity subfunctions
- ************************************/
+ ******************************************************************************/
 
-//Generic checkers and validators
+// Generic checkers and validators
 
-// Be careful using this as a boolean value as it uses match. 
+// Be careful using this as a boolean value as it uses match.
 // Apply negation or double negation to get a boolean value back.
 function checkValue(v, expression)
 {
@@ -1185,7 +1471,7 @@ function validateNotEmpty(elem)
 
 function validChain(c)
 {
-	// @js9 
+	// @js9
 	if (checkValue(c, chainExpression))
 	{
 		var elems = document.submitform.elements;
@@ -1221,12 +1507,13 @@ function validChainHK(c)
 
 // @js12
 
-// *** Sequence Tolerance *** 
+// *** Sequence Tolerance ***
 // Returns an array of two arrays.
-// The first array maps the displayed (numSeqTolSKPremutations) premutation indices to one of the values (true, false, "").
-// 		true means that the premutation is valid
-//		false means that the premutation is invalid
-//		-1 means that the premutation fields are empty
+// The first array maps the displayed (numSeqTolSKPremutations) premutation
+// indices to one of the values (true, false, "").
+// true means that the premutation is valid
+// false means that the premutation is invalid
+// -1 means that the premutation fields are empty
 // The second array holds similar information for the designed residues
 function getValidResidues()
 {
@@ -1269,7 +1556,44 @@ function getValidResidues()
 			}
 		}
 	}
-	if (isProtocol(2, 1))
+	if (isProtocol(3, 0))
+	{
+		for (i = 0; i < numSeqTolSKMultiPremutations ; i = i + 1) 
+		{
+			premutated[i] = false; 
+			var chain = "" + elems["seqtol_SKMulti_pre_mut_c_" + i].value;
+			var resid = elems["seqtol_SKMulti_pre_mut_r_" + i]
+			resid.value = resid.value.replace(/^\s+|\s+$/g, '')
+			var rval = resid.value 
+						
+			var checkboxgroup = "premutatedAAMulti" + i;
+			var anychecked = false;
+			for (j = 0; j < document.getElementsByName(checkboxgroup).length; j++)
+			{
+				anychecked = anychecked || document.getElementsByName(checkboxgroup)[j].checked;
+			}
+			if (chain == "invalid" && rval == "") // upgradetodo:
+																	// count AA
+																	// filled in
+			{
+				premutated[i] = -1;
+			}
+			else if (validChain(chain) && validateElem(resid, integralExpression)) // upgradetodo:
+																					// count
+																					// AA
+																					// filled
+																					// in
+			{
+				if (!existingPremutations[chain+rval])
+				{
+					numValidPremutations = numValidPremutations + 1;
+					premutated[i] = true; 
+				}
+				existingPremutations[chain+rval] = true;
+			}
+		}
+	}
+	if ((isProtocol(2, 1)) || (isProtocol(3, 0)))
 	{
 		for (i = 0; i < numSeqTolSK ; i = i + 1) 
 		{
@@ -1327,11 +1651,13 @@ function getValidResidues()
 	return validResidues;
 }
 
-/************************************
- * GUI functions
- ************************************/
 
-//This function clears all form fields except for those specifically listed in the persistent array
+/*******************************************************************************
+ * GUI functions
+ ******************************************************************************/
+
+// This function clears all form fields except for those specifically listed in
+// the persistent array
 function clearFormFields()
 {
 	var elems = document.submitform.elements;
@@ -1381,7 +1707,8 @@ function showCommonElements(subtask)
 
 function hideInactiveProtocols(app, task)
 {
-	// Change the color of the box depending on the series and add the appropriate logo
+	// Change the color of the box depending on the series and add the
+	// appropriate logo
 	for ( i = 0; i < protocolTasks.length; i++ ) 
 	{
 		new Effect.Fade( "text" + i , { duration: 0.0 } );
@@ -1398,12 +1725,25 @@ function hideInactiveProtocols(app, task)
 	  	
 	// Hide all other specialized parameters
 	var thistask = undefined
+	
+	// special-cased to allow both protocols to share the same form
+	runningSeqtolSK = isProtocol(2, 1) || isProtocol(3, 0);
+	if (!runningSeqtolSK)
+	{
+		new Effect.Fade('parameterSeqtolSK', { duration: 0.0, queue: { scope: 'task' }} )
+	}
+	else
+	{
+		new Effect.Appear('parameterSeqtolSK', { duration: 0.0, queue: { scope: 'task' }} )
+	}
+	
 	for ( i = 0; i < protocolTasks.length; i++ ) 
 	{
 		for ( j = 0; j < protocolTasks[i]; j++ )
 		{
 			ptask = 'parameter' + i + '_' + j;
 			arrowstyle = document.getElementById("protocolarrow" + i + "_" + j).style
+			
 			if ( !isProtocol(i, j)) 
 			{
 				new Effect.Fade(ptask , { duration: 0.0, queue: { scope: 'task' }} );
@@ -1445,7 +1785,8 @@ function allWhite()
 function reset_form ()
 {
 	// Remember the binary selection
-	// This avoids problems when a user loads sample data then resets the form then loads sample data again
+	// This avoids problems when a user loads sample data then resets the form
+	// then loads sample data again
 	selectedMini = -1
 	Mini = document.submitform.Mini;
 	for (var i = 0 ; i < Mini.length ; i++)
@@ -1468,9 +1809,11 @@ function reset_form ()
 	}
 }
 
-/************************************
+
+
+/*******************************************************************************
  * Getters / Setters
- ************************************/
+ ******************************************************************************/
 
 function setProtocol(group, task)
 {
@@ -1493,9 +1836,9 @@ function isProtocolGroup(group)
 	return (document.submitform.protocolgroup.value == group); 
 }
 
-/************************************
- * helper functions 
- ************************************/
+/*******************************************************************************
+ * helper functions
+ ******************************************************************************/
 
 function markError(elem)
 {
@@ -1516,105 +1859,4 @@ function usingMini()
 	alert("Rosetta version unidentified.")
 	return false;
 }
-
-/************************************
- * Jmol functions 
- ************************************/
-function __updateResidues(resstring, n, residues)
-{
-	if (residues.length > 0)
-	{
-		var numres = residues.length;
-		residueString = []
-		for (j = 0; j < residues.length; j++)
-		{
-			residueString.push(residues[j] + "/" + n + " ")
-		}
-		jmolScript(resstring + residueString.join())
-	}
-}
-
-function _updateResidues(strarray, n, residues)
-{
-	if (residues.length > 0)
-	{
-		var numres = residues.length;
-		residueString = []
-		for (j = 0; j < residues.length; j++)
-		{
-			residueString.push(residues[j] + "/" + n + " ")
-		}
-		strarray.push(residueString.join())
-	}
-}
-
-function updateJmolResidues(thischeckbox)
-{
-	resstring = thischeckbox.checked ? "display displayed or" : "hide hidden or ";
-	n = thischeckbox.value
-	_updateResidues(resstring, n, jmolDesignedResidues);
-	_updateResidues(resstring, n, jmolMutatedResidues);
-}
-
-function updateJmol()
-{
-	//for all structure checkboxes
-	
-	displayString = ""
-	var displayString = [];
-	var hideString = [];
-	var residueString = [];
-	designedCheckboxes = document.getElementsByName("JmolDesigned")
-	premutatedCheckboxes = document.getElementsByName("JmolPremutated")	
-		                                      	
-	// Display / hide structures
-	for (i = 0; i < document.getElementsByName("JmolStructures").length; i++)
-	{
-		var showStructure = document.getElementsByName("JmolStructures")[i].checked;
-		
-		index = document.getElementsByName("JmolStructures")[i].value
-		if (showStructure)
-		{
-			displayString.push(index)
-		}
-		else
-		{
-			hideString.push(index)
-		}
-		
-		if (i > 0 && premutatedCheckboxes.length > 0)
-		{
-			if (premutatedCheckboxes[i - 1].checked && showStructure)
-			{
-				_updateResidues(displayString, index, jmolMutatedResidues);
-			}
-			else
-			{
-				_updateResidues(hideString, index, jmolMutatedResidues);
-			}
-		}
-		if (i > 0 && designedCheckboxes.length > 0)
-		{
-			if (designedCheckboxes[i - 1].checked && showStructure)
-			{
-				_updateResidues(displayString, index, jmolDesignedResidues);
-			}
-			else
-			{
-				_updateResidues(hideString, index, jmolDesignedResidues);
-			}
-		}
-		
-	}
-	if (displayString.length == 0)
-	{
-		document.getElementsByName("JmolStructures")[0].checked = true
-		jmolScript("frame all; display 1.0")		
-	}
-	else
-	{
-		jmolScript("frame all; display " + displayString.join() + "; hide " + hideString.join())
-	}
-}
-
 

@@ -44,11 +44,12 @@ class References:
         refIDs = self.getReferences()
 
 class RosettaProtocolGroup:
-    def __init__(self, name, color):
+    def __init__(self, name, color, public = True):
         self.name = name
         self.protocols = []
         self.size = 0
         self.color = color
+        self.public = public
         self.description = ""
     
     def __getitem__(self, index):
@@ -77,10 +78,9 @@ class RosettaProtocolGroup:
 # todo: At some stage, tidy up all member access with use getters/setters
 # todo: Split this over be/fe like the WebserverProtocols class
 class RosettaProtocol:
-    def __init__(self, name, dbname, public = True):
+    def __init__(self, name, dbname):
         self.name = name
         self.dbname = dbname
-        self.public = public
         self.group = None
         self.datadirfunction = None
         self.submitfunction = None
@@ -271,17 +271,17 @@ class WebserverProtocols(object):
         proto.setNumStructures(2,10,50)
         protocolGroups[2].add(proto)
         
-        proto = RosettaProtocol("Generalized Protocol<br>(Fold / Interface)<br>Sequence Tolerance", "sequence_tolerance_SK", True)
+        proto = RosettaProtocol("Generalized Protocol<br>(Fold / Interface)<br>Sequence Tolerance", "sequence_tolerance_SK")
         proto.setBinaries("seqtolJMB", "seqtolP1") 
         proto.setNumStructures(10,20,100)
         protocolGroups[2].add(proto)
         
         # Private protocols for the lab go here
-        protocolGroups.append(RosettaProtocolGroup("Private Protocols", "#ffe2ba"))
+        protocolGroups.append(RosettaProtocolGroup("Private Protocols", "#ffe2ba", public = False))
                 
-        proto = RosettaProtocol("Multiple Sequence Tolerance", "multi_sequence_tolerance", public = False)
+        proto = RosettaProtocol("Multiple Sequence Tolerance", "multi_sequence_tolerance")
         proto.setBinaries("multiseqtol")
-        proto.setNumStructures(2,100,200)
+        proto.setNumStructures(2,20,100)
         protocolGroups[3].add(proto)        
 
         # A flat list of the protocols 

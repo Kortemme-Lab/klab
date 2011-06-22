@@ -213,9 +213,13 @@ def ws():
   form = cgi.FieldStorage()
 
   # SECURITY CHECK
+  #print("Content-type: text/html\n\n")
   for key in form:
+    #print(key)
+    #print(form[key])
     # Escape HTML code
-    form[key].value = escape(form[key].value)
+    if type(form[key]) != type([]):
+        form[key].value = escape(form[key].value)
     if (key == "Password" or key == "ConfirmPassword" or key == "myPassword" or key == "password" or key == "confirmpassword"):
       # Store the password as an MD5 hex digest
       tgb = str(form[key].value)
@@ -329,7 +333,7 @@ def ws():
 
     if form.has_key("job"):
       cryptID = form["job"].value
-      sql = 'SELECT ID,Status,task,mini,PDBComplexFile FROM backrub WHERE cryptID="%s"' % (cryptID)
+      sql = 'SELECT ID,Status,task,mini,PDBComplexFile,ProtocolParameters FROM backrub WHERE cryptID="%s"' % (cryptID)
       
       if form.has_key("local") and form["local"].value == "false":
           isLocal = False
@@ -345,6 +349,7 @@ def ws():
           task = result[0][2]
           binary = result[0][3]
           pdb_filename = result[0][4]
+          protoparams = result[0][5]
       else:
           html_content = "Either an invalid job ID was given or else the job no longer exists in the database."  
     else:
@@ -362,7 +367,7 @@ def ws():
         for p in protocols:
             if task == p.dbname:
                 found = True
-                p.getDataDirFunction()(cryptID, jobid, binary, pdb_filename)
+                p.getDataDirFunction()(cryptID, jobid, binary, pdb_filename, protoparams)
                 break
     if not found:
         html_content = "No data."
@@ -999,6 +1004,15 @@ def submit(rosettaHTML, form, SID):
     pdb_object = None
     pgroup = None
     ptask = None
+    StorageDBConnection = None
+    
+    # get ip addr hostname
+    IP = os.environ['REMOTE_ADDR']
+    sock = socket
+    try:
+        hostname = sock.gethostbyaddr(IP)[0]
+    except:
+        hostname = IP
     
     IDtoDelete = None
     try:
@@ -1066,15 +1080,7 @@ def submit(rosettaHTML, form, SID):
                    isLocalJob = False
                 RemoteInformation = pickle.dumps(RemoteInformation)
                 
-                # if we're good to go, create new job
-                # get ip addr hostname
-                IP = os.environ['REMOTE_ADDR']
-                sock = socket
-                try:
-                    hostname = sock.gethostbyaddr(IP)[0]
-                except:
-                    hostname = IP
-                
+                # if we're good to go, create new job                
                 # Strip the path information from  the pdb
                 m = re.match("pdbs/[A-Z\d]+/([^\\/]+\.pdb)", pdb_filename, re.IGNORECASE)
                 if m:
@@ -1175,10 +1181,11 @@ def submit(rosettaHTML, form, SID):
         excinfo = sys.exc_info()
         estring = traceback.format_exc()        
         
-        if IDtoDelete:
-            sql = """DELETE FROM backrub where ID=%d""" % IDtoDelete
-            result = StorageDBConnection.execQuery(sql)    
-        StorageDBConnection.execQuery("UNLOCK TABLES")
+        if StorageDBConnection:
+            if IDtoDelete:
+                sql = """DELETE FROM backrub where ID=%d""" % IDtoDelete
+                result = StorageDBConnection.execQuery(sql)    
+            StorageDBConnection.execQuery("UNLOCK TABLES")
         
         if hostname == DEVELOPMENT_HOST:
             errors.append("Server error: An exception occurred: %s." % estring)
@@ -1520,7 +1527,7 @@ def storeSequenceToleranceHK(form, pdb_object):
         
 def storeSequenceToleranceSK(form, pdb_object):
     """
-     The submission logic for the second sequence tolerance protocol.
+     The submission logic for the second sequence tolerance protocol and the multi protocol.
      If submission fails then return None.
      Otherwise, returns a dictionary of parameters with the following fields:
         Partners     List[Char]                 A list of chain names
@@ -1536,7 +1543,9 @@ def storeSequenceToleranceSK(form, pdb_object):
     Premutated = {}
     Designed = {}
     Weights = []    
-            
+    
+    formproto = "%d_%d" % (int(form["protocolgroup"].value), int(form["protocoltask"].value))
+    
     # Store the Partner identifiers
     # Only read up to the number of chains selected by the user
     numChainsToRead = int(form["numPartners"].value)
@@ -1608,7 +1617,10 @@ def storeSequenceToleranceSK(form, pdb_object):
     # Store the residues
     scs, numDesignedResidues = storeSequenceToleranceSKResidues(form, Partners, Designed, ROSETTAWEB_SK_MaxMutations, "designed", "seqtol_SK_mut_c_", "seqtol_SK_mut_r_", None)
     success = success and scs
-    scs, numPremutations = storeSequenceToleranceSKResidues(form, Partners, Premutated, ROSETTAWEB_SK_MaxPremutations, "premutated", "seqtol_SK_pre_mut_c_", "seqtol_SK_pre_mut_r_", "premutatedAA")
+    if formproto == "2_1":
+        scs, numPremutations = storeSequenceToleranceSKResidues(form, Partners, Premutated, ROSETTAWEB_SK_MaxPremutations, "premutated", "seqtol_SK_pre_mut_c_", "seqtol_SK_pre_mut_r_", "premutatedAA")
+    elif formproto == "3_0":
+        scs, numPremutations = storeSequenceToleranceSKMultiPremutations(form, Partners, Premutated, ROSETTAWEB_SK_MaxPremutations, "premutated", "seqtol_SKMulti_pre_mut_c_", "seqtol_SKMulti_pre_mut_r_", "premutatedAAMulti")
     success = success and scs
     if numDesignedResidues < 1:
         success = False
@@ -1680,6 +1692,42 @@ def storeSequenceToleranceSKResidues(form, Partners, Residues, maxNumResidues, r
 
     return success, numResidues
 
+def storeSequenceToleranceSKMultiPremutations(form, Partners, Residues, maxNumResidues, restype, chainprefix, idprefix, aaprefix):
+    success = True
+    numResidues = 0
+    lastRes = maxNumResidues
+    for x in range(maxNumResidues):
+        lastRes = x
+        sx = str(x)
+        key1 = chainprefix + sx
+        key2 = idprefix + sx
+        key3 = aaprefix + sx
+        AAlist = form.getlist(key3)
+        if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '' and len(AAlist) > 0:
+            numResidues = numResidues + 1
+            p = form[key1].value
+            residueID = int(form[key2].value)
+            if Partners.get(p) != None: # This is important as Python treats numeric zero as False
+                if Residues[p].get(residueID):
+                    success = False
+                    errors.append("There are multiple %s residues at position %s in chain %s." % (restype, residueID, p))                                
+                else:
+                    Residues[p][residueID] = AAlist
+            else:
+                success = False
+                errors.append("The chain %s was not found for %s residue %i ('%s%4.i')." % (p, restype, x + 1, p, int(residueID)))
+        else:
+            break
+    
+    # Warn if the user left gaps in the residue list
+    for x in range(lastRes + 1, maxNumResidues):
+        key1 = chainprefix + str(x)
+        key2 = idprefix + str(x)
+        if form.has_key(key1) and form[key1].value != '' and form.has_key(key2) and form[key2].value != '':
+            warnings.append("The %s residue %d ('%s%4.i') was not added to the run as previous residues were left blank." % (restype, x + 1, form[key1].value, int(form[key2].value)))
+
+    return success, numResidues
+
 def SequenceToleranceSKChecks(params, pdb_object):
     # Sanity checks:
     
@@ -1702,6 +1750,7 @@ def SequenceToleranceSKChecks(params, pdb_object):
     
     return success
 
+    
 class FrontendProtocols(WebserverProtocols):
       
     def __init__(self, rosettaDD, rosettaHTML):
@@ -1802,15 +1851,15 @@ class FrontendProtocols(WebserverProtocols):
                     nos = p.getNumStructures()
                     p.setNumStructures(2, nos[1], nos[2])
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
-                p.setShowResultsFunction(rosettaHTML.showSequenceToleranceSK)
+                p.setShowResultsFunction(rosettaHTML.showSequenceToleranceSKMulti)
                 p.setStoreFunction(storeSequenceToleranceSK)
-                p.setDataDirFunction(rosettaDD.SequenceToleranceSK)
+                p.setDataDirFunction(rosettaDD.SequenceToleranceSKMulti)
                 p.setReferences("SmithKortemme:2010", "SmithKortemme:2011")
                 refstring = join(['<a href="#ref%s">%d</a>' % (s, refIDs[s]) for s in p.references], ", ")                
                 p.setDescription('''Predicts tolerated sequences for proteins or protein-protein 
                             interfaces. This does multiple runs of the PLoS ONE Sequence Tolerance protocol.''')
                 p.specialname = "Generalized RosettaBackrub sequence tolerance method (multi) [%s]"  % refstring
-                p.progressDisplayHeight = "400px"
+                p.progressDisplayHeight = "660px"
             else:
                 raise
         
@@ -1819,10 +1868,10 @@ class FrontendProtocols(WebserverProtocols):
                 desc = '''
                     This function utilizes the backrub protocol implemented in Rosetta and applies it to the neighborhood of a mutated amino acid residue to model conformational changes in this region.
                     There are two options.
-                    <dl style="text-align:left;">'''
+                    <dl style="text-align:left">'''
                 for i in range(pgroup.getSize()):
                     p = pgroup[i] 
-                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                    desc += '''<dt><b>%s</b></dt><dd style="margin-bottom:2ex">%s</dd>''' % (p.specialname or p.name, p.description)
                 desc += '''</dl>'''
                 pgroup.setDescription(desc)
             elif pgroup.name == "Backrub Ensemble":
@@ -1832,7 +1881,7 @@ class FrontendProtocols(WebserverProtocols):
                     <dl style="text-align:left;">'''
                 for i in range(pgroup.getSize()):
                     p = pgroup[i] 
-                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                    desc += '''<dt><b>%s</b></dt><dd style="margin-bottom:2ex">%s</dd>''' % (p.specialname or p.name, p.description)
                 desc += '''</dl>'''
                 pgroup.setDescription(desc)
             elif pgroup.name == "Sequence Tolerance":
@@ -1843,7 +1892,7 @@ class FrontendProtocols(WebserverProtocols):
                 # Add them backwards
                 for i in range(pgroup.getSize() - 1, -1, -1):
                     p = pgroup[i] 
-                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                    desc += '''<dt><b>%s</b></dt><dd style="margin-bottom:2ex">%s</dd>''' % (p.specialname or p.name, p.description)
                 desc += '''</dl>                
                     Both implementations first apply the RosettaBackrub method to generate 
                     a conformational ensemble, design sequences consistent with the members 
@@ -1856,7 +1905,7 @@ class FrontendProtocols(WebserverProtocols):
                     <dl style="text-align:left;">'''
                 for i in range(pgroup.getSize()):
                     p = pgroup[i] 
-                    desc += '''<dt><b>%s</b></dt><dd>%s</dd><br>''' % (p.specialname or p.name, p.description)
+                    desc += '''<dt><b>%s</b></dt><dd style="margin-bottom:2ex">%s</dd>''' % (p.specialname or p.name, p.description)
                 desc += '''</dl>
                     Tell Shane to add yours!'''
                 pgroup.setDescription(desc)
