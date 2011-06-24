@@ -1,0 +1,8 @@
+04/19/11: As of this date, this folder has been moved to zin so that we can calculate the all-by-all Ca-Ca distances of all the backrub
+          structures of all 11 non-mutated proteins.
+
+04/19/11: I believe all the 263 experimentally determined structures used in the paper are located here: /kortemmelab/shared/publication_data/ehumphris/HIV_Plasticity_2009/DATA/Structures/Model_with_263_Crystal_Structures/xtal_ensemble/
+          I put them in the folder consensus_min_orig_min/ExperimentalStructs 
+
+
+          
