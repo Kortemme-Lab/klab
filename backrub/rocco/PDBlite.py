@@ -6,8 +6,16 @@ import amino_acids
 import numpy as num
 import math, subprocess
 from itertools import izip
+from string import join
+sys.path.append("./objgraph-1.7.0")
+import objgraph
+import time
+import shutil
 
 RAD_TO_DEG = 180.0 / math.pi
+ROWSINAFILE = 200
+
+#shanetodo SHANETEMP = None
 
 def make_pdb_atom_str(atomNum, atomName, resName, chain, resNum, x, y, z, altLoc=' ',insCode=' ',occupancy=1, bFactor=0):
         return "%-6s%5d %4s%1s%3s %1s%4s%1s   %8.3f%8.3f%8.3f%6.2f%6.2f" % \
@@ -20,14 +28,36 @@ def parse_resid(resid): return resid.split("@")
 # from http://aspn.activestate.com/ASPN/Cookbook/Python/Recipe/498246
 # where the input matrix shape is (nres x 3)
 def calc_distance_matrix(nDimPoints):
+    raise Exception("ERRONEOUS FUNCTION - calc_distance_matrix!")
     nDimPoints = num.array(nDimPoints)
     n,m = nDimPoints.shape
     delta = num.zeros((n,n),'d')
     for d in xrange(m):
-        data = nDimPoints[:,d]
+        data = nDimPoints[:,d]        
         delta += (data - data[:,num.newaxis])**2
+        
+        #pointwise-square root
         return num.sqrt(delta)
-                    
+
+def calc_distance_matrix_fixed(dat):
+	nDimPoints = num.array(dat, 'd')
+	n,m = nDimPoints.shape
+	delta = num.zeros((n,n),'d')
+	for d in xrange(m):
+		data = nDimPoints[:,d]
+
+		#data is an nx1 array
+		#data[:,num.newaxis] is a 1xn array (data rotated)
+		#data - data[:,num.newaxis] is an nxn array where (using 1-indexing) a_{r,c} = data_c - data,r
+		#(data - data[:,num.newaxis])**2 is this array pointwise-squared
+
+		#pointwise-addition onto delta 
+		delta += (data - data[:,num.newaxis])**2
+
+	#pointwise-square root
+	return num.sqrt(delta)
+
+
 # expects four letter atom name from a pdb file
 def is_hydrogen(full_atom_name):
     c1, c2= full_atom_name[:2]
@@ -527,6 +557,7 @@ class PDB:
             else: xyz = [atom.x, atom.y, atom.z]
             dat.append(xyz)
         return num.array(dat, 'd')
+    
     # returns matrix of shape nresX3
     def get_ca_xyz_matrix(self):
         return self.get_atom_xyz_matrix("CA")
@@ -703,60 +734,172 @@ class PDBTrajectory:
     # Uses a generator to return a PDB object
     # if return_pdb_txt is true, then return the text rather than a PDB object
     def get_next_pdb(self, return_pdb_lines=False):
-        fn = self.traj_fn
+		fn = self.traj_fn
 
-        assert(os.path.exists(fn))
-        if fn.endswith(".pdb") or fn.endswith(".pdb.gz"): # pdb trajectory
-            if fn.endswith(".pdb"):
-                cmd = "egrep '^(ATOM|MODEL|REMARK) ' %s 2>/dev/null" % fn
-            elif fn.endswith(".pdb.gz"):
-                cmd = "zcat %s | egrep '^(ATOM|MODEL|REMARK) '" % fn
-            self.file_handle = subprocess.Popen([cmd], shell=True, stdout=subprocess.PIPE).stdout
-                                       
-            parsed_model = 0
-	    pdb_lines = []
-	    model_count = 1
-	    for line in self.file_handle:
-                if line[:6] in ("ATOM  ", "REMARK"):
-		    pdb_lines.append(line) # ignore if MODEL hasn't been reached yet
-                elif line[:5] == "MODEL":
-		    if self.end_model != None and model_count > self.end_model: break
-                    else:
-		        atom_lines = filter(lambda l: l.startswith("ATOM  "), pdb_lines)
-			if len(atom_lines) == 0:
-			    pdb_lines = []
-			    continue
+		assert(os.path.exists(fn))
+		if fn.endswith(".pdb") or fn.endswith(".pdb.gz"): # pdb trajectory
+			if fn.endswith(".pdb"):
+				cmd = "egrep '^(ATOM|MODEL|REMARK) ' %s 2>/dev/null" % fn
+ 			elif fn.endswith(".pdb.gz"):
+ 				cmd = "zcat %s | egrep '^(ATOM|MODEL|REMARK) '" % fn
+ 			self.file_handle = subprocess.Popen([cmd], shell=True, stdout=subprocess.PIPE).stdout
+
+			parsed_model = 0
+			pdb_lines = []
+			model_count = 1
+			for line in self.file_handle:
+				if line[:6] in ("ATOM  ", "REMARK"):
+					pdb_lines.append(line) # ignore if MODEL hasn't been reached yet
+				elif line[:5] == "MODEL":
+					if self.end_model != None and model_count > self.end_model:
+						break
+					else:
+						atom_lines = filter(lambda l: l.startswith("ATOM  "), pdb_lines)
+						if len(atom_lines) == 0:
+							pdb_lines = []
+							continue
 			
-                        if self._model_in_range(model_count):
-                            if return_pdb_lines: yield pdb_lines
-                            else: yield PDB(pdb_lines, model_num=parsed_model)
-                        model_count += 1
-                    parsed_model = int(line.split()[1])
-                    pdb_lines = []
-            if self._model_in_range(model_count):
-                if return_pdb_lines: yield pdb_lines
-                else: yield PDB(pdb_lines, model_num=parsed_model)
-        else: # list of pdb files
-            pdb_fns = open(fn).readlines()
-            for model_count, pdb_fn in zip(range(1, len(pdb_fns)+1), pdb_fns):
-                pdb_fn = pdb_fn.strip()
-                #print pdb_fn
-                if not os.path.exists(pdb_fn): raise Exception("ERROR can't find file "+ pdb_fn)
-                if pdb_fn.endswith(".pdb"):
-                    pdb_lines = commands.getoutput("egrep '^ATOM ' %s" % pdb_fn).split("\n")
-                elif pdb_fn.endswith(".pdb.gz"):
-                    pdb_lines = commands.getoutput("zcat %s | egrep '^ATOM '" % pdb_fn).split("\n")
-                else:
-                    print "ERROR unrecognized pdb filetype '%s'"  % pdb_fn
-                    sys.exit(1)
-                #atom_lines = filter(lambda line: line[:4] == "ATOM", all_lines)
-                if self._model_in_range(model_count):
-                    if return_pdb_lines:
-                        yield ["REMARK  99 FILE "+pdb_fn] + pdb_lines
-                    else:
-                        yield PDB(pdb_lines, fn=pdb_fn, model_num=model_count)
-                elif self.end_model != None and model_count > self.end_model:
-                    break 
+						if self._model_in_range(model_count):
+							if return_pdb_lines:
+								yield pdb_lines
+							else:
+								yield PDB(pdb_lines, model_num=parsed_model)
+						model_count += 1
+					parsed_model = int(line.split()[1])
+					pdb_lines = []
+			if self._model_in_range(model_count):
+				if return_pdb_lines:
+					yield pdb_lines
+				else:
+					yield PDB(pdb_lines, model_num=parsed_model)
+		else: # list of pdb files
+			pdb_fns = open(fn).readlines()
+			for model_count, pdb_fn in zip(range(1, len(pdb_fns)+1), pdb_fns):
+				pdb_fn = pdb_fn.strip()
+				#print pdb_fn
+				if not os.path.exists(pdb_fn):
+					raise Exception("ERROR can't find file "+ pdb_fn)
+				if pdb_fn.endswith(".pdb"):
+					pdb_lines = commands.getoutput("egrep '^ATOM ' %s" % pdb_fn).split("\n")
+				elif pdb_fn.endswith(".pdb.gz"):
+					pdb_lines = commands.getoutput("zcat %s | egrep '^ATOM '" % pdb_fn).split("\n")
+				else:
+					print "ERROR unrecognized pdb filetype '%s'"  % pdb_fn
+					sys.exit(1)
+				#atom_lines = filter(lambda line: line[:4] == "ATOM", all_lines)
+				if self._model_in_range(model_count):
+					if return_pdb_lines:
+						yield ["REMARK  99 FILE "+pdb_fn] + pdb_lines
+					else:
+						#shanetodo roots = objgraph.get_leaking_objects()
+						#shanetodo print("LEAKS BEFORE: %d" % len(roots))
+						#shanetodo objgraph.show_refs(roots[:13], refcounts=True, filename='roots.png')
+						#shanetodo objgraph.show_backrefs(objgraph.by_type('Nondestructible'), filename='finalizers.png')
+						tempPDB = PDB(pdb_lines, fn=pdb_fn, model_num=model_count)
+						#shanetodo global SHANETEMP
+						#shanetodo if not SHANETEMP:
+						#shanetodo SHANETEMP = pdb_lines
+						#shanetodo else:
+						#shanetodo objgraph.show_backrefs([SHANETEMP], filename='sample-backref-graph%d.png' % model_count)
+						#shanetodo if model_count > 4:
+						#shanetodo sys.exit(0)
+						yield tempPDB
+						#shanetodo roots = objgraph.get_leaking_objects()
+						#shanetodo print("LEAKS AFTER: %d" % len(roots))
+						
+						#PDB(pdb_lines, fn=pdb_fn, model_num=model_count)
+				elif self.end_model != None and model_count > self.end_model:
+					break 
+
+    def create_CA_differences_matrices(self):
+		fn = self.traj_fn
+
+		if os.path.exists("tmpCA_differences"):
+			shutil.rmtree("tmpCA_differences")
+		os.mkdir("tmpCA_differences")
+		
+		assert(os.path.exists(fn))
+		if fn.endswith(".pdb") or fn.endswith(".pdb.gz"): # pdb trajectory
+			raise Exception("Unsupported call - must supply an ensemble list.")
+		else: # list of pdb files
+			dist_matrices = []
+			sub_dist_matrices = []
+			pdb_fns = open(fn).readlines()
+			counter = 0
+			
+			rowfiles = []
+
+			for model_count, pdb_fn in zip(range(1, len(pdb_fns)+1), pdb_fns):
+				pdb_fn = pdb_fn.strip()
+				#print pdb_fn
+				if not os.path.exists(pdb_fn):
+					util.ERROR(Exception("ERROR can't find file "+ pdb_fn))
+					sys.exit(1)
+				
+				if pdb_fn.endswith(".pdb"):
+					F = open(pdb_fn, "r")
+					pdb_lines = F.read().split("\n")
+					F.close()					
+				elif pdb_fn.endswith(".pdb.gz"):
+					util.ERROR("gzipped files are not supported yet")
+					sys.exit(1)
+				else:
+					util.ERROR("ERROR unrecognized pdb filetype '%s'"  % pdb_fn)
+					sys.exit(1)
+				if self._model_in_range(model_count):
+					dat = []
+					last_resid = None
+					CAline = None
+										
+					atom_lines = filter(lambda l: l[:4] == "ATOM", pdb_lines)
+					for line in atom_lines:
+						resid = "%s@%s"%(line[21:22], line[22:26])
+						if line[12:16].strip()=="CA":
+							if not CAline:
+								# x,y,z
+								CAline = line
+								dat.append([line[30:38],line[38:46],line[46:54]])
+							else:
+								util.WARN("More than one CA line")
+
+						# new residue
+						if last_resid != resid:
+							if not CAline and last_resid:
+								util.WARN("No CA line for %s" % resid)
+								dat.append([num.nan,num.nan,num.nan])
+							last_resid = resid
+							CAline = None
+
+					dist_matrix = calc_distance_matrix_fixed(dat)
+					
+					fname = os.path.join("tmpCA_differences", "matrix%d" % counter)
+					F = open(fname, "w")
+					num.save(F, dist_matrix)
+					F.close()
+					dist_matrices.append(fname)
+					
+					# Append matrix row to sliced files
+					nres = dist_matrix.shape[0]
+					if not rowfiles:
+						for row in range(0, nres, ROWSINAFILE):					 
+							fname = os.path.join("tmpCA_differences", "matrixrows%d" % row)
+							rowfiles.append(open(fname, "a"))
+							sub_dist_matrices.append(fname)
+
+					for row in range(0, nres, ROWSINAFILE):					 
+						num.save(rowfiles[row/ROWSINAFILE], dist_matrix[row:row+ROWSINAFILE])
+					
+					counter += 1
+					if counter % 10 == 0:
+						util.PRINTHEAP("Read PDB %d" % counter)
+				elif self.end_model != None and model_count > self.end_model:
+					break
+				
+
+			for rowfile in rowfiles:
+				rowfile.close()
+			
+			return dist_matrices, sub_dist_matrices 
 
 #    def close(self):
 #        if self.file_handle != None: self.file_handle.close()
@@ -837,39 +980,69 @@ class PDBTrajectory:
         return rmsds
 
     def calc_CA_rmsd_over_sequence_lessmem(self, ref_pdb):
+        '''This function returns a Python list of rmsd values from the starting PDB to the list of PDBS.
+           This list is a full map rmsd:Int->Double from the residue indices in the starting PDB to the rmsd
+           from that residue to its counterparts in the list of PDBs where:
+               - the residues are indexed/ordered according to their order in the starting PDB (and so e.g. rmsd[5] is the rmsd for the sixth residue in the starting PDB);
+               - if that residue is missing from all PDBs in the list then its rmsd is set to zero;
+               - if that residue is missing from some but not all PDBs in the list then an error is thrown.
+           '''
+        
         ref_residues = [res for res in ref_pdb.iter_residues()]
         
-        numResidues = len(ref_residues)
-        residue_map = []
-        nres = len(ref_residues)
-        for i in range(nres):
-            residue_map.append([])
+        if util.DEBUGMODE and False:
+            numref_residues = ["%s%d" % (res.chain, res.res_num) for res in ref_pdb.iter_residues()]
+            util.CREATEFILE("orig.txt", join(numref_residues,"\n"))
         
-        i = 0
+        residue_dict = {}
+        for res in ref_pdb.iter_residues():
+            residue_dict[(res.chain, res.res_num)] = []
+        ref_resset = set(residue_dict.keys())
+        
+        numPDBs = 0
         for pdb in self.get_next_pdb():
-            i += 1
-            if i % 10 == 0:
-                print("**** Reading PDB #%d for RMSD calculation ****" % i)
-            if len(pdb._res_order) != numResidues:
-                raise Exception("ERROR: %s does not have the expected number (%d) of residues" % (pdb.fn, nres))
+            numPDBs += 1
             
-            res_ind = 0
+            if util.DEBUGMODE and False:
+                numref_residues = ["%s%d" % (res.chain, res.res_num) for res in pdb.iter_residues()]
+                util.CREATEFILE("other.txt", join(numref_residues,"\n"))
+                              
+            indices = []
             for resid in pdb._res_order:
-                CAatom = pdb._residues[resid]._atoms["CA"]
-                residue_map[res_ind].append((CAatom.x, CAatom.y, CAatom.z))
-                res_ind += 1
-                    
-        util.PRINTHEAP("Finished reading %i PDBs. Starting RMSD calculation" % i)
+                thisres = pdb._residues[resid]
+                CAatom = thisres._atoms["CA"]
+                idx = (thisres.chain, thisres.res_num)
+                indices.append(idx)
+                residue_dict[idx].append((CAatom.x, CAatom.y, CAatom.z))
+            residues_diff = set(residue_dict.keys()) - set(indices)
+            if residues_diff:
+                util.WARN("Difference between %s and %s: missing %s" % (ref_pdb.fn, pdb.fn, join(map(str, list(residues_diff)), ",")))
+            
+            if numPDBs % 10 == 0:
+                util.LOG("**** Read PDB #%d for RMSD calculation ****" % numPDBs)
+            
+            
+        util.PRINTHEAP("Finished reading %i PDBs. Starting RMSD calculation" % numPDBs)
         
         rmsds = []
-        for res_ind in range(nres):
-            sequence_residues = residue_map[res_ind]
-            referenceCA = ref_residues[res_ind]._atoms["CA"]    
+        for res in ref_pdb.iter_residues():
+            sequence_residues = residue_dict[(res.chain, res.res_num)]
+            referenceCA = res._atoms["CA"]    
             tmplist = [math.sqrt(((referenceCA.x - CApos[0])**2) + ((referenceCA.y - CApos[1])**2) + ((referenceCA.z - CApos[2])**2)) for CApos in sequence_residues]
-            rmsd = num.mean(tmplist)
+            
+            # Sanity check
+            rmsd = 0
+            listlength = len(tmplist)
+            if listlength == 0:
+                util.WARN("The residue %s%s was missing in all PDBs except the starting PDB. Inserting an RMSD of zero for this residue." % (res.chain, res.res_num))
+            elif listlength == numPDBs:
+                rmsd = num.mean(tmplist)
+            else:
+                raise Exception("ERROR: The residue %s%s was missing in some but not all of the PDBs in the list." % (res.chain, res.res_num))
             rmsds.append(rmsd)
+                            
         return rmsds
-
+    
     def get_diff_dist_matrix_str(self, res_range=None, scaled=False):
         util.PRINTHEAP("*** Diff dist matrix str start *** ")
         s = "# TRAJECTORY: " + self.name + "\n"
@@ -881,38 +1054,180 @@ class PDBTrajectory:
         util.PRINTHEAP("*** Diff dist matrix str end *** ")
         return s
 
+    def MSOAD_IONaiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		'''Do not use this. It explains the basic idea but is terrible for I/O.'''
+		util.PRINTHEAP("Running I/O-naive O(m.n^2) algorithm") # m = nstruct, n = nres
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		for r in nrange:
+			for c in nrange:
+				rcarray = sorted([dist_matrices[m][r][c] for m in mrange])
+				avg = 0
+				for m in mrange:
+					x = rcarray[m]
+					avg += (m * x) - ((nstruct - 1 - m) * x)
+				scaled_diff_dist_matrix[r][c] = avg
+		count = (nstruct * (nstruct - 1)) / 2
+		scaled_diff_dist_matrix /= count
+		print(scaled_diff_dist_matrix)
+		util.PRINTHEAP("MSOAD_IONaiveAlgorithm finished")					
+	
+    def MSOAD_OriginalIOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		util.PRINTHEAP("Running I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
+		CHUNKSIZE = 100
+			# Memory usage and I/O efficiency are proportional to CHUNKSIZE 
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		p = 0
+		while p <= nres:
+			linesToRead = min(nres - p, CHUNKSIZE)
+			
+			sub_dist_matrices = [dist_matrices[m][p:p + linesToRead, :] for m in mrange]
+			
+			for r in range(p, p + linesToRead):
+				for c in nrange:
+					rcarray = sorted([dist_matrices[m][r][c] for m in mrange])
+					avg = 0
+					for m in mrange:
+						x = rcarray[m]
+						avg += (m + m - nstruct + 1) * x
+					scaled_diff_dist_matrix[r][c] = avg			
+			p += CHUNKSIZE
+		
+		count = (nstruct * (nstruct - 1)) / 2
+		scaled_diff_dist_matrix /= count
+		print(scaled_diff_dist_matrix)
+		util.PRINTHEAP("MSOAD_OriginalIOSensitiveAlgorithm finished")					
+
+    def MSOAD_IOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		util.PRINTHEAP("Running I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
+		sorttime = 0
+		computetime = 0
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		for roffset in range(0, nres, ROWSINAFILE):
+			# Load in the submatrix for all m structs from rows roffset - (roffset + ROWSINAFILE - 1)
+			# Sub matrix is a nres * (ROWSINAFILE * nstruct) matrix
+			print("%0.2f%%" % (float(100 * roffset)/float(nres)))
+			fp = open(sub_dist_matrices_fnames[roffset/ROWSINAFILE])
+			submatrices = [num.load(fp) for m in mrange]
+			fp.close()
+			for r in range(0, min(ROWSINAFILE, nres - roffset)):
+				sys.stdout.write(".")
+				actualr = roffset + r
+				for c in nrange:
+					st = time.time()
+					rcarray = sorted([submatrices[m][r][c] for m in mrange])
+					et = time.time()
+					sorttime += (et - st)
+					avg = 0
+					for m in mrange:
+						x = rcarray[m]
+						avg += (m + m - nstruct + 1) * x
+					ft = time.time()
+					computetime += (ft - et)
+					scaled_diff_dist_matrix[actualr][c] = avg
+		count = (nstruct * (nstruct - 1)) / 2
+		scaled_diff_dist_matrix /= count
+		print(scaled_diff_dist_matrix)
+		print("time", sorttime, computetime)
+		util.PRINTHEAP("MSOAD_IOSensitiveAlgorithm finished")					
+
+    def MSOAD_BetterIOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		util.PRINTHEAP("Running better arithmetic I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
+		sorttime = 0
+		computetime = 0
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		for roffset in range(0, nres, ROWSINAFILE):
+			# Load in the submatrix for all m structs from rows roffset - (roffset + ROWSINAFILE - 1)
+			# Sub matrix is a nres * (ROWSINAFILE * nstruct) matrix
+			util.MSG("%0.2f%% Done" % (float(100 * roffset)/float(nres)))
+			fp = open(sub_dist_matrices_fnames[roffset/ROWSINAFILE])
+			submatrices = [num.load(fp) for m in mrange]
+			fp.close()
+			
+			for r in range(0, min(ROWSINAFILE, nres - roffset)):
+				
+				actualr = roffset + r
+				submatricesmr = [submatrices[m][r] for m in mrange]
+				scaled_diff_dist_matrix_actualr = scaled_diff_dist_matrix[actualr]
+				
+				for c in nrange:
+					#st = time.time()
+					rcarray = sorted([submatricesmr[m][c] for m in mrange])
+					#et = time.time()
+					#sorttime += (et - st)
+					avg = 0
+					
+					# The loop below may be counter-intuitive so I'll explain:
+					# Since rcarray is sorted, there is a more efficient way to compute the absolute pairwise difference.
+					# The formula can be written as mx - (nstruct - 1 - m)x or factored out into (2m + 1 - nstruct) * x where x = rcarray[m]
+					# Observing the factored formula, the lhs increases by two when m increases by 1 and the starting term where m = 0 is (1 - nstruct)
+					multiplier = 1 - nstruct
+					for m in mrange:
+						avg += (multiplier * rcarray[m])
+						multiplier += 2
+					#ft = time.time()
+					#computetime += (ft - et)
+					scaled_diff_dist_matrix_actualr[c] = avg
+
+		count = (nstruct * (nstruct - 1)) / 2
+		scaled_diff_dist_matrix /= count
+		print(scaled_diff_dist_matrix)
+		util.PRINTHEAP("MSOAD_BetterIOSensitiveAlgorithm finished")					
+		#print("time", sorttime, computetime)
+
+    def MSOAD_OldAlgorithmFixedForMemory(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		util.PRINTHEAP("Running O(m^2.n^2) algorithm")
+		count = 0
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		for i in range(len(dist_matrices)):
+			for j in range(i+1, len(dist_matrices)):
+				diff_dist_matrix = num.abs(dist_matrices[i] - dist_matrices[j])
+				scaled_diff_dist_matrix += diff_dist_matrix
+				count += 1
+		scaled_diff_dist_matrix /= count
+		print(scaled_diff_dist_matrix)
+		util.PRINTHEAP("O(m^2n^2) algorithm finished")
+
+    def calculateMeanSumOfAbsoluteDifferences(self, dist_matrices_fnames, sub_dist_matrices_fnames):
+		
+		nstruct = len(dist_matrices_fnames)
+		mrange = range(nstruct)
+		
+		dist_matrices = [num.load(dist_matrices_fnames[i], mmap_mode='r') for i in mrange]
+		nres = dist_matrices[0].shape[0]
+		nrange = range(nres)
+		
+		if True:
+			self.MSOAD_IONaiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		if True:
+			self.MSOAD_IOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		if True:
+			self.MSOAD_BetterIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		if True:
+			self.MSOAD_OriginalIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		if True:
+			self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+
+		sys.exit(0)
+		return scaled_diff_dist_matrix
+
+     
     # calculate the difference distance matrix
     # 1) calculate distance matrices for each structure
     # 2) for each pair of structures, take the matrix of absolute value of the difference between the distances
     # 3) average these
     def diff_dist_matrix(self, res_range=None, scaled=False):
-        if res_range != None: assert(len(res_range) == 2)
+        if res_range != None:
+            assert(len(res_range) == 2)
         
-        dist_matrices = []
-        for pdb in self.get_next_pdb():
-            ca_xyz = pdb.get_ca_xyz_matrix()
-            if res_range != None: ca_xyz = ca_xyz[res_range[0]-1:res_range[1], :]
-            dist_matrix = calc_distance_matrix(ca_xyz)
-            dist_matrices.append(dist_matrix)
-
-        util.PRINTHEAP("All PDBs read")
-        util.PRINTHEAP("len(dist_matrices %d" % len(dist_matrices))
-        scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
-        count = 0
-        for i in range(len(dist_matrices)):
-            for j in range(i+1, len(dist_matrices)):
-                diff_dist_matrix = num.abs(dist_matrices[i] - dist_matrices[j])
-                if scaled:
-                    scale = num.max(diff_dist_matrix)
-                    if scale == 0: continue
-                    diff_dist_matrix /= scale
-                scaled_diff_dist_matrix += diff_dist_matrix
-                count += 1
-        #print >> sys.stderr, count
-        scaled_diff_dist_matrix /= count
+        if res_range:
+        	raise("res_range not supported in diff_dist_matrix")
         if scaled:
-            scaled_diff_dist_matrix /= num.max(scaled_diff_dist_matrix)
-        return scaled_diff_dist_matrix
+        	raise("scaled not supported in diff_dist_matrix")
+        
+        dist_matrices_fnames, sub_dist_matrices_fnames = self.create_CA_differences_matrices()
+        util.PRINTHEAP("%d CA difference matrices created." % len(dist_matrices_fnames))
+        return self.calculateMeanSumOfAbsoluteDifferences(dist_matrices_fnames, sub_dist_matrices_fnames)
+       
     
 if __name__ == '__main__':
     # Parse the input arguments

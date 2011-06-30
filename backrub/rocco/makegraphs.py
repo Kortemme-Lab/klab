@@ -21,9 +21,9 @@ F.close()
 starttime = time.time()
 
 #starting_pdb_file = "1A8G.pdb"
-print "Starting PDB is: %s" % (starting_pdb_file)
-print "Ensemble list is: %s" % (ensemble_list)
-print "Prefix is: %s" % (prefix)
+util.MSG("\nStarting PDB is: %s" % (starting_pdb_file))
+util.MSG("Ensemble list is: %s" % (ensemble_list))
+util.MSG("Prefix is: %s" % (prefix))
 
 CA_DIST_DIFF_MATRIX_FILE = "ca_dist_difference_matrix-%s.dat" % (prefix)
 CA_DIST_DIFF_BFACT_PDB_FILE = "ca_dist_difference_bfactors-%s.pdb" % (prefix)
@@ -31,21 +31,17 @@ RMSD_PLOT_FILE = "rmsd_plot-%s.png" % (prefix)
 CA_DIST_DIFF_2D_PLOT_FILE = "ca_dist_difference_2D_plot-%s.png" % (prefix)
 CA_DIST_DIFF_1D_PLOT_FILE = "ca_dist_difference_1D_plot-%s.png" % (prefix)
 
-#util.PRINTHEAP("before loading starting pdb")
+util.PRINTHEAP("before loading starting pdb")
 
 starting_pdb = PDBlite.PDB(open(starting_pdb_file).readlines())
 
-#util.PRINTHEAP("after loading starting pdb")
+util.PRINTHEAP("after loading starting pdb")
 
 br_traj = PDBlite.PDBTrajectory(ensemble_list)
 
-#util.PRINTHEAP("after loading ensemble list")
-
-#br_traj = PDBlite.PDBTrajectory("ensemble.lst")
 open(CA_DIST_DIFF_MATRIX_FILE, "w").write(br_traj.get_diff_dist_matrix_str())
 
 util.PRINTHEAP("after computing ca dist diff matrix")
-
 # calculate the RMSDs at each residue
 # 05/19/11: What datatype is rmsds? rmsds is an array of size ? --Rocco
 rmsds = None
@@ -56,7 +52,6 @@ try:
 
     rmsds2 = br_traj.calc_CA_rmsd_over_sequence_lessmem(starting_pdb)
     util.PRINTHEAP("after computing ca dist diff matrix")
-    util.LOG(str(rmsds2))
     rmsds = rmsds2
     
     #if len(rmsds1) != len(rmsds2):
@@ -67,14 +62,17 @@ try:
     #        raise Exception("Lists differ at index %d: %f vs. %f" % (i, rmsds1[i], rmsds2[i]))
     
 except Exception, e:
-    util.PRINTHEAP("exception computing calc_rmsd_over_sequence")
-    print(e)
-    print(traceback.print_exc())
+    util.ERROR("Exception computing calc_rmsd_over_sequence")
+    util.PRINTHEAP("Heap:")
+    util.ERROR(e)
+    util.ERROR(traceback.format_exc())
     sys.exit(1)
 
 #print "length of rmsds",len(rmsds),"\n"
 
 util.PRINTHEAP("after calc_rmsd_over_sequence")
+sys.exit(0) # shanetodo: remove
+
 
 # load the CA distance difference results
 A = numpy.loadtxt(CA_DIST_DIFF_MATRIX_FILE)
@@ -103,6 +101,8 @@ util.PRINTHEAP("CA_DIST_DIFF_BFACT_PDB_FILE")
 res_nums = [int(res.res_num) for res in starting_pdb.iter_residues()]
 nres = len(res_nums)
 res_num_strs = map(str, res_nums)
+
+util.PRINTHEAP("STARTING MATPLOT")
 
 import matplotlib
 matplotlib.use('Agg') # so plots aren't made interactively

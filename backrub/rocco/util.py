@@ -3,6 +3,8 @@
 
 import commands, os.path, time, os, sys, traceback, types, shelve
 from math import floor
+sys.path.append("./objgraph-1.7.0")
+import objgraph
 
 UTIL_POLL_INTERVAL = 10
 UTIL_Q_JOBS_SUBMITTED = 0
@@ -18,26 +20,55 @@ import time
 starttime = time.time()
 logfile = "heapprint.log"
 
-def LOG(msg):
-    print(msg)
-    F = open(logfile, "a")
-    F.write(msg)
-    F.close()
+DEBUGMODE = True
+TERMINAL_GREEN = "\033[92m"
+TERMINAL_YELLOW = "\033[93m"
+TERMINAL_RED = "\033[91m"
+TERMINAL_OFF = "\033[0m"
+
+
+def CREATEFILE(filename, contents):
+	if DEBUGMODE:
+		F = open(filename, "w")
+		F.write(contents)
+		F.close()
+
+def MSG(msg):
+	print("%s%s%s" % (TERMINAL_GREEN, msg, TERMINAL_OFF))
+
+def LOG(msg, warning = False, error = False):
+	if error:
+		print("%s%s%s" % (TERMINAL_RED, msg, TERMINAL_OFF))
+	if warning:
+		print("%s%s%s" % (TERMINAL_YELLOW, msg, TERMINAL_OFF))
+	else:
+		print(msg)
+	if DEBUGMODE:
+		F = open(logfile, "a")
+		F.write(msg)
+		F.close()
     
+def WARN(msg):
+	LOG("[Warning] %s" % msg, warning = True)
+
+def ERROR(msg):
+	LOG("[Warning] %s" % msg, error = True)
+
 def PRINTHEAP(msg):
-    global starttime
-    newtime = time.time()
-    print("**** %s. Time since last heap printout : %.2fs ****" % (msg or "", (newtime - starttime)))
-    starttime = newtime 
-    gc.collect()
-    gc.collect()
-    h = hpy()
-    F = open(logfile, "a")
-    print h.heap()
-    print("\n")
-    F.write(str(h.heap()))
-    F.write("\n")
-    F.close()
+	global starttime
+	newtime = time.time()
+	tstr = ("**** %s. Time since last heap printout : %.2fs ****" % (msg or "", (newtime - starttime)))
+	starttime = newtime 
+	if DEBUGMODE:
+		gc.collect()
+		gc.collect()
+		h = hpy()
+		hp = str(h.heap())
+		print("%s%s%s\n%s\n" % (TERMINAL_GREEN, tstr, TERMINAL_OFF, hp))
+		F = open(logfile, "a")
+		F.write("%s\n%s\n" % (tstr, hp))
+		F.close()
+	
 
 
 def flatten(lst):
