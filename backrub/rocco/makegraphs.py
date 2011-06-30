@@ -15,6 +15,11 @@ starting_pdb_file = sys.argv[1]
 ensemble_list = sys.argv[2]
 prefix = sys.argv[3] 
 
+if len(sys.argv) > 4 and sys.argv[4] == '-d':
+	util.DEBUGMODE = True
+else: 
+	util.DEBUGMODE = False
+
 F = open(util.logfile, "w")
 F.close()   
 
@@ -46,21 +51,11 @@ util.PRINTHEAP("after computing ca dist diff matrix")
 # 05/19/11: What datatype is rmsds? rmsds is an array of size ? --Rocco
 rmsds = None
 try:
-    #rmsds1 = br_traj.calc_rmsd_over_sequence(starting_pdb)
-    #util.PRINTHEAP("after computing ca dist diff matrix")
-    #util.LOG(str(rmsds1))
-
+    # 06/26/11: Added the call to Shane's new function that should fix the memory issue.
     rmsds2 = br_traj.calc_CA_rmsd_over_sequence_lessmem(starting_pdb)
     util.PRINTHEAP("after computing ca dist diff matrix")
     rmsds = rmsds2
-    
-    #if len(rmsds1) != len(rmsds2):
-    #    raise Exception("Lists should be the same size")
 
-    #for i in range(len(rmsds1)):
-    #    if rmsds1[i] != rmsds2[i]:
-    #        raise Exception("Lists differ at index %d: %f vs. %f" % (i, rmsds1[i], rmsds2[i]))
-    
 except Exception, e:
     util.ERROR("Exception computing calc_rmsd_over_sequence")
     util.PRINTHEAP("Heap:")
@@ -71,8 +66,6 @@ except Exception, e:
 #print "length of rmsds",len(rmsds),"\n"
 
 util.PRINTHEAP("after calc_rmsd_over_sequence")
-sys.exit(0) # shanetodo: remove
-
 
 # load the CA distance difference results
 A = numpy.loadtxt(CA_DIST_DIFF_MATRIX_FILE)

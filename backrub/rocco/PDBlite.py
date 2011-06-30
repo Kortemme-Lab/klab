@@ -15,8 +15,6 @@ import shutil
 RAD_TO_DEG = 180.0 / math.pi
 ROWSINAFILE = 200
 
-#shanetodo SHANETEMP = None
-
 def make_pdb_atom_str(atomNum, atomName, resName, chain, resNum, x, y, z, altLoc=' ',insCode=' ',occupancy=1, bFactor=0):
         return "%-6s%5d %4s%1s%3s %1s%4s%1s   %8.3f%8.3f%8.3f%6.2f%6.2f" % \
                ("ATOM", atomNum, atomName, altLoc, resName, chain,resNum, insCode, x, y, z, occupancy, bFactor)
@@ -791,23 +789,8 @@ class PDBTrajectory:
 					if return_pdb_lines:
 						yield ["REMARK  99 FILE "+pdb_fn] + pdb_lines
 					else:
-						#shanetodo roots = objgraph.get_leaking_objects()
-						#shanetodo print("LEAKS BEFORE: %d" % len(roots))
-						#shanetodo objgraph.show_refs(roots[:13], refcounts=True, filename='roots.png')
-						#shanetodo objgraph.show_backrefs(objgraph.by_type('Nondestructible'), filename='finalizers.png')
 						tempPDB = PDB(pdb_lines, fn=pdb_fn, model_num=model_count)
-						#shanetodo global SHANETEMP
-						#shanetodo if not SHANETEMP:
-						#shanetodo SHANETEMP = pdb_lines
-						#shanetodo else:
-						#shanetodo objgraph.show_backrefs([SHANETEMP], filename='sample-backref-graph%d.png' % model_count)
-						#shanetodo if model_count > 4:
-						#shanetodo sys.exit(0)
 						yield tempPDB
-						#shanetodo roots = objgraph.get_leaking_objects()
-						#shanetodo print("LEAKS AFTER: %d" % len(roots))
-						
-						#PDB(pdb_lines, fn=pdb_fn, model_num=model_count)
 				elif self.end_model != None and model_count > self.end_model:
 					break 
 
@@ -1054,82 +1037,6 @@ class PDBTrajectory:
         util.PRINTHEAP("*** Diff dist matrix str end *** ")
         return s
 
-    def MSOAD_IONaiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
-		'''Do not use this. It explains the basic idea but is terrible for I/O.'''
-		util.PRINTHEAP("Running I/O-naive O(m.n^2) algorithm") # m = nstruct, n = nres
-		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
-		for r in nrange:
-			for c in nrange:
-				rcarray = sorted([dist_matrices[m][r][c] for m in mrange])
-				avg = 0
-				for m in mrange:
-					x = rcarray[m]
-					avg += (m * x) - ((nstruct - 1 - m) * x)
-				scaled_diff_dist_matrix[r][c] = avg
-		count = (nstruct * (nstruct - 1)) / 2
-		scaled_diff_dist_matrix /= count
-		print(scaled_diff_dist_matrix)
-		util.PRINTHEAP("MSOAD_IONaiveAlgorithm finished")					
-	
-    def MSOAD_OriginalIOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
-		util.PRINTHEAP("Running I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
-		CHUNKSIZE = 100
-			# Memory usage and I/O efficiency are proportional to CHUNKSIZE 
-		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
-		p = 0
-		while p <= nres:
-			linesToRead = min(nres - p, CHUNKSIZE)
-			
-			sub_dist_matrices = [dist_matrices[m][p:p + linesToRead, :] for m in mrange]
-			
-			for r in range(p, p + linesToRead):
-				for c in nrange:
-					rcarray = sorted([dist_matrices[m][r][c] for m in mrange])
-					avg = 0
-					for m in mrange:
-						x = rcarray[m]
-						avg += (m + m - nstruct + 1) * x
-					scaled_diff_dist_matrix[r][c] = avg			
-			p += CHUNKSIZE
-		
-		count = (nstruct * (nstruct - 1)) / 2
-		scaled_diff_dist_matrix /= count
-		print(scaled_diff_dist_matrix)
-		util.PRINTHEAP("MSOAD_OriginalIOSensitiveAlgorithm finished")					
-
-    def MSOAD_IOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
-		util.PRINTHEAP("Running I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
-		sorttime = 0
-		computetime = 0
-		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
-		for roffset in range(0, nres, ROWSINAFILE):
-			# Load in the submatrix for all m structs from rows roffset - (roffset + ROWSINAFILE - 1)
-			# Sub matrix is a nres * (ROWSINAFILE * nstruct) matrix
-			print("%0.2f%%" % (float(100 * roffset)/float(nres)))
-			fp = open(sub_dist_matrices_fnames[roffset/ROWSINAFILE])
-			submatrices = [num.load(fp) for m in mrange]
-			fp.close()
-			for r in range(0, min(ROWSINAFILE, nres - roffset)):
-				sys.stdout.write(".")
-				actualr = roffset + r
-				for c in nrange:
-					st = time.time()
-					rcarray = sorted([submatrices[m][r][c] for m in mrange])
-					et = time.time()
-					sorttime += (et - st)
-					avg = 0
-					for m in mrange:
-						x = rcarray[m]
-						avg += (m + m - nstruct + 1) * x
-					ft = time.time()
-					computetime += (ft - et)
-					scaled_diff_dist_matrix[actualr][c] = avg
-		count = (nstruct * (nstruct - 1)) / 2
-		scaled_diff_dist_matrix /= count
-		print(scaled_diff_dist_matrix)
-		print("time", sorttime, computetime)
-		util.PRINTHEAP("MSOAD_IOSensitiveAlgorithm finished")					
-
     def MSOAD_BetterIOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
 		util.PRINTHEAP("Running better arithmetic I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
 		sorttime = 0
@@ -1173,6 +1080,7 @@ class PDBTrajectory:
 		print(scaled_diff_dist_matrix)
 		util.PRINTHEAP("MSOAD_BetterIOSensitiveAlgorithm finished")					
 		#print("time", sorttime, computetime)
+		return scaled_diff_dist_matrix
 
     def MSOAD_OldAlgorithmFixedForMemory(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
 		util.PRINTHEAP("Running O(m^2.n^2) algorithm")
@@ -1186,6 +1094,7 @@ class PDBTrajectory:
 		scaled_diff_dist_matrix /= count
 		print(scaled_diff_dist_matrix)
 		util.PRINTHEAP("O(m^2n^2) algorithm finished")
+		return scaled_diff_dist_matrix
 
     def calculateMeanSumOfAbsoluteDifferences(self, dist_matrices_fnames, sub_dist_matrices_fnames):
 		
@@ -1196,19 +1105,21 @@ class PDBTrajectory:
 		nres = dist_matrices[0].shape[0]
 		nrange = range(nres)
 		
-		if True:
-			self.MSOAD_IONaiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-		if True:
-			self.MSOAD_IOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-		if True:
-			self.MSOAD_BetterIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-		if True:
-			self.MSOAD_OriginalIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-		if True:
-			self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-
-		sys.exit(0)
-		return scaled_diff_dist_matrix
+		scaled_diff_dist_matrix1 = None
+		scaled_diff_dist_matrix2 = None
+		if nstruct > 240:
+			scaled_diff_dist_matrix1 = self.MSOAD_BetterIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		else:
+			scaled_diff_dist_matrix2 = self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		
+		if scaled_diff_dist_matrix1 and scaled_diff_dist_matrix2:
+			util.WARNING("Output differs")
+			for i in nrange:
+				for j in nrange:
+					if abs(scaled_diff_dist_matrix1[i][j] - scaled_diff_dist_matrix2[i][j]) > .00001:
+						util.WARNING(i, j, scaled_diff_dist_matrix1[i][j], scaled_diff_dist_matrix2[i][j])
+		
+		return scaled_diff_dist_matrix1 or scaled_diff_dist_matrix2
 
      
     # calculate the difference distance matrix
