@@ -57,7 +57,6 @@ def ERROR(msg):
 def PRINTHEAP(msg):
 	global starttime
 	newtime = time.time()
-	starttime = newtime 
 	if DEBUGMODE:
 		tstr = ("**** %s. Time since last heap printout : %.2fs ****" % (msg or "", (newtime - starttime)))
 		gc.collect()
@@ -71,6 +70,7 @@ def PRINTHEAP(msg):
 	else:
 		tstr = ("**** %s. Time taken : %.2fs ****" % (msg or "", (newtime - starttime)))
 		print("%s%s%s\n" % (TERMINAL_GREEN, tstr, TERMINAL_OFF))
+	starttime = newtime 
 	
 
 

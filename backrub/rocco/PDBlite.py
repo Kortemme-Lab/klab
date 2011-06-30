@@ -1105,21 +1105,26 @@ class PDBTrajectory:
 		nres = dist_matrices[0].shape[0]
 		nrange = range(nres)
 		
-		scaled_diff_dist_matrix1 = None
-		scaled_diff_dist_matrix2 = None
+		scaled_diff_dist_matrix = None
 		if nstruct > 240:
 			scaled_diff_dist_matrix1 = self.MSOAD_BetterIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+			scaled_diff_dist_matrix = scaled_diff_dist_matrix1	
 		else:
 			scaled_diff_dist_matrix2 = self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+			scaled_diff_dist_matrix = scaled_diff_dist_matrix2	
 		
-		if scaled_diff_dist_matrix1 and scaled_diff_dist_matrix2:
-			util.WARNING("Output differs")
+		if False:
+			#if scaled_diff_dist_matrix1.any() and scaled_diff_dist_matrix2.any():
+			s = []
 			for i in nrange:
 				for j in nrange:
 					if abs(scaled_diff_dist_matrix1[i][j] - scaled_diff_dist_matrix2[i][j]) > .00001:
-						util.WARNING(i, j, scaled_diff_dist_matrix1[i][j], scaled_diff_dist_matrix2[i][j])
+						s.append(i, j, scaled_diff_dist_matrix1[i][j], scaled_diff_dist_matrix2[i][j])
+			if s:
+				util.WARNING("Output differs:\n%s" % join(s, "\n"))
+			
 		
-		return scaled_diff_dist_matrix1 or scaled_diff_dist_matrix2
+		return scaled_diff_dist_matrix
 
      
     # calculate the difference distance matrix
