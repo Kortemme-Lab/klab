@@ -1082,6 +1082,61 @@ class PDBTrajectory:
 		#print("time", sorttime, computetime)
 		return scaled_diff_dist_matrix
 
+    def MSOAD_BetterIOSensitiveAlgorithmNumpied(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		util.PRINTHEAP("Running better arithmetic I/O-sensitive O(m.n^2) algorithm") # m = nstruct, n = nres
+		sorttime = 0
+		computetime = 0
+		loadtime = 0
+		outtime = 0 
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		
+		numpysort = num.sort
+		numpyarray = num.array
+		numpyarange = num.arange
+		numpymul = num.multiply
+		numpysum = num.sum
+		
+		multipliers = numpyarange(1 - nstruct, 1 + nstruct, 2)
+		for roffset in range(0, nres, ROWSINAFILE):
+			# Load in the submatrix for all m structs from rows roffset - (roffset + ROWSINAFILE - 1)
+			# Sub matrix is a nres * (ROWSINAFILE * nstruct) matrix
+			util.MSG("%0.2f%% Done" % (float(100 * roffset)/float(nres)))
+			
+			#lt = time.time()
+			fp = open(sub_dist_matrices_fnames[roffset/ROWSINAFILE])
+			submatrices = [num.load(fp) for m in mrange]
+			fp.close()
+			#loadtime += (time.time() - lt)
+			
+				
+			for r in range(0, min(ROWSINAFILE, nres - roffset)):
+				
+				#outer = time.time()
+				actualr = roffset + r
+				submatricesmr = [submatrices[m][r] for m in mrange]
+				scaled_diff_dist_matrix_actualr = scaled_diff_dist_matrix[actualr]
+				
+				#outerend = time.time()
+				#outtime += (outerend - outer) 
+				
+				for c in nrange:
+					#st = time.time()
+					rcarray = numpysort(numpyarray([submatricesmr[m][c] for m in mrange], 'd'))
+					#et = time.time()
+					#sorttime += (et -st)
+					
+					avg = numpysum(numpymul(rcarray, multipliers))
+					scaled_diff_dist_matrix_actualr[c] = avg
+					#ft = time.time()
+					#computetime += (ft - et)
+
+		count = (nstruct * (nstruct - 1)) / 2
+		scaled_diff_dist_matrix /= count
+		print(scaled_diff_dist_matrix)
+		util.PRINTHEAP("MSOAD_BetterIOSensitiveAlgorithm finished")					
+		#print("time", sorttime, computetime, loadtime, outtime)
+		return scaled_diff_dist_matrix
+	
     def MSOAD_OldAlgorithmFixedForMemory(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
 		util.PRINTHEAP("Running O(m^2.n^2) algorithm")
 		count = 0
@@ -1106,13 +1161,15 @@ class PDBTrajectory:
 		nrange = range(nres)
 		
 		scaled_diff_dist_matrix = None
-		if nstruct > 240:
-			scaled_diff_dist_matrix1 = self.MSOAD_BetterIOSensitiveAlgorithm(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+		
+
+		if nstruct > 80:
+			scaled_diff_dist_matrix1 = self.MSOAD_BetterIOSensitiveAlgorithmNumpied(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
 			scaled_diff_dist_matrix = scaled_diff_dist_matrix1	
 		else:
 			scaled_diff_dist_matrix2 = self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
 			scaled_diff_dist_matrix = scaled_diff_dist_matrix2	
-		
+
 		if False:
 			#if scaled_diff_dist_matrix1.any() and scaled_diff_dist_matrix2.any():
 			s = []
