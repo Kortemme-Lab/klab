@@ -30,6 +30,13 @@ util.MSG("\nStarting PDB is: %s" % (starting_pdb_file))
 util.MSG("Ensemble list is: %s" % (ensemble_list))
 util.MSG("Prefix is: %s" % (prefix))
 
+if not os.path.exists(starting_pdb_file):
+	util.ERROR("Cannot find starting PDB %s." % starting_pdb_file)
+	sys.exit(1)
+if not os.path.exists(ensemble_list):
+	util.ERROR("Cannot find ensemble list %s." % ensemble_list)
+	sys.exit(2)
+
 CA_DIST_DIFF_MATRIX_FILE = "ca_dist_difference_matrix-%s.dat" % (prefix)
 CA_DIST_DIFF_BFACT_PDB_FILE = "ca_dist_difference_bfactors-%s.pdb" % (prefix)
 RMSD_PLOT_FILE = "rmsd_plot-%s.png" % (prefix)

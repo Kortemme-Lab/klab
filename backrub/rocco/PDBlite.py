@@ -1037,108 +1037,59 @@ class PDBTrajectory:
         util.PRINTHEAP("*** Diff dist matrix str end *** ")
         return s
 
-    def MSOAD_BetterIOSensitiveAlgorithm(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
-		util.PRINTHEAP("Running better arithmetic I/O-sensitive O(m(nres/CHUNKSIZE) + m.n^2) algorithm") # m = nstruct, n = nres
-		sorttime = 0
-		computetime = 0
-		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
-		for roffset in range(0, nres, ROWSINAFILE):
-			# Load in the submatrix for all m structs from rows roffset - (roffset + ROWSINAFILE - 1)
-			# Sub matrix is a nres * (ROWSINAFILE * nstruct) matrix
-			util.MSG("%0.2f%% Done" % (float(100 * roffset)/float(nres)))
-			fp = open(sub_dist_matrices_fnames[roffset/ROWSINAFILE])
-			submatrices = [num.load(fp) for m in mrange]
-			fp.close()
-			
-			for r in range(0, min(ROWSINAFILE, nres - roffset)):
-				
-				actualr = roffset + r
-				submatricesmr = [submatrices[m][r] for m in mrange]
-				scaled_diff_dist_matrix_actualr = scaled_diff_dist_matrix[actualr]
-				
-				for c in nrange:
-					#st = time.time()
-					rcarray = sorted([submatricesmr[m][c] for m in mrange])
-					#et = time.time()
-					#sorttime += (et - st)
-					avg = 0
-					
-					# The loop below may be counter-intuitive so I'll explain:
-					# Since rcarray is sorted, there is a more efficient way to compute the absolute pairwise difference.
-					# The formula can be written as mx - (nstruct - 1 - m)x or factored out into (2m + 1 - nstruct) * x where x = rcarray[m]
-					# Observing the factored formula, the lhs increases by two when m increases by 1 and the starting term where m = 0 is (1 - nstruct)
-					multiplier = 1 - nstruct
-					for m in mrange:
-						avg += (multiplier * rcarray[m])
-						multiplier += 2
-					#ft = time.time()
-					#computetime += (ft - et)
-					scaled_diff_dist_matrix_actualr[c] = avg
-
-		count = (nstruct * (nstruct - 1)) / 2
-		scaled_diff_dist_matrix /= count
-		print(scaled_diff_dist_matrix)
-		util.PRINTHEAP("MSOAD_BetterIOSensitiveAlgorithm finished")					
-		#print("time", sorttime, computetime)
-		return scaled_diff_dist_matrix
-
-    def MSOAD_BetterIOSensitiveAlgorithmNumpied(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
-		util.PRINTHEAP("Running better arithmetic I/O-sensitive O(m.n^2) algorithm") # m = nstruct, n = nres
-		sorttime = 0
-		computetime = 0
-		loadtime = 0
-		outtime = 0 
-		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+    def MSOAD_Scalable(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
+		''' This algorithm is roughly O(n^2.mlogm) where n = number of residues and m = number of structures. 
+		    The size of the loops is O(n^2) and the body of the inner loop performs a quicksort followed be some linear operations.
+		    The inner loop relies on the array being sorted to calculate the MSOAD using a linear calculation with the constant vector multipliers.
+		    
+		    We could probably make the calculation faster by ordering the matrix files as numpy lists of:
+		      e_1r_1_c1, ..., e_mr_0c_n, e_1r_2c_1, ..., e_mr_2c_n, ... , e_1r_nc_n, ... , e_mr_nc_n
+		    This would avoid the awkward list construction in the lines with submatricesmr.
+		    '''
+		util.PRINTHEAP("Calculating mean sum of absolute differences")
 		
+		# Cache the dict lookups and the multiplier vector
 		numpysort = num.sort
 		numpyarray = num.array
 		numpyarange = num.arange
 		numpymul = num.multiply
 		numpysum = num.sum
-		
 		multipliers = numpyarange(1 - nstruct, 1 + nstruct, 2)
+		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
+		
 		for roffset in range(0, nres, ROWSINAFILE):
 			# Load in the submatrix for all m structs from rows roffset - (roffset + ROWSINAFILE - 1)
 			# Sub matrix is a nres * (ROWSINAFILE * nstruct) matrix
-			util.MSG("%0.2f%% Done" % (float(100 * roffset)/float(nres)))
+			util.MSG("%0.2f%% completed." % (float(100 * roffset)/float(nres)))
 			
-			#lt = time.time()
 			fp = open(sub_dist_matrices_fnames[roffset/ROWSINAFILE])
 			submatrices = [num.load(fp) for m in mrange]
 			fp.close()
-			#loadtime += (time.time() - lt)
-			
-				
+
 			for r in range(0, min(ROWSINAFILE, nres - roffset)):
 				
-				#outer = time.time()
 				actualr = roffset + r
+				# Cache the list lookups
 				submatricesmr = [submatrices[m][r] for m in mrange]
 				scaled_diff_dist_matrix_actualr = scaled_diff_dist_matrix[actualr]
-				
-				#outerend = time.time()
-				#outtime += (outerend - outer) 
-				
+
 				for c in nrange:
-					#st = time.time()
 					rcarray = numpysort(numpyarray([submatricesmr[m][c] for m in mrange], 'd'))
-					#et = time.time()
-					#sorttime += (et -st)
-					
 					avg = numpysum(numpymul(rcarray, multipliers))
 					scaled_diff_dist_matrix_actualr[c] = avg
-					#ft = time.time()
-					#computetime += (ft - et)
 
 		count = (nstruct * (nstruct - 1)) / 2
 		scaled_diff_dist_matrix /= count
 		print(scaled_diff_dist_matrix)
-		util.PRINTHEAP("MSOAD_BetterIOSensitiveAlgorithm finished")					
-		#print("time", sorttime, computetime, loadtime, outtime)
+		util.PRINTHEAP("Finished calculating mean sum of absolute differences.")
 		return scaled_diff_dist_matrix
 	
     def MSOAD_OldAlgorithmFixedForMemory(self, nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames):
-		util.PRINTHEAP("Running O(m^2.n^2) algorithm")
+		''' This algorithm is O(n^2.m^2) where n = number of residues and m = number of structures. 
+		    When m is small, this algorithm can outperform MSOAD_Scalable (quite significantly for very small m). As m increases, the algorithm gets slower
+		    plus the memory usage grows quicker than MSOAD_Scalable so disk thrashing can occur which really slows down the calculation. 
+		    '''
+		util.PRINTHEAP("Calculating mean sum of absolute differences: O(m^2.n^2)")
 		count = 0
 		scaled_diff_dist_matrix = num.zeros(dist_matrices[0].shape, 'd')
 		for i in range(len(dist_matrices)):
@@ -1148,7 +1099,7 @@ class PDBTrajectory:
 				count += 1
 		scaled_diff_dist_matrix /= count
 		print(scaled_diff_dist_matrix)
-		util.PRINTHEAP("O(m^2n^2) algorithm finished")
+		util.PRINTHEAP("Finished calculating mean sum of absolute differences.")
 		return scaled_diff_dist_matrix
 
     def calculateMeanSumOfAbsoluteDifferences(self, dist_matrices_fnames, sub_dist_matrices_fnames):
@@ -1161,17 +1112,18 @@ class PDBTrajectory:
 		nrange = range(nres)
 		
 		scaled_diff_dist_matrix = None
+		scaled_diff_dist_matrix1 = None
+		scaled_diff_dist_matrix2 = None
 		
-
-		if nstruct > 80:
-			scaled_diff_dist_matrix1 = self.MSOAD_BetterIOSensitiveAlgorithmNumpied(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-			scaled_diff_dist_matrix = scaled_diff_dist_matrix1	
+		if nstruct < 70: # This number is tuned from Eyal's example with nres = 962 so it may need to be tweaked.
+			scaled_diff_dist_matrix = self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+			scaled_diff_dist_matrix2 = scaled_diff_dist_matrix
 		else:
-			scaled_diff_dist_matrix2 = self.MSOAD_OldAlgorithmFixedForMemory(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
-			scaled_diff_dist_matrix = scaled_diff_dist_matrix2	
-
-		if False:
-			#if scaled_diff_dist_matrix1.any() and scaled_diff_dist_matrix2.any():
+			scaled_diff_dist_matrix = self.MSOAD_Scalable(nstruct, nres, mrange, nrange, dist_matrices, sub_dist_matrices_fnames)
+			scaled_diff_dist_matrix1 = scaled_diff_dist_matrix	
+		
+		if scaled_diff_dist_matrix1 != None and scaled_diff_dist_matrix2 != None:
+			util.MSG("Comparing matrices.")
 			s = []
 			for i in nrange:
 				for j in nrange:
@@ -1179,7 +1131,8 @@ class PDBTrajectory:
 						s.append(i, j, scaled_diff_dist_matrix1[i][j], scaled_diff_dist_matrix2[i][j])
 			if s:
 				util.WARNING("Output differs:\n%s" % join(s, "\n"))
-			
+			else:
+				util.MSG("Comparison PASSED.")
 		
 		return scaled_diff_dist_matrix
 

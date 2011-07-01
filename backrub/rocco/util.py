@@ -39,7 +39,7 @@ def MSG(msg):
 def LOG(msg, warning = False, error = False):
 	if error:
 		print("%s%s%s" % (TERMINAL_RED, msg, TERMINAL_OFF))
-	if warning:
+	elif warning:
 		print("%s%s%s" % (TERMINAL_YELLOW, msg, TERMINAL_OFF))
 	else:
 		print(msg)
@@ -52,7 +52,7 @@ def WARN(msg):
 	LOG("[Warning] %s" % msg, warning = True)
 
 def ERROR(msg):
-	LOG("[Warning] %s" % msg, error = True)
+	LOG("[Error] %s" % msg, error = True)
 
 def PRINTHEAP(msg):
 	global starttime
