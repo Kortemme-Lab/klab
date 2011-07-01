@@ -1045,6 +1045,8 @@ class PDBTrajectory:
 		    We could probably make the calculation faster by ordering the matrix files as numpy lists of:
 		      e_1r_1_c1, ..., e_mr_0c_n, e_1r_2c_1, ..., e_mr_2c_n, ... , e_1r_nc_n, ... , e_mr_nc_n
 		    This would avoid the awkward list construction in the lines with submatricesmr.
+		    
+		    Finally, this algorithm runs pointwise so a parallel version could be written to speed it up considerably.
 		    '''
 		util.PRINTHEAP("Calculating mean sum of absolute differences")
 		
