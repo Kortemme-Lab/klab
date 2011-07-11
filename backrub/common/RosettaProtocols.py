@@ -181,7 +181,7 @@ RosettaBinaries = {
                     "revision"      : 32532, 
                     "mini"          : True,
                     "runOnCluster"      : False,
-                    "backrub"       : "backrub_r32532", 
+                    "backrub"       : "backrub_r32532_static_patched_34477",
                     "postprocessing": "score_jd2_r32532", 
                     "database"      : "minirosetta_database"
                  },

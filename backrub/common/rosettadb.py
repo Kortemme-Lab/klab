@@ -161,8 +161,9 @@ class RosettaDB:
                 errcode = e[0]
                 # errcode 1100 is an error with table locking
                 # @debug:
-                # sys.stderr.write("\nSQL execution error.")
-                # sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
+                sys.stderr.write("\nSQL execution error in query:")
+                sys.stderr.write("\n %s." % sql)
+                sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
                 #traceback.print_exc()
                 self.connection.ping(True)
                 caughte = e
