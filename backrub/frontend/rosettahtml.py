@@ -143,7 +143,18 @@ class RosettaHTML(object):
 
 <!-- Menu --> %s
         <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
-<!-- Content --> <tr> %s </tr>
+<!-- Content -->
+
+<!--[if IE]>
+<tr>
+<td style="text-align:center;color:red">
+This site has known issues under Internet Explorer. Until these issues are fixed, please try another browser.
+<br><br>
+</td>
+</tr>
+<![endif]-->
+
+<tr> %s </tr>
         <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
 <!-- Legal Info --> <tr> %s </tr>
             <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
@@ -858,12 +869,15 @@ class RosettaHTML(object):
         if runOnCluster:
             if os.path.exists("%(rootdir)s/%(cryptID)s/progress.js" % parameter):
                 html.append("""
-                        <!--[if !IE]><!-->
+                        <![if !IE]>
                         <script language="javascript" type="text/javascript" src="%(rootdir)s/%(cryptID)s/progress.js"></script>
-                        <!--[if IE]><script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script><![endif]-->
-                        <!-- JIT Library File -->
+                        <![endif]>
+                        <!--[if IE]>
+                        <script language="javascript" type="text/javascript" src="/javascripts/JIT/Extras/excanvas.js"></script>
+                        <![endif]-->
+                        <![if !IE]>
                         <script language="javascript" type="text/javascript" src="/javascripts/JIT/jit.js"></script>
-                        <!--<![endif]-->""" % parameter)
+                        <![endif]>""" % parameter)
 
         html.append("""<table border=0 cellpadding=2 cellspacing=1>""")
         
