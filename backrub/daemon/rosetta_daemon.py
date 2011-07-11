@@ -798,7 +798,7 @@ The Kortemme Lab Server Daemon
             try:
                 PM_chain = params["Mutations"][0][0]
                 PM_resid = params["Mutations"][0][1]
-                PM_newres = params["Mutations"][0][2]
+                PM_newres = ROSETTAWEB_SK_AA[params["Mutations"][0][2]]
                 PM_radius = params["Mutations"][0][3]
             except:
                 self.log("params='%s'\n%s" % (str(params), traceback.format_exc()))
@@ -831,7 +831,7 @@ The Kortemme Lab Server Daemon
         elif task == 'multiple_mutation': # multiple point mutations    
             list_chains = [ m[0] for m in params["Mutations"] ]
             list_resids = [ m[1] for m in params["Mutations"] ]
-            list_newres = [ m[2] for m in params["Mutations"] ]
+            list_newres = [ ROSETTAWEB_SK_AA[m[2]] for m in params["Mutations"] ]
             list_radius = [ m[3] for m in params["Mutations"] ]
             
             list_new_resid = []
@@ -881,6 +881,8 @@ The Kortemme Lab Server Daemon
                                        "-s", fn_pdb, 
                                        "-ignore_unrecognized_res", 
                                        "-resfile", fn_resfile, 
+                                       "-ex1", "-ex2", "-extrachi_cutoff", "0",
+                                       "-initial_pack",
                                        "-nstruct",  ensemble_size, 
                                        "-backrub:ntrials", str(self.ntrials),
                                        "-pivot_atoms", "CA" ] )
@@ -1158,6 +1160,8 @@ class ClusterDaemon(RosettaDaemon):
                 if len(data) != 0:
                     jobID = None
                     for i in range(0, len(data)):
+			if data[i][10] != 'kortemmelab':
+				continue
                         # Set up the parameters. We assume ProtocolParameters keys do not overlap with params.
                         jobID = data[i][0]
                         task = data[i][7]                            
