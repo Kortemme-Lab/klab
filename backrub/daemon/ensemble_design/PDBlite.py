@@ -25,7 +25,7 @@ def calc_distance_matrix(nDimPoints):
     for d in xrange(m):
         data = nDimPoints[:,d]
         delta += (data - data[:,num.newaxis])**2
-        return num.sqrt(delta)
+    return num.sqrt(delta)
                     
 # expects four letter atom name from a pdb file
 def is_hydrogen(full_atom_name):
