@@ -72,7 +72,13 @@ import pickle
 # Set this to the machine you are debugging from
 DEVELOPMENT_HOST = "cabernet.ucsf.edu"
 
-#todo: Test this for debugging import cgitb
+# get ip addr hostname
+IP = os.environ['REMOTE_ADDR']
+hostname = IP
+try:
+    hostname = socket.gethostbyaddr(IP)[0]
+except:
+    pass
 
 ###############################################################################################
 # Setup: Change these values according to your settings and usage of the server               #
@@ -207,7 +213,7 @@ def ws():
   title = ''
 
   comment = ''
-  warning = ''
+  adminWarning = ''
   
   # get the POST data from the webserver
   form = cgi.FieldStorage()
@@ -305,14 +311,12 @@ def ws():
   #s.write(str(my_session.cookie)+'\n<br><br>')
   ########## DEBUG Cookies ##########
 
-  if not os.path.exists('/tmp/daemon-example.pid'):
-    if username == 'flo':
-      warning = 'Backend not running. Jobs will not be processed immediately.'
-    else:
-      warning = '' #'Backend not running. Jobs will not be processed immediately.'
+  if not os.path.exists('/tmp/rosettaweb-rosettadaemon.pid'): #upgradetodo: Store this filename in the conf file
+    if hostname == DEVELOPMENT_HOST:
+      adminWarning = 'Backend not running. Jobs will not be processed immediately.'
   
   rosettaDD = RosettaDataDir(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir)
-  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir, username=username, comment=comment, warning=warning)
+  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir, username=username, comment=comment, adminWarning=adminWarning)
   
   global protocolGroups
   global protocols
@@ -1005,14 +1009,6 @@ def submit(rosettaHTML, form, SID):
     pgroup = None
     ptask = None
     StorageDBConnection = None
-    
-    # get ip addr hostname
-    IP = os.environ['REMOTE_ADDR']
-    sock = socket
-    try:
-        hostname = sock.gethostbyaddr(IP)[0]
-    except:
-        hostname = IP
     
     IDtoDelete = None
     try:
@@ -1920,13 +1916,6 @@ class FrontendProtocols(WebserverProtocols):
         
 # run Forest run!
 try:
-    IP = os.environ['REMOTE_ADDR']
-    sock = socket
-    try:
-        hostname = sock.gethostbyaddr(IP)[0]
-    except:
-        hostname = IP
-
     # Change True to False here to display the maintenance page
     # The maintenance page should be updated before doing so e.g. go to the website, copy the source, paste into maintenance.html, and edit to remove links etc.
     if True or hostname == DEVELOPMENT_HOST: 
@@ -1939,10 +1928,6 @@ try:
         sys.stdout.write(contents)
         sys.stdout.close()        
 except Exception, e:
-    try:
-        hostname = sock.gethostbyaddr(IP)[0]
-    except:
-        hostname = IP
     if hostname == DEVELOPMENT_HOST:
         cgitb.handler()
         #print(e)

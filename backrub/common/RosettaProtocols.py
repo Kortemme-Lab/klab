@@ -286,6 +286,7 @@ class WebserverProtocols(object):
 
         # A flat list of the protocols 
         protocols = []
+        
         for i in range(len(protocolGroups)):
             protocols.extend(protocolGroups[i].getProtocols())
                 

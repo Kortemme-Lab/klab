@@ -189,7 +189,7 @@ The Kortemme Lab Server Daemon
                     for i in range(0,len(data)):
                         #start the job, change status and write starttime to DB
                         ID = data[i][0]
-                        pid = self.start_job(data[i][4],data[i][5],data[i][6],data[i][7],data[i][3],data[i][8])
+                        pid = self.start_job(ID, data[i][4],data[i][5],data[i][6],data[i][7],data[i][3],data[i][8])
                         if pid:
                             self.runSQL("UPDATE %s SET Status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID ))
                             break
@@ -897,8 +897,7 @@ The Kortemme Lab Server Daemon
                                       "-resfile", fn_resfile, 
                                       "-bond_angle_params","bond_angle_amber",
                                       "-use_pdb_numbering", 
-                                      "-ex1","-ex2",
-                                      "-extrachi_cutoff","0",
+                                      "-ex1","-ex2", "-extrachi_cutoff","0",
                                       "-nstruct",  ensemble_size,
                                       "-ntrials", str(self.ntrials),
                                       "-norepack_disulf", "-find_disulf", ] )

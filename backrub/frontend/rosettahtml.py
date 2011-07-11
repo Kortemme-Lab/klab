@@ -25,7 +25,7 @@ class RosettaHTML(object):
     server = {}
     
     def __init__(self, server_url, server_title, script_filename, contact_name, download_dir,
-                  username='', comment= '', warning=''):
+                  username='', comment= '', adminWarning=''):
         
         # Calls the init function of object (important)
         super(RosettaHTML, self).__init__()
@@ -41,7 +41,7 @@ class RosettaHTML(object):
         
         self.username        = username
         self.comment         = comment
-        self.warning         = warning
+        self.adminWarning    = adminWarning
         
         self.lowest_structs  = []
         self.html_refs       = ''
@@ -2417,12 +2417,12 @@ var MaxMultiplePointMutations = %d;
         return join(html, "")
 
     def _showWarning(self):
-        if self.warning != '':
+        if self.adminWarning != '':
             return '''<td align="center">
                             <table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; border-color:red; border-style:dashed; border-width:2px;">
                                 <font color="black" >%s</font></td></tr>
                             </table>
-                     </td></tr><tr>''' % self.warning #style="text-decoration:blink;"
+                     </td></tr><tr>''' % self.adminWarning #style="text-decoration:blink;" #upgradetodo:misaligned
 
         if self.comment != '':
             return '''<td align="center" style="padding:10px;">
