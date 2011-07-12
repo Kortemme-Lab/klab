@@ -30,7 +30,8 @@ from analyze_mini import AnalyzeMini
 from ClusterTask import ClusterTask, ClusterScript, getClusterDatabasePath, FAILED_TASK
 from ClusterScheduler import TaskScheduler, RosettaClusterJob
 
-server_root = rosettahelper.server_root
+settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+server_root = settings["BaseDir"]
 specificityRScript = os.path.join(server_root, "daemon", "specificity.R")
 specificity_classicRScript = os.path.join(server_root, "daemon", "specificity_classic.R")
 
@@ -112,15 +113,6 @@ def getOutputFilenameSK(pdbname, index, suffix):
 def getOutputFilenameHK(pdbname, index, suffix):
     return 'BR%s%s_%04.i.pdb' % (pdbname, suffix, index)
 
-def getResIDs(params, justification = 0):
-    design = []
-    for partner in params['Partners']:
-        if params['Designed'].get(partner):
-            pm = params['Designed'][partner]
-            for residue in pm:
-                design.append('%s%s' % (partner, str(residue).rjust(justification)))
-    return design
-
 def createSequenceMotif(infasta, annotations, outpng):
     # create weblogo from the created fasta file
     seqs = read_seq_data(open(infasta))
@@ -144,6 +136,15 @@ def createSequenceMotif(infasta, annotations, outpng):
 
     logo_format = LogoFormat(logo_data, logo_options)
     png_print_formatter(logo_data, logo_format, open(outpng, 'w'))
+
+def getResIDs(params, justification = 0):
+    design = []
+    for partner in params['Partners']:
+        if params['Designed'].get(partner):
+            pm = params['Designed'][partner]
+            for residue in pm:
+                design.append('%s%s' % (partner, str(residue).rjust(justification)))
+    return design
 
 def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
     """create a resfile for the chains

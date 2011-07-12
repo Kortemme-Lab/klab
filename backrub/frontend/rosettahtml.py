@@ -1812,14 +1812,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         return html      
     
     def submitformSequenceToleranceSK(self, chainOptions, aminoAcidOptions, numChainsAvailable):
-
-        # Test: python rosettaseqtol.py 1601 2I0L_A_C_V2006.pdb 2 10.0 0.228 2 0.4 1.0 0.4 A 318 B
-            #Upload structure: 2I0L_A_C_V2006.pdb
-            #Number of structures: 2 
-            #Radius: 10.0
-            #kT: 0.228
-            #Weights list: 2 0.4 1.0 0.4
-            #Designed residues: A 318 B
         
         postscript = ""
         html = ['''

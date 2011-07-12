@@ -11,7 +11,7 @@ import sys
 import os
 import traceback
 from string import join
-from rosettahelper import readFile, writeFile, server_root
+from rosettahelper import readFile, writeFile, WebsiteSettings
 
 import ClusterTask  
 #todo: use this package to pretty-print the JSON : import simplejson
@@ -20,7 +20,8 @@ msubdir = "cluster/"
 if __name__ == "__main__":
     msubdir = ""
 
-thisloc = os.path.join(server_root, "daemon", "cluster")   
+settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+thisloc = os.path.join(settings["BaseDir"], "daemon", "cluster")
 JITSpaceTree = readFile(os.path.join(thisloc, "JITSpaceTree.js"))
 JITForceDirected = readFile(os.path.join(thisloc, "JITForceDirected.js"))
 JITHTML = readFile(os.path.join(thisloc, "JIThtml.html"))

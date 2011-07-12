@@ -57,7 +57,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
-from rbutils import *
+from rosettahelper import WebsiteSettings
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
@@ -84,48 +84,18 @@ except:
 # Setup: Change these values according to your settings and usage of the server               #
 ###############################################################################################
 
-parameter = read_config_file()
+settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
 
 from pdb import PDB
-# todo: this gets more and more messy: solution: make a file with ALL libraries that possibly could ever be accessed by both front- and back-end!
-ROSETTAWEB_base_dir = parameter["base_dir"]
-from rosettaseqtol import make_seqtol_resfile
+from RosettaTasks import make_seqtol_resfile
+if not(settings["LiveWebserver"]):
+    import profile 
 
-ROSETTAWEB_db_host = parameter['db_host']
-ROSETTAWEB_db_db = parameter['db_name']
-ROSETTAWEB_db_user = parameter['db_user']
-ROSETTAWEB_db_passwd = parameter['db_pw']
-ROSETTAWEB_db_port = int(parameter['db_port'])
-ROSETTAWEB_db_socket = parameter['db_socket']
-
-ROSETTAWEB_server_title = parameter['server_title']
-ROSETTAWEB_contact_name = parameter['name_contact']
-ROSETTAWEB_contact_email = parameter['email_contact']
-ROSETTAWEB_admin_email = parameter['email_admin']
-
-ROSETTAWEB_server_name = parameter['server_name']
-ROSETTAWEB_server_script = os.environ['SCRIPT_NAME']
-
-ROSETTAWEB_store_time = parameter['store_time']
-ROSETTAWEB_max_point_mutation = 31
-ROSETTAWEB_max_seqtol_design = 10
-ROSETTAWEB_cookie_expiration = 60 * 60
-
-ROSETTAWEB_bin_sendmail = parameter['bin_sendmail']
-ROSETTAWEB_download_dir = parameter['rosetta_dl']
-ROSETTAWEB_remote_download_dir = parameter['rosetta_remotedl']
-
-ROSETTAWEB_temp_dir = parameter["rosetta_tmp"]
+# open connection to MySQL
+DBConnection = rosettadb.RosettaDB(settings)       
 
 # Keep a reference to the Apache error stream in case we need to use it for debugging scripts timing out.
 apacheerr = sys.stderr     
-
-if ROSETTAWEB_server_name == 'albana.ucsf.edu':
-    import profile 
-ROSETTAWEB_short_server_name = split(ROSETTAWEB_server_name, ".")[0]
-
-# open connection to MySQL
-DBConnection = rosettadb.RosettaDB(ROSETTAWEB_db_host, ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
 ########################################## Setup End ##########################################
 
 # todo: These would be tidier as member elements of a ws class
@@ -133,7 +103,7 @@ errors = []
 warnings = []
 
 def getKlabDBConnection():
-    return rosettadb.RosettaDB("kortemmelab.ucsf.edu", ROSETTAWEB_db_db, ROSETTAWEB_db_user, ROSETTAWEB_db_passwd, ROSETTAWEB_db_port, ROSETTAWEB_db_socket, ROSETTAWEB_store_time)       
+    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")       
 
 def fixFilename(filename):
     filename = filename.replace(' ', '_')
@@ -147,8 +117,8 @@ def fixFilename(filename):
     return filename
     
 def saveTempPDB(SID, pdb_object, pdb_filename):
-    tempdir = "%spdbs" % ROSETTAWEB_temp_dir
-    innertempdir = "%s/%s" % (tempdir, SID)
+    tempdir = os.path.join(settings["TempDir"], "pdbs") 
+    innertempdir = os.path.join(tempdir, SID)
         
     try:
         if not os.path.exists(tempdir):
@@ -157,10 +127,11 @@ def saveTempPDB(SID, pdb_object, pdb_filename):
             os.mkdir(innertempdir, 0775)
         
         pdb_filename = fixFilename(pdb_filename)
-        filepath = "%s/%s" % (innertempdir, pdb_filename)
+        filepath = os.path.join(innertempdir, pdb_filename)
         pdb_object.write(filepath)        
-        filepath = "pdbs/%s/%s" % (SID, pdb_filename)
+        filepath = os.path.join("pdbs", SID, pdb_filename)
         return True, filepath
+    
     except:
         estring = traceback.format_exc()
         errors.append(estring)
@@ -199,9 +170,8 @@ protocols = []
 
 def ws():
   s = sys.stdout
-  if ROSETTAWEB_server_name == 'albana.ucsf.edu':
-      sys.stderr = s # todo: should be removed later
-      #todo: Test this for debugging  
+  if not(settings["LiveWebserver"]):
+      sys.stderr = s
       #cgitb.enable(display=0, logdir="/tmp")
   debug = ''
   
@@ -236,7 +206,7 @@ def ws():
   ####################################### 
 
   # create session object
-  my_session = session.Session(expires=ROSETTAWEB_cookie_expiration, cookie_path='/')
+  my_session = session.Session(expires=settings["CookieExpiration"], cookie_path='/')
   # get time of last visit
   lastvisit = my_session.data.get('lastvisit')
   # set session ID
@@ -297,6 +267,7 @@ def ws():
       # send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
       s.write(str(my_session.cookie) + '\n')
       s.write("Content-type: text/html\n\n")
+      
       s.write(debug)
       my_session.close()
    
@@ -315,8 +286,8 @@ def ws():
     if hostname == DEVELOPMENT_HOST:
       adminWarning = 'Backend not running. Jobs will not be processed immediately.'
   
-  rosettaDD = RosettaDataDir(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir)
-  rosettaHTML = RosettaHTML(ROSETTAWEB_server_name, 'RosettaBackrub', ROSETTAWEB_server_script, ROSETTAWEB_CONTACT, ROSETTAWEB_download_dir, username=username, comment=comment, adminWarning=adminWarning)
+  rosettaDD = RosettaDataDir(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"])
+  rosettaHTML =  RosettaHTML(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"], username=username, comment=comment, adminWarning=adminWarning)
   
   global protocolGroups
   global protocols
@@ -328,7 +299,6 @@ def ws():
   #######################################
   if form.has_key("query") and form["query"].value == "datadir":
     s.write("Content-type: text/html\n\n")
-    
     cryptID = ''
     status = ''
     task = ''
@@ -341,7 +311,7 @@ def ws():
       
       if form.has_key("local") and form["local"].value == "false":
           isLocal = False
-          rosettaDD.download_dir = ROSETTAWEB_remote_download_dir
+          rosettaDD.download_dir = settings["RemoteDownloadDir"]
           rosettaDD.ddir = "../remotedownloads"
           result = getKlabDBConnection().execQuery(sql)
       else:
@@ -646,7 +616,7 @@ The Kortemme Lab Server Daemon
 
       """ % (result[0][1], result[0][2], password)
         
-      if sendMail(ROSETTAWEB_bin_sendmail, Email, ROSETTAWEB_admin_email, "[Kortemme Lab Server] Forgotten Password Request", text) == 1:
+      if sendMail(settings["SendmailBinary"], Email, settings["AdminEmail"], "[Kortemme Lab Server] Forgotten Password Request", text) == 1:
           message = 'New password was send to %s <br><br> \n' % Email
       else:
           password_updated = False
@@ -768,10 +738,10 @@ Have a nice day!
 
 The Kortemme Lab Server Daemon
       
-      """ % (form["firstname"].value, ROSETTAWEB_server_title, ROSETTAWEB_admin_email, form["username"].value, form["firstname"].value, form["lastname"].value)
+      """ % (form["firstname"].value, settings["ServerTitle"], settings["AdminEmail"], form["username"].value, form["firstname"].value, form["lastname"].value)
     
-    sendMail(ROSETTAWEB_bin_sendmail, form["email"].value, ROSETTAWEB_admin_email, "[Kortemme Lab Server] New Account", text)
-    
+    sendMail(settings["SendmailBinary"], form["email"].value, settings["AdminEmail"], "[Kortemme Lab Server] New Account", text)
+
     text_to_admin = """Dear administrator,
     
 A new user account for %s was created:
@@ -783,9 +753,9 @@ Have a nice day!
 
 The Kortemme Lab Server Daemon
 
-    """ % (ROSETTAWEB_server_title, form["username"].value, form["firstname"].value, form["lastname"].value)
+    """ % (settings["ServerTitle"], form["username"].value, form["firstname"].value, form["lastname"].value)
 
-    sendMail(ROSETTAWEB_bin_sendmail, ROSETTAWEB_admin_email, ROSETTAWEB_admin_email, "[Kortemme Lab Server] New Account created", text_to_admin)
+    sendMail(settings["SendmailBinary"], settings["AdminEmail"], settings["AdminEmail"], "[Kortemme Lab Server] New Account created", text_to_admin)
 
   return (process_data, None)
 
@@ -922,7 +892,7 @@ def parsePDB(rosettaHTML, form):
             # This indicates that the file is locally stored 
             pdb_filename = pdb_filename[1:]
             try:
-                F = open(os.path.join(ROSETTAWEB_base_dir, "test", pdb_filename), "r") 
+                F = open(os.path.join(settings["BaseDir"], "test", pdb_filename), "r") 
                 pdbfile = F.read()
                 F.close()
             except Exception, e:
@@ -949,7 +919,7 @@ def parsePDB(rosettaHTML, form):
             # The filename should be generated from always match this if SID is alphanumeric
             try:
                 pdb_filename = sPDB
-                F = open(os.path.join(ROSETTAWEB_temp_dir, pdb_filename), "r") 
+                F = open(os.path.join(settings["TempDir"], pdb_filename), "r") 
                 pdbfile = F.read()
                 F.close()
             except Exception, e:
@@ -1070,7 +1040,7 @@ def submit(rosettaHTML, form, SID):
                 RemoteInformation = {}    
                 StorageDBConnection = DBConnection
                 isLocalJob = True            
-                if ROSETTAWEB_short_server_name != "kortemmelab" and RosettaBinaries[mini]["runOnCluster"]:
+                if not(settings["LiveWebserver"]) and RosettaBinaries[mini]["runOnCluster"]:
                    RemoteInformation = {"UserName": UserName, "Email": Email}
                    StorageDBConnection = getKlabDBConnection()
                    isLocalJob = False
@@ -1088,7 +1058,7 @@ def submit(rosettaHTML, form, SID):
                 # write information to database
                 # Add a dummy hashkey as this field should not be NULL
                 sql = """INSERT INTO backrub ( Date,RemoteInformation,BackrubServer,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
-                                VALUES (NOW(), "%s", "%s", "0", "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (RemoteInformation, ROSETTAWEB_short_server_name, Email, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)
+                                VALUES (NOW(), "%s", "%s", "0", "%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (RemoteInformation, settings["ShortServerName"], Email, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)
                 
                 try: 
                     import random
@@ -1099,7 +1069,7 @@ def submit(rosettaHTML, form, SID):
                     IDtoDelete = ID
                     # create a unique key as name for directories from the ID and host, for the case we need to hide the results
                     # do not just use the ID but also a random sequence
-                    tgb = str(ID) + ROSETTAWEB_db_host + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '')
+                    tgb = str(ID) + settings["SQLHost"] + join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '')
                     cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
                     return_vals = (cryptID, "new", isLocalJob)
            
@@ -1110,14 +1080,14 @@ def submit(rosettaHTML, form, SID):
                     hash_key = StorageDBConnection.generateHash(ID)
             
                     # now find if there's a key like that already:
-                    sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND BackrubServer="%s" AND ID!="%s"''' % (hash_key, ROSETTAWEB_short_server_name, ID)
+                    sql = '''SELECT ID, cryptID, PDBComplexFile FROM backrub WHERE backrub.hashkey="%s" AND (Status="2" OR Status="5") AND BackrubServer="%s" AND ID!="%s"''' % (hash_key, settings["ShortServerName"], ID)
                     result = StorageDBConnection.execQuery(sql)
                     for r in result:
                         if str(r[0]) != str(ID): # if there is ANOTHER, FINISHED simulation with the same hash
                             if isLocalJob:
-                                shutil.copytree(os.path.join(ROSETTAWEB_download_dir, r[1]), os.path.join(ROSETTAWEB_download_dir, cryptID)) # copy the data to a new directory
+                                shutil.copytree(os.path.join(settings["DownloadDir"], r[1]), os.path.join(settings["DownloadDir"], cryptID)) # copy the data to a new directory
                             else:
-                                shutil.copytree(os.path.join(ROSETTAWEB_remote_download_dir, r[1]), os.path.join(ROSETTAWEB_remote_download_dir, cryptID)) # copy the data to a new directory
+                                shutil.copytree(os.path.join(settings["RemoteDownloadDir"], r[1]), os.path.join(settings["RemoteDownloadDir"], cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
                             result = StorageDBConnection.execQuery(sql)
                             return_vals = (cryptID, "old", isLocalJob)
@@ -1138,9 +1108,9 @@ def submit(rosettaHTML, form, SID):
                             localstr = "&local=false"
                             
                         if job[3] == 0:
-                            errors.append('''There is a job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, localstr, job[1], job[0]))
+                            errors.append('''There is a job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) in the active queue with the same parameters. Please wait until it is finished to see the results.''' % (settings["ServerScript"], localstr, job[1], job[0]))
                         elif job[3] == 1:
-                            errors.append('''There is an active job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) running with the same parameters. Please wait until it is finished to see the results.''' % (ROSETTAWEB_server_script, localstr, job[1], job[0]))
+                            errors.append('''There is an active job (<a href="%s?query=jobinfo%s&jobnumber=%s" target="_blank">#%s</a>) running with the same parameters. Please wait until it is finished to see the results.''' % (settings["ServerScript"], localstr, job[1], job[0]))
                         else:
                             errors.append('''Server error checking the job status.''')
                         sql = """DELETE FROM backrub WHERE ID="%s" """ % ID
@@ -1229,14 +1199,14 @@ def queue(form, userid):
     
     #todo: Fix this up with one SQL joined query per server
     
-    thisserver = ROSETTAWEB_short_server_name
+    thisserver = settings["ShortServerName"]
     
     # Get all jobs for this server only which have not expired
     sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
     result1 = DBConnection.execQuery(sql)
     results = []
-    if thisserver == 'albana':
-        # Get all jobs on kortemmelab from albana which have not expired
+    if not (settings["LiveWebserver"]):
+        # Get all jobs on the live webserver which were submitted from this server and which have not expired
         KlabDBConnection = getKlabDBConnection()
         sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver 
         kresult = KlabDBConnection.execQuery(sql)
@@ -1736,7 +1706,7 @@ def SequenceToleranceSKChecks(params, pdb_object):
     success = checkResidues(pdb_object, chainsreslists)
 
     # Test to see if the seqtol resfile would be empty before proceeding 
-    # todo: Tidy this logic up with rosettaseqtol.py and with analysis function of seqtol SK job       
+    # todo: Tidy this logic up with RosettaTasks.py and with analysis function of seqtol SK job       
     all_resids = pdb_object.aa_resids() # todo: Calling this twice (in checkResidues as well)
     resfileHasContents, contents = make_seqtol_resfile(pdb_object, params, ROSETTAWEB_SK_Radius, all_resids)
     
@@ -1828,7 +1798,7 @@ class FrontendProtocols(WebserverProtocols):
 
             elif p.dbname == "sequence_tolerance_SK":
                 # Test server-specific hack to override minimum number of structures for shorter runs
-                if ROSETTAWEB_server_name == 'albana.ucsf.edu':
+                if not(settings["LiveWebserver"]):
                     nos = p.getNumStructures()
                     p.setNumStructures(2, nos[1], nos[2])
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)
@@ -1843,7 +1813,7 @@ class FrontendProtocols(WebserverProtocols):
                 p.progressDisplayHeight = "100px"
             elif p.dbname == "multi_sequence_tolerance":
                 # Test server-specific hack to override minimum number of structures for shorter runs
-                if ROSETTAWEB_server_name == 'albana.ucsf.edu':
+                if not(settings["LiveWebserver"]):
                     nos = p.getNumStructures()
                     p.setNumStructures(2, nos[1], nos[2])
                 p.setSubmitFunction(rosettaHTML.submitformSequenceToleranceSK)

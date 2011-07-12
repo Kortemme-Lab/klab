@@ -6,16 +6,17 @@
 ########################################
 import sys
 import os
-from rosettahelper import server_root
-
-# Cluster debug mode. Sets jobs to use short iterations for quick testing
-CLUSTER_debugmode = False
+from rosettahelper import WebsiteSettings
 
 # Local directories
-cluster_dldir = os.path.join(server_root, "downloads")
-cluster_remotedldir = os.path.join(server_root, "remotedownloads")
-cluster_remotedldir = "/var/www/html/rosettaweb/backrub/remotedownloads"
-cluster_temp = os.path.join(server_root, "temp/cluster")
+settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+server_root = settings["BaseDir"]
+cluster_dldir = settings["ClusterDownloadDir"]
+cluster_remotedldir = settings["ClusterRemoteDownloadDir"]
+cluster_temp = settings["ClusterTemp"]
+
+# Cluster debug mode. Sets jobs to use short iterations for quick testing
+CLUSTER_debugmode = settings["ClusterDebugMode"]
 
 # Cluster netapp directories
 clusterRootDir = "/netapp/home/klabqb3backrub"

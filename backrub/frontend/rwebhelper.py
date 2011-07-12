@@ -9,6 +9,9 @@ import _mysql_exceptions
 
 # Common constants
 
+# Point Mutation
+ROSETTAWEB_max_point_mutation = 31
+
 # Sequence Tolerance (Smith and Kortemme)
 ROSETTAWEB_SK_BoltzmannIncrease = 0.021
 ROSETTAWEB_SK_InitialBoltzmann = 0.228
@@ -19,6 +22,7 @@ ROSETTAWEB_SK_RecommendedNumStructures = 20
 ROSETTAWEB_SK_Radius = 10.0
 ROSETTAWEB_MaxMultiplePointMutations = 30
 ROSETTAWEB_SK_Max_Chains = 6
+ROSETTAWEB_max_seqtol_design = 10
 
 # Contact
 ROSETTAWEB_CONTACT = "Tanja Kortemme"

@@ -14,9 +14,6 @@ import string
 import stat
 import tempfile
 
-server_root = "/var/www/html/rosettaweb/backrub"
-#server_root = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub"
-
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
                     "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
@@ -111,6 +108,79 @@ class RosettaError(Exception):
     def __str__(self):
         return repr(self.ID + ' ' + self.task)
 
+class WebsiteSettings(object):
+    settings = {}
+    base_dir = None
+    
+    def __init__(self, argv, scriptname):
+        self.settings["ServerScript"] = scriptname 
+        self.base_dir = self._getSourceRoot(argv[0])
+        self._read_config_file()
+
+    def _read_config_file(self):
+        base_dir = self.base_dir
+        settings = self.settings
+        settingsFilename = os.path.join(base_dir, "settings.ini")
+            
+        # Read settings from file
+        try:
+            handle = open(settingsFilename, 'r')
+            lines  = handle.readlines()
+            handle.close()
+            for line in lines:
+                if line[0] != '#' and len(line) > 1  : # skip comments and empty lines
+                    # format is: "parameter = value"
+                    list_data = line.split()
+                    if len(list_data) < 3:
+                        raise IndexError(line)
+                    settings[list_data[0]] = list_data[2]
+        except IOError:
+            raise Exception("settings.ini could not be found in %s." % base_dir)
+            sys.exit(2)
+        
+        # Create derived settings
+        settings["BaseDir"] = base_dir
+        settings["BinDir"] = os.path.join(base_dir, "bin")
+        settings["DataDir"] = os.path.join(base_dir, "data")
+        settings["ShortServerName"] = string.split(settings["ServerName"], ".")[0]
+        settings["LiveWebserver"] = bool(int(settings["LiveWebserver"]))
+        settings["ClusterDebugMode"] = bool(int(settings["ClusterDebugMode"]))
+        settings["SQLPort"] = int(settings["SQLPort"])
+        settings["MaxLocalProcesses"] = int(settings["MaxLocalProcesses"])
+        
+        # Constant settings (these can be optionally overwritten in the settings file)
+        if not settings.get("TempDir"):
+            settings["TempDir"] = os.path.join(base_dir, "temp")
+        if not settings.get("EnsembleTempDir"):
+            settings["EnsembleTempDir"] = os.path.join(base_dir, "temp")
+        if not settings.get("DownloadDir"):
+            settings["DownloadDir"] = os.path.join(base_dir, "downloads")
+        if not settings.get("RemoteDownloadDir"):
+            settings["RemoteDownloadDir"] = os.path.join(base_dir, "remotedownloads")
+        if not settings.get("ErrorDir"):
+            settings["ErrorDir"] = os.path.join(base_dir, "error")
+        if not settings.get("StoreTime"):
+            settings["StoreTime"] = 60
+        if not settings.get("CookieExpiration"):
+            settings["CookieExpiration"] = 60 * 60
+        if not settings.get("ClusterDownloadDir"):
+            settings["ClusterDownloadDir"] = os.path.join(base_dir, "downloads")
+        if not settings.get("ClusterRemoteDownloadDir"):
+            settings["ClusterRemoteDownloadDir"] = os.path.join(base_dir, "remotedownloads")
+        if not settings.get("ClusterTemp"):
+            settings["ClusterTemp"] = os.path.join(base_dir, "temp", "cluster")
+
+    def _getSourceRoot(self, scriptfilename):
+        fe = scriptfilename.find("frontend")
+        if fe:
+            return scriptfilename[:fe]
+        be = scriptfilename.find("daemon")
+        if be:
+            return scriptfilename[:be]
+        raise Exception("Cannot determine source root for %s." % scriptfilename)
+
+    def __getitem__(self, index):
+        return self.settings[index]
 
 
 if __name__ == "__main__":

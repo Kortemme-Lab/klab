@@ -22,7 +22,6 @@ from analyze_mini import AnalyzeMini
 from analyze_classic import AnalyzeClassic
 from rosettahelper import * #RosettaError, get_files, grep, make755Directory, makeTemp755Directory
 from RosettaProtocols import *
-from rbutils import *
 import RosettaTasks
 from conf_daemon import *
 from sge import SGEConnection, SGEXMLPrinter
@@ -46,7 +45,7 @@ class RosettaDaemon(Daemon):
     ntrials           = 10000 # THIS SHOULD BE 10000
     logSQL            = False
     logfname          = "RosettaDaemon.log"
-    pidfile           = '/tmp/rosettaweb-rosettadaemon.pid'
+    pidfile           = settings["RosettaPID"]
     email_text_error  = """Dear %s,
     
 An error occurred during your simulation. Please check 
@@ -511,32 +510,21 @@ The Kortemme Lab Server Daemon
                 self.runSQL('UPDATE %s SET Expired=1 WHERE ID=%s' % (self.db_table, del_ID))
                 self.log("%s\t job %s: marked as expired in database\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID ) )
 
-    def configure(self):
-        parameter = read_config_file()
-                
-        self.email_admin            = parameter["email_admin"]
-        self.max_processes          = int(parameter["max_processes"]) # maximal number of processes that can be run at a time
-        self.db_table               = parameter["db_table"]
-        self.server_name            = parameter["server_name"]
-        self.base_dir               = parameter["base_dir"]
-        self.binDir                 = "%sbin" % self.base_dir
-        self.dataDir                = "%sdata" % self.base_dir
-        self.rosetta_tmp            = parameter["rosetta_tmp"]
-        self.rosetta_ens_tmp        = parameter["rosetta_ens_tmp"]
-        self.rosetta_dl             = parameter["rosetta_dl"]
-        self.rosetta_error_dir      = parameter["rosetta_error_dir"]
-        self.store_time             = parameter["store_time"]
-        
-        db_host                = parameter["db_host"]
-        db_name                = parameter["db_name"]
-        db_user                = parameter["db_user"]
-        db_pw                  = parameter["db_pw"]
-        db_port                = int(parameter["db_port"])
-        db_socket              = parameter["db_socket"]
-        db_numTries            = 32
-        self.DBConnection      = rosettadb.RosettaDB(db_host, db_name, db_user, db_pw, db_port, db_socket, self.store_time, db_numTries)
-
-        if self.server_name == 'albana.ucsf.edu':
+    def configure(self):                
+        self.email_admin            = settings["AdminEmail"]
+        self.max_processes          = settings["MaxLocalProcesses"] # maximum number of processes that can be run at a time
+        self.db_table               = settings["SQLTable"]
+        self.server_name            = settings["ServerName"]
+        self.base_dir               = settings["BaseDir"]
+        self.binDir                 = settings["BinDir"]
+        self.dataDir                = settings["DataDir"]
+        self.rosetta_tmp            = settings["TempDir"]
+        self.rosetta_ens_tmp        = settings["EnsembleTempDir"]
+        self.rosetta_dl             = settings["DownloadDir"]
+        self.rosetta_error_dir      = settings["ErrorDir"]
+        self.store_time             = settings["StoreTime"]
+        self.DBConnection      = rosettadb.RosettaDB(settings, numTries = 32)
+        if not settings["LiveWebserver"]:
             self.ntrials = 10        
             
     #############################################################################################
@@ -1036,7 +1024,7 @@ class ClusterDaemon(RosettaDaemon):
     
     MaxClusterJobs    = 3
     logfname          = "ClusterDaemon.log"
-    pidfile           = '/tmp/rosettaweb-clusterdaemon.pid'
+    pidfile           = settings["ClusterPID"]
     
     def __init__(self, stdout, stderr):
         super(ClusterDaemon, self).__init__(stdout, stderr)        
@@ -1488,7 +1476,7 @@ class ClusterProtocols(WebserverProtocols):
             protocols.remove(rp)
                 
 if __name__ == "__main__":
-    temppath = os.path.join(server_root, 'temp')
+    temppath = os.path.join(settings["BaseDir"], 'temp')
              
     if len(sys.argv) > 1:
         if len(sys.argv) == 2:
@@ -1529,7 +1517,7 @@ if __name__ == "__main__":
             sys.exit(0)
         elif 'test' == sys.argv[1]:
             UserID = 106
-            inputDirectory = os.path.join(server_root, "test")
+            inputDirectory = os.path.join(settings["BaseDir"], "test")
             if 'db' == sys.argv[2] and sys.argv[3]:
                 UserID = 25
                 Email = "test@bob.co"
@@ -1560,14 +1548,8 @@ if __name__ == "__main__":
                     import random
                     import md5
                     
-                    db_host                = "localhost"
-                    db_name                = "rosettaweb"
-                    db_user                = "rosettaweb"
-                    db_pw                  = sys.argv[3]
-                    db_port                = 3306
-                    db_socket              = "/var/lib/mysql/mysql.sock"
                     db_numTries            = 32
-                    DBConnection = rosettadb.RosettaDB(db_host, db_name, db_user, db_pw, db_port, db_socket, 60, db_numTries)
+                    DBConnection = rosettadb.RosettaDB(settings, numTries = db_numTries)
                     
                     lockstr = "backrub WRITE, Users READ"         
                     DBConnection.execQuery("LOCK TABLES %s" % lockstr)

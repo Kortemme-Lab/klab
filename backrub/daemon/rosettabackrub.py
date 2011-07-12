@@ -17,7 +17,6 @@ import shutil
 import tempfile
 import subprocess
 
-from rbutils import read_config_file
 from rosettahelper import * 
 from rosettaexec import RosettaExec
 from analyze_mini import AnalyzeMini
@@ -124,7 +123,9 @@ class RosettaBackrub(RosettaExec):
     """gather data for the command line and start the job"""
     
     ntrials = "10000" # should be 10000 on the live webserver
-    if read_config_file()["server_name"] == 'albana.ucsf.edu':
+    
+    settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+    if not(settings["LiveWebserver"]):
         ntrials = "10"
             
     args = [ "-database", self.dbdir, 
