@@ -20,7 +20,11 @@ msubdir = "cluster/"
 if __name__ == "__main__":
     msubdir = ""
 
-settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+if os.environ.get('PWD'):
+    settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+else:
+    settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+
 thisloc = os.path.join(settings["BaseDir"], "daemon", "cluster")
 JITSpaceTree = readFile(os.path.join(thisloc, "JITSpaceTree.js"))
 JITForceDirected = readFile(os.path.join(thisloc, "JITForceDirected.js"))

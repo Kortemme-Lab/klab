@@ -98,7 +98,7 @@ The Kortemme Lab Server Daemon
             return False
     
     def log(self, str):
-        str = "<daemon time='%s'>%s</daemon>" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str)
+        str = "<daemon time='%s'>%s</daemon>\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str)
         if CLUSTER_debugmode:
             print(str)
         else:
@@ -113,7 +113,7 @@ The Kortemme Lab Server Daemon
         self.running_P = 0          # total no of jobs
         self.running_S = 0          # sequence tolerance
         
-        self.log("%s\tStarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        self.log("Started.")
         
         # if there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
         try:
@@ -123,7 +123,7 @@ The Kortemme Lab Server Daemon
                     if self.kill_process(simulation[2]): # checks if process was killed
                         self.runSQL("UPDATE %s SET Status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
                     else:
-                        self.log("%s\t process not killed: ID %s PID %s\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), simulation[0], simulation[2]) )
+                        self.log("Process not killed: ID %s PID %s." % (simulation[0], simulation[2]) )
                 else:
                     self.runSQL("UPDATE %s SET Status=0 WHERE ID=%s" % (self.db_table, simulation[0]))
         except TypeError: # iteration over non-sequence, i.e. results is empty
@@ -135,7 +135,7 @@ The Kortemme Lab Server Daemon
             if self.running_P != len(self.list_RosettaPP):
                 self.running_P = len(self.list_RosettaPP)
                 # only write this on change so the actual file doesn't get too big.
-                self.log("Running processes: %d" % self.running_P)
+                self.log("Running processes: %d." % self.running_P)
             
             # make sure this is written to the disk            
             sys.stdout.flush()
@@ -150,7 +150,7 @@ The Kortemme Lab Server Daemon
                 error = ""
                 if rosetta_object.is_done():
                     if rosetta_object.exit == "terminated":
-                        self.log("%s\t error: ID %s PROCESS TERMINATED\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID) )
+                        self.log("Error: ID %s PROCESS TERMINATED." % ID)
                         error = "Terminated"
                     else:
                         # call clean up function
@@ -158,7 +158,7 @@ The Kortemme Lab Server Daemon
                             (status, error, ID) = self.end_job(rosetta_object)
                             error = '' # since error should already be set by end_job
                         except IndexError:
-                            self.log("%s\t error: ID %s end_job failed, job terminated externally\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID) )
+                            self.log("Error: ID %s end_job failed, job terminated externally." % ID)
                             error = "Terminated"
                     
                     # remove object
@@ -179,7 +179,7 @@ The Kortemme Lab Server Daemon
             try:
                 self.delete_data()
             except Exception, e:
-                self.log("%s\t error: self.delete()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
+                self.log("Error: self.delete()\n%s." % traceback.format_exc()) 
             if len(self.list_RosettaPP) < self.max_processes:
                 # Start any queued jobs
                 ID = None
@@ -198,7 +198,7 @@ The Kortemme Lab Server Daemon
                             break
                     time.sleep(3) # wait 3 seconds after a job was started
                 except Exception, e:
-                    self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
+                    self.log("Error: self.run()\n%s." % traceback.format_exc())
                     if ID:
                         self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))                  
                     time.sleep(10)
@@ -212,7 +212,7 @@ The Kortemme Lab Server Daemon
         
         pid = None
         try:
-            self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, mini, task) )
+            self.log("Start new job ID = %s, mini = %s, %s." % (ID, mini, task) )
             
             # todo: The "task" dict entry is a hack for the mutations protocols. Remove when their functions are separated out            
             params = pickle.loads(ProtocolParameters)
@@ -223,7 +223,7 @@ The Kortemme Lab Server Daemon
                     return p.startFunction(ID, pdb_info, pdb_filename, mini, ensemble_size, params)
           
         except Exception, e: 
-            self.log("%s\t error: start_job() ID = %s\n%s\n\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, traceback.format_exc() ) )
+            self.log("Error: start_job() ID = %s\n%s." % (ID, traceback.format_exc() ) )
             
         return pid
 
@@ -235,7 +235,7 @@ The Kortemme Lab Server Daemon
         for p in self.protocols:
             if p.dbname == task:
                 if p.checkFunction(r_object, ensembleSize, pdb_id, job_id, task, binaryName):
-                    self.log("%s\t\t check_files() ID = %s, task = %s : all files successfully created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
+                    self.log("Check_files() ID = %s, task = %s : all files successfully created." % (job_id, task))
                     return True
         return False
     
@@ -249,7 +249,7 @@ The Kortemme Lab Server Daemon
             We are lock-happy here but SQL performance is not currently an issue daemon-side. 
             """ 
         if self.logSQL:
-            self.log("SQL: %s\n" % query)
+            self.log("SQL: %s." % query)
         results = []
         try:
             lockstr = alternateLocks or "%s WRITE, Users READ" % self.db_table         
@@ -257,7 +257,7 @@ The Kortemme Lab Server Daemon
             results = self.DBConnection.execQuery(query, parameters)
         except Exception, e:
             self.DBConnection.execQuery("UNLOCK TABLES")
-            self.log("\n%s\n" % e)
+            self.log("%s." % e)
             self.log(traceback.format_exc())
             raise Exception
         self.DBConnection.execQuery("UNLOCK TABLES")
@@ -319,8 +319,7 @@ The Kortemme Lab Server Daemon
 
         except Exception, e:
             ID = rosetta_object.get_ID()
-            XX = "%s\t error: end_job() ID %s - postprocessing error\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID )
-            self.log("%s\n%s*******************************\n" % (XX, traceback.format_exc()) )
+            self.log("Error: end_job() ID %s - postprocessing error.\n%s" % (ID, traceback.format_exc()) )
             self.runSQL('UPDATE %s SET Errors="Postprocessing", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
             state["error"] = "Postprocessing"
             
@@ -342,7 +341,7 @@ The Kortemme Lab Server Daemon
             self.copyAndZipOutputFiles(rosetta_object, ID, task, cryptID)    
         except Exception, e:
             ID = rosetta_object.get_ID()
-            self.log("%s\t error: end_job() ID = %s - error moving files\n*******************************\n%s*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, traceback.format_exc() ) )
+            self.log("Error: end_job() ID = %s - error moving files.\n%s" % (ID, traceback.format_exc() ) )
             self.runSQL('UPDATE %s SET Errors="Terminated", Status=4 WHERE ID=%s' % ( self.db_table, ID ))
             error = "error moving files"
             
@@ -422,12 +421,12 @@ The Kortemme Lab Server Daemon
 
         if mailTXT != '' and user_name != "guest":
             if not self.sendMail(user_email, self.email_admin, subject, mailTXT):
-                self.log("%s\t error: sendMail() ID = %s" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )                
+                self.log("Error: sendMail() ID = %s." % ID )                 
                 self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
         
         if adminTXT != '':
             if not self.sendMail(self.email_admin, self.email_admin, subject, adminTXT):
-                self.log("%s\t error: sendMail() ID = %s" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )                
+                self.log("Error: sendMail() ID = %s." % ID )                
                 self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
                 
     def exec_cmd(self, cmd, run_dir):
@@ -452,10 +451,10 @@ The Kortemme Lab Server Daemon
         # Delete jobs whose time has expired
         
         # get due runs for guest user        
-        data = self.runSQL('SELECT br.ID, br.cryptID, br.EndDate, br.Status FROM %s br, Users u WHERE u.UserName="guest" AND br.Expired=0 AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time_guest ), "Users AS u READ, %s AS br WRITE" % self.db_table) or []
+        data = self.runSQL('SELECT br.ID, br.cryptID, br.EndDate, br.Status, br.BackrubServer FROM %s br, Users u WHERE  u.UserName="guest" AND br.Expired=0 AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time_guest ), "Users AS u READ, %s AS br WRITE" % self.db_table) or []
   
         #get due runs for all others
-        sqlquery = 'SELECT br.ID, br.cryptID, br.EndDate, br.Status FROM %s br, Users u WHERE u.UserName!="guest" AND br.Expired=0 AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time )
+        sqlquery =         'SELECT br.ID, br.cryptID, br.EndDate, br.Status, br.BackrubServer FROM %s br, Users u WHERE u.UserName!="guest" AND br.Expired=0 AND br.UserID=u.ID AND DATE_ADD(EndDate, INTERVAL %s DAY) < NOW() AND br.Status!="5"' % ( self.db_table, self.store_time )
         data += self.runSQL(sqlquery, "Users AS u READ, %s AS br WRITE" % self.db_table)
         
         if len(data) > 0:
@@ -485,34 +484,40 @@ The Kortemme Lab Server Daemon
                 columns = [col[0] for col in columns_raw]
                 
                 if x[3] in [2,4]: # done and error
-                    dir_from = "%s%s" % (self.rosetta_dl, cryptID)
-                    dir_to   = "%sarchive/%s" % (self.rosetta_tmp[:-5], del_ID)
+                    if settings["LiveWebserver"]:
+                        if x[4] == 'kortemmelab':
+                            dir_from = os.path.join(self.rosetta_dl, cryptID)
+                        else:
+                            dir_from = os.path.join(self.rosetta_remotedl, cryptID)
+                    else:
+                        raise Exception("Error archiving job %s." % str(del_ID))
+                    dir_to   = os.path.join(self.rosetta_tmp[:-5], "archive", str(del_ID))
                     try:
                         if not os.path.exists(dir_from):
-                            self.log("<error>Cannot find path %s for archival.</error>\n" % dir_from)
+                            self.log("<error>Cannot find path %s for archival.</error>" % dir_from)
                             raise
                         
-                        handle_param = open("%s/DB.txt" % (dir_from), 'w')
+                        handle_param = open(os.path.join(dir_from, "DB.txt"), 'w')
                         for i in range(len(data)-1):
                             handle_param.write('%s\t%s\n' % (columns[i],str(data[0][i])))
                         handle_param.close()
                         
                         os.rename( dir_from, dir_to ) # copy directory
-                        self.log("%s\t job %s: directory moved: %s -> %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID, dir_from, dir_to ) )
+                        self.log("Job %s: directory moved: %s -> %s." % (del_ID, dir_from, dir_to ) )
                         
                         # let's delete the zip file to save space:
                         # todo: why not keep *just* the zip file if it has everything else?
                         try:
-                            os.remove( '%s/data_%s.zip' % (dir_to,del_ID) )
+                            os.remove(os.path.join(dir_to, 'data_%s.zip' % del_ID))
                         except:
                             pass
                     except Exception, e:
-                        self.log("<error>%s\n%s\t job %s: couldn't move directory: %s -> %s</error>\n\n" % (traceback.format_exc(), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID, dir_from, dir_to ) )
+                        self.log("<error>%s\nJob %s: couldn't move directory: %s -> %s</error>" % (traceback.format_exc(), del_ID, dir_from, dir_to ))
                         break
                  
                 # Keep the data in the database but mark it as expired
                 self.runSQL('UPDATE %s SET Expired=1 WHERE ID=%s' % (self.db_table, del_ID))
-                self.log("%s\t job %s: marked as expired in database\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), del_ID ) )
+                self.log("Job %s: marked as expired in database." % del_ID )
 
     def configure(self):                
         self.email_admin            = settings["AdminEmail"]
@@ -525,6 +530,7 @@ The Kortemme Lab Server Daemon
         self.rosetta_tmp            = settings["TempDir"]
         self.rosetta_ens_tmp        = settings["EnsembleTempDir"]
         self.rosetta_dl             = settings["DownloadDir"]
+        self.rosetta_remotedl       = settings["RemoteDownloadDir"]
         self.rosetta_error_dir      = settings["ErrorDir"]
         self.store_time             = settings["StoreTime"]
         self.DBConnection      = rosettadb.RosettaDB(settings, numTries = 32)
@@ -718,7 +724,7 @@ The Kortemme Lab Server Daemon
                     updatesql = 'UPDATE %s SET ProtocolParameters="%s" WHERE ID=%s' % (self.db_table, ProtocolParameters, simulation[0])
                     sqlupdates.append(updatesql)
                     if False and self.runSQL(updatesql) == None: # Enable this line to update the database
-                        self.log("Update failed on record %d" % id)
+                        self.log("Update failed on record %d." % id)
                     
             print(string.join(sqlupdates,"\n"))
             print(string.join(errors,"\n"))
@@ -744,7 +750,7 @@ The Kortemme Lab Server Daemon
         
         # create working directory
         w_dir = object_rosetta.make_workingdir()
-        self.log("%s\t mutation job preprocessing started in directory %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), w_dir) )
+        self.log("Mutation job preprocessing started in directory %s." % w_dir)
         
         # copy pdb data in object and get filename
         fn_pdb = object_rosetta.set_pdb(pdb_filename, pdb_info)
@@ -757,7 +763,7 @@ The Kortemme Lab Server Daemon
         chain_parameter = [] # ["-read_all_chains"]
         resid2type = object_rosetta.pdb.aa_resid2type()
         
-        self.log("%s\t start_job_preprocessing() ID = %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
+        self.log("Start_job_preprocessing() ID = %s." % ID )
         
         task = params["task"] # hack (see above)
         
@@ -897,8 +903,8 @@ The Kortemme Lab Server Daemon
             r_command = object_rosetta.command
         
         pid = object_rosetta.get_pid()
-        self.log("%s %s: mutation job started with pid: %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, pid ) )
-        self.log("%s %s: %s\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, r_command ) )
+        self.log("Mutation job %s started with pid: %s." % (ID, pid ) )
+        self.log("%s: %s." % (ID, r_command ) )
         return pid
         
     def CheckMutations(self, r_object, ensembleSize, pdb_id, job_id, task, binaryName):
@@ -915,9 +921,9 @@ The Kortemme Lab Server Daemon
                 postprocessingBinary = "%s/%s" % (self.binDir, binary["postprocessing"])              
                 analysis = AnalyzeMini(filename="%s/stdout_%s.dat" % ( workingdir, job_id) )
                 if not analysis.analyze(outfile="%s/scores_detailed.txt" % workingdir, outfile2="%s/scores_overall.txt" % workingdir):
-                    self.log("%s\t\t check_files() ID = %s : individual scores could not be created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id ) )
+                    self.log("Check_files() ID = %s : individual scores could not be created." % job_id )
                 if not analysis.calculate_residue_scores( self.base_dir, postprocessingBinary, databaseDir, workingdir, "%s/scores_residues.txt" % workingdir ):
-                    self.log("%s\t\t check_files() ID = %s : residue energies could not be calculated\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id ) )
+                    self.log("Check_files() ID = %s : residue energies could not be calculated." % job_id )
                         
                 x = 1
                 while x <= ensembleSize:
@@ -941,7 +947,7 @@ The Kortemme Lab Server Daemon
               
                 analysis = AnalyzeClassic(filename="%s/stdout_%s.dat" % ( workingdir, job_id) )
                 if not analysis.analyze(outfile="%s/scores_detailed.txt" % workingdir, outfile2="%s/scores_overall.txt" % workingdir):
-                    self.log("%s\t\t check_files() ID = %s : individual scores could not be created\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id ) )
+                    self.log("Check_files() ID = %s : individual scores could not be created." % job_id )
                 
                 x = 1
                 while x <= ensembleSize:
@@ -970,8 +976,8 @@ The Kortemme Lab Server Daemon
                 # handle_out.close()
                 
         except:
-            self.log("%s\t\t check_files() ID = %s, task = %s : failed\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), job_id, task ) )
-            self.log("Exception: %s\n" % traceback.format_exc())
+            self.log("Check_files() ID = %s, task = %s : failed." % (job_id, task ) )
+            self.log("Exception: %s." % traceback.format_exc())
             return False
         
         return True
@@ -1062,8 +1068,7 @@ class ClusterDaemon(RosettaDaemon):
             self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, "%s. %s." % (str(_traceback), str(_exception)), jobID))
         else:
             self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, jobID))
-        self.log("Error: The %s job %d failed at some point:" % (clusterjob.suffix, jobID))
-        self.log(errormsg)
+        self.log("Error: The %s job %d failed at some point:\n%s" % (clusterjob.suffix, jobID, errormsg))
         
     def run(self):
         """The main loop and job controller of the daemon."""
@@ -1182,8 +1187,7 @@ class ClusterDaemon(RosettaDaemon):
                         # Also, never let the list grow too large as the daemon should be able to run a long time                        
                         self.log("Starting job %d." % jobID)
                         if jobID in self.recentDBJobs:
-                            self.log("Error: Trying to run database job %d multiple times." % jobID) 
-                            self.log("Error: Trying to run database job %d multiple times.\n" % jobID)
+                            self.log("Error: Trying to run database job %d multiple times." % jobID)
                             raise
                         self.recentDBJobs.append(jobID)
                         if len(self.recentDBJobs) > 400:
@@ -1202,7 +1206,7 @@ class ClusterDaemon(RosettaDaemon):
             except Exception, e:
                 newclusterjob = newclusterjob or self._clusterjobjuststarted
                 self._clusterjobjuststarted = None
-                self.log("Error: self.run()\n%s\n\n" % traceback.format_exc())
+                self.log("Error: self.run()\n%s" % traceback.format_exc())
                 if newclusterjob:
                     newclusterjob.kill()
                     self.recordErrorInJob(newclusterjob, "Error starting job.", traceback.format_exc(), e)
@@ -1210,7 +1214,7 @@ class ClusterDaemon(RosettaDaemon):
                         self.runningJobs.remove(newclusterjob)
                 else:
                     self.runSQL('UPDATE %s SET Errors="Start.%s%s", Status=4 WHERE ID=%s' % ( self.db_table, traceback.format_exc(), e, str(jobID) ))                                      
-                self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
+                self.log("Error: self.run()\n%s" % traceback.format_exc())
             self._clusterjobjuststarted = None
 
     def start_job(self, task, params, server):
@@ -1224,7 +1228,7 @@ class ClusterDaemon(RosettaDaemon):
         else:
             dldir = cluster_remotedldir
             
-        self.log("%s\t start new job ID = %s, mini = %s, %s \n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID, params["binary"], task) )
+        self.log("Start new job ID = %s, mini = %s, %s." % (jobID, params["binary"], task) )
         if task == "sequence_tolerance":
             clusterjob = RosettaTasks.SequenceToleranceHKJob(self.sgec, params, netappRoot, cluster_temp, dldir)   
         elif task == "sequence_tolerance_SK":
@@ -1320,7 +1324,7 @@ class ClusterDaemon(RosettaDaemon):
         try:
             return clusterjob.moveFilesTo()
         except Exception, e:
-            self.log("moveFilesOnJobCompletion failure. Error moving files to the download directory.\n")
+            self.log("moveFilesOnJobCompletion failure. Error moving files to the download directory.")
             self.log("%s\n%s" % (str(e), traceback.print_exc()))        
     
     def copyAndZipOutputFiles(self, clusterjob, task):
@@ -1371,7 +1375,7 @@ class ClusterDaemon(RosettaDaemon):
         try:
             clusterjob.removeClusterTempDir()
         except Exception, e:
-            self.log("Error removing the temporary directory on the cluster.\n")
+            self.log("Error removing the temporary directory on the cluster.")
             self.log("%s\n%s" % (str(e), traceback.print_exc()))        
 
     #upgradetodo: Add these to the scheduler
@@ -1395,18 +1399,18 @@ class ClusterDaemon(RosettaDaemon):
 
         if os.path.exists(rosetta_object.workingdir + '/failed_minimization.txt'):
             ID = rosetta_object.get_ID()
-            self.log("%s\t error: ID %s SEQTOL MINIMIZATION FAILED\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
+            self.log("Error: ID %s SEQTOL MINIMIZATION FAILED" % ID )
             self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
                             
         elif os.path.exists(rosetta_object.workingdir + '/failed_backrub.txt'):
             failed_handle = open(rosetta_object.workingdir + '/backrub_failed.txt','r')
             ID = rosetta_object.get_ID()
             if len(failed_handle.readlines()) == 2:
-                self.log("%s\t error: ID %s SEQTOL BACKRUB TERMINATED\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID ) )
+                self.log("Error: ID %s SEQTOL BACKRUB TERMINATED" % ID )
                 self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))    
             else: # individual files missing
                 no_failed = len(failed_handle.readlines()) - 2
-                self.log("%s\t error: ID %s SEQTOL BACKRUB FAILED %s\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, no_failed ) )
+                self.log("Error: ID %s SEQTOL BACKRUB FAILED %s" % (ID, no_failed ) )
                 self.runSQL('UPDATE %s SET Errors="backrub failed" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
         
         elif os.path.exists(rosetta_object.workingdir + '/failed_jobs.txt'):
@@ -1414,7 +1418,7 @@ class ClusterDaemon(RosettaDaemon):
             no_failed = len(failed_handle.readlines())
             failed_handle.close()  
             ID = rosetta_object.get_ID()
-            self.log("%s\t warning: ID %s SEQTOL RUNS TERMINATED %s\n*******************************\n" % ( datetime.now().strftime("%Y-%m-%d %H:%M:%S"), ID, no_failed ) )
+            self.log("Warning: ID %s SEQTOL RUNS TERMINATED %s" % (ID, no_failed ) )
             self.runSQL('UPDATE %s SET Errors="Terminated" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
 
     #upgradetodo: Add these to the scheduler
@@ -1491,16 +1495,20 @@ class ClusterProtocols(WebserverProtocols):
                 
 if __name__ == "__main__":
     temppath = os.path.join(settings["BaseDir"], 'temp')
-             
+    
+    printUsageString = True
     if len(sys.argv) > 1:
         if len(sys.argv) == 2:
             daemon = RosettaDaemon(os.path.join(temppath, 'running.log'), os.path.join(temppath, 'running.log'))
+            printUsageString = False
             if 'start' == sys.argv[1]:
                 daemon.start()
             elif 'stop' == sys.argv[1]:
                 daemon.stop()
             elif 'restart' == sys.argv[1]:
                 daemon.restart()
+            else:
+                printUsageString = True
         elif 'db' == sys.argv[1]:
             #todo: separate out the db functions from RosettaDaemon
             daemon = RosettaDaemon(os.path.join(temppath, 'dbrunning.log'), os.path.join(temppath, 'dbrunning.log'))
@@ -1715,6 +1723,7 @@ if __name__ == "__main__":
                     sys.exit(2)
             sys.exit(0)
         
-    print "usage: %s start|stop|restart|cluster start|cluster stop|cluster restart|db check|db rehash|db convert|test add [sk|hk]|test remove <id>" % sys.argv[0]
+    if printUsageString:
+        print "usage: %s start|stop|restart|cluster start|cluster stop|cluster restart|db check|db rehash|db convert|test add [sk|hk]|test remove <id>" % sys.argv[0]
     sys.exit(2)
 

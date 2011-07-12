@@ -30,7 +30,11 @@ from analyze_mini import AnalyzeMini
 from ClusterTask import ClusterTask, ClusterScript, getClusterDatabasePath, FAILED_TASK
 from ClusterScheduler import TaskScheduler, RosettaClusterJob
 
-settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+if os.environ.get('PWD'):
+    settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+else:
+    settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+
 server_root = settings["BaseDir"]
 specificityRScript = os.path.join(server_root, "daemon", "specificity.R")
 specificity_classicRScript = os.path.join(server_root, "daemon", "specificity_classic.R")

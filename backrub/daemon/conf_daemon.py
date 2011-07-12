@@ -9,7 +9,11 @@ import os
 from rosettahelper import WebsiteSettings
 
 # Local directories
-settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+if os.environ.get('PWD'):
+    settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+else:
+    settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+    
 server_root = settings["BaseDir"]
 cluster_dldir = settings["ClusterDownloadDir"]
 cluster_remotedldir = settings["ClusterRemoteDownloadDir"]
