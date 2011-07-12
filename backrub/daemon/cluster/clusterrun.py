@@ -23,6 +23,7 @@ from sge import SGEConnection, SGEXMLPrinter
 from Graph import JITGraph
 
 dlDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/clusterstandalone"
+inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/test/"
 sgec = SGEConnection()
 
 if not os.path.exists(netappRoot):
@@ -33,8 +34,6 @@ if not os.path.exists(cluster_temp):
     make755Directory(cluster_temp)
 if not os.path.exists(dlDirectory):
     make755Directory(dlDirectory)
-
-inputDirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/test/"
 
 # copied from rosetta_daemon
 def printStatus(sgec, statusprinter, diffcounter):
@@ -105,12 +104,13 @@ def testMultiSequenceToleranceSKCommon(extraparams):
     return params  
 
 def testSequenceToleranceHKAnalysis(extraparams):
+    '''To use this to check the analysis functions, set the extraparams in the tests table below.'''
     params = {
                 "radius"            : 5.0,  #todo: Set this in the constants file instead
-                "Partners"          : ["A", "B"],
-                "Designed"          : {"A" : [], "B" : [3, 4, 5, 6]} # todo: Test when "A" not defined
+                "Partners"          : ["B", "C"],
+                "Designed"          : {"B" : [], "C" : [311]} # todo: Test when "A" not defined
                 }
-    setupParameters("seqtolHK", 1934, "2PDZ.pdb", 49, params)            
+    setupParameters("seqtolHK", 2017, "1FRT.pdb", 10, params)            
     return RosettaTasks.SequenceToleranceHKJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
 
 def testMultiSequenceToleranceSKAnalysis(extraparams):
@@ -133,7 +133,7 @@ def testSequenceToleranceHK(extraparams):
 def run():
     tests = {
         "HK"           : {"testfn" : testSequenceToleranceHK,               "analysisOnly" : False, "extraparams" : None},
-        "HKAnalysis"   : {"testfn" : testSequenceToleranceHKAnalysis,       "analysisOnly" : True,  "extraparams" : ("/var/www/html/rosettaweb/backrub/remotedownloads/74cf257f89c8795d18c9b193afd4442a", 6185056)},
+        "HKAnalysis"   : {"testfn" : testSequenceToleranceHKAnalysis,       "analysisOnly" : True,  "extraparams" : ("/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/testhk/tmphYbm4h_seqtolHK/", 6217160)},
         "SKJMB"        : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : "seqtolJMB"},
         "SKP1"         : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : "seqtolP1"},
         "1KI1"         : {"testfn" : testMultiSequenceToleranceSK,          "analysisOnly" : False, "extraparams" : None},
@@ -186,5 +186,5 @@ def run():
                     print(traceback.print_exc())
                     print(e)
      
-test = "HK"       
+test = "HKAnalysis"       
 run()

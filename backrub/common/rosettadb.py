@@ -168,17 +168,16 @@ class RosettaDB:
             except MySQLdb.OperationalError, e:
                 errcode = e[0]
                 # errcode 1100 is an error with table locking
-                # @debug:
-                sys.stderr.write("\nSQL execution error in query at %s:" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-                sys.stderr.write("\n %s." % sql)
-                sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
-                #traceback.print_exc()
                 self.connection.ping(True)
                 caughte = e
                 continue
             except:                
                 traceback.print_exc()
                 break
+        
+        sys.stderr.write("\nSQL execution error in query at %s:" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        sys.stderr.write("\n %s." % sql)
+        sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
         raise MySQLdb.OperationalError(caughte)
         #return None
 

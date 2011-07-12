@@ -30,7 +30,7 @@ from analyze_mini import AnalyzeMini
 from ClusterTask import ClusterTask, ClusterScript, getClusterDatabasePath, FAILED_TASK
 from ClusterScheduler import TaskScheduler, RosettaClusterJob
 
-settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+settings = WebsiteSettings(sys.argv, os.environ['PWD'])
 server_root = settings["BaseDir"]
 specificityRScript = os.path.join(server_root, "daemon", "specificity.R")
 specificity_classicRScript = os.path.join(server_root, "daemon", "specificity_classic.R")
@@ -588,13 +588,13 @@ class SequenceToleranceHKJob(RosettaClusterJob):
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.residues      = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
         self.backrub       = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
-        self.parameters["radius"] = 10.0        
         super(SequenceToleranceHKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
     
     def _initialize(self):
         self.describe()
         
         parameters = self.parameters
+        parameters["radius"] = 10.0        
         
         # Fill in missing parameters to avoid bad key lookups
         designed = parameters['Designed']
@@ -785,6 +785,10 @@ class SequenceToleranceHKJob(RosettaClusterJob):
             list_files.append(file.split('/')[-1].strip())
         list_files.sort()
         
+        GeneticAlgorithmResultsString = re.compile("^\s*FIT\s*INT\s*FOLD")
+        ExhaustiveSearchResultsString = re.compile("^\s*INT\s*FOLD")
+        
+        searchtype = None
         for filename in self.list_outfiles:
             si = int(filename.split('.')[-1]) # get the run id
             output_handle = open(filename, 'r')
@@ -793,24 +797,48 @@ class SequenceToleranceHKJob(RosettaClusterJob):
             for line in output_handle:
                 if line.find("Done with initialization.  Starting individual sequence calculations"):
                     break
-            for line in output_handle:            
-                if line[0:10] == "Generation":
-                    GenNumber = int(line[12:13])
-                    break
-                
-            # Now the stuff we actually need to read in:
+            
             for line in output_handle:
-                if line[0:10] == "Generation":
-                    GenNumber = int(line[12:13])
-                    pass
-                elif len(line) > 1:          # normal line is not empty and the sequence is at the beginning
-                    data_line = line.split() # (sequence, fitness, interface score, complex score)
-                    # Index over both score and sequence to remove any duplicates
-                    sequences_list_total[(float(data_line[2]), data_line[0])] = (GenNumber, si)
-                else:
-                    break # break for the first empty line. This means we're done.
-            output_handle.close() 
-        
+                if GeneticAlgorithmResultsString.match(line):
+                    # Genetic algorithm - Generations data follows
+                    searchtype = 2
+                    break
+                elif ExhaustiveSearchResultsString.match(line):
+                    # Exhaustive search - No generations data follows
+                    searchtype = 1
+                    break            
+            if not searchtype:
+                PostProcessingException("Could not find sequence scores.")
+            elif searchtype == 1:
+                # Exhaustive search
+                for line in output_handle:
+                    if len(line) > 1:          # normal line is not empty and the sequence is at the beginning
+                        data_line = line.split() # (sequence, interface score, complex score)
+                        # Index over both score and sequence to remove any duplicates
+                        sequences_list_total[(float(data_line[1]), data_line[0])] = (1, si)
+                    else:
+                        break # break for the first empty line. This means we're done.
+                    
+            elif searchtype == 2:
+                # Genetic algorithm
+                for line in output_handle:            
+                    if line[0:10] == "Generation":
+                        GenNumber = int(line[12:13])
+                        break
+                    
+                # Now the stuff we actually need to read in:
+                for line in output_handle:
+                    if line[0:10] == "Generation":
+                        GenNumber = int(line[12:13])
+                        pass
+                    elif len(line) > 1:          # normal line is not empty and the sequence is at the beginning
+                        data_line = line.split() # (sequence, fitness, interface score, complex score)
+                        # Index over both score and sequence to remove any duplicates
+                        sequences_list_total[(float(data_line[2]), data_line[0])] = (GenNumber, si)
+                    else:
+                        break # break for the first empty line. This means we're done.
+            
+            output_handle.close()         
         self.sequences_list_total = sequences_list_total
         self.list_files = list_files
     
@@ -850,7 +878,7 @@ class SequenceToleranceHKJob(RosettaClusterJob):
         
         if not self.sequences_list_total:
             sys.stderr.write("There were no sequences for the fasta file. Try increasing the value of pop_size.")
-            raise PostProcessingException
+            raise PostProcessingException(traceback.format_exc())
           
         fasta_file = self._targetdir_file_path("tolerance_sequences.fasta")
         handle_fasta = open(fasta_file, 'w')
@@ -1039,11 +1067,11 @@ class SequenceToleranceSKJob(RosettaClusterJob):
         # The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
         self.map_res_id = {}
         super(SequenceToleranceSKJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
-        self.parameters["radius"] = 10.0        
         
     def _initialize(self):
         self.describe()
         self._checkBinaries()
+        self.parameters["radius"] = 10.0        
         
         # Create input files
         self._import_pdb(self.parameters["pdb_filename"], self.parameters["pdb_info"])
@@ -1307,7 +1335,7 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
          
         self.describe()
         self._checkBinaries()
-        
+                
         # Create input files
         parameters = self.parameters
         self._expandParameters()

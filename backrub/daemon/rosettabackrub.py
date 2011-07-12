@@ -124,7 +124,7 @@ class RosettaBackrub(RosettaExec):
     
     ntrials = "10000" # should be 10000 on the live webserver
     
-    settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+    settings = WebsiteSettings(sys.argv, os.environ['PWD'])
     if not(settings["LiveWebserver"]):
         ntrials = "10"
             

@@ -73,7 +73,7 @@ The Kortemme Lab Server Daemon
 """
 
     def __init__(self, stdout, stderr):
-        super(RosettaDaemon, self).__init__(self.pidfile, stdout = stdout, stderr = stderr)
+        super(RosettaDaemon, self).__init__(self.pidfile, settings, stdout = stdout, stderr = stderr)
         self.configure()
         self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
         self.beProtocols = BackendProtocols(self)
@@ -98,9 +98,13 @@ The Kortemme Lab Server Daemon
             return False
     
     def log(self, str):
-        log = open(self.logfile, 'a+')
-        log.write(str)
-        log.close()
+        str = "<daemon time='%s'>%s</daemon>" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str)
+        if CLUSTER_debugmode:
+            print(str)
+        else:
+            log = open(self.logfile, 'a+')
+            log.write(str)
+            log.close()
         
     def run(self):
         """runs the daemon, sets the maximal number of parallel simulations"""
@@ -131,7 +135,7 @@ The Kortemme Lab Server Daemon
             if self.running_P != len(self.list_RosettaPP):
                 self.running_P = len(self.list_RosettaPP)
                 # only write this on change so the actual file doesn't get too big.
-                print "%s\trunning processes:" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S")), self.running_P
+                self.log("Running processes: %d" % self.running_P)
             
             # make sure this is written to the disk            
             sys.stdout.flush()
@@ -255,7 +259,7 @@ The Kortemme Lab Server Daemon
             self.DBConnection.execQuery("UNLOCK TABLES")
             self.log("\n%s\n" % e)
             self.log(traceback.format_exc())
-            raise e
+            raise Exception
         self.DBConnection.execQuery("UNLOCK TABLES")
         return results
 
@@ -562,15 +566,15 @@ The Kortemme Lab Server Daemon
             newhash = dbconnection.generateHash(simulation[0], debug = True) # Change debug to False to enable updating 
             #Used for testing when the update query in turned off
             if hashkeys[simulation[0]] == newhash:
-                print("unchanged: %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
+                self.log("Unchanged: %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
             
         results = self.runSQL("SELECT ID, hashkey FROM %s" % self.db_table)
         
         for simulation in results:
             if hashkeys[simulation[0]] == simulation[1]:
-                print("unchanged: Simulation %d hash remains as %s." % (simulation[0], simulation[1]))
+                self.log("Unchanged: Simulation %d hash remains as %s." % (simulation[0], simulation[1]))
             else:
-                print("Key for simulation %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
+                self.log("Key for simulation %d changed from %s to %s." % (simulation[0], hashkeys[simulation[0]], simulation[1]))
          
         
     
@@ -581,12 +585,12 @@ The Kortemme Lab Server Daemon
             if simulation[1]:
                 protoparams = pickle.loads((simulation[1]))
                 if len(str(protoparams)) == 2 and task != "no_mutation":
-                    print("Job number %d (%s) is missing parameters." % (simulation[0], task))
+                    self.log("Job number %d (%s) is missing parameters." % (simulation[0], task))
                 else:
                     pass
                     #print("Job number %d is fine." % simulation[0])
             else:
-                print("Job number %d (%s) is missing parameters." % (simulation[0], task))
+                self.log("Job number %d (%s) is missing parameters." % (simulation[0], task))
     
     def dbdumpPDB(self, jobID):
         results = self.runSQL("SELECT PDBComplex, PDBComplexFile FROM %s WHERE ID = %d" % (self.db_table, jobID))
@@ -598,12 +602,12 @@ The Kortemme Lab Server Daemon
             print(filename)            
             self.pdb = pdb.PDB(contents.split('\n'))
             if not os.path.exists(filename):
-                print("Writing file %s:" % filename)
+                self.log("Writing file %s:" % filename)
                 self.pdb.write(filename)
             else:
-                print("The file %s already exists. The PDB in the database was not dumped out." % filename)
+                self.log("The file %s already exists. The PDB in the database was not dumped out." % filename)
         else:
-            print("Job %d could not be found." % jobID)
+            self.log("Job %d could not be found." % jobID)
 
     
     
@@ -714,7 +718,7 @@ The Kortemme Lab Server Daemon
                     updatesql = 'UPDATE %s SET ProtocolParameters="%s" WHERE ID=%s' % (self.db_table, ProtocolParameters, simulation[0])
                     sqlupdates.append(updatesql)
                     if False and self.runSQL(updatesql) == None: # Enable this line to update the database
-                        print("Update failed on record %d" % id)
+                        self.log("Update failed on record %d" % id)
                     
             print(string.join(sqlupdates,"\n"))
             print(string.join(errors,"\n"))
@@ -1022,7 +1026,7 @@ The Kortemme Lab Server Daemon
 
 class ClusterDaemon(RosettaDaemon):
     
-    MaxClusterJobs    = 3
+    MaxClusterJobs    = settings["MaxClusterJobs"]
     logfname          = "ClusterDaemon.log"
     pidfile           = settings["ClusterPID"]
     
@@ -1064,8 +1068,7 @@ class ClusterDaemon(RosettaDaemon):
     def run(self):
         """The main loop and job controller of the daemon."""
         
-        print("Starting daemon.")
-        self.log("%s\tStarted\n" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        self.log("Starting daemon.")
         self.runningJobs = []           # list of running processes
         self.killPreviouslyRunningJobs()
         sgec = self.sgec
@@ -1128,9 +1131,13 @@ class ClusterDaemon(RosettaDaemon):
                     print(clusterjob.getprofileXML())
                     print("</profile>")
                                                                            
+            except RosettaTasks.PostProcessingException, e:
+                self.recordErrorInJob(clusterjob, "Post-processing error.", traceback.format_exc(), e)
+                self.end_job(clusterjob, Failed = True)
+                clusterjob.dumpJITGraph()
             except Exception, e:
                 self.recordErrorInJob(clusterjob, "Failed.", traceback.format_exc(), e)
-                self.end_job(clusterjob)
+                self.end_job(clusterjob, Failed = True)
                 clusterjob.dumpJITGraph()
                             
         # Remove completed jobs from the list
@@ -1147,8 +1154,14 @@ class ClusterDaemon(RosettaDaemon):
                 if len(data) != 0:
                     jobID = None
                     for i in range(0, len(data)):
-			if data[i][10] != 'kortemmelab':
-				continue
+                        # The live webserver cluster daemon will not run jobs which did not originate from the live webserver
+                        # The test cluster daemon will not run jobs which *did* originate from the live webserver
+                        # We could write if (data[i][10] == 'kortemmelab') == not(settings["LiveWebserver"]) but that may be confusing
+                        if data[i][10] != 'kortemmelab' and settings["LiveWebserver"]:
+                            continue
+                        if data[i][10] == 'kortemmelab' and not(settings["LiveWebserver"]):
+                            continue
+                        
                         # Set up the parameters. We assume ProtocolParameters keys do not overlap with params.
                         jobID = data[i][0]
                         task = data[i][7]                            
@@ -1167,10 +1180,10 @@ class ClusterDaemon(RosettaDaemon):
                         # Remember that we are about to start this job to avoid repeatedly submitting the same job to the cluster
                         # This should not happen but just in case.
                         # Also, never let the list grow too large as the daemon should be able to run a long time                        
-                        print(jobID)
+                        self.log("Starting job %d." % jobID)
                         if jobID in self.recentDBJobs:
-                            print("Error: Trying to run database job %d multiple times." % jobID) 
-                            self.log("%s\t Error: Trying to run database job %d multiple times.\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), jobID))
+                            self.log("Error: Trying to run database job %d multiple times." % jobID) 
+                            self.log("Error: Trying to run database job %d multiple times.\n" % jobID)
                             raise
                         self.recentDBJobs.append(jobID)
                         if len(self.recentDBJobs) > 400:
@@ -1189,14 +1202,14 @@ class ClusterDaemon(RosettaDaemon):
             except Exception, e:
                 newclusterjob = newclusterjob or self._clusterjobjuststarted
                 self._clusterjobjuststarted = None
-                print("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
+                self.log("Error: self.run()\n%s\n\n" % traceback.format_exc())
                 if newclusterjob:
                     newclusterjob.kill()
                     self.recordErrorInJob(newclusterjob, "Error starting job.", traceback.format_exc(), e)
                     if newclusterjob in self.runningJobs:
                         self.runningJobs.remove(newclusterjob)
                 else:
-                    self.runSQL('UPDATE %s SET Errors="Start.\n%s\n%s", Status=4 WHERE ID=%s' % ( self.db_table, traceback.format_exc(), e, str(jobID) ))                                      
+                    self.runSQL('UPDATE %s SET Errors="Start.%s%s", Status=4 WHERE ID=%s' % ( self.db_table, traceback.format_exc(), e, str(jobID) ))                                      
                 self.log("%s\t error: self.run()\n%s\n\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),traceback.format_exc()) )
             self._clusterjobjuststarted = None
 
@@ -1266,7 +1279,7 @@ class ClusterDaemon(RosettaDaemon):
         sys.stdout.flush()
             
             
-    def end_job(self, clusterjob):
+    def end_job(self, clusterjob, Failed = False):
         
         ID = clusterjob.jobID                  
         
@@ -1287,7 +1300,9 @@ class ClusterDaemon(RosettaDaemon):
             self.recordErrorInJob(clusterjob, "Error archiving files.", traceback.format_exc(), e)
         
         try:
-            self.removeClusterTempDir(clusterjob)
+            if not Failed:
+                # On reflection, it's best to not remove directories of failed jobs so we can figure out what happened.
+                self.removeClusterTempDir(clusterjob)
         except Exception, e:
             self.recordErrorInJob(clusterjob, "Error removing temporary directory on the cluster", traceback.format_exc(), e)
         
@@ -1305,8 +1320,7 @@ class ClusterDaemon(RosettaDaemon):
         try:
             return clusterjob.moveFilesTo()
         except Exception, e:
-            print("moveFilesOnJobCompletion failure")
-            self.log("Error moving files to the download directory.\n")
+            self.log("moveFilesOnJobCompletion failure. Error moving files to the download directory.\n")
             self.log("%s\n%s" % (str(e), traceback.print_exc()))        
     
     def copyAndZipOutputFiles(self, clusterjob, task):

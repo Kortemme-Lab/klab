@@ -114,7 +114,10 @@ class WebsiteSettings(object):
     
     def __init__(self, argv, scriptname):
         self.settings["ServerScript"] = scriptname 
-        self.base_dir = self._getSourceRoot(argv[0])
+        if argv[0].find("/") != -1:
+            self.base_dir = self._getSourceRoot(argv[0])
+        else:
+            self.base_dir = self._getSourceRoot(scriptname)
         self._read_config_file()
 
     def _read_config_file(self):
@@ -147,6 +150,7 @@ class WebsiteSettings(object):
         settings["ClusterDebugMode"] = bool(int(settings["ClusterDebugMode"]))
         settings["SQLPort"] = int(settings["SQLPort"])
         settings["MaxLocalProcesses"] = int(settings["MaxLocalProcesses"])
+        settings["MaxClusterJobs"] = int(settings["MaxClusterJobs"])
         
         # Constant settings (these can be optionally overwritten in the settings file)
         if not settings.get("TempDir"):
@@ -172,10 +176,10 @@ class WebsiteSettings(object):
 
     def _getSourceRoot(self, scriptfilename):
         fe = scriptfilename.find("frontend")
-        if fe:
+        if fe != -1:
             return scriptfilename[:fe]
         be = scriptfilename.find("daemon")
-        if be:
+        if be != -1:
             return scriptfilename[:be]
         raise Exception("Cannot determine source root for %s." % scriptfilename)
 

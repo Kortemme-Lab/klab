@@ -9,12 +9,13 @@ class Daemon(object):
     
     Usage: subclass the Daemon class and override the run() method
     """
-    def __init__(self, pidfile, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
+    def __init__(self, pidfile, settings, stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         self.stdin   = stdin
         self.stdout  = stdout
         self.stderr  = stderr
         self.pidfile = pidfile
         self.debug   = False
+        self.settings = settings
     
     def daemonize(self):
         """
@@ -46,17 +47,18 @@ class Daemon(object):
             sys.stderr.write("fork #2 failed: %d (%s)\n" % (e.errno, e.strerror))
             sys.exit(1) 
         
-        #redirect standard file descriptors
+        # Redirect standard file descriptors for the live webserver
         # if not self.debug:
         # # this discards any output.
-        sys.stdout.flush()
-        sys.stderr.flush()
-        si = file(self.stdin, 'r')
-        so = file(self.stdout, 'w', 1) # so = file(self.stdout, 'a+', 1)
-        se = file(self.stderr, 'w', 1) # se = file(self.stderr, 'a+', 1)
-        os.dup2(si.fileno(), sys.stdin.fileno())
-        os.dup2(so.fileno(), sys.stdout.fileno())
-        os.dup2(se.fileno(), sys.stderr.fileno())
+        if self.settings["LiveWebserver"]:
+            sys.stdout.flush()
+            sys.stderr.flush()
+            si = file(self.stdin, 'r')
+            so = file(self.stdout, 'w', 1) # so = file(self.stdout, 'a+', 1)
+            se = file(self.stderr, 'w', 1) # se = file(self.stderr, 'a+', 1)
+            os.dup2(si.fileno(), sys.stdin.fileno())
+            os.dup2(so.fileno(), sys.stdout.fileno())
+            os.dup2(se.fileno(), sys.stderr.fileno())
 
         # write pidfile
         atexit.register(self.delpid)
