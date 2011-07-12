@@ -1178,7 +1178,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 cols += 1
             jmolModelSelectors.append('</tr><tr><td colspan="%d"><hr></td></tr>' % cols)
             
-            HKnamestr = re.compile(r"BR(.{4})low_(\d{4})_(.{4})")           
+            HKnamestr = re.compile(r"BR(.*)low_(\d{4})_(.+)")           
             for i in range(0, numstructures):
                 filename = split(list_pdb_files[i], "/")[-1]
                 rindex = filename.rfind(".pdb")
@@ -1799,16 +1799,42 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                     # the <a href="../wiki/" target="_blank">wiki</a>.
             
             for resid in seqtol_list_1:
-              html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( rootdir, cryptID, seqtol_chain1, resid, rootdir, cryptID, seqtol_chain1, resid ))
             for resid in seqtol_list_2:
-              html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
+                html.append('''<a href="%s/%s/tolerance_boxplot_%s%s.png"><img src="%s/%s/tolerance_boxplot_%s%s.png" alt="image file not available" width="400"></a><br>
                     ''' % ( rootdir, cryptID, seqtol_chain2, resid, rootdir, cryptID, seqtol_chain2, resid ))
             
             html.append(self._show_molprobity( cryptID ))
             
             html.append("</td></tr>")
             
+            # todo: Wrap this up into a function since it's very similar to the SK code,
+            # todo: This code to show the logo was disabled at revision 117 by Florian. No comment on the commit - check with Tanja.
+            if False:
+                # This seems to be the pattern in which the weblogo image grows based on our settings
+                # e.g. 1 residue  => 367 + 0 + 83 = 450 pixels wide
+                #      7 residues => 367 + 1*(83+92+91+92+92) + (83 + 92) = 992 pixels wide
+                # The height is always 592 pixels.
+                #
+                # We scale vertically by 0.5 (296 pixels) and horizontally by 0.5 when numDesignedResidues does not exceed 7,
+                # For larger values of numDesignedResidues we fix the width at 500 so the table size does not expand.
+                numDesignedResidues = len(seqtol_list_1) + len(seqtol_list_2)
+                widths = [83, 92, 91, 92, 92]
+                widthOfFive = sum(widths)
+                WeblogoImageWidth = 367 + (int(float(numDesignedResidues) / 5.0) * widthOfFive) + sum(widths[0:(numDesignedResidues % 5)])
+                halfWidth = int(WeblogoImageWidth / 2)
+                if halfWidth > 500:
+                    halfWidth = 500
+                    
+                WebLogoText = self.WebLogoText
+                html.append('''</td></tr>
+                            <tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Predicted sequence tolerance of the mutated residues.<br>Download corresponding <a href="%(rootdir)s/%(cryptID)s/tolerance_sequences.fasta">FASTA file</a>.</td>
+                                 <td align="center" bgcolor="#FFFCD8"><a href="%(rootdir)s/%(cryptID)s/tolerance_motif.png">
+                                                       <img width="%(halfWidth)d" height="296" src="%(rootdir)s/%(cryptID)s/tolerance_motif.png" alt="image file not available" ></a><br>
+                                 %(WebLogoText)s
+                                 </td></tr> ''' % vars())
+
         return html      
     
     def submitformSequenceToleranceSK(self, chainOptions, aminoAcidOptions, numChainsAvailable):

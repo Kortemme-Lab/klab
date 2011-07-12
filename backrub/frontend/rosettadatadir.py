@@ -225,7 +225,14 @@ class RosettaDataDir(RosettaHTML):
           Output files:
             <ul>
               %(minimizedFile)s
-              <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - Up to 10 best scoring sequences for each backrub structure</li>
+              <li><a href="%(jobdatadir)s/tolerance_sequences.fasta">tolerance_sequences.fasta</a> - Up to 10 best scoring sequences for each backrub structure</li>''' % vars()    
+
+        # todo: This code to show the logo was disabled at revision 117 by Florian. No comment on the commit - check with Tanja.
+        if False:
+            self.content +='''
+              <li><a href="%(jobdatadir)s/tolerance_motif.png">tolerance_motif.png</a> - Logo of the best scoring sequences</li>''' % vars()
+        
+        self.content +='''  
               <li><a href="%(jobdatadir)s/tolerance_pwm.txt">tolerance_pwm.txt</a> - Matrix with amino acid frequencies</li>
               <li><a href="%(jobdatadir)s/tolerance_boxplot.png">tolerance_boxplot.png</a>, 
                   <a href="%(jobdatadir)s/tolerance_boxplot.pdf">tolerance_boxplot.pdf</a> - Boxplots with the amino acid frequencies</li>
