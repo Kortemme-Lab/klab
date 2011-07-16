@@ -20,6 +20,8 @@ from rosettahelper import readFile
 from rwebhelper import *
 from RosettaProtocols import *
 
+ospathjoin = os.path.join
+
 class RosettaHTML(object):
 
     server = {}
@@ -919,7 +921,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             </table>
         </td>                   
     </tr>
-    <!--<![endif]-->''' % (os.path.join(parameter["rootdir"], parameter['cryptID'], "progress.html"), progressDisplayHeight, Graph.getHTMLLegend()))
+    <!--<![endif]-->''' % (ospathjoin(parameter["rootdir"], parameter['cryptID'], "progress.html"), progressDisplayHeight, Graph.getHTMLLegend()))
         html.append('''</table>
                             <script language="javascript" type="text/javascript">init();</script>
 <br></div></td>\n''')
@@ -1008,54 +1010,15 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         html += '</td>\n</tr><tr><td align=right></td><td></td></tr>'
         
         return html
-
-    def _getPDBfiles(self, input_filename, cryptID, parameters):
-        
-        dir_results = os.path.join(self.download_dir, cryptID)
-        
-        if os.path.exists( dir_results ):
-            list_files = os.listdir( dir_results )
             
-            # Add the original PDB at the beginning of the list
-            list_pdb_files = ['../downloads/%s/' % cryptID + input_filename]
-            
-            if self.lowest_structs != []:
-                rootname = input_filename[0:input_filename.rfind(".")]
-                for x in self.lowest_structs:
-                    id = x[0]
-                    if parameters['Mini'] == 'classic':  
-                        lowfile = "BR%slow_%s.pdb" % (rootname, id)
-                    else:
-                        lowfile = "%s_%s_low.pdb" % (rootname, id)
-                    list_pdb_files.append('../downloads/%s/%s' % (cryptID, lowfile))
-            else:
-                for filename in list_files:
-                    if filename.endswith("_low.pdb"):
-                        list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
-            for pdb_file in list_pdb_files:
-                #todo: This is not robust - use proper path splitting functions
-                pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
-                if not pdb_file_path.endswith(".gz"):
-                    if not os.path.exists(pdb_file_path + '.gz'):
-                        f_in = open(pdb_file_path, 'rb')
-                        f_out = gzip.open(pdb_file_path + '.gz', 'wb')
-                        f_out.writelines(f_in)
-                        f_out.close()
-                        f_in.close()
-                    pdb_file += '.gz'
-            return list_pdb_files
-        else:
-            return None
-            
-    def _getPDBfilesForEnsemble(self, input_filename, cryptID, parameters):
+    def _getPDBfiles(self, input_filename, cryptID, parameters, ForEnsemble = False):
         # todo: unify with function above
-        dir_results = os.path.join(self.download_dir, cryptID)
-        
+        dir_results = ospathjoin(self.download_dir, cryptID)
         if os.path.exists( dir_results ):
             list_files = os.listdir( dir_results )
             
             # Add the original PDB at the beginning of the list
-            list_pdb_files = ['../downloads/%s/' % cryptID + input_filename]
+            list_pdb_files = [input_filename]
             if self.lowest_structs != []:
                 rootname = input_filename[0:input_filename.rfind(".")]
                 for x in self.lowest_structs:
@@ -1064,16 +1027,22 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                         lowfile = "BR%slow_%s.pdb" % (rootname, id)
                     else:
                         lowfile = "%s_%s_low.pdb" % (rootname, id)
-                    list_pdb_files.append('../downloads/%s/%s' % (cryptID, lowfile))
+                    list_pdb_files.append(lowfile)
             else:
-                lowfileregex = re.compile(".*low_\d{4}.pdb$")
-                for filename in list_files:
-                    if lowfileregex.match(filename):
-                        list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
+                if ForEnsemble == True:
+                    lowfileregex = re.compile(".*low_\d{4}.pdb$")
+                    for filename in list_files:
+                        if lowfileregex.match(filename):
+                            list_pdb_files.append(filename)
+                else:
+                    for filename in list_files:
+                        if filename.endswith("_low.pdb"):
+                            list_pdb_files.append(filename)
                         
-            for pdb_file in list_pdb_files:
-                #todo: This is not robust - use proper path splitting functions
-                pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
+            dlpath = ospathjoin(self.download_dir, cryptID)
+            for i in range(len(list_pdb_files)):
+                pdb_file = list_pdb_files[i]
+                pdb_file_path = ospathjoin(dlpath, pdb_file) # build absolute path to the file
                 if not pdb_file_path.endswith(".gz"):
                     if not os.path.exists(pdb_file_path + '.gz'):
                         f_in = open(pdb_file_path, 'rb')
@@ -1082,6 +1051,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                         f_out.close()
                         f_in.close()
                     pdb_file += '.gz'
+                
+                list_pdb_files[i] = ospathjoin("../downloads", cryptID, pdb_file)
             
             return list_pdb_files
         else:
@@ -1139,7 +1110,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             for pdb in list_pdb_files[1:11]:
                 jmol_cmd += ' "load APPEND %s;" +\n' % (pdb)
             jmol_cmd += ' "cpk off; wireframe off; backbone 0.2;" +'
-                        
             # jmol command to show mutation as balls'n'stick
             # todo: the coercion to string for the residue is a hangover from the old codebase. Remove when it always passes  
             jmolJSDesigned = []
@@ -1600,7 +1570,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             html.append(self._show_scores_file(cryptID, size_of_ensemble))        
         
             comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red.'
-            html.append(self._showApplet4MultipleFiles( comment, self._getPDBfilesForEnsemble(input_filename, cryptID, parameters)))
+            html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters, ForEnsemble=True)))
             html.append(self._show_molprobity( cryptID ))
           
         return html
@@ -1776,13 +1746,13 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             html.append('<tr><td align=right></td><td></td></tr>')
                         
             list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
-            bestScoringPDBdir = os.path.join(rootdir, cryptID, "best_scoring_pdb")
+            bestScoringPDBdir = ospathjoin(rootdir, cryptID, "best_scoring_pdb")
             list_files = []
             if os.path.exists(bestScoringPDBdir):
-                orderFile = os.path.join(bestScoringPDBdir, "order.txt")
+                orderFile = ospathjoin(bestScoringPDBdir, "order.txt")
                 if os.path.exists(orderFile):
                     list_files = readFile(orderFile).split("\n")
-                    list_pdb_files.extend([os.path.join(bestScoringPDBdir, _pdb) for _pdb in list_files])
+                    list_pdb_files.extend([ospathjoin(bestScoringPDBdir, _pdb) for _pdb in list_files])
                 else:
                     list_files = os.listdir(bestScoringPDBdir)
                     list_files.sort()
@@ -2303,8 +2273,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             
             list_pdb_files = ['%s/%s/%s.pdb' % (rootdir, cryptID, input_id) ]
             
-            seqtoldirs = [os.path.join(rootdir, cryptID, "sequence_tolerance%d" % i) for i in range(numberOfRuns)]
-            list_pdb_files.extend( [ os.path.join(seqtoldir, '%s_0001_low.pdb' % input_id) for seqtoldir in seqtoldirs] )
+            seqtoldirs = [ospathjoin(rootdir, cryptID, "sequence_tolerance%d" % i) for i in range(numberOfRuns)]
+            list_pdb_files.extend( [ ospathjoin(seqtoldir, '%s_0001_low.pdb' % input_id) for seqtoldir in seqtoldirs] )
             
             comment1 = """<br>Structural models for up to 10 low-energy initial backrub structures.<br><br>
                         The query structure is shown in red. 
