@@ -145,15 +145,6 @@ class RosettaHTML(object):
         <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
 <!-- Content -->
 
-<!--[if IE]>
-<tr>
-<td style="text-align:center;color:red">
-This site has known issues under Internet Explorer. Until these issues are fixed, please try another browser.
-<br><br>
-</td>
-</tr>
-<![endif]-->
-
 <tr> %s </tr>
         <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
 <!-- Legal Info --> <tr> %s </tr>
@@ -171,6 +162,17 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                             CONTENT,
                             self._showLegalInfo(),
                             self._showFooter() ))
+        
+        if False:
+            incaseofIEfailure = '''<!--[if IE]>
+<tr>
+<td style="text-align:center;color:red">
+This site has known issues under Internet Explorer. Until these issues are fixed, please try another browser.
+<br><br>
+</td>
+</tr>
+<![endif]-->'''
+
 
         return join(html, "")
 
@@ -1031,7 +1033,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                     if filename.endswith("_low.pdb"):
                         list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
             for pdb_file in list_pdb_files:
-                pdb_file_path = pdb_file.replace('../downloads/', self.download_dir) # build absolute path to the file
+                #todo: This is not robust - use proper path splitting functions
+                pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
                 if not pdb_file_path.endswith(".gz"):
                     if not os.path.exists(pdb_file_path + '.gz'):
                         f_in = open(pdb_file_path, 'rb')
@@ -1069,7 +1072,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                         list_pdb_files.append('../downloads/%s/%s' % (cryptID, filename))
                         
             for pdb_file in list_pdb_files:
-                pdb_file_path = pdb_file.replace('../downloads/', self.download_dir) # build absolute path to the file
+                #todo: This is not robust - use proper path splitting functions
+                pdb_file_path = pdb_file.replace('../downloads', self.download_dir) # build absolute path to the file
                 if not pdb_file_path.endswith(".gz"):
                     if not os.path.exists(pdb_file_path + '.gz'):
                         f_in = open(pdb_file_path, 'rb')

@@ -71,6 +71,8 @@ for (var i = 0; i < protocolTasks.length; i++)
 	}
 }
 
+// IE fix for extra protocols on test server
+additionalGUISetup[3] = [[noop]]
 // Additional GUI setup
 function showMutationRowAdder(app, task, extra)
 {

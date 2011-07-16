@@ -6,8 +6,8 @@ To start/restart/stop the webserver daemon, run:
   sudo python rosetta_daemon.py stop
 
 To restart/stop the cluster daemon, run:
-  sudo -u klabqb3backrub ./qbstart
-  sudo -u klabqb3backrub ./qbstop
+  sudo -u klabqb3backrub ./qb3start
+  sudo -u klabqb3backrub ./qb3stop
 
 To run a test job on the cluster using cluster/cluster.py, run:
   cd cluster

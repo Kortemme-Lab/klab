@@ -57,8 +57,7 @@ class RosettaDB:
                                              unix_socket    = settings["SQLSocket"])
         self.store_time = settings["StoreTime"]
         self.numTries = numTries
-                        
-        
+                                                     
     def getData4ID(self, tablename, ID):
         """get the whole row from the database and store it in a dict"""
                
@@ -177,7 +176,9 @@ class RosettaDB:
         
         sys.stderr.write("\nSQL execution error in query at %s:" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
         sys.stderr.write("\n %s." % sql)
-        sys.stderr.write("\nErrorcode %d: '%s'.\n" % (e[0], e[1]))
+        sys.stderr.flush()
+        sys.stderr.write("\nErrorcode: '%s'.\n" % (str(caughte)))
+        sys.stderr.flush()
         raise MySQLdb.OperationalError(caughte)
         #return None
 

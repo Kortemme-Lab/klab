@@ -283,7 +283,7 @@ The Kortemme Lab Server Daemon
         try:               
             # open error messages
             # todo: This doesn't seem to generalise e.g. seqtol has many possible stderr files    
-            error_handle = open( rosetta_object.workingdir + "/" + rosetta_object.filename_stderr, 'r')
+            error_handle = open(os.path.join(rosetta_object.workingdir, rosetta_object.filename_stderr), 'r')
             error_file = error_handle.read()
             error_handle.close()
                         
@@ -298,10 +298,10 @@ The Kortemme Lab Server Daemon
             else: 
                 # if no error occurred move results directory to the download directory 
                 #try:
-                if os.path.exists(rosetta_object.workingdir + "/paths.txt"):
-                    os.remove( rosetta_object.workingdir + "/paths.txt" )
-                if os.path.exists( rosetta_object.workingdir + "/molprobity_err_0.dat" ):
-                    os.remove( rosetta_object.workingdir + "/molprobity_err_0.dat" )
+                if os.path.exists(os.path.join(rosetta_object.workingdir, "paths.txt")):
+                    os.remove(os.path.join(rosetta_object.workingdir, "paths.txt" ))
+                if os.path.exists(os.path.join(rosetta_object.workingdir, "molprobity_err_0.dat" )):
+                    os.remove(os.path.join(rosetta_object.workingdir, "molprobity_err_0.dat" ))
                 
                 #todo: Which temp files should be deleted? 
                 
@@ -314,8 +314,8 @@ The Kortemme Lab Server Daemon
 
                 # remove the resfile, and rosetta raw output if the user doesn't want to keep it
                 if not state["keep_output"]:
-                    os.remove( rosetta_object.workingdir + "/" + rosetta_object.name_resfile )
-                    os.remove( rosetta_object.workingdir + "/stdout_%s.dat" % ( ID ) )
+                    os.remove( os.path.join(rosetta_object.workingdir, rosetta_object.name_resfile ))
+                    os.remove( os.path.join(rosetta_object.workingdir, "stdout_%s.dat" % ( ID ) ))
 
         except Exception, e:
             ID = rosetta_object.get_ID()
@@ -355,7 +355,7 @@ The Kortemme Lab Server Daemon
             # let's move the errors to the webserver too so that someone can more easily debug it. #
             ########################################################################################
             # same code as above therefore no comments
-            result_dir = "%s%s" % (self.rosetta_dl, cryptID)
+            result_dir = os.path.join(self.rosetta_dl, cryptID)
             if os.path.exists( result_dir ):
                 shutil.rmtree( result_dir )
             shutil.move( rosetta_object.workingdir, result_dir ) ## does NOT overwrite destination
@@ -371,7 +371,7 @@ The Kortemme Lab Server Daemon
     def copyAndZipOutputFiles(self, rosetta_object, ID, task, cryptID):
             
         # copy files to web accessible directory
-        result_dir = "%s%s" % (self.rosetta_dl, cryptID)
+        result_dir = os.path.join(self.rosetta_dl, cryptID)
         # move the data to a webserver accessible directory 
         if os.path.exists( result_dir ):
             shutil.rmtree( result_dir )
@@ -741,8 +741,8 @@ The Kortemme Lab Server Daemon
         # create rosetta run
         binary = RosettaBinaries[mini]
         usingMini = binary["mini"]
-        executable = "%s/%s" % (self.binDir, binary["backrub"])
-        databaseDir = "%s/%s" % (self.dataDir, binary["database"])
+        executable = os.path.join(self.binDir, binary["backrub"])
+        databaseDir = os.path.join(self.dataDir, binary["database"])
         object_rosetta = rosettaplusplus.RosettaPlusPlus( ID, executable, databaseDir, self.rosetta_tmp, mini = usingMini)
         
         # store Rosetta object to list; this is not a copy since Python uses references
@@ -917,18 +917,18 @@ The Kortemme Lab Server Daemon
         usingMini = r_object.mini
         try:
             if usingMini:
-                databaseDir = "%s/%s" % (self.dataDir, binary["database"])              
-                postprocessingBinary = "%s/%s" % (self.binDir, binary["postprocessing"])              
-                analysis = AnalyzeMini(filename="%s/stdout_%s.dat" % ( workingdir, job_id) )
-                if not analysis.analyze(outfile="%s/scores_detailed.txt" % workingdir, outfile2="%s/scores_overall.txt" % workingdir):
+                databaseDir = os.path.join(self.dataDir, binary["database"])              
+                postprocessingBinary = os.path.join(self.binDir, binary["postprocessing"])              
+                analysis = AnalyzeMini(filename=os.path.join(workingdir, "stdout_%s.dat" % job_id) )
+                if not analysis.analyze(outfile=os.path.join(workingdir, "scores_detailed.txt"), outfile2=os.path.join(workingdir, "scores_overall.txt")):
                     self.log("Check_files() ID = %s : individual scores could not be created." % job_id )
-                if not analysis.calculate_residue_scores( self.base_dir, postprocessingBinary, databaseDir, workingdir, "%s/scores_residues.txt" % workingdir ):
+                if not analysis.calculate_residue_scores( self.base_dir, postprocessingBinary, databaseDir, workingdir, os.path.join(workingdir, "scores_residues.txt" ) ):
                     self.log("Check_files() ID = %s : residue energies could not be calculated." % job_id )
                         
                 x = 1
                 while x <= ensembleSize:
-                    last_file = '%s/%s_%04.i_last.pdb' % (workingdir, pdb_id, x )
-                    low_file  = '%s/%s_%04.i_low.pdb'  % (workingdir, pdb_id, x )
+                    last_file = os.path.join(workingdir, '%s_%04.i_last.pdb' % (pdb_id, x ))
+                    low_file  = os.path.join(workingdir, '%s_%04.i_low.pdb'  % (pdb_id, x ))
                     if os.path.exists( last_file ): 
                         os.remove( last_file )
                     if not os.path.exists( low_file ):
@@ -940,19 +940,19 @@ The Kortemme Lab Server Daemon
                     x += 1 # IMPORTANT because of while loop
                 
             else:
-                initial_file = '%s/BR%s_initial.pdb' % ( workingdir, pdb_id )
+                initial_file = os.path.join(workingdir, 'BR%s_initial.pdb' % pdb_id )
                 cmd_stdout = os.popen("tail -n 1 %s" % initial_file).readline().split()
                 if cmd_stdout[0] == 'SCORE':
                     initial_score = cmd_stdout[1]
               
-                analysis = AnalyzeClassic(filename="%s/stdout_%s.dat" % ( workingdir, job_id) )
-                if not analysis.analyze(outfile="%s/scores_detailed.txt" % workingdir, outfile2="%s/scores_overall.txt" % workingdir):
+                analysis = AnalyzeClassic(filename=os.path.join(workingdir, "stdout_%s.dat" % job_id) )
+                if not analysis.analyze(outfile=os.path.join(workingdir, "scores_detailed.txt"), outfile2=os.path.join(workingdir, "scores_overall.txt")):
                     self.log("Check_files() ID = %s : individual scores could not be created." % job_id )
                 
                 x = 1
                 while x <= ensembleSize:
-                    last_file = '%s/BR%slast_%04.i.pdb' % (workingdir, pdb_id, x )
-                    low_file  = '%s/BR%slow_%04.i.pdb' % (workingdir, pdb_id, x ) 
+                    last_file = os.path.join(workingdir, 'BR%slast_%04.i.pdb' % (pdb_id, x ))
+                    low_file  = os.path.join(workingdir, 'BR%slow_%04.i.pdb' % (pdb_id, x )) 
                     if os.path.exists( last_file ): 
                         os.remove( last_file )
                     if not os.path.exists( low_file ): 
@@ -997,7 +997,7 @@ The Kortemme Lab Server Daemon
         ENS_num_designs_per_struct = params["NumDesignsPerStruct"]
         
         # starting_pdb_file, backrub_num_structs, backrub_max_segment_length, backrub_num_steps, backrub_temp, num_designs_per_struct
-        cmd_args = [ self.base_dir + "daemon/ensemble_design/ensemble_design.py", self.base_dir + "bin", pdb_filename, ensemble_size, ENS_segment_length, self.ntrials, ENS_temperature, ENS_num_designs_per_struct, '--verbose', '2' ] 
+        cmd_args = [ os.path.join(self.base_dir, "daemon/ensemble_design/ensemble_design.py"), os.path.join(self.base_dir, "bin"), pdb_filename, ensemble_size, ENS_segment_length, self.ntrials, ENS_temperature, ENS_num_designs_per_struct, '--verbose', '2' ] 
                         
         ENS_obj.run_args(cmd_args)
         time.sleep(1)
@@ -1016,15 +1016,15 @@ The Kortemme Lab Server Daemon
         # remove directories
         #shutil.rmtree( rosetta_object.workingdir + "/designs" )
         #shutil.rmtree( rosetta_object.workingdir + "/backrubs" )
-        shutil.rmtree( rosetta_object.workingdir + "/repack" )
+        shutil.rmtree( os.path.join(rosetta_object.workingdir, "repack") )
         # # remove individual files
         # os.remove( rosetta_object.workingdir + "/stdout_%s.dat" % ( ID ) )
-        os.remove( rosetta_object.workingdir + "/%s_br.res" % ( pdb_id ) )
-        os.remove( rosetta_object.workingdir + "/%s_des.res" % ( pdb_id ) )
-        os.remove( rosetta_object.workingdir + "/backrub.log" )
+        os.remove( os.path.join(rosetta_object.workingdir , "%s_br.res" % ( pdb_id ) ))
+        os.remove( os.path.join(rosetta_object.workingdir , "%s_des.res" % ( pdb_id ) ))
+        os.remove( os.path.join(rosetta_object.workingdir , "backrub.log" ))
         # os.remove( rosetta_object.workingdir + "/core.txt" )
-        os.remove( rosetta_object.workingdir + "/designed_pdbs.lst" )
-        os.remove( rosetta_object.workingdir + "/ensemble.lst" )
+        os.remove( os.path.join(rosetta_object.workingdir , "designed_pdbs.lst" ))
+        os.remove( os.path.join(rosetta_object.workingdir , "ensemble.lst" ))
         #os.remove( rosetta_object.workingdir + "/starting_pdb.lst" )
         
     ##################################### end of sendMail() ######################################
@@ -1059,16 +1059,19 @@ class ClusterDaemon(RosettaDaemon):
     def recordSuccessfulJob(self, clusterjob):
         self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, clusterjob.jobID ))
 
-    def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None):
-        jobID = clusterjob.jobID
-        clusterjob.error = errormsg
-        clusterjob.failed = True
+    def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None, jobID = None):
+        suffix = ""
+        if clusterjob:
+            jobID = clusterjob.jobID
+            clusterjob.error = errormsg
+            clusterjob.failed = True
+            suffix = clusterjob.suffix
         
         if _traceback and _exception:
             self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, "%s. %s." % (str(_traceback), str(_exception)), jobID))
         else:
             self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, jobID))
-        self.log("Error: The %s job %d failed at some point:\n%s" % (clusterjob.suffix, jobID, errormsg))
+        self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
         
     def run(self):
         """The main loop and job controller of the daemon."""
@@ -1159,11 +1162,15 @@ class ClusterDaemon(RosettaDaemon):
                 if len(data) != 0:
                     jobID = None
                     for i in range(0, len(data)):
-                        # The live webserver cluster daemon will not run jobs which did not originate from the live webserver
-                        # The test cluster daemon will not run jobs which *did* originate from the live webserver
-                        # We could write if (data[i][10] == 'kortemmelab') == not(settings["LiveWebserver"]) but that may be confusing
+                        # (data[i][10] == 'kortemmelab') == not(settings["LiveWebserver"]) covers both conditions below
+                        
+                        # If enabled, this makes sure that the live webserver cluster daemon will not run jobs which did not originate from the live webserver
+                        # It's preferable to enable this since we usually only want to run one daemon. However, for testing the cluster code while keeping the webserver alive, we should 'continue' the for-loop.
                         if data[i][10] != 'kortemmelab' and settings["LiveWebserver"]:
-                            continue
+                            pass
+                            #continue
+                        
+                        # This makes sure that the test cluster daemon will not run jobs which *did* originate from the live webserver
                         if data[i][10] == 'kortemmelab' and not(settings["LiveWebserver"]):
                             continue
                         
@@ -1188,7 +1195,7 @@ class ClusterDaemon(RosettaDaemon):
                         self.log("Starting job %d." % jobID)
                         if jobID in self.recentDBJobs:
                             self.log("Error: Trying to run database job %d multiple times." % jobID)
-                            raise
+                            raise Exception("Trying to run database job %d multiple times")
                         self.recentDBJobs.append(jobID)
                         if len(self.recentDBJobs) > 400:
                             self.recentDBJobs = self.recentDBJobs[200:]
@@ -1206,15 +1213,15 @@ class ClusterDaemon(RosettaDaemon):
             except Exception, e:
                 newclusterjob = newclusterjob or self._clusterjobjuststarted
                 self._clusterjobjuststarted = None
-                self.log("Error: self.run()\n%s" % traceback.format_exc())
+                self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc())
                 if newclusterjob:
                     newclusterjob.kill()
                     self.recordErrorInJob(newclusterjob, "Error starting job.", traceback.format_exc(), e)
                     if newclusterjob in self.runningJobs:
                         self.runningJobs.remove(newclusterjob)
                 else:
-                    self.runSQL('UPDATE %s SET Errors="Start.%s%s", Status=4 WHERE ID=%s' % ( self.db_table, traceback.format_exc(), e, str(jobID) ))                                      
-                self.log("Error: self.run()\n%s" % traceback.format_exc())
+                    self.recordErrorInJob(None, "Error starting job.", traceback.format_exc(), e, jobID)
+                                     
             self._clusterjobjuststarted = None
 
     def start_job(self, task, params, server):
@@ -1384,8 +1391,9 @@ class ClusterDaemon(RosettaDaemon):
         self.running_S -= 1
         
         # remove files that we don't need
-        if os.path.exists(rosetta_object.workingdir + '/' + 'error.txt') and os.path.getsize(rosetta_object.workingdir + '/' + 'error.txt') > 0:
-            handle = open(rosetta_object.workingdir + '/' + 'error.txt', 'r')
+        errortextfile = os.path.join(rosetta_object.workingdir, 'error.txt')
+        if os.path.exists(errortextfile) and os.path.getsize(errortextfile) > 0:
+            handle = open(errortextfile, 'r')
             state["error"] = "Plasticity classic fail (%s out of %s crashed)" % (len(handle), ensembleSize)
             state["status"] = 4
             raise RosettaError( "sequence_tolerance", ID )
@@ -1411,7 +1419,7 @@ class ClusterDaemon(RosettaDaemon):
             else: # individual files missing
                 no_failed = len(failed_handle.readlines()) - 2
                 self.log("Error: ID %s SEQTOL BACKRUB FAILED %s" % (ID, no_failed ) )
-                self.runSQL('UPDATE %s SET Errors="backrub failed" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
+                self.runSQL('UPDATE %s SET Errors="Backrub failed" Status=4 WHERE ID=%s' % ( self.db_table, ID ))
         
         elif os.path.exists(rosetta_object.workingdir + '/failed_jobs.txt'):
             failed_handle = open(rosetta_object.workingdir + '/failed_jobs.txt','r')

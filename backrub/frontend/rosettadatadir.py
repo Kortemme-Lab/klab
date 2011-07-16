@@ -138,7 +138,7 @@ class RosettaDataDir(RosettaHTML):
     
     def Ensemble(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
         # let's reuse the point mutation function since the output files are the same
-        self.PointMutation( cryptID, jobid, binary, pdb_filename )
+        self.PointMutation( cryptID, jobid, binary, pdb_filename, ProtocolParameters )
         # and overwrite the parts that don't apply
         usingMini = RosettaBinaries[binary]['mini']
         if usingMini:
