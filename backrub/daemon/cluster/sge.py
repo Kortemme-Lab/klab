@@ -17,6 +17,7 @@ import subprocess
 import time
 from string import join, strip
 from conf_daemon import *
+from datetime import datetime
 
 DEBUG = False
 
@@ -371,14 +372,15 @@ class SGEXMLPrinter(SGEPlainPrinter):
                 slxml.append('</dbjob>')
             return '<sge type="status">\n%s\n</sge>' % (join(slxml, "\n")) 
         return None
-    
+
     def summary(self):
         summary = []
         summarylist = self.sgec.summary()
         if summarylist:
             for item in summarylist:
                 summary.append('<dbjob id="%d" numjobs="%d" numtasks="%d"/>' % (item[0], item[1], item[2]))
-            return '<sge type="summary">\n%s\n</sge>' % join(summary, "\n")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            return '<sge type="summary" time="%s">\n%s\n</sge>' % (timestamp, join(summary, "\n"))
         return None
 
     def qdiff(self): 

@@ -17,6 +17,7 @@ import re
 import glob
 from string import join, split
 import traceback
+from datetime import datetime
 
 from conf_daemon import *
 import SimpleProfiler
@@ -357,10 +358,11 @@ class ClusterTask(object):
 
     def _status(self, message, plain = False):
         if self.debug:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             if plain:
-                print(message)
+                print(timestamp, message)
             else:
-                print('<debug id="%d" type="task">%s</debug>' % (self.jobid, message))
+                print('<debug id="%d" type="task" time="%s">%s</debug>' % (self.jobid, timestamp, message))
         
     def cleanup(self):
         """this is the place to remove any remaining files left by your application"""

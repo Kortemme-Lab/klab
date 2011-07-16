@@ -1067,10 +1067,11 @@ class ClusterDaemon(RosettaDaemon):
             clusterjob.failed = True
             suffix = clusterjob.suffix
         
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         if _traceback and _exception:
-            self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, "%s. %s." % (str(_traceback), str(_exception)), jobID))
+            self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, "%s. %s. %s." % (timestamp, str(_traceback), str(_exception)), jobID))
         else:
-            self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, jobID))
+            self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, timestamp, jobID))
         self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
         
     def run(self):
@@ -1123,9 +1124,9 @@ class ClusterDaemon(RosettaDaemon):
                     
         # Check if jobs are finished
         for clusterjob in self.runningJobs:
-            jobID = clusterjob.jobID
-            clusterjob.dumpJITGraph()
             try:
+                jobID = clusterjob.jobID
+                clusterjob.dumpJITGraph()
                 if clusterjob.isCompleted():
                     completedJobs.append(clusterjob)               
 

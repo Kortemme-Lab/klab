@@ -17,6 +17,7 @@ from string import join
 import distutils.dir_util
 import fnmatch
 import traceback
+from datetime import datetime
 
 #import sge
 import ClusterTask  
@@ -109,10 +110,11 @@ class TaskScheduler(object):
     #todo: Use multiple inheritance for this and ClusterTask and SGEConnection classes    
     def _status(self, message, plain = False):
         if self.debug:
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             if plain:
-                print(message)
+                print(timestamp, message)
             else:
-                print('<debug id="%d" type="task">%s</debug>' % (self.dbID, message))
+                print('<debug id="%d" type="scheduler" time="%s">%s</debug>' % (self.dbID, timestamp, message))
             
     def _movequeue(self, task, oldqueue, newqueue):
         # todo: The active queue actually contains both queued and active jobs w.r.t. the cluster head node 
@@ -337,7 +339,8 @@ class RosettaClusterJob(object):
     
     def _status(self, message):
         if self.debug:
-            print('<debug id="%d" type="job">%s</debug>' % (self.jobID, message))
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print('<debug id="%d" type="job" time="%s">%s</debug>' % (self.jobID, timestamp, message))
             
     def start(self):
         try:
