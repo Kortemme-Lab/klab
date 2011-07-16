@@ -454,6 +454,10 @@ class PDB:
                 alternateConformation = line[16]
                 residue = line[17:20]
                 currentChain = line[21]
+                
+                if currentChain == " ":
+                    errors.append("Missing chain identifier (e.g. 'A', 'B') on line %d." % lineidx)
+                
                 currentResidue = line[21:27]
                 classicCurrentResidue = line[21:26] # classic did not handle the insertion code in resfiles until revision 29386
                 

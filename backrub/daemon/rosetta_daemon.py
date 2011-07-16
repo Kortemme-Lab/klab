@@ -598,13 +598,14 @@ The Kortemme Lab Server Daemon
             else:
                 self.log("Job number %d (%s) is missing parameters." % (simulation[0], task))
     
-    def dbdumpPDB(self, jobID):
+    def dbdumpPDB(self, jobID, filename = None):
         results = self.runSQL("SELECT PDBComplex, PDBComplexFile FROM %s WHERE ID = %d" % (self.db_table, jobID))
         if results:
             contents = results[0][0]
-            filename = results[0][1]
+            if not filename:
+                filename = results[0][1]
             filename = os.path.join(os.getcwd(), filename)
-            print(contents)
+            #print(contents)
             print(filename)            
             self.pdb = pdb.PDB(contents.split('\n'))
             if not os.path.exists(filename):
@@ -1527,8 +1528,14 @@ if __name__ == "__main__":
                 daemon.dbconvert()
             elif 'check' == sys.argv[2]:
                 daemon.dbcheck()
-            elif ('dumppdb' == sys.argv[2]) and sys.argv[3]:
-                daemon.dbdumpPDB(int(sys.argv[3]))
+            elif ('dumppdb' == sys.argv[2]):
+                if len(sys.argv) > 3:
+                    filename = None
+                    if len(sys.argv) > 4:
+                        filename = sys.argv[4]
+                    daemon.dbdumpPDB(int(sys.argv[3]), filename)
+                else:
+                    print("Format: python rosetta_daemon.py db dumppdb <jobnumber> [optional filename]")
             else:
                 print "Unknown command to db"
                 sys.exit(2)
