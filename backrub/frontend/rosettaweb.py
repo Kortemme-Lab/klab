@@ -71,6 +71,7 @@ import pickle
 
 # Set this to the machine you are debugging from
 DEVELOPMENT_HOST = "cabernet.ucsf.edu"
+DEVELOPER_USERNAMES = ["oconchus"]
 
 # get ip addr hostname
 IP = os.environ['REMOTE_ADDR']
@@ -1201,8 +1202,9 @@ def queue(form, userid):
     
     thisserver = settings["ShortServerName"]
     
-    # Get all jobs for this server only which have not expired
+    # Get all jobs for this server only which have not expired    
     sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
+    
     result1 = DBConnection.execQuery(sql)
     results = []
     if not (settings["LiveWebserver"]):
@@ -1227,20 +1229,24 @@ def queue(form, userid):
   # sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
   #   userID1 = DBConnection.execQuery(sql)[0][0]
   
+
+            
     for line in result1:
         new_lst = [True, thisserver]
         sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
         result2 = DBConnection.execQuery(sql)
         new_lst.extend(line)
-        if not result2:
+        if (not result2) or (not result2[0]):
             new_lst[5] = '<b><font color="red">BAD USER ID</font></b>'            
-        else:
+            results.append(new_lst)
+        elif result2[0][0] not in DEVELOPER_USERNAMES or hostname == DEVELOPMENT_HOST:
+            # Hide developers' jobs from the public so we can test away
             if int(line[3]) == int(userid):
                 new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
             else:
                 new_lst[5] = result2[0][0]
-        results.append(new_lst)
-    
+            results.append(new_lst)            
+            
     # Sort the jobs by date rather than ID since they come from multiple databases
     # On the live server, we rely on the ID just in case the date gets messed up
     if thisserver != 'kortemmelab':

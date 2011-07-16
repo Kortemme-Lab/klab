@@ -777,6 +777,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             jobIsLocal = line[0]
             server = line[1]
             line = line[2:]
+            
             for p in protocols:
                 if line[9] == p.dbname:
                     task = p.name
