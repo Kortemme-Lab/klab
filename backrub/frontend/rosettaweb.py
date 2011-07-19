@@ -107,10 +107,19 @@ def getKlabDBConnection():
     return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")       
 
 def fixFilename(filename):
+    
+    highestSeparator = filename.rfind('/')
+    if highestSeparator != -1:
+        filename = filename[highestSeparator + 1:]
+    highestSeparator = filename.rfind('\\')
+    if highestSeparator != -1:
+        filename = filename[highestSeparator + 1:]
+    
     filename = filename.replace(' ', '_')
     filename = filename.replace('.', '_')
     filename = filename.replace(':', '_')
     filename = filename.replace('\t', '_')
+    filename = filename.replace('\n', '_')
     if filename[-3:] not in ['pdb', 'PDB' ]:
         filename = filename + '.pdb'
     else:
@@ -1055,6 +1064,9 @@ def submit(rosettaHTML, form, SID):
                 
                 # lock table
                 StorageDBConnection.execQuery("LOCK TABLES backrub WRITE")
+                
+                # Remove other unwanted characters from pdb_filename
+                pdb_filename = pdb_filename.replace("\n", "")
                 
                 # write information to database
                 # Add a dummy hashkey as this field should not be NULL

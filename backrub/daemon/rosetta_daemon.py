@@ -604,9 +604,11 @@ The Kortemme Lab Server Daemon
             contents = results[0][0]
             if not filename:
                 filename = results[0][1]
+            print(filename)
+            print(map(ord, filename))            
             filename = os.path.join(os.getcwd(), filename)
+            print(filename)
             #print(contents)
-            print(filename)            
             self.pdb = pdb.PDB(contents.split('\n'))
             if not os.path.exists(filename):
                 self.log("Writing file %s:" % filename)

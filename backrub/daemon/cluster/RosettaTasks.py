@@ -286,7 +286,6 @@ class SequenceToleranceSKTask(ClusterTask):
             "-ms:numresults", "0",
             "-out:prefix $prefixesvar", 
             "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
-            "-score:ref_offsets HIS 1.2",
             "-score:weights", score_weights,
             "-score:patch", score_patch]
 
