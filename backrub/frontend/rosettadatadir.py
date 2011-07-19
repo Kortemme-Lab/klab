@@ -322,7 +322,6 @@ class RosettaDataDir(RosettaHTML):
     def SequenceToleranceSKMulti(self, cryptID, jobid, binary, pdb_filename, ProtocolParameters):
     
         junk="""
-         #@upgradetodo: hlink [Figure 2B] and [Table 1]
             html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to Figure 2B in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
                               <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See Table 1 in %s.</p>
                               <p>Download the table as 

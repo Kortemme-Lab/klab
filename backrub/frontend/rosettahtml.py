@@ -65,7 +65,7 @@ class RosettaHTML(object):
                         "tt_AtomOccupancy": "header=[Set atom occupancy] body=[Rosetta will ignore any ATOM records in the PDB file with zero occupancy. You can choose to upload the PDB as is (default), remove records with empty occupancy, or set these records with an occupancy of 1.0.] %s" % tooltip_parameter,
                         "tt_StructureURL":  "header=[URL to Structure File] body=[Enter the path to a protein structure file in PDB format. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
                         "tt_PDBID":         "header=[PDB identifier] body=[Enter the 4-digit PDB identifier of the structure file. For NMR structures only the first model in the file will be considered.] %s" % tooltip_parameter,
-                        "tt_RVersion":      """header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or Rosetta 3 (\'mini\'). Some applications only work with one version.<br><br>Both of the generalized sequence tolerance protocols use Rosetta 3; see 'Designed Position Sequence Scoring' in the Methods section of <a href='#refSmithKortemme:2011'>(%d)</a> for a description of the differences.] %s""" % (refIDs["SmithKortemme:2011"], tooltip_parameter), #upgradetodo
+                        "tt_RVersion":      """header=[Rosetta Version] body=[Choose the version of Rosetta, either Rosetta 2 (\'classic\') or Rosetta 3 (\'mini\'). Some applications only work with one version.<br><br>Both of the generalized sequence tolerance protocols use Rosetta 3; see 'Designed Position Sequence Scoring' in the Methods section of <a href='#refSmithKortemme:2011'>(%d)</a> for a description of the differences.] %s""" % (refIDs["SmithKortemme:2011"], tooltip_parameter),
                         "tt_NStruct":       "header=[Number of Structures] body=[Number of generated structures or size of ensemble. We recommend to create 10 structures at a time.] %s" % tooltip_parameter,
                         "tt_ROutput":       "header=[Rosetta output] body=[If checked, the raw output of the Rosetta run is stored. Does not apply to all applications.] %s" % tooltip_parameter,
                         "tt_SelApp":        "header=[Select Application] body=[Click to choose one of the applications. Each application will give you a short explanation and a set of parameters that can be adjusted.] %s" % tooltip_parameter,
@@ -139,7 +139,7 @@ class RosettaHTML(object):
 
 <!-- Header --> <tr> %s </tr>
 
-<!-- Warning --> <tr><td>%s</td></tr>
+<!-- Warning --> <tr><td align="center" style="padding:10px;">%s</td></tr>
 
 <!-- Login Status --> <tr> %s </tr>
 
@@ -354,9 +354,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
               <TR>
                 <TD align=right style="width:300px">Rosetta Version <img alt="tooltip" src="../images/qm_s.png" title="%(tt_RVersion)s"></TD>
                 <TD id="rosetta1" style="padding-left:5pt; padding-top:5pt;">''' % self.tooltips)
-        #upgradetodo ask Tanja - change Rosetta Version for seqtolsk, link to the text from PLoS One -
-         
-
         
         i = 0
         # As it happens, alphabetical ordering of RosettaBinaries co-incides with revision ordering 
@@ -2127,15 +2124,13 @@ This site has known issues under Internet Explorer. Until these issues are fixed
              
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:11], mutated = premutated, designed=designed)) # only the first 10 structures are shown
             
-            #upgradetodo: get doi from Colin
             #@postupgradetodo: change image size based on table size - need more input data and then I can use the code below for the Weblogo
             
             refIDs = self.refs.getReferences()
             reftext = '<a href="#refSmithKortemme:2011">[%(SmithKortemme:2011)d]</a>' % refIDs
             
-            #@upgradetodo: hlink [Figure 2B] and [Table 1]
-            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to Figure 2B in %s except that predicted frequencies are shown instead of experimental frequencies.</p>
-                              <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See Table 1 in %s.</p>
+            html.append('''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><p><br>A ranked table of amino acid types for each position. <br><br>This is similar to <a href="http://www.plosone.org/article/slideshow.action?uri=info:doi/10.1371/journal.pone.0020451&imageURI=info:doi/10.1371/journal.pone.0020451.g002">Figure 2B in %s</a> except that predicted frequencies are shown instead of experimental frequencies.</p>
+                              <p>Across a range of datasets, 42-82%% of amino acid types frequently observed in phage display data (>10%%) are predicted to be above the dashed line. See <a href="http://www.plosone.org/article/slideshow.action?uri=info:doi/10.1371/journal.pone.0020451&imageURI=info:doi/10.1371/journal.pone.0020451.t001">Table 1 in %s</a>.</p>
                               <p>Download the table as 
                               <a href="%s/%s/tolerance_seqrank.png">PNG</a>, <a href="%s/%s/tolerance_seqrank.pdf">PDF</a>.</p>
                               </td>
@@ -2301,7 +2296,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
              
             html.append(self._showApplet4MultipleFiles(comment1, list_pdb_files[:11], mutated = premutated, designed=designed, descriptions = seqid)) # only the first 10 structures are shown
             
-            #upgradetodo: get doi from Colin
             #@postupgradetodo: change image size based on table size - need more input data and then I can use the code below for the Weblogo
             
             refIDs = self.refs.getReferences()
@@ -2425,18 +2419,16 @@ var MaxMultiplePointMutations = %d;
 
     def _showWarning(self):
         if self.adminWarning != '':
-            return '''<td align="center">
-                            <table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; border-color:red; border-style:dashed; border-width:2px;">
-                                <font color="black" >%s</font></td></tr>
-                            </table>
-                     </td></tr><tr>''' % self.adminWarning #style="text-decoration:blink;" #upgradetodo:misaligned
+            return '''<table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; border-color:red; border-style:dashed; border-width:2px;">
+                       <font color="black" >%s</font></td></tr>
+                      </table>
+                     ''' % self.adminWarning
 
         if self.comment != '':
-            return '''<td align="center" style="padding:10px;">
-                                <table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; padding-left:10px; border-color:orange; border-style:dashed; border-width:2px;">
+            return '''<table width="500"><tr><td align="center" style="padding-left:20px; padding-right:20px; padding-top:10px; padding-bottom:10px; padding-left:10px; border-color:orange; border-style:dashed; border-width:2px;">
                                     <font color="red">%s</font></td></tr>
-                                </table>
-                      </td>''' % self.comment
+                      </table>
+                      ''' % self.comment
         return ''
 
     def _showMenu(self):

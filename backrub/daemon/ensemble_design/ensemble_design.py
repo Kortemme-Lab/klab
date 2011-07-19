@@ -133,8 +133,10 @@ except Exception:
 # find the core residues
 try:
     util.mkdir_cd("repack")
-    LOGTIME("Running backrub xx.")
-    util.run("rm -f *pdb; %(ROSETTA_BIN)s xx %(ens_name)s _ -design -onlypack -s %(starting_pdb_file)s -read_all_chains -paths %(PATHS_FILE)s > repack.log" % vars()).split()
+    LOGTIME("Running backrub xx.") 
+    util.run("rm -f *pdb;")
+    print("%(ROSETTA_BIN)s xx %(ens_name)s _ -design -onlypack -s %(starting_pdb_file)s -read_all_chains -paths %(PATHS_FILE)s" % vars())
+    util.run("%(ROSETTA_BIN)s xx %(ens_name)s _ -design -onlypack -s %(starting_pdb_file)s -read_all_chains -paths %(PATHS_FILE)s > repack.log" % vars()).split()
     repacked_pdb_files = util.run("find $PWD -noleaf  -name '*pdb'" % vars()).split()
     assert(len(repacked_pdb_files) == 1)
     repacked_pdb_file = repacked_pdb_files[0]

@@ -8,8 +8,7 @@ class References:
             "FriedlandEtAl:2009"    :   'Friedland GD, Lakomek NA, Griesinger C, Meiler J, Kortemme T. <i>A Correspondence between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family</i>.<br><a href="http://dx.doi.org/10.1371/journal.pcbi.1000393" style="font-size: 10pt"> PLoS Computational Biology, May 2009</a>',
             "LauckEtAl:2010"        :   'Lauck F, Smith CA, Friedland GD, Humphris EL, Kortemme T. <i>RosettaBackrub - A web server for flexible backbone protein structure modeling and design</i>.<br><a href="http://dx.doi.org/10.1093/nar/gkq369" style="font-size: 10pt">Nucleic Acids Research, Volume 38, Issue suppl. 2, Pages W569-W575</a>',
             "SmithKortemme:2010"    :   'Smith CA, Kortemme T. <i>Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains</i>.<br><a href="http://dx.doi.org/10.1016/j.jmb.2010.07.032" style="font-size: 10pt">Journal of Molecular Biology, Volume 402, Issue 2, 17<sup>th</sup> September 2010, Pages 460-474</a>',
-            #@upgradetodo
-            "SmithKortemme:2011"    :   'Smith CA, Kortemme T. <i>Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using Rosetta Backrub Flexible Backbone Design</i>.<br><a href="" style="font-size: 10pt">Accepted to PLoS ONE.</a>',
+            "SmithKortemme:2011"    :   'Smith CA, Kortemme T. <i>Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using Rosetta Backrub Flexible Backbone Design</i>.<br><a href="http://dx.doi.org/10.1371/journal.pone.0020451" style="font-size: 10pt">PLoS ONE 6(7): e20451. doi:10.1371/journal.pone.0020451</a>',
         }
         
         # todo: This was hacked in. Really the refs table above should be separated out to look as below using tuples
@@ -20,8 +19,7 @@ class References:
             "FriedlandEtAl:2009"    :   ('Friedland et al., 2008', 'http://dx.doi.org/10.1371/journal.pcbi.1000393'),
             "LauckEtAl:2010"        :   ('Lauck et al., 2010', 'http://dx.doi.org/10.1093/nar/gkq369'),
             "SmithKortemme:2010"    :   ('Smith and Kortemme, 2010', 'http://dx.doi.org/10.1016/j.jmb.2010.07.032'),
-            #@upgradetodo
-            "SmithKortemme:2011"    :   ('Smith and Kortemme, 2011', ''),
+            "SmithKortemme:2011"    :   ('Smith and Kortemme, 2011', 'http://dx.doi.org/10.1371/journal.pone.0020451'),
         }
     
     def __getitem__(self, index):

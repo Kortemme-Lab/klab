@@ -490,7 +490,8 @@ The Kortemme Lab Server Daemon
                         else:
                             dir_from = os.path.join(self.rosetta_remotedl, cryptID)
                     else:
-                        raise Exception("Error archiving job %s." % str(del_ID))
+                        dir_from = os.path.join(self.rosetta_dl, cryptID)
+                        #raise Exception("Error archiving job %s." % str(del_ID))
                     dir_to   = os.path.join(self.rosetta_tmp[:-5], "archive", str(del_ID))
                     try:
                         if not os.path.exists(dir_from):

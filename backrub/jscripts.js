@@ -974,7 +974,7 @@ function demoSeqtolSKMulti(setAllData)
 	sbmtform.StoredPDB.value = '';
 	sbmtform.PDBID.value = "@1KI1";
 	
-	// upgradetodo"Premutated" : {"A" : {56 : allAAsExceptCysteine}},
+	// @js14 "Premutated" : {"A" : {56 : allAAsExceptCysteine}},
     
     if (setAllData)
     {
@@ -1574,13 +1574,13 @@ function getValidResidues()
 			{
 				anychecked = anychecked || document.getElementsByName(checkboxgroup)[j].checked;
 			}
-			if (chain == "invalid" && rval == "") // upgradetodo:
+			if (chain == "invalid" && rval == "") // @js14:
 																	// count AA
 																	// filled in
 			{
 				premutated[i] = -1;
 			}
-			else if (validChain(chain) && validateElem(resid, integralExpression)) // upgradetodo:
+			else if (validChain(chain) && validateElem(resid, integralExpression)) // @js14:
 																					// count
 																					// AA
 																					// filled
