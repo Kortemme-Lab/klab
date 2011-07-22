@@ -1,0 +1,45 @@
+Uncollectable garbage
+---------------------
+
+Objects that have a ``__del__`` method cannot be collected by the garbage
+collector if they participate in a cycle.
+
+    >>> class Nondestructible(list):
+    ...     def __del__(self):
+    ...         pass
+
+    >>> x = Nondestructible()
+    >>> y = []
+    >>> z = []
+    >>> x.append(y)
+    >>> y.append(z)
+    >>> z.append(x)
+
+When you remove all other references to these, they end up in ``gc.garbage``.
+
+    >>> import objgraph
+    >>> del x, y, z
+    >>> import gc
+    >>> _ = gc.collect()
+    >>> len(gc.garbage)
+    1
+
+We highlight these objects by showing the existence of a ``__del__``.
+
+    >>> objgraph.show_backrefs(objgraph.by_type('Nondestructible'),
+    ...                        filename='finalizers.png') # doctest: +NODES_VARY
+    Graph written to ....dot (8 nodes)
+    Image generated as finalizers.png
+
+.. figure:: finalizers.png
+
+Note that classes that *define* a ``__del__`` method do not have this
+indicator
+
+    >>> objgraph.show_refs(Nondestructible, max_depth=1,
+    ...                    filename='class-with-finalizers.png')
+    Graph written to ....dot (5 nodes)
+    Image generated as class-with-finalizers.png
+
+.. figure:: class-with-finalizers.png
+

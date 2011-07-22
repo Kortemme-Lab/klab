@@ -1,0 +1,215 @@
+.. include:: ../README.txt
+   :end-before: .. _history:
+
+.. currentmodule:: objgraph
+
+
+Quick start
+-----------
+
+Try this in a Python shell:
+
+    >>> x = []
+    >>> y = [x, [x], dict(x=x)]
+    >>> import objgraph
+    >>> objgraph.show_refs([y], filename='sample-graph.png')
+    Graph written to ....dot (5 nodes)
+    Image generated as sample-graph.png
+
+(If you've installed ``xdot``, omit the filename argument to get the
+interactive viewer.)
+
+You should see a graph like this:
+
+.. figure:: sample-graph.png
+   :alt: [graph of objects reachable from y]
+
+
+Backreferences
+--------------
+
+Now try
+
+    >>> objgraph.show_backrefs([x], filename='sample-backref-graph.png')
+    ... # doctest: +NODES_VARY
+    Graph written to ....dot (8 nodes)
+    Image generated as sample-backref-graph.png
+
+and you'll see
+
+.. figure:: sample-backref-graph.png
+   :alt: [graph of objects from which y is reachable]
+   :scale: 50%
+
+
+Memory leak example
+-------------------
+
+The original purpose of :mod:`objgraph` was to help me find memory leaks.
+The idea was to pick an object in memory that shouldn't be there and then
+see what references are keeping it alive.
+
+To get a quick overview of the objects in memory, use the imaginatively-named
+:func:`show_most_common_types`:
+
+    >>> objgraph.show_most_common_types() # doctest: +RANDOM_OUTPUT
+    tuple                      5224
+    function                   1329
+    wrapper_descriptor         967
+    dict                       790
+    builtin_function_or_method 658
+    method_descriptor          340
+    weakref                    322
+    list                       168
+    member_descriptor          167
+    type                       163
+
+But that's looking for a small needle in a large haystack.  Can we limit
+our haystack to objects that were created recently?  Perhaps.
+
+Let's define a function that "leaks" memory
+
+    >>> class MyBigFatObject(object):
+    ...     pass
+    ...
+    >>> def computate_something(_cache={}):
+    ...     _cache[42] = dict(foo=MyBigFatObject(),
+    ...                       bar=MyBigFatObject())
+    ...     # a very explicit and easy-to-find "leak" but oh well
+    ...     x = MyBigFatObject() # this one doesn't leak
+
+We take a snapshot of all the objects counts that are alive before
+we call our function
+
+    >>> objgraph.show_growth(limit=3) # doctest: +RANDOM_OUTPUT
+    tuple                  5228     +5228
+    function               1330     +1330
+    wrapper_descriptor      967      +967
+
+and see what changes after we call it
+
+    >>> computate_something()
+    >>> objgraph.show_growth() # doctest: +RANDOM_OUTPUT
+    MyBigFatObject        2        +2
+    dict                797        +1
+
+It's easy to see :class:`MyBigFatObject` instances that appeared and were
+not freed.  I can pick one of them at random and trace the reference chain
+back to one of the garbage collector's roots.
+
+For simplicity's sake let's assume all of the roots are modules; if you've
+any examples where that isn't true, I'd love to hear about them (although
+see :ref:`leaking-objects`).
+
+    >>> import inspect, random
+    >>> objgraph.show_chain(
+    ...     objgraph.find_backref_chain(
+    ...         random.choice(objgraph.by_type('MyBigFatObject')),
+    ...         inspect.ismodule),
+    ...     filename='chain.png')
+    Graph written to ...dot (13 nodes)
+    Image generated as chain.png
+
+.. figure:: chain.png
+   :alt: [chain of references from a module to a MyBigFatObject instance]
+   :scale: 50%
+
+It is perhaps surprising to find :mod:`linecache` at the end of that chain
+(apparently :mod:`doctest` monkey-patches it), but the important things --
+:func:`computate_something` and its cache dictionary -- are in there.
+
+There are other tools, perhaps better suited for memory leak hunting:
+`heapy <http://pypi.python.org/pypi/guppy>`_,
+`Dozer <http://pypi.python.org/pypi/Dozer>`_.
+
+
+.. _leaking-objects:
+
+Reference counting bugs
+-----------------------
+
+Bugs in C-level reference counting may leave objects in memory that do not
+have any other objects pointing at them.  You can find these by calling
+:func:`get_leaking_objects`, but you'll have to filter out legitimate GC
+roots from them, and there are a *lot* of those:
+
+    >>> roots = objgraph.get_leaking_objects()
+    >>> len(roots) # doctest: +RANDOM_OUTPUT
+    4621
+
+    >>> objgraph.show_most_common_types(objects=roots)
+    ... # doctest: +RANDOM_OUTPUT
+    tuple          4333
+    dict           171
+    list           74
+    instancemethod 4
+    listiterator   2
+    MemoryError    1
+    Sub            1
+    RuntimeError   1
+    Param          1
+    Add            1
+
+    >>> objgraph.show_refs(roots[:3], refcounts=True, filename='roots.png')
+    ... # doctest: +NODES_VARY
+    Graph written to ...dot (19 nodes)
+    Image generated as roots.png
+
+.. figure:: roots.png
+   :alt: [GC roots and potentially leaked objects]
+   :scale: 25%
+
+
+API Documentation
+-----------------
+
+.. toctree::
+   :maxdepth: 2
+
+   objgraph
+
+
+More examples, that also double as tests
+----------------------------------------
+
+.. toctree::
+   :maxdepth: 2
+
+   references
+   extra-info
+   highlighting
+   uncollectable
+   generator-sample
+   chain
+   quoting
+
+.. include:: ../README.txt
+   :start-after: .. _history:
+   :end-before: .. _devel:
+
+And here's the change log
+
+.. toctree::
+   :maxdepth: 2
+
+   CHANGES
+
+
+.. include:: ../README.txt
+   :start-after: .. _devel:
+
+For more information, see :ref:`hacking`.
+
+.. toctree::
+   :hidden:
+
+   HACKING
+
+
+.. Indices and tables
+.. ------------------
+.. 
+.. * :ref:`genindex`
+.. * :ref:`modindex`
+.. * :ref:`search`
+

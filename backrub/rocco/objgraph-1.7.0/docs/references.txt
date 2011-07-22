@@ -1,0 +1,45 @@
+Too many references
+-------------------
+
+Objects that have too many references are truncated
+
+    >>> import objgraph
+    >>> objgraph.show_refs([list(range(7))], too_many=5, filename='too-many.png')
+    Graph written to ....dot (6 nodes)
+    Image generated as too-many.png
+
+.. figure:: too-many.png
+
+The same sort of thing applies to backreferences
+
+    >>> moo = 'moo'
+    >>> refs_to_moo = [[moo] for n in range(42)]
+    >>> objgraph.show_backrefs([moo], too_many=5, max_depth=1, filename='42.png')
+    Graph written to ....dot (6 nodes)
+    Image generated as 42.png
+
+.. figure:: 42.png
+
+
+Reference counts
+----------------
+
+You can enable reference counts.  The number of arrows pointing to an object
+should match the number in square brackets, usually, but there can be
+exceptions.  E.g. objects internal to objgraph's implementation may inflate
+the reference count somewhat.
+
+    >>> import sys
+    >>> one_reference = object()
+    >>> objgraph.show_backrefs([one_reference], refcounts=True,
+    ...     filename='refcounts.png') # doctest: +NODES_VARY
+    Graph written to ....dot (5 nodes)
+    Image generated as refcounts.png
+
+.. figure:: refcounts.png
+
+We see two references to the ``one_reference`` object: the one not shown
+comes from the list passed to show_backrefs.
+
+I think the extra references to the frame object and locals dict come from the
+interpreter internals.
