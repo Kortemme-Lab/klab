@@ -15,10 +15,17 @@ starting_pdb_file = sys.argv[1]
 ensemble_list = sys.argv[2]
 prefix = sys.argv[3] 
 
-if len(sys.argv) > 4 and sys.argv[4] == '-d':
-	util.DEBUGMODE = True
-else: 
-	util.DEBUGMODE = False
+util.DEBUGMODE = False
+allowprune = False
+if len(sys.argv) > 4:
+	for option in sys.argv[4:]:
+		if option == '-d':
+			util.DEBUGMODE = True
+		elif option == '-allow_prune':
+			allowprune = True
+		else:
+			util.ERROR("Unknown option %s." % option)
+			sys.exit(1)
 
 F = open(util.logfile, "w")
 F.close()   
@@ -43,6 +50,10 @@ RMSD_PLOT_FILE = "rmsd_plot-%s.png" % (prefix)
 CA_DIST_DIFF_2D_PLOT_FILE = "ca_dist_difference_2D_plot-%s.png" % (prefix)
 CA_DIST_DIFF_1D_PLOT_FILE = "ca_dist_difference_1D_plot-%s.png" % (prefix)
 
+if allowprune:
+	util.PRINTHEAP("Creating pruned dataset")
+	starting_pdb_file, ensemble_list = PDBlite.pruneDataset(starting_pdb_file, ensemble_list, prefix)
+
 util.PRINTHEAP("before loading starting pdb")
 
 starting_pdb = PDBlite.PDB(open(starting_pdb_file).readlines())
@@ -50,6 +61,7 @@ starting_pdb = PDBlite.PDB(open(starting_pdb_file).readlines())
 util.PRINTHEAP("after loading starting pdb")
 
 br_traj = PDBlite.PDBTrajectory(ensemble_list)
+
 
 open(CA_DIST_DIFF_MATRIX_FILE, "w").write(br_traj.get_diff_dist_matrix_str())
 

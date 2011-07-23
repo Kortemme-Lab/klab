@@ -11,9 +11,110 @@ sys.path.append("./objgraph-1.7.0")
 import objgraph
 import time
 import shutil
+import re
 
 RAD_TO_DEG = 180.0 / math.pi
 ROWSINAFILE = 200
+
+
+def pruneDataset(starting_pdb_file, ensemble_list_file, prefix):
+    F = open(ensemble_list_file, "r")
+    pdbfns = [starting_pdb_file] + F.read().split("\n")
+    F.close()
+    
+    commonResidues = getCommonResidues(pdbfns)
+    
+    new_ensemble_list = []
+    
+    if re.compile("^\w+$").match(prefix):
+        tmpdir = "/tmp/eyal/%s" % prefix
+        if os.path.exists(tmpdir):
+            shutil.rmtree(tmpdir)
+        os.mkdir(tmpdir)
+        
+        for i in range(len(pdbfns)):
+            pdbfn = pdbfns[i]
+            if pdbfn.strip():
+                sys.stdout.flush()
+                if pdbfn.find("./") != -1:
+                    raise Exception("The filename %s contains illegal path components (./ or ../)." % pdbfn)
+                
+                F = open(pdbfn, "r")
+                contents = F.read().split("\n")
+                F.close()
+                
+                contents = pruneToCommonResidues(contents, commonResidues)
+                
+                if pdbfn[0] == '/':
+                    pdbfn = pdbfn[1:]
+                
+                lastslash = pdbfn.rfind("/")
+                if lastslash != -1:
+                    try:
+                        os.makedirs(os.path.join(tmpdir, pdbfn[:lastslash]))
+                    except:
+                        pass
+                
+                newfile = os.path.join(tmpdir, pdbfn)
+                new_ensemble_list.append(newfile)
+                F = open(newfile, "w")
+                F.write(join(contents, "\n"))
+                F.close()
+        
+        starting_pdb_file = new_ensemble_list[0]
+        new_ensemble_list = new_ensemble_list[1:]
+        
+        lastslash = ensemble_list_file.rfind("/")
+        if lastslash != -1:
+            ensemble_list_file = ensemble_list_file[lastslash + 1:]
+        
+        ensemble_list_file = os.path.join(tmpdir, ensemble_list_file)
+        F = open(ensemble_list_file, "w")
+        F.write(join(new_ensemble_list, "\n"))
+        F.close()
+        return starting_pdb_file, ensemble_list_file
+    else:
+        raise Exception("Prefix %s must only contain alphanumeric or underscores characters." % prefix)
+
+def pruneToCommonResidues(filecontents, commonResidues):
+    newlines = []
+    for line in filecontents:
+        if line[0:4] == "ATOM" and commonResidues.get("%s@%s" % (line[21:22], int(line[22:26]))):
+            newlines.append(line)
+    return newlines
+    
+def getCommonResidues(pdblist):
+    commonResidues = None
+    maxNumResidues = 0
+    for pdbfn in pdblist:
+        if not pdbfn.strip():
+            continue
+        pdb = PDB(open(pdbfn).readlines())
+        pdbresidues = set([(res.chain, res.res_num) for res in pdb.iter_residues()])
+        maxNumResidues = max(maxNumResidues, len(pdbresidues))
+        
+        if not commonResidues:
+            util.MSG("Creating common residues from PDB %s.\n" % pdbfn)
+            commonResidues = pdbresidues
+        else:
+            missing = commonResidues.difference(pdbresidues)
+            extra = pdbresidues.difference(commonResidues)
+            if missing:
+                util.WARN("%s is missing residues %s from the common set.\n" % (pdbfn, sorted(missing)))
+            if extra:
+                util.WARN("%s has residues %s which are not in the common set. These will be removed.\n" % (pdbfn, sorted(extra)))
+            if missing or extra:
+                commonResidues = commonResidues.intersection(pdbresidues)
+    
+    util.MSG("\nMaximum number of residues in one of the PDBs: %d." % maxNumResidues)
+    util.MSG("Remaining residues after pruning: %d." % len(commonResidues))
+    util.MSG("Working with %0.2f%% of the structure.\n" % (100*(float(len(commonResidues))/float(maxNumResidues))))
+    
+    newdict = {}
+    for residue in commonResidues:
+        newdict["%s@%s" % (residue[0], residue[1])] = True
+    return newdict
+
 
 def make_pdb_atom_str(atomNum, atomName, resName, chain, resNum, x, y, z, altLoc=' ',insCode=' ',occupancy=1, bFactor=0):
         return "%-6s%5d %4s%1s%3s %1s%4s%1s   %8.3f%8.3f%8.3f%6.2f%6.2f" % \
