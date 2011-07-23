@@ -12,10 +12,12 @@ import objgraph
 import time
 import shutil
 import re
+import stat
 
 RAD_TO_DEG = 180.0 / math.pi
 ROWSINAFILE = 200
 
+permissions775 = stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
 
 def pruneDataset(starting_pdb_file, ensemble_list_file, prefix):
     F = open(ensemble_list_file, "r")
@@ -26,8 +28,13 @@ def pruneDataset(starting_pdb_file, ensemble_list_file, prefix):
     
     new_ensemble_list = []
     
+    pdtmpdir = "/tmp/ensdesign"
+    if not os.path.exists(pdtmpdir):
+        os.mkdir(pdtmpdir)
+        os.chmod(pdtmpdir, permissions775)
+        
     if re.compile("^\w+$").match(prefix):
-        tmpdir = "/tmp/eyal/%s" % prefix
+        tmpdir = os.path.join(pdtmpdir, prefix)
         if os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
         os.mkdir(tmpdir)
