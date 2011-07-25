@@ -24,6 +24,9 @@ def pruneDataset(starting_pdb_file, ensemble_list_file, prefix):
     pdbfns = [starting_pdb_file] + F.read().split("\n")
     F.close()
     
+    # Remove empty lines
+    pdbfns = filter(None, pdbfns)
+    
     commonResidues = getCommonResidues(pdbfns)
     
     new_ensemble_list = []
@@ -93,11 +96,24 @@ def pruneToCommonResidues(filecontents, commonResidues):
 def getCommonResidues(pdblist):
     commonResidues = None
     maxNumResidues = 0
+    
+    # Missing residue stats to help with pruning the dataset
+    allResiduesByPDB = {}
+    residuesInFiles = {}
+        
     for pdbfn in pdblist:
         if not pdbfn.strip():
             continue
         pdb = PDB(open(pdbfn).readlines())
         pdbresidues = set([(res.chain, res.res_num) for res in pdb.iter_residues()])
+        
+        # Frequency table
+        for res in pdb.iter_residues():
+            key = (res.chain, res.res_num)
+            allResiduesByPDB[key] = allResiduesByPDB.get(key, [])
+            allResiduesByPDB[key].append(pdbfn)
+        residuesInFiles[pdbfn] = len(pdb._res_order)
+            
         maxNumResidues = max(maxNumResidues, len(pdbresidues))
         
         if not commonResidues:
@@ -116,6 +132,25 @@ def getCommonResidues(pdblist):
     util.MSG("\nMaximum number of residues in one of the PDBs: %d." % maxNumResidues)
     util.MSG("Remaining residues after pruning: %d." % len(commonResidues))
     util.MSG("Working with %0.2f%% of the structure.\n" % (100*(float(len(commonResidues))/float(maxNumResidues))))
+    
+    fileset = set(pdblist)
+    for respair, filelist in sorted(sorted(allResiduesByPDB.iteritems()), key=lambda(rpair, plist): -len(plist)):
+        if len(filelist) < len(pdblist):
+            util.WARN("The residue %s%s is missing in these %d files:" % (respair[0], respair[1], len(pdblist) - len(filelist)))
+            for missing in (fileset.difference(set(filelist))):
+                print(missing)
+    
+    util.WARN("Printing out the top 40% of files with missing residues:")
+    counter = (len(pdblist) / 2.5)
+    for pdb, reslistsize in sorted(sorted(residuesInFiles.iteritems()), key=lambda(k,v): v - maxNumResidues):
+        if maxNumResidues == reslistsize:
+            break
+        print("%s: Missing %d residues." % (pdb, maxNumResidues - reslistsize))
+        counter -= 1
+        if counter < 0:
+            break
+    
+    print("\n\n") 
     
     newdict = {}
     for residue in commonResidues:
