@@ -46,11 +46,13 @@ class RosettaDB:
     def close(self):
         self.connection.close()
         
-    def __init__(self, settings, numTries = 1, host = None):
+    def __init__(self, settings, numTries = 1, host = None, db = None):
         if not host:
             host = settings["SQLHost"]
+        if not db:
+            db = settings["SQLDatabase"]
         self.connection = MySQLdb.Connection(host           = host,
-                                             db             = settings["SQLDatabase"],
+                                             db             = db,
                                              user           = settings["SQLUser"],
                                              passwd         = settings["SQLPassword"],
                                              port           = settings["SQLPort"],

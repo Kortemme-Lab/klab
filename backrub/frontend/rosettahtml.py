@@ -15,6 +15,7 @@ from string import find
 import pickle
 import gzip
 import Graph
+import admin
 
 from rosettahelper import readFile
 from rwebhelper import *
@@ -842,7 +843,15 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         html.append('</table> </div><br> </td>')
         
         return join(html, "")
-   
+
+###############################################################################################
+# printQueue                                                                                             #
+###############################################################################################
+
+    def adminPage(self, quotas, usage, users):
+        html = admin.generateAdminPage(quotas, usage, users)
+        return join(html, "")
+    
 ###############################################################################################
 # jobinfo function and related subfunctions                                                                                  #
 # This function creates the HTML for the Job Info page accessed by clicking a job in the queue
@@ -2445,9 +2454,16 @@ var MaxMultiplePointMutations = %d;
                 <tr><td align=center>
                     [&nbsp;<A class="nav" href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
-                    [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;]
+                    [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;] """ % (self.script_filename, self.script_filename)
+        
+        #todo : Change this based on if not(settings["LiveWebserver"]) rather than albana
+        if self.server_shortname == 'albana':
+            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
+        
+        
+        html +="""
                 </td></tr>
-                <tr><td align=center> %s %s \n</td></tr>""" % (self.script_filename,self.script_filename, s1, s2)
+                <tr><td align=center> %s %s \n</td></tr>""" % (s1, s2)
     
         return html
 

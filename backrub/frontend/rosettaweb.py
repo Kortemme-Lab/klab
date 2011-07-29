@@ -61,13 +61,14 @@ from rosettahelper import WebsiteSettings
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
-from datetime import datetime
+from datetime import datetime, date
 from string import *
 from cStringIO import StringIO
 from cgi import escape
 
 import string
 import pickle
+import admin
 
 # Set this to the machine you are debugging from
 DEVELOPMENT_HOST = "cabernet.ucsf.edu"
@@ -105,6 +106,9 @@ warnings = []
 
 def getKlabDBConnection():
     return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")       
+
+def getLabspaceConnection():
+    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "labspace")       
 
 def fixFilename(filename):
     
@@ -255,12 +259,20 @@ def ws():
     
       else: # we have a cookie already, let's look it up in the database and check whether the user is logged in
         # set cookie to the present time with time() function
+        
         my_session.data['lastvisit'] = repr(time.time())
         # get infos about session
         sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
         result = DBConnection.execQuery(sql)
+        
+        allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
+        subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
+        if not(settings["LiveWebserver"]):
+            allowedQueries.append("admin")
+            subAllowedQueries.append("admin")
+            
         # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
-        if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]:
+        if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
           query_type = form["query"].value
         
           sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
@@ -269,7 +281,7 @@ def ws():
             username = result[0][0]
             userid = int(result[0][1])
     
-        elif form.has_key("query") and form['query'].value in ["register", "index", "login", "terms_of_service", "oops", "doc"]:
+        elif form.has_key("query") and form['query'].value in subAllowedQueries:
           query_type = form["query"].value
         else:
           query_type = "index" # fallback, shouldn't occur
@@ -461,6 +473,19 @@ def ws():
     else:
         html_content = rosettaHTML.register(errors=errors)
     title = 'Registration'
+
+  elif query_type == "admin":
+      if not(settings["LiveWebserver"]):
+          numberOfDays = 30
+          dstart = date.fromtimestamp(time.time() - (60*60*24*numberOfDays)) 
+          dend = date.today()
+          
+          quotas = getLabspaceConnection().execQuery("SELECT Date, Quotas, DriveUsage, OtherData, GroupUsage FROM Quota WHERE Date >= %s AND Date <= %s ORDER BY Date", parameters = (dstart, dend))
+          usage = getLabspaceConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
+          users = getLabspaceConnection().execQuery("SELECT * FROM Users ORDER BY Username")
+          
+          html_content = rosettaHTML.adminPage(quotas, usage, users)
+          title = 'Admin'
 
   elif query_type == "update":
     user_data = getUserData(form, SID)
