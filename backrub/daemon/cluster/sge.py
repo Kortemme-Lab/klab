@@ -27,6 +27,8 @@ qstatus = {
     't'    :    'transferring',
 }
 
+class ClusterException(Exception): pass
+
 class SGEConnection(object):
          
     def __init__(self):
@@ -166,11 +168,18 @@ class SGEConnection(object):
         
         waitfor = 0
         errorcode = subp.wait()
+
         file_stdout.close()
         file_stdout = open(command_filename + ".temp.out", 'r')
         output = strip(file_stdout.read())
         file_stdout.close()
         file_stderr.close()
+
+        if errorcode != 0:
+            if output.find("unable to contact qmaster") != -1:
+                raise ClusterException("qsub failed: unable to contact qmaster")
+            else:
+                raise ClusterException(output)
             
         # Match job id
         # This part of the script is probably error-prone as it depends on the server message.

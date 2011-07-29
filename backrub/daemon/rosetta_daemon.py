@@ -24,7 +24,7 @@ from rosettahelper import * #RosettaError, get_files, grep, make755Directory, ma
 from RosettaProtocols import *
 import RosettaTasks
 from conf_daemon import *
-from sge import SGEConnection, SGEXMLPrinter
+from sge import SGEConnection, SGEXMLPrinter, ClusterException
 
 cwd = str(os.getcwd())
 
@@ -1148,6 +1148,10 @@ class ClusterDaemon(RosettaDaemon):
                 self.recordErrorInJob(clusterjob, "Post-processing error.", traceback.format_exc(), e)
                 self.end_job(clusterjob, Failed = True)
                 clusterjob.dumpJITGraph()
+            except ClusterException, e:
+                self.recordErrorInJob(clusterjob, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e)
+                self.end_job(clusterjob, Failed = True)
+                clusterjob.dumpJITGraph()
             except Exception, e:
                 self.recordErrorInJob(clusterjob, "Failed.", traceback.format_exc(), e)
                 self.end_job(clusterjob, Failed = True)
@@ -1215,6 +1219,17 @@ class ClusterDaemon(RosettaDaemon):
                         if len(self.runningJobs) >= self.MaxClusterJobs:
                             break
                         
+            except ClusterException, e:
+                newclusterjob = newclusterjob or self._clusterjobjuststarted
+                self._clusterjobjuststarted = None
+                self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc())
+                if newclusterjob:
+                    newclusterjob.kill()
+                    self.recordErrorInJob(newclusterjob, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e)
+                    if newclusterjob in self.runningJobs:
+                        self.runningJobs.remove(newclusterjob)
+                else:
+                    self.recordErrorInJob(None, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e, jobID)
             except Exception, e:
                 newclusterjob = newclusterjob or self._clusterjobjuststarted
                 self._clusterjobjuststarted = None
