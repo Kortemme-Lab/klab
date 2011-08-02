@@ -80,7 +80,7 @@ def testSequenceToleranceSK(extraparams):
                 "Premutated"        : {"A" : {102 : "A"}},
                 "Designed"          : {"A" : [103, 104]}
                 }
-    setupParameters(extraparams, 1234, "1MDY_mod.pdb", 2, params)            
+    setupParameters(extraparams["binary"], 1234, "1MDY_mod.pdb", 2, params)            
     return RosettaTasks.SequenceToleranceSKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
     
 def testMultiSequenceToleranceSKCommon(extraparams):
@@ -113,6 +113,19 @@ def testSequenceToleranceHKAnalysis(extraparams):
     setupParameters("seqtolHK", 2017, "1FRT.pdb", 10, params)            
     return RosettaTasks.SequenceToleranceHKJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
 
+def testSequenceToleranceSKAnalysis(extraparams):
+    params = {
+                "radius"            : 10,
+                "kT"                : 0.228,
+                "Partners"          : ["C", "D"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {},
+                "Designed"          : {"D" : [434, 435, 436, 309, 310, 311, 314, 252, 253, 254]}
+                }
+    setupParameters(extraparams["binary"], 2016, "1FC2.pdb", 10, params)            
+    return RosettaTasks.SequenceToleranceSKJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams["dldir"])
+    
+
 def testMultiSequenceToleranceSKAnalysis(extraparams):
     params = testMultiSequenceToleranceSKCommon(extraparams) 
     return RosettaTasks.SequenceToleranceSKMultiJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
@@ -134,8 +147,9 @@ def run():
     tests = {
         "HK"           : {"testfn" : testSequenceToleranceHK,               "analysisOnly" : False, "extraparams" : None},
         "HKAnalysis"   : {"testfn" : testSequenceToleranceHKAnalysis,       "analysisOnly" : True,  "extraparams" : ("/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/testhk/tmphYbm4h_seqtolHK/", 6217160)},
-        "SKJMB"        : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : "seqtolJMB"},
-        "SKP1"         : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : "seqtolP1"},
+        "SKJMB"        : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : {"binary" : "seqtolJMB"}},
+        "SKP1"         : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : {"binary" : "seqtolP1"}},
+        "SKAnalysis"   : {"testfn" : testSequenceToleranceSKAnalysis,       "analysisOnly" : True,  "extraparams" : {"binary" : "seqtolP1", "dldir" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/41f7141e75998737061a3cca2e1dd7b7"}},
         "1KI1"         : {"testfn" : testMultiSequenceToleranceSK,          "analysisOnly" : False, "extraparams" : None},
         "1KI1analysis" : {"testfn" : testMultiSequenceToleranceSKAnalysis,  "analysisOnly" : True,  "extraparams" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/cluster/tmpqNjqAs_seqtolMultiSK"},
      }
@@ -186,5 +200,5 @@ def run():
                     print(traceback.print_exc())
                     print(e)
      
-test = "HKAnalysis"       
+test = "SKAnalysis"       
 run()

@@ -1154,10 +1154,15 @@ class SequenceToleranceSKJob(RosettaClusterJob):
         self.file_stdout.close()
         self.file_stderr.close()
         
+        Fpwm = open(self._targetdir_file_path("tolerance_pwm.txt"))
+        annotations = Fpwm.readline().split()
+        if len(set(annotations).difference(set(getResIDs(self.parameters)))) != 0:
+            self._status("Warning: There is a difference in the set of designed residues from the pwm (%s) and from getResIDs (%s)." % (str(getResIDs(self.parameters)), str(annotations)))
+        Fpwm.close()
         success = True
         try:
             fasta_file = self._targetdir_file_path("tolerance_sequences.fasta")                
-            createSequenceMotif(fasta_file, getResIDs(self.parameters), self._targetdir_file_path( "tolerance_motif.png" ))
+            createSequenceMotif(fasta_file, annotations, self._targetdir_file_path( "tolerance_motif.png" ))
         except Exception, e:
             self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
             success = False
@@ -1426,12 +1431,18 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
             self.file_stdout.close()
             self.file_stderr.close()
                
-            success = True           
+            success = True
+            Fpwm = open(os.path.join(targettaskdir, "tolerance_pwm.txt"))
+            annotations = Fpwm.readline().split()
+            if len(set(annotations).difference(set(getResIDs(self.parameters)))) != 0:
+                self._status("Warning: There is a difference in the set of designed residues from the pwm (%s) and from getResIDs (%s)." % (str(getResIDs(self.parameters)), str(annotations)))
+            Fpwm.close()
+            
             try:
                 # create weblogo from the created fasta file
                 fasta_file = self._targetdir_file_path("tolerance_sequences%d.fasta" % i)                
                 shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), fasta_file)
-                createSequenceMotif(fasta_file, getResIDs(self.parameters), self._targetdir_file_path( "tolerance_motif%d.png" % i))
+                createSequenceMotif(fasta_file, annotations, self._targetdir_file_path( "tolerance_motif%d.png" % i))
             except Exception, e:
                 self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
                 success = False
