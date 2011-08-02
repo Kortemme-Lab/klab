@@ -848,8 +848,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 # printQueue                                                                                             #
 ###############################################################################################
 
-    def adminPage(self, quotas, usage, users):
-        html = admin.generateAdminPage(quotas, usage, users)
+    def adminPage(self, quotas, usage, users, settings):
+        html = admin.generateAdminPage(quotas, usage, users, settings)
         return join(html, "")
     
 ###############################################################################################

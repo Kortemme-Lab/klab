@@ -10,9 +10,12 @@ from string import join
 import pickle
 import string
 from sys import maxint
+import rosettadb
+
 
 userColors = {}
 showHistoryForDays = 31
+settings = None
 
 def initGoogleCharts(chartfnlist):
     html = []
@@ -102,9 +105,8 @@ def addDriveUsageChart(DriveUsage):
     html = []
     chartsfns = []
  
-    drives = ["ganon", "zin", "link", "zelda", "Webserver", "Test webserver"]
+    drives = ["ganon", "zin", "link", "zelda", "hyrule", "Webserver", "Test webserver"]
     #colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", Unaccounted : "#EFEFEF"}
-    
     for drive in drives:
         nospdrive = drive.replace(" ", "")
         if DriveUsage.get(drive):
@@ -147,8 +149,8 @@ function %(fnname)s() {
         if DriveUsage.get(drive):
             html.append('''<td><table><tr><td id="DriveUsageChart%s"></td></tr><tr><td align=center>Size: %s</td></tr></table></td>''' % (nospdrive, DriveUsage[drive]["Size"]))
         counter += 1
-        if counter >= 4:
-            # Show 4 drives per row
+        if counter >= 5:
+            # Show 5 drives per row
             html.append('''</tr><tr>''')
             counter = 0
     html.append('''</tr></table>''')
@@ -354,8 +356,8 @@ def simpleHash(instr):
         hash = "0" + str(hash)
     return hash
 
-def generateAdminPage(quotas, usage, users):
-    
+def generateDiskStatsSubpage(quotas, usage, users):
+    html = []
     charthtml = []
     chartfns = []
     titles = []
@@ -394,9 +396,7 @@ def generateAdminPage(quotas, usage, users):
     # Prepare javascript calls
     for i in range(len(chartfns)):
         chartfns[i] += "();"
-        
-    html = ["<td align=left>"]
-    
+
     # Titles
     html.append('''<table><tr><td style="text-align:left"><div style="font-size:15pt">Statistics up to %s:</div><ol>''' % dt)
     for i in range(0, len(titles)):
@@ -414,6 +414,153 @@ def generateAdminPage(quotas, usage, users):
     
     html.extend(initGoogleCharts(chartfns))
     html.extend(charthtml)
+    return html
+
+from cStringIO import StringIO
+
+def getKlabDBConnection():
+    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
+
+def getAlbanaConnection():
+    return rosettadb.RosettaDB(settings)
+
+def getJobs():
+    userid='27'
+    output = StringIO()
+    output.write('<TD align="center">')
+    
+    results = []
+    # Get all jobs on the live webserver which were submitted from this server and which have not expired
+    KlabDBConnection = getKlabDBConnection()
+    
+    connections = [getKlabDBConnection(), getAlbanaConnection()]
+    
+    for connection in connections:
+        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task, BackrubServer, Expired FROM backrub ORDER BY backrub.ID DESC" 
+        result = connection.execQuery(sql)
+    
+        for line in result:
+            sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
+            result2 = KlabDBConnection.execQuery(sql)
+            new_list = []
+            new_list.extend(line)
+            new_list[3] = result2[0][0]
+            results.append(new_list)
+        connection.close()
+  
+    # Sort the jobs by date
+    results.sort(key = lambda x:x[6], reverse = True) 
+        
+    return results
+
+def generateJobAdminSubpage():
+    html = []
+    job_list = getJobs()
+    html.append("""<H1 class="title"> Job queue </H1> <br>
+          <div id="queue_bg">
+          <table border=0 cellpadding=2 cellspacing=0 width=700 >
+           <colgroup>
+             <col width="35">
+             <col width="80">
+             <col width="90">
+             <col width="90">
+             <col width="200">
+             <col width="160">
+             <col width="25">
+           </colgroup>
+          <tr align=center bgcolor="#828282" style="color:white;"> 
+           <td > ID </td> 
+           <td > Status </td> 
+           <td > User Name </td>
+           <td > Date (PST) </td>
+           <td > Job Name </td>
+           <td > Rosetta Application </td>
+           <td > Structures </td>\n""")
+
+    for line in job_list:
+        jobIsLocal = True
+        server = line[10]
+        
+        task = line[9]
+        task_color = "#888888"
+        
+        bgcolor = "#EEEEEE"
+        if not jobIsLocal:
+            bgcolor = "#DDDDFF"
+        
+        html.append("""<tr align=center bgcolor="%s" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='%s'; this.style.color='#000000';" >""" % (bgcolor, bgcolor))
+        link_to_job = ''
+        
+        # write ID
+        html.append('<td class="lw" %s>%s </td>' % (link_to_job, str(line[0])))
+        # write status 
+        status = int(line[2])
+        
+        if status == 0:
+            html.append('<td class="lw" %s><font color="orange">in queue</font></td>' % link_to_job)
+        elif status == 1:
+            html.append('<td class="lw" %s><font color="green">active</font></td>' % link_to_job)
+        elif status == 2:
+            html.append('<td class="lw" %s><font color="black">done</font></td>' % link_to_job) # <font color="darkblue" %s></font>
+        elif status == 5:
+            html.append('<td class="lw" style="background-color: #AFE2C2;" %s><font color="darkblue">sample</font></td>' % link_to_job)
+        else:
+          # write error
+          if  str(line[8]) != '' and line[8] != None:
+            # onclick="window.open('https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation','backrub_wiki')"
+            #                        onmouseover="this.style.background='#447DAE'; this.style.color='#000000'"
+            #                        onmouseout="this.style.background='#EEEEEE';"
+            html.append('''<td class="lw">
+                          <font color="FF0000">error</font>
+                          (<a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation" target="_blank"
+                             onmouseover="this.style.color='#FFFFFF'" onmouseout="this.style.color='#365a79'">%s</a>)</td>''' % str(line[8]))
+          else:
+            html.append('<td class="lw"><font color="FF0000">error</font></td>')
+            
+        # write username
+        html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[3])))
+        # write date
+        html.append('<td class="lw" style="font-size:small;" %s>%s</td>' % (link_to_job, str(line[4])))
+        # write jobname or "notes"
+        if len(str(line[5])) < 26:
+            html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[5])))
+        else:
+            html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[5])[0:23] + "..."))
+        
+        # Rosetta version
+        # todo: the mini/classic distinction is somewhat deprecated with the new seqtol protocol
+        miniVersion = line[6]
+        html.append('<td class="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
+    
+        # write size of ensemble
+        html.append('<td class="lw" %s >%s</td></tr>\n' % (link_to_job, str(line[7])))
+            
+    html.append('</table> </div>')
+    return html
+
+def generateAdminPage(quotas, usage, users, settings_):
+    
+    global settings
+    settings = settings_
+    
+    # Create menu
+    html = ['''<script src="/backrub/frontend/admin.js" type="text/javascript"></script>''']
+    html.append("<td align=center>")
+    html.append('''<input type="button" value="Disk stats" onClick="showPage('diskstats');">''')
+    html.append('''<input type="button" value="Job administration" onClick="showPage('jobadmin');">''')
+    html.append("</td></tr><tr>")
+    
+    html.append("<td align=left>")
+    
+    # Disk stats
+    html.append("<div id='diskstats'>")
+    html.extend(generateDiskStatsSubpage(quotas, usage, users))
+    html.append("</div>")
+
+    # Job admin
+    html.append('<div style="display:none" id="jobadmin">')
+    html.extend(generateJobAdminSubpage())
+    html.append("</div>")
     
     html.append("</td>")
     return html

@@ -484,7 +484,7 @@ def ws():
           usage = getLabspaceConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
           users = getLabspaceConnection().execQuery("SELECT * FROM Users ORDER BY Username")
           
-          html_content = rosettaHTML.adminPage(quotas, usage, users)
+          html_content = rosettaHTML.adminPage(quotas, usage, users, settings)
           title = 'Admin'
 
   elif query_type == "update":
