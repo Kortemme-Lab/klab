@@ -11,6 +11,7 @@
 
 import sys, os
 import MySQLdb
+import MySQLdb.cursors
 import traceback
 import md5
 import pickle
@@ -19,6 +20,8 @@ import time
 from datetime import datetime
 
 from string import join
+
+DictCursor = MySQLdb.cursors.DictCursor
 
 def _lowercaseToStr(x):
     return str.lower(str(x))   
@@ -46,15 +49,16 @@ class RosettaDB:
     def close(self):
         self.connection.close()
         
-    def __init__(self, settings, numTries = 1, host = None, db = None):
+    def __init__(self, settings, numTries = 1, host = None, db = None, admin = False):
         if not host:
             host = settings["SQLHost"]
         if not db:
             db = settings["SQLDatabase"]
+        passwd_ = settings["SQLPassword"]
         self.connection = MySQLdb.Connection(host           = host,
                                              db             = db,
                                              user           = settings["SQLUser"],
-                                             passwd         = settings["SQLPassword"],
+                                             passwd         = passwd_,
                                              port           = settings["SQLPort"],
                                              unix_socket    = settings["SQLSocket"])
         self.store_time = settings["StoreTime"]
@@ -147,7 +151,8 @@ class RosettaDB:
         """
         pass    
     
-    def execQuery(self, sql, parameters = None):
+    
+    def execQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor):
         """execute SQL query"""
         # Note: This loop was always disabled!
         i = 0
@@ -155,7 +160,7 @@ class RosettaDB:
         caughte = None
         while i < self.numTries:
             try:    
-                cursor = self.connection.cursor()
+                cursor = self.connection.cursor(cursorClass)
                 if parameters:
                     errcode = cursor.execute(sql, parameters)
                 else:

@@ -848,8 +848,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 # printQueue                                                                                             #
 ###############################################################################################
 
-    def adminPage(self, quotas, usage, users, settings):
-        html = admin.generateAdminPage(quotas, usage, users, settings)
+    def adminPage(self, quotas, usage, users, settings, form):
+    	html = admin.generateAdminPage(quotas, usage, users, settings, self, form)
         return join(html, "")
     
 ###############################################################################################
@@ -1386,6 +1386,24 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                     </td>""" % message
                   
         return html
+
+    def jobAdminCommand(self, success, action, jobID, error):
+     if success:
+     	if action == "clear":
+	 		msg = "The admin command for Job #%s has been cancelled" % (jobID)     		
+     	else:
+     		if action[-1] == "e":
+     			action = action[:-1]
+     		msg = "Job #%s has been set to be %sed" % (jobID, action)
+     	error = ""
+     else:
+     	msg = "<font color='red'>An error occurred %sing Job #%s</font>" % (action, jobID)
+     	
+     html = """<td align="center">
+				  <H1 class="title">%s</H1><p>%s</p>
+					</td>""" % (msg, error)
+				  
+     return html
 
 ###############################################################################################
 # help                                                                                             #

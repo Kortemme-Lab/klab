@@ -1,39 +1,50 @@
-subpages = ["jobadmin", "diskstats"]
+subpages = ["diskstats", "jobadmin", "webusers", "labusers"]
 
 function showPage(page)
 {
 	foundDiv = false;
-	for (i = 0; i < subpages.length; i++)
+	for (j = 0 ; j < 2; j++)
 	{
-		if (page == subpages[i])
+		for (i = 0; i < subpages.length; i++)
 		{
-			foundDiv = true;
-		}
-	}
-	if (foundDiv)
-	{
-		if (document.getElementById)
-		{
-			for (i = 0; i < subpages.length; i++)
+			if (page == subpages[i])
 			{
-				tpage = subpages[i]
-				if (page == subpages[i])
+				foundDiv = true;
+			}
+		}
+		if (foundDiv)
+		{
+			if (document.getElementById)
+			{
+				for (i = 0; i < subpages.length; i++)
 				{
-					document.getElementById(tpage).style.display = 'block';
-				}
-				else
-				{
-					document.getElementById(tpage).style.display = 'none'; 
+					tpage = subpages[i]
+					if (page == subpages[i])
+					{
+						document.getElementById(tpage).style.display = 'block';
+						document.adminform.AdminPage.value = page
+					}
+					else
+					{
+						document.getElementById(tpage).style.display = 'none'; 
+					}
 				}
 			}
+			else
+			{
+				print("missing document.getElementById")
+			}
+			return;
 		}
 		else
 		{
-			print("missing document.getElementById")
+			page = subpages[0]
 		}
 	}
-	else
-	{
-		alert("Cannot find div " + page)
-	}
+	alert("Cannot find div " + page)
+}
+
+if (document.adminform.AdminPage.value != null)
+{
+	showPage(document.adminform.AdminPage.value)
 }

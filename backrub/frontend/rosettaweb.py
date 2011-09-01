@@ -268,8 +268,8 @@ def ws():
         allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
         subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
         if not(settings["LiveWebserver"]):
-            allowedQueries.append("admin")
-            subAllowedQueries.append("admin")
+            allowedQueries.extend(["admin","PDB", "admincmd"])
+            subAllowedQueries.extend(["admin","PDB", "admincmd"])
             
         # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
         if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
@@ -288,7 +288,10 @@ def ws():
 
       # send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
       s.write(str(my_session.cookie) + '\n')
-      s.write("Content-type: text/html\n\n")
+      
+      
+      if form["query"].value not in ["PDB"]:
+      	s.write("Content-type: text/html\n\n")
       
       s.write(debug)
       my_session.close()
@@ -474,6 +477,71 @@ def ws():
         html_content = rosettaHTML.register(errors=errors)
     title = 'Registration'
 
+  elif query_type == "PDB":
+  	if not(settings["LiveWebserver"]):
+  		jobID = form["job"].value
+  		executionserver = form["server"].value
+  		nolinenums = False
+  		if form.has_key("plain"):
+  			nolinenums = form["plain"] 
+  		
+  		# This logic does not currently generalize to multiple test servers
+  		StorageDBConnection = DBConnection
+  		if executionserver == "kortemmelab":
+  			StorageDBConnection = getKlabDBConnection()
+  		
+  		quotas = StorageDBConnection.execQuery("SELECT PDBComplex FROM backrub WHERE ID=%s", parameters = (jobID,))
+  		s.write("Content-type: text/plain\n\n")
+  		if quotas:
+  			pdbfile = quotas[0][0]
+  			if not nolinenums:
+	  			import math
+	  			linenum = 1
+	  			pdbfile = pdbfile.split("\n")
+	  			numzeros = math.ceil(math.log10(len(pdbfile)))
+	  			for line in pdbfile:
+	  				s.write("%0*d: %s\n" % (int(numzeros), linenum, line))
+	  				linenum += 1
+  			else:
+  			 s.write(pdbfile)
+  		else:
+  			s.write("Could not retrieve the PDB from the database.")
+  		#html_content = rosettaHTML.adminPage(quotas, usage, users, settings)
+  		title = 'Job #%s' % jobID
+
+  elif query_type == "admincmd":
+  	if not(settings["LiveWebserver"]):
+  		jobID = form["job"].value
+  		executionserver = form["server"].value
+  		cmd = form["cmd"].value
+  		
+  		# This logic does not currently generalize to multiple test servers
+  		StorageDBConnection = DBConnection
+  		if executionserver == "kortemmelab":
+  			StorageDBConnection = getKlabDBConnection()
+  		
+  		success = True
+  		error = None
+  		allowedAdminCommands = ["restart", "kill", "clear", "expire", "revive"]
+  		try:
+  			if cmd == "clear":
+  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=NULL WHERE ID=%s", parameters = (jobID,))
+  			elif cmd == "expire":
+  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET Expired=1 WHERE ID=%s", parameters = (jobID,))
+  			elif cmd == "revive":
+  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET Expired=0 WHERE ID=%s", parameters = (jobID,))
+  			elif cmd in allowedAdminCommands:
+  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=%s WHERE ID=%s", parameters = (cmd, jobID))
+  			else:
+  				oldcmd = cmd
+  				cmd = "administrat"
+  				raise Exception("Unknown command %s passed." % oldcmd)
+  		except Exception, e:
+  		 success = False
+  		 error = "Error: '%s'<br><br>%s" % (str(e), join(traceback.format_exc().split("\n"), "<br>"))
+  		html_content = rosettaHTML.jobAdminCommand(success, cmd, jobID, error)
+  		title = 'Job #%s %sed' % (jobID, cmd)
+  		
   elif query_type == "admin":
       if not(settings["LiveWebserver"]):
           numberOfDays = 30
@@ -484,7 +552,7 @@ def ws():
           usage = getLabspaceConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
           users = getLabspaceConnection().execQuery("SELECT * FROM Users ORDER BY Username")
           
-          html_content = rosettaHTML.adminPage(quotas, usage, users, settings)
+          html_content = rosettaHTML.adminPage(quotas, usage, users, settings, form)
           title = 'Admin'
 
   elif query_type == "update":
@@ -525,8 +593,8 @@ def ws():
   else:
     html = "this is impossible" # should never happen since we only allow states from list above 
 
-  s.write(rosettaHTML.main(html_content, title, query_type))
-
+  if query_type not in ["PDB"]:
+    s.write(rosettaHTML.main(html_content, title, query_type))
   s.close() 
 
 ########################################## end of ws() ########################################

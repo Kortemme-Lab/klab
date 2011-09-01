@@ -11,11 +11,14 @@ import pickle
 import string
 from sys import maxint
 import rosettadb
-
+import calendar
 
 userColors = {}
 showHistoryForDays = 31
+
 settings = None
+protocols = None
+script_filename = None
 
 def initGoogleCharts(chartfnlist):
     html = []
@@ -419,148 +422,440 @@ def generateDiskStatsSubpage(quotas, usage, users):
 from cStringIO import StringIO
 
 def getKlabDBConnection():
-    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
+
+def getKortemmelabUsersConnection():
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab", admin = True)
 
 def getAlbanaConnection():
-    return rosettadb.RosettaDB(settings)
+	return rosettadb.RosettaDB(settings)
+
+def getWebsiteUsers():
+	# Get all jobs on the live webserver which were submitted from this server and which have not expired
+	connection = getKlabDBConnection()
+	sql = '''SELECT ID, UserName, Concat(FirstName, ' ', LastName) AS Name, Email, Institution, Address1, Address2, City, State, Zip, Country, Phone, Date, LastLoginDate, Priority, Jobs, EmailList FROM Users ORDER BY UserName''' 
+	result = connection.execQuery(sql, cursorClass = rosettadb.DictCursor)
+	return result
+
+def getUsers():
+	# Get all jobs on the live webserver which were submitted from this server and which have not expired
+	connection = getKortemmelabUsersConnection()
+	sql = '''SELECT Concat(FirstName, ' ', Surname), Username, Email, SecondaryEmail, Status, DOB, ReceiveDailyMeetingsEmail, ReceiveWeeklyMeetingsEmail, ReceiveUpdateMeetingsEmail FROM Users WHERE Status="current" ORDER BY FirstName, Surname''' 
+	result = list(connection.execQuery(sql))
+	sql = '''SELECT Concat(FirstName, ' ', Surname), Username, Email, SecondaryEmail, Status, DOB, ReceiveDailyMeetingsEmail, ReceiveWeeklyMeetingsEmail, ReceiveUpdateMeetingsEmail FROM Users WHERE Status="alumni" ORDER BY FirstName, Surname''' 
+	result.extend(list(connection.execQuery(sql)))
+	sql = '''SELECT Concat(FirstName, ' ', Surname), Username, Email, SecondaryEmail, Status, DOB, ReceiveDailyMeetingsEmail, ReceiveWeeklyMeetingsEmail, ReceiveUpdateMeetingsEmail FROM Users WHERE Status="pastrotationstudent" ORDER BY FirstName, Surname''' 
+	result.extend(list(connection.execQuery(sql)))
+	users = []
+	for record in result:
+		users.append({
+						"name" : record[0],
+						"username" : record[1],
+						"email" : [record[2], record[3]],
+						"status" : record[4],
+						"DOB"	: record[5],
+						"daily" : record[6],
+						"weekly" : record[7],
+						"update" : record[8],
+					})
+	return users
+
+def generateWebUsersSubpage():
+	html = []
+	userlist = getWebsiteUsers()
+	html.append("""<H1 align=left > Kortemme Lab users </H1> <br>
+		<div >
+		<table  border=1 cellpadding=2 cellspacing=0 width=1200 >
+		<colgroup>
+			 <col >
+			 <col width="30">
+			 <col width="200">
+			 <col width="150">
+			 <col width="200">
+			 <col width="150">
+			 <col width="50">
+			 <col width="200">
+			 <col width="120">
+			 <col >
+			 <col >
+			 <col >
+		</colgroup>
+		<tr align=left bgcolor="#828282" style="color:white;"> 
+		<td> Username </td> 
+		<td> ID </td> 
+		<td> Name </td> 
+		<td> Email </td>
+		<td> Institution</td>
+		<td> Address</td>
+		<td> Phone </td>
+		<td> Member since </td>
+		<td> Last login </td>
+		<td> Priority </td>
+		<td> Jobs </td>
+		<td> EmailList </td>
+		</tr>""")
+	
+	for user in userlist:
+		html.append("""<tr bgcolor='#ffe' onmouseover="this.style.background='#5d5';" onmouseout="this.style.background='#ffe'; ">""")
+		html.append("<td>%(UserName)s</td>" % user) 
+		html.append("<td>%(ID)s</td>" % user) 
+		html.append("<td>%(Name)s</td>" % user) 
+		if "@" in user["Email"] and '"' not in user["Email"]:
+			html.append("""<td><a href="mailto:%(Email)s">%(Email)s</a></td>""" % user) 
+		else:
+			html.append("<td>%(Email)s</td>" % user) 
+		html.append("<td>%(Institution)s</td>" % user)
+		address = [user["Address1"], user["Address2"], user["City"], user["State"], user["Zip"], user["Country"]]
+		address = [a for a in address if a] 
+		html.append("<td>%s</td>" % join(address, "<br>"))
+		html.append("<td>%(Phone)s</td>" % user)
+		dt = user["Date"]
+		if dt:
+			html.append("<td>%s-%s-%s</td>" % (dt.year, dt.month, dt.day))
+		else:
+			html.append("<td></td>")
+		html.append("<td>%(LastLoginDate)s</td>" % user)
+		html.append("<td>%(Priority)s</td>" % user)
+		html.append("<td>%(Jobs)s</td>" % user)
+		if user["EmailList"]:
+			html.append("<td>Y</td>" % user)
+		else:
+			html.append("<td>N</td>" % user)
+		html.append("</tr>")
+	html.append('</table> </div>')
+	return html
+
+def generateLabUsersSubpage():
+	html = []
+	userlist = getUsers()
+	html.append("""<H1 align=left > Website users </H1> <br>
+		<div >
+		<table  border=0 cellpadding=2 cellspacing=0 width=800 >
+		<colgroup>
+			 <col width="200">
+			 <col width="80">
+			 <col width="90">
+			 <col width="250">
+			 <col width="150">
+			 <col >
+			 <col >
+		</colgroup>
+		<tr align=center style="color:white;">
+		<td colspan="5"></td>
+		<td colspan="3" bgcolor="#828282">Lab meetings emails</td>
+		</tr> 
+		<tr align=left bgcolor="#828282" style="color:white;"> 
+		<td > Name </td> 
+		<td > Username </td> 
+		<td > Email </td>
+		<td > Status</td>
+		<td > Birthday </td>
+		<td > Daily </td>
+		<td > Weekly </td>
+		<td > Update </td>
+		</tr>""")
+	
+	CurrentMembers = "Current Members"
+	LabAlumni = "Lab Alumni"
+	PastRotationStudents = "Past Rotation Students"
+	Unaccounted = "Unaccounted"
+	colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", Unaccounted : "#EFEFEF"}
+	
+	for user in userlist:
+		html.append("<tr ")
+		if user["status"] == "current":
+			html.append('bgcolor="%s"' % colors[CurrentMembers])
+			user["status"] = "Current"
+		elif user["status"] == "alumni":
+			html.append('bgcolor="%s"' % colors[LabAlumni])
+			user["status"] = "Alumni"
+		elif user["status"] == "pastrotationstudent":
+			html.append('bgcolor="%s"' % colors[PastRotationStudents])
+			user["status"] = "Past rotation student"
+			
+		html.append("><td>%(name)s</td>" % user) 
+		html.append("<td>%(username)s</td>" % user)
+		html.append("<td>")
+		addresses = []
+		for address in user["email"]:
+			if address:
+				addresses.append(address)
+		if addresses:
+			html.append(join(addresses, ", "))
+		html.append("</td>")
+		html.append("<td>%(status)s</td>" % user)
+		if user["DOB"]:
+			month = calendar.month_name[user["DOB"].month]
+			day = user["DOB"].day
+			html.append("<td>%(month)s %(day)s</td>" % vars())
+		else:
+			html.append("<td></td>") 
+		
+		if user["daily"]:
+			html.append("<td align=center>Y</td>")
+		else:
+			html.append("<td></td>")
+		if user["weekly"]:
+			html.append("<td align=center>Y</td>")
+		else:
+			html.append("<td></td>")
+		if user["update"]:
+			html.append("<td align=center>Y</td>")
+		else:
+			html.append("<td></td>")
+			
+		html.append("</tr>")
+	html.append('</table> </div>')
+	return html
 
 def getJobs():
-    userid='27'
-    output = StringIO()
-    output.write('<TD align="center">')
-    
-    results = []
-    # Get all jobs on the live webserver which were submitted from this server and which have not expired
-    KlabDBConnection = getKlabDBConnection()
-    
-    connections = [getKlabDBConnection(), getAlbanaConnection()]
-    
-    for connection in connections:
-        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task, BackrubServer, Expired FROM backrub ORDER BY backrub.ID DESC" 
-        result = connection.execQuery(sql)
-    
-        for line in result:
-            sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
-            result2 = KlabDBConnection.execQuery(sql)
-            new_list = []
-            new_list.extend(line)
-            new_list[3] = result2[0][0]
-            results.append(new_list)
-        connection.close()
-  
-    # Sort the jobs by date
-    results.sort(key = lambda x:x[6], reverse = True) 
-        
-    return results
+	'''Get all jobs on the live webserver which were submitted from this server and which have not expired'''
+	results = []
+	querystr = []
+
+	querystr.append("SELECT '%s' AS ExecutionServer, backrub.ID, backrub.cryptID, backrub.Status, Users.UserName, backrub.Date, backrub.Notes, backrub.AdminErrors,")
+	querystr.append("backrub.Mini, backrub.EnsembleSize, backrub.Errors, backrub.task, backrub.backrubserver AS SubmissionServer, backrub.Expired, backrub.AdminCommand")
+	querystr.append("FROM backrub INNER JOIN Users WHERE backrub.UserID=Users.ID ORDER BY backrub.ID DESC") 
+	querystr = join(querystr, " ")
+	connections = [('kortemmelab', getKlabDBConnection()), ('albana', getAlbanaConnection())]
+	for connection in connections:
+		results.extend(connection[1].execQuery(querystr % connection[0], cursorClass = rosettadb.DictCursor))
+		connection[1].close()
+
+	# Sort the jobs by date
+	results.sort(key = lambda x:x["Date"], reverse = True) 
+
+	return results
 
 def generateJobAdminSubpage():
-    html = []
-    job_list = getJobs()
-    html.append("""<H1 class="title"> Job queue </H1> <br>
-          <div id="queue_bg">
-          <table border=0 cellpadding=2 cellspacing=0 width=700 >
-           <colgroup>
-             <col width="35">
-             <col width="80">
-             <col width="90">
-             <col width="90">
-             <col width="200">
-             <col width="160">
-             <col width="25">
-           </colgroup>
-          <tr align=center bgcolor="#828282" style="color:white;"> 
-           <td > ID </td> 
-           <td > Status </td> 
-           <td > User Name </td>
-           <td > Date (PST) </td>
-           <td > Job Name </td>
-           <td > Rosetta Application </td>
-           <td > Structures </td>\n""")
+	html = []
+	job_list = getJobs() 
+	html.append("""<H1> Job queue </H1> <br>
+		<div>
+		<table border=0 cellpadding=2 cellspacing=0 width=1600>
+		 <colgroup>
+		   <col width="50">
+		   <col width="35">
+		   <col width="70">
+		   <col width="80">
+		   <col width="30">
+		   <col width="35">
+		   <col width="120">
+		   <col width="185">
+		   <col width="160">
+		   <col width="25">
+		   <col width="95">
+		   <col width="100">
+		 </colgroup>
+		<tr><td colspan="11">If a job has failed, mouse-over the Status field to display a stacktrace (if available).</td></tr>
+		<tr><td colspan="11">Expired jobs should not be visible to users of the public website.</td></tr>
+		<tr><td></td></tr>
+		<tr align=center bgcolor="#828282" style="color:white;"> 
+		 <td> Server </td> 
+		 <td> ID </td> 
+		 <td> User Name </td>
+		 <td> Job Name </td>
+		 <td> Status </td> 
+		 <td> Expired </td> 
+		 <td> Date (PST) </td>
+		 <td> Admin </td>
+		 <td> Rosetta Application </td>
+		 <td> Structures </td>
+		 <td> PDB </td>
+		 <td> CryptID </td>
+		 </tr>
+		 \n""")
 
-    for line in job_list:
-        jobIsLocal = True
-        server = line[10]
-        
-        task = line[9]
-        task_color = "#888888"
-        
-        bgcolor = "#EEEEEE"
-        if not jobIsLocal:
-            bgcolor = "#DDDDFF"
-        
-        html.append("""<tr align=center bgcolor="%s" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='%s'; this.style.color='#000000';" >""" % (bgcolor, bgcolor))
-        link_to_job = ''
-        
-        # write ID
-        html.append('<td class="lw" %s>%s </td>' % (link_to_job, str(line[0])))
-        # write status 
-        status = int(line[2])
-        
-        if status == 0:
-            html.append('<td class="lw" %s><font color="orange">in queue</font></td>' % link_to_job)
-        elif status == 1:
-            html.append('<td class="lw" %s><font color="green">active</font></td>' % link_to_job)
-        elif status == 2:
-            html.append('<td class="lw" %s><font color="black">done</font></td>' % link_to_job) # <font color="darkblue" %s></font>
-        elif status == 5:
-            html.append('<td class="lw" style="background-color: #AFE2C2;" %s><font color="darkblue">sample</font></td>' % link_to_job)
-        else:
-          # write error
-          if  str(line[8]) != '' and line[8] != None:
-            # onclick="window.open('https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation','backrub_wiki')"
-            #                        onmouseover="this.style.background='#447DAE'; this.style.color='#000000'"
-            #                        onmouseout="this.style.background='#EEEEEE';"
-            html.append('''<td class="lw">
-                          <font color="FF0000">error</font>
-                          (<a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation" target="_blank"
-                             onmouseover="this.style.color='#FFFFFF'" onmouseout="this.style.color='#365a79'">%s</a>)</td>''' % str(line[8]))
-          else:
-            html.append('<td class="lw"><font color="FF0000">error</font></td>')
-            
-        # write username
-        html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[3])))
-        # write date
-        html.append('<td class="lw" style="font-size:small;" %s>%s</td>' % (link_to_job, str(line[4])))
-        # write jobname or "notes"
-        if len(str(line[5])) < 26:
-            html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[5])))
-        else:
-            html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[5])[0:23] + "..."))
-        
-        # Rosetta version
-        # todo: the mini/classic distinction is somewhat deprecated with the new seqtol protocol
-        miniVersion = line[6]
-        html.append('<td class="lw" style="font-size:small;" bgcolor="%s" %s ><i>%s</i><br>%s</td>' % (task_color, link_to_job, miniVersion, task))
-    
-        # write size of ensemble
-        html.append('<td class="lw" %s >%s</td></tr>\n' % (link_to_job, str(line[7])))
-            
-    html.append('</table> </div>')
-    return html
+	for line in job_list:
+		thisserver = settings["ShortServerName"]
+		submissionserver = line["SubmissionServer"]
+		executionserver = line["ExecutionServer"]
+		jobIsLocal = (executionserver == submissionserver)
+		
+		task = line["task"]
+		task_color = "#888888"
+		for p in protocols:
+			if task == p.dbname:
+				task = p.name
+				task_color = p.group.color
+				break
+		
+		bgcolor = "#EEEEEE"
+		if not jobIsLocal:
+			bgcolor = "#DDDDFF"
 
-def generateAdminPage(quotas, usage, users, settings_):
-    
-    global settings
-    settings = settings_
-    
-    # Create menu
-    html = ['''<script src="/backrub/frontend/admin.js" type="text/javascript"></script>''']
-    html.append("<td align=center>")
-    html.append('''<input type="button" value="Disk stats" onClick="showPage('diskstats');">''')
-    html.append('''<input type="button" value="Job administration" onClick="showPage('jobadmin');">''')
-    html.append("</td></tr><tr>")
-    
-    html.append("<td align=left>")
-    
-    # Disk stats
-    html.append("<div id='diskstats'>")
-    html.extend(generateDiskStatsSubpage(quotas, usage, users))
-    html.append("</div>")
+		if submissionserver != thisserver:
+			link_to_job = 'onclick="window.location.href=\'https://%s.ucsf.edu/%s?query=jobinfo&amp;jobnumber=%s\'"' % ( submissionserver, script_filename, line["cryptID"] )
+		elif jobIsLocal:
+			link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&amp;jobnumber=%s\'"' % ( script_filename, line["cryptID"] )
+		else:
+			link_to_job = 'onclick="window.location.href=\'%s?query=jobinfo&amp;local=false&amp;jobnumber=%s\'"' % ( script_filename, line["cryptID"] )
+		
+		html.append("""<tr align=center bgcolor="%s" onmouseover="this.style.background='#447DAE'; this.style.color='#FFFFFF';" onmouseout="this.style.background='%s'; this.style.color='#000000';" >""" % (bgcolor, bgcolor))
 
-    # Job admin
-    html.append('<div style="display:none" id="jobadmin">')
-    html.extend(generateJobAdminSubpage())
-    html.append("</div>")
-    
-    html.append("</td>")
-    return html
+		# write submission server
+		colors = {"kortemmelab" : '#aaaaff', "albana" : "#FFA500"} # todo: use the actual colors here
+		if not jobIsLocal:
+			html.append('<td %s bgcolor="%s" class="lw">%s&rarr;%s</td>' % (link_to_job, colors.get(submissionserver, "#666666"), submissionserver, executionserver))
+		else:
+			html.append('<td %s bgcolor="%s" class="lw">%s</td>' % (link_to_job, colors.get(submissionserver, "#666666"), submissionserver))
+
+		# write ID
+		html.append('<td %s class="lw">%s </td>' % (link_to_job, str(line["ID"])))
+		
+		# write username
+		html.append('<td %s class="lw">%s</td>' % (link_to_job, str(line["UserName"])))
+		
+		# write jobname
+		html.append('<td %s class="lw">%s</td>' % ( link_to_job, str(line["Notes"])))
+		
+		# write status 
+		status = int(line["Status"])
+		admincmd = line["AdminCommand"] or ""
+		if admincmd:
+			admincmd = "<br><font color='#00f'>[%s]</font>" % admincmd
+		if status == 0:
+			html.append('<td %s class="lw"><font color="orange">in queue%s</font></td>' % (link_to_job, admincmd) )
+		elif status == 1:
+			html.append('<td %s class="lw"><font color="green">active%s</font></td>' % (link_to_job, admincmd))
+		elif status == 2:
+			html.append('<td %s class="lw"><font color="black">done%s</font></td>' % (link_to_job, admincmd)) # <font color="darkblue" %s></font>
+		elif status == 5:
+			html.append('<td %s class="lw" style="background-color: #AFE2C2;"><font color="darkblue">sample%s</font></td>' % (link_to_job, admincmd))
+		else:
+			# write error
+			errors = line["Errors"]
+			errorstr = str(errors) 
+			if  errorstr != '' and errors != None:
+				adminerrorstr = ''
+				if line["AdminErrors"]:
+					adminerrorstr = str(line["AdminErrors"])
+				tooltiptext = "%s\n%s" % (errorstr, adminerrorstr)
+				
+				html.append('''<td %(link_to_job)s title='%(tooltiptext)s' >
+					<font color="FF0000">error</font>
+					(<a href="https://kortemmelab.ucsf.edu/backrub/wiki/Error#Errors_during_the_simulation" target="_blank"
+					onmouseover="this.style.color=clear'#FFFFFF'" onmouseout="this.style.color='#365a79'">%(errorstr)s%(admincmd)s</a>)</td>''' % vars())
+			else:
+				html.append('<td class="lw"><font color="FF0000">error%s</font></td>' % admincmd)
+		
+		# write expiration 
+		expired = int(line["Expired"])
+		if expired:
+			expiredcmd = "revive"
+			html.append('<td %s class="lw"><font color="red"><b>Y</b></font></td>' % link_to_job)
+		else:
+			expiredcmd = "expire"
+			html.append('<td %s class="lw">N</td>'  % link_to_job)
+		
+		# write date
+		html.append('<td %s class="lw" style="font-size:small;">%s</td>' % (link_to_job, str(line["Date"])))
+		
+		# Admin commands
+		#   Restart job and kill buttons
+		html.append('''<td class="lw" bgcolor="#ddd">''')
+		
+		# Add this after if we want to switch focus: //if (window.focus) {newwindow.focus();}
+		if status == 2:
+			html.append('''<button onclick="
+			if (confirm('Are you sure you want to restart the job?') && confirm('Really?!')){
+				window.open('%s?query=admincmd&amp;cmd=restart&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+				document.adminform.query.value='admin';
+				document.adminform.submit();
+			}">restart</button>''' % (script_filename, line["ID"], executionserver))
+			html.append('''<button disabled="disabled">kill</button>''')
+		else:
+			html.append('''<button disabled="disabled">restart</button>''')
+			html.append('''<button onclick="
+			if (confirm('Are you sure you want to kill the job?') && confirm('Really?!')){
+				window.open('%s?query=admincmd&amp;cmd=kill&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+				document.adminform.query.value='admin';
+				document.adminform.submit();
+			}">kill</button>''' % (script_filename, line["ID"], executionserver))
+			
+		html.append('''<button onclick="
+			window.open('%s?query=admincmd&amp;cmd=%s&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+			document.adminform.query.value='admin';
+			document.adminform.submit();
+			">%s</button>''' % (script_filename, expiredcmd, line["ID"], executionserver, expiredcmd))
+		if admincmd:
+			html.append('''<button onclick="
+			window.open('%s?query=admincmd&amp;cmd=clear&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+			document.adminform.query.value='admin';
+			document.adminform.submit();
+			">clear</button>''' % (script_filename, line["ID"], executionserver))
+		else:
+			html.append('''<button disabled="disabled">clear</button>''')
+		
+		html.append("</td>")
+				
+		# Rosetta version
+		# todo: the mini/classic distinction is somewhat deprecated with the new seqtol protocol
+		miniVersion = line["Mini"]
+		html.append('<td %s class="lw" style="font-size:small;" bgcolor="%s"><i>%s</i><br>%s</td>' % (link_to_job, task_color, miniVersion, task))
+		
+		# write size of ensemble
+		html.append('<td %s class="lw">%s</td>' % (link_to_job, str(line["EnsembleSize"])))
+		
+		html.append('''<td class="lw" bgcolor="#ddd"><button onclick="window.open('%s?query=PDB&amp;job=%d&amp;server=%s')">PDB</button><button onclick="window.open('%s?query=PDB&amp;job=%d&amp;server=%s&amp;plain=true')">Raw</button></td>''' % (script_filename, line["ID"], executionserver, script_filename, line["ID"], executionserver))
+		
+		html.append('<td %s class="lw">%s</td>' % (link_to_job, line["cryptID"]))
+		
+		html.append("</tr>\n")
+		link_to_job
+	html.append('</table> </div>')
+	return html
+
+def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
+
+	global settings
+	global protocols
+	global script_filename
+	settings = settings_
+	protocols = rosettahtml.protocols
+	script_filename = rosettahtml.script_filename 
+	
+	adminpage = ""
+	if form.has_key("AdminPage"):
+		adminpage = form["AdminPage"].value
+		
+	# Create menu
+	html = []
+	html.append("<td align=center>")
+	html.append('''<FORM name="adminform" method="post">''')
+	html.append('''<input type="button" value="Disk stats" onClick="showPage('diskstats');">''')
+	html.append('''<input type="button" value="Job administration" onClick="showPage('jobadmin');">''')
+	html.append('''<input type="button" value="Website users" onClick="showPage('webusers');">''')
+	html.append('''<input type="button" value="Lab users" onClick="showPage('labusers');">''')
+	html.append('''<input type="button" value="Refresh" onClick="document.adminform.query.value='admin'; document.adminform.submit();">''')
+	html.append('''<input type="hidden" NAME="AdminPage" VALUE="%s">''' % adminpage)
+	html.append('''<input type="hidden" NAME="query" VALUE="">''')
+	html.append('''</FORM>''')
+	html.append("</td></tr><tr>")
+	
+	html.append("<td align=left>")
+	
+	# Disk stats
+	html.append('<div style="display:none" id="diskstats">')
+	html.extend(generateDiskStatsSubpage(quotas, usage, users))
+	html.append("</div>")
+	
+	# Job admin
+	html.append('<div style="display:none" id="jobadmin">')
+	html.extend(generateJobAdminSubpage())
+	html.append("</div>")
+
+	# Website users
+	html.append('<div style="display:none" id="webusers">')
+	html.extend(generateWebUsersSubpage())
+	html.append("</div>")
+
+	# Job admin
+	html.append('<div style="display:none" id="labusers">')
+	html.extend(generateLabUsersSubpage())
+	html.append("</div>")
+		
+	html.append("</td>")
+	html.append('''<script src="/backrub/frontend/admin.js" type="text/javascript"></script>''')
+
+	return html
