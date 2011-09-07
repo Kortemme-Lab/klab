@@ -746,7 +746,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 # printQueue                                                                                             #
 ###############################################################################################
 
-    def printQueue(self, job_list):
+    def printQueue(self, job_list, userid):
       
         html = []
         html.append("""<td align=center><H1 class="title"> Job queue </H1> <br>
@@ -820,7 +820,11 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 html.append('<td class="lw"><font color="FF0000">error</font></td>')
                 
             # write username
-            html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[3])))
+            if int(line[-1]) == int(userid):
+                html.append('<td class="lw" %s><b><font color="green">%s</font></b></td>' % (link_to_job, str(line[3])))
+            else:
+                html.append('<td class="lw" %s>%s</td>' % (link_to_job, str(line[3])))
+            
             # write date
             html.append('<td class="lw" style="font-size:small;" %s>%s</td>' % (link_to_job, str(line[4])))
             # write jobname or "notes"

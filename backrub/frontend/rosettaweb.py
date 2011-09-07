@@ -454,8 +454,10 @@ def ws():
     title = 'Submission Form'
 
   elif query_type == "queue":
+    output = StringIO()
+    output.write('<TD align="center">')
     job_list = queue(form, userid)
-    html_content = rosettaHTML.printQueue(job_list)
+    html_content = rosettaHTML.printQueue(job_list, userid)
     title = 'Job Queue'
 
   elif query_type == "jobinfo":
@@ -1299,59 +1301,26 @@ def submit(rosettaHTML, form, SID):
 ###############################################################################################
         
 def queue(form, userid):
-  
-    output = StringIO()
-    output.write('<TD align="center">')
-    
-    #todo: Fix this up with one SQL joined query per server
-    
+    # Get all jobs for this server only which have not expired        
     thisserver = settings["ShortServerName"]
+    liveprefix = "SELECT True as JobIsLocal, '%s' AS server," % thisserver
+    testprefix = "SELECT False as JobIsLocal, 'kortemmelab' AS server,"
+    columns = "backrub.ID, backrub.cryptID, backrub.Status, Users.UserName, backrub.Date, backrub.Notes, backrub.Mini, backrub.EnsembleSize, backrub.Errors, backrub.task, Users.ID FROM backrub INNER JOIN Users WHERE backrub.UserID=Users.ID AND Expired=0 AND BackrubServer='%(thisserver)s' ORDER BY backrub.ID DESC" % vars()
     
-    # Get all jobs for this server only which have not expired    
-    sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver
+    # Get local jobs
+    sql = "%(liveprefix)s %(columns)s" % vars() 
+    results = DBConnection.execQuery(sql)
+
+    # Hide developers' jobs from the public so we can test away
+    results = [line for line in results if line[5] not in DEVELOPER_USERNAMES or hostname == DEVELOPMENT_HOST]
     
-    result1 = DBConnection.execQuery(sql)
-    results = []
     if not (settings["LiveWebserver"]):
         # Get all jobs on the live webserver which were submitted from this server and which have not expired
         KlabDBConnection = getKlabDBConnection()
-        sql = "SELECT ID, cryptID, Status, UserID, Date, Notes, Mini, EnsembleSize, Errors, task FROM backrub WHERE BackrubServer='%s' AND Expired=0 ORDER BY backrub.ID DESC" % thisserver 
-        kresult = KlabDBConnection.execQuery(sql)
-    
-        for line in kresult:
-            new_lst = [False, "kortemmelab"]
-            sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
-            result2 = KlabDBConnection.execQuery(sql)
-            new_lst.extend(line)
-            if int(line[3]) == int(userid):
-                new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
-            else:
-                new_lst[5] = result2[0][0]
-            results.append(new_lst)
+        sql = "SELECT %(testprefix)s %(columns)s" % vars() 
+        results.extend(KlabDBConnection.execQuery(sql))
         KlabDBConnection.close()
-  
-  # get user id of logged in user
-  # sql = 'SELECT UserID FROM Sessions WHERE SessionID="%s"' % SID
-  #   userID1 = DBConnection.execQuery(sql)[0][0]
-  
 
-            
-    for line in result1:
-        new_lst = [True, thisserver]
-        sql = "SELECT UserName FROM Users WHERE ID=%s" % line[3]
-        result2 = DBConnection.execQuery(sql)
-        new_lst.extend(line)
-        if (not result2) or (not result2[0]):
-            new_lst[5] = '<b><font color="red">BAD USER ID</font></b>'            
-            results.append(new_lst)
-        elif result2[0][0] not in DEVELOPER_USERNAMES or hostname == DEVELOPMENT_HOST:
-            # Hide developers' jobs from the public so we can test away
-            if int(line[3]) == int(userid):
-                new_lst[5] = '<b><font color="green">' + result2[0][0] + '</font></b>'
-            else:
-                new_lst[5] = result2[0][0]
-            results.append(new_lst)            
-            
     # Sort the jobs by date rather than ID since they come from multiple databases
     # On the live server, we rely on the ID just in case the date gets messed up
     if thisserver != 'kortemmelab':

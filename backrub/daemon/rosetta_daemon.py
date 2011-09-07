@@ -25,6 +25,7 @@ from RosettaProtocols import *
 import RosettaTasks
 from conf_daemon import *
 from sge import SGEConnection, SGEXMLPrinter, ClusterException
+import MySQLdb.cursors
 
 cwd = str(os.getcwd())
 
@@ -80,6 +81,14 @@ The Kortemme Lab Server Daemon
         self.protocolGroups, self.protocols = self.beProtocols.getProtocols()
         self.setupSQL()
     
+    def restartJobs(self):
+        IDs = []
+        results = self.runSQL('SELECT ID from backrub WHERE AdminCommand="restart" AND (%s) ORDER BY Date' % self.SQLJobSelectString, cursorClass = rosettadb.DictCursor)
+        for result in results:
+            IDs.append(result["ID"])
+            self.runSQL('UPDATE backrub SET AdminCommand=NULL, AdminErrors=Null, Errors=Null, Status=0 WHERE ID=%s', parameters = (result["ID"],))
+        return IDs
+
     def setupSQL(self):
         dbnames = self.beProtocols.getProtocolDBNames()
         SQLJobSelectString = []
@@ -181,11 +190,14 @@ The Kortemme Lab Server Daemon
             except Exception, e:
                 self.log("Error: self.delete()\n%s." % traceback.format_exc()) 
             if len(self.list_RosettaPP) < self.max_processes:
+                self.restartJobs()
+                
                 # Start any queued jobs
                 ID = None
                 try:
                     data = self.runSQL("SELECT ID,Date,Status,task,PDBComplex,PDBComplexFile,Mini,EnsembleSize,ProtocolParameters,cryptID,BackrubServer FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
-                    if len(data) == 0:
+                    
+		    if len(data) == 0:
                         time.sleep(10) # wait 10 seconds if there's no job in queue
                         continue
                     
@@ -240,7 +252,7 @@ The Kortemme Lab Server Daemon
         return False
     
             
-    def runSQL(self, query, alternateLocks = "", parameters = None):
+    def runSQL(self, query, alternateLocks = "", parameters = None, cursorClass = MySQLdb.cursors.Cursor):
         """ This function should be the only place in this class which executes SQL.
             Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
             Using this function and passing the string in reduces the likelihood of these errors.
@@ -254,7 +266,7 @@ The Kortemme Lab Server Daemon
         try:
             lockstr = alternateLocks or "%s WRITE, Users READ" % self.db_table         
             self.DBConnection.execQuery("LOCK TABLES %s" % lockstr)
-            results = self.DBConnection.execQuery(query, parameters)
+	    results = self.DBConnection.execQuery(query, parameters, cursorClass)
         except Exception, e:
             self.DBConnection.execQuery("UNLOCK TABLES")
             self.log("%s." % e)
@@ -1063,6 +1075,7 @@ class ClusterDaemon(RosettaDaemon):
     def recordSuccessfulJob(self, clusterjob):
         self.runSQL('UPDATE %s SET Status=2, EndDate=NOW() WHERE ID=%s' % ( self.db_table, clusterjob.jobID ))
 
+                        
     def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None, jobID = None):
         suffix = ""
         if clusterjob:
@@ -1091,10 +1104,11 @@ class ClusterDaemon(RosettaDaemon):
         while True:
             self.writepid()
             self.checkRunningJobs()
+            self.restartJobs()
             self.startNewJobs()
             sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
             self.printStatus()            
-    
+        	
     def killPreviouslyRunningJobs(self):
         # If there were jobs running when the daemon crashed, see if they are still running, kill them and restart them
         # todo: used to be SELECT ID, status, pid
@@ -1160,7 +1174,15 @@ class ClusterDaemon(RosettaDaemon):
         # Remove completed jobs from the list
         for cj in completedJobs:
             self.runningJobs.remove(cj)
-            
+    
+    def restartJobs(self):
+        jobIDs = super(ClusterDaemon, self).restartJobs()
+        
+        # Allow the job to be restarted without error if it was recently run
+        for jobID in jobIDs:
+            if jobID in self.recentDBJobs:
+                self.recentDBJobs.remove[jobID]
+
     def startNewJobs(self):
         # Start more jobs
         newclusterjob = None
@@ -1560,6 +1582,7 @@ if __name__ == "__main__":
             sys.exit(0)
         elif 'cluster' == sys.argv[1]:
             daemon = ClusterDaemon(os.path.join(temppath, 'qb3running.log'), os.path.join(temppath, 'qb3running.log'))
+            
             #daemon = ClusterDaemon('/dev/stdout','/dev/stderr')
             if 'start' == sys.argv[2]:
                 daemon.start()
