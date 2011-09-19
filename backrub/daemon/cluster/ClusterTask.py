@@ -82,7 +82,7 @@ class ClusterScript:
 #$ -r y
 #$ -j n
 #$ -l arch=lx24-amd64
-#$ -l panqb3=1G,scratch=1G,mem_total=3G
+#$ -l netapp=1G,scratch=1G,mem_total=3G
 #$ -l h_rt=%(maxhours)d:%(maxmins)d:00
 %(taskparam)s
 %(taskline)s

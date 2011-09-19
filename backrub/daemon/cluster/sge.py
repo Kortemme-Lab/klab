@@ -176,6 +176,7 @@ class SGEConnection(object):
         file_stderr.close()
 
         if errorcode != 0:
+            print('<sge message="Failed running qsub command: %s in cwd %s"/>' % (command, workingdir))
             if output.find("unable to contact qmaster") != -1:
                 raise ClusterException("qsub failed: unable to contact qmaster")
             else:
