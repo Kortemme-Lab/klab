@@ -57,7 +57,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
-from rosettahelper import WebsiteSettings
+from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
@@ -69,10 +69,6 @@ from cgi import escape
 import string
 import pickle
 import admin
-
-# Set this to the machine you are debugging from
-DEVELOPMENT_HOST = "cabernet.ucsf.edu"
-DEVELOPER_USERNAMES = ["oconchus"]
 
 # get ip addr hostname
 IP = os.environ['REMOTE_ADDR']
@@ -308,7 +304,7 @@ def ws():
   ########## DEBUG Cookies ##########
 
   if not os.path.exists('/tmp/rosettaweb-rosettadaemon.pid'): #upgradetodo: Store this filename in the conf file
-    if hostname == DEVELOPMENT_HOST:
+    if hostname in DEVELOPMENT_HOSTS:
       adminWarning = 'Backend not running. Jobs will not be processed immediately.'
   
   rosettaDD = RosettaDataDir(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"])
@@ -1261,7 +1257,7 @@ def submit(rosettaHTML, form, SID):
                 result = StorageDBConnection.execQuery(sql)    
             StorageDBConnection.execQuery("UNLOCK TABLES")
         
-        if hostname == DEVELOPMENT_HOST:
+        if hostname in DEVELOPMENT_HOSTS:
             errors.append("Server error: An exception occurred: %s." % estring)
         # todo: Log this to file
         errors.append("An error occurred during submission.")
@@ -1968,7 +1964,7 @@ class FrontendProtocols(WebserverProtocols):
 try:
     # Change True to False here to display the maintenance page
     # The maintenance page should be updated before doing so e.g. go to the website, copy the source, paste into maintenance.html, and edit to remove links etc.
-    if True or hostname == DEVELOPMENT_HOST: 
+    if True or hostname in DEVELOPMENT_HOSTS: 
         ws()
     else:
         F=open("maintenance.html")
@@ -1978,7 +1974,7 @@ try:
         sys.stdout.write(contents)
         sys.stdout.close()        
 except Exception, e:
-    if hostname == DEVELOPMENT_HOST:
+    if hostname in DEVELOPMENT_HOSTS:
         cgitb.handler()
         #print(e)
         #print("<br>")

@@ -12,6 +12,10 @@ import string
 from sys import maxint
 import rosettadb
 import calendar
+from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES
+
+import locale
+locale.setlocale(locale.LC_ALL, 'en_US')
 
 userColors = {}
 showHistoryForDays = 31
@@ -19,6 +23,13 @@ showHistoryForDays = 31
 settings = None
 protocols = None
 script_filename = None
+
+CurrentMembers = "Current Members"
+LabAlumni = "Lab Alumni"
+PastRotationStudents = "Past Rotation Students"
+Unaccounted = "Unaccounted"
+LimboUsers = "Recently left"
+colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", LimboUsers : "#AAD", Unaccounted : "#EFEFEF"}
 
 def initGoogleCharts(chartfnlist):
     html = []
@@ -50,12 +61,6 @@ def addGroupUsageChart(GroupUsage):
  
     userdirs = ["home", "data", "archive"]
         
-    CurrentMembers = "Current Members"
-    LabAlumni = "Lab Alumni"
-    PastRotationStudents = "Past Rotation Students"
-    Unaccounted = "Unaccounted"
-    colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", Unaccounted : "#EFEFEF"}
-
     #GroupUsage = pickle.loads(GroupUsage[0])
     
     for userdir in userdirs:
@@ -159,192 +164,547 @@ function %(fnname)s() {
     html.append('''</tr></table>''')
     return title, html, chartsfns  
 
+def getSortedUsers(usagetbl, latestdate, users, userdir):
+	sortedUsers = []
+	if userdir == "numfiles":
+		for k,v in sorted(usagetbl[latestdate].iteritems(), key=lambda(k,v): -v.get(userdir, 0)):
+			sortedUsers.append(k)
+	else:
+		for k,v in sorted(usagetbl[latestdate].iteritems(), key=lambda(k,v): -v.get(userdir, {}).get("SizeInMB", 0)):
+			sortedUsers.append(k)
+	missingUsernames = set([u[0] for u in users])
+	missingUsernames = missingUsernames.difference(set(sortedUsers))
+	sortedUsers.extend(list(missingUsernames))
+	return sortedUsers
+
 def addStorageSpaceChart(quotas, usage, users):
-    # Return values
-    title = "Storage space usage"
-    html = []
-    chartsfns = []
-    latestdate = usage[-1][0]
-    
-    # Assume ordered by date and get the most recent data
-    dailyquotas = quotas[-showHistoryForDays:]
-    
-    # Convert the data into a table indexed by dates whose values are tables indexed by user of their storage on that day     
-    usagetbl = {}
-    for use in usage:
-        usagetbl[use[0]] = usagetbl.get(use[0]) or {}
-        usagetbl[use[0]][use[1]] = pickle.loads(use[2])
-        
-    CurrentMembers = "Current Members"
-    LabAlumni = "Lab Alumni"
-    PastRotationStudents = "Past Rotation Students"
-    Unaccounted = "Unaccounted"
-    colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", Unaccounted : "#EFEFEF"}
+	# Return values
+	title = "Storage space usage"
+	html = []
+	chartsfns = []
+	latestdate = usage[-1][0]
+	
+	# Assume ordered by date and get the most recent data
+	dailyquotas = quotas[-showHistoryForDays:]
+	
+	# Convert the data into a table indexed by dates whose values are tables indexed by user of their storage on that day     
+	usagetbl = {}
+	for use in usage:
+		usagetbl[use[0]] = usagetbl.get(use[0]) or {}
+		usagetbl[use[0]][use[1]] = pickle.loads(use[2])
+		
+	# todo: Store this info in the db. Special case for users who are not current users but whose data directories have not been moved
+	limbousers = ['colin', 'meames', 'dmandell']
 
-    #GroupUsage = pickle.loads(GroupUsage[0])
-    
-    userdirs = ["home", "data", "archive", "numfiles"]
-    
-    for userdir in userdirs:
- 
-        sortedUsers = []
-        if userdir != "numfiles":
-            for k,v in sorted(usagetbl[latestdate].iteritems(), key=lambda(k,v): -v.get(userdir, {}).get("SizeInMB", 0)):
-                sortedUsers.append(k)
-        else:
-            for k,v in sorted(usagetbl[latestdate].iteritems(), key=lambda(k,v): -v.get(userdir, 0)):
-                sortedUsers.append(k)
-        missingUsernames = set([u[0] for u in users])
-        missingUsernames = missingUsernames.difference(set(sortedUsers))
-        sortedUsers.extend(list(missingUsernames))
-        
-        if userdir == "numfiles":
-            yAxisTitle = "Number of files"
-        else:
-            yAxisTitle = "Usage in GB"
-            
-        fnname = "drawSpaceUsage%s" % string.capwords(userdir)
-        chartsfns.append(fnname)
-        html.append('''
-                      
-    <script type="text/javascript">
-    function %(fnname)s() {
-    // Create our data table.
-    var data = new google.visualization.DataTable();''' % vars())
-    
-        # Add X-axis
-        html.append(''' data.addColumn('string', 'Date');''')
-        
-        # Add quota datapoint
-        if userdir == "archive":
-            
-            OtherData = None
-            suffix = ""
-            if dailyquotas[-1][3]:
-                OtherData = pickle.loads(dailyquotas[-1][3])
-                suffix = " (90%)"
-            
-            html.append(''' data.addColumn('number', 'Stress threshold%s');''' % suffix)
-        else:
-            html.append(''' data.addColumn('number', 'Quota');''')
+	userstatus = {}
+	for user in users:
+		userstatus[user[0]] = user[4]
+	
+	# Create the numfiles chart
+	userdirs = ["home", "data", "archive"]
+	for dirname_ in ["numfiles"]:
+		sortedUsers = getSortedUsers(usagetbl, latestdate, users, "numfiles")
+		yAxisTitle = "Number of files"
+		fnname = "drawSpaceUsageNumfiles"
+		chartsfns.append(fnname)
+						
+		html.append('''<script type="text/javascript">
+	var numfiles_chart;
+	var numfiles_dataview;
+	var numfiles_currentusers;
+	var numfiles_pastusers;
+	var numfiles_allusers;
+	var numfiles_nousers;
+		  
+	function %(fnname)s() {
+	// Create our data table.
+	var data = new google.visualization.DataTable();\n
+	data.addColumn('string', 'Date');\n''' % vars())
+	
+		html.append('''data.addColumn('number', 'Quota home + data');\n''')
+		for userdir in userdirs:
+			html.append('''data.addColumn('number', 'Quota %(userdir)s');\n	''' % vars())
+		
+		# Add user datapoints
+		numpoints = len(dailyquotas)
+		numrows = numpoints * (len(userdirs) + 1) # 1 extra for data + home
+		for user in sortedUsers:
+			html.append('''data.addColumn('number', '%s');\n''' % user)	
+		html.append('''data.addRows(%d);\n''' % numrows)
+		minValue = 0 # Prefer zero-based graphs
+		maxValue = 0
+		startindex = 1 + 1 + len(userdirs) # Date, home+data, userdirs
+		
+		# Counters for the total number of files
+		dirtotals = {}
+		for userdir in userdirs:
+			dirtotals[userdir] = 0
+		
+		sumFilecount = [[] for i in range(numpoints)]
+		for i in range(numpoints):
+			# Date, Quotas, DriveUsage, OtherData, GroupUsage
+			quota = dailyquotas[i]
+			Quotas = pickle.loads(quota[1])
+			OtherData = None
+			if quota[3]:
+				OtherData = pickle.loads(quota[3])
 
-        # Add used datapoint
-        if userdir == "archive":
-            html.append(''' data.addColumn('number', 'Used');''')
+			dt = quota[0]
+			quotaValue = 0 #(Quotas.get("numfiles") or 0)
+			
+			quotaValue = Quotas["numfiles"][CurrentMembers]
+			alumniQuotaValue = Quotas["numfiles"][LabAlumni]
+			
+			sumFilecount[i] = [0 for sfc in range(len(userdirs) + 1)]
+			
+			# Add quota
+			for rangedi in range(i, numrows, numpoints):
+				html.append('''data.setValue(%d, 0, '%s');\n''' % (rangedi, dt))
+			
+			for rangedi in range(i, numrows, numpoints):
+				if rangedi == i:
+					html.append('''data.setValue(%d, 1, %d);\n''' % (rangedi, quotaValue + quotaValue))
+				else:
+					html.append('''data.setValue(%d, 1, 0);\n''' % (rangedi))
+				
+			k = 2
+			for userdir in userdirs:
+				for rangedi in range(i, numrows, numpoints):
+					if rangedi == i + (numpoints * (k - 1)):
+						html.append('''data.setValue(%d, %d, %d);\n''' % (rangedi, k, quotaValue))
+					else:
+						html.append('''data.setValue(%d, %d, 0);\n''' % (rangedi, k))						
+				k += 1
+			
+			# Add user datapoints
+			for j in range(len(sortedUsers)):			
+				username = sortedUsers[j]
+				Filecount = []
+				
+				rangedi = i
+				homePlusData = 0
+				if usagetbl[dt].get(username) and usagetbl[dt][username].get("home") and usagetbl[dt][username].get("data"):
+					homePlusData = usagetbl[dt][username].get("home")["numfiles"] + usagetbl[dt][username]["data"]["numfiles"]
+				sumFilecountIndex = 0 
+				sumFilecount[i][sumFilecountIndex] += homePlusData
+				html.append('''data.setValue(%d, %d, %d);\n''' % (rangedi, j + startindex, homePlusData))
+				rangedi += numpoints
+				for userdir in userdirs:
+					sumFilecountIndex += 1
+					Filecount = 0
+					if usagetbl[dt].get(username):
+						Filecount = usagetbl[dt][username][userdir]["numfiles"]
+						sumFilecount[i][sumFilecountIndex] += Filecount
+					html.append('''data.setValue(%d, %d, %d);\n''' % (rangedi, j + startindex, Filecount))
+					rangedi += numpoints
+			sumFilecount[i] = [dt] + sumFilecount[i]
+			
 
-        # Add user datapoints
-        for user in sortedUsers:
-            html.append('''data.addColumn('number', '%s');''' % user)    
-        
-        html.append('''data.addRows(%d);''' % len(dailyquotas))
-        
-        diff = 0
-        minValue = 0 # Prefer zero-based graphs
-        maxValue = 0
-        for i in range(len(dailyquotas)):
-            # Date, Quotas, DriveUsage, OtherData, GroupUsage
-            quota = dailyquotas[i]
-            Quotas = pickle.loads(quota[1])
-            OtherData = None
-            if quota[3]:
-                OtherData = pickle.loads(quota[3])
+		# Maintain lists of the user indices to enable us to hide different sets
+		# todo: also add the list of colors here to keep them consistent when you switch sets
+		startindex = 4
+		JScurrentusers = range(0, startindex) 
+		JSpastusers = range(0, startindex) 
+		JSallusers = range(0, startindex + len(sortedUsers))
+		JSnousers = range(0, startindex)
+		for j in range(len(sortedUsers)):
+			username = sortedUsers[j]
+			if userstatus[username] == CurrentMembers or username in limbousers:
+				JScurrentusers.append(j + startindex)
+			else:
+				JSpastusers.append(j + startindex)
+					
+		maxValue *= 1.05
+		sumFilecountHeadings = str(["data + home"] +userdirs)
+		currentSumFilecount = str([locale.format("%d", nsfc, grouping=True) for nsfc in sumFilecount[-1][1:]])  
+		tuserdir = 'Number of files in storage (current = %(currentSumFilecount)s)' % vars()
+		colorlist = [('#333', 4), ('#300', 4), ('#030', 4), ('#003', 4)]
+		
+		# Colors
+		global userColors
+		for i in range(len(sortedUsers)):
+			colorlist.append((userColors[sortedUsers[i]], 2))
+		seriesformat = ["%d:{color: '%s', lineWidth: %d}" % (i, colorlist[i][0], colorlist[i][1]) for i in range(len(colorlist))]
+		seriesformat = join(seriesformat,", ")
+		seriesformat = "{%s}" % seriesformat 
+		
+		groupcolors = colorlist[0:4]
+		for i in range(len(sortedUsers)):
+			u = sortedUsers[i]
+			if userstatus[u] == CurrentMembers or u in limbousers:
+				groupcolors.append((userColors[u], 2))
+		seriesformatcurrent = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
+		seriesformatcurrent = "{%s}" % join(seriesformatcurrent,", ") 
+		
+		groupcolors = colorlist[0:4]
+		for i in range(len(sortedUsers)):
+			u = sortedUsers[i]
+			if not(userstatus[u] == CurrentMembers or u in limbousers):
+				groupcolors.append((userColors[u], 2))
+		seriesformatpast = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
+		seriesformatpast = "{%s}" % join(seriesformatpast,", ") 
 
-            dt = quota[0]
-            
-            quotaValue = (Quotas.get(userdir) or 0)
-            if userdir == "archive" and OtherData and OtherData.get("ArchiveHogThresholdInGB"):
-                quotaInGB = OtherData["ArchiveHogThresholdInGB"]
-            else:
-                quotaInGB = quotaValue / 1024
-            
-            # Add quota
-            html.append('''data.setValue(%d, 0, '%s');''' % (i, dt))
-            if userdir == "numfiles":
-                html.append('''data.setValue(%d, 1, %d);''' % (i, quotaValue))
-            else:
-                html.append('''data.setValue(%d, 1, %d);''' % (i, quotaInGB))
-            
-            # Add user datapoints
-            startindex = 2
-            if userdir == "archive":
-                startindex = 3
-            sumUsageInGB = 0
-                
-            if userdir == "numfiles":
-                for j in range(len(sortedUsers)):
-                    
-                    Filecount = 0
-                    if usagetbl[dt].get(sortedUsers[j]):
-                        Filecount = usagetbl[dt][sortedUsers[j]][userdir]
-                    maxValue = max(maxValue, Filecount)
-                    minValue = min(maxValue, Filecount)
-                    html.append('''data.setValue(%d, %d, %d);''' % (i, j + startindex, Filecount))
-                    diff += 4
-            else:
-                for j in range(len(sortedUsers)):
-                    UsageInGB = 0
-                    if usagetbl[dt].get(sortedUsers[j]):
-                        UsageInGB = float(usagetbl[dt][sortedUsers[j]][userdir]["SizeInMB"]) / float(1024)
-                    sumUsageInGB += UsageInGB
-                    maxValue = max(maxValue, UsageInGB)
-                    minValue = min(maxValue, UsageInGB)
-                    html.append('''data.setValue(%d, %d, %0.3f);''' % (i, j + startindex, UsageInGB))
-                    diff += 4
-            
-            if userdir == "archive":
-                html.append('''data.setValue(%d, 2, %d);''' % (i, sumUsageInGB))
-                
-            
-            diff += 10
-            
-            
-            #chartcolors = []
-            #for group, percentage in sorted(data.iteritems()):
-            #    chartcolors.append("'%s'" % colors[group])
-            #chartcolors = join(chartcolors, ",")
-        
-        maxValue *= 1.05
-        
-        if userdir == "archive":
-            usages = pickle.loads(quotas[-1][2])
-            tuserdir = "/%s usage (current : %s)" % (userdir, usages["zin"]["Use%"])
-        elif userdir == "numfiles":
-            tuserdir = 'Number of files in storage'
-        else:
-            tuserdir = '/%(userdir)s usage' % vars()
-            
-        if userdir == "archive":
-            colorlist = [('black', 4), ('red', 4)]
-        else:
-            colorlist = [('black', 4)]
-        
-        global userColors
-        for i in range(len(sortedUsers)):
-            colorlist.append((userColors[sortedUsers[i]], 2))
-        
-        seriesformat = ["%d:{color: '%s', lineWidth: %d}" % (i, colorlist[i][0], colorlist[i][1]) for i in range(len(colorlist))]
-        seriesformat = join(seriesformat,", ")
-        seriesformat = "series:{%s}" % seriesformat 
-        
-        html.append('''
-          // Instantiate and draw our chart, passing in some options.
-          var chart = new google.visualization.LineChart(document.getElementById('SpaceUsageChart%(userdir)s'));
-          chart.draw(data, {hAxis:{slantedText:true,slantedTextAngle:60}, backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s', minValue:%(minValue)d, maxValue:%(maxValue)d}, lineWidth: 2, %(seriesformat)s, width: 1200, height: 640, title: '%(tuserdir)s'});
-        }
-        </script>
-        ''' % vars())
-        
-    html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span><br><br>''' % vars())
+		html.append('''
+		// Instantiate and draw our chart, passing in some options.
+		numfiles_chart = new google.visualization.LineChart(document.getElementById('SpaceUsageChartnumfiles'));
+		numfiles_dataview = new google.visualization.DataView(data);
+		numfiles_currentusers = %(JScurrentusers)s;
+		numfiles_pastusers = %(JSpastusers)s;
+		numfiles_allusers = %(JSallusers)s;
+		numfiles_nousers = %(JSnousers)s;
+		numfiles_numpoints = %(numpoints)s;
+		numfiles_filecounts = %(currentSumFilecount)s;
+		numfiles_filecountHeadings = %(sumFilecountHeadings)s;
+		numfiles_title = "Title";
+		numfiles_seriesformatall = %(seriesformat)s;
+		numfiles_seriesformatpast = %(seriesformatpast)s;
+		numfiles_seriesformatcurrent = %(seriesformatcurrent)s; 
+		numfiles_seriesformat = numfiles_seriesformatall; 
+		set_numfilesRows(0);
+		set_numfilesColumns(true, true);
+	}
+	function set_numfilesRows(userdirindex)
+	{
+		numfiles_title = 'Number of files in ' + numfiles_filecountHeadings[userdirindex] + ' (current = ' + numfiles_filecounts[userdirindex] + ')'
+		startindex = userdirindex * numfiles_numpoints;
+		numfiles_dataview.setRows(startindex, startindex + (numfiles_numpoints - 1));
+		draw_numfiles();
+	}
+	function draw_numfiles()
+	{
+		settitle = numfiles_title;
+		numfiles_chart.draw(numfiles_dataview, {title: settitle, hAxis:{slantedText:true,slantedTextAngle:60}, backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s', minValue:%(minValue)d}, lineWidth: 2, series: numfiles_seriesformat, width: 1200, height: 640});
 
-    #html.append("<table>")
-    subtitles = []
-    for userdir in userdirs:
-        subtitle = "/%s usage" % userdir
-        subtitles.append(subtitle)
-        html.append('''<A NAME="%s"></A><div id="SpaceUsageChart%s"></div><br><br>''' % (subtitle, userdir))
-        #html.append('''<tr><td id="SpaceUsageChart%s"><span><A NAME="%s">.</A></span></td></tr>''' % (userdir, subtitle))
-    #html.append('''</table>''')
-    return (title, subtitles), html, chartsfns  
+	}
+	function set_numfilesColumns(current, past)
+	{
+		// choose the columns
+		if (current && past)
+		{
+			numfiles_dataview.setColumns(numfiles_allusers)
+			numfiles_seriesformat = numfiles_seriesformatall;
+		}
+		else if (current)
+		{
+			numfiles_dataview.setColumns(numfiles_currentusers)
+			numfiles_seriesformat = numfiles_seriesformatcurrent;
+		}
+		else if (past)
+		{
+			numfiles_dataview.setColumns(numfiles_pastusers)
+			numfiles_seriesformat = numfiles_seriesformatpast;
+		}
+		else
+		{
+			numfiles_dataview.setColumns(numfiles_nousers)
+		}
+		draw_numfiles();
+	}
+	</script>
+		''' % vars())
+		
+		fnname = "drawSpaceUsageNumfilesTotals"
+		chartsfns.append(fnname)
+		html.append('''
+	<script type="text/javascript">
+	var numfilestotals_chart;
+	function %(fnname)s() {
+	// Create our data table.
+	var data = new google.visualization.DataTable();
+	data.addColumn('string', 'Date');
+	data.addColumn('number', 'home + data');''' % vars())
+	
+		for userdir in userdirs:
+			html.append('''data.addColumn('number', '%(userdir)s');''' % vars())
+		html.append('''data.addRows(%d);''' % len(sumFilecount))
+		
+		i = 0
+		for daysCount in sumFilecount:
+			html.append('''data.setValue(%d, 0, '%s');''' % (i, daysCount[0]))
+			for j in range(1, len(daysCount)):
+				html.append('''data.setValue(%d, %d, %d);''' % (i, j, daysCount[j]))
+			i += 1
+		
+		totalscolorlist = [('red', 2), ('blue', 2), ('yellow', 2), ('green', 2), ('orange', 2)]
+		seriesformattotals = ["%d:{color: '%s', lineWidth: %d}" % (i, totalscolorlist[i][0], totalscolorlist[i][1]) for i in range(len(totalscolorlist))]
+		seriesformattotals = join(seriesformattotals,", ")
+		seriesformattotals = "series:{%s}" % seriesformattotals 
+		html.append('''
+
+		numfilestotals_chart = new google.visualization.LineChart(document.getElementById('SpaceUsageChartNumfilesTotals'));
+		numfilestotals_dataview = new google.visualization.DataView(data);
+		numfilestotals_chart.draw(numfilestotals_dataview, {title: "Total number of files", hAxis:{slantedText:true,slantedTextAngle:60}, backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s'}, lineWidth: 2, %(seriesformattotals)s, width: 1200, height: 400});
+
+	}
+	</script>''' % vars())
+		
+
+	for userdir in userdirs:
+		sortedUsers = getSortedUsers(usagetbl, latestdate, users, userdir)
+		yAxisTitle = "Usage in GB"
+		fnname = "drawSpaceUsage%s" % string.capwords(userdir)
+		chartsfns.append(fnname)
+		totalInGB = []
+			
+		html.append('''
+	<script type="text/javascript">
+	var %(userdir)s_chart;
+	var %(userdir)s_dataview;
+	var %(userdir)s_currentusers;
+	var %(userdir)s_pastusers;
+	var %(userdir)s_allusers;
+	var %(userdir)s_nousers;
+		  
+	function %(fnname)s() {
+	// Create our data table.
+	var data = new google.visualization.DataTable();''' % vars())
+	
+		# Add X-axis
+		html.append(''' data.addColumn('string', 'Date');''')
+		
+		# Add quota datapoint
+		if userdir == "archive":
+			OtherData = None
+			suffix = ""
+			if dailyquotas[-1][3]:
+				OtherData = pickle.loads(dailyquotas[-1][3])
+				suffix = " (90%)"
+			html.append(''' data.addColumn('number', 'Stress threshold%s');''' % suffix)
+			html.append(''' data.addColumn('number', 'Used');''') # Add used datapoint
+
+		else:
+			html.append(''' data.addColumn('number', 'Quota');''')
+			html.append(''' data.addColumn('number', 'Alumni quota');''')
+		startindex = 3
+		
+		# Add user datapoints
+		for user in sortedUsers:
+			html.append('''data.addColumn('number', '%s');''' % user)	
+		
+		html.append('''data.addRows(%d);''' % len(dailyquotas))
+		
+		minValue = 0 # Prefer zero-based graphs
+		maxValue = 0
+		#if userdir == "archive":
+		#	startindex += 1
+
+		for i in range(len(dailyquotas)):
+			# Date, Quotas, DriveUsage, OtherData, GroupUsage
+			quota = dailyquotas[i]
+			Quotas = pickle.loads(quota[1])
+			OtherData = None
+			if quota[3]:
+				OtherData = pickle.loads(quota[3])
+
+			dt = quota[0]
+			
+			quotaValue = 0
+			alumniQuotaValue = 0
+			if Quotas.get(userdir):
+				if Quotas[userdir].get(CurrentMembers):
+					quotaValue = Quotas[userdir][CurrentMembers]
+				if Quotas[userdir].get(LabAlumni):
+					alumniQuotaValue = Quotas[userdir][LabAlumni]
+				elif Quotas[userdir].get(PastRotationStudents):
+					alumniQuotaValue = Quotas[userdir][PastRotationStudents]
+			if userdir == "archive" and OtherData and OtherData.get("ArchiveHogThresholdInGB"):
+				quotaInGB = OtherData["ArchiveHogThresholdInGB"]
+			else:
+				quotaInGB = quotaValue / 1024
+				alumniQuotaInGB = alumniQuotaValue / 1024
+			
+			# Add quota
+			html.append('''data.setValue(%d, 0, '%s');''' % (i, dt))
+			html.append('''data.setValue(%d, 1, %d);''' % (i, quotaInGB))
+			html.append('''data.setValue(%d, 2, %d);''' % (i, alumniQuotaInGB))
+			
+			# Add user datapoints
+			sumUsageInGB = 0
+			
+			for j in range(len(sortedUsers)):
+				username = sortedUsers[j]
+				UsageInGB = 0
+				if usagetbl[dt].get(username):
+					UsageInGB = float(usagetbl[dt][username][userdir]["SizeInMB"]) / float(1024)
+				sumUsageInGB += UsageInGB
+				maxValue = max(maxValue, UsageInGB)
+				minValue = min(maxValue, UsageInGB)
+				html.append('''data.setValue(%d, %d, %0.3f);''' % (i, j + startindex, UsageInGB))
+		
+			totalInGB.append(sumUsageInGB)
+			if userdir == "archive":
+				html.append('''data.setValue(%d, 2, %d);''' % (i, sumUsageInGB))
+		
+		# Maintain lists of the user indices to enable us to hide different sets
+		# todo: also add the list of colors here to keep them consistent when you switch sets
+		JScurrentusers = range(0, startindex)
+		JSpastusers = range(0, startindex) 
+		if userdir != "archive":
+			# Remove the quota for the other group
+			JScurrentusers.remove(2) 
+			JSpastusers.remove(1)
+		JSallusers = range(0, startindex + len(sortedUsers))
+		JSnousers = range(0, startindex)
+		for j in range(len(sortedUsers)):
+			username = sortedUsers[j]
+			if userstatus[username] == CurrentMembers or username in limbousers:
+				JScurrentusers.append(j + startindex)
+			else:
+				JSpastusers.append(j + startindex)
+					
+		maxValue *= 1.05
+		
+		if userdir == "archive":
+			usages = pickle.loads(quotas[-1][2])
+			tuserdir = "/%s usage (current : %s)" % (userdir, usages["zin"]["Use%"])
+		else:
+			sumUsageInTB = sumUsageInGB / 1024
+			tuserdir = '/%(userdir)s usage (current = %(sumUsageInTB).2fTB)' % vars()
+			
+		if userdir == "archive":
+			colorlist = [('black', 4), ('red', 4)]
+		else:
+			colorlist = [('black', 4), ('#333', 3)]
+		
+		global userColors
+		for i in range(len(sortedUsers)):
+			colorlist.append((userColors[sortedUsers[i]], 2))
+		
+		seriesformat = ["%d:{color: '%s', lineWidth: %d}" % (i, colorlist[i][0], colorlist[i][1]) for i in range(len(colorlist))]
+		seriesformat = "series:{%s}" % join(seriesformat,", ") 
+		if userdir != "archive":
+			groupcolors = [colorlist[0]]
+			for i in range(len(sortedUsers)):
+				u = sortedUsers[i]
+				if userstatus[u] == CurrentMembers or u in limbousers:
+					groupcolors.append((userColors[u], 2))
+			seriesformatcurrent = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
+			seriesformatcurrent = "series:{%s}" % join(seriesformatcurrent,", ") 
+			
+			groupcolors = [colorlist[1]]
+			for i in range(len(sortedUsers)):
+				u = sortedUsers[i]
+				if not(userstatus[u] == CurrentMembers or u in limbousers):
+					groupcolors.append((userColors[u], 2))
+			seriesformatpast = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
+			seriesformatpast = "series:{%s}" % join(seriesformatpast,", ") 
+			
+		else:
+			seriesformatcurrent = seriesformat
+			seriesformatpast = seriesformat
+			
+		
+		html.append('''
+		  // Instantiate and draw our chart, passing in some options.
+		  %(userdir)s_chart = new google.visualization.LineChart(document.getElementById('SpaceUsageChart%(userdir)s'));
+		  %(userdir)s_dataview = new google.visualization.DataView(data); 
+		  %(userdir)s_currentusers = %(JScurrentusers)s;
+		  %(userdir)s_pastusers = %(JSpastusers)s;
+		  %(userdir)s_allusers = %(JSallusers)s;
+		  %(userdir)s_nousers = %(JSnousers)s;
+		  
+		  draw_%(userdir)s(true, true);
+		}
+		function draw_%(userdir)s(current, past)
+		  {
+			  if (current && past)
+			  {
+				  %(userdir)s_dataview.setColumns(%(userdir)s_allusers)
+				  %(userdir)s_chart.draw(%(userdir)s_dataview, {hAxis:{slantedText:true,slantedTextAngle:60}, backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s', minValue:%(minValue)d}, lineWidth: 2, %(seriesformat)s, width: 1200, height: 640, title: '%(tuserdir)s'});
+			  }
+			  else if (current)
+			  {
+				  %(userdir)s_dataview.setColumns(%(userdir)s_currentusers)
+				  %(userdir)s_chart.draw(%(userdir)s_dataview, {hAxis:{slantedText:true,slantedTextAngle:60}, backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s', minValue:%(minValue)d}, lineWidth: 2, %(seriesformatcurrent)s, width: 1200, height: 640, title: '%(tuserdir)s'});
+			  }
+			  else if (past)
+			  {
+				  %(userdir)s_dataview.setColumns(%(userdir)s_pastusers)
+				  %(userdir)s_chart.draw(%(userdir)s_dataview, {hAxis:{slantedText:true,slantedTextAngle:60}, backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s', minValue:%(minValue)d}, lineWidth: 2, %(seriesformatpast)s, width: 1200, height: 640, title: '%(tuserdir)s'});
+			  }
+			  else
+			  {
+				  %(userdir)s_dataview.setColumns(%(userdir)s_nousers)
+			  }
+		  }
+
+		</script>
+		''' % vars())
+		
+
+		if userdir != 'archive':
+			fnname = "drawSpaceUsageTotals%s" % string.capwords(userdir)
+			chartsfns.append(fnname)
+			numpoints=len(dailyquotas)
+			html.append('''
+<script type="text/javascript">
+function %(fnname)s() {
+// Create our data table.
+var totalsdata = new google.visualization.DataTable();
+totalsdata.addColumn('string', 'Date');
+totalsdata.addColumn('number', 'Total');
+totalsdata.addColumn('number', 'Max asssuming quota reached by all');
+totalsdata.addRows(%(numpoints)d);
+''' % vars())
+		
+			for i in range(len(dailyquotas)):
+				html.append('''totalsdata.setValue(%d, 0, '%s');\n''' % (i, dt))
+				html.append('''totalsdata.setValue(%d, 1, %d);\n''' % (i, totalInGB[i]))
+				html.append('''totalsdata.setValue(%d, 2, %d);\n''' % (i, quotaInGB * len(users)))
+			
+			html.append('''
+// Instantiate and draw our chart, passing in some options.
+%(userdir)s_totalschart = new google.visualization.LineChart(document.getElementById('SpaceUsageChartTotals%(userdir)s'));
+%(userdir)s_totalschart.draw(totalsdata, {backgroundColor:{strokeWidth:3}, pointSize:2, vAxis:{title:'%(yAxisTitle)s'}, lineWidth: 2, series:{0:{color: 'black', lineWidth: 4}, 1:{color: 'blue', lineWidth: 2}}, width: 1200, height: 200, title: '/%(userdir)s total usage'});
+}
+</script>''' % vars())
+		
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span><br><br>''' % vars())
+
+	#html.append("<table>")
+	subtitles = []
+	for userdir in userdirs:
+		subtitle = "/%s usage" % userdir
+		subtitles.append(subtitle)
+		html.append('''<A NAME="%(subtitle)s"></A><div id="SpaceUsageChart%(userdir)s"></div>
+		<div align="center">
+		<form action="">
+<input type="radio" name="%(userdir)s_radio" value="0" onclick="draw_%(userdir)s(true, true);" CHECKED /> All
+<input type="radio" name="%(userdir)s_radio" value="1" onclick="draw_%(userdir)s(true, false);"/> Current members
+<input type="radio" name="%(userdir)s_radio" value="2" onclick="draw_%(userdir)s(false, true);"/> Past members
+</form></div>
+		<br><br>''' % vars())
+		subtitle = "/%s usage totals" % userdir
+		subtitles.append(subtitle)
+		html.append('''<A NAME="%(subtitle)s"></A><div id="SpaceUsageChartTotals%(userdir)s"></div><br><br>''' % vars())
+
+	for userdir in ["numfiles"]:
+		subtitle = "Number of files"
+		subtitles.append(subtitle)
+		html.append('''
+		<A NAME="%(subtitle)s"></A><div id="SpaceUsageChartnumfiles"></div>
+		<div align="center">
+		<form action="">
+			<input type="radio" name="numfiles_columnSelector" value="0" onclick="set_numfilesColumns(true, true);" CHECKED /> All
+			<input type="radio" name="numfiles_columnSelector" value="1" onclick="set_numfilesColumns(true, false);"/> Current members
+			<input type="radio" name="numfiles_columnSelector" value="2" onclick="set_numfilesColumns(false, true);"/> Past members
+		</form>
+		</div>
+		<div align="center">
+		<form action="">
+			<input type="radio" name="numfiles_rowSelector" value="0" onclick="set_numfilesRows(this.value);" CHECKED /> data + home
+			<input type="radio" name="numfiles_rowSelector" value="1" onclick="set_numfilesRows(this.value);"/> home
+			<input type="radio" name="numfiles_rowSelector" value="2" onclick="set_numfilesRows(this.value);"/> data
+			<input type="radio" name="numfiles_rowSelector" value="3" onclick="set_numfilesRows(this.value);"/> archive
+		</form>
+		</div>''' % vars())
+		
+		subtitle = "Number of files (totals)" 
+		subtitles.append(subtitle)
+		html.append('''<A NAME="%(subtitle)s"></A><div id="SpaceUsageChartNumfilesTotals"></div><br><br>''' % vars())
+#html.append('''<tr><td id="SpaceUsageChart%s"><span><A NAME="%s">.</A></span></td></tr>''' % (userdir, subtitle))
+	#html.append('''</table>''')
+	return (title, subtitles), html, chartsfns  
 
 
 def simpleHash(instr):
@@ -555,12 +915,6 @@ def generateLabUsersSubpage():
 		<td > Update </td>
 		</tr>""")
 	
-	CurrentMembers = "Current Members"
-	LabAlumni = "Lab Alumni"
-	PastRotationStudents = "Past Rotation Students"
-	Unaccounted = "Unaccounted"
-	colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", Unaccounted : "#EFEFEF"}
-	
 	for user in userlist:
 		html.append("<tr ")
 		if user["status"] == "current":
@@ -628,6 +982,15 @@ def getJobs():
 	return results
 
 def generateJobAdminSubpage():
+	# get ip addr hostname
+	import os
+	IP = os.environ['REMOTE_ADDR']
+	hostname = IP
+	try:
+		hostname = socket.gethostbyaddr(IP)[0]
+	except:
+		pass
+
 	html = []
 	job_list = getJobs() 
 	html.append("""<H1> Job queue </H1> <br>
@@ -756,36 +1119,42 @@ def generateJobAdminSubpage():
 		html.append('''<td class="lw" bgcolor="#ddd">''')
 		
 		# Add this after if we want to switch focus: //if (window.focus) {newwindow.focus();}
-		if status == 2:
-			html.append('''<button onclick="
-			if (confirm('Are you sure you want to restart the job?') && confirm('Really?!')){
-				window.open('%s?query=admincmd&amp;cmd=restart&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
-				document.adminform.query.value='admin';
-				document.adminform.submit();
-			}">restart</button>''' % (script_filename, line["ID"], executionserver))
-			html.append('''<button disabled="disabled">kill</button>''')
-		else:
+		if not hostname in DEVELOPMENT_HOSTS:
 			html.append('''<button disabled="disabled">restart</button>''')
+			html.append('''<button disabled="disabled">kill</button>''')
+			html.append('''<button disabled="disabled">%s</button>''' % expiredcmd)
+			html.append('''<button disabled="disabled">clear</button>''')
+		else:
+			if status == 2 or status == 4:
+				html.append('''<button onclick="
+				if (confirm('Are you sure you want to restart the job?') && confirm('Really?!')){
+					window.open('%s?query=admincmd&amp;cmd=restart&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+					document.adminform.query.value='admin';
+					document.adminform.submit();
+				}">restart</button>''' % (script_filename, line["ID"], executionserver))
+				html.append('''<button disabled="disabled">kill</button>''')
+			else:
+				html.append('''<button disabled="disabled">restart</button>''')
+				html.append('''<button onclick="
+				if (confirm('Are you sure you want to kill the job?') && confirm('Really?!')){
+					window.open('%s?query=admincmd&amp;cmd=kill&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+					document.adminform.query.value='admin';
+					document.adminform.submit();
+				}">kill</button>''' % (script_filename, line["ID"], executionserver))
+				
 			html.append('''<button onclick="
-			if (confirm('Are you sure you want to kill the job?') && confirm('Really?!')){
-				window.open('%s?query=admincmd&amp;cmd=kill&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+				window.open('%s?query=admincmd&amp;cmd=%s&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
 				document.adminform.query.value='admin';
 				document.adminform.submit();
-			}">kill</button>''' % (script_filename, line["ID"], executionserver))
-			
-		html.append('''<button onclick="
-			window.open('%s?query=admincmd&amp;cmd=%s&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
-			document.adminform.query.value='admin';
-			document.adminform.submit();
-			">%s</button>''' % (script_filename, expiredcmd, line["ID"], executionserver, expiredcmd))
-		if admincmd:
-			html.append('''<button onclick="
-			window.open('%s?query=admincmd&amp;cmd=clear&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
-			document.adminform.query.value='admin';
-			document.adminform.submit();
-			">clear</button>''' % (script_filename, line["ID"], executionserver))
-		else:
-			html.append('''<button disabled="disabled">clear</button>''')
+				">%s</button>''' % (script_filename, expiredcmd, line["ID"], executionserver, expiredcmd))
+			if admincmd:
+				html.append('''<button onclick="
+				window.open('%s?query=admincmd&amp;cmd=clear&amp;job=%d&amp;server=%s','KortemmeLabAdmin','height=400,width=850');
+				document.adminform.query.value='admin';
+				document.adminform.submit();
+				">clear</button>''' % (script_filename, line["ID"], executionserver))
+			else:
+				html.append('''<button disabled="disabled">clear</button>''')
 		
 		html.append("</td>")
 				
@@ -819,14 +1188,23 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 	if form.has_key("AdminPage"):
 		adminpage = form["AdminPage"].value
 		
-	# Create menu
+	
+	# Set generate to False to hide pages for quicker testing
+	subpages = [
+		{"name" : "diskstats",	"desc" : "Disk stats",			"fn" : generateDiskStatsSubpage,	"generate" :True,	"params" : [quotas, usage, users]},
+		{"name" : "jobadmin",	"desc" : "Job administration",	"fn" : generateJobAdminSubpage,		"generate" :True,	"params" : []},
+		{"name" : "webusers",	"desc" : "Website users",		"fn" : generateWebUsersSubpage,		"generate" :True,	"params" : []},
+		{"name" : "labusers",	"desc" : "Lab users",			"fn" : generateLabUsersSubpage,		"generate" :True,	"params" : []},
+		]
+# Create menu
 	html = []
 	html.append("<td align=center>")
 	html.append('''<FORM name="adminform" method="post">''')
-	html.append('''<input type="button" value="Disk stats" onClick="showPage('diskstats');">''')
-	html.append('''<input type="button" value="Job administration" onClick="showPage('jobadmin');">''')
-	html.append('''<input type="button" value="Website users" onClick="showPage('webusers');">''')
-	html.append('''<input type="button" value="Lab users" onClick="showPage('labusers');">''')
+	
+	for subpage in subpages:
+		if subpage["generate"]:
+			html.append('''<input type="button" value="%(desc)s" onClick="showPage('%(name)s');">''' % subpage)
+	
 	html.append('''<input type="button" value="Refresh" onClick="document.adminform.query.value='admin'; document.adminform.submit();">''')
 	html.append('''<input type="hidden" NAME="AdminPage" VALUE="%s">''' % adminpage)
 	html.append('''<input type="hidden" NAME="query" VALUE="">''')
@@ -836,24 +1214,11 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 	html.append("<td align=left>")
 	
 	# Disk stats
-	html.append('<div style="display:none" id="diskstats">')
-	html.extend(generateDiskStatsSubpage(quotas, usage, users))
-	html.append("</div>")
-	
-	# Job admin
-	html.append('<div style="display:none" id="jobadmin">')
-	html.extend(generateJobAdminSubpage())
-	html.append("</div>")
-
-	# Website users
-	html.append('<div style="display:none" id="webusers">')
-	html.extend(generateWebUsersSubpage())
-	html.append("</div>")
-
-	# Job admin
-	html.append('<div style="display:none" id="labusers">')
-	html.extend(generateLabUsersSubpage())
-	html.append("</div>")
+	for subpage in subpages:
+		html.append('<div style="display:none" id="%s">' % subpage["name"])
+		if subpage["generate"]:
+			html.extend(subpage["fn"](*subpage["params"]))
+		html.append("</div>")
 		
 	html.append("</td>")
 	html.append('''<script src="/backrub/frontend/admin.js" type="text/javascript"></script>''')
