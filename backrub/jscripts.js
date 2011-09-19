@@ -1779,7 +1779,10 @@ function allWhite()
 		}
 		else
 		{
-			elem.style.background = "grey";
+			if (elem.style.background != null && elem.style.background != "")
+			{
+				elem.style.backgroundColor = "silver";
+			}
 		}
 	}
 }

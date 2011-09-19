@@ -1313,7 +1313,7 @@ def queue(form, userid):
     if not (settings["LiveWebserver"]):
         # Get all jobs on the live webserver which were submitted from this server and which have not expired
         KlabDBConnection = getKlabDBConnection()
-        sql = "SELECT %(testprefix)s %(columns)s" % vars() 
+        sql = "%(testprefix)s %(columns)s" % vars() 
         results.extend(KlabDBConnection.execQuery(sql))
         KlabDBConnection.close()
 
