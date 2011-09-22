@@ -315,9 +315,12 @@ class SequenceToleranceSKTask(ClusterTask):
                 backrub.append( ( x[0], int(x[1].lstrip())) )
         
         # translate resid to absolute mini rosetta res ids
+        
         for residue in backrub:
-            self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
-                
+            if residue[1] == 0:
+                self.pivot_res.append( self.map_res_id[ '%s   0' % residue[0]  ] )
+            else:
+                self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
     
     def retire(self):
         passed = super(SequenceToleranceSKTask, self).retire()
@@ -780,6 +783,7 @@ class SequenceToleranceHKJob(RosettaClusterJob):
         '''Read the output files to read in the sequences. Depends on _checkOutput.'''
         # CREATE SEQUENCE MOTIF    ## this all would be better off in the postprocessing of the onerun class
         sequences_list_total = {}
+        sequences_list_pdbs = {}
         
         if not self.testonly:
             rosettahelper.make755Directory(self._targetdir_file_path("best_scoring_pdb"))
@@ -818,7 +822,9 @@ class SequenceToleranceHKJob(RosettaClusterJob):
                     if len(line) > 1:          # normal line is not empty and the sequence is at the beginning
                         data_line = line.split() # (sequence, interface score, complex score)
                         # Index over both score and sequence to remove any duplicates
-                        sequences_list_total[(float(data_line[1]), data_line[0])] = (1, si)
+                        sequences_list_pdbs[(float(data_line[1]), data_line[0])] = (1, si)
+                        # Index over score, sequence, and run id to remove any duplicate scores within a run
+                        sequences_list_total[(float(data_line[1]), data_line[0], si)] = (1, si)
                     else:
                         break # break for the first empty line. This means we're done.
                     
@@ -837,23 +843,42 @@ class SequenceToleranceHKJob(RosettaClusterJob):
                     elif len(line) > 1:          # normal line is not empty and the sequence is at the beginning
                         data_line = line.split() # (sequence, fitness, interface score, complex score)
                         # Index over both score and sequence to remove any duplicates
-                        sequences_list_total[(float(data_line[2]), data_line[0])] = (GenNumber, si)
+                        sequences_list_pdbs[(float(data_line[2]), data_line[0])] = (GenNumber, si)
+                        # Index over score, sequence, and run id to remove any duplicate scores within a run
+                        sequences_list_total[(float(data_line[2]), data_line[0], si)] = (GenNumber, si)
                     else:
                         break # break for the first empty line. This means we're done.
             
-            output_handle.close()         
+            output_handle.close()
+            
+        # If the same sequence appears more than once in the same generation, remove the lower scoring ones
+        pruned_sequences_list_total = {}
+        listOfKeysToDelete = []
+        for k, v in sequences_list_total.iteritems():
+            if pruned_sequences_list_total.get((k[1], k[2])):
+                existingScore = pruned_sequences_list_total[(k[1], k[2])]
+                if k[0] < existingScore:
+                    listOfKeysToDelete.append((existingScore, k[1], k[2]))
+                    pruned_sequences_list_total[(k[1], k[2])] = k[0]
+                else:                    
+                    listOfKeysToDelete.append((k[0], k[1], k[2]))
+            else:
+                pruned_sequences_list_total[(k[1], k[2])] = k[0]
+        for i in range(len(listOfKeysToDelete)):
+            del sequences_list_total[listOfKeysToDelete[i]]
+               
         self.sequences_list_total = sequences_list_total
+        self.sequences_list_pdbs = sequences_list_pdbs
         self.list_files = list_files
     
     def _copyBestScoringPDBs(self):
         '''Get the best scoring pdb files associated with this job. Depends on _parseOutputFiles.'''
         
         structure_counter = 0 
-        #self._status("sequences list:%s\n" % sorted(self.sequences_list_total.iteritems()))
-
+        
         # keep the 10 best scoring structures
         bestScoringOrder = []
-        for designed_sequence, origin in sorted(self.sequences_list_total.iteritems()):
+        for designed_sequence, origin in sorted(self.sequences_list_pdbs.iteritems()):
             GenNumber = origin[0]
             structureIndex = origin[1]
             sequence = designed_sequence[1]
@@ -889,8 +914,6 @@ class SequenceToleranceHKJob(RosettaClusterJob):
         for designed_sequence, origin in sorted(self.sequences_list_total.iteritems()):
             i += 1
             handle_fasta.write('>%s\n%s\n' % (i, designed_sequence[1]))
-            if i >= 50:
-                break
         handle_fasta.close()
    
         annotations = [partners[0] + str(resid) for resid in designed[partners[0]]] + [partners[1] + str(resid) for resid in designed[partners[1]]]

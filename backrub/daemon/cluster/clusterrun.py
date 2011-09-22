@@ -82,6 +82,18 @@ def testSequenceToleranceSK(extraparams):
                 }
     setupParameters(extraparams["binary"], 1234, "1MDY_mod.pdb", 2, params)            
     return RosettaTasks.SequenceToleranceSKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
+
+def testSequenceToleranceSKNegativeIndices(extraparams):
+    params = {
+                "radius"            : 10,
+                "kT"                : 0.228,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {},
+                "Designed"          : {"B" : [11, 13]}
+                }
+    setupParameters(extraparams["binary"], 1234, "negidx.pdb", 2, params)            
+    return RosettaTasks.SequenceToleranceSKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
     
 def testMultiSequenceToleranceSKCommon(extraparams):
     nstruct = 100
@@ -148,6 +160,7 @@ def run():
         "HK"           : {"testfn" : testSequenceToleranceHK,               "analysisOnly" : False, "extraparams" : None},
         "HKAnalysis"   : {"testfn" : testSequenceToleranceHKAnalysis,       "analysisOnly" : True,  "extraparams" : ("/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/testhk/tmphYbm4h_seqtolHK/", 6217160)},
         "SKJMB"        : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : {"binary" : "seqtolJMB"}},
+        "SKJMBneg"     : {"testfn" : testSequenceToleranceSKNegativeIndices,"analysisOnly" : False, "extraparams" : {"binary" : "seqtolP1"}},
         "SKP1"         : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : {"binary" : "seqtolP1"}},
         "SKAnalysis"   : {"testfn" : testSequenceToleranceSKAnalysis,       "analysisOnly" : True,  "extraparams" : {"binary" : "seqtolP1", "dldir" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/41f7141e75998737061a3cca2e1dd7b7"}},
         "1KI1"         : {"testfn" : testMultiSequenceToleranceSK,          "analysisOnly" : False, "extraparams" : None},
@@ -200,5 +213,5 @@ def run():
                     print(traceback.print_exc())
                     print(e)
      
-test = "SKAnalysis"       
+test = "SKJMBneg"
 run()
