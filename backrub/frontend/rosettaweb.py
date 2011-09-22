@@ -1308,7 +1308,7 @@ def queue(form, userid):
     results = DBConnection.execQuery(sql)
 
     # Hide developers' jobs from the public so we can test away
-    results = [line for line in results if line[5] not in DEVELOPER_USERNAMES or hostname == DEVELOPMENT_HOST]
+    results = [line for line in results if line[5] not in DEVELOPER_USERNAMES or hostname in DEVELOPMENT_HOSTS]
     
     if not (settings["LiveWebserver"]):
         # Get all jobs on the live webserver which were submitted from this server and which have not expired
