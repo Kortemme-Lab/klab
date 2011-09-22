@@ -440,6 +440,18 @@ The Kortemme Lab Server Daemon
             if not self.sendMail(self.email_admin, self.email_admin, subject, adminTXT):
                 self.log("Error: sendMail() ID = %s." % ID )                
                 self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
+    
+    def notifyAdminOfError(self, ID):
+        subject  = "Kortemme Lab Backrub Server - Your Job #%s" % (ID)
+        if self.server_name == 'albana.ucsf.edu':
+            subject = 'Albana test job %d failed.' % ID
+            adminTXT = 'An error occurred during TEST server simulation #%s.' % ID
+        else:
+            adminTXT = 'An error occurred during simulation #%s.' % ID
+        if not self.sendMail(self.email_admin, self.email_admin, subject, adminTXT):
+            self.log("Error: sendMail() ID = %s." % ID )                
+            self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
+                
                 
     def exec_cmd(self, cmd, run_dir):
         subp = subprocess.Popen(cmd,
@@ -1090,6 +1102,7 @@ class ClusterDaemon(RosettaDaemon):
         else:
             self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, timestamp, jobID))
         self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
+        notifyAdminOfError(jobID)
         
     def run(self):
         """The main loop and job controller of the daemon."""
