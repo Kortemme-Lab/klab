@@ -3,7 +3,7 @@
  ******************************************************************************/
 
 // Constants used by validation functions
-var integralExpression 	= /^[0-9]+$/; // const
+var integralExpression 	= /^-*[0-9]+$/; // const
 var numericExpression 	= /^([0-9]+[\.]*[0-9]*|[0-9]*[\.]*[0-9]+)$/; // const
 var alphaExpression 		= /^[A-Za-z]+$/; // const
 var chainExpression 		= /^[A-Za-z]$/; // const
