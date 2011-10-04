@@ -191,9 +191,6 @@ def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
         
     return True, contents
 
-
-# Sequence Tolerance SK Tasks        
-
 class SequenceToleranceSKTask(ClusterTask):
 
     # additional attributes
@@ -350,6 +347,144 @@ class SequenceToleranceSKTask(ClusterTask):
           
         return passed
         
+
+# Sequence Tolerance SK Tasks        
+class SequenceToleranceSKTaskFixBB(SequenceToleranceSKTask):
+
+    # additional attributes
+    prefix = "SeqTolerance"
+         
+    def __init__(self, workingdir, targetdirectory, parameters, seqtol_resfile, name=""):
+        self.seqtol_resfile     = seqtol_resfile
+        self.residues           = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
+        self.pivot_res          = []   # list of pivot residues, consecutively numbered from 1 [1,...]
+        self.map_res_id         = {}   # contains the mapping from (chain,resid) to pivot_res
+        
+        if not parameters.get("binary") or not(parameters["binary"] == "multiseqtol"):
+            raise Exception
+                        
+        super(SequenceToleranceSKTaskFixBB, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
+    
+    def _initialize(self):
+        self._prepare_backrub()
+        parameters = self.parameters
+                
+        self.br_output_prefixes = ["%04i_" % (i + 1) for i in range(parameters["nstruct"])]
+        self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
+        self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
+        self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
+        print(self.low_files[0])
+        sys.exit(0)
+        #% (ct.getWorkingDir(), parameters["pdb_filename"])
+        
+        
+        self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
+        self.parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
+        if CLUSTER_debugmode:
+            self.parameters["ntrials"] = 10   
+            self.parameters["pop_size"] = 20
+        
+        # Create script
+        
+        taskarrays = {
+            "broutprefixes" : self.br_output_prefixes, 
+            "lowfiles" : self.low_files, 
+            "prefixes" : self.prefixes}
+        ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = taskarrays)
+        
+
+        # See the backrub_seqtol.py file in the RosettaCon repository: RosettaCon2010/protocol_capture/protocol_capture/backrub_seqtol/scripts/backrub_seqtol.py        
+        if parameters["binary"] == "seqtolJMB":
+            no_hb_env_dep_weights_file = os.path.join(ct.getBinaryDir(), "standard_NO_HB_ENV_DEP.wts")
+            score_weights = no_hb_env_dep_weights_file
+            score_patch = ""
+            ref_offsets = "HIS 1.2"
+        elif parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol":
+            score_weights = "standard"
+            score_patch = "score12"
+            ref_offsets = "HIS 1.2"
+            
+        # Setup sequence tolerance
+        seqtolCommand = [
+            ct.getBinary("sequence_tolerance"),   
+            "-database %s" % ct.getDatabaseDir(), 
+            "-s $lowfilesvar",
+            "-ex1 -ex2 -extrachi_cutoff 0",
+            "-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
+            "-ms:generations 5",
+            "-ms:pop_size %d" % parameters["pop_size"],
+            "-ms:pop_from_ss 1",
+            "-ms:checkpoint:prefix $prefixesvar",
+            "-ms:checkpoint:interval 200",
+            "-ms:checkpoint:gz",
+            "-ms:numresults", "0",
+            "-out:prefix $prefixesvar", 
+            "-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
+            "-score:weights", score_weights,
+            "-score:patch", score_patch]
+
+        if ref_offsets:
+            seqtolCommand.append("-score:ref_offsets %s" % ref_offsets)
+        
+        
+        seqtolCommand = [
+            '# Run sequence tolerance', '', 
+            join(seqtolCommand, " ")]        
+        
+        self.script = ct.createScript(seqtolCommand, type="SequenceTolerance")
+        
+    def _prepare_backrub( self ):
+        """prepare data for a full backbone backrub run"""
+        self.pdb = pdb.PDB(self.parameters["pdb_info"].split('\n'))
+        self.map_res_id = self.parameters["map_res_id"] 
+        self.residue_ids = self.pdb.aa_resids()
+
+        # backrub is applied to all residues: append all residues to the backrub list
+        backrub = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
+        for res in self.residue_ids:
+            x = [ res[0], res[1:].strip() ] # 0: chain ID, 1..: resid
+            if len(x) == 1:
+                backrub.append( ( "_", int(x[0].lstrip())) )
+            else:
+                backrub.append( ( x[0], int(x[1].lstrip())) )
+        
+        # translate resid to absolute mini rosetta res ids
+        
+        for residue in backrub:
+            if residue[1] == 0:
+                self.pivot_res.append( self.map_res_id[ '%s   0' % residue[0]  ] )
+            else:
+                self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
+    
+    def retire(self):
+        passed = super(SequenceToleranceSKTaskFixBB, self).retire()
+                               
+        try:
+            # Run the analysis on the originating host
+            errors = []
+            # check whether files were created (and write the total scores to a file)
+            for x in range(1, self.parameters['nstruct']+1):
+                low_file   = self._workingdir_file_path(getOutputFilenameSK(self.parameters["pdbRootname"], x, "low"))          
+                if not os.path.exists( low_file ): 
+                    errors.append('%s missing' % low_file)
+                            
+            # Copy the files from the cluster submission host back to the originating host
+            self._status('Copying pdb, gz, and resfiles back')
+            self._copyFilesBackToHost(["*.pdb", "*.gz", "*.resfile"])
+        except Exception, e:
+            errors.append(str(e))
+            errors.append(traceback.format_exc())
+            
+        # At this stage we are actually done but do not mark ourselves as completed otherwise the scheduler will get confused
+        if errors:
+            errs = join(errors,"</error>\n\t<error>")
+            print("<errors>\n\t<error>%s</error>\n</errors>" % errs)
+            self.state = FAILED_TASK
+            return False
+          
+        return passed
+        
+
 # Sequence Tolerance HK Tasks        
 
 #todo: Add a required files list to all tasks and check before running
@@ -1637,7 +1772,33 @@ class SequenceToleranceHKJobAnalyzer(SequenceToleranceHKJob):
             if v[0] > 1:
                 print("%s, %d, %s" % (k, v[0], sorted(v[1])))
         print(join(bestscoring[:150], "\n"))
+
+class SequenceToleranceSKMultiJobFixBB(SequenceToleranceSKMultiJob):
+
+    def _initialize(self):
+         
+        self.describe()
+        self._checkBinaries()
+                
+        # Create input files
+        parameters = self.parameters
+        self._expandParameters()
+
+        self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
+        self._write_seqtol_resfile()
         
+        scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile])
+        
+        for i in range(self.numberOfRuns):
+            targetsubdirectory = "sequence_tolerance%d" % i
+            inputfiles = [self.parameters["pdb_filename"], self.seqtol_resfile]
+            taskdir = self._make_taskdir(targetsubdirectory, inputfiles)
+            targetdir = os.path.join(self.targetdirectory, targetsubdirectory)
+            
+            stTask = SequenceToleranceSKTaskFixBB(taskdir, targetdir, parameters, self.seqtol_resfile, name=self.jobname + "for run %d of the sequence tolerance protocol" % i)
+            scheduler.addInitialTasks(stTask)
+        
+        self.scheduler = scheduler        
                
 class SequenceToleranceSKJobAnalyzer(SequenceToleranceSKJob):
                
