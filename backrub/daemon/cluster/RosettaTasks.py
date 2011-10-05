@@ -363,7 +363,7 @@ class SequenceToleranceSKTaskFixBB(SequenceToleranceSKTask):
         if not parameters.get("binary") or not(parameters["binary"] == "multiseqtol"):
             raise Exception
                         
-        super(SequenceToleranceSKTaskFixBB, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
+        super(SequenceToleranceSKTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])          
     
     def _initialize(self):
         self._prepare_backrub()
@@ -373,8 +373,6 @@ class SequenceToleranceSKTaskFixBB(SequenceToleranceSKTask):
         self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
         self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
         self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
-        print(self.low_files[0])
-        sys.exit(0)
         #% (ct.getWorkingDir(), parameters["pdb_filename"])
         
         
@@ -403,7 +401,17 @@ class SequenceToleranceSKTaskFixBB(SequenceToleranceSKTask):
             score_weights = "standard"
             score_patch = "score12"
             ref_offsets = "HIS 1.2"
-            
+        
+        # The input was generated using Rosetta 3.3 release and the following commands
+        fixBBcmd = '''
+./fixbb.static.linuxgccrelease -database /home/oconchus/ddgsrc/r3.3/rosetta_database -s 1KI1.pdb -resfile 1KI1.resfile -nstruct 1 -ignore_unrecognized_res -ex1 -ex2 -extrachi_cutoff 0 -score:weights standard -score:patch score12 -overwrite
+mv 1KI1_0001.pdb 1KI1_fixbb_out.pdb
+'''
+
+        backrubCommand = [
+            '# Setup seqtol', '', 
+            'cp 1KI1_fixbb_out.pdb %s_${SGE_TASK_ID4}_low.pdb' % (parameters["pdbRootname"]), ''] 
+        
         # Setup sequence tolerance
         seqtolCommand = [
             ct.getBinary("sequence_tolerance"),   
@@ -431,7 +439,7 @@ class SequenceToleranceSKTaskFixBB(SequenceToleranceSKTask):
             '# Run sequence tolerance', '', 
             join(seqtolCommand, " ")]        
         
-        self.script = ct.createScript(seqtolCommand, type="SequenceTolerance")
+        self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
         
     def _prepare_backrub( self ):
         """prepare data for a full backbone backrub run"""
@@ -1798,7 +1806,144 @@ class SequenceToleranceSKMultiJobFixBB(SequenceToleranceSKMultiJob):
             stTask = SequenceToleranceSKTaskFixBB(taskdir, targetdir, parameters, self.seqtol_resfile, name=self.jobname + "for run %d of the sequence tolerance protocol" % i)
             scheduler.addInitialTasks(stTask)
         
-        self.scheduler = scheduler        
+        self.scheduler = scheduler
+
+    def _analyze(self):
+        # Run the analysis on the originating host
+        
+        self._status("Analyzing results")
+        # run Colin's analysis script: filtering and profiles/motifs
+        thresh_or_temp = self.parameters['kT']
+        
+        weights = self.parameters['Weights']
+        fitness_coef = 'c(%s' % weights[0]
+        for i in range(1, len(weights)):
+            fitness_coef += ', %s' % weights[i]
+        fitness_coef += ')'
+        
+        type_st = '\\"boltzmann\\"'
+        prefix  = '\\"tolerance\\"'
+        percentile = '.5'
+        
+        success = True
+        
+        for i in range(self.numberOfRuns):
+            
+            # Run the R script inside the subdirectory otherwise the recursive search will find output files from the other runs
+            targettaskdir = os.path.join(self.targetdirectory, "sequence_tolerance%d" % i)
+            
+            # Create the standard output file where the R script expects it
+            firststdout = None
+            firstlowfile = None
+            for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*.cmd.o*.1")):
+                firststdout = file
+                break
+            for file in glob.glob(self._workingdir_file_path(self.parameters["pdb_filename"])):
+                originalpdb = file
+                shutil.copy(originalpdb, self.targetdirectory)
+                break
+            if firststdout and originalpdb:
+                self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+                shutil.copy(firststdout, self._taskresultsdir_file_path("sequence_tolerance%d" % i, "seqtol_1_stdout.txt"))
+                shutil.copy(originalpdb, targettaskdir)
+            else:
+                self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+                
+            
+            cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
+                      | /bin/cat %s - \\
+                      | /usr/bin/R --vanilla''' % ( targettaskdir, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)
+                             
+            self._status(cmd)
+            
+            # open files for stderr and stdout 
+            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+            self.file_stdout.write("*********************** R output ***********************\n")
+            subp = subprocess.Popen(cmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=targettaskdir, shell=True, executable='/bin/bash')
+                    
+            while True:
+                returncode = subp.poll()
+                if returncode != None:
+                    if returncode != 0:
+                        sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+                        raise PostProcessingException
+                    break;
+                time.sleep(2)
+            self.file_stdout.close()
+            self.file_stderr.close()
+               
+            success = True
+            Fpwm = open(os.path.join(targettaskdir, "tolerance_pwm.txt"))
+            annotations = Fpwm.readline().split()
+            if len(set(annotations).difference(set(getResIDs(self.parameters)))) != 0:
+                self._status("Warning: There is a difference in the set of designed residues from the pwm (%s) and from getResIDs (%s)." % (str(getResIDs(self.parameters)), str(annotations)))
+            Fpwm.close()
+            
+            try:
+                # create weblogo from the created fasta file
+                fasta_file = self._targetdir_file_path("tolerance_sequences%d.fasta" % i)                
+                shutil.move(os.path.join(targettaskdir, "tolerance_sequences.fasta"), fasta_file)
+                createSequenceMotif(fasta_file, annotations, self._targetdir_file_path( "tolerance_motif%d.png" % i))
+            except Exception, e:
+                self._appendError("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
+            
+            # Delete the *last.pdb and generation files:
+            try:
+                for file in glob.glob(self._targetdir_file_path("*")):
+                    if os.path.getsize(file) == 0:
+                        self._status('Deleting empty file %s' % file)
+                        os.remove(file)
+                #for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_last.pdb")):
+                #    self._status('deleting %s' % file)
+                #    os.remove(file)
+                for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*_low.ga.generations.gz")):
+                    self._status('deleting %s' % file)
+                    os.remove(file)
+                #os.remove(self._targetdir_file_path("seqtol_1_stdout.txt"))
+            except Exception, e:
+                self._appendError("An error occurred deleting files.\n%s\n%s" % (str(e), traceback.format_exc()))
+                success = False
+        
+        try:
+            # Generate tolerance motif montage
+            self.verticaltiles = int(math.ceil(float(self.numberOfRuns) / float(self.horizontaltiles)))
+            montagecmd = "montage -geometry +2+2 -tile %dx%d -pointsize 80 -font Times-Roman "% (self.horizontaltiles, self.verticaltiles)
+            # todo: This is error-prone if we change the logic in _write_backrub_resfiles. Separate this iteration into a separate function and use for both
+            for i in range(self.numberOfRuns):
+                params = self.multiparameters[i]
+                lbl = []
+                for partner in params['Partners']:
+                    if params['Premutated'].get(partner):
+                        pm = params['Premutated'][partner]
+                        for residue in pm:
+                            lbl.append("%s%d:%s" % (partner, residue, pm[residue]))
+                montagecmd += "\( tolerance_motif%d.png -set label '%s' \) " % (i, join(lbl,"\\n"))             
+            montagecmd += "multi_tolerance_motif.png;"
+            self._status(montagecmd)
+            
+            self.file_stdout = open(self._targetdir_file_path( self.filename_stdout ), 'a+')
+            self.file_stderr = open(self._targetdir_file_path( self.filename_stderr ), 'a+')
+            self.file_stdout.write("*********************** montage output ***********************\n")
+            subp = subprocess.Popen(montagecmd, stdout=self.file_stdout, stderr=self.file_stderr, cwd=self.targetdirectory, shell=True, executable='/bin/bash')
+            
+            while True:
+                returncode = subp.poll()
+                if returncode != None:
+                    if returncode != 0:
+                        sys.stderr.write("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+                        raise PostProcessingException
+                    break;
+                time.sleep(2)
+            self.file_stdout.close()
+            self.file_stderr.close()
+
+        except Exception, e:
+            self._appendError("An error occurred creating the motif montage.\n%s\n%s" % (str(e), traceback.format_exc()))
+            success = False
+                
+        return success
                
 class SequenceToleranceSKJobAnalyzer(SequenceToleranceSKJob):
                

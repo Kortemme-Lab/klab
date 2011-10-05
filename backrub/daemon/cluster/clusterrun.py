@@ -112,7 +112,7 @@ def testMultiSequenceToleranceSKCommon(extraparams):
                 "Premutated"        : {"A" : {56 : allAAsExceptCysteine}},
                 "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
                 }
-    setupParameters("multiseqtol", 1234, "1ki1.pdb", nstruct, params)
+    setupParameters("multiseqtol", 1234, "1KI1.pdb", nstruct, params)
     return params  
 
 def testSequenceToleranceHKAnalysis(extraparams):
@@ -146,6 +146,23 @@ def testMultiSequenceToleranceSK(extraparams):
     params = testMultiSequenceToleranceSKCommon(extraparams) 
     return RosettaTasks.SequenceToleranceSKMultiJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
 
+def testMultiSequenceToleranceSKFixBB(extraparams):
+    nstruct = 100
+    if CLUSTER_debugmode:
+        nstruct = 2
+        allAAsExceptCysteine = ["A", "D"]
+
+    params = {
+                "radius"            : 10,
+                "kT"                : 0.228 + 0.021,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"A" : {56 : 'R'}},
+                "Designed"          : {"B" : [1369, 1373, 1376, 1380]}
+                }
+    setupParameters("multiseqtol", 1234, "1KI1_fixbb_out.pdb", nstruct, params)
+    return RosettaTasks.SequenceToleranceSKMultiJobFixBB(sgec, params, netappRoot, cluster_temp, dlDirectory)
+
 def testSequenceToleranceHK(extraparams):
     params = {
                 "radius"            : 5.0,  #todo: Set this in the constants file instead
@@ -165,6 +182,7 @@ def run():
         "SKAnalysis"   : {"testfn" : testSequenceToleranceSKAnalysis,       "analysisOnly" : True,  "extraparams" : {"binary" : "seqtolP1", "dldir" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/41f7141e75998737061a3cca2e1dd7b7"}},
         "1KI1"         : {"testfn" : testMultiSequenceToleranceSK,          "analysisOnly" : False, "extraparams" : None},
         "1KI1analysis" : {"testfn" : testMultiSequenceToleranceSKAnalysis,  "analysisOnly" : True,  "extraparams" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/cluster/tmpqNjqAs_seqtolMultiSK"},
+        "1KI1fixBB"    : {"testfn" : testMultiSequenceToleranceSKFixBB,     "analysisOnly" : False, "extraparams" : None},
      }
     global test
     if tests.get(test):
@@ -212,6 +230,7 @@ def run():
                 except Exception, e:
                     print(traceback.print_exc())
                     print(e)
-     
-test = "SKJMBneg"
+    else:
+    	print("Cannot find test '%s'." % test)
+test = "1KI1fixBB"
 run()
