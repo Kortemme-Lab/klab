@@ -441,8 +441,10 @@ The Kortemme Lab Server Daemon
                 self.log("Error: sendMail() ID = %s." % ID )                
                 self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
     
-    def notifyAdminOfError(self, ID):
-        subject  = "Kortemme Lab Backrub Server - Your Job #%s" % (ID)
+    def notifyAdminOfError(self, ID, description = ""):
+        if description:
+            description = "(%s): " % description
+        subject  = "%sKortemme Lab Backrub Server - Your Job #%s" % (description, ID)
         if self.server_name == 'albana.ucsf.edu':
             subject = 'Albana test job %d failed.' % ID
             adminTXT = 'An error occurred during TEST server simulation #%s.' % ID
@@ -451,6 +453,7 @@ The Kortemme Lab Server Daemon
         if not self.sendMail(self.email_admin, self.email_admin, subject, adminTXT):
             self.log("Error: sendMail() ID = %s." % ID )                
             self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
+
                 
                 
     def exec_cmd(self, cmd, run_dir):
@@ -558,7 +561,7 @@ The Kortemme Lab Server Daemon
         self.rosetta_remotedl       = settings["RemoteDownloadDir"]
         self.rosetta_error_dir      = settings["ErrorDir"]
         self.store_time             = settings["StoreTime"]
-        self.DBConnection      = rosettadb.RosettaDB(settings, numTries = 32)
+        self.DBConnection      		= rosettadb.RosettaDB(settings, numTries = 32)
         if not settings["LiveWebserver"]:
             self.ntrials = 10        
             
@@ -1102,7 +1105,7 @@ class ClusterDaemon(RosettaDaemon):
         else:
             self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, timestamp, jobID))
         self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
-        notifyAdminOfError(jobID)
+        self.notifyAdminOfError(jobID)
         
     def run(self):
         """The main loop and job controller of the daemon."""
@@ -1508,6 +1511,356 @@ class ClusterDaemon(RosettaDaemon):
                 os.remove(rosetta_object.workingdir + '/entities.Rda') # R temp file
             if os.path.exists(rosetta_object.workingdir + '/specificity_boxplot_NA.png'):
                 os.remove(rosetta_object.workingdir + '/specificity_boxplot_NA.png') # boxplot tempfile I guess
+
+class ddGDaemon(RosettaDaemon):
+	
+	MaxClusterJobs	= 1
+	logfname		= "ddGDaemon.log"
+	pidfile			= settings["ddGPID"]
+	
+	def __init__(self, stdout, stderr):
+		self.configure()
+		self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
+		self.sgec = SGEConnection()
+		self._clusterjobjuststarted = None
+		
+		# Maintain a list of recent DB jobs started. This is to avoid any logical errors which 
+		# would repeatedly start a job and spam the cluster. This should never happen but let's be cautious. 
+		self.recentDBJobs = []				  
+		
+		if not os.path.exists(netappRoot):
+			make755Directory(netappRoot)
+		if not os.path.exists(cluster_temp):
+			make755Directory(cluster_temp)
+	
+	def configure(self):
+		passwd = None
+		F = open("../sqlpw", "r")
+		while True:
+			line = F.readline()
+			if line == "":
+				break
+			else:
+				line = line.split("=")
+				if line[0].strip() == "ddGSQLPassword":
+					passwd = line[1].strip()
+					break
+		F.close()
+		if not passwd:
+			raise Exception("Did not find password.")
+		
+		settings["SQLPassword"]		= passwd 
+		self.email_admin		= settings["AdminEmail"]
+		self.server_name		= settings["ServerName"]
+		self.base_dir			= settings["BaseDir"]
+		self.binDir				= settings["BinDir"]
+		self.dataDir			= settings["DataDir"]
+		self.rosetta_tmp		= settings["TempDir"]
+		self.rosetta_ens_tmp	= settings["EnsembleTempDir"]
+		self.rosetta_dl			= settings["DownloadDir"]
+		self.rosetta_remotedl	= settings["RemoteDownloadDir"]
+		self.rosetta_error_dir	= settings["ErrorDir"]
+		self.store_time			= settings["StoreTime"]
+		self.DBConnection		= rosettadb.RosettaDB(settings, host = 'localhost', db = 'ddG', user = 'kortemmelab', passwd = passwd, numTries = 32)
+	
+	def runSQL(self, query, alternateLocks = "", parameters = None, cursorClass = MySQLdb.cursors.DictCursor):
+		""" This function should be the only place in this class which executes SQL.
+			Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
+			Using this function and passing the string in reduces the likelihood of these errors.
+			It also allows us to log all executed SQL here if we wish.
+			We use DictCursor by default for this class.
+			""" 
+		if self.logSQL:
+			self.log("SQL: %s." % query)
+		results = []
+		try: # 	TODO: check if try in old function
+			results = self.DBConnection.execInnoDBQuery(query, parameters, cursorClass)
+		except Exception, e:
+			self.log("%s." % e)
+			self.log(traceback.format_exc())
+			raise Exception()
+		return results
+	
+	def recordSuccessfulJob(self, clusterjob):
+		self.runSQL('UPDATE Prediction SET Status="done", EndDate=NOW() WHERE ID=%s' % clusterjob.jobID)
+
+						
+	def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None, jobID = None):
+		suffix = ""
+		if clusterjob:
+			jobID = clusterjob.jobID
+			clusterjob.error = errormsg
+			clusterjob.failed = True
+			suffix = clusterjob.suffix
+		
+		timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+		if _traceback and _exception:
+			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception)), jobID))
+		else:
+			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, timestamp, jobID))
+		self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
+		self.notifyAdminOfError(jobID, description = "ddG")
+		
+	def run(self):
+		"""The main loop and job controller of the daemon."""
+		
+		self.log("Starting daemon.")
+		self.runningJobs = []		   # list of running processes
+		sgec = self.sgec
+		self.statusprinter = SGEXMLPrinter(sgec)
+		self.diffcounter = CLUSTER_printstatusperiod
+		
+		while True:
+			self.writepid()
+			self.checkRunningJobs()
+			self.restartJobs()
+			self.startNewJobs()
+			sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
+			self.printStatus()			
+			
+	def checkRunningJobs(self):
+		completedJobs = []
+		failedjobs = []
+		
+		# Remove failed jobs from the list
+		# Any errors should already have been logged in the database
+		for clusterjob in self.runningJobs:
+			if clusterjob.failed:
+				failedjobs.append(clusterjob)
+				self.recordErrorInJob(clusterjob, clusterjob.error)
+		for clusterjob in failedjobs:
+			self.runningJobs.remove(clusterjob)
+					
+		# Check if jobs are finished
+		for clusterjob in self.runningJobs:
+			try:
+				jobID = clusterjob.jobID
+				clusterjob.dumpJITGraph()
+				if clusterjob.isCompleted():
+					completedJobs.append(clusterjob)
+
+					clusterjob.saveProfile()
+					clusterjob.analyze()
+					
+					self.end_job(clusterjob)
+					clusterjob.dumpJITGraph()
+					
+					print("<profile>")
+					print(clusterjob.getprofileXML())
+					print("</profile>")
+																		   
+			except RosettaTasks.PostProcessingException, e:
+				self.recordErrorInJob(clusterjob, "Post-processing error.", traceback.format_exc(), e)
+				self.end_job(clusterjob, Failed = True)
+				clusterjob.dumpJITGraph()
+			except ClusterException, e:
+				self.recordErrorInJob(clusterjob, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e)
+				self.end_job(clusterjob, Failed = True)
+				clusterjob.dumpJITGraph()
+			except Exception, e:
+				self.recordErrorInJob(clusterjob, "Failed.", traceback.format_exc(), e)
+				self.end_job(clusterjob, Failed = True)
+				clusterjob.dumpJITGraph()
+							
+		# Remove completed jobs from the list
+		for cj in completedJobs:
+			self.runningJobs.remove(cj)
+	
+	def restartJobs(self):
+		results = self.runSQL('SELECT ID from Prediction WHERE AdminCommand="restart" ORDER BY Date', cursorClass = rosettadb.DictCursor)
+		for result in results:
+			jobID = result["ID"]
+			self.runSQL('UPDATE Prediction SET AdminCommand=NULL, Errors=Null, Status="queued" WHERE ID=%s', parameters = (jobID,))
+			# Allow the job to be restarted without error if it was recently run
+			if jobID in self.recentDBJobs:
+				self.recentDBJobs.remove[jobID]
+
+	def startNewJobs(self):
+		# Start more jobs
+		newclusterjob = None
+		if len(self.runningJobs) < self.MaxClusterJobs:			
+			# get all jobs in queue
+			results = self.runSQL("SELECT Prediction.ID as ID, StrippedPDB, InputFiles, cryptID, Tool.Name AS ToolName, Tool.Version AS ToolVersion, Tool.SVNRevision AS ToolSVNRevision, Command.Type AS CommandType, Command.Command as Command, Command.Description as Description FROM Prediction INNER JOIN Tool ON Prediction.ToolID=Tool.ID INNER JOIN Command ON Prediction.CommandID=Command.ID WHERE Prediction.Status='queued' ORDER BY EntryDate")
+			try:
+				if len(results) != 0:
+					jobID = None
+					for params in results:
+						# Set up the parameters. We assume ProtocolParameters keys do not overlap with params.
+						jobID = params["ID"]
+						params["Description"] = pickle.loads(params["Description"])
+						params["InputFiles"] = pickle.loads(params["InputFiles"])
+						params["ToolVersion"] = pickle.loads(params["ToolVersion"])
+						
+						# Remember that we are about to start this job to avoid repeatedly submitting the same job to the cluster
+						# This should not happen but just in case.
+						# Also, never let the list grow too large as the daemon should be able to run a long time						
+						self.log("Starting job %d." % jobID)
+						if jobID in self.recentDBJobs:
+							self.log("Error: Trying to run database job %d multiple times." % jobID)
+							raise Exception("Trying to run database job %d multiple times")
+						self.recentDBJobs.append(jobID)
+						if len(self.recentDBJobs) > 400:
+							self.recentDBJobs = self.recentDBJobs[200:]
+						
+						# Start the job						
+						newclusterjob = self.start_job(params)
+						if newclusterjob:
+							#change status and write start time to DB
+							self.runningJobs.append(newclusterjob)
+							self.runSQL("UPDATE Prediction SET Status='active', StartDate=NOW() WHERE ID=%s", parameters = (jobID,))
+																						
+						if len(self.runningJobs) >= self.MaxClusterJobs:
+							break
+						
+			except ClusterException, e:
+				newclusterjob = newclusterjob or self._clusterjobjuststarted
+				self._clusterjobjuststarted = None
+				self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc())
+				if newclusterjob:
+					newclusterjob.kill()
+					self.recordErrorInJob(newclusterjob, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e)
+					if newclusterjob in self.runningJobs:
+						self.runningJobs.remove(newclusterjob)
+				else:
+					self.recordErrorInJob(None, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e, jobID)
+			except Exception, e:
+				newclusterjob = newclusterjob or self._clusterjobjuststarted
+				self._clusterjobjuststarted = None
+				self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc())
+				if newclusterjob:
+					newclusterjob.kill()
+					self.recordErrorInJob(newclusterjob, "Error starting job.", traceback.format_exc(), e)
+					if newclusterjob in self.runningJobs:
+						self.runningJobs.remove(newclusterjob)
+				else:
+					self.recordErrorInJob(None, "Error starting job.", traceback.format_exc(), e, jobID)
+									 
+			self._clusterjobjuststarted = None
+
+	def start_job(self, params):
+
+		clusterjob = None
+		jobID = params["ID"]
+		
+		# Leave the results for remote jobs in a different directory 
+		dldir = cluster_ddGdir
+			
+		self.log("Start new job ID = %s. %s" % (jobID, params["Description"].get("Short", "")) )
+		clusterjob = RosettaTasks.ddGJob(self.sgec, params, netappRoot, cluster_temp, cluster_ddGdir)   
+
+		# Start the job
+		self._clusterjobjuststarted = clusterjob # clusterjob will not be returned on exception and the reference will be lost
+
+		# Remove any old files in the same target location
+		destpath = os.path.join(clusterjob.dldir, params["cryptID"])
+		if os.path.exists(destpath):
+			shutil.rmtree(destpath)
+		
+		clusterjob.start()
+		return clusterjob
+	
+	def printStatus(self):
+		'''Print the status of all jobs.'''
+		statusprinter = self.statusprinter
+		
+		if self.runningJobs:
+			someoutput = False
+			diff = statusprinter.qdiff()
+			
+			if False: # For debugging
+				sys.stdout.write("\n")
+				if self.sgec.CachedList:
+					sys.stdout.write(self.sgec.CachedList)
+				
+			if diff:
+				sys.stdout.write("\n")
+				self.diffcounter += 1
+				if self.diffcounter >= CLUSTER_printstatusperiod:
+					# Every x diffs, print a full summary
+					summary = statusprinter.summary()
+					statusList = statusprinter.statusList()
+					if summary:
+						sys.stdout.write(summary)
+					if statusList:
+						sys.stdout.write(statusList)
+					self.diffcounter = 0
+				sys.stdout.write(diff)
+			else:
+				# Indicate tick
+				sys.stdout.write(".")
+		else:
+			sys.stdout.write(".")
+		sys.stdout.flush()
+			
+			
+	def end_job(self, clusterjob, Failed = False):
+		
+		ID = clusterjob.jobID				  
+				
+		try:
+			self.copyAndZipOutputFiles(clusterjob)
+		except Exception, e:
+			self.recordErrorInJob(clusterjob, "Error archiving files.", traceback.format_exc(), e)
+		
+		try:
+			if not Failed:
+				# On reflection, it's best to not remove directories of failed jobs so we can figure out what happened.
+				self.removeClusterTempDir(clusterjob)
+		except Exception, e:
+			self.recordErrorInJob(clusterjob, "Error removing temporary directory on the cluster", traceback.format_exc(), e)
+		
+		if not clusterjob.error:
+			self.recordSuccessfulJob(clusterjob)
+
+	def moveFilesOnJobCompletion(self, clusterjob):
+		try:
+			return clusterjob.moveFilesTo()
+		except Exception, e:
+			self.log("moveFilesOnJobCompletion failure. Error moving files to the download directory.")
+			self.log("%s\n%s" % (str(e), traceback.print_exc()))		
+	
+	def copyAndZipOutputFiles(self, clusterjob):
+			
+		ID = clusterjob.jobID						
+		
+		# move the data to a webserver accessible directory 
+		result_dir = self.moveFilesOnJobCompletion(clusterjob)
+		
+		# remember directory
+		current_dir = os.getcwd()
+		os.chdir(result_dir)
+		
+		# let's remove all empty files to not confuse the user
+		self.exec_cmd('find . -size 0 -exec rm {} \";\"', result_dir)
+		
+		# store all files also in a zip file, to make it easier accessible
+		filename_zip = "data_%s.zip" % ( ID )
+		all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
+		abs_files = get_files('./')
+		
+		# Do not include the timing profile in the zip
+		timingprofile = os.path.join(result_dir, "timing_profile.txt")
+		if timingprofile in abs_files:
+			abs_files.remove(timingprofile)
+			
+		os.chdir(result_dir)
+		filenames_for_zip = [ string.replace(fn, os.getcwd()+'/','') for fn in abs_files ] # os.listdir(result_dir)
+								
+		for file in filenames_for_zip:
+			if file != filename_zip:
+				all_output.write( file )
+				
+		all_output.close()
+		
+		# go back to our working dir 
+		os.chdir(current_dir)
+	
+	def removeClusterTempDir(self, clusterjob):
+		try:
+			clusterjob.removeClusterTempDir()
+		except Exception, e:
+			self.log("Error removing the temporary directory on the cluster.")
+			self.log("%s\n%s" % (str(e), traceback.print_exc()))		
 
 
 
