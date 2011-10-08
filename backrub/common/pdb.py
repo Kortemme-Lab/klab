@@ -123,6 +123,11 @@ class PDB:
         self.lines = [line for line in self.lines if not line.startswith("HETATM")]
 
     def stripForDDG(self, chains = True, keepHETATM = False):
+        '''Strips a PDB to ATOM lines. If keepHETATM is True then also retain HETATM lines.
+           By default all PDB chains are kept. The chains parameter should be True or a list.
+           In the latter case, only those chains in the list are kept.
+           This function also builds maps from PDB numbering to Rosetta numbering and vice versa.
+           '''
         resmap = {}
         iresmap = {}
         newlines = []
@@ -148,8 +153,10 @@ class PDB:
                     line = "%s%d%s" % (line[0:21], resmap[fieldtype + "-" + resid], line[27:])
                     newlines.append(line)
         self.lines = newlines
-        
-        # Sanity check
+        self.ddGresmap = resmap
+        self.ddGiresmap = iresmap
+
+        # Sanity check against a known library
         tmpfile = "/tmp/ddgtemp.pdb"
         F = open(tmpfile,'w')
         F.write(string.join(atomlines, ""))
@@ -162,10 +169,7 @@ class PDB:
             count += 1    
         assert(count == residx)
         assert(len(resmap) == len(iresmap))
-        
-        self.ddGresmap = resmap
-        self.ddGiresmap = iresmap
-    
+            
     def mapRosettaToPDB(self, resnumber):
         res = self.ddGiresmap.get(resnumber)
         if res:
