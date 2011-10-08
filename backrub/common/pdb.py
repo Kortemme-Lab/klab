@@ -3,12 +3,14 @@
 
 import re
 import sys
+import os
 import types
 import string
 import UserDict
 import spatialhash
 import chainsequence
-
+from Bio.PDB import PDBParser
+        
 #todo: replace with ROSETTAWEB_SK_AA
 aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
        "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
@@ -120,7 +122,68 @@ class PDB:
     
         self.lines = [line for line in self.lines if not line.startswith("HETATM")]
 
+    def stripForDDG(self, chains = True, keepHETATM = False):
+        resmap = {}
+        iresmap = {}
+        newlines = []
+        atomlines = []
+        residx = 0
+        oldres = None
+        for line in self.lines:
+            fieldtype = line[0:6].strip()
+            if (fieldtype == "ATOM" or (fieldtype == "HETATM" and keepHETATM)) and (float(line[54:60]) != 0):
+                atomlines.append(line)
+                chain = line[21:22]
+                if (chains == True) or (chain in chains): 
+                    resid = line[21:27] # Chain, residue sequence number, insertion code
+                    iCode = line[26:27]
+                    if resid != oldres:
+                        residx += 1
+                        newnumbering = "%s%4.i " % (chain, residx)
+                        assert(len(newnumbering) == 6)
+                        id = fieldtype + "-" + resid
+                        resmap[id] = residx 
+                        iresmap[residx] = id 
+                        oldres = resid
+                    line = "%s%d%s" % (line[0:21], resmap[fieldtype + "-" + resid], line[27:])
+                    newlines.append(line)
+        self.lines = newlines
+        
+        # Sanity check
+        tmpfile = "/tmp/ddgtemp.pdb"
+        F = open(tmpfile,'w')
+        F.write(string.join(atomlines, ""))
+        F.close()
+        parser=PDBParser()
+        structure=parser.get_structure('tmp', tmpfile)
+        os.remove(tmpfile)
+        count = 0
+        for residue in structure.get_residues():
+            count += 1    
+        assert(count == residx)
+        assert(len(resmap) == len(iresmap))
+        
+        self.ddGresmap = resmap
+        self.ddGiresmap = iresmap
     
+    def mapRosettaToPDB(self, resnumber):
+        res = self.ddGiresmap.get(resnumber)
+        if res:
+            res = res.split("-")
+            return res[1], res[0]
+        return None
+       
+    def mapPDBToRosetta(self, chain, resnum, iCode = " ", ATOM = True):
+        if ATOM:
+            key = "ATOM-%s%4.i%s" % (chain, resnum, iCode) 
+        else:
+            key = "HETATM-%s%4.i%s" % (chain, resnum, iCode)
+        res = self.ddGresmap.get(key)
+        if res:
+            return res
+        return None
+       
+    	
     def aa_resids(self, only_res=None):
     
         if only_res:
