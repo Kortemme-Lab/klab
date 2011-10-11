@@ -501,7 +501,7 @@ function validateMultipleMutations()
 	var sbmtform = document.submitform;
 	var elems = sbmtform.elements;
 	
-	for (var i = 0 ; i < MaxMultiplePointMutations ; i = i + 1) 
+	for (var i = 0 ; i < numMPM ; i = i + 1) 
 	{
 		chain = elems['PM_chain' + i];
 		resid = elems['PM_resid' + i];
