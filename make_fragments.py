@@ -9,12 +9,17 @@ from string import join, strip
 import shutil
 import subprocess
 import traceback
+import time
+from datetime import datetime
 from optparse import OptionParser
 
 ERRCODE_ARGUMENTS = 1
 ERRCODE_CLUSTER = 2
+ERRCODE_OLDRESULTS = 3
 
-cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -noporter -id %(pdbid)s%(chain)s %(fasta)s'
+logfile = "make_fragments_destinations.txt"
+	
+cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -id %(pdbid)s%(chain)s %(fasta)s'
 
 template ='''
 #!/bin/csh	    
@@ -44,7 +49,6 @@ echo "</arch>"
 cd %(outpath)s'''
 
 template += '''
-# noporter flag is used until Porter is up and running	    
 echo "<cmd>%(cmd)s</cmd>"
 %(cmd)s
 '''  % vars()
@@ -56,6 +60,9 @@ echo "</startdate>"
 
 echo "</make_fragments>"
 '''
+
+def getUsername():
+	return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
 
 def printError(s):
 	print('\033[91m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
@@ -72,20 +79,35 @@ def printMessage(s):
 def parseArgs():
 	errors = []
 	pdbpattern = re.compile("^\w{4}$")
-	parser = OptionParser(usage="usage: %prog [options]", version="%prog 1.0", description = "e.g. make_fragments.py -p 1KI1 -c B -f /path/to/1KI1.fasta.txt.\nThe output of the computation will be saved in the output directory, along with the input FASTA files which is generated from the supplied FASTA file.")
+	description = ["e.g. make_fragments.py -p 1KI1 -c B -f /path/to/1KI1.fasta.txt."]
+	description.append("The output of the computation will be saved in the output directory, along with the input FASTA files which is generated from the supplied FASTA file.")
+	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory, to help locate run data." % logfile)
+	description.append("Warning: Do not reuse the same output directory for multiple runs. Results from a previous run may confuse the executable chain and lead to erroneous results.")
+	description.append("To prevent this occurring e.g. in batch submissions, use the -S option to create the results in a subdirectory of the output directory.")
+	description = join(description, "\n")
+	parser = OptionParser(usage="usage: %prog [options]", version="%prog 1.0", description = description)
 	parser.add_option("-f", "--fasta", dest="fasta", help="The input FASTA file. This defaults to OUTPUT_DIRECTORY/PDBID.fasta.txt if the PDB ID is supplied.", metavar="FASTA")
 	parser.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
 	parser.add_option("-p", "--pdbid", dest="pdbid", help="The input PDB identifier. This is optional if the FASTA file is specified and only contains one PDB identifier.", metavar="PDBID")
 	parser.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-	parser.add_option("-n", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
+	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against %s and then quit." % logfile)
+	parser.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
+	parser.add_option("-N", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
 	parser.set_defaults(outdir = os.getcwd())
 	parser.set_defaults(noprompt = False)
+	parser.set_defaults(subdirs = False)
+	parser.set_defaults(qstat = False)
 	(options, args) = parser.parse_args()
 	
-	username = subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
+	username = getUsername()
 	if len(args) >= 1:
 		errors.append("Unexpected arguments: %s." % join(args, ", "))
 	
+	# qstat
+	if options.qstat:
+		qstat()
+		sys.exit(0)
+		
 	# PDB ID
 	if options.pdbid and not pdbpattern.match(options.pdbid): 
 		errors.append("Please enter a valid PDB identifier.")
@@ -126,7 +148,7 @@ def parseArgs():
 					except Exception, e:
 						errors.append(str(e))
 						errors.append(traceback.format_exc())
-	
+		
 	# FASTA
 	if options.fasta:
 		if not os.path.isabs(options.fasta):
@@ -186,7 +208,24 @@ def parseArgs():
 					# This line determines in which case the filenames will be generated for the command chain
 					options.pdbid = options.pdbid.lower()
 					
+					# Create subdirectories if specified
 					assert(options.pdbid and options.chain)
+					if options.subdirs:
+						newoutpath = os.path.join(outpath, "%s%s" % (options.pdbid, options.chain))
+						if os.path.exists(newoutpath):
+							count = 1
+							while count < 1000:
+								newoutpath = os.path.join(outpath, "%s%s_%.3i" % (options.pdbid, options.chain, count))
+								if not os.path.exists(newoutpath):
+									break						
+								count += 1
+							if count == 1000:
+								printError("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
+								sys.exit(ERRCODE_OLDRESULTS)
+						outpath = newoutpath
+						os.makedirs(outpath, 0755)
+
+					# Create a pruned FASTA file in the output directory
 					if foundsequence:
 						fpath, ffile = os.path.split(options.fasta)
 						newfile = os.path.join(outpath, "%s%s.fasta" % (options.pdbid, options.chain))
@@ -262,6 +301,72 @@ def parseFASTA(fastafile):
 		count += 1
 	return records
 
+def qstat():
+	""" Returns a table of jobs run by the user."""
+	
+	#2011-10-17T11:50:43.799896: Job ID 6777279 results will be saved in /netapp/home/shaneoconner/fragtestMonday3.
+	
+	F = open(logfile, "r")
+	joblist = F.read().strip().split("\n")
+	F.close()
+	
+	reg = re.compile("^(.*): Job ID (\d+) results will be saved in (.+)\.$")
+	jobDirs = {}
+	jobTimes = {}
+	for job in joblist:
+		mtchs = reg.match(job)
+		if mtchs:
+			jobID = int(mtchs.group(2))
+			jobDirs[jobID] = mtchs.group(3)
+			nt = mtchs.group(1)
+			nt = nt.replace("-", "")
+			nt = nt[:nt.find(".")]
+			timetaken = datetime.now() - datetime(*time.strptime(nt, "%Y%m%dT%H:%M:%S")[0:6])
+			jobTimes[jobID] = timetaken.seconds
+		else:
+			printError("Error parsing logfile: '%s' does not match regex." % job)
+	
+	command = ['qstat']
+	output = subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0]
+	# Form command
+	output = output.strip().split("\n")
+	jobs = {}
+	if len(output) > 2:
+		for line in output[2:]:
+			# We assume that our script names contain no spaces for the parsing below to work (this should be ensured by ClusterTask) 
+			tokens = line.split()
+			jid = int(tokens[0])
+			jobstate = tokens[4]
+						
+			details = {  "jobid" : jid,
+						 "prior" : tokens[1],
+						 "name" : tokens[2],
+						 "user" : tokens[3],
+						 "state" : jobstate,
+						 "submit/start at" : "%s %s" % (tokens[5], tokens[6])
+						 }			
+			jataskID = 0
+			if jobstate == "r":
+				details["queue"] = tokens[7]
+				details["slots"] = tokens[8]
+			elif jobstate == "qw":
+				details["slots"] = tokens[7]
+				if len(tokens) >= 9:
+					jataskID = tokens[8]
+					details["ja-task-ID"] = jataskID
+					
+			if len(tokens) > 9:
+				jataskID = tokens[9]
+				details["ja-task-ID"] = jataskID
+				
+			jobs[jid] = jobs.get(jid) or {}
+			jobs[jid][jataskID] = details
+			if jobDirs.get(jid):
+				print("Job %d submitted %d minutes ago. Status: '%s'. Destination directory: %s." % (jid, jobTimes[jid] / 60, jobstate, jobDirs[jid]))
+			else:
+				print("Job %d submitted at %s %s. Status: '%s'. Destination directory unknown." % (jid, tokens[5], tokens[6], jobstate))
+
+	
 def qsub_submit(command_filename, workingdir, hold_jobid = None, showstdout = False):
 	'''Submit the given command filename to the queue. Adapted from the qb3 example.'''
 
@@ -337,8 +442,8 @@ if __name__ == "__main__":
 		sys.exit(ERRCODE_CLUSTER)
 	
 	printMessage("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
-	F = open("make_fragments_destinations.txt", "a")
-	F.write("Job ID %d results will be saved in %s.\n" % (jobid, options["outpath"]))
+	F = open(logfile, "a")
+	F.write("%s: Job ID %d results will be saved in %s.\n" % (datetime.now().isoformat(), jobid, options["outpath"]))
 	F.close()
 	
 
