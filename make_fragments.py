@@ -459,16 +459,21 @@ def searchConfigurationFiles(findstr, replacestr = None):
 	for line in F.readlines():
 		line = line.strip()
 		if line:
-			cmd = ["grep", "-n", "-i",  findstr, line]
-			output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-			errors = output[1]
-			output = output[0]
-			if errors:
-				errors = errors.strip()
-				allerrors[line] = errors
-			if output:
-				output = output.strip()
-				alloutput[line] = output.split("\n")
+			if line.endswith("make_fragments.py"):
+				# Do not parse the Python script but check that it exists
+				if not(os.path.exists(line)):
+					allerrors[line] = "File/directory %s does not exist." % line
+			else:
+				cmd = ["grep", "-n", "-i",  findstr, line]
+				output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+				errors = output[1]
+				output = output[0]
+				if errors:
+					errors = errors.strip()
+					allerrors[line] = errors
+				if output:
+					output = output.strip()
+					alloutput[line] = output.split("\n")
 	return alloutput, allerrors
 
 def checkConfigurationPaths():
