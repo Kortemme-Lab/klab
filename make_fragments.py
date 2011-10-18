@@ -18,26 +18,10 @@ ERRCODE_CLUSTER = 2
 ERRCODE_OLDRESULTS = 3
 ERRCODE_CONFIG = 4
 
-logfile = "make_fragments_destinations.txt"
-	
 cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -noporter -id %(pdbid)s%(chain)s %(fasta)s'
-
-# A successful job contains the following in the stdout file.
-# Also, any files of the form aa<pdbid><chain>_picker_cmd_size<numder>.log should have size zero 
-Notes = '''
-sam file ok
-...
-Checking frag file format: aa1cyoA.3mers
-Format okay!
-Checking frag file format: aa1cyoA.9mers
-Format okay!
-aa1cyoA03_05.200_v1_3
-aa1cyoA09_05.200_v1_3
-Done!'''
-
 template ='''
 #!/bin/csh	    
-#$ -N fragment_generation	    
+#$ -N %(jobname)s 
 #$ -o %(outpath)s	    
 #$ -e %(outpath)s	    
 #$ -cwd	    
@@ -45,9 +29,6 @@ template ='''
 #$ -l mem_free=1G	    
 #$ -l arch=lx24-amd64	    
 #$ -l h_rt=24:00:00	    
-
-#setenv LD_LIBRARY_PATH /netapp/home/shaneoconner/fragtest
-#env
 
 echo "<make_fragments>"
 echo "<startdate>"
@@ -63,46 +44,95 @@ echo "<arch>"
 uname -i
 echo "</arch>"
 
-#ls -latr /lib/
-
 cd %(outpath)s
-
-#ldd  /netapp/home/klabqb3backrub/make_fragments/porter/Distill_JC/Porter/Porter'''
+'''
 
 template += '''
 echo "<cmd>%(cmd)s</cmd>"
+echo "<output>"
 %(cmd)s
 '''  % vars()
 
 template += '''
-echo "<startdate>"
+echo "</output>"
+echo "<enddate>"
 date
-echo "</startdate>"
+echo "</enddate>"
 
 echo "</make_fragments>"
 '''
 
+class LogFile(object):
+	
+	class LogFileException(Exception): pass
+	
+	def __init__(self, flname):
+		self.logfile = flname
+		self.format = "%s: Job ID %s results will be saved in %s.%s"
+		self.regex = re.compile(self.format % ("^(.*)", "(\\d+)", "(.+)\\", "$"))
+		
+	def getName(self):
+		return self.logfile
+	
+	def readFromLogfile(self):
+		joblist = {}
+		F = open(self.logfile, "r")
+		lines = F.read().strip().split("\n")
+		F.close()
+		for line in lines:
+			mtchs = self.regex.match(line)
+			if mtchs:
+				jobID = int(mtchs.group(2))
+				jobdir = mtchs.group(3)
+				nt = mtchs.group(1)
+				nt = nt.replace("-", "")
+				nt = nt[:nt.find(".")]
+				timetaken = datetime.now() - datetime(*time.strptime(nt, "%Y%m%dT%H:%M:%S")[0:6])
+				jobtime = timetaken.seconds
+				joblist[jobID] = {"Directory" : jobdir, "TimeInSeconds" : jobtime}
+			else:
+				raise LogFileException("Error parsing logfile: '%s' does not match regex." % line)
+		return joblist
+		
+	def writeToLogfile(self, o_datetime, jobid, location):
+		F = open(self.logfile, "a")
+		F.write(self.format % (o_datetime.isoformat(), jobid, location, "\n"))
+		F.close()
+
+class colorprinter(object):
+	
+	@staticmethod
+	def error(s):
+		print('\033[91m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+
+	@staticmethod
+	def warning(s):
+		print('\033[91m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+	
+	@staticmethod
+	def prompt(s = None):
+		if s:
+			print('\033[93m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+		else:
+			sys.stdout.write("\033[93m $ \033[0m")								
+	
+	@staticmethod
+	def message(s):
+		print('\033[92m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+
+# Globals
+logfile = LogFile("make_fragments_destinations.txt")
+clusterJobName = "fragment_generation"
+
 def getUsername():
 	return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
-
-def printError(s):
-	print('\033[91m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
-
-def printPrompt(s = None):
-	if s:
-		print('\033[93m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
-	else:
-		sys.stdout.write("\033[93m $ \033[0m")								
-
-def printMessage(s):
-	print('\033[92m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
 
 def parseArgs():
 	errors = []
 	pdbpattern = re.compile("^\w{4}$")
 	description = ["e.g. make_fragments.py -p 1KI1 -c B -f /path/to/1KI1.fasta.txt."]
 	description.append("The output of the computation will be saved in the output directory, along with the input FASTA files which is generated from the supplied FASTA file.")
-	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory, to help locate run data." % logfile)
+	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory, to help locate run data." % logfile.getName())
 	description.append("Warning: Do not reuse the same output directory for multiple runs. Results from a previous run may confuse the executable chain and lead to erroneous results.")
 	description.append("To prevent this occurring e.g. in batch submissions, use the -S option to create the results in a subdirectory of the output directory.")
 	description = join(description, "\n")
@@ -111,9 +141,10 @@ def parseArgs():
 	parser.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
 	parser.add_option("-p", "--pdbid", dest="pdbid", help="The input PDB identifier. This is optional if the FASTA file is specified and only contains one PDB identifier.", metavar="PDBID")
 	parser.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against %s and then quit." % logfile)
+	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, print whether the job was successful.", metavar="JOBID")
 	parser.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
 	parser.add_option("-N", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
+	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against %s and then quit." % logfile.getName())
 	parser.set_defaults(outdir = os.getcwd())
 	parser.set_defaults(noprompt = False)
 	parser.set_defaults(subdirs = False)
@@ -124,9 +155,36 @@ def parseArgs():
 	if len(args) >= 1:
 		errors.append("Unexpected arguments: %s." % join(args, ", "))
 	
-	# qstat
+	# QSTAT
 	if options.qstat:
 		qstat()
+	# CHECK
+	elif options.check:
+		if not(options.check.isdigit()):
+			errors.append("Please enter a valid job identifier.")
+		else:
+			if not qstat(options.check):
+				# The job has finished. Check the output file.
+				jobID = int(options.check)
+				joblist = logfile.readFromLogfile()
+				if not joblist.get(jobID):
+					errors.append("Job %d is not running but also has no entry in the logfile %s." % (jobID, logfile.getName()))
+				else:
+					global clusterJobName
+					cname = clusterJobName
+					dir = joblist[jobID]["Directory"]
+					outputfile = os.path.join(dir, "%(cname)s.o%(jobID)d" % vars())
+					F = open(outputfile, "r")
+					contents = F.read()
+					F.close()
+					success = re.compile('''(Done!)\s+<startdate>.*?</startdate>\s*</make_fragments>\s*$''', re.DOTALL)#''')#\/startdate>''')#\s*</make_fragments>\s*$''')
+					match = success.search(contents)
+					if match:
+						colorprinter.message("Job %d finished successfully." % jobID)	
+					else:
+						errors.append("Job %d has finished running but was not successful." % jobID)
+					
+	validOptions = options.qstat or options.check
 		
 	# PDB ID
 	if options.pdbid and not pdbpattern.match(options.pdbid): 
@@ -146,25 +204,20 @@ def parseArgs():
 		errors.append("Please enter an output directory inside your netapp space.")
 	else:
 		if not os.path.exists(outpath):
-			if not options.noprompt:
+			createDir = options.noprompt
+			if not createDir:
 				answer = ""
-				printPrompt("Output path '%(outpath)s' does not exist. Create it now with 755 permissions (y/n)?" % vars())
+				colorprinter.prompt("Output path '%(outpath)s' does not exist. Create it now with 755 permissions (y/n)?" % vars())
 				while answer not in ['Y', 'N']:
-					printPrompt()
+					colorprinter.prompt()
 					answer = sys.stdin.readline().upper().strip()
 				if answer == 'Y':
-					try:
-						pass
-						#os.makedirs(outpath, 0755)
-					except Exception, e:
-						errors.append(str(e))
-						errors.append(traceback.format_exc())
+					createDir = True
 				else:
 					errors.append("Output directory '%s' does not exist." % outpath)
-			else:
+			if createDir:
 				try:
-					pass
-					#os.makedirs(outpath, 0755)
+					os.makedirs(outpath, 0755)
 				except Exception, e:
 					errors.append(str(e))
 					errors.append(traceback.format_exc())
@@ -176,116 +229,117 @@ def parseArgs():
 	if options.pdbid and not options.fasta:
 		options.fasta = os.path.join(outpath, "%s.fasta.txt" % options.pdbid)
 	if not options.fasta:
-		if options.qstat:
-			sys.exit(0)
-		else:
+		if not validOptions:
 			parser.print_help()
 			sys.exit(ERRCODE_ARGUMENTS)
-	if not os.path.exists(options.fasta):
-		errors.append("FASTA file %s does not exists." % options.fasta)
-	elif not errors:
-		fastadata = None
-		try:
-			fastadata = parseFASTA(options.fasta)
-			if not fastadata:
-				errors.append("No data found in the FASTA file %s." % options.fasta)
-				
-		except Exception, e:
-			errors.append("Error parsing FASTA file %s:\n%s" % (options.fasta, str(e)))
-		
-		if fastadata:
-			sequencecount = len(fastadata)
-			recordfrequency = {}
-			for record in fastadata.keys():
-				k = (record[1], record[2])
-				recordfrequency[k] = recordfrequency.get(k, 0) + 1 
-			multipledefinitions = ["\tPDB ID: %s, Chain %s" % (record[0], record[1]) for record, count in sorted(recordfrequency.iteritems()) if count > 1]
-			chainspresent = sorted([record[2] for record in fastadata.keys()])
-			pdbidspresent = sorted(list(set([record[1] for record in fastadata.keys()])))
-			if len(multipledefinitions) > 0:
-				errors.append("The FASTA file %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (options.fasta, join(multipledefinitions, "\n")))				 
-			elif sequencecount == 0:
-				errors.append("No sequences found in the FASTA file %s." % options.fasta)
-			else:
-				if not options.chain and sequencecount > 1: 
-					errors.append("Please enter a chain. Valid chains are: %s." % join(chainspresent, ", "))
-				elif not options.pdbid and len(pdbidspresent) > 1:
-					errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbidspresent, ", "))	
+	if options.fasta:
+		if not os.path.exists(options.fasta):
+			if not validOptions:
+				errors.append("FASTA file %s does not exists." % options.fasta)
+		elif not errors:
+			fastadata = None
+			try:
+				fastadata = parseFASTA(options.fasta)
+				if not fastadata:
+					errors.append("No data found in the FASTA file %s." % options.fasta)
+					
+			except Exception, e:
+				errors.append("Error parsing FASTA file %s:\n%s" % (options.fasta, str(e)))
+			
+			if fastadata:
+				sequencecount = len(fastadata)
+				recordfrequency = {}
+				for record in fastadata.keys():
+					k = (record[1], record[2])
+					recordfrequency[k] = recordfrequency.get(k, 0) + 1 
+				multipledefinitions = ["\tPDB ID: %s, Chain %s" % (record[0], record[1]) for record, count in sorted(recordfrequency.iteritems()) if count > 1]
+				chainspresent = sorted([record[2] for record in fastadata.keys()])
+				pdbidspresent = sorted(list(set([record[1] for record in fastadata.keys()])))
+				if len(multipledefinitions) > 0:
+					errors.append("The FASTA file %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (options.fasta, join(multipledefinitions, "\n")))				 
+				elif sequencecount == 0:
+					errors.append("No sequences found in the FASTA file %s." % options.fasta)
 				else:
-					foundsequence = None
-					
-					if sequencecount == 1:
-						key = fastadata.keys()[0]
-						(temp, options.pdbid, options.chain) = key
-						foundsequence = fastadata[key]
-						printMessage("One chain and PDB ID pair (%s, %s) found in %s. Using that pair as input." % (options.chain, options.pdbid, options.fasta))
-					elif not options.pdbid:
-						assert(len(pdbidspresent) == 1)
-						options.pdbid = pdbidspresent[0]
-						printMessage("No PDB ID specified. Using the only one present in the fasta file, %s." % options.pdbid)
-						if sequencecount > 1:
-							for (recordnumber, pdbid, chain), sequence in sorted(fastadata.iteritems()):
-								if pdbid.upper() == options.pdbid.upper() and chain == options.chain:
-									foundsequence = sequence						
-					
-					# This line determines in which case the filenames will be generated for the command chain
-					options.pdbid = options.pdbid.lower()
-					
-					# Create subdirectories if specified
-					assert(options.pdbid and options.chain)
-					if options.subdirs:
-						newoutpath = os.path.join(outpath, "%s%s" % (options.pdbid, options.chain))
-						if os.path.exists(newoutpath):
-							count = 1
-							while count < 1000:
-								newoutpath = os.path.join(outpath, "%s%s_%.3i" % (options.pdbid, options.chain, count))
-								if not os.path.exists(newoutpath):
-									break						
-								count += 1
-							if count == 1000:
-								printError("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
-								sys.exit(ERRCODE_OLDRESULTS)
-						outpath = newoutpath
-						os.makedirs(outpath, 0755)
-
-					# Create a pruned FASTA file in the output directory
-					if foundsequence:
-						fpath, ffile = os.path.split(options.fasta)
-						newfile = os.path.join(outpath, "%s%s.fasta" % (options.pdbid, options.chain))
-						printMessage("Creating a new FASTA file %s." % newfile) 
-						
-						writefile = True
-						if os.path.exists(newfile):
-							printPrompt("The file %(newfile)s exists. Do you want to overwrite it?" % vars())
-							answer = None
-							while answer not in ['Y', 'N']:
-								printPrompt()
-								answer = sys.stdin.readline().upper().strip()
-							if answer == 'N':
-								writefile = False
-								errors.append("Please remove the existing file %(newfile)s to continue." % vars())
-						if writefile:
-							F = open(newfile, "w")
-							for line in foundsequence:
-								F.write("%s" % line)
-							F.close()
-							options.fasta = newfile
+					if not options.chain and sequencecount > 1: 
+						errors.append("Please enter a chain. Valid chains are: %s." % join(chainspresent, ", "))
+					elif not options.pdbid and len(pdbidspresent) > 1:
+						errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbidspresent, ", "))	
 					else:
-						errors.append("Could not find the sequence for chain %s in structure %s in FASTA file %s." % (options.chain, options.pdbid, options.fasta))
+						foundsequence = None
+						
+						if sequencecount == 1:
+							key = fastadata.keys()[0]
+							(temp, options.pdbid, options.chain) = key
+							foundsequence = fastadata[key]
+							colorprinter.message("One chain and PDB ID pair (%s, %s) found in %s. Using that pair as input." % (options.chain, options.pdbid, options.fasta))
+						elif not options.pdbid:
+							assert(len(pdbidspresent) == 1)
+							options.pdbid = pdbidspresent[0]
+							colorprinter.message("No PDB ID specified. Using the only one present in the fasta file, %s." % options.pdbid)
+							if sequencecount > 1:
+								for (recordnumber, pdbid, chain), sequence in sorted(fastadata.iteritems()):
+									if pdbid.upper() == options.pdbid.upper() and chain == options.chain:
+										foundsequence = sequence						
+						
+						# This line determines in which case the filenames will be generated for the command chain
+						options.pdbid = options.pdbid.lower()
+						
+						# Create subdirectories if specified
+						assert(options.pdbid and options.chain)
+						if options.subdirs:
+							newoutpath = os.path.join(outpath, "%s%s" % (options.pdbid, options.chain))
+							if os.path.exists(newoutpath):
+								count = 1
+								while count < 1000:
+									newoutpath = os.path.join(outpath, "%s%s_%.3i" % (options.pdbid, options.chain, count))
+									if not os.path.exists(newoutpath):
+										break						
+									count += 1
+								if count == 1000:
+									colorprinter.error("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
+									sys.exit(ERRCODE_OLDRESULTS)
+							outpath = newoutpath
+							os.makedirs(outpath, 0755)
+	
+						# Create a pruned FASTA file in the output directory
+						if foundsequence:
+							fpath, ffile = os.path.split(options.fasta)
+							newfile = os.path.join(outpath, "%s%s.fasta" % (options.pdbid, options.chain))
+							colorprinter.message("Creating a new FASTA file %s." % newfile) 
+							
+							writefile = True
+							if os.path.exists(newfile):
+								colorprinter.prompt("The file %(newfile)s exists. Do you want to overwrite it?" % vars())
+								answer = None
+								while answer not in ['Y', 'N']:
+									colorprinter.prompt()
+									answer = sys.stdin.readline().upper().strip()
+								if answer == 'N':
+									writefile = False
+									errors.append("Please remove the existing file %(newfile)s to continue." % vars())
+							if writefile:
+								F = open(newfile, "w")
+								for line in foundsequence:
+									F.write("%s" % line)
+								F.close()
+								options.fasta = newfile
+						else:
+							errors.append("Could not find the sequence for chain %s in structure %s in FASTA file %s." % (options.chain, options.pdbid, options.fasta))
 	if errors:
 		print("")
 		for e in errors:
-			printError(e)
+			colorprinter.error(e)
 		print("")
 		parser.print_help()
 		sys.exit(ERRCODE_ARGUMENTS)
 	
 	return {
-		"user"  : username,
-		"outpath": outpath,
-		"pdbid" : options.pdbid,
-		"chain" : options.chain,
-		"fasta" : options.fasta,
+		"user"		: username,
+		"outpath"	: outpath,
+		"pdbid"		: options.pdbid,
+		"chain"		: options.chain,
+		"fasta"		: options.fasta,
+		"jobname"	: clusterJobName,
 		}
 
 class FastaException(Exception): pass
@@ -324,32 +378,15 @@ def parseFASTA(fastafile):
 		count += 1
 	return records
 
-def qstat():
+def qstat(jobID = None):
 	""" Returns a table of jobs run by the user."""
 	
-	#2011-10-17T11:50:43.799896: Job ID 6777279 results will be saved in /netapp/home/shaneoconner/fragtestMonday3.
+	joblist = logfile.readFromLogfile()
 	
-	F = open(logfile, "r")
-	joblist = F.read().strip().split("\n")
-	F.close()
-	
-	reg = re.compile("^(.*): Job ID (\d+) results will be saved in (.+)\.$")
-	jobDirs = {}
-	jobTimes = {}
-	for job in joblist:
-		mtchs = reg.match(job)
-		if mtchs:
-			jobID = int(mtchs.group(2))
-			jobDirs[jobID] = mtchs.group(3)
-			nt = mtchs.group(1)
-			nt = nt.replace("-", "")
-			nt = nt[:nt.find(".")]
-			timetaken = datetime.now() - datetime(*time.strptime(nt, "%Y%m%dT%H:%M:%S")[0:6])
-			jobTimes[jobID] = timetaken.seconds
-		else:
-			printError("Error parsing logfile: '%s' does not match regex." % job)
-	
-	command = ['qstat']
+	if jobID and type(jobID) == type(1):
+		command = ['qstat', jobID]
+	else:
+		command = ['qstat']
 	output = subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0]
 	# Form command
 	output = output.strip().split("\n")
@@ -384,10 +421,13 @@ def qstat():
 				
 			jobs[jid] = jobs.get(jid) or {}
 			jobs[jid][jataskID] = details
-			if jobDirs.get(jid):
-				print("Job %d submitted %d minutes ago. Status: '%s'. Destination directory: %s." % (jid, jobTimes[jid] / 60, jobstate, jobDirs[jid]))
+			if joblist.get(jid):
+				jobdir = joblist["Directory"]
+				jobtime = joblist["TimeInSeconds"]
+				print("Job %d submitted %d minutes ago. Status: '%s'. Destination directory: %s." % (jid, jobtime / 60, jobstate, jobdir))
 			else:
 				print("Job %d submitted at %s %s. Status: '%s'. Destination directory unknown." % (jid, tokens[5], tokens[6], jobstate))
+		return True
 
 	
 def qsub(command_filename, workingdir, hold_jobid = None, showstdout = False):
@@ -409,7 +449,7 @@ def qsub(command_filename, workingdir, hold_jobid = None, showstdout = False):
 	try:
 		subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stdout, cwd=workingdir)
 	except Exception, e:
-		printError('Failed running qsub command: %s in cwd %s.' % (command, workingdir))
+		colorprinter.error('Failed running qsub command: %s in cwd %s.' % (command, workingdir))
 		raise
 
 	waitfor = 0
@@ -421,7 +461,7 @@ def qsub(command_filename, workingdir, hold_jobid = None, showstdout = False):
 	file_stdout.close()
 
 	if errorcode != 0:
-		printError('Failed running qsub command: %s in cwd %s.' % (command, workingdir))
+		colorprinter.error('Failed running qsub command: %s in cwd %s.' % (command, workingdir))
 		if output.find("unable to contact qmaster") != -1:
 			raise Exception("qsub failed: unable to contact qmaster")
 		else:
@@ -502,34 +542,33 @@ def checkConfigurationPaths():
 if __name__ == "__main__":
 	errors = checkConfigurationPaths()
 	if errors:
-		printError("There is an error in the configuration files:")
+		colorprinter.error("There is an error in the configuration files:")
 		for e in errors:
 			print("")
 			flname = e[0]
 			es = e[1]
-			printPrompt(flname)
+			colorprinter.warning(flname)
 			for e in es:
-				printError(e)
+				colorprinter.error(e)
 		sys.exit(ERRCODE_CONFIG)
-			
+	
 	options = parseArgs()
-	template = template % options
-	qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
-	F = open(qcmdfile, "w")
-	F.write(template)
-	F.close()
+	if options["outpath"] and options["fasta"] and options["pdbid"] and options["chain"]:
+		template = template % options
+		qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
+		F = open(qcmdfile, "w")
+		F.write(template)
+		F.close()
+		
+		try:
+			(jobid, output) = qsub(qcmdfile, options["outpath"] )
+		except Exception, e:
+			colorprinter.error("An exception occurred during submission to the cluster.")
+			colorprinter.error(str(e))
+			colorprinter.error(traceback.format_exc())
+			sys.exit(ERRCODE_CLUSTER)
 	
-	try:
-		(jobid, output) = qsub(qcmdfile, options["outpath"] )
-	except Exception, e:
-		printError("An exception occurred during submission to the cluster.")
-		printError(str(e))
-		printError(traceback.format_exc())
-		sys.exit(ERRCODE_CLUSTER)
-	
-	printMessage("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
-	F = open(logfile, "a")
-	F.write("%s: Job ID %d results will be saved in %s.\n" % (datetime.now().isoformat(), jobid, options["outpath"]))
-	F.close()
-	
+		colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
+		writeToLogfile(datetime.now(), jobid, options["outpath"])
+
 
