@@ -16,10 +16,24 @@ from optparse import OptionParser
 ERRCODE_ARGUMENTS = 1
 ERRCODE_CLUSTER = 2
 ERRCODE_OLDRESULTS = 3
+ERRCODE_CONFIG = 4
 
 logfile = "make_fragments_destinations.txt"
 	
-cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -id %(pdbid)s%(chain)s %(fasta)s'
+cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -noporter -id %(pdbid)s%(chain)s %(fasta)s'
+
+# A successful job contains the following in the stdout file.
+# Also, any files of the form aa<pdbid><chain>_picker_cmd_size<numder>.log should have size zero 
+Notes = '''
+sam file ok
+...
+Checking frag file format: aa1cyoA.3mers
+Format okay!
+Checking frag file format: aa1cyoA.9mers
+Format okay!
+aa1cyoA03_05.200_v1_3
+aa1cyoA09_05.200_v1_3
+Done!'''
 
 template ='''
 #!/bin/csh	    
@@ -31,6 +45,9 @@ template ='''
 #$ -l mem_free=1G	    
 #$ -l arch=lx24-amd64	    
 #$ -l h_rt=24:00:00	    
+
+#setenv LD_LIBRARY_PATH /netapp/home/shaneoconner/fragtest
+#env
 
 echo "<make_fragments>"
 echo "<startdate>"
@@ -46,7 +63,11 @@ echo "<arch>"
 uname -i
 echo "</arch>"
 
-cd %(outpath)s'''
+#ls -latr /lib/
+
+cd %(outpath)s
+
+#ldd  /netapp/home/klabqb3backrub/make_fragments/porter/Distill_JC/Porter/Porter'''
 
 template += '''
 echo "<cmd>%(cmd)s</cmd>"
@@ -106,7 +127,6 @@ def parseArgs():
 	# qstat
 	if options.qstat:
 		qstat()
-		sys.exit(0)
 		
 	# PDB ID
 	if options.pdbid and not pdbpattern.match(options.pdbid): 
@@ -117,38 +137,38 @@ def parseArgs():
 		errors.append("Chain must only be one character.")
 	
 	# OUTDIR
-	if options.outdir.find("..") != -1:
-		errors.append("Output directory '%s' should not contain '..'." % options.outdir)
+	outpath = options.outdir
+	if outpath[0] != "/":
+		outpath = os.path.join(os.getcwd(), outpath)
+	userdir = os.path.join("/netapp/home", username)
+	outpath = os.path.normpath(outpath)
+	if os.path.commonprefix([userdir, outpath]) != userdir:
+		errors.append("Please enter an output directory inside your netapp space.")
 	else:
-		if options.outdir == os.getcwd():
-			userdir = os.path.join("/netapp/home", username)
-			if os.path.commonprefix([userdir, options.outdir]) != userdir:
-				errors.append("Please enter an output directory inside your netapp space.")
-			outpath = options.outdir
-		else:
-			outpath = os.path.join("/netapp/home", username, options.outdir)
-			if not os.path.exists(outpath):
-				if not options.noprompt:
-					answer = ""
-					printPrompt("Output path '%(outpath)s' does not exist. Create it now with 755 permissions (y/n)?" % vars())
-					while answer not in ['Y', 'N']:
-						printPrompt()
-						answer = sys.stdin.readline().upper().strip()
-					if answer == 'Y':
-						try:
-							os.makedirs(outpath, 0755)
-						except Exception, e:
-							errors.append(str(e))
-							errors.append(traceback.format_exc())
-					else:
-						errors.append("Output directory '%s' does not exist." % outpath)
-				else:
+		if not os.path.exists(outpath):
+			if not options.noprompt:
+				answer = ""
+				printPrompt("Output path '%(outpath)s' does not exist. Create it now with 755 permissions (y/n)?" % vars())
+				while answer not in ['Y', 'N']:
+					printPrompt()
+					answer = sys.stdin.readline().upper().strip()
+				if answer == 'Y':
 					try:
-						os.makedirs(outpath, 0755)
+						pass
+						#os.makedirs(outpath, 0755)
 					except Exception, e:
 						errors.append(str(e))
 						errors.append(traceback.format_exc())
-		
+				else:
+					errors.append("Output directory '%s' does not exist." % outpath)
+			else:
+				try:
+					pass
+					#os.makedirs(outpath, 0755)
+				except Exception, e:
+					errors.append(str(e))
+					errors.append(traceback.format_exc())
+
 	# FASTA
 	if options.fasta:
 		if not os.path.isabs(options.fasta):
@@ -156,11 +176,14 @@ def parseArgs():
 	if options.pdbid and not options.fasta:
 		options.fasta = os.path.join(outpath, "%s.fasta.txt" % options.pdbid)
 	if not options.fasta:
-		parser.print_help()
-		sys.exit(ERRCODE_ARGUMENTS)
+		if options.qstat:
+			sys.exit(0)
+		else:
+			parser.print_help()
+			sys.exit(ERRCODE_ARGUMENTS)
 	if not os.path.exists(options.fasta):
 		errors.append("FASTA file %s does not exists." % options.fasta)
-	else:
+	elif not errors:
 		fastadata = None
 		try:
 			fastadata = parseFASTA(options.fasta)
@@ -367,7 +390,7 @@ def qstat():
 				print("Job %d submitted at %s %s. Status: '%s'. Destination directory unknown." % (jid, tokens[5], tokens[6], jobstate))
 
 	
-def qsub_submit(command_filename, workingdir, hold_jobid = None, showstdout = False):
+def qsub(command_filename, workingdir, hold_jobid = None, showstdout = False):
 	'''Submit the given command filename to the queue. Adapted from the qb3 example.'''
 
 	# Open streams
@@ -425,7 +448,65 @@ def qsub_submit(command_filename, workingdir, hold_jobid = None, showstdout = Fa
 
 	return jobid, output
 
+def searchConfigurationFiles(findstr, replacestr = None):
+	'''This function could be used to find and replace paths in the configuration files.
+		At present, it only finds phrases.'''
+		
+	F = open("make_fragments_confs.txt", "r")
+	allerrors = {}
+	alloutput = {}
+	
+	for line in F.readlines():
+		line = line.strip()
+		if line:
+			cmd = ["grep", "-n", "-i",  findstr, line]
+			output = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+			errors = output[1]
+			output = output[0]
+			if errors:
+				errors = errors.strip()
+				allerrors[line] = errors
+			if output:
+				output = output.strip()
+				alloutput[line] = output.split("\n")
+	return alloutput, allerrors
+
+def checkConfigurationPaths():
+	pathregex1 = re.compile('.*"(/netapp.*?)".*')
+	pathregex2 = re.compile('.*".*(/netapp.*?)\\\\".*')
+	alloutput, allerrors = searchConfigurationFiles("netapp")
+	errors = []
+	if allerrors:
+		for flname, errs in sorted(allerrors.iteritems()):
+			errors.append((flname, [errs]))
+	for flname, output in sorted(alloutput.iteritems()):
+		m_errors = []
+		for line in output:
+			mtchs = pathregex1.match(line) or pathregex2.match(line)
+			if not mtchs:
+				m_errors.append("Regex could not match line: %s." % line)
+			else:
+				dir = mtchs.group(1).split()[0]
+				if not os.path.exists(dir):
+					m_errors.append("File/directory %s does not exist." % dir)
+		if m_errors:
+			errors.append((flname, m_errors))
+		
+	return errors
+
 if __name__ == "__main__":
+	errors = checkConfigurationPaths()
+	if errors:
+		printError("There is an error in the configuration files:")
+		for e in errors:
+			print("")
+			flname = e[0]
+			es = e[1]
+			printPrompt(flname)
+			for e in es:
+				printError(e)
+		sys.exit(ERRCODE_CONFIG)
+			
 	options = parseArgs()
 	template = template % options
 	qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
@@ -434,7 +515,7 @@ if __name__ == "__main__":
 	F.close()
 	
 	try:
-		(jobid, output) = qsub_submit(qcmdfile, options["outpath"] )
+		(jobid, output) = qsub(qcmdfile, options["outpath"] )
 	except Exception, e:
 		printError("An exception occurred during submission to the cluster.")
 		printError(str(e))
