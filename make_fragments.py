@@ -17,6 +17,8 @@ ERRCODE_ARGUMENTS = 1
 ERRCODE_CLUSTER = 2
 ERRCODE_OLDRESULTS = 3
 ERRCODE_CONFIG = 4
+ERRCODE_NOOUTPUT = 5
+ERRCODE_JOBFAILED = 6
 
 cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -noporter -id %(pdbid)s%(chain)s %(fasta)s'
 template ='''
@@ -123,6 +125,7 @@ class colorprinter(object):
 # Globals
 logfile = LogFile("make_fragments_destinations.txt")
 clusterJobName = "fragment_generation"
+errcode = 0
 
 def getUsername():
 	return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
@@ -130,20 +133,22 @@ def getUsername():
 def parseArgs():
 	errors = []
 	pdbpattern = re.compile("^\w{4}$")
-	description = ["e.g. make_fragments.py -p 1KI1 -c B -f /path/to/1KI1.fasta.txt."]
-	description.append("The output of the computation will be saved in the output directory, along with the input FASTA files which is generated from the supplied FASTA file.")
-	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory, to help locate run data." % logfile.getName())
+	description = ["Example 1 (minimal): make_fragments.py -d results -f /path/to/1CYO.fasta.txt"]
+	description.append("Example 2: make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA")
+	description.append("-----------------------------------------------------------------------------")
+	description.append("The output of the computation will be saved in the output directory, along with the input FASTA file which is generated from the supplied FASTA file.")
+	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.getName())
 	description.append("Warning: Do not reuse the same output directory for multiple runs. Results from a previous run may confuse the executable chain and lead to erroneous results.")
 	description.append("To prevent this occurring e.g. in batch submissions, use the -S option to create the results in a subdirectory of the output directory.")
 	description = join(description, "\n")
-	parser = OptionParser(usage="usage: %prog [options]", version="%prog 1.0", description = description)
+	parser = OptionParser(usage="usage: %prog [options]", version="%prog 1.0A", description = description)
 	parser.add_option("-f", "--fasta", dest="fasta", help="The input FASTA file. This defaults to OUTPUT_DIRECTORY/PDBID.fasta.txt if the PDB ID is supplied.", metavar="FASTA")
 	parser.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
 	parser.add_option("-p", "--pdbid", dest="pdbid", help="The input PDB identifier. This is optional if the FASTA file is specified and only contains one PDB identifier.", metavar="PDBID")
 	parser.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, print whether the job was successful.", metavar="JOBID")
-	parser.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
+	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
 	parser.add_option("-N", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
+	parser.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
 	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against %s and then quit." % logfile.getName())
 	parser.set_defaults(outdir = os.getcwd())
 	parser.set_defaults(noprompt = False)
@@ -174,15 +179,20 @@ def parseArgs():
 					cname = clusterJobName
 					dir = joblist[jobID]["Directory"]
 					outputfile = os.path.join(dir, "%(cname)s.o%(jobID)d" % vars())
-					F = open(outputfile, "r")
-					contents = F.read()
-					F.close()
-					success = re.compile('''(Done!)\s+<startdate>.*?</startdate>\s*</make_fragments>\s*$''', re.DOTALL)#''')#\/startdate>''')#\s*</make_fragments>\s*$''')
-					match = success.search(contents)
-					if match:
-						colorprinter.message("Job %d finished successfully." % jobID)	
+					if os.path.exists(outputfile):
+						F = open(outputfile, "r")
+						contents = F.read()
+						F.close()
+						success = re.compile('''(Done!)\s+<startdate>.*?</startdate>\s*</make_fragments>\s*$''', re.DOTALL)#''')#\/startdate>''')#\s*</make_fragments>\s*$''')
+						match = success.search(contents)
+						if match:
+							colorprinter.message("Job %d finished successfully." % jobID)	
+						else:
+							errors.append("Job %d has finished running but was not successful." % jobID)
+							errcode = ERRCODE_JOBFAILED
 					else:
-						errors.append("Job %d has finished running but was not successful." % jobID)
+							errors.append("The output file %s associated with job %d could not be found." % (outputfile, jobID))
+							errcode = ERRCODE_NOOUTPUT
 					
 	validOptions = options.qstat or options.check
 		
@@ -330,6 +340,8 @@ def parseArgs():
 		for e in errors:
 			colorprinter.error(e)
 		print("")
+		if errcode:
+			sys.exit(errcode)
 		parser.print_help()
 		sys.exit(ERRCODE_ARGUMENTS)
 	
@@ -422,11 +434,11 @@ def qstat(jobID = None):
 			jobs[jid] = jobs.get(jid) or {}
 			jobs[jid][jataskID] = details
 			if joblist.get(jid):
-				jobdir = joblist["Directory"]
-				jobtime = joblist["TimeInSeconds"]
-				print("Job %d submitted %d minutes ago. Status: '%s'. Destination directory: %s." % (jid, jobtime / 60, jobstate, jobdir))
+				jobdir = joblist[jid]["Directory"]
+				jobtime = joblist[jid]["TimeInSeconds"]
+				colorprinter.message("Job %d submitted %d minutes ago. Status: '%s'. Destination directory: %s." % (jid, jobtime / 60, jobstate, jobdir))
 			else:
-				print("Job %d submitted at %s %s. Status: '%s'. Destination directory unknown." % (jid, tokens[5], tokens[6], jobstate))
+				colorprinter.message("Job %d submitted at %s %s. Status: '%s'. Destination directory unknown." % (jid, tokens[5], tokens[6], jobstate))
 		return True
 
 	
@@ -569,6 +581,6 @@ if __name__ == "__main__":
 			sys.exit(ERRCODE_CLUSTER)
 	
 		colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
-		writeToLogfile(datetime.now(), jobid, options["outpath"])
+		logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
 
