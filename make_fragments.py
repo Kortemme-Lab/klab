@@ -183,10 +183,10 @@ def parseArgs():
 						F = open(outputfile, "r")
 						contents = F.read()
 						F.close()
-						success = re.compile('''(Done!)\s+<startdate>.*?</startdate>\s*</make_fragments>\s*$''', re.DOTALL)#''')#\/startdate>''')#\s*</make_fragments>\s*$''')
+						success = re.compile('''Done!\s*</output>\s*<enddate>(.*?)</enddate>\s*</make_fragments>\s*$''', re.DOTALL)
 						match = success.search(contents)
 						if match:
-							colorprinter.message("Job %d finished successfully." % jobID)	
+							colorprinter.message("Job %d finished successfully on %s." % (jobID, match.groups(1)[0].strip()))	
 						else:
 							errors.append("Job %d has finished running but was not successful." % jobID)
 							errcode = ERRCODE_JOBFAILED
