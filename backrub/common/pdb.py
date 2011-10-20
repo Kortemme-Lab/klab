@@ -47,6 +47,8 @@ class PDB:
   # 
     def __init__(self, pdb = None):
     
+        self.ddGresmap = None
+        self.ddGiresmap = None
         self.lines = []
         if type(pdb) == types.StringType:
             self.read(pdb)
@@ -61,10 +63,9 @@ class PDB:
         self.lines = pdbhandle.readlines()
         pdbhandle.close()
     
-    def write(self, pdbpath):
-    
+    def write(self, pdbpath, separator = '\n'):
         pdbhandle = open(pdbpath, "w")
-        text = string.join(self.lines, '\n')
+        text = string.join(self.lines, separator)
         pdbhandle.write(text)
         pdbhandle.close()
     
@@ -121,7 +122,27 @@ class PDB:
     def remove_hetatm(self):
     
         self.lines = [line for line in self.lines if not line.startswith("HETATM")]
+    
+    def get_ddGResmap(self):
+        return self.ddGresmap
+        
+    def get_ddGInverseResmap(self):
+        return self.ddGiresmap 
+    
+    def getAminoAcid(self, line):
+        return line[17:20]
 
+    def getAtomLine(self, chain, resid):
+        '''This function assumes that all lines are ATOM or HETATM lines.
+           resid should have the proper PDB format i.e. an integer left-padded
+           to length 4 followed by the insertion code which may be a blank space.'''
+        for line in self.lines:
+            fieldtype = line[0:6].strip()
+            assert(fieldtype == "ATOM" or fieldtype == "HETATM")
+            if line[21:22] == chain and resid == line[22:27]:
+                return line
+        raise Exception("Could not find the ATOM/HETATM line corresponding to chain '%(chain)s' and residue '%(resid)s'." % vars())	
+        
     def stripForDDG(self, chains = True, keepHETATM = False):
         '''Strips a PDB to ATOM lines. If keepHETATM is True then also retain HETATM lines.
            By default all PDB chains are kept. The chains parameter should be True or a list.
@@ -131,26 +152,27 @@ class PDB:
         resmap = {}
         iresmap = {}
         newlines = []
-        atomlines = []
         residx = 0
         oldres = None
         for line in self.lines:
             fieldtype = line[0:6].strip()
             if (fieldtype == "ATOM" or (fieldtype == "HETATM" and keepHETATM)) and (float(line[54:60]) != 0):
-                atomlines.append(line)
                 chain = line[21:22]
                 if (chains == True) or (chain in chains): 
                     resid = line[21:27] # Chain, residue sequence number, insertion code
                     iCode = line[26:27]
                     if resid != oldres:
-                        residx += 1
+                    	residx += 1
                         newnumbering = "%s%4.i " % (chain, residx)
                         assert(len(newnumbering) == 6)
                         id = fieldtype + "-" + resid
                         resmap[id] = residx 
                         iresmap[residx] = id 
                         oldres = resid
-                    line = "%s%d%s" % (line[0:21], resmap[fieldtype + "-" + resid], line[27:])
+                    oldlength = len(line)
+                    # Add the original line back including the chain [21] and inserting a blank for the insertion code
+                    line = "%s%4.i %s" % (line[0:22], resmap[fieldtype + "-" + resid], line[27:])
+                    assert(len(line) == oldlength)
                     newlines.append(line)
         self.lines = newlines
         self.ddGresmap = resmap
@@ -158,15 +180,16 @@ class PDB:
 
         # Sanity check against a known library
         tmpfile = "/tmp/ddgtemp.pdb"
+        self.lines = self.lines or ["\n"] 	# necessary to avoid a crash in the Bio Python module 
         F = open(tmpfile,'w')
-        F.write(string.join(atomlines, ""))
+        F.write(string.join(self.lines, "\n"))
         F.close()
         parser=PDBParser()
         structure=parser.get_structure('tmp', tmpfile)
         os.remove(tmpfile)
         count = 0
         for residue in structure.get_residues():
-            count += 1    
+            count += 1
         assert(count == residx)
         assert(len(resmap) == len(iresmap))
             
