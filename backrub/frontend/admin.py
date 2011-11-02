@@ -12,8 +12,8 @@ import string
 from sys import maxint
 import rosettadb
 import calendar
+import socket
 from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES
-
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
 
@@ -988,7 +988,7 @@ def generateJobAdminSubpage():
 	hostname = IP
 	try:
 		hostname = socket.gethostbyaddr(IP)[0]
-	except:
+	except Exception, e:
 		pass
 
 	html = []

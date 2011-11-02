@@ -24,7 +24,7 @@ for k, v in ROSETTAWEB_SK_AA.items():
     ROSETTAWEB_SK_AAinv[v] = k
 
 # Set this to the machine you are debugging from
-DEVELOPMENT_HOSTS = ["cabernet.ucsf.edu"]
+DEVELOPMENT_HOSTS = ["cabernet.ucsf.edu", "zin.ucsf.edu"]
 DEVELOPER_USERNAMES = ["oconchus"]
 
 permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
