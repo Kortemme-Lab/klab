@@ -8,20 +8,19 @@ default_email = "shane.oconnor@ucsf.edu"
 
 def sendEmail(subject, sender, recipients, plaintext, htmltext = None, cc = None, debug = False, useMIMEMultipart = True):
 	if recipients:
-		#if type(recipients) == type([]):
-		#	recipients = join(recipients, ";")
 		if type(recipients) == type(""):
 			recipients = [recipients]
 		elif type(recipients) != type([]):
-			raise Exception()
+			raise Exception("Unexpected type for recipients.")
 		if cc:
 			if type(cc) == type(""):
 				recipients.append(cc)
 			elif type(cc) == type([]):
 				recipients.extend(cc)
 			else:
-				raise Exception()
-			
+				raise Exception("Unexpected type for cc.")
+		recipients = join(recipients, ";")
+		
 		if useMIMEMultipart:
 			msg = MIMEMultipart('alternative')
 		else:
@@ -46,33 +45,6 @@ def sendEmail(subject, sender, recipients, plaintext, htmltext = None, cc = None
 			s = smtplib.SMTP()
 			s.connect()
 			s.sendmail(msg['From'], recipients, msg.as_string())
-			s.close()
-		return True
-	return False
-
-def sendEmail2(subject, sender, recipients, body, cc = None, debug = False):
-	if recipients:
-		if type(recipients) == type(""):
-			recipients = [recipients]#
-			#join(recipients, ";")
-		msg = email.Message.Message()
-		msg['Subject'] = subject
-		msg['From'] = sender
-		msg['To'] = recipients
-		msg['Reply-To'] = default_email
-		
-		msg.set_type("text/plain")
-		msg.set_payload(body)
-		
-		if debug:
-			print(msg)
-		else:
-			s = smtplib.SMTP()
-			s.connect()
-			if cc:
-				s.sendmail(msg['From'], [msg['To'], cc], msg.as_string())
-			else:
-				s.sendmail(msg['From'], [msg['To']], msg.as_string())
 			s.close()
 		return True
 	return False
