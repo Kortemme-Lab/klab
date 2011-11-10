@@ -216,3 +216,60 @@ def readRetrospectLog(logfile, maxchars):
 		scriptsRun[rscript] = {"status" : RETROSPECT_FAIL, "lastRun" : None, "lastSuccess" : None} 
 			
 	return log, scriptsRun
+
+def generateSummaryHTMLTable(scriptsRun):
+	html = []
+	html.append("<table style='text-align:center;border:1px solid black;margin-left: auto;margin-right: auto;'>") # Start summary table
+	html.append('	<tr><td colspan="4" style="text-align:center"><hl></td></tr>')
+	html.append('	<tr style="font-weight:bold;background-color:#cccccc;text-align:center"><td>Script</td><td>Last status</td><td>Last run</td><td>Last success</td></tr>')
+	tablestyle = ['background-color:#33dd33;', 'background-color:#33ff33;']
+	warningstyle = ['background-color:#EA8737;', 'background-color:#f5b767;']
+	failstyle = ['background-color:#dd3333;', 'background-color:#ff3333;']
+	count = 0
+	
+	expectedScriptLastSuccess = {}
+	for es in expectedScripts:
+		expectedScriptLastSuccess[es[0]] = es[1]
+	expectedScriptsNames = expectedScriptLastSuccess.keys()
+	
+	for name, details in sorted(scriptsRun.iteritems()):
+		status = None
+		
+		rowstyle = tablestyle[count % 2]
+		if details["lastSuccess"] and (name in expectedScriptLastSuccess.keys()):
+			td = (datetime.datetime.today() - details["lastSuccess"])
+			days = td.days + (float(td.seconds) / float(60 * 60 * 24))
+			if (days > expectedScriptLastSuccess[name] + 1.5): # Allow two days of grace period before indicating failure
+				rowstyle = failstyle[count % 2]		 
+		else:
+			rowstyle = failstyle[count % 2]
+			status = "FAIL"
+		#
+		if details["status"] & RETROSPECT_FAIL:
+			laststatusstyle = failstyle[count % 2]
+			status = "FAIL"
+		elif details["status"] & RETROSPECT_WARNING:
+			laststatusstyle = warningstyle[count % 2]
+			status = "WARNINGS"
+		elif status != "FAIL":
+			laststatusstyle = tablestyle[count % 2]
+			status = "OK"
+			
+		html.append('<tr style="text-align:left;%s">' % rowstyle)
+		html.append('<td>%s</td>' % name)
+		if details["lastRun"]:
+			html.append('<td style="%s"><a href="#%s">%s</a></td>' % (laststatusstyle, ("%s%s" % (name, str(details["lastRun"]))).replace(" ",""), status))
+		else:
+			html.append('<td style="%s">%s</td>' % (laststatusstyle, status))
+		if details["lastRun"]:
+			html.append('<td style="%s"><a href="#%s">%s</a></td>' % (laststatusstyle, ("%s%s" % (name, str(details["lastRun"]))).replace(" ",""), details["lastRun"]))
+		else:
+			html.append('<td style="%s">none found</td>' % laststatusstyle)
+		if details["lastSuccess"]:
+			html.append('<td><a href="#%s">%s</a></td>' % (("%s%s" % (name, str(details["lastSuccess"]))).replace(" ",""), details["lastSuccess"]))
+		else:
+			html.append('<td>none found</td>')
+		html.append('</tr>')
+		count += 1
+	html.append("</table>")
+	return html
