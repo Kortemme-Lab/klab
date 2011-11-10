@@ -2481,6 +2481,8 @@ var MaxMultiplePointMutations = %d;
         #todo : Change this based on if not(settings["LiveWebserver"]) rather than albana
         if self.server_shortname == 'albana':
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
+            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
+
         
         
         html +="""

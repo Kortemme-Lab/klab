@@ -4,6 +4,14 @@ TD { font-family: Arial, Helvetica, Sans-Serif; font-size: 10pt; }
 PRE { font-family: Courier; font-size: 10pt; border:1px solid black; background-color:#F6F6F6; padding:10px; }
 PRE.sequence { font-family:'courier new'; font-size:8pt; color:black; }
 
+pre.Retrospect {
+	white-space: pre-wrap;       /* css-3 */
+	white-space: -moz-pre-wrap !important;  /* Mozilla, since 1999 */
+	white-space: -pre-wrap;      /* Opera 4-6 */
+	white-space: -o-pre-wrap;    /* Opera 7 */
+	word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+
 H1 { font-family: Arial, Helvetica; font-weight: bold; font-size: 11pt;}
 H2 { font-family: Arial, Helvetica; font-weight: bold; font-size: 11pt;} 
 H1.pdb { font-family: Arial, Helvetica; font-weight: bold; font-size: 12pt;}

@@ -5,6 +5,8 @@
 # Code for the admin page
 ########################################
 
+import os, re
+import datetime
 from datetime import date
 from string import join
 import pickle
@@ -16,6 +18,7 @@ import socket
 from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
+import retrospect
 
 userColors = {}
 showHistoryForDays = 31
@@ -1175,6 +1178,157 @@ def generateJobAdminSubpage():
 	html.append('</table> </div>')
 	return html
 
+def generateRetrospectLogPage():
+	
+	html = []
+	
+	maxchars = 10 * 65536
+	logfile = "/retrospect/operations_log.utx"
+		
+	# Read from the log file
+	log, scriptsRun = retrospect.readRetrospectLog(logfile, maxchars)
+	
+	logdates = {}
+	for dt in log.keys():
+		logdates["%s-%s-%s" % (dt.year, dt.month, dt.day)] = True
+	
+	html.append('<div style="color:white;background-color:#00b5f9;text-align:center"><hr><hr><h1>Retrospect</h1><hr><hr></div>')
+			
+	html.append("<div>")
+	html.append("	<table style='margin-left: auto;margin-right: auto;'><tr><td><div style='text-align:center'><b>Summary</b></div>")
+	html.append("		<table style='text-align:center;border:1px solid black;margin-left: auto;margin-right: auto;'>") # Start summary table
+	html.append('			<tr><td colspan="4" style="text-align:center"><hl></td></tr>')
+	html.append('			<tr style="font-weight:bold;background-color:#cccccc;text-align:center"><td>Script</td><td>Last status</td><td>Last run</td><td>Last success</td></tr>')
+	tablestyle = ['background-color:#33dd33;', 'background-color:#33ff33;']
+	warningstyle = ['background-color:#EA8737;', 'background-color:#f5b767;']
+	failstyle = ['background-color:#dd3333;', 'background-color:#ff3333;']
+	count = 0
+	
+	expectedScriptLastSuccess = {}
+	for es in retrospect.expectedScripts:
+		expectedScriptLastSuccess[es[0]] = es[1]
+	expectedScriptsNames = expectedScriptLastSuccess.keys()
+	
+	for name, details in sorted(scriptsRun.iteritems()):
+		status = None
+		
+		rowstyle = tablestyle[count % 2]
+		if details["lastSuccess"] and (name in expectedScriptLastSuccess.keys()):
+			td = (datetime.datetime.today() - details["lastSuccess"])
+			days = td.days + (float(td.seconds) / float(60 * 60 * 24))
+			if (days > expectedScriptLastSuccess[name] + 1.5): # Allow two days of grace period before indicating failure
+				rowstyle = failstyle[count % 2]		 
+		else:
+			rowstyle = failstyle[count % 2]
+			status = "FAIL"
+		#
+		if details["status"] & retrospect.RETROSPECT_FAIL:
+			laststatusstyle = failstyle[count % 2]
+			status = "FAIL"
+		elif details["status"] & retrospect.RETROSPECT_WARNING:
+			laststatusstyle = warningstyle[count % 2]
+			status = "WARNINGS"
+		elif status != "FAIL":
+			laststatusstyle = tablestyle[count % 2]
+			status = "OK"
+			
+		html.append('<tr style="text-align:left;%s">' % rowstyle)
+		html.append('<td>%s</td>' % name)
+		if details["lastRun"]:
+			html.append('<td style="%s"><a href="#%s">%s</a></td>' % (laststatusstyle, ("%s%s" % (name, str(details["lastRun"]))).replace(" ",""), status))
+		else:
+			html.append('<td style="%s">%s</td>' % (laststatusstyle, status))
+		if details["lastRun"]:
+			html.append('<td><a href="#%s">%s</a></td>' % (("%s%s" % (name, str(details["lastRun"]))).replace(" ",""), details["lastRun"]))
+		else:
+			html.append('<td>none found</td>')
+		if details["lastSuccess"]:
+			html.append('<td><a href="#%s">%s</a></td>' % (("%s%s" % (name, str(details["lastSuccess"]))).replace(" ",""), details["lastSuccess"]))
+		else:
+			html.append('<td>none found</td>')
+		html.append('</tr>')
+		count += 1
+	html.append("</table></td><td width='200px'></td>") # End summary table
+	html.append("<td style='vertical-align:top;' ><div style='text-align:center'><b>Dates shown</b></div>") #
+	
+	html.append("<table style='text-align:center;border:1px solid black;margin-left: auto;margin-right: auto;'>")
+	tablestyle = ['background-color:#d0ffd0;', 'background-color:white;']
+	count = 0
+	for dt in reversed(sorted(logdates.keys())):
+		html.append('<tr><td style="%s"><a href="#%s">%s</a><br></td></tr>' % (tablestyle[count % 2], dt, dt))
+		count += 1
+	html.append("</table></td></tr></table></div><br><br>")
+	
+	oldKey = None
+	for dt, record in reversed(sorted(log.iteritems())):
+		newKey = "%s-%s-%s" % (dt.year, dt.month, dt.day)
+		if newKey != oldKey:
+			html.append('<A NAME="%s"></A><div style="color:white;background-color:#00b5f9;text-align:center"><hr><hr><h1>%s</h1><hr><hr></div>' % (newKey, newKey))
+			oldKey = newKey
+		
+		html.append('<A NAME="%s"></A>' % ("%s%s" % (record["script"], str(dt))).replace(" ",""))
+		
+		html.append('<div style="text-align:center;"><b>%s: %s</b></div>'% (record["script"], dt))
+		
+		color = ""
+		if record["status"] & retrospect.RETROSPECT_FAIL == retrospect.RETROSPECT_FAIL:
+			color = "background-color:#ffbbbb"
+		elif record["status"] & retrospect.RETROSPECT_WARNING == retrospect.RETROSPECT_WARNING:
+			color = "background-color:#f5b767"
+		elif record["status"] & retrospect.RETROSPECT_EVENT:
+			color = "background-color:#bbbbff"
+			
+		html.append('<pre style="width:900px;%s" class="Retrospect">' % color)
+		for line in record["lines"]:
+			if line[0] == retrospect.RETROSPECT_HEADER:
+				html.append('<b><font color="green">%s</font></b>' % line[1])
+			elif line[0] == retrospect.RETROSPECT_SUBHEADER:
+				html.append('<i>%s</i>' % line[1])
+			elif line[0] == retrospect.RETROSPECT_WARNING:
+				html.append('<font color="#E56717">%s</font>' % line[1])
+			elif line[0] == retrospect.RETROSPECT_FAIL:
+				html.append('<b><font color="red">%s</font></b>' % line[1])
+			elif line[0] == retrospect.RETROSPECT_UNHANDLED:
+				html.append('<b><font color="blue">%s</font></b>' % line[1])
+			else:
+				html.append(line[1])
+				
+		html.append('</pre>')
+		
+	return html
+	# Print the file contents, highlighting entry headers in green
+	for line in contents.split("\n"):
+		
+		if entryregex.match(line):
+			html.append('\n<b><font color="green">%s</font></b>' % line)
+			continue 
+		
+		outercontinue = False
+		for k, s in warningStrings.iteritems():
+			if line.find(s) != -1:
+				html.append('<font color="#E56717">%s</font>' % line)
+				outercontinue = True
+				break
+		if outercontinue:
+			continue
+
+		for k, s in errorStrings.iteritems():
+			if line.find(s) != -1:
+				html.append('<b><font color="red">%s</font></b>' % line)
+				outercontinue = True
+				break
+		if outercontinue:
+			continue
+		
+		if line.find("error -") != -1:
+			# Unhandled error
+			html.append('<b><font color="blue">%s</font></b>' % line)
+		else:
+			html.append(line)
+	html.append("</pre>")
+	#print(html)
+	return html
+
 def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 
 	global settings
@@ -1195,6 +1349,7 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 		{"name" : "jobadmin",	"desc" : "Job administration",	"fn" : generateJobAdminSubpage,		"generate" :True,	"params" : []},
 		{"name" : "webusers",	"desc" : "Website users",		"fn" : generateWebUsersSubpage,		"generate" :True,	"params" : []},
 		{"name" : "labusers",	"desc" : "Lab users",			"fn" : generateLabUsersSubpage,		"generate" :True,	"params" : []},
+		{"name" : "retrospect",	"desc" : "Backups",				"fn" : generateRetrospectLogPage,	"generate" :True,	"params" : []},
 		]
 # Create menu
 	html = []
