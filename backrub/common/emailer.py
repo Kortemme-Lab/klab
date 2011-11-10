@@ -4,7 +4,11 @@ import smtplib
 from email.MIMEMultipart import MIMEMultipart 
 from email.MIMEText import MIMEText
 
+#todo: Use better variable names here 
 default_email = "shane.oconnor@ucsf.edu"
+
+#todo: Use this list for retrospect summaries, disk usage emails, etc. 
+admin_emails = ["shane.oconnor@ucsf.edu"]
 
 def sendEmail(subject, sender, recipients, plaintext, htmltext = None, cc = None, debug = False, useMIMEMultipart = True):
 	if recipients:
