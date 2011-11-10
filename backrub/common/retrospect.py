@@ -242,6 +242,62 @@ def getFailedJobs(scriptsRun):
 	
 	return failedJobTimestamps
 
+def generateSummary(scriptsRun):
+	body = []
+	expectedScriptLastSuccess = {}
+	for es in expectedScripts:
+		expectedScriptLastSuccess[es[0]] = es[1]
+	expectedScriptsNames = expectedScriptLastSuccess.keys()
+	
+	numberOfFailed = 0
+	failedList = []
+	successList = []
+	for name, details in sorted(scriptsRun.iteritems()):
+		status = None
+		daysSinceSuccess = None
+		
+		if details["lastSuccess"] and (name in expectedScriptLastSuccess.keys()):
+			td = (datetime.datetime.today() - details["lastSuccess"])
+			daysSinceSuccess = td.days + (float(td.seconds) / float(60 * 60 * 24))
+			if (daysSinceSuccess > expectedScriptLastSuccess[name] + 1.5): # Allow two days of grace period before indicating failure
+				status = "FAILED"
+		else:
+			status = "FAILED"
+		
+		if not status:
+			if details["status"] & RETROSPECT_FAIL:
+				status = "FAILED"
+			elif details["status"] & RETROSPECT_WARNING:
+				status = "WARNINGS"
+			elif status != "FAILED":
+				status = "OK"
+		
+		
+		if status == "FAILED":
+			numberOfFailed += 1
+			if details["lastSuccess"]:
+				failedList.append("%s: Last run %s (%s), last successful run %s (%0.1f days ago)" % (name, details["lastRun"], status, details["lastSuccess"], daysSinceSuccess))
+			else:
+				failedList.append("%s: Last run %s (%s), no recent successful run." % (name, details["lastRun"], status))
+		else:
+			successList.append("%s: Last run %s (%s), last successful run %s (%0.1f days ago)" % (name, details["lastRun"], status, details["lastSuccess"], daysSinceSuccess))
+	
+	body = []
+	if failedList:
+		body.append("FAILED JOBS")
+		body.append("***********")
+		for j in failedList:
+			body.append(j)
+		body.append("\n")
+	if successList:
+		body.append("SUCCESSFUL JOBS")
+		body.append("***************")
+		for j in successList:
+			body.append(j)
+	
+	return body, failedList
+	
+
 def generateSummaryHTMLTable(scriptsRun):
 	html = []
 	html.append("<table style='text-align:center;border:1px solid black;margin-left: auto;margin-right: auto;'>\n") # Start summary table
