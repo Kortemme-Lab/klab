@@ -208,7 +208,7 @@ def readRetrospectLog(logfile, maxchars):
 	scriptsRead = set(scriptsRun.keys())
 	scriptsMaintained = set([es[0] for es in expectedScripts])
 	missingScripts = list(scriptsRead.difference(scriptsMaintained).union(scriptsMaintained.difference(scriptsRead)))
-	for t in ['Restore', 'Grooming', 'Engine start', 'Rebuild']:
+	for t in ['Restore', 'Grooming', 'Engine start', 'Rebuild', 'Retrieve Snapshot']:
 		if t in missingScripts:
 			missingScripts.remove(t)
 			del scriptsRun[t]
