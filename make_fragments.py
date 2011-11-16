@@ -19,8 +19,14 @@ ERRCODE_OLDRESULTS = 3
 ERRCODE_CONFIG = 4
 ERRCODE_NOOUTPUT = 5
 ERRCODE_JOBFAILED = 6
+errcode = 0
 
-cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -noporter -id %(pdbid)s%(chain)s %(fasta)s'
+# The location of the text file containing the names of the configuration scripts
+configurationFilesLocation = "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
+
+# The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
+cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -id %(pdbid)s%(chain)s %(fasta)s'
+
 template ='''
 #!/bin/csh	    
 #$ -N %(jobname)s 
@@ -60,9 +66,10 @@ echo "</output>"
 echo "<enddate>"
 date
 echo "</enddate>"
-
+%(qstatstats)s
 echo "</make_fragments>"
 '''
+class FastaException(Exception): pass
 
 class LogFile(object):
 	
@@ -109,7 +116,7 @@ class colorprinter(object):
 
 	@staticmethod
 	def warning(s):
-		print('\033[91m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+		print('\033[93m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
 	
 	@staticmethod
 	def prompt(s = None):
@@ -125,12 +132,12 @@ class colorprinter(object):
 # Globals
 logfile = LogFile("make_fragments_destinations.txt")
 clusterJobName = "fragment_generation"
-errcode = 0
 
 def getUsername():
 	return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
 
 def parseArgs():
+	global errcode
 	errors = []
 	pdbpattern = re.compile("^\w{4}$")
 	description = ["Example 1 (minimal): make_fragments.py -d results -f /path/to/1CYO.fasta.txt"]
@@ -168,16 +175,20 @@ def parseArgs():
 		if not(options.check.isdigit()):
 			errors.append("Please enter a valid job identifier.")
 		else:
-			if not qstat(options.check):
-				# The job has finished. Check the output file.
-				jobID = int(options.check)
-				joblist = logfile.readFromLogfile()
-				if not joblist.get(jobID):
+			# The job has finished. Check the output file.
+			jobID = int(options.check)
+			joblist = logfile.readFromLogfile()
+			jobIsRunning = qstat(int(options.check))
+			if not joblist.get(jobID):
+				if not jobIsRunning:
 					errors.append("Job %d is not running but also has no entry in the logfile %s." % (jobID, logfile.getName()))
 				else:
-					global clusterJobName
-					cname = clusterJobName
-					dir = joblist[jobID]["Directory"]
+					errors.append("Job %d is running but has no entry in the logfile %s." % (jobID, logfile.getName()))
+			else:
+				global clusterJobName
+				cname = clusterJobName
+				dir = joblist[jobID]["Directory"]
+				if not jobIsRunning:
 					outputfile = os.path.join(dir, "%(cname)s.o%(jobID)d" % vars())
 					if os.path.exists(outputfile):
 						F = open(outputfile, "r")
@@ -186,13 +197,15 @@ def parseArgs():
 						success = re.compile('''Done!\s*</output>\s*<enddate>(.*?)</enddate>\s*</make_fragments>\s*$''', re.DOTALL)
 						match = success.search(contents)
 						if match:
-							colorprinter.message("Job %d finished successfully on %s." % (jobID, match.groups(1)[0].strip()))	
+							colorprinter.message("Job %d finished successfully on %s. Results are in %s." % (jobID, match.groups(1)[0].strip(), dir))	
 						else:
-							errors.append("Job %d has finished running but was not successful." % jobID)
+							errors.append("Job %d has finished running but was not successful. Results are in %s." % (jobID, dir))
 							errcode = ERRCODE_JOBFAILED
 					else:
-							errors.append("The output file %s associated with job %d could not be found." % (outputfile, jobID))
+							errors.append("The output file %s associated with job %d could not be found. Searched in %s." % (outputfile, jobID, dir))
 							errcode = ERRCODE_NOOUTPUT
+				else:
+					colorprinter.warning("Job %d is still running. Results are being stored in %s." % (jobID, dir))	
 					
 	validOptions = options.qstat or options.check
 		
@@ -346,15 +359,15 @@ def parseArgs():
 		sys.exit(ERRCODE_ARGUMENTS)
 	
 	return {
-		"user"		: username,
-		"outpath"	: outpath,
-		"pdbid"		: options.pdbid,
-		"chain"		: options.chain,
-		"fasta"		: options.fasta,
-		"jobname"	: clusterJobName,
+		"user"			: username,
+		"outpath"		: outpath,
+		"pdbid"			: options.pdbid,
+		"chain"			: options.chain,
+		"fasta"			: options.fasta,
+		"jobname"		: clusterJobName,
+		"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.   
 		}
 
-class FastaException(Exception): pass
 def parseFASTA(fastafile): 
 	F = open(fastafile, "r")
 	fasta = F.readlines()
@@ -391,18 +404,28 @@ def parseFASTA(fastafile):
 	return records
 
 def qstat(jobID = None):
-	""" Returns a table of jobs run by the user."""
+	"""If jobID is an integer then return False if the job has finished and True if it is still running.
+	   Otherwise, returns a table of jobs run by the user."""
 	
 	joblist = logfile.readFromLogfile()
 	
 	if jobID and type(jobID) == type(1):
-		command = ['qstat', jobID]
+		command = ['qstat', '-j', str(jobID)]
 	else:
 		command = ['qstat']
-	output = subprocess.Popen(command, stdout=subprocess.PIPE).communicate()[0]
+	
+	processoutput = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+	output = processoutput[0] 
+	serror = processoutput[1] 
 	# Form command
-	output = output.strip().split("\n")
 	jobs = {}
+	if type(jobID) == type(1):
+		if serror.find("Following jobs do not exist") != -1:
+			return False
+		else:
+			return True
+	
+	output = output.strip().split("\n")
 	if len(output) > 2:
 		for line in output[2:]:
 			# We assume that our script names contain no spaces for the parsing below to work (this should be ensured by ClusterTask) 
@@ -504,11 +527,13 @@ def searchConfigurationFiles(findstr, replacestr = None):
 	'''This function could be used to find and replace paths in the configuration files.
 		At present, it only finds phrases.'''
 		
-	F = open("make_fragments_confs.txt", "r")
+	F = open(configurationFilesLocation, "r")
+	lines = F.readlines()
+	F.close()
 	allerrors = {}
 	alloutput = {}
 	
-	for line in F.readlines():
+	for line in lines:
 		line = line.strip()
 		if line:
 			if line.endswith("make_fragments.py"):
