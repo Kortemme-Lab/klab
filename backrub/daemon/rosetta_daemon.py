@@ -1519,6 +1519,8 @@ class ddGDaemon(RosettaDaemon):
 	pidfile			= settings["ddGPID"]
 	
 	def __init__(self, stdout, stderr):
+		
+		super(RosettaDaemon, self).__init__(self.pidfile, settings, stdout = stdout, stderr = stderr)
 		self.configure()
 		self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
 		self.sgec = SGEConnection()
@@ -1575,6 +1577,7 @@ class ddGDaemon(RosettaDaemon):
 		results = []
 		try: # 	TODO: check if try in old function
 			results = self.DBConnection.execInnoDBQuery(query, parameters, cursorClass)
+			
 		except Exception, e:
 			self.log("%s." % e)
 			self.log(traceback.format_exc())
@@ -1667,7 +1670,8 @@ class ddGDaemon(RosettaDaemon):
 			self.runningJobs.remove(cj)
 	
 	def restartJobs(self):
-		results = self.runSQL('SELECT ID from Prediction WHERE AdminCommand="restart" ORDER BY Date', cursorClass = rosettadb.DictCursor)
+		results = self.runSQL('SELECT ID from Prediction WHERE AdminCommand="restart" ORDER BY EntryDate', cursorClass = rosettadb.DictCursor)
+		self.log(results)
 		for result in results:
 			jobID = result["ID"]
 			self.runSQL('UPDATE Prediction SET AdminCommand=NULL, Errors=Null, Status="queued" WHERE ID=%s', parameters = (jobID,))
@@ -1865,288 +1869,300 @@ class ddGDaemon(RosettaDaemon):
 
 
 class BackendProtocols(WebserverProtocols):
-      
-    def __init__(self, rosettaDaemon):
-        super(BackendProtocols, self).__init__()
-        
-        protocolGroups = self.protocolGroups
-        protocols = self.protocols
-        
-        # Add backend specific information
-        removelist = []
-        for p in protocols:
-            if p.dbname == "point_mutation":
-                p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
-            elif p.dbname == "multiple_mutation":
-                p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
-            elif p.dbname == "no_mutation":
-                p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
-            elif p.dbname == "ensemble":
-                p.setBackendFunctions(rosettaDaemon.StartEnsemble, rosettaDaemon.CheckEnsemble, rosettaDaemon.EndEnsemble)
-            else:
-                removelist.append(p)
-        
-        # Prune the protocols list
-        for rp in removelist:
-            protocols.remove(rp)
+
+	def __init__(self, rosettaDaemon):
+		super(BackendProtocols, self).__init__()
+		
+		protocolGroups = self.protocolGroups
+		protocols = self.protocols
+		
+		# Add backend specific information
+		removelist = []
+		for p in protocols:
+			if p.dbname == "point_mutation":
+				p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
+			elif p.dbname == "multiple_mutation":
+				p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
+			elif p.dbname == "no_mutation":
+				p.setBackendFunctions(rosettaDaemon.StartMutations, rosettaDaemon.CheckMutations, rosettaDaemon.EndMutations)
+			elif p.dbname == "ensemble":
+				p.setBackendFunctions(rosettaDaemon.StartEnsemble, rosettaDaemon.CheckEnsemble, rosettaDaemon.EndEnsemble)
+			else:
+				removelist.append(p)
+		
+		# Prune the protocols list
+		for rp in removelist:
+			protocols.remove(rp)
 
 class ClusterProtocols(WebserverProtocols):
-      
-    def __init__(self, clusterDaemon):
-        super(ClusterProtocols, self).__init__()
-        
-        protocolGroups = self.protocolGroups
-        protocols = self.protocols
-        
-        # Add backend specific information
-        removelist = []
-        whitelist = ["sequence_tolerance", "sequence_tolerance_SK", "multi_sequence_tolerance"]
-        for p in protocols:
-            if p.dbname not in whitelist:
-                removelist.append(p)
-        
-        # Prune the protocols list
-        for rp in removelist:
-            protocols.remove(rp)
-                
+	
+	def __init__(self, clusterDaemon):
+		super(ClusterProtocols, self).__init__()
+		
+		protocolGroups = self.protocolGroups
+		protocols = self.protocols
+		
+		# Add backend specific information
+		removelist = []
+		whitelist = ["sequence_tolerance", "sequence_tolerance_SK", "multi_sequence_tolerance"]
+		for p in protocols:
+			if p.dbname not in whitelist:
+				removelist.append(p)
+		
+		# Prune the protocols list
+		for rp in removelist:
+			protocols.remove(rp)
+				
 if __name__ == "__main__":
-    temppath = os.path.join(settings["BaseDir"], 'temp')
-    
-    printUsageString = True
-    if len(sys.argv) > 1:
-        if len(sys.argv) == 2:
-            daemon = RosettaDaemon(os.path.join(temppath, 'running.log'), os.path.join(temppath, 'running.log'))
-            printUsageString = False
-            if 'start' == sys.argv[1]:
-                daemon.start()
-            elif 'stop' == sys.argv[1]:
-                daemon.stop()
-            elif 'restart' == sys.argv[1]:
-                daemon.restart()
-            else:
-                printUsageString = True
-        elif 'db' == sys.argv[1]:
-            #todo: separate out the db functions from RosettaDaemon
-            daemon = RosettaDaemon(os.path.join(temppath, 'dbrunning.log'), os.path.join(temppath, 'dbrunning.log'))
-            if 'rehash' == sys.argv[2]:
-                daemon.dbrehash()
-            elif 'convert' == sys.argv[2]:
-                daemon.dbconvert()
-            elif 'check' == sys.argv[2]:
-                daemon.dbcheck()
-            elif ('dumppdb' == sys.argv[2]):
-                if len(sys.argv) > 3:
-                    filename = None
-                    if len(sys.argv) > 4:
-                        filename = sys.argv[4]
-                    daemon.dbdumpPDB(int(sys.argv[3]), filename)
-                else:
-                    print("Format: python rosetta_daemon.py db dumppdb <jobnumber> [optional filename]")
-            else:
-                print "Unknown command to db"
-                sys.exit(2)
-            sys.exit(0)
-        elif 'cluster' == sys.argv[1]:
-            daemon = ClusterDaemon(os.path.join(temppath, 'qb3running.log'), os.path.join(temppath, 'qb3running.log'))
-            
-            #daemon = ClusterDaemon('/dev/stdout','/dev/stderr')
-            if 'start' == sys.argv[2]:
-                daemon.start()
-            elif 'stop' == sys.argv[2]:
-                daemon.stop()
-            elif 'restart' == sys.argv[2]:
-                daemon.restart()
-            else:
-                print "Unknown command to cluster"
-                sys.exit(2)
-            sys.exit(0)
-        elif 'test' == sys.argv[1]:
-            UserID = 106
-            inputDirectory = os.path.join(settings["BaseDir"], "test")
-            if 'db' == sys.argv[2] and sys.argv[3]:
-                UserID = 25
-                Email = "test@bob.co"
-                ProtocolParameters = {}
-                pdb_filename = '3QDO.pdb'
-                output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
-                pdbfile = output_handle.read()
-                output_handle.close()
-                IP = '127.0.0.1'
-                hostname = 'albana'
-                nos = '10'
-                keep_output = 1
-                
-                print("Adding a new sequence tolerance (SK) job:")
-                JobName = "3QDO (Job 1957)"
-                mini = 'seqtolJMB'
-                modus = "sequence_tolerance_SK"
-                ProtocolParameters = {
-                    "kT"                : 0.228,
-                    "Partners"          : ["A", "B"],
-                    "Weights"           : [0.4, 0.4, 0.4, 1.0],
-                    "Premutated"        : {"A": {}, "B" : {}},
-                    "Designed"          : {"A": {}, "B" : {203 : True, 204 : True, 205 : True, 206 : True, 207 : True, 208 : True}}
-                }
-                ProtocolParameters = pickle.dumps(ProtocolParameters)
-                
-                try: 
-                    import random
-                    import md5
-                    
-                    db_numTries            = 32
-                    DBConnection = rosettadb.RosettaDB(settings, numTries = db_numTries)
-                    
-                    lockstr = "backrub WRITE, Users READ"         
-                    DBConnection.execQuery("LOCK TABLES %s" % lockstr)
-                    try:
-                        query = """INSERT INTO backrub ( Status, cryptID, Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
-                                    VALUES (2, "shanetest", NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)           
-                        result = DBConnection.execQuery(query)
-                        query = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
-                        result = DBConnection.execQuery(query)
-                        ID = result[0][0]
-                        print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
-                    except Exception, e: 
-                        print("Error.\n%s\n%s" % (e, traceback.format_exc()))
-                        DBConnection.execQuery("UNLOCK TABLES")
-                        sys.exit(1)
-                    DBConnection.execQuery("UNLOCK TABLES")
+	temppath = os.path.join(settings["BaseDir"], 'temp')
+	
+	printUsageString = True
+	if len(sys.argv) > 1:
+		if len(sys.argv) == 2:
+			daemon = RosettaDaemon(os.path.join(temppath, 'running.log'), os.path.join(temppath, 'running.log'))
+			printUsageString = False
+			if 'start' == sys.argv[1]:
+				daemon.start()
+			elif 'stop' == sys.argv[1]:
+				daemon.stop()
+			elif 'restart' == sys.argv[1]:
+				daemon.restart()
+			else:
+				printUsageString = True
+		elif 'db' == sys.argv[1]:
+			#todo: separate out the db functions from RosettaDaemon
+			daemon = RosettaDaemon(os.path.join(temppath, 'dbrunning.log'), os.path.join(temppath, 'dbrunning.log'))
+			if 'rehash' == sys.argv[2]:
+				daemon.dbrehash()
+			elif 'convert' == sys.argv[2]:
+				daemon.dbconvert()
+			elif 'check' == sys.argv[2]:
+				daemon.dbcheck()
+			elif ('dumppdb' == sys.argv[2]):
+				if len(sys.argv) > 3:
+					filename = None
+					if len(sys.argv) > 4:
+						filename = sys.argv[4]
+					daemon.dbdumpPDB(int(sys.argv[3]), filename)
+				else:
+					print("Format: python rosetta_daemon.py db dumppdb <jobnumber> [optional filename]")
+			else:
+				print "Unknown command to db"
+				sys.exit(2)
+			sys.exit(0)
+		elif 'cluster' == sys.argv[1]:
+			daemon = ClusterDaemon(os.path.join(temppath, 'qb3running.log'), os.path.join(temppath, 'qb3running.log'))
+			
+			#daemon = ClusterDaemon('/dev/stdout','/dev/stderr')
+			if 'start' == sys.argv[2]:
+				daemon.start()
+			elif 'stop' == sys.argv[2]:
+				daemon.stop()
+			elif 'restart' == sys.argv[2]:
+				daemon.restart()
+			else:
+				print "Unknown command to cluster"
+				sys.exit(2)
+			sys.exit(0)
+		elif 'ddg' == sys.argv[1]:
+			daemon = ddGDaemon(os.path.join(temppath, 'ddgrunning.log'), os.path.join(temppath, 'ddgrunning.log'))
+			if 'start' == sys.argv[2]:
+				daemon.start()
+			elif 'stop' == sys.argv[2]:
+				daemon.stop()
+			elif 'restart' == sys.argv[2]:
+				daemon.restart()
+			else:
+				print "Unknown command to cluster"
+				sys.exit(2)
+			sys.exit(0)
+		elif 'test' == sys.argv[1]:
+			UserID = 106
+			inputDirectory = os.path.join(settings["BaseDir"], "test")
+			if 'db' == sys.argv[2] and sys.argv[3]:
+				UserID = 25
+				Email = "test@bob.co"
+				ProtocolParameters = {}
+				pdb_filename = '3QDO.pdb'
+				output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
+				pdbfile = output_handle.read()
+				output_handle.close()
+				IP = '127.0.0.1'
+				hostname = 'albana'
+				nos = '10'
+				keep_output = 1
+				
+				print("Adding a new sequence tolerance (SK) job:")
+				JobName = "3QDO (Job 1957)"
+				mini = 'seqtolJMB'
+				modus = "sequence_tolerance_SK"
+				ProtocolParameters = {
+					"kT"				: 0.228,
+					"Partners"		  : ["A", "B"],
+					"Weights"		   : [0.4, 0.4, 0.4, 1.0],
+					"Premutated"		: {"A": {}, "B" : {}},
+					"Designed"		  : {"A": {}, "B" : {203 : True, 204 : True, 205 : True, 206 : True, 207 : True, 208 : True}}
+				}
+				ProtocolParameters = pickle.dumps(ProtocolParameters)
+				
+				try: 
+					import random
+					import md5
+					
+					db_numTries			= 32
+					DBConnection = rosettadb.RosettaDB(settings, numTries = db_numTries)
+					
+					lockstr = "backrub WRITE, Users READ"		 
+					DBConnection.execQuery("LOCK TABLES %s" % lockstr)
+					try:
+						query = """INSERT INTO backrub ( Status, cryptID, Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
+									VALUES (2, "shanetest", NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters)		   
+						result = DBConnection.execQuery(query)
+						query = """SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName)
+						result = DBConnection.execQuery(query)
+						ID = result[0][0]
+						print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
+					except Exception, e: 
+						print("Error.\n%s\n%s" % (e, traceback.format_exc()))
+						DBConnection.execQuery("UNLOCK TABLES")
+						sys.exit(1)
+					DBConnection.execQuery("UNLOCK TABLES")
 
-                except Exception, e:
-                    print("Error.\n%s" % e)
-                    sys.exit(1)
-                print("Success")
-                sys.exit(0)
-                    # success
-            
-            daemon = ClusterDaemon(os.path.join(temppath, 'testrunning.log'), os.path.join(temppath, 'testrunning.log'))    
-            if 'remove' == sys.argv[2] and sys.argv[3]: 
-                try: 
-                    print("Removing job %s:" % sys.argv[3])
-                    jobID = int(sys.argv[3])
-                    sql = "SELECT ID, Notes FROM %s WHERE ID=%d AND UserID=%d" % (daemon.db_table, jobID, UserID)
-                    results = daemon.runSQL(sql)
-                    if not results:
-                        print("Job not found.")
-                        sys.exit(2)
-                    print("Deleting jobs: %s" % results)
-                    time.sleep(5)    
-                    sql = "DELETE FROM %s WHERE ID=%d AND UserID=%d" % (daemon.db_table, jobID, UserID)    
-                    results = daemon.runSQL(sql)
-                    if results:
-                        print(results)
-                    print("\tSuccessful removal.")
-                except Exception, e:
-                    print("\tError: %s\n%s" % (str(e), traceback.print_exc())) 
-                    print("\tFailed.")
-                    sys.exit(2)
-            
-            if 'add' == sys.argv[2]:
-                JobName = "Cluster test"
-                pdb_filename = '1MDY_mod.pdb'
-                output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
-                pdbfile = output_handle.read()
-                output_handle.close()
-                IP = '127.0.0.1'
-                hostname = 'albana'
-                keep_output = 1
-                nos = None
-                
-                ProtocolParameters = {}
-                if 'cm1' == sys.argv[3]:
-                    pdb_filename = '3QDO.pdb'
-                    output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
-                    pdbfile = output_handle.read()
-                    output_handle.close()
-                    nos = '100'
-                
-                    print("Adding a new sequence tolerance (SK) job:")
-                    JobName = "3QDO (Job 1957)"
-                    mini = 'seqtolJMB'
-                    modus = "sequence_tolerance_SK"
-                    ProtocolParameters = {
-                        "kT"                : 0.228,
-                        "Partners"          : ["A", "B"],
-                        "Weights"           : [0.4, 0.4, 0.4, 1.0],
-                        "Premutated"        : {},
-                        "Designed"          : {"B" : [203, 204, 205, 206, 207, 208]}
-                    }
-                if 'cm2' == sys.argv[3]:
-                    pdb_filename = '3QE1.pdb'
-                    output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
-                    pdbfile = output_handle.read()
-                    output_handle.close()
-                    nos = '100'
-                
-                    print("Adding a new sequence tolerance (SK) job:")
-                    JobName = "3QE1 (Job 1958)"
-                    mini = 'seqtolJMB'
-                    modus = "sequence_tolerance_SK"
-                    ProtocolParameters = {
-                        "kT"                : 0.228,
-                        "Partners"          : ["A", "B"],
-                        "Weights"           : [0.4, 0.4, 0.4, 1.0],
-                        "Premutated"        : {},
-                        "Designed"          : {"B" : [201, 202, 203, 204, 205, 206]}
-                    }
-                if 'sk' == sys.argv[3]:
-                    print("Adding a new sequence tolerance (SK) job:")
-                    mini = 'seqtolJMB'
-                    modus = "sequence_tolerance_SK"
-                    nos = '2'
-                    ProtocolParameters = {
-                        "kT"                : 0.228,
-                        "Partners"          : ["A", "B"],
-                        "Weights"           : [0.4, 0.4, 0.4, 1.0],
-                        "Premutated"        : {"A" : {102 : "A"}},
-                        "Designed"          : {"A" : {103 : True, 104 : True}}
-                    }
-                elif 'hk' == sys.argv[3]:
-                    pdb_filename = 'hktest.pdb'
-                    output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
-                    pdbfile = output_handle.read()
-                    output_handle.close()
-                    nos = '2'
-                    
-                    print("Adding a new sequence tolerance (HK) job:")
-                    mini = 'seqtolHK'
-                    modus = "sequence_tolerance"
-                    ProtocolParameters = {
-                        "Partners"          : ["A", "B"],
-                        "Designed"          : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]}, # todo: Test when "A" not defined
-                    }
-                ProtocolParameters = pickle.dumps(ProtocolParameters)
-                
-                try: 
-                    import random
-                    import md5
-                    print(UserID)
-                    daemon.runSQL("""INSERT INTO %s ( Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
-                                VALUES (NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))           
-                    result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))
-                    ID = result[0][0]
-                    print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
-                    # create a unique key as name for directories from the ID, for the case we need to hide the results
-                    # do not just use the ID but also a random sequence
-                    tgb = str(ID) + 'flo' + string.join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
-                    cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
-                    return_vals = (cryptID, "new")
-                    sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
-                    result = daemon.runSQL(sql)
-                    # success
-                    
-                    #livejobs = daemon.runSQL("SELECT Date,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
-                    livejobs = daemon.runSQL("SELECT ID, Status, Notes FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
-                    print(livejobs)
-                
-                    print("Success.")
-                except Exception, e:
-                    print("\tError: %s\n%s" % (str(e), traceback.print_exc())) 
-                    print("Failed.")
-                    sys.exit(2)
-            sys.exit(0)
-        
-    if printUsageString:
-        print "usage: %s start|stop|restart|cluster start|cluster stop|cluster restart|db check|db rehash|db convert|test add [sk|hk]|test remove <id>" % sys.argv[0]
-    sys.exit(2)
+				except Exception, e:
+					print("Error.\n%s" % e)
+					sys.exit(1)
+				print("Success")
+				sys.exit(0)
+					# success
+			
+			daemon = ClusterDaemon(os.path.join(temppath, 'testrunning.log'), os.path.join(temppath, 'testrunning.log'))	
+			if 'remove' == sys.argv[2] and sys.argv[3]: 
+				try: 
+					print("Removing job %s:" % sys.argv[3])
+					jobID = int(sys.argv[3])
+					sql = "SELECT ID, Notes FROM %s WHERE ID=%d AND UserID=%d" % (daemon.db_table, jobID, UserID)
+					results = daemon.runSQL(sql)
+					if not results:
+						print("Job not found.")
+						sys.exit(2)
+					print("Deleting jobs: %s" % results)
+					time.sleep(5)	
+					sql = "DELETE FROM %s WHERE ID=%d AND UserID=%d" % (daemon.db_table, jobID, UserID)	
+					results = daemon.runSQL(sql)
+					if results:
+						print(results)
+					print("\tSuccessful removal.")
+				except Exception, e:
+					print("\tError: %s\n%s" % (str(e), traceback.print_exc())) 
+					print("\tFailed.")
+					sys.exit(2)
+			
+			if 'add' == sys.argv[2]:
+				JobName = "Cluster test"
+				pdb_filename = '1MDY_mod.pdb'
+				output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
+				pdbfile = output_handle.read()
+				output_handle.close()
+				IP = '127.0.0.1'
+				hostname = 'albana'
+				keep_output = 1
+				nos = None
+				
+				ProtocolParameters = {}
+				if 'cm1' == sys.argv[3]:
+					pdb_filename = '3QDO.pdb'
+					output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
+					pdbfile = output_handle.read()
+					output_handle.close()
+					nos = '100'
+				
+					print("Adding a new sequence tolerance (SK) job:")
+					JobName = "3QDO (Job 1957)"
+					mini = 'seqtolJMB'
+					modus = "sequence_tolerance_SK"
+					ProtocolParameters = {
+						"kT"				: 0.228,
+						"Partners"		  : ["A", "B"],
+						"Weights"		   : [0.4, 0.4, 0.4, 1.0],
+						"Premutated"		: {},
+						"Designed"		  : {"B" : [203, 204, 205, 206, 207, 208]}
+					}
+				if 'cm2' == sys.argv[3]:
+					pdb_filename = '3QE1.pdb'
+					output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
+					pdbfile = output_handle.read()
+					output_handle.close()
+					nos = '100'
+				
+					print("Adding a new sequence tolerance (SK) job:")
+					JobName = "3QE1 (Job 1958)"
+					mini = 'seqtolJMB'
+					modus = "sequence_tolerance_SK"
+					ProtocolParameters = {
+						"kT"				: 0.228,
+						"Partners"		  : ["A", "B"],
+						"Weights"		   : [0.4, 0.4, 0.4, 1.0],
+						"Premutated"		: {},
+						"Designed"		  : {"B" : [201, 202, 203, 204, 205, 206]}
+					}
+				if 'sk' == sys.argv[3]:
+					print("Adding a new sequence tolerance (SK) job:")
+					mini = 'seqtolJMB'
+					modus = "sequence_tolerance_SK"
+					nos = '2'
+					ProtocolParameters = {
+						"kT"				: 0.228,
+						"Partners"		  : ["A", "B"],
+						"Weights"		   : [0.4, 0.4, 0.4, 1.0],
+						"Premutated"		: {"A" : {102 : "A"}},
+						"Designed"		  : {"A" : {103 : True, 104 : True}}
+					}
+				elif 'hk' == sys.argv[3]:
+					pdb_filename = 'hktest.pdb'
+					output_handle = open(os.path.join(inputDirectory, pdb_filename), 'r')
+					pdbfile = output_handle.read()
+					output_handle.close()
+					nos = '2'
+					
+					print("Adding a new sequence tolerance (HK) job:")
+					mini = 'seqtolHK'
+					modus = "sequence_tolerance"
+					ProtocolParameters = {
+						"Partners"		  : ["A", "B"],
+						"Designed"		  : {"A" : [], "B" : [145, 147, 148, 150, 152, 153]}, # todo: Test when "A" not defined
+					}
+				ProtocolParameters = pickle.dumps(ProtocolParameters)
+				
+				try: 
+					import random
+					import md5
+					print(UserID)
+					daemon.runSQL("""INSERT INTO %s ( Date,hashkey,BackrubServer,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters) 
+								VALUES (NOW(), "0", "albana", "shaneoconnor@ucsf.edu","%d","%s","%s","%s","%s","%s","%s","%s","%s","%s","%s")""" % (daemon.db_table, UserID, JobName, pdbfile, pdb_filename, IP, hostname, mini, nos, keep_output, modus, ProtocolParameters))		   
+					result = daemon.runSQL("""SELECT ID FROM backrub WHERE UserID="%s" AND Notes="%s" ORDER BY Date DESC""" % (UserID , JobName))
+					ID = result[0][0]
+					print("\tTest job created with PDB %s and ID #%s" % (pdb_filename, str(ID)))
+					# create a unique key as name for directories from the ID, for the case we need to hide the results
+					# do not just use the ID but also a random sequence
+					tgb = str(ID) + 'flo' + string.join(random.sample('0123456789abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6), '') #feel free to subsitute your own name here ;)
+					cryptID = md5.new(tgb.encode('utf-8')).hexdigest()
+					return_vals = (cryptID, "new")
+					sql = 'UPDATE backrub SET cryptID="%s" WHERE ID="%s"' % (cryptID, ID)
+					result = daemon.runSQL(sql)
+					# success
+					
+					#livejobs = daemon.runSQL("SELECT Date,hashkey,Email,UserID,Notes, PDBComplex,PDBComplexFile,IPAddress,Host,Mini,EnsembleSize,KeepOutput,task, ProtocolParameters FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
+					livejobs = daemon.runSQL("SELECT ID, Status, Notes FROM %s WHERE UserID=%d and (%s) ORDER BY Date" % (daemon.db_table, UserID, daemon.SQLJobSelectString))
+					print(livejobs)
+				
+					print("Success.")
+				except Exception, e:
+					print("\tError: %s\n%s" % (str(e), traceback.print_exc())) 
+					print("Failed.")
+					sys.exit(2)
+			sys.exit(0)
+		
+	if printUsageString:
+		print "usage: %s start|stop|restart|cluster start|cluster stop|cluster restart|db check|db rehash|db convert|test add [sk|hk]|test remove <id>" % sys.argv[0]
+	sys.exit(2)
 

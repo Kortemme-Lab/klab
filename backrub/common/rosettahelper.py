@@ -173,10 +173,15 @@ class WebsiteSettings(object):
             settings["CookieExpiration"] = 60 * 60
         if not settings.get("ClusterDownloadDir"):
             settings["ClusterDownloadDir"] = os.path.join(base_dir, "downloads")
+        if not settings.get("ClusterDownloadDir"):
+            settings["ClusterDownloadDir"] = os.path.join(base_dir, "ddgdownloads")
         if not settings.get("ClusterRemoteDownloadDir"):
             settings["ClusterRemoteDownloadDir"] = os.path.join(base_dir, "remotedownloads")
         if not settings.get("ClusterTemp"):
             settings["ClusterTemp"] = os.path.join(base_dir, "temp", "cluster")
+        if not settings.get("ddGTemp"):
+            settings["ddGTemp"] = os.path.join(base_dir, "temp", "ddG")
+        settings["ClusterddGDir"] = None
 
     def _getSourceRoot(self, scriptfilename):
         fe = scriptfilename.find("frontend")
@@ -186,6 +191,9 @@ class WebsiteSettings(object):
         if be != -1:
             return scriptfilename[:be]
         raise Exception("Cannot determine source root for %s." % scriptfilename)
+
+    def __setitem__(self, index, value):
+        self.settings[index] = value
 
     def __getitem__(self, index):
         return self.settings[index]

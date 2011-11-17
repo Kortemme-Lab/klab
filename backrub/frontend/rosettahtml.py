@@ -1289,6 +1289,24 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             Please also check for <a href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">current announcements</a>. 
                     </P>""" % refIDs)
         
+        # Add a news box here where the news is read from the database. Black text for messages, dark red for warnings.
+        if False:
+            html.append("""
+            <div id="news_box_good">
+                <P style="text-align:center; color:black;">The JMB sequence tolerance protocol is back online. If you submitted any jobs as a guest user, they have been rerun and successfully completed.</P>
+            </div>
+            <br>
+            <br>
+            """)        
+        if False:
+        	html.append("""
+        	<div id="news_box_warning">
+        		<P style="text-align:center; color:black;">We are currently debugging a crash which occasionally occurs in the JMB version of the sequence tolerance protocol. Please use the PLoS ONE version in the interim if possible.</P>
+        	</div>
+        	<br>
+        	<br>
+        	""")
+        
         html.append("""
                   <div id="login_box">
                     <form name="loginform" method="post" action="%s">

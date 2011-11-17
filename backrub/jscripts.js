@@ -130,6 +130,8 @@ function startup(query)
 	else if (query == "index" || query == "login") 
     {
 		Nifty("div#login_box","big transparent fixed-height");
+		//todo: test this on the testserver to conditionally change div and use the same logic above to fix JS errors alert(document.getElementsByName("news_box_good"));
+		//Nifty("div#news_box_good","big transparent fixed-height");
     }
 	else if (query == "queue" ) 
     {

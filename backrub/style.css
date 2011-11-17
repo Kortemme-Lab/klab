@@ -78,6 +78,8 @@ table.jmoltable td:first-child+td { text-align: center; }
 table.jmoltable td:first-child+td+td { text-align: center; }
 		
 div#box{float:right; width: 440px; padding: 20px; margin:0px auto; color:#000; }
+div#news_box_good{float:center; width: 600px; padding: 5px; margin:0px auto; color:#000; background-color:#66CC66; }
+div#news_box_warning{float:center; width: 600px; padding: 5px; margin:0px auto; color:#000; background-color:#CC3333; }
 div#login_box{float:center; width: 600px; padding: 20px; margin:0px auto; color:#000; background-color:#DCE9F4; }
 div#queue_bg{float:center; width: 700px; padding: 20px; margin:0px auto; color:#000; background-color:#EEEEEE; }
 div#jobinfo{float:center; width: 850px; padding: 20px; margin:0px auto; color:#000; background-color:#EEEEFF; }

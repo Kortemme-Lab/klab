@@ -15,6 +15,7 @@ else:
     settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
     
 server_root = settings["BaseDir"]
+cluster_ddGdir = settings["ClusterddGDir"]
 cluster_dldir = settings["ClusterDownloadDir"]
 cluster_remotedldir = settings["ClusterRemoteDownloadDir"]
 cluster_temp = settings["ClusterTemp"]

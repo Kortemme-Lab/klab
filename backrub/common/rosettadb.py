@@ -49,20 +49,19 @@ class RosettaDB:
     def close(self):
         self.connection.close()
         
-    def __init__(self, settings, numTries = 1, host = None, db = None, admin = False):
-        if not host:
-            host = settings["SQLHost"]
-        if not db:
-            db = settings["SQLDatabase"]
-        passwd_ = settings["SQLPassword"]
-        self.connection = MySQLdb.Connection(host           = host,
-                                             db             = db,
-                                             user           = settings["SQLUser"],
-                                             passwd         = passwd_,
+    def __init__(self, settings, numTries = 1, host = None, db = None, user = None, passwd = None):
+        self.connection = MySQLdb.Connection(host           = host or settings["SQLHost"],
+                                             db             = db or settings["SQLDatabase"],
+                                             user           = user or settings["SQLUser"],
+                                             passwd         = passwd or settings["SQLPassword"],
                                              port           = settings["SQLPort"],
                                              unix_socket    = settings["SQLSocket"])
         self.store_time = settings["StoreTime"]
         self.numTries = numTries
+        self.lastrowid = None
+    
+    def getLastRowID(self):
+        return self.lastrowid
                                                      
     def getData4ID(self, tablename, ID):
         """get the whole row from the database and store it in a dict"""
@@ -151,24 +150,58 @@ class RosettaDB:
         """
         pass    
     
-    
-    def execQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor):
-        """execute SQL query"""
-        # Note: This loop was always disabled!
+    def callproc(self, procname, parameters = (), cursorClass = MySQLdb.cursors.DictCursor, quiet = False):
+        """Calls a MySQL stored procedure procname. This uses DictCursor by default."""
         i = 0
         errcode = 0
         caughte = None
         while i < self.numTries:
+            i += 1
+            try:    
+                cursor = self.connection.cursor(cursorClass)
+                if type(parameters) != type(()):
+                    parameters = (parameters,)
+                errcode = cursor.callproc(procname, parameters)
+                results = cursor.fetchall()
+                self.lastrowid = int(cursor.lastrowid)
+                cursor.close()
+                return results
+            except MySQLdb.OperationalError, e:
+                errcode = e[0]
+                self.connection.ping()
+                caughte = e
+                continue
+            except:                
+                traceback.print_exc()
+                break
+        
+        if not quiet:
+            sys.stderr.write("\nSQL execution error call stored procedure %s at %s:" % (procname, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+            sys.stderr.flush()
+        raise MySQLdb.OperationalError(caughte)
+    
+    def execInnoDBQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor):
+    	self.connection.ping(True)
+    	return self.execQuery(sql, parameters, cursorClass, InnoDB = True)
+    	
+    def execQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor, InnoDB = False):
+        """Execute SQL query."""
+        i = 0
+        errcode = 0
+        caughte = None
+        while i < self.numTries:
+            i += 1
             try:    
                 cursor = self.connection.cursor(cursorClass)
                 if parameters:
                     errcode = cursor.execute(sql, parameters)
                 else:
                     errcode = cursor.execute(sql)
-                #@debug:
-                #if errcode != 1:
-                #    print("%d: %s" %(errcode,traceback.print_stack()))
+                if InnoDB:
+               	    self.connection.commit()
                 results = cursor.fetchall()
+                self.lastrowid = int(cursor.lastrowid)
                 cursor.close()
                 return results
             except MySQLdb.OperationalError, e:
