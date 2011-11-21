@@ -24,7 +24,7 @@ import ClusterTask
 import SimpleProfiler
 from Graph import JITGraph
 
-from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755
+from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775
          
 todo='''
     We allow directed acylic graphs, not necessarily strongly connected.
