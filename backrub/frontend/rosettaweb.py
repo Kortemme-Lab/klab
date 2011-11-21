@@ -1189,9 +1189,15 @@ def submit(rosettaHTML, form, SID):
                     for r in result:
                         if str(r[0]) != str(ID): # if there is ANOTHER, FINISHED simulation with the same hash
                             if isLocalJob:
-                                shutil.copytree(os.path.join(settings["DownloadDir"], r[1]), os.path.join(settings["DownloadDir"], cryptID)) # copy the data to a new directory
+                                oldResultsDirectory = os.path.join(settings["DownloadDir"], r[1])
+                                if not os.path.exists(oldResultsDirectory):
+                                    break
+                                shutil.copytree(oldResultsDirectory, os.path.join(settings["DownloadDir"], cryptID)) # copy the data to a new directory
                             else:
-                                shutil.copytree(os.path.join(settings["RemoteDownloadDir"], r[1]), os.path.join(settings["RemoteDownloadDir"], cryptID)) # copy the data to a new directory
+                                oldResultsDirectory = os.path.join(settings["RemoteDownloadDir"], r[1])
+                                if not os.path.exists(oldResultsDirectory):
+                                    break
+                                shutil.copytree(oldResultsDirectory, os.path.join(settings["RemoteDownloadDir"], cryptID)) # copy the data to a new directory
                             sql = 'UPDATE backrub SET Status="2", StartDate=NOW(), EndDate=NOW(), PDBComplexFile="%s" WHERE ID="%s"' % (r[2], ID) # save the new/old filename and the simulation "end" time.
                             result = StorageDBConnection.execQuery(sql)
                             return_vals = (cryptID, "old", isLocalJob)
