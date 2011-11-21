@@ -30,7 +30,10 @@ colors = {
 rainbow_ = ['blue', 'green', 'yellow', 'orange', 'red', 'purple', 'lightblue']
 rasta_ = ['red', 'yellow', 'green']
 
-def write(s, color = 'white', bgcolor = 'black', suffix = "", effect = None):
+def flush():
+	sys.stdout.flush()
+
+def make(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None):
 	bgcolor = bgcolor or 'black' # Handier than optional arguments when using compound calls
 	color = color or 'white' # Handier than optional arguments when using compound calls
 	colorcode, dark = colors.get(color, EMPTY_TUPLE)
@@ -46,17 +49,23 @@ def write(s, color = 'white', bgcolor = 'black', suffix = "", effect = None):
 			if not bgdark:
 				bgcolorcode += 60
 			bgcolor = "\033[%sm" % bgcolorcode
-		sys.stdout.write('%s\033[%sm%s%s%s' % (bgcolor, colorcode, s, COLOR_OFF, suffix))
+		return '%s\033[%sm%s%s%s' % (bgcolor, colorcode, s, COLOR_OFF, suffix)
 	else:
-		sys.stdout.write('%s%s' % (s, suffix))
+		return '%s%s' % (s, suffix)
 
-def printf(s, color = 'white', bgcolor = None, suffix = "", effect = None):
-	write(s, color = color, bgcolor = bgcolor, suffix = "%s\n" % suffix, effect = effect)
+def write(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None):
+	sys.stdout.write(make(s, color = color, bgcolor = bgcolor, suffix = suffix, effect = effect))
+
+def printf(s, color = 'silver', bgcolor = None, suffix = "", effect = None):
+	sys.stdout.write(make(s, color = color, bgcolor = bgcolor, suffix = "%s\n" % suffix, effect = effect))
 
 def bar(bgcolor, length, suffix = None):
 	str = " " * length
 	write(str, bgcolor = bgcolor, suffix = suffix)
 	
+def make_error(s):
+	return make(s, color='red')
+
 def error(s, suffix = "\n"):
 	write(s, color = 'red', suffix = suffix)
 	
@@ -78,6 +87,12 @@ def rainbowprint(s, bgcolor = None, suffix = "\n", effect = None, rainbow = rain
 
 def rastaprint(s, bgcolor = None, suffix = "\n", effect = None):
 	rainbowprint(s, bgcolor = bgcolor, suffix = suffix, effect = effect, rainbow = rasta_)
+
+class Exception(Exception): 	
+	def __init__(self, msg):
+		self.message = make_error(msg)
+	def __str__(self):
+		return self.message
 
 if __name__ == "__main__":
 	# Test

@@ -9,6 +9,7 @@ import string
 import UserDict
 import spatialhash
 import chainsequence
+import math
 from Bio.PDB import PDBParser
         
 #todo: replace with ROSETTAWEB_SK_AA
@@ -38,6 +39,43 @@ records = ["HEADER","OBSLTE","TITLE","SPLIT","CAVEAT","COMPND","SOURCE","KEYWDS"
            "MTRIX1","MTRIX2","MTRIX3","MODEL","ATOM","ANISOU","TER","HETATM",
            "ENDMDL","CONECT","MASTER","END"]
 
+def ChainResidueID2String(chain, residueID):
+    '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier
+       spaced as in the PDB format.'''
+    if residueID.isdigit():
+        return "%s%s " % (chain, residueID.rjust(4))
+    else:
+        return "%s%s" % (chain, residueID.rjust(5))
+
+def checkPDBAgainstMutations(pdbID, pdb, mutations):
+    resID2AA = pdb.ProperResidueIDToAAMap()
+    badmutations = []
+    for m in mutations:
+        wildtype = resID2AA.get(ChainResidueID2String(m[0], m[1]), "")
+        if m[2] != wildtype:
+            badmutations.append("%s%s:%s->%s" % (m[0], m[1], m[2], m[3]))
+    if badmutations:
+        raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (string.join(badmutations, ", "), pdbID))
+
+def computeMeanAndStandardDeviation(values):
+    sum = 0
+    n = len(values)
+    
+    for v in values:
+        sum += v
+    
+    mean = sum / n
+    sumsqdiff = 0
+    
+    for v in values:
+        t = (v - mean)
+        sumsqdiff += t * t
+    
+    variance = sumsqdiff / n
+    stddev = math.sqrt(variance)
+    
+    return mean, stddev, variance
+   
 class PDB:
     """A class to store and manipulate PDB data"""
   
@@ -142,11 +180,25 @@ class PDB:
             if line[21:22] == chain and resid == line[22:27]:
                 return line
         raise Exception("Could not find the ATOM/HETATM line corresponding to chain '%(chain)s' and residue '%(resid)s'." % vars())	
-        
+    
+    def remapMutations(self, mutations):
+        '''Takes in a list of (Chain, ResidueID, WildtypeAA, MutantAA) mutation tuples and returns the remapped
+           mutations based on the ddGResmap (which must be previously instantiated).
+           This function checks that the mutated positions exist and that the wild-type matches the PDB.
+        '''
+        remappedMutations = []
+        ddGResmap = self.get_ddGResmap()
+        for m in mutations:
+            ns = (ChainResidueID2String(m[0], str(ddGResmap['ATOM-%s' % ChainResidueID2String(m[0], m[1])])))
+            remappedMutations.append((ns[0], ns[1:].strip(), m[2], m[3])) 
+        checkPDBAgainstMutations("?", self, mutations)
+        return remappedMutations
+
     def stripForDDG(self, chains = True, keepHETATM = False):
         '''Strips a PDB to ATOM lines. If keepHETATM is True then also retain HETATM lines.
            By default all PDB chains are kept. The chains parameter should be True or a list.
            In the latter case, only those chains in the list are kept.
+           Unoccupied ATOM lines are discarded.
            This function also builds maps from PDB numbering to Rosetta numbering and vice versa.
            '''
         resmap = {}
@@ -229,7 +281,66 @@ class PDB:
                 resid_list.append(resid)
         
         return resid_list # format: "A 123" or: '%s%4.i' % (chain,resid)
-    
+
+    def ComputeBFactors(self):
+        '''This reads in all ATOM lines and compute the mean and standard deviation of each
+           residue's bfactors. It returns a table of the mean and standard deviation per
+           residue as well as the mean and standard deviation over all residues with each
+           residue having equal weighting.
+           
+           Whether the atom is occupied or not is not taken into account.'''
+           
+        # Read in the list of bfactors for each ATOM line.
+        bfactors = {}
+        old_residueID = None
+        for line in self.lines:
+            if line[0:4] == "ATOM":
+                residueID = line[21:27]
+                if residueID != old_residueID:
+                    bfactors[residueID] = []
+                    old_residueID = residueID
+                bfactors[residueID].append(float(line[60:66]))
+        
+        # Compute the mean and standard deviation for the list of bfactors of each residue
+        BFPerResidue = {}
+        MeanPerResidue = []
+        for residueID, bfactorlist in bfactors.iteritems():
+            mean, stddev, variance = computeMeanAndStandardDeviation(bfactorlist)
+            BFPerResidue[residueID] = (mean, stddev)
+            MeanPerResidue.append(mean)
+        TotalAverage, TotalStandardDeviation, variance = computeMeanAndStandardDeviation(MeanPerResidue)
+        
+        return {"_description" : "First tuple element is average, second is standard deviation",
+                "Total"        : (TotalAverage, TotalStandardDeviation),
+                "PerResidue"    : BFPerResidue}
+        
+    def CheckForPresenceOf(self, reslist):
+        '''This checks whether residues in reslist exist in the ATOM lines. 
+           It returns a list of the residues in reslist which did exist.'''
+        if type(reslist) == type(""):
+            reslist = [reslist]
+                
+        foundRes = {}
+        for line in self.lines:
+            resname = line[17:20]
+            if line[0:4] == "ATOM":
+                if resname in reslist:
+                    foundRes[resname] = True
+        
+        return foundRes.keys()
+
+    def ProperResidueIDToAAMap(self):
+        '''This fixes the odd behaviour of aa_resid2type by including the insertion code.
+           Returns a dictionary mapping residue IDs (Chain, residue number, insertion code) to the
+           corresponding one-letter amino acid.'''
+
+        resid2type = {}
+        for line in self.lines:
+            resname = line[17:20]
+            if line[0:4] == "ATOM" and resname in residues and line[13:16] == 'CA ':
+                resid2type[line[21:27]] = aa1[resname]
+        return resid2type 
+       
         
     def aa_resid2type(self):
         '''this creates a dictionary where the resid "A 123" is mapped to the one-letter aa type'''
@@ -330,6 +441,9 @@ class PDB:
             x+=1
         return map_res_id
     
+    def GetAllATOMLines(self):
+    	return [line for line in self.lines if line[0:4] == "ATOM"]
+		
     def atomlines(self, resid_list = None):
     
         if resid_list == None:
