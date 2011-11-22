@@ -42,10 +42,15 @@ records = ["HEADER","OBSLTE","TITLE","SPLIT","CAVEAT","COMPND","SOURCE","KEYWDS"
 def ChainResidueID2String(chain, residueID):
     '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier
        spaced as in the PDB format.'''
+    return "%s%s" % (chain, ResidueID2String(residueID))
+
+def ResidueID2String(residueID):
+    '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier
+       spaced as in the PDB format.'''
     if residueID.isdigit():
-        return "%s%s " % (chain, residueID.rjust(4))
+        return "%s " % (residueID.rjust(4))
     else:
-        return "%s%s" % (chain, residueID.rjust(5))
+        return "%s" % (residueID.rjust(5))
 
 def checkPDBAgainstMutations(pdbID, pdb, mutations):
     resID2AA = pdb.ProperResidueIDToAAMap()
@@ -181,7 +186,7 @@ class PDB:
                 return line
         raise Exception("Could not find the ATOM/HETATM line corresponding to chain '%(chain)s' and residue '%(resid)s'." % vars())	
     
-    def remapMutations(self, mutations):
+    def remapMutations(self, mutations, pdbID = '?'):
         '''Takes in a list of (Chain, ResidueID, WildtypeAA, MutantAA) mutation tuples and returns the remapped
            mutations based on the ddGResmap (which must be previously instantiated).
            This function checks that the mutated positions exist and that the wild-type matches the PDB.
@@ -191,7 +196,7 @@ class PDB:
         for m in mutations:
             ns = (ChainResidueID2String(m[0], str(ddGResmap['ATOM-%s' % ChainResidueID2String(m[0], m[1])])))
             remappedMutations.append((ns[0], ns[1:].strip(), m[2], m[3])) 
-        checkPDBAgainstMutations("?", self, mutations)
+        checkPDBAgainstMutations(pdbID, self, remappedMutations)
         return remappedMutations
 
     def stripForDDG(self, chains = True, keepHETATM = False):
