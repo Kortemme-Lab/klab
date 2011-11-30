@@ -147,13 +147,15 @@ class FieldNames(dict):
 		self.StrippedPDB = "StrippedPDB"
 		self.InputFiles = "InputFiles"
 		self.Description = "Description"
+		self.ShortDescription = "ShortDescription"
 		self.EntryDate = "EntryDate"
 		self.StartDate = "StartDate"
 		self.EndDate = "EndDate"
 		self.CryptID = "cryptID"
 		self.Status = "Status"
 		self.Errors = "Errors"
-		self.AdminCommand = "AdminCommand" 
+		self.AdminCommand = "AdminCommand"
+		self.ExtraParameters = "ExtraParameters" 
 
 	def __getitem__(self, key):
 		return self.__dict__[key]
@@ -630,13 +632,14 @@ class ddGDatabase(object):
 	chainErrors = {}
 	chainWarnings= {}
 	
-	def __init__(self):
-		if os.path.exists("pw"):
-			F = open("pw")
-			passwd = F.read().strip()
-			F.close()
-		else:
-			passwd = getpass.getpass("Enter password to connect to MySQL database:")
+	def __init__(self, passwd = None):
+		if not passwd:
+			if os.path.exists("pw"):
+				F = open("pw")
+				passwd = F.read().strip()
+				F.close()
+			else:
+				passwd = getpass.getpass("Enter password to connect to MySQL database:")
 		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddG", user = "kortemmelab", passwd = passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
 		self.numTries = 32
 		self.lastrowid = None
@@ -908,6 +911,26 @@ class DatabasePrimer(object):
 				"Database_SVN_URL"				:	"https://svn.rosettacommons.org/source/trunk/minirosetta_database",
 			})))
 
+		Tools.append(('Rosetta', 'r32231', 32231,
+			pickle.dumps({
+				"FirstBranchRevision"			:	None,
+				"Branch_SVN_URL"				:	None,
+				"SourceSVNRevision"				:	32231,
+				"Source_SVN_URL"				:	"https://svn.rosettacommons.org/source/trunk/mini",
+				"DatabaseSVNRevisionInTrunk"	:	32231,
+				"Database_SVN_URL"				:	"https://svn.rosettacommons.org/source/trunk/minirosetta_database",
+			})))
+
+		Tools.append(('Rosetta', 'r32257', 32257,
+			pickle.dumps({
+				"FirstBranchRevision"			:	None,
+				"Branch_SVN_URL"				:	None,
+				"SourceSVNRevision"				:	32257,
+				"Source_SVN_URL"				:	"https://svn.rosettacommons.org/source/trunk/mini",
+				"DatabaseSVNRevisionInTrunk"	:	32257,
+				"Database_SVN_URL"				:	"https://svn.rosettacommons.org/source/trunk/minirosetta_database",
+			})))
+
 		Tools.append(('Rosetta', '3.1', 32528,
 			pickle.dumps({
 				"FirstBranchRevision"			:	30467,
@@ -1038,7 +1061,92 @@ class DatabasePrimer(object):
 		for aa in aas:
 			SQL = 'INSERT INTO AminoAcids (Code, LongCode, Name, Polarity, Size) VALUES (%s, %s, %s, %s, %s);'
 			self.ddGdb.execute(SQL, parameters = tuple(aa))
+	
+	def insertCommands(self):
+		
+		protocols = [{} for i in range(0,21)]
+		ddgexecutable = ""
+	
+		existingCommands = self.ddGdb.execute("SELECT * FROM Command")
 
+		# KL-FB Protocols
+		
+		commonstr = [
+			'-in:file:s', '%(INPUT_PDB)s',
+			'-resfile', '%(RESFILE)s',
+			'-database', '%(DATABASE_DIR)s',
+			'-ignore_unrecognized_res',
+			'-in:file:fullatom',
+			'-constraints::cst_file', '%(CONSTRAINTS_FILE)s'
+		]
+		
+		softrep = ['-score:weights', 'soft_rep_design']
+		hardrep = ['-score:weights standard', '-score:patch score12']
+		minnohardrep = ['-ddg::minimization_scorefunction', 'standard', '-ddg::minimization_patch', 'score12']
+		
+		protocols1617 = [
+			'-ddg::weight_file', 'soft_rep_design',
+			'-ddg::iterations', '1', # todo: 50
+			'-ddg::local_opt_only', 'false',
+			'-ddg::min_cst', 'true',
+			'-ddg::mean', 'false',
+			'-ddg::min', 'true',
+			'-ddg::sc_min_only', 'false', # Backbone and sidechain minimization
+			'-ddg::ramp_repulsive', 'true', 
+			'-ddg::minimization_scorefunction', 'standard',
+			'-ddg::minimization_patch', 'score12'
+		]
+		
+		protocols[16] = {
+			FieldNames_.Type : "CommandLine",
+			FieldNames_.Command : {
+				"Preminimization" : {
+					"BinaryRevision" : ("Rosetta", "3.3"),
+					"DatabaseRevision" : ("Rosetta", "3.3"),
+					'args' : [
+						'%(BIN_DIR)s/minimize_with_cst.static.linuxgccrelease',
+						'-in:file:l', '%(INPUT_PDB_LIST)s',
+						'-in:file:fullatom',
+						'-ignore_unrecognized_res',
+						'-fa_max_dis', '9.0',
+						'-database', '%(DATABASE_DIR)s',
+						'-ddg::harmonic_ca_tether', '0.5',
+						'-score:weights', 'standard',
+						'-ddg::constraint_weight','1.0',
+						'-ddg::out_pdb_prefix', 'min_cst_0.5',
+						'-ddg::sc_min_only', 'false',
+						'-score:patch', 'score12'
+					]
+				},
+				"ddG" : {
+					"BinaryRevision" : ("Rosetta", "r32231"),
+					"DatabaseRevision" : ("Rosetta", "r32257"),
+					'args' : ['%(BIN_DIR)s/fix_bb_monomer_ddg.linuxgccrelease'] + commonstr + softrep +  protocols1617
+				}
+			},
+			FieldNames_.Description : "Protocol 16 from Kellogg, Leaver-Fay, and Baker",
+			FieldNames_.ShortDescription : "Kellogg:p16:32231"
+		}
+		
+		for newc in protocols:
+			if newc:
+				addthis = True
+				for c in existingCommands:
+					ed = pickle.loads(c[FieldNames_.Command])
+					if c[FieldNames_.Type] == newc[FieldNames_.Type] and ed == newc[FieldNames_.Command]:
+						# Already exists, do not add a new record
+						if c[FieldNames_.Description] != newc[FieldNames_.Description]:
+							# todo:
+							print("Need to add code to update description.")
+						addthis = False
+						break
+				if addthis:
+					print("Inserting", newc)
+					newc[FieldNames_.Command] = pickle.dumps(newc[FieldNames_.Command])
+					self.ddGdb.insertDict('Command', newc)
+		
+
+	
 if __name__ == "__main__":
 	ddGdb = ddGDatabase()
 	primer = DatabasePrimer(ddGdb)
@@ -1046,5 +1154,6 @@ if __name__ == "__main__":
 	#primer.computeBFactors()
 	#print("Removing all data")
 	#primer.deleteAllExperimentalData()
-	primer.insertTools()
+	primer.insertCommands()
+	#primer.insertTools()
 	
