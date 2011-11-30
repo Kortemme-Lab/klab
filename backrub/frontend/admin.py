@@ -1386,38 +1386,6 @@ def generateRetrospectLogPage():
 		html.append('</pre>')
 		
 	return html, []
-	# Print the file contents, highlighting entry headers in green
-	for line in contents.split("\n"):
-		
-		if entryregex.match(line):
-			html.append('\n<b><font color="green">%s</font></b>' % line)
-			continue 
-		
-		outercontinue = False
-		for k, s in warningStrings.iteritems():
-			if line.find(s) != -1:
-				html.append('<font color="#E56717">%s</font>' % line)
-				outercontinue = True
-				break
-		if outercontinue:
-			continue
-
-		for k, s in errorStrings.iteritems():
-			if line.find(s) != -1:
-				html.append('<b><font color="red">%s</font></b>' % line)
-				outercontinue = True
-				break
-		if outercontinue:
-			continue
-		
-		if line.find("error -") != -1:
-			# Unhandled error
-			html.append('<b><font color="blue">%s</font></b>' % line)
-		else:
-			html.append(line)
-	html.append("</pre>")
-	#print(html)
-	return html, []
 
 def generateWebserverStatsSubpage():
 	html = []
