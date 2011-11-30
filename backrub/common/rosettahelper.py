@@ -13,6 +13,7 @@ import re
 import string
 import stat
 import tempfile
+import colorsys
 
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
@@ -112,6 +113,24 @@ class RosettaError(Exception):
         self.ID = ID
     def __str__(self):
         return repr(self.ID + ' ' + self.task)
+
+def saturateHexColor(hexcolor, adjustment = 1.0):
+	'''Takes in an RGB color in 6-character hexadecimal with an optional preceding hash character.
+	   Returns the RGB color in the same format adjusted by saturation by the second parameter.'''
+	assert(adjustment >= 0 and len(hexcolor) >= 1)
+	prefix = ""
+	if hexcolor[0] == '#':
+		hexcolor = hexcolor[1:]
+		prefix = "#"
+	assert(len(hexcolor) == 6)
+	
+	if adjustment == 1.0:
+		return "%s%s" % (prefix, hexcolor)
+	else:
+		hsvColor = list(colorsys.rgb_to_hsv(int(hexcolor[0:2], 16)/255.0, int(hexcolor[2:4], 16)/255.0, int(hexcolor[4:6], 16)/255.0))
+		hsvColor[1] = min(1.0, hsvColor[1] * adjustment)
+		rgbColor = [min(255, 255 * v) for v in colorsys.hsv_to_rgb(hsvColor[0], hsvColor[1], hsvColor[2])]
+		return "%s%.2x%.2x%.2x" % (prefix, rgbColor[0], rgbColor[1], rgbColor[2]) 
 
 class WebsiteSettings(object):
     settings = {}

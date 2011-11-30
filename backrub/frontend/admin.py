@@ -15,11 +15,13 @@ from sys import maxint
 import rosettadb
 import calendar
 import socket
-from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES
+from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, saturateHexColor
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
 import retrospect
-
+from RosettaProtocols import WebserverProtocols
+#from cStringIO import StringIO
+	
 userColors = {}
 showHistoryForDays = 31
 
@@ -43,7 +45,7 @@ def initGoogleCharts(chartfnlist):
             <script type="text/javascript">
             
             // Load the Visualization API and the piechart package.
-            google.load('visualization', '1', {'packages':['corechart', 'gauge']});
+            google.load('visualization', '1', {'packages':['corechart', 'gauge', 'geochart']});
             </script>
 
             <script type="text/javascript">
@@ -109,6 +111,150 @@ function %(fnname)s() {
             html.append('''<td id="GroupUsageChart%s"></td>''' % userdir)
     html.append('''</tr></table>''')
     return title, html, chartsfns  
+
+def webstatsSuccessFailure(stats):
+	# Return values
+	title = "Success/Failure rate"
+	html = []
+	fnname = "drawStatsSuccessFailure"
+	chartsfns = [fnname]
+		
+	mkeys = sorted(stats.keys())[-12:]
+	c = len(mkeys)
+	html.append('''
+	<script type="text/javascript">
+	function %(fnname)s() {''' % vars())
+	
+	if c:
+		html.append('''
+		// Create our data table.
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Month');
+		data.addColumn('number', 'Failure');
+		data.addColumn('number', 'Success');
+		data.addRows([''' % vars())
+		
+		for k in mkeys:
+			v = stats[k]
+			key = map(int, k.split("-"))
+			dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+			html.append('''["%s", %d, %d],''' % (dt, v.get("failed", 0), v.get("successful", 0))) 
+		html.append(''']);
+		
+		// Instantiate and draw our chart, passing in some options.
+		var chart = new google.visualization.ColumnChart(document.getElementById('webstatsSuccessFailureChart'));
+		seriesstyle = {0:{color: 'red'}, 1:{color: 'green'}}
+		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle});
+		''')
+	html.append('''
+	}
+	</script>
+	''')
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span>''' % vars())
+	html.append('''<div id="webstatsSuccessFailureChart"></div>''')
+	
+	return title, html, chartsfns
+
+def webstatsJobsByProtocol(stats):
+	# Return values
+	title = "Jobs by protocol"
+	html = []
+	fnname = "drawStatsJobsByProtocol"
+	chartsfns = [fnname]
+	protocols = ["Point/multiple mutation", "Backrub Ensemble", "Backrub Ensemble Design", "Sequence Tolerance (Elisabeth)", "Sequence Tolerance (Colin)"]
+	
+	protocolGroups = WebserverProtocols().getProtocols()[0]
+	seriesColors = [
+		saturateHexColor(protocolGroups[0].color, 2),
+		saturateHexColor(protocolGroups[1].color, 1.5),
+		saturateHexColor(protocolGroups[1].color, 3.5),
+		saturateHexColor(protocolGroups[2].color, 2),
+		saturateHexColor(protocolGroups[2].color, 3.5)
+	]
+	mkeys = sorted(stats.keys())[-12:]
+	c = len(mkeys)
+	html.append('''
+	<script type="text/javascript">
+	function %(fnname)s() {''' % vars())
+	
+	if c:
+		html.append('''
+		// Create our data table.
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Month');''')
+		
+		for p in protocols:
+			html.append('''		data.addColumn('number', '%s');\n''' % p)
+		
+		html.append('''		data.addRows([''')
+		
+		for k in mkeys:
+			v = stats[k]
+			key = map(int, k.split("-"))
+			dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+			html.append('''["%s", ''' % dt)
+			for p in protocols:
+				html.append('''%d,''' % v.get(p, 0))
+			html.append('''],''')
+		html.append(''']);
+		
+		// Instantiate and draw our chart, passing in some options.
+		var chart = new google.visualization.ColumnChart(document.getElementById('webstatsJobsByProtocolChart'));
+		seriesstyle = {''')
+		
+		for i in range(len(seriesColors)):
+			html.append('''%d:{color: '%s'}, ''' % (i, seriesColors[i]))
+		html.append('''}
+		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle});''')
+	html.append('''
+	}
+	</script>
+	''')
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span>''' % vars())
+	html.append('''<div id="webstatsJobsByProtocolChart"></div>''')
+	
+	return title, html, chartsfns
+
+def websiteUserGeoChart(userGeoFreqCount):
+	# Return values
+	title = "Users by country"
+	html = []
+	fnname = "drawStatsUserGeoChart"
+	chartsfns = [fnname]
+	
+	#userGeoFreqCount
+	html.append('''
+	<script type='text/javascript'>
+	var userGeoChart;
+	var userGeoData;
+	function %(fnname)s() {''' % vars())
+	if userGeoFreqCount:
+		html.append('''
+		userGeoData = new google.visualization.DataTable();
+		userGeoData.addRows(%d);
+		userGeoData.addColumn('string', 'Country');
+		userGeoData.addColumn('number', 'Popularity');\n''' % len(userGeoFreqCount))
+	
+		c = 0
+		for k, v in sorted(userGeoFreqCount.iteritems()):
+			html.append('''		userGeoData.setValue(%d, 0, '%s');\n''' % (c, k))
+			html.append('''		userGeoData.setValue(%d, 1, %s);\n''' % (c, v))
+			c += 1
+
+		width = 800
+		height = width / 1.6
+		html.append('''
+		userGeoChart = new google.visualization.GeoChart(document.getElementById('webstatsUserGeoChart'));
+		userGeoChart.draw(userGeoData, {width: %d, height: %d, colors:['#FFF8C6', 'yellow', 'orange', 'red']});''' % (width, height))
+	html.append('''
+	}
+	</script>
+	''')
+	
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span>''' % vars())
+	html.append('''<div id="webstatsUserGeoChart"></div>''')
+	
+	return title, html, chartsfns
 
 def addDriveUsageChart(DriveUsage):
     # Return values
@@ -759,10 +905,6 @@ def generateDiskStatsSubpage(quotas, usage, users):
         else:
             charthtml.extend(g[0]())
     
-    # Prepare javascript calls
-    for i in range(len(chartfns)):
-        chartfns[i] += "();"
-
     # Titles
     html.append('''<table><tr><td style="text-align:left"><div style="font-size:15pt">Statistics up to %s:</div><ol>''' % dt)
     for i in range(0, len(titles)):
@@ -778,17 +920,14 @@ def generateDiskStatsSubpage(quotas, usage, users):
                 
     html.append("</ol></td></tr></table><br><br>")
     
-    html.extend(initGoogleCharts(chartfns))
     html.extend(charthtml)
-    return html
-
-from cStringIO import StringIO
+    return html, chartfns
 
 def getKlabDBConnection():
 	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
 
 def getKortemmelabUsersConnection():
-	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab", admin = True)
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab")
 
 def getAlbanaConnection():
 	return rosettadb.RosettaDB(settings)
@@ -828,7 +967,7 @@ def generateWebUsersSubpage():
 	userlist = getWebsiteUsers()
 	html.append("""<H1 align=left > Kortemme Lab users </H1> <br>
 		<div >
-		<table  border=1 cellpadding=2 cellspacing=0 width=1200 >
+		<table border=1 cellpadding=2 cellspacing=0 width=1200 >
 		<colgroup>
 			 <col >
 			 <col width="30">
@@ -886,7 +1025,7 @@ def generateWebUsersSubpage():
 			html.append("<td>N</td>" % user)
 		html.append("</tr>")
 	html.append('</table> </div>')
-	return html
+	return html, []
 
 def generateLabUsersSubpage():
 	html = []
@@ -963,7 +1102,7 @@ def generateLabUsersSubpage():
 			
 		html.append("</tr>")
 	html.append('</table> </div>')
-	return html
+	return html, []
 
 def getJobs():
 	'''Get all jobs on the live webserver which were submitted from this server and which have not expired'''
@@ -986,7 +1125,6 @@ def getJobs():
 
 def generateJobAdminSubpage():
 	# get ip addr hostname
-	import os
 	IP = os.environ['REMOTE_ADDR']
 	hostname = IP
 	try:
@@ -1176,13 +1314,13 @@ def generateJobAdminSubpage():
 		html.append("</tr>\n")
 		link_to_job
 	html.append('</table> </div>')
-	return html
+	return html, []
 
 def generateRetrospectLogPage():
 	
 	html = []
 	
-	maxchars = 10 * 65536
+	maxchars = 25 * 65536
 	logfile = "/retrospect/operations_log.utx"
 		
 	# Read from the log file
@@ -1247,7 +1385,7 @@ def generateRetrospectLogPage():
 				
 		html.append('</pre>')
 		
-	return html
+	return html, []
 	# Print the file contents, highlighting entry headers in green
 	for line in contents.split("\n"):
 		
@@ -1279,7 +1417,194 @@ def generateRetrospectLogPage():
 			html.append(line)
 	html.append("</pre>")
 	#print(html)
-	return html
+	return html, []
+
+def generateWebserverStatsSubpage():
+	html = []
+	errors = []
+	
+	db = getKlabDBConnection()
+	stats = {}
+	# 2011 stats starting in June
+	for m in range(6,13):
+		k = "2011-%.2d" % m
+		stats[k] = {}
+	# Later stats
+	tdy = date.today()
+	for y in range(2012, tdy.year + 1):
+		for m in range(1,13):
+			k = "%d-%.2d" % (y, m)
+			stats[k] = {}
+	
+	excludestr = "BackrubServer = 'kortemmelab' AND UserID <> 84 AND UserID <> 106 AND UserID <> 120"
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND STATUS=0 or STATUS=1 or STATUS=2 GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["successful"] = r[2]
+	
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND STATUS=4 GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["failed"] = r[2]
+	
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND Task='multiple_mutation' OR Task='point_mutation' GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["Point/multiple mutation"] = r[2]
+
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND Task='no_mutation' GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["Backrub Ensemble"] = r[2]
+
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND Task='ensemble' GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["Backrub Ensemble Design"] = r[2]
+	
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND Task='sequence_tolerance' GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["Sequence Tolerance (Elisabeth)"] = r[2]
+
+	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND Task='sequence_tolerance_SK' GROUP BY YEAR(Date), MONTH(Date)" % excludestr)
+	for r in results:
+		k = "%d-%.2d" % (r[1], r[0])
+		if stats.get(k) != None:
+			stats[k]["Sequence Tolerance (Colin)"] = r[2]
+	
+	results = db.execQuery("SELECT * FROM Users ORDER BY ID", cursorClass = rosettadb.DictCursor)
+	fields = ["Address1", "Address2", "City", "State", "Zip", "Country"]
+	userGeoFreqCount = {}
+	
+	GoogleCountries = {"east timor": "TP", "samoa": "WS", "japan": "JP", "french southern territories": "TF", 
+					"tokelau": "TK", "cayman islands": "KY", "azerbaijan": "AZ", "north korea": "KP", 
+					"djibouti": "DJ", "french guiana": "GF", "malta": "MT", "guinea-bissau": "GW", 
+					"hungary": "HU", "taiwan": "TW", "cyprus": "CY", "haiti": "HT", "barbados": "BB", 
+					"eastern asia": "UN030", "bhutan": "BT", "yugoslavia": "YU", "lithuania": "LT", 
+					"congo - kinshasa": "CD", "micronesia": "UN057", "andorra": "AD", 
+					"union of soviet socialist republics": "SU", "rwanda": "RW", "aruba": "AW", 
+					"liberia": "LR", "argentina": "AR", "norway": "NO", "sierra leone": "SL", 
+					"somalia": "SO", "ghana": "GH", "falkland islands": "FK", "belarus": "BY", 
+					"saint helena": "SH", "cuba": "CU", "middle africa": "UN017", "central asia": "UN143", 
+					"french polynesia": "PF", "southern europe": "UN039", "guatemala": "GT", "isle of man": "IM",
+					"belgium": "BE", "world": "UN001", "congo - brazzaville": "CG", "southern asia": "UN034", 
+					"kazakhstan": "KZ", "burkina faso": "BF", "aland islands": "AX", "kyrgyzstan": "KG", "netherlands": "NL", "portugal": "PT", "central america": "UN013", "denmark": "DK", "philippines": "PH", "montserrat": "MS", "senegal": "SN", "moldova": "MD", "latvia": "LV", "croatia": "HR", "bosnia and herzegovina": "BA", "chad": "TD", "switzerland": "CH", "western europe": "UN155", "mali": "ML", "bulgaria": "BG", "jamaica": "JM", "albania": "AL", "angola": "AO", "colombia": "CO", "serbia and montenegro": "CS", "northern america": "UN021", "palestinian territory": "PS", "lebanon": "LB", "malaysia": "MY", "christmas island": "CX", "mozambique": "MZ", "greece": "GR", "zaire": "ZR", "nicaragua": "NI", "new zealand": "NZ", "southern africa": "UN018", "canada": "CA", "afghanistan": "AF", "qatar": "QA", "oceania": "UN009", "palau": "PW", "turkmenistan": "TM", "equatorial guinea": "GQ", "pitcairn": "PN", "guinea": "GN", "panama": "PA", "nepal": "NP", "central african republic": "CF", "luxembourg": "LU", "solomon islands": "SB", "south america": "UN005", "swaziland": "SZ", "cook islands": "CK", "tuvalu": "TV", "netherlands antilles": "AN", "namibia": "NA", "nauru": "NR", "venezuela": "VE", "australia and new zealand": "UN053", "outlying oceania": "QO", "europe": "UN150", "brunei": "BN", "iran": "IR", "british indian ocean territory": "IO", "united arab emirates": "AE", "south georgia and the south sandwich islands": "GS", "saint kitts and nevis": "KN", "sri lanka": "LK", "paraguay": "PY", "china": "CN", "armenia": "AM", "western asia": "UN145", "kiribati": "KI", "belize": "BZ", "tunisia": "TN", "ukraine": "UA", "melanesia": "UN054", "yemen": "YE", "northern mariana islands": "MP", "libya": "LY", "trinidad and tobago": "TT", "mayotte": "YT", "gambia": "GM", "finland": "FI", "macedonia": "MK", "americas": "UN019", "mauritius": "MU", "antigua and barbuda": "AG", "niue": "NU", "syria": "SY", "dominican republic": "DO", "people's democratic republic of yemen": "YD", "jersey": "JE", "burma": "BU", "pakistan": "PK", "romania": "RO", "seychelles": "SC", "metropolitan france": "FX", "czech republic": "CZ", "myanmar": "MM", "el salvador": "SV", "egypt": "EG", "neutral zone": "NT", "guam": "GU", "africa": "UN002", "papua new guinea": "PG", "wallis and futuna": "WF", "united states": "US", "austria": "AT", "greenland": "GL", "mongolia": "MN", "ivory coast": "CI", "thailand": "TH", "honduras": "HN", "niger": "NE", "fiji": "FJ", "comoros": "KM", "turkey": "TR", "united kingdom": "GB", "madagascar": "MG", "iraq": "IQ", "bangladesh": "BD", "mauritania": "MR", "eastern europe": "UN151", "bolivia": "BO", "uruguay": "UY", "france": "FR", "bahamas": "BS", "vatican": "VA", "slovakia": "SK", "gibraltar": "GI", "ireland": "IE", "laos": "LA", "british virgin islands": "VG", "south korea": "KR", "anguilla": "AI", "malawi": "MW", "ecuador": "EC", "israel": "IL", "peru": "PE", "algeria": "DZ", "serbia": "RS", "tanzania": "TZ", "puerto rico": "PR", "montenegro": "ME", "tajikistan": "TJ", "svalbard and jan mayen": "SJ", "togo": "TG", "jordan": "JO", "chile": "CL", "martinique": "MQ", "oman": "OM", "turks and caicos islands": "TC", "nigeria": "NG", "spain": "ES", "sao tome and principe": "ST", "georgia": "GE", "eastern africa": "UN014", "bouvet island": "BV", "asia": "UN142", "northern europe": "UN154", "american samoa": "AS", "polynesia": "UN061", "morocco": "MA", "sweden": "SE", "heard island and mcdonald islands": "HM", "gabon": "GA", "guyana": "GY", "western africa": "UN011", "grenada": "GD", "guadeloupe": "GP", "hong kong": "HK", "russia": "RU", "u.s. virgin islands": "VI", "cocos islands": "CC", "bahrain": "BH", "zimbabwe": "ZW", "estonia": "EE", "mexico": "MX", "reunion": "RE", "india": "IN", "new caledonia": "NC", "lesotho": "LS", "antarctica": "AQ", "australia": "AU", "saint vincent and the grenadines": "VC", "saint pierre and miquelon": "PM", "uganda": "UG", "burundi": "BI", "kenya": "KE", "macao": "MO", "botswana": "BW", "italy": "IT", "western sahara": "EH", "south africa": "ZA", "east germany": "DD", "cambodia": "KH", "ethiopia": "ET", "bermuda": "BM", "vanuatu": "VU", "marshall islands": "MH", "cameroon": "CM", "zambia": "ZM", "benin": "BJ", "brazil": "BR", "saudi arabia": "SA", "singapore": "SG", "faroe islands": "FO", "iceland": "IS", "saint lucia": "LC", "monaco": "MC", "costa rica": "CR", "united states minor outlying islands": "UM", "slovenia": "SI", "germany": "DE", "caribbean": "UN029", "san marino": "SM", "dominica": "DM", "suriname": "SR", "eritrea": "ER", "tonga": "TO", "maldives": "MV", "south-eastern asia": "UN035", "uzbekistan": "UZ", "northern africa": "UN015", "norfolk island": "NF", "poland": "PL", "indonesia": "ID", "cape verde": "CV", "sudan": "SD", "liechtenstein": "LI", "vietnam": "VN", "guernsey": "GG", "kuwait": "KW"};
+
+	countryRemap = {
+		"Iran (Islamic Republic of)" : "Iran",
+		"Russian Federation" : "Russia",
+		"Taiwan, Province of China" : "Taiwan",
+	}
+	
+	for r in results:
+		if r["UserName"] != "guest":
+			country = r["Country"]
+			if country:
+				country = countryRemap.get(country, country)
+				if not GoogleCountries.get(country.lower()):
+					print("Cannot find mapping for country %(Country)s of user %(UserName)s.<br>" % r)
+				userGeoFreqCount[country] = userGeoFreqCount.get(country, 0) + 1
+			else:
+				pass
+			
+	generators = [
+		[webstatsSuccessFailure, stats],
+		[webstatsJobsByProtocol, stats],
+		[websiteUserGeoChart, userGeoFreqCount]
+	]
+	
+	chartfns = []
+	charthtml = []
+	titles = []
+	for g in generators:
+		if len(g) > 1:
+			gtitles, ghtml, gchartfns = g[0](*g[1:])
+			titles.append(gtitles)
+			charthtml.extend(ghtml)
+			charthtml.append("<br><br>")
+			chartfns.extend(gchartfns)
+		else:
+			charthtml.extend(g[0]())
+	
+	tabtitle = "Tabular data"
+	titles.append(tabtitle)
+	
+	# Titles
+	html.append('''<table><tr><td style="text-align:left"><div style="font-size:15pt">Web site statistics:</div><ol>''')
+	for i in range(0, len(titles)):
+		title = titles[i]
+		if type(title) == type(""):
+			html.append('''<li><a href="#%s">%s</a>''' % (title, title))
+		elif type(title) == type((None,)):
+			html.append('''<li><a href="#%s">%s</a>
+						   <ol>''' % (title[0], title[0]))
+			for j in range(0, len(title[1])):
+				html.append('''<li><a href="#%s">%s</a>''' % (title[1][j], title[1][j]))
+			html.append("</ol>")
+	html.append("</ol></td></tr></table><br><br>")
+	
+	html.extend(charthtml)
+	
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(tabtitle)s"></A>%(tabtitle)s</span>''' % vars())
+	html.append("<table style='margin-left: auto; margin-right: auto;'>")
+	
+	html.append("<tr><td><i>Contact Shane if you want these in another format e.g. CSV.</i><br><br></td></tr>")
+	
+	html.append("<tr><td><div style='text-align:left;'><b>Success/Failure rate</b></div></td></tr>")
+	html.append("<tr><td><table border=1 cellpadding=2 cellspacing=0 width=260 ><tr style='background-color:#DDDDDD'>")
+	html.append("<td width='130'>Month</td><td>Success</td><td>Failure</td></tr>")
+	found = False
+	for k, v in sorted(stats.iteritems()):
+		if v.get("successful") or v.get("failed"):
+			found = True
+		if found:
+			key = map(int, k.split("-"))
+			if key[0] < 2011:
+				continue
+			elif key[0] == 2011 and key[1] <=5:
+				continue
+			dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+			html.append("<tr><td>%s</td><td>%d</td><td>%d</td></tr>" % (dt, v.get("successful", 0), v.get("failed", 0)))
+	html.append("</table>")
+	html.append("</td></tr>")
+	
+	html.append("<tr><td><br><br></td></tr>")
+	
+	html.append("<tr><td><div style='text-align:left;'><b>Jobs run by protocol</b></div></td></tr>")
+	html.append("<tr><td><table border=1 cellpadding=2 cellspacing=0 width=760 ><tr style='background-color:#DDDDDD'>")
+	html.append("<td width='130'>Month</td><td>Point/multiple Mutation</td><td>Backrub Ensemble</td><td>Backrub Ensemble Design</td><td>Sequence Tolerance (Elisabeth)</td><td>Sequence Tolerance (Colin)</td></tr>")
+	found = False
+	for k, v in sorted(stats.iteritems()):
+		key = map(int, k.split("-"))
+		if key[0] < 2011:
+			continue
+		elif key[0] == 2011 and key[1] <=5:
+			continue
+		dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+		html.append("<tr><td>%s</td><td>%d</td><td>%d</td><td>%d</td><td>%d</td><td>%d</td></tr>" % (dt, v.get("Point/multiple mutation", 0), v.get("Backrub Ensemble", 0), v.get("Backrub Ensemble Design", 0), v.get("Sequence Tolerance (Elisabeth)", 0), v.get("Sequence Tolerance (Colin)", 0)))
+	html.append("</table>")
+	html.append("</td></tr>")
+	
+	html.append("<tr><td><br><br></td></tr>")
+	
+	html.append("<tr><td><div style='text-align:left;'><b>Users by country</b></div></td></tr>")
+	html.append("<tr><td><table border=1 cellpadding=2 cellspacing=0 width=200 ><tr style='background-color:#DDDDDD'>")
+	html.append("<td width='130'>Country</td><td>#Users</td></tr>")
+	for k, v in sorted(userGeoFreqCount.items(), key=lambda x:x[1], reverse=True):
+		html.append("<tr><td>%s</td><td>%d</td></tr>" % (k, v))
+	html.append("</table>")
+	html.append("</td></tr>")
+
+	html.append("</table>")
+	
+	return html, chartfns
 
 def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 
@@ -1297,11 +1622,12 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 	
 	# Set generate to False to hide pages for quicker testing
 	subpages = [
+		{"name" : "retrospect",	"desc" : "Backups",				"fn" : generateRetrospectLogPage,	"generate" :True,	"params" : []},
 		{"name" : "diskstats",	"desc" : "Disk stats",			"fn" : generateDiskStatsSubpage,	"generate" :True,	"params" : [quotas, usage, users]},
 		{"name" : "jobadmin",	"desc" : "Job administration",	"fn" : generateJobAdminSubpage,		"generate" :True,	"params" : []},
 		{"name" : "webusers",	"desc" : "Website users",		"fn" : generateWebUsersSubpage,		"generate" :True,	"params" : []},
+		{"name" : "sitestats",	"desc" : "Website stats",		"fn" : generateWebserverStatsSubpage,"generate" :True,	"params" : []},
 		{"name" : "labusers",	"desc" : "Lab users",			"fn" : generateLabUsersSubpage,		"generate" :True,	"params" : []},
-		{"name" : "retrospect",	"desc" : "Backups",				"fn" : generateRetrospectLogPage,	"generate" :True,	"params" : []},
 		]
 # Create menu
 	html = []
@@ -1321,13 +1647,22 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 	html.append("<td align=left>")
 	
 	# Disk stats
+	gchartfns = []
 	for subpage in subpages:
 		html.append('<div style="display:none" id="%s">' % subpage["name"])
 		if subpage["generate"]:
-			html.extend(subpage["fn"](*subpage["params"]))
+			h, gcf = subpage["fn"](*subpage["params"])
+			html.extend(h)
+			gchartfns.extend(gcf)
 		html.append("</div>")
-		
+	
+	# Prepare javascript calls
+	for i in range(len(gchartfns)):
+		gchartfns[i] += "();"
+
+
 	html.append("</td>")
+	html.extend(initGoogleCharts(gchartfns))
 	html.append('''<script src="/backrub/frontend/admin.js" type="text/javascript"></script>''')
 
 	return html
