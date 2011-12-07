@@ -32,6 +32,10 @@ script_filename = None
 CurrentMembers = "Current Members"
 LabAlumni = "Lab Alumni"
 PastRotationStudents = "Past Rotation Students"
+
+#todo: Change the database records to use the enum in Users as below in UCurrentMembers 
+UCurrentMembers = "current"
+
 Unaccounted = "Unaccounted"
 LimboUsers = "Recently left"
 colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", LimboUsers : "#AAD", Unaccounted : "#EFEFEF"}
@@ -458,7 +462,7 @@ def addStorageSpaceChart(quotas, usage, users):
 		JSnousers = range(0, startindex)
 		for j in range(len(sortedUsers)):
 			username = sortedUsers[j]
-			if userstatus[username] == CurrentMembers or username in limbousers:
+			if userstatus[username] == UCurrentMembers or username in limbousers:
 				JScurrentusers.append(j + startindex)
 			else:
 				JSpastusers.append(j + startindex)
@@ -480,7 +484,7 @@ def addStorageSpaceChart(quotas, usage, users):
 		groupcolors = colorlist[0:4]
 		for i in range(len(sortedUsers)):
 			u = sortedUsers[i]
-			if userstatus[u] == CurrentMembers or u in limbousers:
+			if userstatus[u] == UCurrentMembers or u in limbousers:
 				groupcolors.append((userColors[u], 2))
 		seriesformatcurrent = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
 		seriesformatcurrent = "{%s}" % join(seriesformatcurrent,", ") 
@@ -488,7 +492,7 @@ def addStorageSpaceChart(quotas, usage, users):
 		groupcolors = colorlist[0:4]
 		for i in range(len(sortedUsers)):
 			u = sortedUsers[i]
-			if not(userstatus[u] == CurrentMembers or u in limbousers):
+			if not(userstatus[u] == UCurrentMembers or u in limbousers):
 				groupcolors.append((userColors[u], 2))
 		seriesformatpast = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
 		seriesformatpast = "{%s}" % join(seriesformatpast,", ") 
@@ -696,7 +700,7 @@ def addStorageSpaceChart(quotas, usage, users):
 		JSnousers = range(0, startindex)
 		for j in range(len(sortedUsers)):
 			username = sortedUsers[j]
-			if userstatus[username] == CurrentMembers or username in limbousers:
+			if userstatus[username] == UCurrentMembers or username in limbousers:
 				JScurrentusers.append(j + startindex)
 			else:
 				JSpastusers.append(j + startindex)
@@ -725,7 +729,7 @@ def addStorageSpaceChart(quotas, usage, users):
 			groupcolors = [colorlist[0]]
 			for i in range(len(sortedUsers)):
 				u = sortedUsers[i]
-				if userstatus[u] == CurrentMembers or u in limbousers:
+				if userstatus[u] == UCurrentMembers or u in limbousers:
 					groupcolors.append((userColors[u], 2))
 			seriesformatcurrent = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
 			seriesformatcurrent = "series:{%s}" % join(seriesformatcurrent,", ") 
@@ -733,7 +737,7 @@ def addStorageSpaceChart(quotas, usage, users):
 			groupcolors = [colorlist[1]]
 			for i in range(len(sortedUsers)):
 				u = sortedUsers[i]
-				if not(userstatus[u] == CurrentMembers or u in limbousers):
+				if not(userstatus[u] == UCurrentMembers or u in limbousers):
 					groupcolors.append((userColors[u], 2))
 			seriesformatpast = ["%d:{color: '%s', lineWidth: %d}" % (i, groupcolors[i][0], groupcolors[i][1]) for i in range(len(groupcolors))]
 			seriesformatpast = "series:{%s}" % join(seriesformatpast,", ") 
@@ -1316,74 +1320,109 @@ def generateJobAdminSubpage():
 	html.append('</table> </div>')
 	return html, []
 
+# Add this style (for word-wrap inside the pre tag) to your CSS page
+#pre.Retrospect {
+#	white-space: pre-wrap;
+#	white-space: -moz-pre-wrap !important;
+#	white-space: -pre-wrap;
+#	white-space: -o-pre-wrap;
+#	word-wrap: break-word;
+#}
 def generateRetrospectLogPage():
+	'''This function returns a HTML containing a table of the most recent runs of the expected scripts,
+		printed logs for all records read from the log file, and an index to traverse the records by date. 
+		The return value is a list of HTML strings.
+		todo: remove second return before posting.
+	'''
 	
 	html = []
-	
-	maxchars = 25 * 65536
 	logfile = "/retrospect/operations_log.utx"
 		
-	# Read from the log file
-	log, scriptsRun = retrospect.readRetrospectLog(logfile, maxchars)
+	# Read the default amount (retrospect.DEFAULT_LOG_SIZE) from the log file
+	retrospectLog = retrospect.LogReader(logfile, retrospect.expectedScripts)
+	log = retrospectLog.getLog()
 	
+	# Create a date-descending list of dates from the extracted log entries
+	# This is used to generate an hyperlinked index for quick navigation
 	logdates = {}
 	for dt in log.keys():
 		logdates["%s-%s-%s" % (dt.year, dt.month, dt.day)] = True
+	logdates = reversed(sorted(logdates.keys()))
 	
-	html.append('<div style="color:white;background-color:#00b5f9;text-align:center"><hr><hr><h1>Retrospect</h1><hr><hr></div>')
-			
+	# Retrospect header
+	html.append('<div style="color:white;background-color:#00b5f9;text-align:center"><hr><hr><h1>Retrospect</h1><hr><hr></div>')	
+	
+	# The summary table
 	html.append("<div>")
 	html.append("	<table style='margin-left: auto;margin-right: auto;'>")
 	html.append("		<tr><td>")
-	html.append("			<div style='text-align:center'><b>Summary</b></div>")
-	html.extend(retrospect.generateSummaryHTMLTable(scriptsRun))
+	html.append("			<div style='text-align:center'><b>Summary since %s</b></div>" % retrospectLog.getEarliestEntry())
+	html.extend(retrospectLog.generateSummaryHTMLTable(1.5))	# Allow 1.5 days before considering a job to have stopped. Edit this value to suit
 	html.append("			</td>")
 	html.append("			<td width='200px'></td>")
 	html.append("<td style='vertical-align:top;' ><div style='text-align:center'><b>Dates shown</b></div>") #
-	
+	# The 'dates shown' index
 	html.append("<table style='text-align:center;border:1px solid black;margin-left: auto;margin-right: auto;'>")
 	tablestyle = ['background-color:#d0ffd0;', 'background-color:white;']
 	count = 0
-	for dt in reversed(sorted(logdates.keys())):
+	for dt in logdates:
 		html.append('<tr><td style="%s"><a href="#%s">%s</a><br></td></tr>' % (tablestyle[count % 2], dt, dt))
 		count += 1
 	html.append("</table></td></tr></table></div><br><br>")
 	
+	# Add the records from the log, delimited by date
 	oldKey = None
 	for dt, record in reversed(sorted(log.iteritems())):
 		newKey = "%s-%s-%s" % (dt.year, dt.month, dt.day)
 		if newKey != oldKey:
+			# Add an anchor for the last record of the day to be linked by the 'dates shown' index table 
 			html.append('<A NAME="%s"></A><div style="color:white;background-color:#00b5f9;text-align:center"><hr><hr><h1>%s</h1><hr><hr></div>' % (newKey, newKey))
 			oldKey = newKey
 		
-		html.append('<A NAME="%s"></A>' % ("%s%s" % (record["script"], str(dt))).replace(" ",""))
+		# Create an anchor for the record so it can be linked to from the summary table
+		anchorID = retrospectLog.createAnchorID(record["script"], dt)
+		html.append("<!--RECORD-->")
+		html.append('<A NAME="%s"></A>' % anchorID)
 		
+		# Record header
 		html.append('<div style="text-align:center;"><b>%s: %s</b></div>'% (record["script"], dt))
 		
+		# Determine the color for the record 'block' 
 		color = ""
 		if record["status"] & retrospect.RETROSPECT_FAIL == retrospect.RETROSPECT_FAIL:
-			color = "background-color:#ffbbbb"
+			color = "background-color:#ffbbbb" # Pink
 		elif record["status"] & retrospect.RETROSPECT_WARNING == retrospect.RETROSPECT_WARNING:
-			color = "background-color:#f5b767"
+			color = "background-color:#f5b767" # Orange
 		elif record["status"] & retrospect.RETROSPECT_EVENT:
-			color = "background-color:#bbbbff"
-			
+			color = "background-color:#bbbbff" # Lavender
+		
+		# Add the actual record. Lines are formatted depending on their types:
+		#   Bold green for headers, italics for subheaders ('events'), orange for warnings,
+		#	bold red for errors, blue for possible errors that are not yet recognised by the log reader. 
+		# Note that the <pre> block has the class Retrospect. The CSS snippet above should be added
+		# to the CSS section/file of your webpage or else word wrapping may not function.
+		
+		while True:
+			if record["lines"] and not(record["lines"][-1][1].strip()):
+				record["lines"] = record["lines"][:-1]
+				continue
+			break
+		
 		html.append('<pre style="width:900px;%s" class="Retrospect">' % color)
 		for line in record["lines"]:
 			if line[0] == retrospect.RETROSPECT_HEADER:
-				html.append('<b><font color="green">%s</font></b>' % line[1])
+				html.append('<b><font color="green">%s</font></b>\n' % line[1].strip())
 			elif line[0] == retrospect.RETROSPECT_SUBHEADER:
 				html.append('<i>%s</i>' % line[1])
 			elif line[0] == retrospect.RETROSPECT_WARNING:
 				html.append('<font color="#E56717">%s</font>' % line[1])
 			elif line[0] == retrospect.RETROSPECT_FAIL:
 				html.append('<b><font color="red">%s</font></b>' % line[1])
-			elif line[0] == retrospect.RETROSPECT_UNHANDLED:
+			elif line[0] == retrospect.RETROSPECT_UNHANDLED_ERROR:
 				html.append('<b><font color="blue">%s</font></b>' % line[1])
 			else:
 				html.append(line[1])
-				
-		html.append('</pre>')
+		html.append('</pre>\n')
 		
 	return html, []
 

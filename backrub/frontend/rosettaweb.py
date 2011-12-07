@@ -101,10 +101,10 @@ errors = []
 warnings = []
 
 def getKlabDBConnection():
-    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")       
+    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
 
-def getLabspaceConnection():
-    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "labspace")       
+def getKortemmelabUsersConnection():
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab")
 
 def fixFilename(filename):
     
@@ -545,10 +545,9 @@ def ws():
           numberOfDays = 30
           dstart = date.fromtimestamp(time.time() - (60*60*24*numberOfDays)) 
           dend = date.today()
-          
-          quotas = getLabspaceConnection().execQuery("SELECT Date, Quotas, DriveUsage, OtherData, GroupUsage FROM Quota WHERE Date >= %s AND Date <= %s ORDER BY Date", parameters = (dstart, dend))
-          usage = getLabspaceConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
-          users = getLabspaceConnection().execQuery("SELECT * FROM Users ORDER BY Username")
+          quotas = getKortemmelabUsersConnection().execQuery("SELECT Date, Quotas, DriveUsage, OtherData, GroupUsage FROM Quota WHERE Date >= %s AND Date <= %s ORDER BY Date", parameters = (dstart, dend))
+          usage = getKortemmelabUsersConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
+          users = getKortemmelabUsersConnection().execQuery("SELECT * FROM Users ORDER BY Username")
           
           html_content = rosettaHTML.adminPage(quotas, usage, users, settings, form)
           title = 'Admin'
