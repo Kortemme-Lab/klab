@@ -25,7 +25,7 @@ def sendEmail(subject, sender, recipients, plaintext, htmltext = None, cc = None
 				raise Exception("Unexpected type for cc.")
 		recipients = join(recipients, ";")
 		
-		if useMIMEMultipart:
+		if plaintext and htmltext and useMIMEMultipart:
 			msg = MIMEMultipart('alternative')
 		else:
 			msg = email.Message.Message()
@@ -34,7 +34,7 @@ def sendEmail(subject, sender, recipients, plaintext, htmltext = None, cc = None
 		msg['From'] = sender
 		msg['To'] = recipients
 		msg['Reply-To'] = default_email
-		if useMIMEMultipart:
+		if plaintext and htmltext and useMIMEMultipart:
 			part1 = MIMEText(plaintext, 'plain')
 			part2 = MIMEText(htmltext, 'html')
 			msg.attach(part1)
