@@ -1,7 +1,7 @@
+import os
+import re
 import datetime
 import codecs
-import os, re
-
 
 # Attributes/flags for Retrospect log lines. 
 RETROSPECT_HEADER = 0
@@ -452,7 +452,8 @@ class LogReader(object):
 			if status == "STOPPED":
 				html.append('\t<td style="%s">%s</td>\n' % (failstyle[count % 2], name))
 			else:
-				html.append('\t<td>%s</td>\n' % name)
+				html.append('\t<td style="%s">%s</td>' % (tablestyle[count % 2], name))
+			
 				
 			# Last status field
 			if details["lastRun"]:
@@ -499,11 +500,11 @@ for s in []:
 # Private
 for s in ["kortemme-cd", "kortemme-fplc", "kortemme-hplc", "kortemme-spec",
 		"kortemmelab-admin", "kortemmelab-data", "kortemmelab-home",
-		"AmelieStein", "Bobal", "Kortemme", "Lab Admin",
+		"AmelieStein", "Bobal", "Kortemme", "Lab Admin", "Ming",
 		"Epona", "Ganon", "Web Server", "Workstations"]:
 	expectedScripts.add(s, SimpleScript(1))
 for s in ["kortemme-cd (offsite)", "kortemme-fplc (offsite)", "kortemme-hplc (offsite)", "kortemme-spec (offsite)",
 		"kortemmelab-alumni-data", "kortemmelab-alumni-home",
-		"Amelie (offsite)", "Bobal (offsite)", "Kortemme (offsite)", "Lab Admin (offsite)",
+		"AmelieStein (offsite)", "Bobal (offsite)", "Kortemme (offsite)", "Lab Admin (offsite)", "Ming (offsite)",
 		"Epona (offsite)", "Ganon", "Web Server (offsite)", "Workstations (offsite)"]:
 	expectedScripts.add(s, SimpleScript(7))
