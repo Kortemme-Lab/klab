@@ -438,7 +438,7 @@ class LogReader(object):
 			if details["status"] & RETROSPECT_FAIL:
 				laststatusstyle = failstyle[count % 2]
 				status = "FAIL"
-			elif details["status"] & RETROSPECT_WARNING:
+			elif status != "STOPPED" and details["status"] & RETROSPECT_WARNING:
 				laststatusstyle = warningstyle[count % 2]
 				status = "WARNINGS"
 			elif status != "FAIL" and status != "STOPPED":
