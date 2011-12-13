@@ -1,0 +1,608 @@
+TY  - JOUR
+C8  - 2010 Publications 
+T1  - Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains
+JO  - Journal of Molecular Biology
+VL  - 402
+IS  - 2
+SP  - 460
+EP  - 474
+PY  - 2010/9/17/
+T2  - 
+AU  - Smith, Colin A.
+AU  - Kortemme, Tanja
+SN  - 0022-2836
+M3  - doi: 10.1016/j.jmb.2010.07.032
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283610007850
+KW  - PDZ domain
+KW  - specificity prediction
+KW  - tolerated sequence space
+KW  - protein design
+KW  - backrub backbone flexibility
+ER  - 
+TY  - JOUR
+C8  - 2010 Publications 
+A1  - Lauffer, Benjamin E.L.
+A1  - Melero, Cristina
+A1  - Temkin, Paul
+A1  - Lei, Cai
+A1  - Hong, Wanjin
+A1  - Kortemme, Tanja
+A1  - von Zastrow, Mark
+T1  - SNX27 mediates PDZ-directed sorting from endosomes to the plasma membrane 
+Y1  - 2010/08/23 
+JF  - The Journal of Cell Biology 
+JO  - The Journal of Cell Biology 
+SP  - 565 
+EP  - 574 
+M3  - 10.1083/jcb.201004060 
+VL  - 190 
+IS  - 4 
+UR  - http://jcb.rupress.org/content/190/4/565.abstract 
+N2  - Postsynaptic density 95/discs large/zonus occludens-1 (PDZ) domain–interacting motifs, in addition to their well-established roles in protein scaffolding at the cell surface, are proposed to act as cis-acting determinants directing the molecular sorting of transmembrane cargo from endosomes to the plasma membrane. This hypothesis requires the existence of a specific trans-acting PDZ protein that mediates the proposed sorting operation in the endosome membrane. Here, we show that sorting nexin 27 (SNX27) is required for efficient PDZ-directed recycling of the β2-adrenoreceptor (β2AR) from early endosomes. SNX27 mediates this sorting function when expressed at endogenous levels, and its recycling activity requires both PDZ domain–dependent recognition of the β2AR cytoplasmic tail and Phox homology (PX) domain–dependent association with the endosome membrane. These results identify a discrete role of SNX27 in PDZ-directed recycling of a physiologically important signaling receptor, and extend the concept of cargo-specific molecular sorting in the recycling pathway. 
+ER  -
+TY  - JOUR
+C8  - 2010 Publications 
+A1  - Lauck, Florian
+A1  - Smith, Colin A.
+A1  - Friedland, Gregory F.
+A1  - Humphris, Elisabeth L.
+A1  - Kortemme, Tanja
+T1  - RosettaBackrub—a web server for flexible backbone protein structure modeling and design 
+Y1  - 2010/07/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - W569 
+EP  - W575 
+M3  - 10.1093/nar/gkq369 
+VL  - 38 
+IS  - suppl 2 
+UR  - http://nar.oxfordjournals.org/content/38/suppl_2/W569.abstract 
+N2  - The RosettaBackrub server (http://kortemmelab.ucsf.edu/backrub) implements the Backrub method, derived from observations of alternative conformations in high-resolution protein crystal structures, for flexible backbone protein modeling. Backrub modeling is applied to three related applications using the Rosetta program for structure prediction and design: (I) modeling of structures of point mutations, (II) generating protein conformational ensembles and designing sequences consistent with these conformations and (III) predicting tolerated sequences at protein–protein interfaces. The three protocols have been validated on experimental data. Starting from a user-provided single input protein structure in PDB format, the server generates near-native conformational ensembles. The predicted conformations and sequences can be used for different applications, such as to guide mutagenesis experiments, for ensemble-docking approaches or to generate sequence libraries for protein design. 
+ER  -
+TY  - JOUR
+C8  - 2010 Publications 
+T1  - Designing ensembles in conformational and sequence space to characterize and engineer proteins
+JO  - Current Opinion in Structural Biology
+VL  - 20
+IS  - 3
+SP  - 377
+EP  - 384
+PY  - 2010/6//
+T2  - Nucleic acids / Sequences and topology
+AU  - Friedland, Gregory D
+AU  - Kortemme, Tanja
+SN  - 0959-440X
+M3  - doi: 10.1016/j.sbi.2010.02.004
+UR  - http://www.sciencedirect.com/science/article/pii/S0959440X10000370
+ER  - 
+TY  - CONF
+C8  - 2009 Publications 
+JO  - Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)
+TI  - SAT-based protein design
+T2  - Computer-Aided Design - Digest of Technical Papers, 2009. ICCAD 2009. IEEE/ACM International Conference on
+IS  - 
+SN  - 1092-3152
+VO  - 
+SP  - 128
+EP  - 135
+AU  - Ollikainen, N.
+AU  - Sentovich, E.
+AU  - Coelho, C.
+AU  - Kuehlmann, A.
+AU  - Kortemme, T.
+Y1  - 2-5 Nov. 2009
+PY  - 2009
+KW  - Boolean functions
+KW  - bioinformatics
+KW  - biological techniques
+KW  - computability
+KW  - molecular biophysics
+KW  - molecular configurations
+KW  - optimisation
+KW  - proteins
+KW  - tree searching
+KW  - Boolean function
+KW  - Boolean satisfiability solver
+KW  - DEE based method
+KW  - SAT based protein design
+KW  - SAT based search space encoding
+KW  - amino acid sequence
+KW  - branch-and-bound algorithm
+KW  - computational protein design
+KW  - dead-end-elimination
+KW  - optimisation problem
+KW  - protein core design problems
+KW  - protein structure energy minimisation
+KW  - search based approach
+VL  - 
+JA  - Computer-Aided Design - Digest of Technical Papers, 2009. ICCAD 2009. IEEE/ACM International Conference on
+DOI  - 
+URL - http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=5361301
+ER  - 
+TY  - JOUR
+C8  - 2009 Publications 
+AU  - Mandell, Daniel J
+AU  - Kortemme, Tanja
+TI  - Computer-aided design of functional protein interactions
+JA  - Nat Chem Biol
+PY  - 2009/11//print
+VL  - 5
+IS  - 11
+SP  - 797
+EP  - 807
+PB  - Nature Publishing Group
+SN  - 1552-4450
+UR  - http://dx.doi.org/10.1038/nchembio.251
+M3  - 10.1038/nchembio.251
+N1  - 10.1038/nchembio.251
+ER  - 
+TY  - JOUR
+C8  - 2009 Publications 
+T1  - Backbone flexibility in computational protein design
+JO  - Current Opinion in Biotechnology
+VL  - 20
+IS  - 4
+SP  - 420
+EP  - 428
+PY  - 2009/8//
+T2  - Protein technologies / Systems and synthetic biology
+AU  - Mandell, Daniel J
+AU  - Kortemme, Tanja
+SN  - 0958-1669
+M3  - doi: 10.1016/j.copbio.2009.07.006
+UR  - http://www.sciencedirect.com/science/article/pii/S0958166909000913
+ER  - 
+
+TY  - JOUR
+C8  - 2009 Publications 
+AU  - Mandell, Daniel J
+AU  - Coutsias, Evangelos A
+AU  - Kortemme, Tanja
+TI  - Sub-angstrom accuracy in protein loop reconstruction by robotics-inspired conformational sampling
+JA  - Nat Meth
+PY  - 2009/08//print
+VL  - 6
+IS  - 8
+SP  - 551
+EP  - 552
+PB  - Nature Publishing Group
+SN  - 1548-7091
+UR  - http://dx.doi.org/10.1038/nmeth0809-551
+M3  - 10.1038/nmeth0809-551
+N1  - 10.1038/nmeth0809-551
+L3  - http://www.nature.com/nmeth/journal/v6/n8/suppinfo/nmeth0809-551_S1.html
+ER  - 
+TY  - JOUR
+C8  - 2009 Publications 
+T1  - A Correspondence Between Solution-State Dynamics of an Individual Protein and the Sequence and Conformational Diversity of its Family
+A1  - Friedland, Gregory D. 
+A1  - Lakomek, Nils-Alexander 
+A1  - Griesinger, Christian 
+A1  - Meiler, Jens 
+A1  - Kortemme, Tanja 
+Y1  - 2009/05/29
+N2  - <title>Author Summary</title><p>Knowledge of protein properties is essential for enhancing the understanding and engineering of biological functions. One key property of proteins is their flexibility—their intrinsic ability to adopt different conformations. This flexibility can be measured experimentally but the measurements are indirect and computational models are required to interpret them. Here we develop a new computational method for interpreting these measurements of flexibility and use it to create a model of flexibility of the protein ubiquitin. We apply our results to show relationships between the flexibility of one protein and the diversity of structures and amino acid sequences of the protein's evolutionary family. Thus, our results show that more accurate computational modeling of protein flexibility is useful for improving prediction of a broader range of amino acid sequences compatible with a given protein. Our method will be helpful for advancing methods to rationally engineer protein functions by enabling sampling of conformational and sequence diversity similar to that of a protein's evolutionary family.</p>
+JF  - PLoS Comput Biol
+JA  - PLoS Comput Biol
+VL  - 5
+IS  - 5
+UR  - http://dx.doi.org/10.1371%2Fjournal.pcbi.1000393
+SP  - e1000393
+EP  -
+PB  - Public Library of Science
+M3  - doi:10.1371/journal.pcbi.1000393
+ER  -
+TY  - JOUR
+C8  - 2009 Publications 
+AU  - Oberdorf, Richard
+AU  - Kortemme, Tanja
+TI  - Complex topology rather than complex membership is a determinant of protein dosage sensitivity
+JA  - Mol Syst Biol
+PY  - 2009/03/17/print
+VL  - 5
+PB  - EMBO and Nature Publishing Group
+UR  - http://dx.doi.org/10.1038/msb.2009.9
+M3  - 10.1038/msb.2009.9
+N1  - 10.1038/msb.2009.9
+L3  - http://www.nature.com/msb/journal/v5/n1/suppinfo/msb20099_S1.html
+ER  - 
+TY  - JOUR
+C8  - 2009 Publications 
+T1  - Outcome of a Workshop on Applications of Protein Models in Biomedical Research
+JO  - Structure
+VL  - 17
+IS  - 2
+SP  - 151
+EP  - 159
+PY  - 2009/2/13/
+T2  - 
+AU  - Schwede, Torsten
+AU  - Sali, Andrej
+AU  - Honig, Barry
+AU  - Levitt, Michael
+AU  - Berman, Helen M.
+AU  - Jones, David
+AU  - Brenner, Steven E.
+AU  - Burley, Stephen K.
+AU  - Das, Rhiju
+AU  - Dokholyan, Nikolay V.
+AU  - Dunbrack Jr., Roland L.
+AU  - Fidelis, Krzysztof
+AU  - Fiser, Andras
+AU  - Godzik, Adam
+AU  - Huang, Yuanpeng Janet
+AU  - Humblet, Christine
+AU  - Jacobson, Matthew P.
+AU  - Joachimiak, Andrzej
+AU  - Krystek Jr., Stanley R.
+AU  - Kortemme, Tanja
+AU  - Kryshtafovych, Andriy
+AU  - Montelione, Gaetano T.
+AU  - Moult, John
+AU  - Murray, Diana
+AU  - Sanchez, Roberto
+AU  - Sosnick, Tobin R.
+AU  - Standley, Daron M.
+AU  - Stouch, Terry
+AU  - Vajda, Sandor
+AU  - Vasquez, Max
+AU  - Westbrook, John D.
+AU  - Wilson, Ian A.
+SN  - 0969-2126
+M3  - doi: 10.1016/j.str.2008.12.014
+UR  - http://www.sciencedirect.com/science/article/pii/S0969212609000318
+KW  - PROTEINS
+ER  - 
+TY  - JOUR
+C8  - 2009 Publications 
+A1  - Babor, Mariana
+A1  - Kortemme, Tanja
+T1  - Multi-constraint computational design suggests that native sequences of germline antibody H3 loops are nearly optimal for conformational flexibility
+JF  - Proteins: Structure, Function, and Bioinformatics
+JA  - Proteins
+VL  - 75
+IS  - 4
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1097-0134
+UR  - http://dx.doi.org/10.1002/prot.22293
+M3  - 10.1002/prot.22293
+SP  - 846
+EP  - 858
+KW  - antibody flexibility
+KW  - computational structural biology
+KW  - computational design
+KW  - multi-constraint design
+KW  - affinity maturation
+Y1  - 2009
+ER  - 
+TY  - JOUR
+C8  - 2009 Publications 
+T1  - Differences in Flexibility Underlie Functional Differences in the Ras Activators Son of Sevenless and Ras Guanine Nucleotide Releasing Factor 1
+JO  - Structure
+VL  - 17
+IS  - 1
+SP  - 41
+EP  - 53
+PY  - 2009/1/14/
+T2  - 
+AU  - Freedman, Tanya S.
+AU  - Sondermann, Holger
+AU  - Kuchment, Olga
+AU  - Friedland, Gregory D.
+AU  - Kortemme, Tanja
+AU  - Kuriyan, John
+SN  - 0969-2126
+M3  - doi: 10.1016/j.str.2008.11.004
+UR  - http://www.sciencedirect.com/science/article/pii/S0969212608004280
+KW  - PROTEINS
+KW  - SIGNALING
+ER  - 
+TY  - JOUR
+C8  - 2008 Publications 
+T1  - Prediction of Protein-Protein Interface Sequence Diversity Using Flexible Backbone Computational Protein Design
+JO  - Structure
+VL  - 16
+IS  - 12
+SP  - 1777
+EP  - 1788
+PY  - 2008/12/12/
+T2  - 
+AU  - Humphris, Elisabeth L.
+AU  - Kortemme, Tanja
+SN  - 0969-2126
+M3  - doi: 10.1016/j.str.2008.09.012
+UR  - http://www.sciencedirect.com/science/article/pii/S0969212608003869
+KW  - PROTEINS
+ER  - 
+TY  - JOUR
+C8  - 2008 Publications 
+A1  - Lauffer, Benjamin E. L.
+A1  - Chen, Stanford
+A1  - Melero, Cristina
+A1  - Kortemme, Tanja
+A1  - von Zastrow, Mark
+A1  - Vargas, Gabriel A.
+T1  - Engineered Protein Connectivity to Actin Mimics PDZ-dependent Recycling of G Protein-coupled Receptors but Not Its Regulation by Hrs 
+Y1  - 2009/01/23 
+JF  - Journal of Biological Chemistry 
+JO  - Journal of Biological Chemistry 
+SP  - 2448 
+EP  - 2458 
+N1  - 10.1074/jbc.M806370200 
+VL  - 284 
+IS  - 4 
+UR  - http://www.jbc.org/content/284/4/2448.abstract 
+N2  - Many G protein-coupled receptors (GPCRs) recycle after agonist-induced endocytosis by a sequence-dependent mechanism, which is distinct from default membrane flow and remains poorly understood. Efficient recycling of the β2-adrenergic receptor (β2AR) requires a C-terminal PDZ (PSD-95/Discs Large/ZO-1) protein-binding determinant (PDZbd), an intact actin cytoskeleton, and is regulated by the endosomal protein Hrs (hepatocyte growth factor-regulated substrate). The PDZbd is thought to link receptors to actin through a series of protein interaction modules present in NHERF/EBP50 (Na+/H+ exchanger 3 regulatory factor/ezrin-binding phosphoprotein of 50 kDa) family and ERM (ezrin/radixin/moesin) family proteins. It is not known, however, if such actin connectivity is sufficient to recapitulate the natural features of sequence-dependent recycling. We addressed this question using a receptor fusion approach based on the sufficiency of the PDZbd to promote recycling when fused to a distinct GPCR, the δ-opioid receptor, which normally recycles inefficiently in HEK293 cells. Modular domains mediating actin connectivity promoted receptor recycling with similarly high efficiency as the PDZbd itself, and recycling promoted by all of the domains was actin-dependent. Regulation of receptor recycling by Hrs, however, was conferred only by the PDZbd and not by downstream interaction modules. These results suggest that actin connectivity is sufficient to mimic the core recycling activity of a GPCR-linked PDZbd but not its cellular regulation. 
+ER  -
+TY  - JOUR
+C8  - 2008 Publications 
+T1  - A Simple Model of Backbone Flexibility Improves Modeling of Side-chain Conformational Variability
+JO  - Journal of Molecular Biology
+VL  - 380
+IS  - 4
+SP  - 757
+EP  - 774
+PY  - 2008/7/18/
+T2  - 
+AU  - Friedland, Gregory D.
+AU  - Linares, Anthony J.
+AU  - Smith, Colin A.
+AU  - Kortemme, Tanja
+SN  - 0022-2836
+M3  - doi: 10.1016/j.jmb.2008.05.006
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283608005597
+KW  - protein dynamics
+KW  - side-chain dynamics
+KW  - NMR order parameters
+KW  - protein design
+KW  - flexible backbone
+ER  - 
+TY  - JOUR
+C8  - 2008 Publications 
+T1  - Backrub-Like Backbone Simulation Recapitulates Natural Protein Conformational Variability and Improves Mutant Side-Chain Prediction
+JO  - Journal of Molecular Biology
+VL  - 380
+IS  - 4
+SP  - 742
+EP  - 756
+PY  - 2008/7/18/
+T2  - 
+AU  - Smith, Colin A.
+AU  - Kortemme, Tanja
+SN  - 0022-2836
+M3  - doi: 10.1016/j.jmb.2008.05.023
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283608005779
+KW  - flexible backbone sampling
+KW  - backrub motion
+KW  - point mutation
+KW  - Monte Carlo
+KW  - triosephosphate isomerase loop 6
+ER  - 
+TY  - JOUR
+C8  - 2008 Publications 
+T1  - A New Twist in TCR Diversity Revealed by a Forbidden αβ TCR
+JO  - Journal of Molecular Biology
+VL  - 375
+IS  - 5
+SP  - 1306
+EP  - 1319
+PY  - 2008/2/1/
+T2  - 
+AU  - McBeth, Christine
+AU  - Seamons, Audrey
+AU  - Pizarro, Juan C.
+AU  - Fleishman, Sarel J.
+AU  - Baker, David
+AU  - Kortemme, Tanja
+AU  - Goverman, Joan M.
+AU  - Strong, Roland K.
+SN  - 0022-2836
+M3  - doi: 10.1016/j.jmb.2007.11.020
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283607014805
+ER  - 
+TY  - JOUR
+C8  - 2007 Publications 
+T1  - Design of Multi-Specificity in Protein Interfaces
+A1  - Humphris, Elisabeth L 
+A1  - Kortemme, Tanja 
+Y1  - 2007/08/24
+N2  - <title>Author Summary</title><sec id="st1"><title/><p>Computational methods have recently led to remarkable successes in the design of molecules with novel functions. These approaches offer great promise for creating highly selective molecules to accurately control biological processes. However, to reach these goals modeling procedures are needed that are able to define the optimal â€œfitnessâ€ of a protein to function correctly within complex biological networks and in the context of many possible interaction partners. To make progress toward these goals, we describe a computational design procedure that predicts protein sequences optimized to bind not only to a single protein but also to a set of target interaction partners. Application of the method to characterize â€œhubâ€ proteins in cellular interaction networks gives insights into the mechanisms nature has used to tune protein surfaces to recognize multiple correct partner proteins. Our study also provides a starting point to engineer designer molecules that could modulate or replace naturally occurring protein interaction networks to combat misregulation in disease or to build new sets of protein interactions for synthetic biology.</p></sec>
+JF  - PLoS Comput Biol
+JA  - PLoS Comput Biol
+VL  - 3
+IS  - 8
+UR  - http://dx.plos.org/10.1371%2Fjournal.pcbi.0030164
+SP  - e164
+EP  -
+PB  - Public Library of Science
+M3  - doi:10.1371/journal.pcbi.0030164
+ER  -
+TY  - JOUR
+C8  - 2007 Publications 
+A1  - Lengyel, Candice S. E.
+A1  - Willis, Lindsey J.
+A1  - Mann, Patrick
+A1  - Baker, David
+A1  - Kortemme, Tanja
+A1  - Strong, Roland K.
+A1  - McFarland, Benjamin J.
+T1  - Mutations Designed to Destabilize the Receptor-Bound Conformation Increase MICA-NKG2D Association Rate and Affinity 
+Y1  - 2007/10/19 
+JF  - Journal of Biological Chemistry 
+JO  - Journal of Biological Chemistry 
+SP  - 30658 
+EP  - 30666 
+N1  - 10.1074/jbc.M704513200 
+VL  - 282 
+IS  - 42 
+UR  - http://www.jbc.org/content/282/42/30658.abstract 
+N2  - MICA is a major histocompatibility complex-like protein that undergoes a structural transition from disorder to order upon binding its immunoreceptor, NKG2D. We redesigned the disordered region of MICA with RosettaDesign to increase NKG2D binding. Mutations that stabilize this region were expected to increase association kinetics without changing dissociation kinetics, increase affinity of interaction, and reduce entropy loss upon binding. MICA mutants were stable in solution, and they were amenable to surface plasmon resonance evaluation of NKG2D binding kinetics and thermodynamics. Several MICA mutants bound NKG2D with enhanced affinity, kinetic changes were primarily observed during association, and thermodynamic changes in entropy were as expected. However, none of the 15 combinations of mutations predicted to stabilize the receptor-bound MICA conformation enhanced NKG2D affinity, whereas all 10 mutants predicted to be destabilized bound NKG2D with increased on-rates. Five of these had affinities enhanced by 0.9–1.8 kcal/mol over wild type by one to three non-contacting substitutions. Therefore, in this case, mutations designed to mildly destabilize a protein enhanced association and affinity. 
+ER  -
+TY  - JOUR
+C8  - 2007 Publications 
+T1  - Structural Mapping of Protein Interactions Reveals Differences in Evolutionary Pressures Correlated to mRNA Level and Protein Abundance
+JO  - Structure
+VL  - 15
+IS  - 11
+SP  - 1442
+EP  - 1451
+PY  - 2007/11/13/
+T2  - 
+AU  - Eames, Matt
+AU  - Kortemme, Tanja
+SN  - 0969-2126
+M3  - doi: 10.1016/j.str.2007.09.010
+UR  - http://www.sciencedirect.com/science/article/pii/S0969212607003358
+KW  - PROTEINS
+KW  - SIGNALING
+ER  - 
+TY  - JOUR
+C8  - 2006 Publications 
+T1  - Computational Design of a New Hydrogen Bond Network and at Least a 300-fold Specificity Switch at a Protein−Protein Interface
+JO  - Journal of Molecular Biology
+VL  - 361
+IS  - 1
+SP  - 195
+EP  - 208
+PY  - 2006/8/4/
+T2  - 
+AU  - Joachimiak, Lukasz A.
+AU  - Kortemme, Tanja
+AU  - Stoddard, Barry L.
+AU  - Baker, David
+SN  - 0022-2836
+M3  - doi: 10.1016/j.jmb.2006.05.022
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283606006048
+KW  - computational design
+KW  - hydrogen bond network
+KW  - DNAse
+KW  - immunity protein
+KW  - protein–protein interactions
+ER  - 
+TY  - JOUR
+C8  - 2006 Publications 
+T1  - Ca2+ Indicators Based on Computationally Redesigned Calmodulin-Peptide Pairs
+JO  - Chemistry &amp; Biology
+VL  - 13
+IS  - 5
+SP  - 521
+EP  - 530
+PY  - 2006/5//
+T2  - 
+AU  - Palmer, Amy E.
+AU  - Giacomello, Marta
+AU  - Kortemme, Tanja
+AU  - Hires, S. Andrew
+AU  - Lev-Ram, Varda
+AU  - Baker, David
+AU  - Tsien, Roger Y.
+SN  - 1074-5521
+M3  - doi: 10.1016/j.chembiol.2006.03.007
+UR  - http://www.sciencedirect.com/science/article/pii/S1074552106001177
+KW  - MOLNEURO
+KW  - CHEMBIO
+ER  - 
+TY  - JOUR
+C8  - 2006 Publications 
+A1  - Song, Gang
+A1  - Lazar, Greg A.
+A1  - Kortemme, Tanja
+A1  - Shimaoka, Motomu
+A1  - Desjarlais, John R.
+A1  - Baker, David
+A1  - Springer, Timothy A.
+T1  - Rational Design of Intercellular Adhesion Molecule-1 (ICAM-1) Variants for Antagonizing Integrin Lymphocyte Function-associated Antigen-1-dependent Adhesion 
+Y1  - 2006/02/24 
+JF  - Journal of Biological Chemistry 
+JO  - Journal of Biological Chemistry 
+SP  - 5042 
+EP  - 5049 
+N1  - 10.1074/jbc.M510454200 
+VL  - 281 
+IS  - 8 
+UR  - http://www.jbc.org/content/281/8/5042.abstract 
+N2  - The interaction between integrin lymphocyte function-associated antigen-1 (LFA-1) and its ligand intercellular adhesion molecule-1 (ICAM-1) is critical in immunological and inflammatory reactions but, like other adhesive interactions, is of low affinity. Here, multiple rational design methods were used to engineer ICAM-1 mutants with enhanced affinity for LFA-1. Five amino acid substitutions 1) enhance the hydrophobicity and packing of residues surrounding Glu-34 of ICAM-1, which coordinates to a Mg2+ in the LFA-1 I domain, and 2) alter associations at the edges of the binding interface. The affinity of the most improved ICAM-1 mutant for intermediate- and high-affinity LFA-1 I domains was increased by 19-fold and 22-fold, respectively, relative to wild type. Moreover, potency was similarly enhanced for inhibition of LFA-1-dependent ligand binding and cell adhesion. Thus, rational design can be used to engineer novel adhesion molecules with high monomeric affinity; furthermore, the ICAM-1 mutant holds promise for targeting LFA-1-ICAM-1 interaction for biological studies and therapeutic purposes. 
+ER  -
+TY  - JOUR
+C8  - 2006 Publications 
+A1  - Freedman, Tanya S.
+A1  - Sondermann, Holger
+A1  - Friedland, Gregory D.
+A1  - Kortemme, Tanja
+A1  - Bar-Sagi, Dafna
+A1  - Marqusee, Susan
+A1  - Kuriyan, John
+T1  - A Ras-induced conformational switch in the Ras activator Son of sevenless 
+Y1  - 2006/11/07 
+JF  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences 
+SP  - 16692 
+EP  - 16697 
+N1  - 10.1073/pnas.0608127103 
+VL  - 103 
+IS  - 45 
+UR  - http://www.pnas.org/content/103/45/16692.abstract 
+N2  - The Ras-specific guanine nucleotide-exchange factors Son of sevenless (Sos) and Ras guanine nucleotide-releasing factor 1 (RasGRF1) transduce extracellular stimuli into Ras activation by catalyzing the exchange of Ras-bound GDP for GTP. A truncated form of RasGRF1 containing only the core catalytic Cdc25 domain is sufficient for stimulating Ras nucleotide exchange, whereas the isolated Cdc25 domain of Sos is inactive. At a site distal to the catalytic site, nucleotide-bound Ras binds to Sos, making contacts with the Cdc25 domain and with a Ras exchanger motif (Rem) domain. This allosteric Ras binding stimulates nucleotide exchange by Sos, but the mechanism by which this stimulation occurs has not been defined. We present a crystal structure of the Rem and Cdc25 domains of Sos determined at 2.0-Å resolution in the absence of Ras. Differences between this structure and that of Sos bound to two Ras molecules show that allosteric activation of Sos by Ras occurs through a rotation of the Rem domain that is coupled to a rotation of a helical hairpin at the Sos catalytic site. This motion relieves steric occlusion of the catalytic site, allowing substrate Ras binding and nucleotide exchange. A structure of the isolated RasGRF1 Cdc25 domain determined at 2.2-Å resolution, combined with computational analyses, suggests that the Cdc25 domain of RasGRF1 is able to maintain an active conformation in isolation because the helical hairpin has strengthened interactions with the Cdc25 domain core. These results indicate that RasGRF1 lacks the allosteric activation switch that is crucial for Sos activity. 
+ER  -
+TY  - JOUR
+C8  - 2006 Publications 
+A1  - Wang, Stephanie X.
+A1  - Pandey, Kailash C.
+A1  - Somoza, John R.
+A1  - Sijwali, Puran S.
+A1  - Kortemme, Tanja
+A1  - Brinen, Linda S.
+A1  - Fletterick, Robert J.
+A1  - Rosenthal, Philip J.
+A1  - McKerrow, James H.
+T1  - Structural basis for unique mechanisms of folding and hemoglobin binding by a malarial protease 
+Y1  - 2006/08/01 
+JF  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences 
+SP  - 11503 
+EP  - 11508 
+N1  - 10.1073/pnas.0600489103 
+VL  - 103 
+IS  - 31 
+UR  - http://www.pnas.org/content/103/31/11503.abstract 
+N2  - Falcipain-2 (FP2), the major cysteine protease of the human malaria parasite Plasmodium falciparum, is a hemoglobinase and promising drug target. Here we report the crystal structure of FP2 in complex with a protease inhibitor, cystatin. The FP2 structure reveals two previously undescribed cysteine protease structural motifs, designated FP2nose and FP2arm, in addition to details of the active site that will help focus inhibitor design. Unlike most cysteine proteases, FP2 does not require a prodomain but only the short FP2nose motif to correctly fold and gain catalytic activity. Our structure and mutagenesis data suggest a molecular basis for this unique mechanism by highlighting the functional role of two Tyr within FP2nose and a conserved Glu outside this motif. The FP2arm motif is required for hemoglobinase activity. The structure reveals topographic features and a negative charge cluster surrounding FP2arm that suggest it may serve as an exo-site for hemoglobin binding. Motifs similar to FP2nose and FP2arm are found only in related plasmodial proteases, suggesting that they confer malaria-specific functions. 
+ER  -
+[2005 Publications]
+Morozov, A.V. & Kortemme T. Potential functions for hydrogen bonds in protein structure prediction and design. Adv Protein Chem 2005;72:1-38.
+
+[Prediction and Design of Protein-Protein Interactions]
+Kortemme, T, & Baker, D. A simple physical model for binding energy hotspots in protein protein complexes, Proc Natl Acad Sci U S A 99, 14116-14121, 2002.
+Chevalier, BS, Kortemme, T, Chadsey, MS, Baker, D, Monnat, RJJr., & Stoddard, BL. Design, activity and structure of E-DreI, a highly site-specific artificial endonuclease. Mol. Cell 10, 895-905, 2002.
+Gray, JJ, Moughon, S, Kortemme, T, Schueler-Furman, O, Misura, KMS, Morozov, AV, & Baker, D. Protein-protein docking predictions for the CAPRI experiment. Prot. Struct. Funct. Genet. 52, 118-122, 2003.
+Kortemme, T, Joachimiak, LA, Bullock, AN, Schuler, AD, Stoddard, BL, & Baker, D. Computational redesign of protein-protein interaction specificity. Nat Struct Mol Biol 11, 371-379, 2004.
+Kortemme T, & Baker D. Computational design of protein-protein interactions. Curr Opin Chem Biol 8, 91-97, 2004.
+
+[Computational Models & Energy Functions]
+Kortemme, T, Morozov, AV, & Baker, D. An orientation-dependent hydrogen bonding potential improves prediction of specificity and structure for proteins and protein complexes. J. Mol. Biol. 326, 1239-1259, 2003.
+Morozov, AV, Kortemme, T, & Baker, D. Evaluation of models of electrostatic interactions in proteins. J. Phys. Chem. B 107, 2075-2090, 2003.
+Kortemme, T, Kim, DE, & Baker, D. Computational alanine scanning of protein-protein interfaces. Sci STKE 2004, pl2, 2004.
+Morozov, AV, Kortemme, T, Tsemekhman, K, & Baker, D. Close agreement between the orientation dependence of hydrogen bonds observed in protein structures and quantum mechanical calculations. Proc Natl Acad Sci U S A 101, 6946-6951, 2004.
+Chen Y, Kortemme T, Robertson T, Baker D, & Varani, G. A new hydrogen-bonding potential for the design of protein-RNA interactions predicts specific contacts and discriminates decoys. Nucleic Acids Res. 32, 147-162, 2004.
+Jiang, L, Kuhlman, B, Kortemme, T, Baker, D. A "solvated rotamer" approach to modeling water-mediated hydrogen bonds at protein-protein interfaces. Proteins 58, 893-904, 2005.
+
+[Predictions on Specific Systems]
+McFarland, BJ, Kortemme, T, Baker, D, & Strong, RK. Symmetry recognizing asymmetry: Analysis of the interactions between the C-type lectin-like immunoreceptor NKG2D and its MHC class I-like ligand, Structure 11, 411-422, 2003.
+Boulanger MJ, Bankovich AJ, Kortemme T, Baker D, & Garcia KC. Convergent mechanisms for recognition of divergent cytokines by the shared signaling receptor gp130. Mol. Cell 12, 577-589, 2003.
+Svensson, HG, Wedemeyer, WJ, Ekstrom, JL, Callender, DR, Kortemme, T, Kim, DE, Sjobring, U, & Baker, D. Contributions of amino acid side chains to the kinetics and thermodynamics of the bivalent binding of protein L to Ig kappa light chain. Biochemistry 43, 2445-2457, 2004.
+
+[Peptide Model Systems: Alpha-helices and Beta-sheets]
+Chakrabartty, A, Kortemme, T, Padmanabhan, S, & Baldwin, RL. Aromatic side-chain contribution to far-ultraviolet circular dichroism of helical peptides and its effect on measurement of helix propensities. Biochemistry 32, 5560-5565, 1993.
+Chakrabartty, A., Kortemme, T, & Baldwin, RL. Helix propensities of the amino acids measured in alanine-based peptides without helix-stabilizing side-chain interactions. Protein Sci. 3, 843-852, 1994.
+Kortemme, T, Ramirez-Alvarado, M, & Serrano, L. Design of a 20 amino acid three-stranded betasheet protein. Science 281, 253-256, 1998.
+Ramirez-Alvarado, M, Kortemme, T, Blanco, FJ, & Serrano, L. Beta-hairpin and beta-sheet formation in designed linear peptides. Bioorg Med Chem 7, 93-103, 1999.
+Lacroix, E, Kortemme, T, Lopez de la Paz, M., & Serrano, L. The design of linear peptides that fold as monomeric beta-sheet structures. Curr Opin Struct Biol 9, 487-93, 1999.
+
+[Protein Folding]
+Kortemme, T, Hollecker, M, Kemmink, J, & Creighton, TE. Comparison of the (30-51, 14-38) two-disulphide folding intermediates of the homologous proteins dendrotoxin K and bovine pancreatic trypsin inhibitor by two-dimensional 1H nuclear magnetic resonance. J. Mol. Biol. 257, 188-198, 1996.
+Kortemme, T, Kelly, MJS, Kay, LE, Forman-Kay, J, & Serrano, L. Similarities between the spectrin SH3 domain denatured state and its folding transition state. J. Mol. Biol. 297, 1217-1229, 2000.
+Alm, E, Morozov, AV, Kortemme, T, & Baker, D. Simple physical models connect theory and experiment in protein folding kinetics. J. Mol. Biol. 322, 463-476, 2002.
+
+[Electrostatic interactions in Thioredoxin-like Proteins]
+Kortemme, T, & Creighton, TE. Ionisation of cysteine residues at the termini of model alpha-helical peptides. Relevance to unusual thiol pKa values in proteins of the thioredoxin family. J. Mol. Biol. 253, 799-812, 1995.
+Kortemme, T, Darby, NJ, & Creighton, TE. Electrostatic interactions in the active site of the N-terminal thioredoxin-like domain of protein disulfide isomerase. Biochemistry 35, 14503-14511, 1996.
+Bulaj, G, Kortemme, T, & Goldenberg, DP. Ionization-reactivity relationships for cysteine thiols in polypeptides. Biochemistry 37, 8965-8972, 1998.
