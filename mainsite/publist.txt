@@ -1,3 +1,15 @@
+# To add new citations, copy and paste the RIS formatted entry into this file. Citations are grouped. The order in which they appear on the website is first by
+# group (group order is determined by the order in which a group's first citation appears in this file) and then by the order in which the citation appears in this
+# file. 
+# There are a few changes needed to make the parsing work:
+#    - Add a C8 field indicating the group for the website. This will be stripped from the public RIS file.
+#    - If the DOI is present in an entry, prefix it with "doi: " if not already so. This helps parse the doi which appears in different fields from different sources. 
+#    - If no DOI is present but the article has a URL, add a URL. One example of this below is "Computer-aided design of functional protein interactions".
+#    - Add the full journal name. This will be abbreviated for the website.
+#    - For maximum flexibility, use long form names with middle initials where appropriate. Append a period to abbreviated names e.g. "Kirk, James T."
+# Any text before the first ER line is ignored for parsing and stripped from the public RIS file.
+#
+ER  -
 TY  - JOUR
 C8  - 2010 Publications 
 T1  - Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains
@@ -21,7 +33,7 @@ KW  - backrub backbone flexibility
 ER  - 
 TY  - JOUR
 C8  - 2010 Publications 
-A1  - Lauffer, Benjamin E.L.
+A1  - Lauffer, Benjamin E. L.
 A1  - Melero, Cristina
 A1  - Temkin, Paul
 A1  - Lei, Cai
@@ -34,7 +46,7 @@ JF  - The Journal of Cell Biology
 JO  - The Journal of Cell Biology 
 SP  - 565 
 EP  - 574 
-M3  - 10.1083/jcb.201004060 
+M3  - doi: 10.1083/jcb.201004060 
 VL  - 190 
 IS  - 4 
 UR  - http://jcb.rupress.org/content/190/4/565.abstract 
@@ -44,7 +56,7 @@ TY  - JOUR
 C8  - 2010 Publications 
 A1  - Lauck, Florian
 A1  - Smith, Colin A.
-A1  - Friedland, Gregory F.
+A1  - Friedland, Gregory D.
 A1  - Humphris, Elisabeth L.
 A1  - Kortemme, Tanja
 T1  - RosettaBackrub—a web server for flexible backbone protein structure modeling and design 
@@ -53,7 +65,7 @@ JF  - Nucleic Acids Research
 JO  - Nucleic Acids Research 
 SP  - W569 
 EP  - W575 
-M3  - 10.1093/nar/gkq369 
+M3  - doi: 10.1093/nar/gkq369 
 VL  - 38 
 IS  - suppl 2 
 UR  - http://nar.oxfordjournals.org/content/38/suppl_2/W569.abstract 
@@ -69,7 +81,7 @@ SP  - 377
 EP  - 384
 PY  - 2010/6//
 T2  - Nucleic acids / Sequences and topology
-AU  - Friedland, Gregory D
+AU  - Friedland, Gregory D.
 AU  - Kortemme, Tanja
 SN  - 0959-440X
 M3  - doi: 10.1016/j.sbi.2010.02.004
@@ -85,11 +97,11 @@ SN  - 1092-3152
 VO  - 
 SP  - 128
 EP  - 135
-AU  - Ollikainen, N.
-AU  - Sentovich, E.
-AU  - Coelho, C.
-AU  - Kuehlmann, A.
-AU  - Kortemme, T.
+AU  - Ollikainen, Noah
+AU  - Sentovich, Ellen
+AU  - Coelho, Carlos
+AU  - Kuehlmann, Andreas
+AU  - Kortemme, Tanja
 Y1  - 2-5 Nov. 2009
 PY  - 2009
 KW  - Boolean functions
@@ -116,12 +128,11 @@ KW  - protein structure energy minimisation
 KW  - search based approach
 VL  - 
 JA  - Computer-Aided Design - Digest of Technical Papers, 2009. ICCAD 2009. IEEE/ACM International Conference on
-DOI  - 
-URL - http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=5361301
+URL  - http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=5361301
 ER  - 
 TY  - JOUR
 C8  - 2009 Publications 
-AU  - Mandell, Daniel J
+AU  - Mandell, Daniel J.
 AU  - Kortemme, Tanja
 TI  - Computer-aided design of functional protein interactions
 JA  - Nat Chem Biol
@@ -133,7 +144,7 @@ EP  - 807
 PB  - Nature Publishing Group
 SN  - 1552-4450
 UR  - http://dx.doi.org/10.1038/nchembio.251
-M3  - 10.1038/nchembio.251
+M3  - doi: 10.1038/nchembio.251
 N1  - 10.1038/nchembio.251
 ER  - 
 TY  - JOUR
@@ -146,7 +157,7 @@ SP  - 420
 EP  - 428
 PY  - 2009/8//
 T2  - Protein technologies / Systems and synthetic biology
-AU  - Mandell, Daniel J
+AU  - Mandell, Daniel J.
 AU  - Kortemme, Tanja
 SN  - 0958-1669
 M3  - doi: 10.1016/j.copbio.2009.07.006
@@ -155,8 +166,8 @@ ER  -
 
 TY  - JOUR
 C8  - 2009 Publications 
-AU  - Mandell, Daniel J
-AU  - Coutsias, Evangelos A
+AU  - Mandell, Daniel J.
+AU  - Coutsias, Evangelos A.
 AU  - Kortemme, Tanja
 TI  - Sub-angstrom accuracy in protein loop reconstruction by robotics-inspired conformational sampling
 JA  - Nat Meth
@@ -168,7 +179,7 @@ EP  - 552
 PB  - Nature Publishing Group
 SN  - 1548-7091
 UR  - http://dx.doi.org/10.1038/nmeth0809-551
-M3  - 10.1038/nmeth0809-551
+M3  - doi: 10.1038/nmeth0809-551
 N1  - 10.1038/nmeth0809-551
 L3  - http://www.nature.com/nmeth/journal/v6/n8/suppinfo/nmeth0809-551_S1.html
 ER  - 
@@ -190,7 +201,7 @@ UR  - http://dx.doi.org/10.1371%2Fjournal.pcbi.1000393
 SP  - e1000393
 EP  -
 PB  - Public Library of Science
-M3  - doi:10.1371/journal.pcbi.1000393
+M3  - doi: 10.1371/journal.pcbi.1000393
 ER  -
 TY  - JOUR
 C8  - 2009 Publications 
@@ -202,7 +213,7 @@ PY  - 2009/03/17/print
 VL  - 5
 PB  - EMBO and Nature Publishing Group
 UR  - http://dx.doi.org/10.1038/msb.2009.9
-M3  - 10.1038/msb.2009.9
+M3  - doi: 10.1038/msb.2009.9
 N1  - 10.1038/msb.2009.9
 L3  - http://www.nature.com/msb/journal/v5/n1/suppinfo/msb20099_S1.html
 ER  - 
@@ -265,7 +276,7 @@ IS  - 4
 PB  - Wiley Subscription Services, Inc., A Wiley Company
 SN  - 1097-0134
 UR  - http://dx.doi.org/10.1002/prot.22293
-M3  - 10.1002/prot.22293
+M3  - doi: 10.1002/prot.22293
 SP  - 846
 EP  - 858
 KW  - antibody flexibility
@@ -328,7 +339,7 @@ JF  - Journal of Biological Chemistry
 JO  - Journal of Biological Chemistry 
 SP  - 2448 
 EP  - 2458 
-N1  - 10.1074/jbc.M806370200 
+N1  - doi: 10.1074/jbc.M806370200 
 VL  - 284 
 IS  - 4 
 UR  - http://www.jbc.org/content/284/4/2448.abstract 
@@ -403,7 +414,7 @@ ER  -
 TY  - JOUR
 C8  - 2007 Publications 
 T1  - Design of Multi-Specificity in Protein Interfaces
-A1  - Humphris, Elisabeth L 
+A1  - Humphris, Elisabeth L. 
 A1  - Kortemme, Tanja 
 Y1  - 2007/08/24
 N2  - <title>Author Summary</title><sec id="st1"><title/><p>Computational methods have recently led to remarkable successes in the design of molecules with novel functions. These approaches offer great promise for creating highly selective molecules to accurately control biological processes. However, to reach these goals modeling procedures are needed that are able to define the optimal â€œfitnessâ€ of a protein to function correctly within complex biological networks and in the context of many possible interaction partners. To make progress toward these goals, we describe a computational design procedure that predicts protein sequences optimized to bind not only to a single protein but also to a set of target interaction partners. Application of the method to characterize â€œhubâ€ proteins in cellular interaction networks gives insights into the mechanisms nature has used to tune protein surfaces to recognize multiple correct partner proteins. Our study also provides a starting point to engineer designer molecules that could modulate or replace naturally occurring protein interaction networks to combat misregulation in disease or to build new sets of protein interactions for synthetic biology.</p></sec>
@@ -415,7 +426,7 @@ UR  - http://dx.plos.org/10.1371%2Fjournal.pcbi.0030164
 SP  - e164
 EP  -
 PB  - Public Library of Science
-M3  - doi:10.1371/journal.pcbi.0030164
+M3  - doi: 10.1371/journal.pcbi.0030164
 ER  -
 TY  - JOUR
 C8  - 2007 Publications 
@@ -432,7 +443,7 @@ JF  - Journal of Biological Chemistry
 JO  - Journal of Biological Chemistry 
 SP  - 30658 
 EP  - 30666 
-N1  - 10.1074/jbc.M704513200 
+N1  - doi: 10.1074/jbc.M704513200 
 VL  - 282 
 IS  - 42 
 UR  - http://www.jbc.org/content/282/42/30658.abstract 
@@ -517,7 +528,7 @@ JF  - Journal of Biological Chemistry
 JO  - Journal of Biological Chemistry 
 SP  - 5042 
 EP  - 5049 
-N1  - 10.1074/jbc.M510454200 
+N1  - doi: 10.1074/jbc.M510454200 
 VL  - 281 
 IS  - 8 
 UR  - http://www.jbc.org/content/281/8/5042.abstract 
@@ -538,7 +549,7 @@ JF  - Proceedings of the National Academy of Sciences
 JO  - Proceedings of the National Academy of Sciences 
 SP  - 16692 
 EP  - 16697 
-N1  - 10.1073/pnas.0608127103 
+N1  - doi: 10.1073/pnas.0608127103 
 VL  - 103 
 IS  - 45 
 UR  - http://www.pnas.org/content/103/45/16692.abstract 
@@ -561,48 +572,572 @@ JF  - Proceedings of the National Academy of Sciences
 JO  - Proceedings of the National Academy of Sciences 
 SP  - 11503 
 EP  - 11508 
-N1  - 10.1073/pnas.0600489103 
+N1  - doi: 10.1073/pnas.0600489103 
 VL  - 103 
 IS  - 31 
 UR  - http://www.pnas.org/content/103/31/11503.abstract 
 N2  - Falcipain-2 (FP2), the major cysteine protease of the human malaria parasite Plasmodium falciparum, is a hemoglobinase and promising drug target. Here we report the crystal structure of FP2 in complex with a protease inhibitor, cystatin. The FP2 structure reveals two previously undescribed cysteine protease structural motifs, designated FP2nose and FP2arm, in addition to details of the active site that will help focus inhibitor design. Unlike most cysteine proteases, FP2 does not require a prodomain but only the short FP2nose motif to correctly fold and gain catalytic activity. Our structure and mutagenesis data suggest a molecular basis for this unique mechanism by highlighting the functional role of two Tyr within FP2nose and a conserved Glu outside this motif. The FP2arm motif is required for hemoglobinase activity. The structure reveals topographic features and a negative charge cluster surrounding FP2arm that suggest it may serve as an exo-site for hemoglobin binding. Motifs similar to FP2nose and FP2arm are found only in related plasmodial proteases, suggesting that they confer malaria-specific functions. 
 ER  -
-[2005 Publications]
-Morozov, A.V. & Kortemme T. Potential functions for hydrogen bonds in protein structure prediction and design. Adv Protein Chem 2005;72:1-38.
-
-[Prediction and Design of Protein-Protein Interactions]
-Kortemme, T, & Baker, D. A simple physical model for binding energy hotspots in protein protein complexes, Proc Natl Acad Sci U S A 99, 14116-14121, 2002.
-Chevalier, BS, Kortemme, T, Chadsey, MS, Baker, D, Monnat, RJJr., & Stoddard, BL. Design, activity and structure of E-DreI, a highly site-specific artificial endonuclease. Mol. Cell 10, 895-905, 2002.
-Gray, JJ, Moughon, S, Kortemme, T, Schueler-Furman, O, Misura, KMS, Morozov, AV, & Baker, D. Protein-protein docking predictions for the CAPRI experiment. Prot. Struct. Funct. Genet. 52, 118-122, 2003.
-Kortemme, T, Joachimiak, LA, Bullock, AN, Schuler, AD, Stoddard, BL, & Baker, D. Computational redesign of protein-protein interaction specificity. Nat Struct Mol Biol 11, 371-379, 2004.
-Kortemme T, & Baker D. Computational design of protein-protein interactions. Curr Opin Chem Biol 8, 91-97, 2004.
-
-[Computational Models & Energy Functions]
-Kortemme, T, Morozov, AV, & Baker, D. An orientation-dependent hydrogen bonding potential improves prediction of specificity and structure for proteins and protein complexes. J. Mol. Biol. 326, 1239-1259, 2003.
-Morozov, AV, Kortemme, T, & Baker, D. Evaluation of models of electrostatic interactions in proteins. J. Phys. Chem. B 107, 2075-2090, 2003.
-Kortemme, T, Kim, DE, & Baker, D. Computational alanine scanning of protein-protein interfaces. Sci STKE 2004, pl2, 2004.
-Morozov, AV, Kortemme, T, Tsemekhman, K, & Baker, D. Close agreement between the orientation dependence of hydrogen bonds observed in protein structures and quantum mechanical calculations. Proc Natl Acad Sci U S A 101, 6946-6951, 2004.
-Chen Y, Kortemme T, Robertson T, Baker D, & Varani, G. A new hydrogen-bonding potential for the design of protein-RNA interactions predicts specific contacts and discriminates decoys. Nucleic Acids Res. 32, 147-162, 2004.
-Jiang, L, Kuhlman, B, Kortemme, T, Baker, D. A "solvated rotamer" approach to modeling water-mediated hydrogen bonds at protein-protein interfaces. Proteins 58, 893-904, 2005.
-
-[Predictions on Specific Systems]
-McFarland, BJ, Kortemme, T, Baker, D, & Strong, RK. Symmetry recognizing asymmetry: Analysis of the interactions between the C-type lectin-like immunoreceptor NKG2D and its MHC class I-like ligand, Structure 11, 411-422, 2003.
-Boulanger MJ, Bankovich AJ, Kortemme T, Baker D, & Garcia KC. Convergent mechanisms for recognition of divergent cytokines by the shared signaling receptor gp130. Mol. Cell 12, 577-589, 2003.
-Svensson, HG, Wedemeyer, WJ, Ekstrom, JL, Callender, DR, Kortemme, T, Kim, DE, Sjobring, U, & Baker, D. Contributions of amino acid side chains to the kinetics and thermodynamics of the bivalent binding of protein L to Ig kappa light chain. Biochemistry 43, 2445-2457, 2004.
-
-[Peptide Model Systems: Alpha-helices and Beta-sheets]
-Chakrabartty, A, Kortemme, T, Padmanabhan, S, & Baldwin, RL. Aromatic side-chain contribution to far-ultraviolet circular dichroism of helical peptides and its effect on measurement of helix propensities. Biochemistry 32, 5560-5565, 1993.
-Chakrabartty, A., Kortemme, T, & Baldwin, RL. Helix propensities of the amino acids measured in alanine-based peptides without helix-stabilizing side-chain interactions. Protein Sci. 3, 843-852, 1994.
-Kortemme, T, Ramirez-Alvarado, M, & Serrano, L. Design of a 20 amino acid three-stranded betasheet protein. Science 281, 253-256, 1998.
-Ramirez-Alvarado, M, Kortemme, T, Blanco, FJ, & Serrano, L. Beta-hairpin and beta-sheet formation in designed linear peptides. Bioorg Med Chem 7, 93-103, 1999.
-Lacroix, E, Kortemme, T, Lopez de la Paz, M., & Serrano, L. The design of linear peptides that fold as monomeric beta-sheet structures. Curr Opin Struct Biol 9, 487-93, 1999.
-
-[Protein Folding]
-Kortemme, T, Hollecker, M, Kemmink, J, & Creighton, TE. Comparison of the (30-51, 14-38) two-disulphide folding intermediates of the homologous proteins dendrotoxin K and bovine pancreatic trypsin inhibitor by two-dimensional 1H nuclear magnetic resonance. J. Mol. Biol. 257, 188-198, 1996.
-Kortemme, T, Kelly, MJS, Kay, LE, Forman-Kay, J, & Serrano, L. Similarities between the spectrin SH3 domain denatured state and its folding transition state. J. Mol. Biol. 297, 1217-1229, 2000.
-Alm, E, Morozov, AV, Kortemme, T, & Baker, D. Simple physical models connect theory and experiment in protein folding kinetics. J. Mol. Biol. 322, 463-476, 2002.
-
-[Electrostatic interactions in Thioredoxin-like Proteins]
-Kortemme, T, & Creighton, TE. Ionisation of cysteine residues at the termini of model alpha-helical peptides. Relevance to unusual thiol pKa values in proteins of the thioredoxin family. J. Mol. Biol. 253, 799-812, 1995.
-Kortemme, T, Darby, NJ, & Creighton, TE. Electrostatic interactions in the active site of the N-terminal thioredoxin-like domain of protein disulfide isomerase. Biochemistry 35, 14503-14511, 1996.
-Bulaj, G, Kortemme, T, & Goldenberg, DP. Ionization-reactivity relationships for cysteine thiols in polypeptides. Biochemistry 37, 8965-8972, 1998.
+TY  - CHAP
+C8  - 2005 Publications
+AU  - Morozov, Alexandre V.
+AU  - Kortemme, Tanja
+T1  - Potential Functions for Hydrogen Bonds in Protein Structure Prediction and Design
+A2  - Baldwin, Robert L.
+A2  - Baker, David
+BT  - Advances in Protein Chemistry
+PB  - Academic Press
+PY  - 2005
+VL  - Volume 72
+SP  - 1
+EP  - 38
+T2  - Peptide Solvation and H‐Bonds
+SN  - 0065-3233
+M3  - doi: 10.1016/S0065-3233(05)72001-5
+UR  - http://www.sciencedirect.com/science/article/pii/S0065323305720015
+ER  - 
+TY  - JOUR
+C8  - Prediction and Design of Protein-Protein Interactions
+A1  - Kortemme, Tanja
+A1  - Baker, David
+T1  - A simple physical model for binding energy hot spots in protein–protein complexes 
+Y1  - 2002/10/29 
+JF  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences 
+SP  - 14116 
+EP  - 14121 
+N1  - 10.1073/pnas.202485799 
+VL  - 99 
+IS  - 22 
+UR  - http://www.pnas.org/content/99/22/14116.abstract 
+N2  - Protein–protein recognition plays a central role in most biological processes. Although the structures of many protein–protein complexes have been solved in molecular detail, general rules describing affinity and selectivity of protein–protein interactions do not accurately account for the extremely diverse nature of the interfaces. We investigate the extent to which a simple physical model can account for the wide range of experimentally measured free energy changes brought about by alanine mutation at protein–protein interfaces. The model successfully predicts the results of alanine scanning experiments on globular proteins (743 mutations) and 19 protein–protein interfaces (233 mutations) with average unsigned errors of 0.81 kcal/mol and 1.06 kcal/mol, respectively. The results test our understanding of the dominant contributions to the free energy of protein–protein interactions, can guide experiments aimed at the design of protein interaction inhibitors, and provide a stepping-stone to important applications such as interface redesign. 
+ER  -
+TY  - JOUR
+C8  - Prediction and Design of Protein-Protein Interactions
+T1  - Design, Activity, and Structure of a Highly Specific Artificial Endonuclease
+JO  - Molecular Cell
+VL  - 10
+IS  - 4
+SP  - 895
+EP  - 905
+PY  - 2002/10//
+T2  - 
+AU  - Chevalier, Brett S.
+AU  - Kortemme, Tanja
+AU  - Chadsey, Meggen S.
+AU  - Baker, David
+AU  - Monnat Jr., Raymond J.
+AU  - Stoddard, Barry L.
+SN  - 1097-2765
+M3  - doi: 10.1016/S1097-2765(02)00690-1
+UR  - http://www.sciencedirect.com/science/article/pii/S1097276502006901
+ER  - 
+TY  - JOUR
+C8  - Prediction and Design of Protein-Protein Interactions
+A1  - Gray, Jeffrey J.
+A1  - Moughon, Stewart E.
+A1  - Kortemme, Tanja
+A1  - Schueler-Furman, Ora
+A1  - Misura, Kira M. S.
+A1  - Morozov, Alexandre V.
+A1  - Baker, David
+T1  - Protein–protein docking predictions for the CAPRI experiment
+JF  - Proteins: Structure, Function, and Bioinformatics
+JA  - Proteins
+VL  - 52
+IS  - 1
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1097-0134
+UR  - http://dx.doi.org/10.1002/prot.10384
+M3  - 10.1002/prot.10384
+SP  - 118
+EP  - 122
+KW  - protein binding
+KW  - protein interactions
+KW  - biomolecular free energy function
+KW  - high-resolution refinement
+KW  - flexible side chains
+Y1  - 2003
+ER  - 
+TY  - JOUR
+C8  - Prediction and Design of Protein-Protein Interactions
+AU  - Kortemme, Tanja
+AU  - Joachimiak, Lukasz A.
+AU  - Bullock, Alex N.
+AU  - Schuler, Aaron D.
+AU  - Stoddard, Barry L.
+AU  - Baker, David
+TI  - Computational redesign of protein-protein interaction specificity
+JA  - Nat Struct Mol Biol
+PY  - 2004/04//print
+VL  - 11
+IS  - 4
+SP  - 371
+EP  - 379
+SN  - 1545-9993
+UR  - http://dx.doi.org/10.1038/nsmb749
+M3  - 10.1038/nsmb749
+N1  - 10.1038/nsmb749
+L3  - http://www.nature.com/nsmb/journal/v11/n4/suppinfo/nsmb749_S1.html
+ER  - 
+TY  - JOUR
+C8  - Prediction and Design of Protein-Protein Interactions
+T1  - Computational design of protein–protein interactions
+JO  - Current Opinion in Chemical Biology
+VL  - 8
+IS  - 1
+SP  - 91
+EP  - 97
+PY  - 2004/2//
+T2  - 
+AU  - Kortemme, Tanja
+AU  - Baker, David
+SN  - 1367-5931
+M3  - doi: 10.1016/j.cbpa.2003.12.008
+UR  - http://www.sciencedirect.com/science/article/pii/S1367593103001777
+ER  - 
+TY  - JOUR
+C8  - Computational Models & Energy Functions
+T1  - An Orientation-dependent Hydrogen Bonding Potential Improves Prediction of Specificity and Structure for Proteins and Protein–Protein Complexes
+JO  - Journal of Molecular Biology
+VL  - 326
+IS  - 4
+SP  - 1239
+EP  - 1259
+PY  - 2003/2/28/
+T2  - 
+AU  - Kortemme, Tanja
+AU  - Morozov, Alexandre V.
+AU  - Baker, David
+SN  - 0022-2836
+M3  - doi: 10.1016/S0022-2836(03)00021-4
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283603000214
+KW  - hydrogen bond
+KW  - electrostatics
+KW  - protein docking
+KW  - protein design
+KW  - free energy function
+ER  - 
+TY  - JOUR
+C8  - Computational Models & Energy Functions
+T1  - Evaluation of Models of Electrostatic Interactions in Proteins
+AU  - Morozov, Alexandre V.
+AU  - Kortemme, Tanja
+AU  - Baker, David
+Y1  - 2003/02/07
+PY  - 2003
+DA  - 2003/03/01
+N1  - doi: 10.1021/jp0267555
+DO  - 10.1021/jp0267555
+T2  - The Journal of Physical Chemistry B
+JF  - The Journal of Physical Chemistry B
+JO  - J. Phys. Chem. B
+SP  - 2075
+EP  - 2090
+VL  - 107
+IS  - 9
+PB  - American Chemical Society
+SN  - 1520-6106
+M3  - doi: 10.1021/jp0267555
+UR  - http://dx.doi.org/10.1021/jp0267555
+Y2  - 2011/12/13
+ER  - 
+TY  - JOUR
+C8  - Computational Models & Energy Functions
+A1  - Kortemme, Tanja
+A1  - Kim, David E.
+A1  - Baker, David
+T1  - Computational Alanine Scanning of Protein-Protein Interfaces
+Y1  - 2004/2/10
+JF  - Science Signaling
+JO  - Sci. STKE
+SP  - pl2
+EP  - 
+VL  - 2004
+IS  - 219
+UR  - http://stke.sciencemag.org/cgi/content/abstract/sigtrans;2004/219/pl2
+N2  - Protein-protein interactions are key components of all signal transduction processes, so methods to alter these interactions promise to become important tools in dissecting function of connectivities in these networks. We have developed a fast computational approach for the prediction of energetically important amino acid residues in protein-protein interfaces (available at http://robetta.bakerlab.org/alaninescan), which we, following Peter Kollman, have termed "computational alanine scanning." The input consists of a three-dimensional structure of a protein-protein complex; output is a list of "hot spots," or amino acid side chains that are predicted to significantly destabilize the interface when mutated to alanine, analogous to the results of experimental alanine-scanning mutagenesis. 79% of hot spots and 68% of neutral residues were correctly predicted in a test of 233 mutations in 19 protein-protein complexes. A single interface can be analyzed in minutes. The computational methodology has been validated by the successful design of protein interfaces with new specificity and activity, and has yielded new insights into the mechanisms of receptor specificity and promiscuity in biological systems.
+N1  - 10.1126/stke.2192004pl2
+ER  -  
+TY  - JOUR
+C8  - Computational Models & Energy Functions
+A1  - Morozov, Alexandre V.
+A1  - Kortemme, Tanja
+A1  - Tsemekhman, Kiril
+A1  - Baker, David
+T1  - Close agreement between the orientation dependence of hydrogen bonds observed in protein structures and quantum mechanical calculations 
+Y1  - 2004/05/04 
+JF  - Proceedings of the National Academy of Sciences of the United States of America 
+JO  - Proceedings of the National Academy of Sciences of the United States of America 
+SP  - 6946 
+EP  - 6951 
+N1  - 10.1073/pnas.0307578101 
+VL  - 101 
+IS  - 18 
+UR  - http://www.pnas.org/content/101/18/6946.abstract 
+N2  - Hydrogen bonding is a key contributor to the exquisite specificity of the interactions within and between biological macromolecules, and hence accurate modeling of such interactions requires an accurate description of hydrogen bonding energetics. Here we investigate the orientation and distance dependence of hydrogen bonding energetics by combining two quite disparate but complementary approaches: quantum mechanical electronic structure calculations and protein structural analysis. We find a remarkable agreement between the energy landscapes obtained from the electronic structure calculations and the distributions of hydrogen bond geometries observed in protein structures. In contrast, molecular mechanics force fields commonly used for biomolecular simulations do not consistently exhibit close correspondence to either quantum mechanical calculations or experimentally observed hydrogen bonding geometries. These results suggest a route to improved energy functions for biological macromolecules that combines the generality of quantum mechanical electronic structure calculations with the accurate context dependence implicit in protein structural analysis. 
+ER  -
+TY  - JOUR
+C8  - Computational Models & Energy Functions
+A1  - Chen, Yu
+A1  - Kortemme, Tanja
+A1  - Robertson, Tim
+A1  - Baker, David
+A1  - Varani, Gabriele
+T1  - A new hydrogen-bonding potential for the design of protein–RNA interactions predicts specific contacts and discriminates decoys 
+Y1  - 2004/01/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - 5147 
+EP  - 5162 
+N1  - 10.1093/nar/gkh785 
+VL  - 32 
+IS  - 17 
+UR  - http://nar.oxfordjournals.org/content/32/17/5147.abstract 
+N2  - RNA-binding proteins play many essential roles in the regulation of gene expression in the cell. Despite the significant increase in the number of structures for RNA–protein complexes in the last few years, the molecular basis of specificity remains unclear even for the best-studied protein families. We have developed a distance and orientation-dependent hydrogen-bonding potential based on the statistical analysis of hydrogen-bonding geometries that are observed in high-resolution crystal structures of protein–DNA and protein–RNA complexes. We observe very strong geometrical preferences that reflect significant energetic constraints on the relative placement of hydrogen-bonding atom pairs at protein–nucleic acid interfaces. A scoring function based on the hydrogen-bonding potential discriminates native protein–RNA structures from incorrectly docked decoys with remarkable predictive power. By incorporating the new hydrogen-bonding potential into a physical model of protein–RNA interfaces with full atom representation, we were able to recover native amino acids at protein–RNA interfaces. 
+ER  -
+TY  - JOUR
+C8  - Computational Models & Energy Functions
+A1  - Jiang, Lin
+A1  - Kuhlman, Brian
+A1  - Kortemme, Tanja
+A1  - Baker, David
+T1  - A “solvated rotamer” approach to modeling water-mediated hydrogen bonds at protein–protein interfaces
+JF  - Proteins: Structure, Function, and Bioinformatics
+JA  - Proteins
+VL  - 58
+IS  - 4
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1097-0134
+UR  - http://dx.doi.org/10.1002/prot.20347
+M3  - 10.1002/prot.20347
+SP  - 893
+EP  - 904
+KW  - hydration
+KW  - solvent modeling
+KW  - water-mediated hydrogen bonds
+KW  - free-energy function
+KW  - protein design
+KW  - protein–protein interactions
+Y1  - 2005
+ER  - 
+TY  - JOUR
+C8  - Predictions on Specific Systems
+T1  - Symmetry Recognizing Asymmetry: Analysis of the Interactions between the C-Type Lectin-like Immunoreceptor NKG2D and MHC Class I-like Ligands
+JO  - Structure
+VL  - 11
+IS  - 4
+SP  - 411
+EP  - 422
+PY  - 2003/4//
+T2  - 
+AU  - McFarland, Benjamin J.
+AU  - Kortemme, Tanja
+AU  - Yu, Shuyuarn F.
+AU  - Baker, David
+AU  - Strong, Roland K.
+SN  - 0969-2126
+M3  - doi: 10.1016/S0969-2126(03)00047-9
+UR  - http://www.sciencedirect.com/science/article/pii/S0969212603000479
+KW  - immunoreceptors
+KW  - MHC class I homologs
+KW  - structural immunology
+KW  - molecular recognition
+KW  - computational alanine scanning
+KW  - interface plasticity
+ER  - 
+TY  - JOUR
+C8  - Predictions on Specific Systems
+T1  - Convergent Mechanisms for Recognition of Divergent Cytokines by the Shared Signaling Receptor gp130
+JO  - Molecular Cell
+VL  - 12
+IS  - 3
+SP  - 577
+EP  - 589
+PY  - 2003/9//
+T2  - 
+AU  - Boulanger, Martin J.
+AU  - Bankovich, Alexander J.
+AU  - Kortemme, Tanja
+AU  - Baker, David
+AU  - Garcia, K. Christopher
+SN  - 1097-2765
+M3  - doi: 10.1016/S1097-2765(03)00365-4
+UR  - http://www.sciencedirect.com/science/article/pii/S1097276503003654
+ER  - 
+TY  - JOUR
+C8  - Predictions on Specific Systems
+T1  - Contributions of Amino Acid Side Chains to the Kinetics and Thermodynamics of the Bivalent Binding of Protein L to Ig κ Light Chain†
+AU  - Svensson, Henrik G.
+AU  - Wedemeyer, William J.
+AU  - Ekstrom, Jennifer L.
+AU  - Callender, David R.
+AU  - Kortemme, Tanja
+AU  - Kim, David E.
+AU  - Sjöbring, Ulf
+AU  - Baker, David
+Y1  - 2004/02/13
+PY  - 2004
+DA  - 2004/03/01
+N1  - doi: 10.1021/bi034873s
+DO  - 10.1021/bi034873s
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 2445
+EP  - 2457
+VL  - 43
+IS  - 9
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi034873s
+UR  - http://dx.doi.org/10.1021/bi034873s
+Y2  - 2011/12/13
+ER  - 
+TY  - JOUR
+C8  - Peptide Model Systems: Alpha-helices and Beta-sheets
+T1  - Aromatic side-chain contribution to far-ultraviolet circular dichroism of helical peptides and its effect on measurement of helix propensities
+AU  - Chakrabartty, Avijit
+AU  - Kortemme, Tanja
+AU  - Padmanabhan, S.
+AU  - Baldwin, Robert L.
+Y1  - 1993/06/01
+PY  - 1993
+DA  - 1993/06/01
+N1  - doi: 10.1021/bi00072a010
+DO  - 10.1021/bi00072a010
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 5560
+EP  - 5565
+VL  - 32
+IS  - 21
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi00072a010
+UR  - http://dx.doi.org/10.1021/bi00072a010
+Y2  - 2011/12/13
+ER  - 
+TY  - JOUR
+C8  - Peptide Model Systems: Alpha-helices and Beta-sheets
+A1  - Chakrabartty, Avijit
+A1  - Kortemme, Tanja
+A1  - Baldwin, Robert L.
+T1  - Helix propensities of the amino acids measured in alanine-based peptides without helix-stabilizing side-chain interactions
+JF  - Protein Science
+JA  - Protein Science
+VL  - 3
+IS  - 5
+PB  - Cold Spring Harbor Laboratory Press
+SN  - 1469-896X
+UR  - http://dx.doi.org/10.1002/pro.5560030514
+M3  - 10.1002/pro.5560030514
+SP  - 843
+EP  - 852
+KW  - alanine-based peptides
+KW  - helix capping
+KW  - helix propensities
+KW  - helix stability
+KW  - modified Lifson-Roig theory
+KW  - peptide helices
+KW  - protein folding
+Y1  - 1994
+ER  - 
+TY  - JOUR
+C8  - Peptide Model Systems: Alpha-helices and Beta-sheets
+A1  - Kortemme, Tanja
+A1  - Ramı́rez-Alvarado, Marina
+A1  - Serrano, Luis
+T1  - Design of a 20-Amino Acid, Three-Stranded β-Sheet Protein 
+Y1  - 1998/07/10 
+JF  - Science 
+JO  - Science 
+SP  - 253 
+EP  - 256 
+N1  - 10.1126/science.281.5374.253 
+VL  - 281 
+IS  - 5374 
+UR  - http://www.sciencemag.org/content/281/5374/253.abstract 
+N2  - A 20-residue protein (named Betanova) forming a monomeric, three-stranded, antiparallel β sheet was designed using a structural backbone template and an iterative hierarchical approach. Structural and physicochemical characterization show that the β-sheet conformation is stabilized by specific tertiary interactions and that the protein exhibits a cooperative two-state folding-unfolding transition, which is a hallmark of natural proteins. The Betanova molecule constitutes a tractable model system to aid in the understanding of β-sheet formation, including β-sheet aggregation and amyloid fibril formation. 
+ER  -
+TY  - JOUR
+C8  - Peptide Model Systems: Alpha-helices and Beta-sheets
+T1  - β-Hairpin and β-sheet formation in designed linear peptides
+JO  - Bioorganic &amp; Medicinal Chemistry
+VL  - 7
+IS  - 1
+SP  - 93
+EP  - 103
+PY  - 1999/1//
+T2  - 
+AU  - Ramı́rez-Alvarado, Marina
+AU  - Kortemme, Tanja
+AU  - Blanco, Francisco J.
+AU  - Serrano, Luis
+SN  - 0968-0896
+M3  - doi: 10.1016/S0968-0896(98)00215-6
+UR  - http://www.sciencedirect.com/science/article/pii/S0968089698002156
+KW  - β-hairpin
+KW  - β-sheet
+KW  - peptides
+KW  - protein folding
+KW  - NMR
+ER  - 
+TY  - JOUR
+C8  - Peptide Model Systems: Alpha-helices and Beta-sheets
+T1  - The design of linear peptides that fold as monomeric β-sheet structures
+JO  - Current Opinion in Structural Biology
+VL  - 9
+IS  - 4
+SP  - 487
+EP  - 493
+PY  - 1999/8//
+T2  - 
+AU  - Lacroix, Emmanuel
+AU  - Kortemme, Tanja
+AU  - de la Paz, Manuela Lopez
+AU  - Serrano, Luis
+SN  - 0959-440X
+M3  - doi: 10.1016/S0959-440X(99)80069-4
+UR  - http://www.sciencedirect.com/science/article/pii/S0959440X99800694
+ER  - 
+TY  - JOUR
+C8  - Protein Folding
+T1  - Comparison of the (30-51, 14-38) Two-disulphide Folding Intermediates of the Homologous Proteins Dendrotoxin K and Bovine Pancreatic Trypsin Inhibitor by Two-dimensional1H Nuclear Magnetic Resonance
+JO  - Journal of Molecular Biology
+VL  - 257
+IS  - 1
+SP  - 188
+EP  - 198
+PY  - 1996/3/22/
+T2  - 
+AU  - Kortemme, Tanja
+AU  - Hollecker, Michelle
+AU  - Kemmink, Johan
+AU  - Creighton, Thomas E.
+SN  - 0022-2836
+M3  - doi: 10.1006/jmbi.1996.0155
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283696901552
+KW  - BPTI
+KW  - protein folding
+KW  - disulphide bonds
+KW  - NMR
+KW  - dendrotoxin
+ER  - 
+TY  - JOUR
+C8  - Protein Folding
+T1  - Similarities between the spectrin SH3 domain denatured state and its folding transition state
+JO  - Journal of Molecular Biology
+VL  - 297
+IS  - 5
+SP  - 1217
+EP  - 1229
+PY  - 2000/4/14/
+T2  - 
+AU  - Kortemme, Tanja
+AU  - Kelly, Mark J. S.
+AU  - Kay, Lewis E.
+AU  - Forman-Kay, Julie
+AU  - Serrano, Luis
+SN  - 0022-2836
+M3  - doi: 10.1006/jmbi.2000.3618
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283600936180
+KW  - denatured state ensemble
+KW  - transition state
+KW  - protein folding
+KW  - NMR
+KW  - deuteration
+ER  - 
+TY  - JOUR
+C8  - Protein Folding
+T1  - Simple Physical Models Connect Theory and Experiment in Protein Folding Kinetics
+JO  - Journal of Molecular Biology
+VL  - 322
+IS  - 2
+SP  - 463
+EP  - 476
+PY  - 2002/9/13/
+T2  - 
+AU  - Alm, Eric
+AU  - Morozov, Alexandre V.
+AU  - Kortemme, Tanja
+AU  - Baker, David
+SN  - 0022-2836
+M3  - doi: 10.1016/S0022-2836(02)00706-4
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283602007064
+KW  - protein folding
+KW  - transition state
+KW  - kinetics
+KW  - φ-values
+KW  - master equation
+ER  - 
+TY  - JOUR
+C8  - Electrostatic interactions in Thioredoxin-like Proteins
+T1  - Ionisation of Cysteine Residues at the Termini of Model α-Helical Peptides. Relevance to Unusual Thiol pKaValues in Proteins of the Thioredoxin Family
+JO  - Journal of Molecular Biology
+VL  - 253
+IS  - 5
+SP  - 799
+EP  - 812
+PY  - 1995/11/10/
+T2  - 
+AU  - Kortemme, Tanja
+AU  - Creighton, Thomas E.
+SN  - 0022-2836
+M3  - doi: 10.1006/jmbi.1995.0592
+UR  - http://www.sciencedirect.com/science/article/pii/S002228368570592X
+KW  - α-helix dipole
+KW  - electrostatic interactions
+KW  - cysteine residues
+KW  - thioredoxin
+KW  - DsbA
+ER  - 
+TY  - JOUR
+C8  - Electrostatic interactions in Thioredoxin-like Proteins
+T1  - Electrostatic Interactions in the Active Site of the N-Terminal Thioredoxin-like Domain of Protein Disulfide Isomerase
+AU  - Kortemme, Tanja
+AU  - Darby, Nigel J.
+AU  - Creighton, Thomas E.
+Y1  - 1996/01/01
+PY  - 1996
+DA  - 1996/01/01
+N1  - doi: 10.1021/bi9617724
+DO  - 10.1021/bi9617724
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 14503
+EP  - 14511
+VL  - 35
+IS  - 46
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi9617724
+UR  - http://dx.doi.org/10.1021/bi9617724
+Y2  - 2011/12/13
+ER  - 
+TY  - JOUR
+C8  - Electrostatic interactions in Thioredoxin-like Proteins
+T1  - Ionization−Reactivity Relationships for Cysteine Thiols in Polypeptides†
+AU  - Bulaj, Grzegorz
+AU  - Kortemme, Tanja
+AU  - Goldenberg, David P.
+Y1  - 1998/06/01
+PY  - 1998
+DA  - 1998/06/01
+N1  - doi: 10.1021/bi973101r
+DO  - 10.1021/bi973101r
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 8965
+EP  - 8972
+VL  - 37
+IS  - 25
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi973101r
+UR  - http://dx.doi.org/10.1021/bi973101r
+Y2  - 2011/12/13
+ER  - 
