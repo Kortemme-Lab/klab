@@ -434,7 +434,8 @@ class LogReader(object):
 			else:
 				rowstyle = failstyle[count % 2]
 				status = "FAIL"
-			#
+				
+			laststatusstyle = tablestyle[count % 2]
 			if details["status"] & RETROSPECT_FAIL:
 				laststatusstyle = failstyle[count % 2]
 				status = "FAIL"
@@ -442,9 +443,8 @@ class LogReader(object):
 				laststatusstyle = warningstyle[count % 2]
 				status = "WARNINGS"
 			elif status != "FAIL" and status != "STOPPED":
-				laststatusstyle = tablestyle[count % 2]
 				status = "OK"
-			
+				
 			# Start a row	
 			html.append('<tr style="text-align:left;%s">\n' % rowstyle)
 			
