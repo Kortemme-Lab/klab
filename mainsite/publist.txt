@@ -4,12 +4,157 @@
 # There are a few changes needed to make the parsing work:
 #    - Add a C8 field indicating the group for the website. This will be stripped from the public RIS file.
 #    - If the DOI is present in an entry, prefix it with "doi: " if not already so. This helps parse the doi which appears in different fields from different sources. 
-#    - If no DOI is present but the article has a URL, add a URL. One example of this below is "Computer-aided design of functional protein interactions".
+#    - If no DOI is present but the article has a URL, add a UR field. One example of this below is "Computer-aided design of functional protein interactions".
 #    - Add the full journal name. This will be abbreviated for the website.
 #    - For maximum flexibility, use long form names with middle initials where appropriate. Append a period to abbreviated names e.g. "Kirk, James T."
+#    - Make sure the date has the proper format - YYYY/MM/DD/other. The other field can contain other information e.g. a range of days for a conference.
 # Any text before the first ER line is ignored for parsing and stripped from the public RIS file.
 #
 ER  -
+TY  - JOUR
+C8  - 2011 Publications 
+T1  - A Mechanism for Tunable Autoinhibition in the Structure of a Human Ca2+/Calmodulin- Dependent Kinase II Holoenzyme
+JO  - Cell
+VL  - 146
+IS  - 5
+SP  - 732
+EP  - 745
+PY  - 2011/9/2/
+T2  - 
+AU  - Chao, Luke H.
+AU  - Stratton, Margaret M.
+AU  - Lee, Il-Hyung
+AU  - Rosenberg, Oren S.
+AU  - Levitz, Joshua
+AU  - Mandell, Daniel J.
+AU  - Kortemme, Tanja
+AU  - Groves, Jay T.
+AU  - Schulman, Howard
+AU  - Kuriyan, John
+SN  - 0092-8674
+M3  - doi: 10.1016/j.cell.2011.07.038
+UR  - http://www.sciencedirect.com/science/article/pii/S0092867411008762
+ER  - 
+TY  - JOUR
+C8  - 2011 Publications 
+T1  - Predicting the Tolerated Sequences for Proteins and Protein Interfaces Using RosettaBackrub Flexible Backbone Design
+A1  - Smith, Colin A. 
+A1  - Kortemme, Tanja 
+Y1  - 2011/07/18
+N2  - <p>Predicting the set of sequences that are tolerated by a protein or protein interface, while maintaining a desired function, is useful for characterizing protein interaction specificity and for computationally designing sequence libraries to engineer proteins with new functions. Here we provide a general method, a detailed set of protocols, and several benchmarks and analyses for estimating tolerated sequences using flexible backbone protein design implemented in the Rosetta molecular modeling software suite. The input to the method is at least one experimentally determined three-dimensional protein structure or high-quality model. The starting structure(s) are expanded or refined into a conformational ensemble using Monte Carlo simulations consisting of backrub backbone and side chain moves in Rosetta. The method then uses a combination of simulated annealing and genetic algorithm optimization methods to enrich for low-energy sequences for the individual members of the ensemble. To emphasize certain functional requirements (e.g. forming a binding interface), interactions between and within parts of the structure (e.g. domains) can be reweighted in the scoring function. Results from each backbone structure are merged together to create a single estimate for the tolerated sequence space. We provide an extensive description of the protocol and its parameters, all source code, example analysis scripts and three tests applying this method to finding sequences predicted to stabilize proteins or protein interfaces. The generality of this method makes many other applications possible, for example stabilizing interactions with small molecules, DNA, or RNA. Through the use of within-domain reweighting and/or multistate design, it may also be possible to use this method to find sequences that stabilize particular protein conformations or binding interactions over others.</p>
+JF  - PLoS ONE
+JA  - PLoS ONE
+VL  - 6
+IS  - 7
+UR  - http://dx.doi.org/10.1371%2Fjournal.pone.0020451
+SP  - e20451
+EP  -
+PB  - Public Library of Science
+M3  - doi: 10.1371/journal.pone.0020451
+ER  -
+TY  - JOUR
+C8  - 2011 Publications 
+A1  - Babor, Mariana
+A1  - Mandell, Daniel J.
+A1  - Kortemme, Tanja
+T1  - Assessment of flexible backbone protein design methods for sequence library prediction in the therapeutic antibody Herceptin–HER2 interface
+JF  - Protein Science
+JA  - Protein Science
+VL  - 20
+IS  - 6
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1469-896X
+UR  - http://dx.doi.org/10.1002/pro.632
+M3  - doi: 10.1002/pro.632
+SP  - 1082
+EP  - 1089
+KW  - protein design
+KW  - sequence space
+KW  - library design
+KW  - antibody
+KW  - phage display
+KW  - flexible backbone
+KW  - conformational ensemble
+KW  - kinematic closure
+KW  - backrub
+KW  - molecular dynamics
+Y1  - 2011
+ER  - 
+TY  - CHAP
+C8  - 2011 Publications 
+AU  - Leaver-Fay, Andrew
+AU  - Tyka, Michael
+AU  - Lewis, Steven M.
+AU  - Lange, Oliver F.
+AU  - Thompson, James
+AU  - Jacak, Ron
+AU  - Kaufman, Kristian W.
+AU  - Renfrew, P. Douglas
+AU  - Smith, Colin A.
+AU  - Sheffler, Will
+AU  - Davis, Ian W.
+AU  - Cooper, Seth
+AU  - Treuille, Adrien
+AU  - Mandell, Daniel J.
+AU  - Richter, Florian
+AU  - Ban, Yih-En Andrew
+AU  - Fleishman, Sarel J.
+AU  - Corn, Jacob E.
+AU  - Kim, David E.
+AU  - Lyskov, Sergey
+AU  - Berrondo, Monica
+AU  - Mentzer, Stuart
+AU  - Popović, Zoran
+AU  - Havranek, James J.
+AU  - Karanicolas, John
+AU  - Das, Rhiju
+AU  - Meiler, Jens
+AU  - Kortemme, Tanja
+AU  - Gray, Jeffrey J.
+AU  - Kuhlman, Brian
+AU  - Baker, David
+AU  - Bradley, Philip
+T1  - Chapter nineteen - Rosetta3: An Object-Oriented Software Suite for the Simulation and Design of Macromolecules
+A2  - Johnson, Michael L.
+A2  - Brand, Ludwig
+BT  - Methods in Enzymology
+PB  - Academic Press
+PY  - 2011
+VL  - Volume 487
+SP  - 545
+EP  - 574
+T2  - Computer Methods, Part C
+SN  - 0076-6879
+M3  - doi: 10.1016/B978-0-12-381270-4.00019-6
+UR  - http://www.sciencedirect.com/science/article/pii/B9780123812704000196
+ER  - 
+TY  - JOUR
+C8  - 2011 Publications 
+T1  - Construction of a Genetic Multiplexer to Toggle between Chemosensory Pathways in Escherichia coli
+JO  - Journal of Molecular Biology
+VL  - 406
+IS  - 2
+SP  - 215
+EP  - 227
+PY  - 2011/2/18/
+T2  - 
+AU  - Moon, Tae Seok
+AU  - Clarke, Elizabeth J.
+AU  - Groban, Eli S.
+AU  - Tamsir, Alvin
+AU  - Clark, Ryan M.
+AU  - Eames, Matt
+AU  - Kortemme, Tanja
+AU  - Voigt, Christopher A.
+SN  - 0022-2836
+M3  - doi: 10.1016/j.jmb.2010.12.019
+UR  - http://www.sciencedirect.com/science/article/pii/S0022283610013264
+KW  - genetic memory
+KW  - recombinase
+KW  - stochastic switching
+KW  - synthetic biology
+KW  - systems biology
+ER  - 
 TY  - JOUR
 C8  - 2010 Publications 
 T1  - Structure-Based Prediction of the Peptide Sequence Space Recognized by Natural and Synthetic PDZ Domains
@@ -102,7 +247,7 @@ AU  - Sentovich, Ellen
 AU  - Coelho, Carlos
 AU  - Kuehlmann, Andreas
 AU  - Kortemme, Tanja
-Y1  - 2-5 Nov. 2009
+Y1  - 2009/11/02/2nd-5th November 2009
 PY  - 2009
 KW  - Boolean functions
 KW  - bioinformatics
@@ -128,14 +273,14 @@ KW  - protein structure energy minimisation
 KW  - search based approach
 VL  - 
 JA  - Computer-Aided Design - Digest of Technical Papers, 2009. ICCAD 2009. IEEE/ACM International Conference on
-URL  - http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=5361301
+UR  - http://ieeexplore.ieee.org/xpls/abs_all.jsp?arnumber=5361301
 ER  - 
 TY  - JOUR
 C8  - 2009 Publications 
 AU  - Mandell, Daniel J.
 AU  - Kortemme, Tanja
 TI  - Computer-aided design of functional protein interactions
-JA  - Nat Chem Biol
+JA  - Nature Chemical Biology
 PY  - 2009/11//print
 VL  - 5
 IS  - 11
@@ -170,7 +315,7 @@ AU  - Mandell, Daniel J.
 AU  - Coutsias, Evangelos A.
 AU  - Kortemme, Tanja
 TI  - Sub-angstrom accuracy in protein loop reconstruction by robotics-inspired conformational sampling
-JA  - Nat Meth
+JA  - Nature Methods
 PY  - 2009/08//print
 VL  - 6
 IS  - 8
@@ -193,8 +338,8 @@ A1  - Meiler, Jens
 A1  - Kortemme, Tanja 
 Y1  - 2009/05/29
 N2  - <title>Author Summary</title><p>Knowledge of protein properties is essential for enhancing the understanding and engineering of biological functions. One key property of proteins is their flexibility—their intrinsic ability to adopt different conformations. This flexibility can be measured experimentally but the measurements are indirect and computational models are required to interpret them. Here we develop a new computational method for interpreting these measurements of flexibility and use it to create a model of flexibility of the protein ubiquitin. We apply our results to show relationships between the flexibility of one protein and the diversity of structures and amino acid sequences of the protein's evolutionary family. Thus, our results show that more accurate computational modeling of protein flexibility is useful for improving prediction of a broader range of amino acid sequences compatible with a given protein. Our method will be helpful for advancing methods to rationally engineer protein functions by enabling sampling of conformational and sequence diversity similar to that of a protein's evolutionary family.</p>
-JF  - PLoS Comput Biol
-JA  - PLoS Comput Biol
+JF  - PLoS Computational Biology
+JA  - PLoS Computational Biology
 VL  - 5
 IS  - 5
 UR  - http://dx.doi.org/10.1371%2Fjournal.pcbi.1000393
@@ -208,9 +353,10 @@ C8  - 2009 Publications
 AU  - Oberdorf, Richard
 AU  - Kortemme, Tanja
 TI  - Complex topology rather than complex membership is a determinant of protein dosage sensitivity
-JA  - Mol Syst Biol
+JA  - Molecular Systems Biology
 PY  - 2009/03/17/print
 VL  - 5
+IS  - 253
 PB  - EMBO and Nature Publishing Group
 UR  - http://dx.doi.org/10.1038/msb.2009.9
 M3  - doi: 10.1038/msb.2009.9
@@ -417,14 +563,14 @@ T1  - Design of Multi-Specificity in Protein Interfaces
 A1  - Humphris, Elisabeth L. 
 A1  - Kortemme, Tanja 
 Y1  - 2007/08/24
-N2  - <title>Author Summary</title><sec id="st1"><title/><p>Computational methods have recently led to remarkable successes in the design of molecules with novel functions. These approaches offer great promise for creating highly selective molecules to accurately control biological processes. However, to reach these goals modeling procedures are needed that are able to define the optimal â€œfitnessâ€ of a protein to function correctly within complex biological networks and in the context of many possible interaction partners. To make progress toward these goals, we describe a computational design procedure that predicts protein sequences optimized to bind not only to a single protein but also to a set of target interaction partners. Application of the method to characterize â€œhubâ€ proteins in cellular interaction networks gives insights into the mechanisms nature has used to tune protein surfaces to recognize multiple correct partner proteins. Our study also provides a starting point to engineer designer molecules that could modulate or replace naturally occurring protein interaction networks to combat misregulation in disease or to build new sets of protein interactions for synthetic biology.</p></sec>
-JF  - PLoS Comput Biol
-JA  - PLoS Comput Biol
+N2  - <title>Author Summary</title><sec id="st1"><title/><p>Computational methods have recently led to remarkable successes in the design of molecules with novel functions. These approaches offer great promise for creating highly selective molecules to accurately control biological processes. However, to reach these goals modeling procedures are needed that are able to define the optimal â€œfitnessâ€ of a protein to function correctly within complex biological networks and in the context of many possible interaction partners. To make progress toward these goals, we describe a computational design procedure that predicts protein sequences optimized to bind not only to a single protein but also to a set of target interaction partners. Application of the method to characterize â€œhubâ€ proteins in cellular interaction networks gives insights into the mechanisms nature has used to tune protein surfaces to recognize multiple correct partner proteins. Our study also provides a starting point to engineer designer molecules that could modulate or replace naturally occurring protein interaction networks to combat misregulation in disease or to build new sets of protein interactions for synthetic biology.</p></sec>.SP  - e164
+JF  - PLoS Computational Biology
+JA  - PLoS Computational Biology
 VL  - 3
 IS  - 8
 UR  - http://dx.plos.org/10.1371%2Fjournal.pcbi.0030164
-SP  - e164
-EP  -
+SP  - 1591
+EP  - 1604
 PB  - Public Library of Science
 M3  - doi: 10.1371/journal.pcbi.0030164
 ER  -
@@ -493,7 +639,7 @@ ER  -
 TY  - JOUR
 C8  - 2006 Publications 
 T1  - Ca2+ Indicators Based on Computationally Redesigned Calmodulin-Peptide Pairs
-JO  - Chemistry &amp; Biology
+JO  - Chemistry & Biology
 VL  - 13
 IS  - 5
 SP  - 521
@@ -668,7 +814,7 @@ AU  - Schuler, Aaron D.
 AU  - Stoddard, Barry L.
 AU  - Baker, David
 TI  - Computational redesign of protein-protein interaction specificity
-JA  - Nat Struct Mol Biol
+JA  - Nature Structural & Molecular Biology
 PY  - 2004/04//print
 VL  - 11
 IS  - 4
@@ -731,7 +877,7 @@ N1  - doi: 10.1021/jp0267555
 DO  - 10.1021/jp0267555
 T2  - The Journal of Physical Chemistry B
 JF  - The Journal of Physical Chemistry B
-JO  - J. Phys. Chem. B
+JO  - The Journal of Physical Chemistry B
 SP  - 2075
 EP  - 2090
 VL  - 107
@@ -767,8 +913,8 @@ A1  - Tsemekhman, Kiril
 A1  - Baker, David
 T1  - Close agreement between the orientation dependence of hydrogen bonds observed in protein structures and quantum mechanical calculations 
 Y1  - 2004/05/04 
-JF  - Proceedings of the National Academy of Sciences of the United States of America 
-JO  - Proceedings of the National Academy of Sciences of the United States of America 
+JF  - Proceedings of the National Academy of Sciences
+JO  - Proceedings of the National Academy of Sciences
 SP  - 6946 
 EP  - 6951 
 N1  - 10.1073/pnas.0307578101 
@@ -964,7 +1110,7 @@ ER  -
 TY  - JOUR
 C8  - Peptide Model Systems: Alpha-helices and Beta-sheets
 T1  - β-Hairpin and β-sheet formation in designed linear peptides
-JO  - Bioorganic &amp; Medicinal Chemistry
+JO  - Bioorganic & Medicinal Chemistry
 VL  - 7
 IS  - 1
 SP  - 93
@@ -1074,7 +1220,7 @@ KW  - master equation
 ER  - 
 TY  - JOUR
 C8  - Electrostatic interactions in Thioredoxin-like Proteins
-T1  - Ionisation of Cysteine Residues at the Termini of Model α-Helical Peptides. Relevance to Unusual Thiol pKaValues in Proteins of the Thioredoxin Family
+T1  - Ionisation of Cysteine Residues at the Termini of Model α-Helical Peptides. Relevance to Unusual Thiol pKa Values in Proteins of the Thioredoxin Family
 JO  - Journal of Molecular Biology
 VL  - 253
 IS  - 5
@@ -1119,7 +1265,7 @@ Y2  - 2011/12/13
 ER  - 
 TY  - JOUR
 C8  - Electrostatic interactions in Thioredoxin-like Proteins
-T1  - Ionization−Reactivity Relationships for Cysteine Thiols in Polypeptides†
+T1  - Ionization−Reactivity Relationships for Cysteine Thiols in Polypeptides
 AU  - Bulaj, Grzegorz
 AU  - Kortemme, Tanja
 AU  - Goldenberg, David P.

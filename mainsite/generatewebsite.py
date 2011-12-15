@@ -1,5 +1,6 @@
 from string import join
 import publications
+import news
 
 #<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 
@@ -24,7 +25,7 @@ header = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
 # body is open
 
 leftpane = '''
-    <table border="0" cellpadding="0" cellspacing="0" width="100%"> 
+    <table border="0" cellpadding="0" cellspacing="0" width="100%%"> 
       <tbody> 
         <tr valign="top"> 
           <td style="width:228px">
@@ -36,7 +37,7 @@ leftpane = '''
                       <tr valign="top"> 
                         <td style="width:30px">
                         <td>
-                        <a href="index.html" class="menulink">Home</a><br>
+                        <a href="%(testprefix)sindex.html" class="menulink">Home</a><br>
                       </tr>
                     </table>                    
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
@@ -49,7 +50,7 @@ leftpane = '''
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
                       <tr valign="top"> 
                         <td style="width:30px">
-                        <td><a href="people.html" class="menulink">People</a><br>
+                        <td><a href="%(testprefix)speople.html" class="menulink">People</a><br>
                       </tr>
                     </table>
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
@@ -62,7 +63,7 @@ leftpane = '''
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
                       <tr valign="top"> 
                         <td style="width:30px">
-                        <td><a href="publications.html" class="menulink">Publications</a><br>
+                        <td><a href="%(testprefix)spublications.html" class="menulink">Publications</a><br>
                       </tr>
                     </table>
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
@@ -75,7 +76,7 @@ leftpane = '''
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
                       <tr valign="top"> 
                         <td style="width:30px">
-                        <td><a href="research.html" class="menulink">Research</a><br>
+                        <td><a href="%(testprefix)sresearch.html" class="menulink">Research</a><br>
                         </tr>
                     </table>
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
@@ -88,7 +89,7 @@ leftpane = '''
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
                       <tr valign="top"> 
                         <td style="width:30px">
-                        <td><a href="meetings.html" class="menulink">Meetings</a><br>
+                        <td><a href="%(testprefix)smeetings.html" class="menulink">Meetings</a><br>
                       </tr>
                     </table>
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
@@ -101,7 +102,7 @@ leftpane = '''
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
                       <tr valign="top"> 
                         <td style="width:30px">
-                        <td><a href="news.html" class="menulink">News</a><br>
+                        <td><a href="%(testprefix)snews.html" class="menulink">News</a><br>
                       </tr>
                     </table>
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
@@ -114,7 +115,7 @@ leftpane = '''
                     <table border="0" cellpadding="0" cellspacing="0" width="228"> 
                       <tr valign="top"> 
                         <td style="width:30px">
-                        <td><a href="contact.html" class="menulink">Contact / Join the Lab</a><br>
+                        <td><a href="%(testprefix)scontact.html" class="menulink">Contact / Join the Lab</a><br>
                       </tr>
                     </table>
                    </td> 
@@ -222,32 +223,81 @@ footer = '''
 '''
 
 def indexHTML(page):
-	F = open(page, 'r')
+	F = open(page + ".html", 'r')
 	str = F.read()
 	F.close()
-	return str
-  
-def makePage(page, d, debug = True):
-	html = []
-	html.append(header % d)
-	html.append(leftpane)
-	html.append(d["generator"](page))
-	html.append(footer % d)
-	if debug:
-		F = open("/var/www/html/test-%s" % page, "w")
-	else:
-		F = open("/var/www/html/%s" % page, "w")
-	F.write(join(html, "\n"))
+	return [(page, str)]
+
+news_items = [
+	('September, 2010', 	'''Colin's paper on specificity prediction is highlighted by Faculty of 1000'''),
+	('September, 2010',		'''Ryan receives the Mel Jones Excellence in Graduate Student Research Award'''),
+	('June, 2010',			'''Dan receives the Julius R. Krevans Distinguished Dissertation Award'''),
+	('June, 2010',			'''Dan graduates'''),
+	('May, 2010', 			'''Matt graduates'''),
+	('October, 2009', 		'''Elisabeth graduates'''),
+	('August, 2009', 		'''The NSF &quot;Emerging Frontiers&quot; program awards our lab an ARRA research grant to improve and disseminate molecular modeling and prediction methods for the characterization and redesign of interactions between proteins, building on Florian's webserver work'''),
+	('April, 2009', 		'''Noah is awarded a NSF graduate research fellowship'''),
+	('January, 2009', 		'''The UC Office of the President awards our lab in collaboration with Charlie Strauss at LANL a UC Lab Research Grant on "New algorithms for computational design of protein biosensors". Our lab's contribution builds on Dan and Vageli's work on kinematic loop closure methods'''),
+	('January, 2009', 		'''Dan is awarded a PhRMA Foundation predoctoral fellowship in informatics'''),
+	('December, 2008', 		'''Greg F. graduates'''),
+	('July, 2008', 			'''Ryan is awarded a UCSF HHMI/NIBIB fellowship'''),
+	('July, 2008', 			'''Noah is awarded a UCSF HHMI/NIBIB fellowship'''),
+	('June, 2008', 			'''Rich is awarded a Kozloff graduate fellowship'''),
+	('March, 2008', 		'''Tanja receives an NSF CAREER award'''),
+	('July, 2007', 			'''Rich is awarded an iPQB fellowship in complex biological systems'''),
+	('April, 2007', 		'''Colin is awarded graduate student fellowships from Genentech, NSF, and DOD'''),
+	('October, 2006', 		'''Dan and Elisabeth are recipients of the UCSF/UC Berkeley Nanosciences and Biology Student Award'''),
+	('August, 2006', 		'''Elisabeth is awarded a Genentech/Sandler graduate student fellowship'''),
+	('July, 2006', 			'''Matt's work on quantifying how alternative mechanisms of protein evolution shape organism fitness is funded by a grant from the Sandler Program in Basic Sciences'''),
+	('June, 2006', 			'''Dan is awarded an ARCS graduate student fellowship'''),
+	('September, 2005', 	'''Cristina's and Greg K.'s work on engineering protein interaction modules is funded by an NIH grant on &quot;Engineering Cellular Control: Synthetic Signaling and Motility Systems&quot;, headed by Wendell Lim and in collaboration with labs at UCSF and UC Berkeley. Our group will be leading the &quot;molecular tool kit&quot; platform of the center'''),
+]
+
+def newsHTML(page):
+	'''One-use function to parse the news page to create the array above.''' 
+	#F = open(page + "/var/www/html/news.html", 'r')
+	F = open("news.html", 'r')
+	str = F.readlines()
 	F.close()
+	
+	newsstart = '''<tr><td width="125px" valign="top"><span class="meeting_text">'''
+	newsmid = '''</span></td><td><span class="meeting_text">'''
+	for line in str:
+		idx = line.find(newsstart)
+		if idx != -1:
+			line = line[idx + len(newsstart):]
+			idy = line.find(newsmid)
+			tm = line[:idy].strip()
+			event = line[idy + len(newsmid):].strip().replace("</span></td></tr>", "")
+			print(tm, event)
+	
+	return [()]
+	return [(page, str)]
+
+def makePage(page, d, debug = True):
+	testprefix = "test-"
+	for pagehtml in d["generator"](page):
+		if pagehtml:
+			html = []
+			html.append(header % d)
+			html.append(leftpane % vars())
+			html.append(pagehtml[1])
+			html.append(footer % d)
+			if debug:
+				F = open("/var/www/html/%s%s.html" % (testprefix, pagehtml[0]), "w")
+			else:
+				F = open("/var/www/html/%s.html" % pagehtml[0], "w")
+			F.write(join(html, "\n"))
+			F.close()
 
 def main():
 	strictlyValidated = '''<a href="http://validator.w3.org/check?uri=referer"><img src="http://www.w3.org/Icons/valid-html401" alt="Valid HTML 4.01 Strict" height="31" width="88"></a>'''
 	websitepages = {
-		'index.html'        : {'pagename' : 'Home',          'bodyclass' : '',  'validation' : strictlyValidated, 'generator' : indexHTML},
-		'publications.html' : {'pagename' : 'Publications',  'bodyclass' : '',  'validation' : '', 'generator' : publications.getHTML},
+		'index'        : {'pagename' : 'Home',          'bodyclass' : '',  'validation' : strictlyValidated, 'generator' : indexHTML},
+		'publications' : {'pagename' : 'Publications',  'bodyclass' : '',  'validation' : '', 'generator' : publications.getHTML},
 		#  'people.html'       : {'pagename' : 'People',        'bodyclass' : 'class="body_people"'},
 		#  'research.html'     : {'pagename' : 'Research',      'bodyclass' : ''},
-		#  'news.html'         : {'pagename' : 'News',          'bodyclass' : ''},
+		'news'		: {'pagename' : 'News',         'bodyclass': '', 'validation' : '', 'generator' : news.getHTML},
 		#  'contact.html'      : {'pagename' : 'Contact',       'bodyclass' : ''},
 		#  'meetings.html'     : {'pagename' : 'Meetings',      'bodyclass' : ''},
 	}
