@@ -1,6 +1,8 @@
 from string import join
 import publications
 import news
+import people
+import research
 
 #<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN">
 
@@ -228,52 +230,6 @@ def indexHTML(page):
 	F.close()
 	return [(page, str)]
 
-news_items = [
-	('September, 2010', 	'''Colin's paper on specificity prediction is highlighted by Faculty of 1000'''),
-	('September, 2010',		'''Ryan receives the Mel Jones Excellence in Graduate Student Research Award'''),
-	('June, 2010',			'''Dan receives the Julius R. Krevans Distinguished Dissertation Award'''),
-	('June, 2010',			'''Dan graduates'''),
-	('May, 2010', 			'''Matt graduates'''),
-	('October, 2009', 		'''Elisabeth graduates'''),
-	('August, 2009', 		'''The NSF &quot;Emerging Frontiers&quot; program awards our lab an ARRA research grant to improve and disseminate molecular modeling and prediction methods for the characterization and redesign of interactions between proteins, building on Florian's webserver work'''),
-	('April, 2009', 		'''Noah is awarded a NSF graduate research fellowship'''),
-	('January, 2009', 		'''The UC Office of the President awards our lab in collaboration with Charlie Strauss at LANL a UC Lab Research Grant on "New algorithms for computational design of protein biosensors". Our lab's contribution builds on Dan and Vageli's work on kinematic loop closure methods'''),
-	('January, 2009', 		'''Dan is awarded a PhRMA Foundation predoctoral fellowship in informatics'''),
-	('December, 2008', 		'''Greg F. graduates'''),
-	('July, 2008', 			'''Ryan is awarded a UCSF HHMI/NIBIB fellowship'''),
-	('July, 2008', 			'''Noah is awarded a UCSF HHMI/NIBIB fellowship'''),
-	('June, 2008', 			'''Rich is awarded a Kozloff graduate fellowship'''),
-	('March, 2008', 		'''Tanja receives an NSF CAREER award'''),
-	('July, 2007', 			'''Rich is awarded an iPQB fellowship in complex biological systems'''),
-	('April, 2007', 		'''Colin is awarded graduate student fellowships from Genentech, NSF, and DOD'''),
-	('October, 2006', 		'''Dan and Elisabeth are recipients of the UCSF/UC Berkeley Nanosciences and Biology Student Award'''),
-	('August, 2006', 		'''Elisabeth is awarded a Genentech/Sandler graduate student fellowship'''),
-	('July, 2006', 			'''Matt's work on quantifying how alternative mechanisms of protein evolution shape organism fitness is funded by a grant from the Sandler Program in Basic Sciences'''),
-	('June, 2006', 			'''Dan is awarded an ARCS graduate student fellowship'''),
-	('September, 2005', 	'''Cristina's and Greg K.'s work on engineering protein interaction modules is funded by an NIH grant on &quot;Engineering Cellular Control: Synthetic Signaling and Motility Systems&quot;, headed by Wendell Lim and in collaboration with labs at UCSF and UC Berkeley. Our group will be leading the &quot;molecular tool kit&quot; platform of the center'''),
-]
-
-def newsHTML(page):
-	'''One-use function to parse the news page to create the array above.''' 
-	#F = open(page + "/var/www/html/news.html", 'r')
-	F = open("news.html", 'r')
-	str = F.readlines()
-	F.close()
-	
-	newsstart = '''<tr><td width="125px" valign="top"><span class="meeting_text">'''
-	newsmid = '''</span></td><td><span class="meeting_text">'''
-	for line in str:
-		idx = line.find(newsstart)
-		if idx != -1:
-			line = line[idx + len(newsstart):]
-			idy = line.find(newsmid)
-			tm = line[:idy].strip()
-			event = line[idy + len(newsmid):].strip().replace("</span></td></tr>", "")
-			print(tm, event)
-	
-	return [()]
-	return [(page, str)]
-
 def makePage(page, d, debug = True):
 	testprefix = "test-"
 	for pagehtml in d["generator"](page):
@@ -293,13 +249,13 @@ def makePage(page, d, debug = True):
 def main():
 	strictlyValidated = '''<a href="http://validator.w3.org/check?uri=referer"><img src="http://www.w3.org/Icons/valid-html401" alt="Valid HTML 4.01 Strict" height="31" width="88"></a>'''
 	websitepages = {
-		'index'        : {'pagename' : 'Home',          'bodyclass' : '',  'validation' : strictlyValidated, 'generator' : indexHTML},
-		'publications' : {'pagename' : 'Publications',  'bodyclass' : '',  'validation' : '', 'generator' : publications.getHTML},
-		#  'people.html'       : {'pagename' : 'People',        'bodyclass' : 'class="body_people"'},
-		#  'research.html'     : {'pagename' : 'Research',      'bodyclass' : ''},
-		'news'		: {'pagename' : 'News',         'bodyclass': '', 'validation' : '', 'generator' : news.getHTML},
-		#  'contact.html'      : {'pagename' : 'Contact',       'bodyclass' : ''},
-		#  'meetings.html'     : {'pagename' : 'Meetings',      'bodyclass' : ''},
+		'index'			: {'pagename' : 'Home',			'bodyclass' : '',	'validation' : strictlyValidated,	'generator' : indexHTML},
+		'publications'	: {'pagename' : 'Publications', 'bodyclass' : '',	'validation' : '', 					'generator' : publications.getHTML},
+		'people'		: {'pagename' : 'People',		'bodyclass' : '', 	'validation' : strictlyValidated,	'generator' : people.getHTML},
+		'research'		: {'pagename' : 'Research',		'bodyclass' : '', 	'validation' : strictlyValidated,	'generator' : research.getHTML},
+		'news'			: {'pagename' : 'News',			'bodyclass' : '',	'validation' : strictlyValidated,	'generator' : news.getHTML},
+		#  'contact'      : {'pagename' : 'Contact',       'bodyclass' : ''},
+		#  'meetings'     : {'pagename' : 'Meetings',      'bodyclass' : ''},
 	}
 	
 	for p, d in websitepages.iteritems():

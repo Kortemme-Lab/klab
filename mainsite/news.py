@@ -1,7 +1,7 @@
 from string import join
 
 header  = '''
-      <td width="100%">
+      <td style="width:100%;">
         <table style="width: 100%;" border="0" cellpadding="0" cellspacing="0">
           <tbody>
             <tr valign="top">
@@ -9,12 +9,11 @@ header  = '''
                 <img src="img/news.jpg" alt="news" style="border: 0px solid ; width: 271px; height: 35px;">
                 <br>
                 <br> 
-                <table style="text-align: left; width: 100%; height: 19px;" border="0" cellpadding="0" cellspacing="0">
+                <table style="text-align: left; width: 100%; height: 19px;" border="0">
                   <tbody>'''
 
 item_html = '''
-                    <tr><td width="125px" valign="top"><span class="meeting_text">%(tm)s</span></td><td><span class="meeting_text">%(event)s</span></td></tr> 
-                    <tr><td height="10px><td height="10px"></tr>'''
+                    <tr class="newsitem"><td style="width:125px" valign="top"><span style="font-size: 13px;" class="meeting_text">%(tm)s</span></td><td><span class="meeting_text">%(event)s</span></td></tr> '''
 
 footer = '''
                   </tbody>
@@ -26,14 +25,14 @@ footer = '''
       </td>'''
 
 news_items = [
-	('September 2011', 		'''Ryan’s work on engineering light-controlled cadherins is funded by a grant from the NSF'''),
-	('August 2011', 		'''A new project on quantifying systems-level protein interaction specificity is funded by the NIH, in collaboration with Nevan Krogan’s group'''),
-	('July 2012', 			'''Colin graduates'''),
-	('July 2011', 			'''Noah’s abstract is selected for a talk at the “Structural Bioinformatics and Computational Biophysics” ISMB meeting in Vienna'''),
-	('June 2011', 			'''Laurens is awarded an ARCS graduate student fellowship'''),
-	('June 2011', 			'''Amelie is awarded an EMBO postdoctoral fellowship'''),
-	('March 2011', 			'''Dan's work on engineering small molecule biosensors is funded by a grant from the NIH'''),
-	('February 2011', 		'''Daniel is awarded a postdoctoral fellowship from the German Research Foundation'''),
+	('September, 2011', 		'''Ryan’s work on engineering light-controlled cadherins is funded by a grant from the NSF'''),
+	('August, 2011', 		'''A new project on quantifying systems-level protein interaction specificity is funded by the NIH, in collaboration with Nevan Krogan’s group'''),
+	('July, 2012', 			'''Colin graduates'''),
+	('July, 2011', 			'''Noah’s abstract is selected for a talk at the “Structural Bioinformatics and Computational Biophysics” ISMB meeting in Vienna'''),
+	('June, 2011', 			'''Laurens is awarded an ARCS graduate student fellowship'''),
+	('June, 2011', 			'''Amelie is awarded an EMBO postdoctoral fellowship'''),
+	('March, 2011', 			'''Dan's work on engineering small molecule biosensors is funded by a grant from the NIH'''),
+	('February, 2011', 		'''Daniel is awarded a postdoctoral fellowship from the German Research Foundation'''),
 	('September, 2010', 	'''Colin's paper on specificity prediction is highlighted by Faculty of 1000'''),
 	('September, 2010',		'''Ryan receives the Mel Jones Excellence in Graduate Student Research Award'''),
 	('June, 2010',			'''Dan receives the Julius R. Krevans Distinguished Dissertation Award'''),

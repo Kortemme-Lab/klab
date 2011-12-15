@@ -168,14 +168,30 @@ def parsePub(pub):
 				d[k] = v[0]
 	return d
 
+def pubpageID(pub_name):
+	s = shortFormatAuthor(pub_name)
+	s = s.replace(" ", "")
+	s = s.replace(".", "")
+	s = s.replace(",", "")
+	s = s.lower()
+	return s
+	
+def shortFormatAuthor(author):
+	names = re.split(r'[,]', author)
+	surname = names[0]
+	firstnames = [n for n in re.split(r'[ ]', names[1]) if n]
+	initials = join([n[0] for n in firstnames], "")
+	return "%s, %s" % (surname, initials)
+	
 def shortFormatAuthors(authors):
 	short = []
 	for author in authors:
-		names = re.split(r'[,]', author)
-		surname = names[0]
-		firstnames = [n for n in re.split(r'[ ]', names[1]) if n]
-		initials = join([n[0] for n in firstnames], "")
-		short.append("%s, %s" % (surname, initials))
+		short.append(shortFormatAuthor(author))
+		#names = re.split(r'[,]', author)
+		#surname = names[0]
+		#firstnames = [n for n in re.split(r'[ ]', names[1]) if n]
+		#initials = join([n[0] for n in firstnames], "")
+		#short.append("%s, %s" % (surname, initials))
 	return short
 
 def getShortPageRange(startpage, endpage):
@@ -414,20 +430,23 @@ Yellow potentially indicates a duplicate name, cyan potentially indicates a miss
 
 # List of lab members with publications. This is used to generate personal publications pages.
 labmembers = [
-	"Kortemme, Tanja",
-	"Babor, Mariana",
-	"Eames, Matt",
-	"Friedland, Gregory D.",
-	"Humphris, Elisabeth L.",
-	"Linares, Anthony J.",
-	"Lauck, Florian",
-	"Mandell, Daniel J.",
-	"Melero, Cristina",
-	"Oberdorf, Richard",
-	"Ollikainen, Noah",
-	"Smith, Colin A.",
-	"Tamsir, Alvin",
+	("Kortemme, Tanja", None),
+	("Babor, Mariana", None),
+	("Eames, Matt", None),
+	("Friedland, Gregory D.", "Greg"),
+	("Humphris, Elisabeth L.", None),
+	("Linares, Anthony J.", None),
+	("Lauck, Florian", None),
+	("Mandell, Daniel J.", "Dan"),
+	("Melero, Cristina", None),
+	("Oberdorf, Richard", None),
+	("Ollikainen, Noah", None),
+	("Smith, Colin A.", None),
+	("Tamsir, Alvin", None),
 ]
+
+def getPublishedMembers():
+	return [l[0] for l in labmembers]
 			
 def getHTML(page):
 	webpages = []
@@ -452,14 +471,15 @@ def getHTML(page):
 	webpages.append((page, join(html)))
 	
 	# Lab members publications pages
-	count = 0
-	for labmember in labmembers:
+	for labmemberp in labmembers:
+		labmember = labmemberp[0]
+		count = 0
 		sectionpubs = author_publications.get(labmember)
 		if sectionpubs:
 			html = [header]
-			firstname = [n for n in re.split(r'[, ]', labmember) if n][1]
+			firstname = labmemberp[1] or [n for n in re.split(r'[, ]', labmember) if n][1]
 			sectiontitle = "%s's Publications" % firstname
-			firstname = firstname.lower()
+			pagename = pubpageID(labmember)
 			html.append(sectionheader % sectiontitle)
 			html.append('''                <ol class="style14" style="counter-reset:item %d;" start="%d">''' % (count, count +1))
 			for p in sectionpubs:
@@ -467,7 +487,7 @@ def getHTML(page):
 				count += 1				
 			html.append('''                </ol>''')
 			html.append(footer)
-			webpages.append(("%s-%s" % (page, firstname), join(html)))
+			webpages.append(("%s-%s" % (page, pagename), join(html)))
 	return webpages
 
 #Missing in PubMed:
