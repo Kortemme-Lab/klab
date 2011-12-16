@@ -6,7 +6,7 @@ header = '''<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
     <title>Kortemme Lab, UCSF | %(pagename)s</title>
     <link href="style.css" type="text/css" rel="stylesheet">
   </head>
-  <body style="margin-bottom:0; margin-left:0; margin-right:0; margin-top:0; background-image: url(img/background.jpg);" %(bodyclass)s> 
+  <body style="margin-bottom:0; margin-left:0; margin-right:0; margin-top:0; background-image: url(img/background.jpg);"> 
     <table border="0" cellpadding="0" cellspacing="0" width="100%%"> 
       <tbody> 
         <tr valign="top"> 
@@ -215,3 +215,6 @@ footer = '''
     </body>
 </html>
 '''
+
+strict401 = '''<a href="http://validator.w3.org/check?uri=referer"><img src="http://www.w3.org/Icons/valid-html401" alt="Valid HTML 4.01 Strict" height="31" width="88"></a>'''
+	
