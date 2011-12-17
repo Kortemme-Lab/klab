@@ -27,7 +27,7 @@ footer = '''
 news_items = [
 	('September, 2011', 		'''Ryan’s work on engineering light-controlled cadherins is funded by a grant from the NSF'''),
 	('August, 2011', 		'''A new project on quantifying systems-level protein interaction specificity is funded by the NIH, in collaboration with Nevan Krogan’s group'''),
-	('July, 2012', 			'''Colin graduates'''),
+	('July, 2011', 			'''Colin graduates'''),
 	('July, 2011', 			'''Noah’s abstract is selected for a talk at the “Structural Bioinformatics and Computational Biophysics” ISMB meeting in Vienna'''),
 	('June, 2011', 			'''Laurens is awarded an ARCS graduate student fellowship'''),
 	('June, 2011', 			'''Amelie is awarded an EMBO postdoctoral fellowship'''),

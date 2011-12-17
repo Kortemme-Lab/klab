@@ -752,7 +752,7 @@ JF  - Proceedings of the National Academy of Sciences
 JO  - Proceedings of the National Academy of Sciences 
 SP  - 14116 
 EP  - 14121 
-N1  - 10.1073/pnas.202485799 
+N1  - doi: 10.1073/pnas.202485799 
 VL  - 99 
 IS  - 22 
 UR  - http://www.pnas.org/content/99/22/14116.abstract 
@@ -795,7 +795,7 @@ IS  - 1
 PB  - Wiley Subscription Services, Inc., A Wiley Company
 SN  - 1097-0134
 UR  - http://dx.doi.org/10.1002/prot.10384
-M3  - 10.1002/prot.10384
+M3  - doi: 10.1002/prot.10384
 SP  - 118
 EP  - 122
 KW  - protein binding
@@ -822,7 +822,7 @@ SP  - 371
 EP  - 379
 SN  - 1545-9993
 UR  - http://dx.doi.org/10.1038/nsmb749
-M3  - 10.1038/nsmb749
+M3  - doi: 10.1038/nsmb749
 N1  - 10.1038/nsmb749
 L3  - http://www.nature.com/nsmb/journal/v11/n4/suppinfo/nsmb749_S1.html
 ER  - 
@@ -903,7 +903,7 @@ VL  - 2004
 IS  - 219
 UR  - http://stke.sciencemag.org/cgi/content/abstract/sigtrans;2004/219/pl2
 N2  - Protein-protein interactions are key components of all signal transduction processes, so methods to alter these interactions promise to become important tools in dissecting function of connectivities in these networks. We have developed a fast computational approach for the prediction of energetically important amino acid residues in protein-protein interfaces (available at http://robetta.bakerlab.org/alaninescan), which we, following Peter Kollman, have termed "computational alanine scanning." The input consists of a three-dimensional structure of a protein-protein complex; output is a list of "hot spots," or amino acid side chains that are predicted to significantly destabilize the interface when mutated to alanine, analogous to the results of experimental alanine-scanning mutagenesis. 79% of hot spots and 68% of neutral residues were correctly predicted in a test of 233 mutations in 19 protein-protein complexes. A single interface can be analyzed in minutes. The computational methodology has been validated by the successful design of protein interfaces with new specificity and activity, and has yielded new insights into the mechanisms of receptor specificity and promiscuity in biological systems.
-N1  - 10.1126/stke.2192004pl2
+N1  - doi: 10.1126/stke.2192004pl2
 ER  -  
 TY  - JOUR
 C8  - Computational Models & Energy Functions
@@ -917,7 +917,7 @@ JF  - Proceedings of the National Academy of Sciences
 JO  - Proceedings of the National Academy of Sciences
 SP  - 6946 
 EP  - 6951 
-N1  - 10.1073/pnas.0307578101 
+N1  - doi: 10.1073/pnas.0307578101 
 VL  - 101 
 IS  - 18 
 UR  - http://www.pnas.org/content/101/18/6946.abstract 
@@ -936,7 +936,7 @@ JF  - Nucleic Acids Research
 JO  - Nucleic Acids Research 
 SP  - 5147 
 EP  - 5162 
-N1  - 10.1093/nar/gkh785 
+N1  - doi: 10.1093/nar/gkh785 
 VL  - 32 
 IS  - 17 
 UR  - http://nar.oxfordjournals.org/content/32/17/5147.abstract 
@@ -956,7 +956,7 @@ IS  - 4
 PB  - Wiley Subscription Services, Inc., A Wiley Company
 SN  - 1097-0134
 UR  - http://dx.doi.org/10.1002/prot.20347
-M3  - 10.1002/prot.20347
+M3  - doi: 10.1002/prot.20347
 SP  - 893
 EP  - 904
 KW  - hydration
@@ -1013,7 +1013,7 @@ UR  - http://www.sciencedirect.com/science/article/pii/S1097276503003654
 ER  - 
 TY  - JOUR
 C8  - Predictions on Specific Systems
-T1  - Contributions of Amino Acid Side Chains to the Kinetics and Thermodynamics of the Bivalent Binding of Protein L to Ig κ Light Chain†
+T1  - Contributions of Amino Acid Side Chains to the Kinetics and Thermodynamics of the Bivalent Binding of Protein L to Ig κ Light Chain
 AU  - Svensson, Henrik G.
 AU  - Wedemeyer, William J.
 AU  - Ekstrom, Jennifer L.
@@ -1078,7 +1078,7 @@ IS  - 5
 PB  - Cold Spring Harbor Laboratory Press
 SN  - 1469-896X
 UR  - http://dx.doi.org/10.1002/pro.5560030514
-M3  - 10.1002/pro.5560030514
+M3  - doi: 10.1002/pro.5560030514
 SP  - 843
 EP  - 852
 KW  - alanine-based peptides
@@ -1101,7 +1101,7 @@ JF  - Science
 JO  - Science 
 SP  - 253 
 EP  - 256 
-N1  - 10.1126/science.281.5374.253 
+N1  - doi: 10.1126/science.281.5374.253 
 VL  - 281 
 IS  - 5374 
 UR  - http://www.sciencemag.org/content/281/5374/253.abstract 
@@ -1286,4 +1286,984 @@ SN  - 0006-2960
 M3  - doi: 10.1021/bi973101r
 UR  - http://dx.doi.org/10.1021/bi973101r
 Y2  - 2011/12/13
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Isaacs, Farren J.
+A1  - Carr, Peter A.
+A1  - Wang, Harris H.
+A1  - Lajoie, Marc J.
+A1  - Sterling, Bram
+A1  - Kraal, Laurens
+A1  - Tolonen, Andrew C.
+A1  - Gianoulis, Tara A.
+A1  - Goodman, Daniel B.
+A1  - Reppas, Nikos B.
+A1  - Emig, Christopher J.
+A1  - Bang, Duhee
+A1  - Hwang, Samuel J.
+A1  - Jewett, Michael C.
+A1  - Jacobson, Joseph M.
+A1  - Church, George M.
+T1  - Precise Manipulation of Chromosomes in Vivo Enables Genome-Wide Codon Replacement 
+Y1  - 2011/07/15
+JF  - Science 
+JO  - Science 
+SP  - 348 
+EP  - 353 
+N1  - doi: 10.1126/science.1205822 
+VL  - 333 
+IS  - 6040 
+UR  - http://www.sciencemag.org/content/333/6040/348.abstract 
+N2  - We present genome engineering technologies that are capable of fundamentally reengineering genomes from the nucleotide to the megabase scale. We used multiplex automated genome engineering (MAGE) to site-specifically replace all 314 TAG stop codons with synonymous TAA codons in parallel across 32 Escherichia coli strains. This approach allowed us to measure individual recombination frequencies, confirm viability for each modification, and identify associated phenotypes. We developed hierarchical conjugative assembly genome engineering (CAGE) to merge these sets of codon modifications into genomes with 80 precise changes, which demonstrate that these synonymous codon substitutions can be combined into higher-order strains without synthetic lethal effects. Our methods treat the chromosome as both an editable and an evolvable template, permitting the exploration of vast genetic landscapes. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - A Test on Peptide Stability of AMBER Force Fields with Implicit Solvation
+AU  - Shell, M. Scott
+AU  - Ritterson, Ryan
+AU  - Dill, Ken A.
+Y1  - 2008/05/10
+PY  - 2008
+DA  - 2008/06/01
+N1  - doi: 10.1021/jp800282x
+DO  - 10.1021/jp800282x
+T2  - The Journal of Physical Chemistry B
+JF  - The Journal of Physical Chemistry B
+JO  - The Journal of Physical Chemistry B
+SP  - 6878
+EP  - 6886
+VL  - 112
+IS  - 22
+PB  - American Chemical Society
+SN  - 1520-6106
+M3  - doi: 10.1021/jp800282x
+UR  - http://dx.doi.org/10.1021/jp800282x
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Widespread Protein Aggregation as an Inherent Part of Aging in <italic>C. elegans</italic>
+A1  - David, Della C. 
+A1  - Ollikainen, Noah 
+A1  - Trinidad, Jonathan C. 
+A1  - Cary, Michael P. 
+A1  - Burlingame, Alma L. 
+A1  - Kenyon, Cynthia 
+Y1  - 2010/08/10
+N2  - <p>Several hundred proteins become insoluble and aggregation-prone as a consequence of aging in <italic>Caenorhabditis elegans</italic>. The data indicate that these proteins influence disease-related protein aggregation and toxicity.</p>
+JF  - PLoS Biology
+JA  - PLoS Biology
+VL  - 8
+IS  - 8
+UR  - http://dx.doi.org/10.1371%2Fjournal.pbio.1000450
+SP  - e1000450
+EP  -
+PB  - Public Library of Science
+M3  - doi: 10.1371/journal.pbio.1000450
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Gupta, Nitin
+A1  - Benhamida, Jamal
+A1  - Bhargava, Vipul
+A1  - Goodman, Daniel B.
+A1  - Kain, Elisabeth
+A1  - Kerman, Ian
+A1  - Nguyen, Ngan
+A1  - Ollikainen, Noah
+A1  - Rodriguez, Jesse
+A1  - Wang, Jian
+A1  - Lipton, Mary S.
+A1  - Romine, Margaret
+A1  - Bafna, Vineet
+A1  - Smith, Richard D.
+A1  - Pevzner, Pavel A.
+T1  - Comparative proteogenomics: Combining mass spectrometry and comparative genomics to analyze multiple genomes 
+Y1  - 2008/07/01 
+JF  - Genome Research 
+JO  - Genome Research 
+SP  - 1133 
+EP  - 1142 
+N1  - doi: 10.1101/gr.074344.107 
+VL  - 18 
+IS  - 7 
+UR  - http://genome.cshlp.org/content/18/7/1133.abstract 
+N2  - Recent proliferation of low-cost DNA sequencing techniques will soon lead to an explosive growth in the number of sequenced genomes and will turn manual annotations into a luxury. Mass spectrometry recently emerged as a valuable technique for proteogenomic annotations that improves on the state-of-the-art in predicting genes and other features. However, previous proteogenomic approaches were limited to a single genome and did not take advantage of analyzing mass spectrometry data from multiple genomes at once. We show that such a comparative proteogenomics approach (like comparative genomics) allows one to address the problems that remained beyond the reach of the traditional “single proteome” approach in mass spectrometry. In particular, we show how comparative proteogenomics addresses the notoriously difficult problem of “one-hit-wonders” in proteomics, improves on the existing gene prediction tools in genomics, and allows identification of rare post-translational modifications. We therefore argue that complementing DNA sequencing projects by comparative proteogenomics projects can be a viable approach to improve both genomic and proteomic annotations. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+AU  - Baker, Michael E.
+AU  - Chandsawangbhuwana, Charlie
+AU  - Ollikainen, Noah
+PY  - 2007
+IS  - 1
+M3  - doi: 10.1186/1471-2148-7-24
+SP  - 24
+T1  - Structural analysis of the evolution of steroid specificity in the mineralocorticoid and glucocorticoid receptors
+JO  - BMC Evolutionary Biology
+UR  - http://www.biomedcentral.com/1471-2148/7/24
+VL  - 7
+SN  - 1471-2148
+N2  - BACKGROUND:The glucocorticoid receptor (GR) and mineralocorticoid receptor (MR) evolved from a common ancestor. Still not completely understood is how specificity for glucocorticoids (e.g. cortisol) and mineralocorticoids (e.g. aldosterone) evolved in these receptors.RESULTS:Our analysis of several vertebrate GRs and MRs in the context of 3D structures of human GR and MR indicates that with the exception of skate GR, a cartilaginous fish, there is a deletion in all GRs, at the position corresponding to Ser-949 in human MR. This deletion occurs in a loop before helix 12, which contains the activation function 2 (AF2) domain, which binds coactivator proteins and influences transcriptional activity of steroids. Unexpectedly, we find that His-950 in human MR, which is conserved in the MR in chimpanzee, orangutan and macaque, is glutamine in all teleost and land vertebrate MRs, including New World monkeys and prosimians.CONCLUSION:Evolution of differences in the responses of the GR and MR to corticosteroids involved deletion in the GR of a residue corresponding to Ser-949 in human MR. A mutation corresponding to His-950 in human MR may have been important in physiological changes associated with emergence of Old World monkeys from prosimians.
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Ollikainen, Noah
+A1  - Chandsawangbhuwana, Charlie
+A1  - Baker, Michael E.
+T1  - Evolution of the thyroid hormone, retinoic acid, ecdysone and liver X receptors 
+Y1  - 2006/08/30 
+JF  - Integrative and Comparative Biology 
+JO  - Integrative and Comparative Biology 
+SP  - 815 
+EP  - 826 
+N1  - doi: 10.1093/icb/icl035 
+VL  - 46 
+IS  - 6 
+UR  - http://icb.oxfordjournals.org/content/46/6/815.abstract 
+N2  - Ecdysone and thyroid hormone are 2 ligands that have important roles in regulating metamorphosis in animals. Ecdysone is a steroid that regulates molting in insects. Thyroid hormone regulates differentiation and development in fish and amphibia. Although ecdysone and thyroid hormone have different chemical structures, both hormones act by binding to transcription factors that belong to the nuclear receptor family. We investigated the evolution of structure and function in the ecdysone receptor (EcR) and thyroid hormone receptor (TR), and liver X receptor (LXR) and retinoic acid receptor (RAR), which cluster with EcR and TR, respectively (Bertrand S, Brunet FG, Escriva H, Parmentier G, Laudet V, Robinson-Rechavi M. 2004. Mol Biol Evol 21:1923–37), by constructing a multiple alignment of their sequences and calculating ancestral sequences for TR, RAR, EcR, and LXR. These alignments were mapped onto the 3D structures of TR, RAR, EcR, and LXR in the Protein Data Bank to examine the evolution of amino acids involved in the binding of ligands to TR, RAR, EcR, and LXR. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+PB  - American Physical Society
+ID  - doi: 10.1103/PhysRevE.74.051801
+TI  - Secondary structures in long compact polymers
+JF  - Physical Review E
+JA  - Physical Review E
+J1  - PRE
+VL  - 74
+IS  - 5
+SP  - 051801
+EP  - 
+PY  - 2006/11/01/
+UR  - http://link.aps.org/doi/10.1103/PhysRevE.74.051801
+A1  - Oberdorf, Richard
+AU  - Ferguson, Allison
+AU  - Jacobsen, Jesper L.
+AU  - Kondev, Jané
+ER  - 
+
+
+
+
+TY  - JOUR
+C8  - LabMember
+T1  - Dynamics of Light-Induced Activation in the PAS Domain Proteins LOV2 and PYP Probed by Time-Resolved Tryptophan Fluorescence
+AU  - Hoersch, Daniel
+AU  - Bolourchian, Farzin
+AU  - Otto, Harald
+AU  - Heyn, Maarten P.
+AU  - Bogomolni, Roberto A.
+Y1  - 2010/11/22
+PY  - 2010
+DA  - 2010/12/28
+N1  - doi: 10.1021/bi101413v
+DO  - 10.1021/bi101413v
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 10811
+EP  - 10817
+VL  - 49
+IS  - 51
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi101413v
+UR  - http://dx.doi.org/10.1021/bi101413v
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Strong Hydrogen Bond between Glutamic Acid 46 and Chromophore Leads to the Intermediate Spectral Form and Excited State Proton Transfer in the Y42F Mutant of the Photoreceptor Photoactive Yellow Protein
+AU  - Joshi, Chandra P.
+AU  - Otto, Harald
+AU  - Hoersch, Daniel
+AU  - Meyer, Terry E.
+AU  - Cusanovich, Michael A.
+AU  - Heyn, Maarten P.
+Y1  - 2009/09/20
+PY  - 2009
+DA  - 2009/10/27
+N1  - doi: 10.1021/bi9012897
+DO  - 10.1021/bi9012897
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 9980
+EP  - 9993
+VL  - 48
+IS  - 42
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi9012897
+UR  - http://dx.doi.org/10.1021/bi9012897
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Time-resolved spectroscopy of dye-labeled photoactive yellow protein suggests a pathway of light-induced structural changes in the N-terminal cap
+A1  - Hoersch, Daniel
+A1  - Otto, Harald
+A1  - Cusanovich, Michael A.
+A1  - Heyn, Maarten P.
+Y1  - 2009
+SP  - 5437
+EP  - 5444
+JF  - Physical Chemistry Chemical Physics
+JO  - Physical Chemistry Chemical Physics
+VL  - 11
+IS  - 26
+PB  - The Royal Society of Chemistry
+SN  - 1463-9076
+M3  - doi: 10.1039/B821345C
+UR  - http://dx.doi.org/10.1039/B821345C
+N2  - The photoreceptor PYP responds to light activation with global conformational changes. These changes are mainly located in the N-terminal cap of the protein, which is [similar]20 A away from the chromophore binding pocket and separated from it by the central [small beta]-sheet. The question of the propagation of the structural change across the central [small beta]-sheet is of general interest for the superfamily of PAS domain proteins, for which PYP is the structural prototype. Here we measured the kinetics of the structural changes in the N-terminal cap by transient absorption spectroscopy on the ns to second timescale. For this purpose the cysteine mutants A5C and N13C were prepared and labeled with thiol reactive 5-iodoacetamidofluorescein (IAF). A5 is located close to the N-terminus, while N13 is part of helix [small alpha]1 near the functionally important salt bridge E12-K110 between the N-terminal cap and the central anti-parallel [small beta]-sheet. The absorption spectrum of the dye is sensitive to its environment, and serves as a sensor for conformational changes near the labeling site. In both labeled mutants light activation results in a transient red-shift of the fluorescein absorption spectrum. To correlate the conformational changes with the photocycle intermediates of the protein, we compared the kinetics of the transient absorption signal of the dye with that of the -hydroxycinnamoyl chromophore. While the structural change near A5 is synchronized with the rise of the I intermediate, which is formed in [similar]200 [small mu ]s, the change near N13 is delayed and rises with the next intermediate I[prime or minute], which forms in [similar]2 ms. This indicates that different parts of the N-terminal cap respond to light activation with different kinetics. For the signaling pathway of photoactive yellow protein we propose a model in which the structural signal propagates from the chromophore binding pocket across the central [small beta]-sheet the N-terminal region to helix [small alpha]1, resulting in a large change in the protein conformation.
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Monitoring the Conformational Changes of Photoactivated Rhodopsin from Μicroseconds to Seconds by Transient Fluorescence Spectroscopy†
+AU  - Hoersch, Daniel
+AU  - Otto, Harald
+AU  - Wallat, Ingrid
+AU  - Heyn, Maarten P.
+Y1  - 2008/10/11
+PY  - 2008
+DA  - 2008/11/04
+N1  - doi: 10.1021/bi801397e
+DO  - 10.1021/bi801397e
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 11518
+EP  - 11527
+VL  - 47
+IS  - 44
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi801397e
+UR  - http://dx.doi.org/10.1021/bi801397e
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Distinguishing Chromophore Structures of Photocycle Intermediates of the Photoreceptor PYP by Transient Fluorescence and Energy Transfer§
+AU  - Hoersch, Daniel
+AU  - Otto, Harald
+AU  - Cusanovich, Michael A.
+AU  - Heyn, Maarten P.
+Y1  - 2008/07/01
+PY  - 2008
+DA  - 2008/07/01
+N1  - doi: 10.1021/jp801174z
+DO  - 10.1021/jp801174z
+T2  - The Journal of Physical Chemistry B
+JF  - The Journal of Physical Chemistry B
+JO  - The Journal of Physical Chemistry B
+SP  - 9118
+EP  - 9125
+VL  - 112
+IS  - 30
+PB  - American Chemical Society
+SN  - 1520-6106
+M3  - doi: 10.1021/jp801174z
+UR  - http://dx.doi.org/10.1021/jp801174z
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Role of a Conserved Salt Bridge between the PAS Core and the N-Terminal Domain in the Activation of the Photoreceptor Photoactive Yellow Protein
+JO  - Biophysical Journal
+VL  - 93
+IS  - 5
+SP  - 1687
+EP  - 1699
+PY  - 2007/9/1/
+T2  - 
+AU  - Hoersch, Daniel
+AU  - Otto, Harald
+AU  - Joshi, Chandra P.
+AU  - Borucki, Berthold
+AU  - Cusanovich, Michael A.
+AU  - Heyn, Maarten P.
+SN  - 0006-3495
+M3  - doi: 10.1529/biophysj.107.106633
+UR  - http://www.sciencedirect.com/science/article/pii/S000634950771425X
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Time-Resolved Single Tryptophan Fluorescence in Photoactive Yellow Protein Monitors Changes in the Chromophore Structure during the Photocycle via Energy Transfer†
+AU  - Otto, Harald
+AU  - Hoersch, Daniel
+AU  - Meyer, Terry E.
+AU  - Cusanovich, Michael A.
+AU  - Heyn, Maarten P.
+Y1  - 2005/12/01
+PY  - 2005
+DA  - 2005/12/01
+N1  - doi: 10.1021/bi051448l
+DO  - 10.1021/bi051448l
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 16804
+EP  - 16816
+VL  - 44
+IS  - 51
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi051448l
+UR  - http://dx.doi.org/10.1021/bi051448l
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Itzhaki, Zohar
+A1  - Akiva, Eyal
+A1  - Margalit, Hanah
+T1  - Preferential use of protein domain pairs as interaction mediators: order and transitivity 
+Y1  - 2010/10/15 
+JF  - Bioinformatics 
+JO  - Bioinformatics 
+SP  - 2564 
+EP  - 2570 
+N1  - doi: 10.1093/bioinformatics/btq495 
+VL  - 26 
+IS  - 20 
+UR  - http://bioinformatics.oxfordjournals.org/content/26/20/2564.abstract 
+N2  - Motivation: Many protein–protein interactions (PPIs) are mediated by protein domains. The structural data of multi-domain PPIs reveal the domain pair (or pairs) that mediate a PPI, and implicitly also the domain pairs that are not involved in the interaction. By analyzing such data, preference relations between domain pairs as interaction mediators may be revealed.Results: Here, we analyze the differential use of domain pairs as mediators of stable interactions based on structurally solved multi-domain protein complexes. Our analysis revealed domain pairs that are preferentially used as interaction mediators and domain pairs that rarely or never mediate interaction, independent of the proteins' context. Between these extremes, there are domain pairs that mediate protein interaction in some protein contexts, while in other contexts different domain pairs predominate over them. By describing the preference relations between domain pairs as a network, we uncovered partial order and transitivity in these relations, which we further exploited for predicting interaction-mediating domains. The preferred domain pairs and the ones over which they predominate differ in several properties, but these differences cannot yet determine explicitly what underlies the differential use of domain pairs as interaction mediators. One property that stood up was the over-abundance of homotypic interactions among the preferred domain pairs, supporting previous suggestions on the advantages in the use of domain self-interaction for mediating protein interactions. Finally, we show a possible association between the preferred domain pairs and the function of the complex where they reside.Contact: hanahm@ekmd.huji.ac.ilSupplementary information: Supplementary data are available at Bioinformatics online. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Akiva, Eyal
+A1  - Itzhaki, Zohar
+A1  - Margalit, Hanah
+T1  - Built-in loops allow versatility in domain–domain interactions: Lessons from self-interacting domains 
+Y1  - 2008/09/09 
+JF  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences 
+SP  - 13292 
+EP  - 13297 
+N1  - doi: 10.1073/pnas.0801207105 
+VL  - 105 
+IS  - 36 
+UR  - http://www.pnas.org/content/105/36/13292.abstract 
+N2  - Compilations of domain–domain interactions based on solved structures suggest there are distinct domain pairs that are used repeatedly in different protein contexts to mediate protein–protein interactions. However, not all protein pairs with the corresponding domains that can potentially mediate interaction do interact, even when they are colocalized and coexpressed. It is conceivable that there are structural and sequence features, below the domain level, that play a role in determining the potential of domains to mediate protein–protein interactions. Here, we discover such features by comparing domains that, on the one hand, mediate homodimerization of proteins and, on the other, occur in different proteins that are documented as monomers. Intriguingly, this comparison uncovered surface loops that can be considered as determinants of the interactions. There are enabling loops, which mediate the domain interactions, and disabling loops that prevent the interactions. The presence of the enabling/disabling loops is consistent with the fulfillment/prevention of the interaction and is highly preserved in evolution. This suggests that, along with the preservation of structural elements that enable interaction, evolution maintains elements intended to prevent unwanted interactions. The enabling and disabling loops discovered in this study have implications in prediction of protein–protein interactions, by pointing to the protein regions that determine the interaction. Our results extend the hierarchy of attributes that collectively establish the modularity of domain-mediated protein–protein interactions. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+AU  - Itzhaki, Zohar
+AU  - Akiva, Eyal
+AU  - Altuvia, Yael
+AU  - Margalit, Hanah
+PY  - 2006
+IS  - 12
+M3  - doi: 10.1186/gb-2006-7-12-r125
+SP  - R125
+T1  - Evolutionary conservation of domain-domain interactions
+JO  - Genome Biology
+UR  - http://genomebiology.com/2006/7/12/R125
+VL  - 7
+SN  - 1465-6906
+N2  - BACKGROUND:Recently, there has been much interest in relating domain-domain interactions (DDIs) to protein-protein interactions (PPIs) and vice versa, in an attempt to understand the molecular basis of PPIs.RESULTS:Here we map structurally derived DDIs onto the cellular PPI networks of different organisms and demonstrate that there is a catalog of domain pairs that is used to mediate various interactions in the cell. We show that these DDIs occur frequently in protein complexes and that homotypic interactions (of a domain with itself) are abundant. A comparison of the repertoires of DDIs in the networks of Escherichia coli, Saccharomyces cerevisiae, Caenorhabditis elegans, Drosophila melanogaster, and Homo sapiens shows that many DDIs are evolutionarily conserved.CONCLUSION:Our results indicate that different organisms use the same 'building blocks' for PPIs, suggesting that the functionality of many domain pairs in mediating protein interactions is maintained in evolution.
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Huang, Yao-Ming
+A1  - Nayak, Sasmita
+A1  - Bystroff, Christopher
+T1  - Quantitative in vivo solubility and reconstitution of truncated circular permutants of green fluorescent protein
+JF  - Protein Science
+JA  - Protein Science
+VL  - 20
+IS  - 11
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1469-896X
+UR  - http://dx.doi.org/10.1002/pro.735
+M3  - doi: 10.1002/pro.735
+SP  - 1775
+EP  - 1780
+KW  - protein folding
+KW  - leave-one-out
+KW  - GFP
+KW  - reconstitution
+KW  - circular permutant
+Y1  - 2011
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - A Rewired Green Fluorescent Protein: Folding and Function in a Nonsequential, Noncircular GFP Permutant
+AU  - Reeder, Philippa J.
+AU  - Huang, Yao-Ming
+AU  - Dordick, Jonathan S.
+AU  - Bystroff, Christopher
+Y1  - 2010/11/23
+PY  - 2010
+DA  - 2010/12/28
+N1  - doi: 10.1021/bi100975z
+DO  - 10.1021/bi100975z
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 10773
+EP  - 10779
+VL  - 49
+IS  - 51
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi100975z
+UR  - http://dx.doi.org/10.1021/bi100975z
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Complementation and Reconstitution of Fluorescence from Circularly Permuted and Truncated Green Fluorescent Protein†
+AU  - Huang, Yao-Ming
+AU  - Bystroff, Christopher
+Y1  - 2009/01/13
+PY  - 2009
+DA  - 2009/02/10
+N1  - doi: 10.1021/bi802027g
+DO  - 10.1021/bi802027g
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 929
+EP  - 940
+VL  - 48
+IS  - 5
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi802027g
+UR  - http://dx.doi.org/10.1021/bi802027g
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Huang, Yao-Ming
+A1  - Bystroff, Christopher
+T1  - Improved pairwise alignments of proteins in the Twilight Zone using local structure predictions 
+Y1  - 2006/02/15 
+JF  - Bioinformatics 
+JO  - Bioinformatics 
+SP  - 413 
+EP  - 422 
+N1  - doi: 10.1093/bioinformatics/bti828 
+VL  - 22 
+IS  - 4 
+UR  - http://bioinformatics.oxfordjournals.org/content/22/4/413.abstract 
+N2  - Motivation: In recent years, advances have been made in the ability of computational methods to discriminate between homologous and non-homologous proteins in the ‘twilight zone’ of sequence similarity, where the percent sequence identity is a poor indicator of homology. To make these predictions more valuable to the protein modeler, they must be accompanied by accurate alignments. Pairwise sequence alignments are inferences of orthologous relationships between sequence positions. Evolutionary distance is traditionally modeled using global amino acid substitution matrices. But real differences in the likelihood of substitutions may exist for different structural contexts within proteins, since structural context contributes to the selective pressure.Results: HMMSUM (HMMSTR-based substitution matrices) is a new model for structural context-based amino acid substitution probabilities consisting of a set of 281 matrices, each for a different sequence–structure context. HMMSUM does not require the structure of the protein to be known. Instead, predictions of local structure are made using HMMSTR, a hidden Markov model for local structure. Alignments using the HMMSUM matrices compare favorably to alignments carried out using the BLOSUM matrices or structure-based substitution matrices SDM and HSDM when validated against remote homolog alignments from BAliBASE. HMMSUM has been implemented using local Dynamic Programming and with the Bayesian Adaptive alignment method.Availability: Matrices, source codes and programs are available at http://www.bioinfo.rpi.edu/~bystrc/downloads.html.Contact: bystrc@rpi.edu, huangy2@rpi.edu 
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Huang, Yao-Ming
+A1  - Chen, Shee-Uan
+A1  - Goodman, Steven D.
+A1  - Wu, Shang-Hsin
+A1  - Kao, Jau-Tsuen
+A1  - Lee, Chun-Nan
+A1  - Cheng, Wern-Cherng
+A1  - Tsai, Keh-Sung
+A1  - Fang, Woei-horng
+T1  - Interaction of Nick-directed DNA Mismatch Repair and Loop Repair in Human Cells 
+Y1  - 2004/07/16 
+JF  - Journal of Biological Chemistry 
+JO  - Journal of Biological Chemistry 
+SP  - 30228 
+EP  - 30235 
+N1  - doi: 10.1074/jbc.M401675200 
+VL  - 279 
+IS  - 29 
+UR  - http://www.jbc.org/content/279/29/30228.abstract 
+N2  - In human cells, large DNA loop heterologies are repaired through a nick-directed pathway independent of mismatch repair. However, a 3′-nick generated by bacteriophage fd gene II protein heterology is not capable of stimulating loop repair. To evaluate the possibility that a mismatch near a loop could induce both repair types in human cell extracts, we constructed and tested a set of DNA heteroduplexes, each of which contains a combination of mismatches and loops. We have demonstrated that a strand break generated by restriction endonucleases 3′ to a large loop is capable of provoking and directing loop repair. The repair of 3′-heteroduplexes in human cell extracts is very similar to that of 5′-heteroduplex repair, being strand-specific and highly biased to the nicked strand. This observation suggests that the loop repair pathway possesses bidirectional repair capability similar to that of the bacterial loop repair system. We also found that a nick 5′ to a coincident mismatch and loop can apparently stimulate the repair of both. In contrast, 3′-nick-directed repair of a G-G mismatch was reduced when in the vicinity of a loop (33 or 46 bp between two sites). Increasing the distance separating the G-G mismatch and loop by 325 bp restored the efficiency of repair to the level of a single base-base mismatch. This observation suggests interference between 3′-nick-directed large loop repair and conventional mismatch repair systems when a mispair is near a loop. We propose a model in which DNA repair systems avoid simultaneous repair at adjacent sites to avoid the creation of double-stranded DNA breaks. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Huang, Yao-Ming
+A1  - Lee, Chun-Nan
+A1  - Liang, W. C.
+A1  - Chuang, Y. K.
+A1  - Chang, Y. T.
+A1  - Fang, Woei-horng
+T1  -  DNA Mismatch Repair in Nuclear Extracts of Mouse M12 Cells
+Y1  - 2000
+JF  - Journal of Biomedical & Laboratory Sciences
+JO  - Journal of Biomedical & Laboratory Sciences 
+SP  - 35 
+EP  - 45 
+VL  - 12 
+IS  - 2 
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - A Systematic Study of the Energetics Involved in Structural Changes upon Association and Connectivity in Protein Interaction Networks
+JO  - Structure
+VL  - 19
+IS  - 6
+SP  - 881
+EP  - 889
+PY  - 2011/6/8/
+T2  - 
+AU  - Stein, Amelie
+AU  - Rueda, Manuel
+AU  - Panjkovich, Alejandro
+AU  - Orozco, Modesto
+AU  - Aloy, Patrick
+SN  - 0969-2126
+M3  - doi: 10.1016/j.str.2011.03.009
+UR  - http://www.sciencedirect.com/science/article/pii/S096921261100133X
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Three-dimensional modeling of protein interactions and complexes is going ‘omics
+JO  - Current Opinion in Structural Biology
+VL  - 21
+IS  - 2
+SP  - 200
+EP  - 208
+PY  - 2011/4//
+T2  - 
+AU  - Stein, Amelie
+AU  - Mosca, Roberto
+AU  - Aloy, Patrick
+SN  - 0959-440X
+M3  - doi: 10.1016/j.sbi.2011.01.005
+UR  - http://www.sciencedirect.com/science/article/pii/S0959440X11000078
+ER  - 
+TY  - JOUR
+C8  - LabMember
+AU  - Sardon, Teresa
+AU  - Pache, Roland A.
+AU  - Stein, Amelie
+AU  - Molina, Henrik
+AU  - Vernos, Isabelle
+AU  - Aloy, Patrick
+TI  - Uncovering new substrates for Aurora A kinase
+JA  - EMBO Reports
+PY  - 2010/12//print
+VL  - 11
+IS  - 12
+SP  - 977
+EP  - 984
+PB  - European Molecular Biology Organization
+SN  - 1469-221X
+UR  - http://dx.doi.org/10.1038/embor.2010.171
+M3  - doi: 10.1038/embor.2010.171
+N1  - doi: 10.1038/embor.2010.171
+L3  - http://www.nature.com/embor/journal/v11/n12/suppinfo/embor2010171a_S1.html
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Stein, Amelie
+A1  - Céol, Arnaud
+A1  - Aloy, Patrick
+T1  - 3did: identification and classification of domain-based interactions of known three-dimensional structure 
+Y1  - 2011/01/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - D718 
+EP  - D723 
+N1  - doi: 10.1093/nar/gkq962 
+VL  - 39 
+IS  - suppl 1 
+UR  - http://nar.oxfordjournals.org/content/39/suppl_1/D718.abstract 
+N2  - The database of three-dimensional interacting domains (3did) is a collection of protein interactions for which high-resolution three-dimensional structures are known. 3did exploits the availability of structural data to provide molecular details on interactions between two globular domains as well as novel domain–peptide interactions, derived using a recently published method from our lab. The interface residues are presented for each interaction type individually, plus global domain interfaces at which one or more partners (domains or peptides) bind. The 3did web server at http://3did.irbbarcelona.org visualizes these interfaces along with atomic details of individual interactions using Jmol. The complete contents are also available for download. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - Novel Peptide-Mediated Interactions Derived from High-Resolution 3-Dimensional Structures
+A1  - Stein, Amelie 
+A1  - Aloy, Patrick 
+Y1  - 2010/05/20
+N2  - <title>Author Summary</title><p>Protein-protein interactions are paramount in any aspect of the cellular life. Some proteins form large macromolecular complexes that execute core functionalities of the cell, while others transmit information in signalling networks to co-ordinate these processes. The latter type, of more transient nature, often occurs through the recognition of a small linear sequence motif in one protein by a specialized globular domain in the other. These peptide stretches often contain a consensus pattern complementary to the interaction surface displayed by their binding partners, and adopt a well-defined structure upon binding. Information that is currently available only from high-resolution three-dimensional (3D) structures, and that can be as characteristic as the consensus motif itself. In this manuscript, we present a strategy to identify novel domain-motif interactions (DMIs) among the set of protein complexes of known 3D structures, which provides information on the consensus motif and binding domain and also allows ready identification of the key interacting residues. A detailed knowledge of the interface is critical to plan further functional studies and for the development of interfering elements, be it drug-like compounds or novel engineered binding proteins or peptides. The small interfaces typical for DMIs make them interesting candidates for all these applications.</p>
+JF  - PLoS Computational Biology
+JA  - PLoS Computational Biology
+VL  - 6
+IS  - 5
+UR  - http://dx.doi.org/10.1371%2Fjournal.pcbi.1000789
+SP  - e1000789
+EP  -
+PB  - Public Library of Science
+M3  - doi: 10.1371/journal.pcbi.1000789
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Littler, D. R.
+A1  - Alvarez-Fernández, M.
+A1  - Stein, Amelie
+A1  - Hibbert, R. G.
+A1  - Heidebrecht, T.
+A1  - Aloy, P.
+A1  - Medema, R. H.
+A1  - Perrakis, A.
+T1  - Structure of the FoxM1 DNA-recognition domain bound to a promoter sequence 
+Y1  - 2010/07/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - 4527 
+EP  - 4538 
+N1  - doi: 10.1093/nar/gkq194 
+VL  - 38 
+IS  - 13 
+UR  - http://nar.oxfordjournals.org/content/38/13/4527.abstract 
+N2  - FoxM1 is a member of the Forkhead family of transcription factors and is implicated in inducing cell proliferation and some forms of tumorigenesis. It binds promoter regions with a preference for tandem repeats of a consensus ‘TAAACA’ recognition sequence. The affinity of the isolated FoxM1 DNA-binding domain for this site is in the micromolar range, lower than observed for other Forkhead proteins. To explain these FoxM1 features, we determined the crystal structure of its DNA-binding domain in complex with a tandem recognition sequence. FoxM1 adopts the winged-helix fold, typical of the Forkhead family. Neither ‘wing’ of the fold however, makes significant contacts with the DNA, while the second, C-terminal, wing adopts an unusual ordered conformation across the back of the molecule. The lack of standard DNA–‘wing’ interactions may be a reason for FoxM1’s relatively low affinity. The role of the ‘wings’ is possibly undertaken by other FoxM1 regions outside the DBD, that could interact with the target DNA directly or mediate interactions with other binding partners. Finally, we were unable to show a clear preference for tandem consensus site recognition in DNA-binding, transcription activation or bioinformatics analysis; FoxM1's moniker, ‘Trident’, is not supported by our data. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - Systematic Bioinformatics and Experimental Validation of Yeast Complexes Reduces the Rate of Attrition during Structural Investigations
+JO  - Structure
+VL  - 18
+IS  - 9
+SP  - 1075
+EP  - 1082
+PY  - 2010/9/8/
+T2  - 
+AU  - Brooks, Mark A.
+AU  - Gewartowski, Kamil
+AU  - Mitsiki, Eirini
+AU  - Létoquart, Juliette
+AU  - Pache, Roland A.
+AU  - Billier, Ysaline
+AU  - Bertero, Michela
+AU  - Corréa, Margot
+AU  - Czarnocki-Cieciura, Mariusz
+AU  - Dadlez, Michal
+AU  - Henriot, Véronique
+AU  - Lazar, Noureddine
+AU  - Delbos, Lila
+AU  - Lebert, Dorothée
+AU  - Piwowarski, Jan
+AU  - Rochaix, Pascal
+AU  - Böttcher, Bettina
+AU  - Serrano, Luis
+AU  - Séraphin, Bertrand
+AU  - van Tilbeurgh, Herman
+AU  - Aloy, Patrick
+AU  - Perrakis, Anastassis
+AU  - Dziembowski, Andrzej
+SN  - 0969-2126
+M3  - doi: 10.1016/j.str.2010.08.001
+UR  - http://www.sciencedirect.com/science/article/pii/S096921261000273X
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Stein, Amelie
+A1  - Pache, Roland A.
+A1  - Bernadó, Pau
+A1  - Pons, Miquel
+A1  - Aloy, Patrick
+T1  - Dynamic interactions of proteins in complex networks: a more structured view
+JF  - FEBS Journal
+VL  - 276
+IS  - 19
+PB  - Blackwell Publishing Ltd
+SN  - 1742-4658
+UR  - http://dx.doi.org/10.1111/j.1742-4658.2009.07251.x
+M3  - doi: 10.1111/j.1742-4658.2009.07251.x
+SP  - 5390
+EP  - 5405
+KW  - interaction specificity
+KW  - intrinsically unstructured proteins
+KW  - linear motifs
+KW  - modular recognition domains
+KW  - peptide-mediated interactions
+KW  - phosphorylation events
+KW  - post-translational modifications
+KW  - protein disorder
+KW  - protein interaction networks
+KW  - signalling networks
+Y1  - 2009
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Stein, Amelie
+A1  - Panjkovich, Alejandro
+A1  - Aloy, Patrick
+T1  - 3did Update: domain–domain and peptide-mediated interactions of known 3D structure 
+Y1  - 2009/01/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - D300 
+EP  - D304 
+N1  - doi: 10.1093/nar/gkn690 
+VL  - 37 
+IS  - suppl 1 
+UR  - http://nar.oxfordjournals.org/content/37/suppl_1/D300.abstract 
+N2  - The database of 3D interacting domains (3did) is a collection of protein interactions for which high-resolution 3D structures are known. 3did exploits structural information to provide the crucial molecular details necessary for understanding how protein interactions occur. Besides interactions between globular domains, the new release of 3did also contains a hand-curated set of transient peptide-mediated interactions. The interactions are grouped in Interaction Types, based on the mode of binding, and the different binding interfaces used in each type are also identified and catalogued. A web-based tool to query 3did is available at http://3did.irbbarcelona.org. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - Approved Drug Mimics of Short Peptide Ligands from Protein Interaction Motifs
+AU  - Parthasarathi, Laavanya
+AU  - Casey, Fergal
+AU  - Stein, Amelie
+AU  - Aloy, Patrick
+AU  - Shields, Denis C.
+Y1  - 2008/10/01
+PY  - 2008
+DA  - 2008/10/27
+N1  - doi: 10.1021/ci800174c
+DO  - 10.1021/ci800174c
+T2  - Journal of Chemical Information and Modeling
+JF  - Journal of Chemical Information and Modeling
+JO  - Journal of Chemical Information and Modeling
+SP  - 1943
+EP  - 1948
+VL  - 48
+IS  - 10
+PB  - American Chemical Society
+SN  - 1549-9596
+M3  - doi: 10.1021/ci800174c
+UR  - http://dx.doi.org/10.1021/ci800174c
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Contextual Specificity in Peptide-Mediated Protein Interactions
+A1  - Stein, Amelie 
+A1  - Aloy, Patrick 
+Y1  - 2008/07/02
+N2  - <p>Most biological processes are regulated through complex networks of transient protein interactions where a globular domain in one protein recognizes a linear peptide from another, creating a relatively small contact interface. Although sufficient to ensure binding, these linear motifs alone are usually too short to achieve the high specificity observed, and additional contacts are often encoded in the residues surrounding the motif (i.e. the context). Here, we systematically identified all instances of peptide-mediated protein interactions of known three-dimensional structure and used them to investigate the individual contribution of motif and context to the global binding energy. We found that, on average, the context is responsible for roughly 20% of the binding and plays a crucial role in determining interaction specificity, by either improving the affinity with the native partner or impeding non-native interactions. We also studied and quantified the topological and energetic variability of interaction interfaces, finding a much higher heterogeneity in the context residues than in the consensus binding motifs. Our analysis partially reveals the molecular mechanisms responsible for the dynamic nature of peptide-mediated interactions, and suggests a global evolutionary mechanism to maximise the binding specificity. Finally, we investigated the viability of non-native interactions and highlight cases of potential cross-reaction that might compensate for individual protein failure and establish backup circuits to increase the robustness of cell networks.</p>
+JF  - PLoS ONE
+JA  - PLoS ONE
+VL  - 3
+IS  - 7
+UR  - http://dx.plos.org/10.1371%2Fjournal.pone.0002524
+SP  - e2524
+EP  -
+PB  - Public Library of Science
+M3  - doi: 10.1371/journal.pone.0002524
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - A molecular interpretation of genetic interactions in yeast
+JO  - FEBS Letters
+VL  - 582
+IS  - 8
+SP  - 1245
+EP  - 1250
+PY  - 2008/4/9/
+T2  - (1) The Digital, Democratic Age of Scientific Abstracts (2) Targeting and Tinkering with Interaction Networks
+AU  - Stein, Amelie
+AU  - Aloy, Patrick
+SN  - 0014-5793
+M3  - doi: 10.1016/j.febslet.2008.02.020
+UR  - http://www.sciencedirect.com/science/article/pii/S0014579308001257
+KW  - Genetic interaction
+KW  - Synthetic lethal
+KW  - Network robustness
+KW  - Gene duplicate
+KW  - Pathway redundancy
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Stein, Amelie
+A1  - Russell, Robert B.
+A1  - Aloy, Patrick
+T1  - 3did: interacting protein domains of known three-dimensional structure 
+Y1  - 2005/01/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - D413 
+EP  - D417 
+N1  - doi: 10.1093/nar/gki037 
+VL  - 33 
+IS  - suppl 1 
+UR  - http://nar.oxfordjournals.org/content/33/suppl_1/D413.abstract 
+N2  - The database of 3D Interacting Domains (3did) is a collection of domain–domain interactions in proteins for which high-resolution three-dimensional structures are known. 3did exploits structural information to provide critical molecular details necessary for understanding how interactions occur. It also offers an overview of how similar in structure are interactions between different members of the same protein family. The database also contains Gene Ontology-based functional annotations and interactions between yeast proteins from large-scale interaction discovery studies. A web-based tool to query 3did is available at http://3did.embl.de. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+AU  - Pache, Roland A.
+AU  - Babu, M Madan
+AU  - Aloy, Patrick
+PY  - 2009
+IS  - 1
+M3  - doi: 10.1186/1752-0509-3-74
+SP  - 74
+T1  - Exploiting gene deletion fitness effects in yeast to understand the modular architecture of protein complexes under different growth conditions
+JO  - BMC Systems Biology
+UR  - http://www.biomedcentral.com/1752-0509/3/74
+VL  - 3
+SN  - 1752-0509
+N2  - BACKGROUND:Understanding how individual genes contribute towards the fitness of an organism is a fundamental problem in biology. Although recent genome-wide screens have generated abundant data on quantitative fitness for single gene knockouts, very few studies have systematically integrated other types of biological information to understand how and why deletion of specific genes give rise to a particular fitness effect. In this study, we combine quantitative fitness data for single gene knock-outs in yeast with large-scale interaction discovery experiments to understand the effect of gene deletion on the modular architecture of protein complexes, under different growth conditions.RESULTS:Our analysis reveals that genes in complexes show more severe fitness effects upon deletion than other genes but, in contrast to what has been observed in binary protein-protein interaction networks, we find that this is not related to the number of complexes in which they are present. We also find that, in general, the core and attachment components of protein complexes are equally important for the complex machinery to function. However, when quantifying the importance of core and attachments in single complex variations, or isoforms, we observe that this global trend originates from either the core or the attachment components being more important for strain fitness, both being equally important or both being dispensable. Finally, our study reveals that different isoforms of a complex can exhibit distinct fitness patterns across growth conditions.CONCLUSION:This study presents a powerful approach to unveil the molecular basis for various complex phenotypic profiles observed in gene deletion experiments. It also highlights some interesting cases of potential functional compensation between protein paralogues and suggests a new piece to fit into the histone-code puzzle.
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Pache, Roland A.
+A1  - Aloy, Patrick
+T1  - Incorporating high-throughput proteomics experiments into structural biology pipelines: Identification of the low-hanging fruits
+JF  - Proteomics
+JA  - Proteomics
+VL  - 8
+IS  - 10
+PB  - WILEY-VCH Verlag
+SN  - 1615-9861
+UR  - http://dx.doi.org/10.1002/pmic.200700966
+M3  - doi: 10.1002/pmic.200700966
+SP  - 1959
+EP  - 1964
+KW  - High-throughput proteomics
+KW  - Macromolecular complexes
+KW  - Structural biology
+KW  - Structural genomics
+KW  - Target selection
+Y1  - 2008
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Towards a molecular characterisation of pathological pathways
+JO  - FEBS Letters
+VL  - 582
+IS  - 8
+SP  - 1259
+EP  - 1265
+PY  - 2008/4/9/
+T2  - (1) The Digital, Democratic Age of Scientific Abstracts (2) Targeting and Tinkering with Interaction Networks
+AU  - Pache, Roland A.
+AU  - Zanzoni, Andreas
+AU  - Naval, Jordi
+AU  - Mas, José Manuel
+AU  - Aloy, Patrick
+SN  - 0014-5793
+M3  - doi: 10.1016/j.febslet.2008.02.014
+UR  - http://www.sciencedirect.com/science/article/pii/S0014579308001191
+KW  - Systems pathology
+KW  - Protein–protein interaction
+KW  - Network modelling
+KW  - Biological pathway
+KW  - Drug discovery
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - New Method for the Assessment of All Drug-Like Pockets Across a Structural Genome
+AU  - Nicola, George
+AU  - Smith, Colin A.
+AU  - Abagyan, Ruben
+Y1  - 2008/03/11
+PY  - 2008
+DA  - 2008/04/01
+N1  - doi: 10.1089/cmb.2007.0178
+DO  - 10.1089/cmb.2007.0178
+T2  - Journal of Computational Biology
+JF  - Journal of Computational Biology
+JO  - Journal of Computational Biology
+SP  - 231
+EP  - 240
+VL  - 15
+IS  - 3
+PB  - Mary Ann Liebert, Inc., publishers
+SN  - 1066-5277
+M3  - doi: 10.1089/cmb.2007.0178
+UR  - http://dx.doi.org/10.1089/cmb.2007.0178
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Discovery of novel inhibitors targeting enoyl–acyl carrier protein reductase in Plasmodium falciparum by structure-based virtual screening
+JO  - Biochemical and Biophysical Research Communications
+VL  - 358
+IS  - 3
+SP  - 686
+EP  - 691
+PY  - 2007/7/6/
+T2  - 
+AU  - Nicola, George
+AU  - Smith, Colin A.
+AU  - Lucumi, Edinson
+AU  - Kuo, Mack R.
+AU  - Karagyozov, Luchezar
+AU  - Fidock, David A.
+AU  - Sacchettini, James C.
+AU  - Abagyan, Ruben
+SN  - 0006-291X
+M3  - doi: 10.1016/j.bbrc.2007.04.113
+UR  - http://www.sciencedirect.com/science/article/pii/S0006291X0700825X
+KW  - Virtual screening
+KW  - VLS
+KW  - Structure-based drug design
+KW  - Plasmodium
+KW  - Enoyl–acyl carrier protein reductase
+KW  - ENR
+KW  - Triclosan
+KW  - ICM
+KW  - Inhibitor
+KW  - Malaria
+KW  - Molecular modeling
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - XCMS:  Processing Mass Spectrometry Data for Metabolite Profiling Using Nonlinear Peak Alignment, Matching, and Identification
+AU  - Smith, Colin A.
+AU  - Want, Elizabeth J.
+AU  - O'Maille, Grace
+AU  - Abagyan, Ruben
+AU  - Siuzdak, Gary
+Y1  - 2006/01/07
+PY  - 2006
+DA  - 2006/02/01
+N1  - doi: 10.1021/ac051437y
+DO  - 10.1021/ac051437y
+T2  - Analytical Chemistry
+JF  - Analytical Chemistry
+JO  - Analytical Chemistry
+SP  - 779
+EP  - 787
+VL  - 78
+IS  - 3
+PB  - American Chemical Society
+SN  - 0003-2700
+M3  - doi: 10.1021/ac051437y
+UR  - http://dx.doi.org/10.1021/ac051437y
+Y2  - 2011/12/16
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Solvent-Dependent Metabolite Distribution, Clustering, and Protein Extraction for Serum Profiling with Mass Spectrometry
+AU  - Want, Elizabeth J.
+AU  - O'Maille, Grace
+AU  - Smith, Colin A.
+AU  - Brandon, Theodore R.
+AU  - Uritboonthai, Wilasinee
+AU  - Qin, Chuan
+AU  - Trauger, Sunia A.
+AU  - Siuzdak, Gary
+Y1  - 2005/12/16
+PY  - 2005
+DA  - 2006/02/01
+N1  - doi: 10.1021/ac051312t
+DO  - 10.1021/ac051312t
+T2  - Analytical Chemistry
+JF  - Analytical Chemistry
+JO  - Analytical Chemistry
+SP  - 743
+EP  - 752
+VL  - 78
+IS  - 3
+PB  - American Chemical Society
+SN  - 0003-2700
+M3  - doi: 10.1021/ac051312t
+UR  - http://dx.doi.org/10.1021/ac051312t
+Y2  - 2011/12/16
+ER  - 
+TY  - CONF
+C8  - LabMember
+T1  - METLIN: A Metabolite Mass Spectral Database
+AU  - Smith, Colin A.
+AU  - O'Maille, Grace
+AU  - Want, Elizabeth J.
+AU  - Qin, Chuan
+AU  - Trauger, Sunia A.
+AU  - Brandon, Theodore R.
+AU  - Custodio, Darlene E.
+AU  - Abagyan, Ruben
+AU  - Siuzdak, Gary
+Y1  - 2005/04/23/April 23-28
+UR  - http://meta.wkhealth.com/pt/pt-core/template-journal/lwwgateway/media/landingpage.htm?issn=0163-4356&volume=27&issue=6&spage=747
+T2  - Therapeutic Drug Monitoring
+JO  - Proceedings of the 9th International Congress of Therapeutic Drug Monitoring & Clinical Toxicology
+SP  - 747
+EP  - 751
+VL  - 27
+IS  - 6
 ER  - 

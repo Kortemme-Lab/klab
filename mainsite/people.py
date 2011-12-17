@@ -97,7 +97,7 @@ p_roland = {
 	"extratext"	:	"",
 	"caption"	:	"In my free time I practice Aikido and explore the world of photography.",
 	"mouseover"	:	None,
-	"pub_name"	:	"Pache, Roland",
+	"pub_name"	:	"Pache, Roland A.",
 }
 
 p_ming = {
@@ -113,7 +113,7 @@ p_ming = {
 	"extratext"	:	"Postdoctoral research in structural and computational biology at Rensselaer Polytechnic Institute",
 	"caption"	:	"",
 	"mouseover"	:	None,
-	"pub_name"	:	"Huang, Yao-ming",
+	"pub_name"	:	"Huang, Yao-Ming",
 }
 
 p_lin = {
@@ -276,22 +276,24 @@ peopleByGroup = [
 ]
 
 pastRotationStudents = [
+	{"name" : 'Alec Nielsen', "course" : 'Biophysics', "rotation" : 'Winter 2011',},
+	{"name" : 'David Mavor', "course" : 'Biophysics', "rotation" : 'Summer 2011',},
 	{"name" : 'Joel Karpiak', "course" : 'CCB', "rotation" : 'Winter 2010',},
-	{"name" : 'Ian Vaughn', "course" : 'Biophysics', "rotation" : 'Fall 2009',},
 	{"name" : 'Geoff Rollins', "course" : 'Biophysics', "rotation" : 'Winter 2009',},
 	{"name" : 'Rocco Varela', "course" : 'BMI', "rotation" : 'Winter 2009',},
-	{"name" : 'Roxana Ordonez', "course" : 'BMI', "rotation" : 'Summer 2008',},
+	{"name" : 'Ian Vaughn', "course" : 'Biophysics', "rotation" : 'Fall 2009',},
 	{"name" : 'Elaine Kirshke', "course" : 'Biophysics', "rotation" : 'Winter 2008',},
 	{"name" : 'Charles Kehoe', "course" : 'BMI', "rotation" : 'Winter 2008',},
+	{"name" : 'Roxana Ordonez', "course" : 'BMI', "rotation" : 'Summer 2008',},
 	{"name" : 'Jaline Gerardin', "course" : 'Biophysics', "rotation" : 'Fall 2007',},
 	{"name" : 'Alvin Tamsir', "course" : 'Tetrad', "rotation" : 'Spring 2007', "pub_name" : 'Tamsir, Alvin'},
-	{"name" : 'Sheel Dandekar', "course" : 'Biophysics', "rotation" : 'Spring 2006',},
 	{"name" : 'Reid Williams', "course" : 'Biophysics', "rotation" : 'Fall 2006',},
 	{"name" : 'Dan Gray', "course" : 'CCB', "rotation" : 'Fall 2006',},
+	{"name" : 'Sheel Dandekar', "course" : 'Biophysics', "rotation" : 'Spring 2006',},
 	{"name" : 'Michael Hicks', "course" : 'PSPG', "rotation" : 'Winter 2005',},
+	{"name" : 'Kareen Riviere', "course" : 'PSPG', "rotation" : 'Winter 2005',},
 	{"name" : 'Chris McClendon', "course" : 'Biophysics', "rotation" : 'Fall 2005',},
 	{"name" : 'Ian Harwood', "course" : 'Biophysics', "rotation" : 'Spring 2005',},
-	{"name" : 'Kareen Riviere', "course" : 'PSPG', "rotation" : 'Winter 2005',},
 	{"name" : 'Mike Keiser', "course" : 'BMI', "rotation" : 'Fall 2004',},
 ]
 
@@ -327,7 +329,6 @@ def ruledSectionHeader(title, width = 486):
 def getPeopleHTML():
 	html = []
 	publishedMembers = publications.getPublishedMembers()
-	print("*", publishedMembers)
 	for pgroup in peopleByGroup:
 		groupname = pgroup[0]
 		people = pgroup[1]
@@ -349,7 +350,6 @@ def getPeopleHTML():
 			publink_open = ""
 			publink_close = ""
 			if person.get("pub_name") and person["pub_name"] in publishedMembers:
-				print(person)
 				pagename = publications.pubpageID(person["pub_name"])
 				publink_open = "<a href='test-publications-%s.html'>" % pagename
 				publink_close = "</a>"
@@ -367,9 +367,20 @@ def getPeopleHTML():
                     </tr> 
                     <tr> 
                       <td style="vertical-align: top; width: 369px; height: 157px;">
-                        <span class="u_people_text">%(ptext)s</span>
+                        <span class="u_people_text">%(ptext)s</span>''' % vars())
+			if publink_open and publink_close:
+				if firstname[-1] == "s":
+					html.append('''
+                        <p class="u_people_text">%(publink_open)sSee %(firstname)s's publications.%(publink_close)s</p>''' % vars())
+				else:
+					html.append('''
+                        <p class="u_people_text">%(publink_open)sSee %(firstname)s's publications.%(publink_close)s</p>''' % vars())
+			else:
+				html.append('''
                         <br> 
-                        <br> 
+                        <br>''') 
+				
+			html.append('''
                         %(pfellowship)s
                         <table cellpadding="0" cellspacing="0" style="line-height:3px; text-align:left; width:100%%; border:0;"> 
                           <tbody>''' % vars())

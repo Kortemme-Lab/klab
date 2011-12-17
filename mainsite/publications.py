@@ -69,33 +69,54 @@ taglist = [
 'ER',#  - End of Reference (must be the last tag)
  #
 'VO', # - Volume?
-'URL', # Tag Shane added
+'ID', # Seems to be doi
 'L3', # Link?
+'J1', # ?
 ]
 
 publication_abbreviations = {
 	"Advances in Protein Chemistry"						: "Adv Protein Chem",
+	"Analytical Chemistry"								: "Analyt Chem",
+	"Biochemical and Biophysical Research Communications": "Biochem Biophys Res Comms",
 	"Biochemistry"										: "Biochemistry",
+	"Bioinformatics"									: "Bioinformatics",
 	"Bioorganic & Medicinal Chemistry"					: "Bioorg Med Chem",
+	"Biophysical Journal"								: "Biophys Journal",
+	"BMC Evolutionary Biology"							: "BMC Evol Biol",
+	"BMC Systems Biology"								: "BMC Sys Biol",
 	"Cell"												: "Cell",
 	"Chemistry & Biology"								: "Chem Biol",
 	"Current Opinion in Chemical Biology"				: "Curr Opin Chem Biol",
 	"Current Opinion in Structural Biology"				: "Curr Opin Struct Biol",
 	"Current Opinion in Biotechnology"					: "Curr Opin Biotechnol",
-	"Journal of Molecular Biology"						: "J Mol Biol",
+	"EMBO Reports"										: "EMBO Rep",
+	"FEBS Journal"										: "FEBS Journal",
+	"FEBS Letters"										: "FEBS Letters",
+	"Genome Biology"									: "Genome Biology",
+	"Genome Research"									: "Genome Research",
+	"Integrative and Comparative Biology"				: "Integr and Comparative Biol",
 	"Journal of Biological Chemistry"					: "J Biol Chem",
+	"Journal of Biomedical & Laboratory Sciences"		: "J Biomed Lab Sci",
+	"Journal of Chemical Information and Modeling"		: "J Chem Inf Model",
+	"Journal of Computational Biology"					: "J Comp Biol",
 	"Methods in Enzymology"								: "Meth Enzym",
+	"Journal of Molecular Biology"						: "J Mol Biol",
 	"Molecular Cell"									: "Mol Cell",
 	"Molecular Systems Biology"							: "Mol Syst Biol",
 	"Nature Chemical Biology" 							: "Nat Chem Biol",
 	"Nature Methods" 									: "Nat Methods",
 	"Nature Structural & Molecular Biology" 			: "Nat Struct Mol Biol",
 	"Nucleic Acids Research"							: "Nucleic Acids Res",
+	"Physical Review E"									: "Phys Rev E",
+	"Physical Chemistry Chemical Physics"				: "Phys Chem Chem Phys",
+	"PLoS Biology" 										: "PLoS Biol",
 	"PLoS Computational Biology" 						: "PLoS Comput Biol",
 	"PLoS ONE"											: "PLoS ONE",
+	"Proceedings of the 9th International Congress of Therapeutic Drug Monitoring & Clinical Toxicology" : "Ther Drug Mon",
 	"Proceedings of the National Academy of Sciences"	: "Proc Natl Acad Sci U S A",
 	"Protein Science"									: "Protein Sci",
 	"Proteins: Structure, Function, and Bioinformatics"	: "Proteins",
+	"Proteomics"										: "Proteomics",
 	"Sci. STKE"											: "Sci STKE",
 	"Science"											: "Science",
 	"Structure"											: "Structure",
@@ -220,7 +241,7 @@ class PublicationEntry(dict):
 			"doi" : doi,
 			"URL" : URL,
 		}
-	
+
 	def __getitem__(self, k):
 		return self.dict[k]
 	
@@ -265,6 +286,7 @@ def parsePublist(saveRis = True):
 	
 	publist = []
 	author_publications = {}
+	DOIs = {}
 	
 	count = 0
 		
@@ -282,7 +304,6 @@ def parsePublist(saveRis = True):
 		errors = []
 		if pub:
 			d = parsePub(pub)
-			
 			if not d:
 				break
 			
@@ -300,6 +321,7 @@ def parsePublist(saveRis = True):
 				authornames[author] = True
 			authors = d.get("AU",[])
 			
+			journal = None
 			recordtype = d.get("TY") 
 			if  recordtype == "JOUR" or recordtype == "CONF":
 				journal = d.get("JO")
@@ -347,12 +369,15 @@ def parsePublist(saveRis = True):
 			
 			if not(journal):
 				errors.append("No journal name found.")
-					
+			
+			doi = None	
 			for k, v in d.iteritems():
 				if type(v) == strtype and v.startswith("doi:"):
 					doi = v[4:].strip()
-			
-			if not(doi or d.get("URL")):
+			if doi and DOIs.get(doi):
+				errors.append("This DOI is duplicated by '%s'." % DOIs[doi])
+				DOIs[doi] = title
+			if not(doi or d.get("UR")):
 				errors.append("No DOI or URL available.")
 			
 			if authors and title and journal and year:
@@ -361,7 +386,7 @@ def parsePublist(saveRis = True):
 				else:
 					# Abbreviate the journal name
 					journal = publication_abbreviations[journal]
-					pubEntry = PublicationEntry(authors, title, journal, entry, year, doi, d.get("URL"))
+					pubEntry = PublicationEntry(authors, title, journal, entry, year, doi, d.get("UR"))
 					pubsBySection[sectiontitle].append(pubEntry)
 					for author in authors:
 						author_publications[author] = author_publications.get(author) or []
@@ -439,10 +464,17 @@ labmembers = [
 	("Lauck, Florian", None),
 	("Mandell, Daniel J.", "Dan"),
 	("Melero, Cristina", None),
-	("Oberdorf, Richard", None),
+	("Oberdorf, Richard", "Rich"),
 	("Ollikainen, Noah", None),
 	("Smith, Colin A.", None),
 	("Tamsir, Alvin", None),
+	("Kraal, Laurens", None),
+	("Ritterson, Ryan", None),
+	("Hoersch, Daniel", None),
+	("Akiva, Eyal", None),
+	("Huang, Yao-Ming", None),
+	("Stein, Amelie", None),
+	("Pache, Roland A.", None),
 ]
 
 def getPublishedMembers():
@@ -457,16 +489,17 @@ def getHTML(page):
 	publist, author_publications = parsePublist()
 	for section in publist:
 		sectiontitle = section[0]
-		html.append(sectionheader % sectiontitle)
-		
-		sectionpubs = section[1]
-		html.append('''                <ol class="style14" style="counter-reset:item %d;" start="%d">''' % (count, count +1))
-		for p in sectionpubs:
-			# Do not display the year for sections like ' 2011 Publications'
-			showyear = not(sectiontitle[0:4].isdigit() and sectiontitle[4:] == " Publications")
-			html.append('''                  <li class="publist">%s<br>''' % p.getHTML(showyear))
-			count += 1				
-		html.append('''                </ol>''')
+		if sectiontitle != "LabMember":	
+			html.append(sectionheader % sectiontitle)
+			
+			sectionpubs = section[1]
+			html.append('''                <ol class="style14" style="counter-reset:item %d;" start="%d">''' % (count, count +1))
+			for p in sectionpubs:
+				# Do not display the year for sections like ' 2011 Publications'
+				showyear = not(sectiontitle[0:4].isdigit() and sectiontitle[4:] == " Publications")
+				html.append('''                  <li class="publist">%s<br>''' % p.getHTML(showyear))
+				count += 1				
+			html.append('''                </ol>''')
 	html.append(footer)
 	webpages.append((page, join(html)))
 	
@@ -478,7 +511,10 @@ def getHTML(page):
 		if sectionpubs:
 			html = [header]
 			firstname = labmemberp[1] or [n for n in re.split(r'[, ]', labmember) if n][1]
-			sectiontitle = "%s's Publications" % firstname
+			if firstname[-1] == "s":
+				sectiontitle = "%s's Publications" % firstname
+			else:
+				sectiontitle = "%s's Publications" % firstname
 			pagename = pubpageID(labmember)
 			html.append(sectionheader % sectiontitle)
 			html.append('''                <ol class="style14" style="counter-reset:item %d;" start="%d">''' % (count, count +1))
