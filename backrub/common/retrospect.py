@@ -101,6 +101,7 @@ class LogReader(object):
 			"Execution incomplete" : "Execution incomplete.",
 			"Catalog File invalid/damaged" : "error -2241",
 			"Network communication failed" : "error -519",
+			"Cannot access volume" : "Can't access volume ",
 		}
 		warningStrings = {
 			"Read error (feature unsupported)" : "error -1012",
@@ -288,7 +289,7 @@ class LogReader(object):
 		missingScripts = expectedScripts.SymmetricDifference(scriptsRun.keys())
 		
 		# NOTE: We ignore these special script types. This list is probably not comprehensive and so may need to be added to.
-		for t in ['Restore', 'Grooming', 'Engine start', 'Rebuild', 'Retrieve Snapshot']:
+		for t in ['Ming', 'Ming (offsite)', 'Restore', 'Grooming', 'Engine start', 'Rebuild', 'Retrieve Snapshot']:
 			if t in missingScripts:
 				missingScripts.remove(t)
 				del scriptsRun[t]
@@ -499,12 +500,12 @@ for s in []:
 	
 # Private
 for s in ["kortemme-cd", "kortemme-fplc", "kortemme-hplc", "kortemme-spec",
-		"kortemmelab-admin", "kortemmelab-data", "kortemmelab-home",
-		"AmelieStein", "Bobal", "Kortemme", "Lab Admin", "Ming",
+		"kortemmelab-admin", "kortemmelab-data", "kortemmelab-home", "kortemmelab-shared",
+		"AmelieStein", "Bobal", "Kortemme", "Lab Admin", 
 		"Epona", "Ganon", "Web Server", "Workstations"]:
 	expectedScripts.add(s, SimpleScript(1))
 for s in ["kortemme-cd (offsite)", "kortemme-fplc (offsite)", "kortemme-hplc (offsite)", "kortemme-spec (offsite)",
 		"kortemmelab-alumni-data", "kortemmelab-alumni-home",
-		"AmelieStein (offsite)", "Bobal (offsite)", "Kortemme (offsite)", "Lab Admin (offsite)", "Ming (offsite)",
+		"AmelieStein (offsite)", "Bobal (offsite)", "Kortemme (offsite)", "Lab Admin (offsite)", 
 		"Epona (offsite)", "Ganon", "Web Server (offsite)", "Workstations (offsite)"]:
 	expectedScripts.add(s, SimpleScript(7))

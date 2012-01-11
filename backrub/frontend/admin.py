@@ -274,6 +274,7 @@ def addDriveUsageChart(DriveUsage):
             data = DriveUsage[drive]
             fnname = "drawDriveUsage%s" % string.capwords(drive.replace(" ",""))
             chartsfns.append(fnname)
+            usepercentage = int(data["Use%"][0:-1])
             html.append('''
                           
 <script type="text/javascript">
@@ -290,13 +291,20 @@ function %(fnname)s() {
             #chartcolors = join(chartcolors, ",")
             
             html.append('''
-        ['%s', %d],''' % (drive, int(data["Use%"][0:-1])))
+        ['%s', %d],''' % (drive, usepercentage))
             html.append('''
               ]);
         
               // Instantiate and draw our chart, passing in some options.
               var chart = new google.visualization.Gauge(document.getElementById('DriveUsageChart%(nospdrive)s'));
-              chart.draw(data, {width: 300, height: 180, greenColor: '#ff0', greenFrom: 70, greenTo: 80, yellowFrom: 80, yellowTo: 90, redFrom: 90, redTo: 100,});
+               
+              options = {width: 300, height: 180, greenColor: '#ff0', greenFrom: 70, greenTo: 80, yellowFrom: 80, yellowTo: 90, redFrom: 90, redTo: 100,}
+              chart.draw(data, options);
+              
+              setInterval(function() {
+				data.setValue(0, 1, Math.round(%(usepercentage)s + 3 * (0.5 - Math.random())));
+				chart.draw(data, options);
+			  }, 300);
             }
             </script>
             ''' % vars())
@@ -1439,9 +1447,14 @@ def generateWebserverStatsSubpage():
 	# Later stats
 	tdy = date.today()
 	for y in range(2012, tdy.year + 1):
-		for m in range(1,13):
-			k = "%d-%.2d" % (y, m)
-			stats[k] = {}
+		if y == tdy.year:
+			for m in range(1,tdy.month + 1):
+				k = "%d-%.2d" % (y, m)
+				stats[k] = {}
+		else:
+			for m in range(1,13):
+				k = "%d-%.2d" % (y, m)
+				stats[k] = {}
 	
 	excludestr = "BackrubServer = 'kortemmelab' AND UserID <> 84 AND UserID <> 106 AND UserID <> 120"
 	results = db.execQuery("SELECT MONTH(Date), YEAR(Date), COUNT(id) FROM backrub WHERE %s AND STATUS=0 or STATUS=1 or STATUS=2 GROUP BY YEAR(Date), MONTH(Date)" % excludestr)

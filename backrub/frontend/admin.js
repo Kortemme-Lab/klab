@@ -48,3 +48,5 @@ if (document.adminform.AdminPage.value != null)
 {
 	showPage(document.adminform.AdminPage.value)
 }
+
+
