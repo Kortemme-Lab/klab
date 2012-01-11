@@ -33,7 +33,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
-from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES
+from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
@@ -562,8 +562,22 @@ def ws():
 
 	if query_type not in ["PDB"]:
 		s.write(rosettaHTML.main(html_content, title, query_type))
-	s.close() 
+	
+	s.close()
 
+def logBrowser(sid, userid):
+	log_dir = os.path.join(os.environ['DOCUMENT_ROOT'], 'rosettaweb', 'logs')
+	if not os.path.exists(log_dir):
+		make755Directory(log_dir)
+	
+	F = open(os.path.join(log_dir, "browser-%s.txt" % sid), "w")
+	F.write("User\t%s\n" % userid)
+	F.write("User-Agent\t%s\n" % os.environ.get("HTTP_USER_AGENT", "N/A"))
+	F.write("IP\t%s\n" % IP)
+	F.write("Hostname\t%s\n" % hostname)
+	F.write("Time\t%s\n" % datetime.today())
+	F.close()
+	
 ########################################## end of ws() ########################################
 
 
@@ -601,6 +615,7 @@ def login(form, my_session, t):
 				# all clear ... go!
 				sql = "UPDATE Sessions SET UserID = \"%s\", Date = \"%s\", loggedin = \"%s\" WHERE SessionID = \"%s\" " % (UserID, lv_strftime, "1", SID)
 				result = DBConnection.execQuery(sql)
+				logBrowser(SID, UserID)	
 				return True # successfully logged in
 
 			else:

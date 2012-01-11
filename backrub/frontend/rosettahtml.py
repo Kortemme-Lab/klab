@@ -727,7 +727,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 ###############################################################################################
 
     def registered(self):
-      html = """ <td align="center">Registration successful. You should recieve a confirmation Email shortly.<br> <br> \n 
+      html = """ <td align="center">Registration successful. You should receive a confirmation email shortly.<br> <br> \n 
                    Proceed to <A href="%s?query=login">Login</A> \n""" % ( self.script_filename )
       return html
 
