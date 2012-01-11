@@ -419,7 +419,7 @@ function validateEmail()
 	str = f.value.replace(/^\s+|\s+$/g, '');
 	ati = str.indexOf("@")
 	doti = str.indexOf(".")
-	isValid = !(ati == -1 || doti == -1 || str.length < 6 || dot - 1 <= ati);
+	isValid = !(ati == -1 || doti == -1 || str.length < 6 || doti - 1 <= ati);
 	if (!isValid)
 	{
 		f.style.background = "#ff5555";
