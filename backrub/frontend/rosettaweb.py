@@ -5,35 +5,9 @@
 # and calling the appropriate functions from the lower levels to
 # produce web pages.
 
-
-########################################
-# functions                            
-# 
-# ws()                            
-# login()                            
-# logout()                            
-# send_password()                            
-# register()                            
-## update()                            
-# submit()                            
-# queue()                            
-# jobinfo()                            
-# dummy()                            
-# make_header()                            
-# make_menu()                            
-# legal_info()                            
-# make_footer()                            
-# terms_of_service()                            
-# help()                            
-# sendMail()
-# print_countries()                            
-# 
-######################################## 
-
 # import the basics
 import sys, os
 # Append document_root to sys.path to be able to find user modulesface
-#sys.path.append(os.environ['DOCUMENT_ROOT'])
 
 sys.path.insert(0, "../common/")
 sys.path.insert(1, "../daemon/")
@@ -43,9 +17,11 @@ import sha, time
 import cgi
 import cgitb; cgitb.enable()
 import Cookie
+
 # set Python egg dir MscOSX only
 if os.uname()[0] == 'Darwin':
-  os.environ['PYTHON_EGG_CACHE'] = '/Applications/XAMPP/xamppfiles/tmp'
+	os.environ['PYTHON_EGG_CACHE'] = '/Applications/XAMPP/xamppfiles/tmp'
+
 import _mysql_exceptions
 import socket
 import md5
@@ -70,16 +46,16 @@ import string
 import pickle
 import admin
 
-# get ip addr hostname
+# Get IP address and hostname
 IP = os.environ['REMOTE_ADDR']
 hostname = IP
 try:
-    hostname = socket.gethostbyaddr(IP)[0]
+	hostname = socket.gethostbyaddr(IP)[0]
 except:
-    pass
+	pass
 
 ###############################################################################################
-# Setup: Change these values according to your settings and usage of the server               #
+# Setup: Change these values according to your settings and usage of the server
 ###############################################################################################
 
 settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
@@ -87,13 +63,13 @@ settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
 from pdb import PDB
 from RosettaTasks import make_seqtol_resfile
 if not(settings["LiveWebserver"]):
-    import profile 
+	import profile 
 
 # open connection to MySQL
-DBConnection = rosettadb.RosettaDB(settings)       
+DBConnection = rosettadb.RosettaDB(settings)
 
 # Keep a reference to the Apache error stream in case we need to use it for debugging scripts timing out.
-apacheerr = sys.stderr     
+apacheerr = sys.stderr
 ########################################## Setup End ##########################################
 
 # todo: These would be tidier as member elements of a ws class
@@ -101,72 +77,72 @@ errors = []
 warnings = []
 
 def getKlabDBConnection():
-    return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu")
 
 def getKortemmelabUsersConnection():
 	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab")
 
 def fixFilename(filename):
-    
-    highestSeparator = filename.rfind('/')
-    if highestSeparator != -1:
-        filename = filename[highestSeparator + 1:]
-    highestSeparator = filename.rfind('\\')
-    if highestSeparator != -1:
-        filename = filename[highestSeparator + 1:]
-    
-    filename = filename.replace(' ', '_')
-    filename = filename.replace('.', '_')
-    filename = filename.replace(':', '_')
-    filename = filename.replace('\t', '_')
-    filename = filename.replace('\n', '_')
-    if filename[-3:] not in ['pdb', 'PDB' ]:
-        filename = filename + '.pdb'
-    else:
-        filename = filename[:-4] + '.pdb'
-    return filename
-    
+	
+	highestSeparator = filename.rfind('/')
+	if highestSeparator != -1:
+		filename = filename[highestSeparator + 1:]
+	highestSeparator = filename.rfind('\\')
+	if highestSeparator != -1:
+		filename = filename[highestSeparator + 1:]
+	
+	filename = filename.replace(' ', '_')
+	filename = filename.replace('.', '_')
+	filename = filename.replace(':', '_')
+	filename = filename.replace('\t', '_')
+	filename = filename.replace('\n', '_')
+	if filename[-3:] not in ['pdb', 'PDB' ]:
+		filename = filename + '.pdb'
+	else:
+		filename = filename[:-4] + '.pdb'
+	return filename
+	
 def saveTempPDB(SID, pdb_object, pdb_filename):
-    tempdir = os.path.join(settings["TempDir"], "pdbs") 
-    innertempdir = os.path.join(tempdir, SID)
-        
-    try:
-        if not os.path.exists(tempdir):
-            os.mkdir(tempdir, 0775)
-        if not os.path.exists(innertempdir):
-            os.mkdir(innertempdir, 0775)
-        
-        pdb_filename = fixFilename(pdb_filename)
-        filepath = os.path.join(innertempdir, pdb_filename)
-        pdb_object.write(filepath)        
-        filepath = os.path.join("pdbs", SID, pdb_filename)
-        return True, filepath
-    
-    except:
-        estring = traceback.format_exc()
-        errors.append(estring)
-        if estring.find("IOError: [Errno 13] Permission denied") != -1:
-            estring = "Write permission was denied when creating the file. If this persists, please contact support@kortemmelab.ucsf.edu."
-        else:
-            # We don't know what the error was but returning the string back as is gives the user too much internal information
-            # todo: We should log this error and should email the admin as well (update error string to indicate that admin was notified)
-            estring = "An error occurred uploading the file. If this persists, please contact support@kortemmelab.ucsf.edu." 
-        errors.append(estring)
-        return False, ''
+	tempdir = os.path.join(settings["TempDir"], "pdbs") 
+	innertempdir = os.path.join(tempdir, SID)
+		
+	try:
+		if not os.path.exists(tempdir):
+			os.mkdir(tempdir, 0775)
+		if not os.path.exists(innertempdir):
+			os.mkdir(innertempdir, 0775)
+		
+		pdb_filename = fixFilename(pdb_filename)
+		filepath = os.path.join(innertempdir, pdb_filename)
+		pdb_object.write(filepath)		
+		filepath = os.path.join("pdbs", SID, pdb_filename)
+		return True, filepath
+	
+	except:
+		estring = traceback.format_exc()
+		errors.append(estring)
+		if estring.find("IOError: [Errno 13] Permission denied") != -1:
+			estring = "Write permission was denied when creating the file. If this persists, please contact support@kortemmelab.ucsf.edu."
+		else:
+			# We don't know what the error was but returning the string back as is gives the user too much internal information
+			# todo: We should log this error and should email the admin as well (update error string to indicate that admin was notified)
+			estring = "An error occurred uploading the file. If this persists, please contact support@kortemmelab.ucsf.edu." 
+		errors.append(estring)
+		return False, ''
 
 # Used on submission. ChosenBinary should be set by uploading the PDB and be propagated down to this stage
-def getRosettaVersion(form):   
-    if form.has_key("ChosenBinary") and form["ChosenBinary"].value:
-        return form["ChosenBinary"].value
-    else:
-        return None
+def getRosettaVersion(form):
+	if form.has_key("ChosenBinary") and form["ChosenBinary"].value:
+		return form["ChosenBinary"].value
+	else:
+		return None
    
 # Used on parsing the PDB. Mini should be set by the Rosetta version select group
 def usingMini(form):
-    if form.has_key("Mini"):
-        return RosettaBinaries[form["Mini"].value]["mini"]
-    else:
-        return None    
+	if form.has_key("Mini"):
+		return RosettaBinaries[form["Mini"].value]["mini"]
+	else:
+		return None	
 
 ###############################################################################################
 # ws()                                                                                        #
@@ -179,420 +155,414 @@ protocolGroups = []
 protocols = []
 
 def ws():
-  s = sys.stdout
-  if not(settings["LiveWebserver"]):
-      sys.stderr = s
-      #cgitb.enable(display=0, logdir="/tmp")
-  debug = ''
-  
-  html_content = ''
-  query_type = 'dftba'
-  SID = ''
-  username = ''
-  userid = ''
-  title = ''
+	s = sys.stdout
+	if not(settings["LiveWebserver"]):
+		sys.stderr = s
+		#cgitb.enable(display=0, logdir="/tmp")
+	debug = ''
 
-  comment = ''
-  adminWarning = ''
-  
-  # get the POST data from the webserver
-  form = cgi.FieldStorage()
+	html_content = ''
+	query_type = 'dftba'
+	SID = ''
+	username = ''
+	userid = ''
+	title = ''
+	
+	comment = ''
+	adminWarning = ''
+	
+	# get the POST data from the webserver
+	form = cgi.FieldStorage()
+	
+	# SECURITY CHECK
+	#print("Content-type: text/html\n\n")
+	for key in form:
+		#print(key)
+		#print(form[key])
+		# Escape HTML code
+		if type(form[key]) != type([]):
+			form[key].value = escape(form[key].value)
+		if (key == "Password" or key == "ConfirmPassword" or key == "myPassword" or key == "password" or key == "confirmpassword"):
+			# Store the password as an MD5 hex digest
+			tgb = str(form[key].value)
+			form[key].value = md5.new(tgb.encode('utf-8')).hexdigest()
 
-  # SECURITY CHECK
-  #print("Content-type: text/html\n\n")
-  for key in form:
-    #print(key)
-    #print(form[key])
-    # Escape HTML code
-    if type(form[key]) != type([]):
-        form[key].value = escape(form[key].value)
-    if (key == "Password" or key == "ConfirmPassword" or key == "myPassword" or key == "password" or key == "confirmpassword"):
-      # Store the password as an MD5 hex digest
-      tgb = str(form[key].value)
-      form[key].value = md5.new(tgb.encode('utf-8')).hexdigest()
-    
-  ####################################### 
-  # cookie check                        #
-  ####################################### 
+	####################################### 
+	# cookie check                        #
+	####################################### 
 
-  # create session object
-  my_session = session.Session(expires=settings["CookieExpiration"], cookie_path='/')
-  # get time of last visit
-  lastvisit = my_session.data.get('lastvisit')
-  # set session ID
-  SID = my_session.cookie['sid'].value
-  # get present time as datetime object
-  t = datetime.now()
-  
-  # s.write(str(my_session.cookie)+'\n')
-  # s.write("Content-type: text/html\n\n")
-  # s.write("%s\n" % (lastvisit))
-  # s.write("%s\n" % (SID))
-  # my_session.close()
-  # s.close() 
-  # return
-  
-  if not (form.has_key("query") and form["query"].value == "datadir"):
-          
-      if lastvisit == None:  # lastvisit == None means that the user doesn't have a cookie
-        
-        # set the session object to the actual time and also write the time to the database
-        my_session.data['lastvisit'] = repr(time.time())
-        lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
-        sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % (SID, lv_strftime, "login", "0")
-        result = DBConnection.execQuery(sql)
-        # redirect user to the index page
-        query_type = "index"
-         
-        # then create the HTTP header which includes the cookie. THESE LINES MUST NOT BE REMOVED!
-        # s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
-        # s.write("Content-type: text/html\n\n")
-        # s.write("Location: %s?query=%s\n\n" % ( ROSETTAWEB_server_script, query_type ) ) # this line reloads the page
-        # close session object
-        # my_session.close()
-        # s.close() 
-        # return
-    
-      else: # we have a cookie already, let's look it up in the database and check whether the user is logged in
-        # set cookie to the present time with time() function
-        
-        my_session.data['lastvisit'] = repr(time.time())
-        # get infos about session
-        sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
-        result = DBConnection.execQuery(sql)
-        
-        allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
-        subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
-        if not(settings["LiveWebserver"]):
-            allowedQueries.extend(["admin","PDB", "admincmd"])
-            subAllowedQueries.extend(["admin","PDB", "admincmd"])
-            
-        # if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
-        if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
-          query_type = form["query"].value
-        
-          sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
-          result = DBConnection.execQuery(sql)
-          if result[0][0] != () and result[0][0] != (): #todo
-            username = result[0][0]
-            userid = int(result[0][1])
-    
-        elif form.has_key("query") and form['query'].value in subAllowedQueries:
-          query_type = form["query"].value
-        else:
-          query_type = "index" # fallback, shouldn't occur
+	# create session object
+	my_session = session.Session(expires=settings["CookieExpiration"], cookie_path='/')
+	# get time of last visit
+	lastvisit = my_session.data.get('lastvisit')
+	# set session ID
+	SID = my_session.cookie['sid'].value
+	# get present time as datetime object
+	t = datetime.now()
+	
+	# s.write(str(my_session.cookie)+'\n')
+	# s.write("Content-type: text/html\n\n")
+	# s.write("%s\n" % (lastvisit))
+	# s.write("%s\n" % (SID))
+	# my_session.close()
+	# s.close() 
+	# return
 
-      # send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
-      s.write(str(my_session.cookie) + '\n')
-      
-      
-      if form["query"].value not in ["PDB"]:
-      	s.write("Content-type: text/html\n\n")
-      
-      s.write(debug)
-      my_session.close()
-   
-  ###############################
-  # HTML CODE GENERATION
-  ###############################
+	if not (form.has_key("query") and form["query"].value == "datadir"):
+		if lastvisit == None:  # lastvisit == None means that the user doesn't have a cookie
+			# set the session object to the actual time and also write the time to the database
+			my_session.data['lastvisit'] = repr(time.time())
+			lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
+			sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % (SID, lv_strftime, "login", "0")
+			result = DBConnection.execQuery(sql)
+			# redirect user to the index page
+			query_type = "index"
+			 
+			# then create the HTTP header which includes the cookie. THESE LINES MUST NOT BE REMOVED!
+			# s.write(str(my_session.cookie)+'\n')  # DO NOT REMOVE OR COMMENT THIS LINE!!!
+			# s.write("Content-type: text/html\n\n")
+			# s.write("Location: %s?query=%s\n\n" % ( ROSETTAWEB_server_script, query_type ) ) # this line reloads the page
+			# close session object
+			# my_session.close()
+			# s.close() 
+			# return
 
-    
-  ########## DEBUG Cookies ########## 
-  #s.write(string_cookie+'\n<br><br>')
-  #s.write('%s <br> sess.cookie = %s <br> sess.data = %s\n<br><br>' % (my_session.cookie, my_session.cookie, my_session.data))
-  #s.write(str(my_session.cookie)+'\n<br><br>')
-  ########## DEBUG Cookies ##########
+		else: # we have a cookie already, let's look it up in the database and check whether the user is logged in
+			# set cookie to the present time with time() function
+			
+			my_session.data['lastvisit'] = repr(time.time())
+			# get infos about session
+			sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
+			result = DBConnection.execQuery(sql)
+			
+			allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
+			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
+			if not(settings["LiveWebserver"]):
+				allowedQueries.extend(["admin","PDB", "admincmd"])
+				subAllowedQueries.extend(["admin","PDB", "admincmd"])
 
-  if not os.path.exists('/tmp/rosettaweb-rosettadaemon.pid'): #upgradetodo: Store this filename in the conf file
-    if hostname in DEVELOPMENT_HOSTS:
-      adminWarning = 'Backend not running. Jobs will not be processed immediately.'
-  
-  rosettaDD = RosettaDataDir(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"])
-  rosettaHTML =  RosettaHTML(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"], username=username, comment=comment, adminWarning=adminWarning)
-  
-  global protocolGroups
-  global protocols
-  feProtocols = FrontendProtocols(rosettaDD, rosettaHTML)
-  protocolGroups, protocols = feProtocols.getProtocols()
-  
-    #######################################
-  # show the result files, no login     #
-  #######################################
-  if form.has_key("query") and form["query"].value == "datadir":
-    s.write("Content-type: text/html\n\n")
-    cryptID = ''
-    status = ''
-    task = ''
-    html_content = ''
-    mini = False
+			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
+			if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
+				query_type = form["query"].value
 
-    if form.has_key("job"):
-      cryptID = form["job"].value
-      sql = 'SELECT ID,Status,task,mini,PDBComplexFile,ProtocolParameters FROM backrub WHERE cryptID="%s"' % (cryptID)
-      
-      if form.has_key("local") and form["local"].value == "false":
-          isLocal = False
-          rosettaDD.download_dir = settings["RemoteDownloadDir"]
-          rosettaDD.ddir = "../remotedownloads"
-          result = getKlabDBConnection().execQuery(sql)
-      else:
-          result = DBConnection.execQuery(sql)
-          
-      if len(result) > 0:
-          jobid = result[0][0]
-          status = result[0][1]
-          task = result[0][2]
-          binary = result[0][3]
-          pdb_filename = result[0][4]
-          protoparams = result[0][5]
-      else:
-          html_content = "Either an invalid job ID was given or else the job no longer exists in the database."  
-    else:
-      html_content = "Invalid link. No job ID given."
-      
-    if status == 1: # running
-      html_content = '<br>Job is Running. Please check again later.'
-    elif status == 0:
-      html_content = '<br>Job in queue. Please check again later.'
-    elif status in [3, 4]:
-      html_content = '<br>No data.'
-        
-    found = False
-    if html_content == '':
-        for p in protocols:
-            if task == p.dbname:
-                found = True
-                p.getDataDirFunction()(cryptID, jobid, binary, pdb_filename, protoparams)
-                break
-    if not found:
-        html_content = "No data."
+				sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
+				result = DBConnection.execQuery(sql)
+				if result[0][0] != () and result[0][0] != (): #todo
+					username = result[0][0]
+					userid = int(result[0][1])
+			elif form.has_key("query") and form['query'].value in subAllowedQueries:
+				query_type = form["query"].value
+			else:
+				query_type = "index" # fallback, shouldn't occur
 
-    s.write(rosettaDD.main(html_content))
-          
-    s.close()
-    return
+		# send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
+		s.write(str(my_session.cookie) + '\n')
+		
 
-  # session is now active, execute function
-  # if query_type == "index":
-  #   html_content = rosettaHTML.index()
-  #   title = 'Home'
-  propagatedValues = ['ChosenBinary']
-  extraValues = {}
-  for pv in propagatedValues:
-      if form.has_key(pv):
-          extraValues[pv] = form[pv].value
-  
-  if query_type == "login" or query_type == "index":
-    login_return = login(form, my_session, t)
-    if login_return == True:
-      username = form["myUserName"].value
-      html_content = rosettaHTML.loggedIn(username)
-    elif login_return in ['no_password', 'wrong_password', 'wrong_username']:
-      html_content = rosettaHTML.login(message='Wrong username or password. Please try again.')
-    elif login_return == 'logged_in':
-      html_content = rosettaHTML.login(message='You are already logged in.', login_disabled=True)
-    else:
-      html_content = rosettaHTML.login()
-    title = 'Home'
+		if form["query"].value not in ["PDB"]:
+			s.write("Content-type: text/html\n\n")
+		s.write(debug)
+		my_session.close()
 
-  elif query_type == "loggedin":
-    html_content = rosettaHTML.loggedIn(username) 
+	###############################
+	# HTML CODE GENERATION
+	###############################
 
-  elif query_type == "logout":
-    if logout(form, my_session):
-      html_content = rosettaHTML.logout(username)
-    else:
-      html_content = rosettaHTML.index()
-    title = 'Logout'
+	########## DEBUG Cookies ########## 
+	#s.write(string_cookie+'\n<br><br>')
+	#s.write('%s <br> sess.cookie = %s <br> sess.data = %s\n<br><br>' % (my_session.cookie, my_session.cookie, my_session.data))
+	#s.write(str(my_session.cookie)+'\n<br><br>')
+	########## DEBUG Cookies ##########
 
-  elif query_type == "parsePDB" or query_type == "sampleData":
-      #html_content = rosettaHTML.submit(jobname='')
-      #form
-      
-      protocol = (form["protocolgroup"].value, form["protocoltask"].value)
-      
-      #if False:
-      pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(rosettaHTML, form)
-      if not pdb_okay:
-          # reset the query for the JS startup function
-          query_type = "submit"
-          html_content = rosettaHTML.submit(jobname='', errors=errors, activeProtocol = protocol, extraValues = extraValues)
-      else:              
-          saveSucceeded, newfilepath = saveTempPDB(SID, pdb_object, pdb_filename)
-          if not saveSucceeded:
-              # reset the query for the JS startup function
-              query_type = "submit"
-              html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
-          else:
-              PDBchains = pdb_object.chain_ids() 
-              numPDBchains = len(PDBchains)
-              
-              
-              if numPDBchains > ROSETTAWEB_SK_Max_Chains:
-                  errors.append('The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_SK_Max_Chains))
-              
-              extraValues['ChosenBinary'] = form["Mini"].value
-                  
-              html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value, extraValues, query_type == "sampleData")
-              title = 'Submission Form'
-      
-  elif query_type == "submitted":    
-    return_val = submit(rosettaHTML, form, SID)
-    if return_val: # data was submitted and written to the database
-        html_content = rosettaHTML.submitted('', return_val[0], return_val[1], return_val[2], warnings)
-        title = 'Job submitted'
-    else: # no data was submitted/there is an error
-        html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
-        title = 'Submission Form'
+	if not os.path.exists('/tmp/rosettaweb-rosettadaemon.pid'): #upgradetodo: Store this filename in the conf file
+		if hostname in DEVELOPMENT_HOSTS:
+			adminWarning = 'Backend not running. Jobs will not be processed immediately.'
 
-  elif query_type == "submit":
-    html_content = rosettaHTML.submit(jobname='', extraValues = extraValues)
-    title = 'Submission Form'
+	rosettaDD = RosettaDataDir(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"])
+	rosettaHTML =  RosettaHTML(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"], username=username, comment=comment, adminWarning=adminWarning)
+	
+	global protocolGroups
+	global protocols
+	feProtocols = FrontendProtocols(rosettaDD, rosettaHTML)
+	protocolGroups, protocols = feProtocols.getProtocols()
+	
+	  #######################################
+	# show the result files, no login     #
+	#######################################
+	if form.has_key("query") and form["query"].value == "datadir":
+		s.write("Content-type: text/html\n\n")
+		cryptID = ''
+		status = ''
+		task = ''
+		html_content = ''
+		mini = False
 
-  elif query_type == "queue":
-    output = StringIO()
-    output.write('<TD align="center">')
-    job_list = queue(form, userid)
-    html_content = rosettaHTML.printQueue(job_list, userid)
-    title = 'Job Queue'
+		if form.has_key("job"):
+			cryptID = form["job"].value
+			sql = 'SELECT ID,Status,task,mini,PDBComplexFile,ProtocolParameters FROM backrub WHERE cryptID="%s"' % (cryptID)
 
-  elif query_type == "jobinfo":
-    parameter = jobinfo(form, SID)
-    if parameter[0]:
-        html_content = rosettaHTML.jobinfo(parameter[1], parameter[2])
-    else:
-        html_content = '<td align="center">No Data<br><br></td>'
-    title = 'Job Info'
+			if form.has_key("local") and form["local"].value == "false":
+				isLocal = False
+				rosettaDD.download_dir = settings["RemoteDownloadDir"]
+				rosettaDD.ddir = "../remotedownloads"
+				result = getKlabDBConnection().execQuery(sql)
+			else:
+				result = DBConnection.execQuery(sql)
 
-  elif query_type == "register":
-    register_result = register(form, SID)
-    if register_result[0]:
-        if register_result[1] == 'updated':
-            html_content = rosettaHTML.updated()
-        else:
-            html_content = rosettaHTML.registered()
-    else:
-        html_content = rosettaHTML.register(errors=errors)
-    title = 'Registration'
+			if len(result) > 0:
+				jobid = result[0][0]
+				status = result[0][1]
+				task = result[0][2]
+				binary = result[0][3]
+				pdb_filename = result[0][4]
+				protoparams = result[0][5]
+			else:
+				html_content = "Either an invalid job ID was given or else the job no longer exists in the database."  
+		else:
+			html_content = "Invalid link. No job ID given."
 
-  elif query_type == "PDB":
-  	if not(settings["LiveWebserver"]):
-  		jobID = form["job"].value
-  		executionserver = form["server"].value
-  		nolinenums = False
-  		if form.has_key("plain"):
-  			nolinenums = form["plain"] 
-  		
-  		# This logic does not currently generalize to multiple test servers
-  		StorageDBConnection = DBConnection
-  		if executionserver == "kortemmelab":
-  			StorageDBConnection = getKlabDBConnection()
-  		
-  		quotas = StorageDBConnection.execQuery("SELECT PDBComplex FROM backrub WHERE ID=%s", parameters = (jobID,))
-  		s.write("Content-type: text/plain\n\n")
-  		if quotas:
-  			pdbfile = quotas[0][0]
-  			if not nolinenums:
-	  			import math
-	  			linenum = 1
-	  			pdbfile = pdbfile.split("\n")
-	  			numzeros = math.ceil(math.log10(len(pdbfile)))
-	  			for line in pdbfile:
-	  				s.write("%0*d: %s\n" % (int(numzeros), linenum, line))
-	  				linenum += 1
-  			else:
-  			 s.write(pdbfile)
-  		else:
-  			s.write("Could not retrieve the PDB from the database.")
-  		#html_content = rosettaHTML.adminPage(quotas, usage, users, settings)
-  		title = 'Job #%s' % jobID
+		if status == 1: # running
+			html_content = '<br>Job is Running. Please check again later.'
+		elif status == 0:
+			html_content = '<br>Job in queue. Please check again later.'
+		elif status in [3, 4]:
+			html_content = '<br>No data.'
 
-  elif query_type == "admincmd":
-  	if not(settings["LiveWebserver"]):
-  		jobID = form["job"].value
-  		executionserver = form["server"].value
-  		cmd = form["cmd"].value
-  		
-  		# This logic does not currently generalize to multiple test servers
-  		StorageDBConnection = DBConnection
-  		if executionserver == "kortemmelab":
-  			StorageDBConnection = getKlabDBConnection()
-  		
-  		success = True
-  		error = None
-  		allowedAdminCommands = ["restart", "kill", "clear", "expire", "revive"]
-  		try:
-  			if cmd == "clear":
-  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=NULL WHERE ID=%s", parameters = (jobID,))
-  			elif cmd == "expire":
-  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET Expired=1 WHERE ID=%s", parameters = (jobID,))
-  			elif cmd == "revive":
-  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET Expired=0 WHERE ID=%s", parameters = (jobID,))
-  			elif cmd in allowedAdminCommands:
-  				quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=%s WHERE ID=%s", parameters = (cmd, jobID))
-  			else:
-  				oldcmd = cmd
-  				cmd = "administrat"
-  				raise Exception("Unknown command %s passed." % oldcmd)
-  		except Exception, e:
-  		 success = False
-  		 error = "Error: '%s'<br><br>%s" % (str(e), join(traceback.format_exc().split("\n"), "<br>"))
-  		html_content = rosettaHTML.jobAdminCommand(success, cmd, jobID, error)
-  		title = 'Job #%s %sed' % (jobID, cmd)
-  		
-  elif query_type == "admin":
-      if not(settings["LiveWebserver"]):
-          numberOfDays = 30
-          dstart = date.fromtimestamp(time.time() - (60*60*24*numberOfDays)) 
-          dend = date.today()
-          quotas = getKortemmelabUsersConnection().execQuery("SELECT Date, Quotas, DriveUsage, OtherData, GroupUsage FROM Quota WHERE Date >= %s AND Date <= %s ORDER BY Date", parameters = (dstart, dend))
-          usage = getKortemmelabUsersConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
-          users = getKortemmelabUsersConnection().execQuery("SELECT * FROM Users ORDER BY Username")
-          
-          html_content = rosettaHTML.adminPage(quotas, usage, users, settings, form)
-          title = 'Admin'
+		found = False
+		if html_content == '':
+			for p in protocols:
+				if task == p.dbname:
+					found = True
+					p.getDataDirFunction()(cryptID, jobid, binary, pdb_filename, protoparams)
+					break
+		if not found:
+			html_content = "No data."
 
-  elif query_type == "update":
-    user_data = getUserData(form, SID)
-    html_content = rosettaHTML.register(username=user_data['username'],
-                                        firstname=user_data['firstname'],
-                                        lastname=user_data['lastname'],
-                                        institution=user_data['institution'],
-                                        email=user_data['email'],
-                                        address=user_data['address'],
-                                        city=user_data['city'],
-                                        zip=user_data['zip'],
-                                        state=user_data['state'],
-                                        country=user_data['country'],
-                                        update=True)
-    title = 'User Information'
+		s.write(rosettaDD.main(html_content))
+		s.close()
+		return
 
-  elif query_type == "terms_of_service":
-    html_content = rosettaHTML.terms_of_service()
-    title = 'Terms of Service'
+	# session is now active, execute function
+	# if query_type == "index":
+	#   html_content = rosettaHTML.index()
+	#   title = 'Home'
+	propagatedValues = ['ChosenBinary']
+	extraValues = {}
+	for pv in propagatedValues:
+		if form.has_key(pv):
+			extraValues[pv] = form[pv].value
 
-  elif query_type == "doc":
-    html_content = rosettaHTML.help()
-    title = 'Documentation'
+	if query_type == "login" or query_type == "index":
+		login_return = login(form, my_session, t)
+		if login_return == True:
+			username = form["myUserName"].value
+			html_content = rosettaHTML.loggedIn(username)
+		elif login_return in ['no_password', 'wrong_password', 'wrong_username']:
+			html_content = rosettaHTML.login(message='Wrong username or password. Please try again.')
+		elif login_return == 'logged_in':
+			html_content = rosettaHTML.login(message='You are already logged in.', login_disabled=True)
+		else:
+			html_content = rosettaHTML.login()
+		title = 'Home'
 
-  elif query_type == "delete":
-    html = deletejob(form, SID)
-    title = 'Job Deleted'
+	elif query_type == "loggedin":
+		html_content = rosettaHTML.loggedIn(username) 
 
-  elif query_type == "oops":
-    password_result = send_password(form)
-    if password_result[0]:
-        html_content = rosettaHTML.passwordUpdated(password_result[1])
-    else:
-        html_content = rosettaHTML.sendPassword(password_result[1])
-    title = 'Password'
+	elif query_type == "logout":
+		if logout(form, my_session):
+			html_content = rosettaHTML.logout(username)
+		else:
+			html_content = rosettaHTML.index()
+		title = 'Logout'
 
-  else:
-    html = "this is impossible" # should never happen since we only allow states from list above 
+	elif query_type == "parsePDB" or query_type == "sampleData":
+		#html_content = rosettaHTML.submit(jobname='')
+		#form
+		
+		protocol = (form["protocolgroup"].value, form["protocoltask"].value)
+		
+		#if False:
+		pdb_okay, pdbfile, pdb_filename, pdb_object = parsePDB(rosettaHTML, form)
+		if not pdb_okay:
+			# reset the query for the JS startup function
+			query_type = "submit"
+			html_content = rosettaHTML.submit(jobname='', errors=errors, activeProtocol = protocol, extraValues = extraValues)
+		else:
+			saveSucceeded, newfilepath = saveTempPDB(SID, pdb_object, pdb_filename)
+			if not saveSucceeded:
+				# reset the query for the JS startup function
+				query_type = "submit"
+				html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
+			else:
+				PDBchains = pdb_object.chain_ids() 
+				numPDBchains = len(PDBchains)
+				
 
-  if query_type not in ["PDB"]:
-    s.write(rosettaHTML.main(html_content, title, query_type))
-  s.close() 
+				if numPDBchains > ROSETTAWEB_SK_Max_Chains:
+					errors.append('The PDB file contains %d chains. The maximum number of chains currently supported by the applications is %d.' % (numPDBchains, ROSETTAWEB_SK_Max_Chains))
+
+				extraValues['ChosenBinary'] = form["Mini"].value
+				html_content = rosettaHTML.submit('', errors, protocol, pdb_filename, newfilepath, pdb_object.chain_ids(), form["MiniTextValue"].value, extraValues, query_type == "sampleData")
+		title = 'Submission Form'
+
+	elif query_type == "submitted":    
+		return_val = submit(rosettaHTML, form, SID)
+		if return_val: # data was submitted and written to the database
+			html_content = rosettaHTML.submitted('', return_val[0], return_val[1], return_val[2], warnings)
+			title = 'Job submitted'
+		else: # no data was submitted/there is an error
+			html_content = rosettaHTML.submit(jobname='', errors=errors, extraValues = extraValues)
+			title = 'Submission Form'
+
+	elif query_type == "submit":
+		html_content = rosettaHTML.submit(jobname='', extraValues = extraValues)
+		title = 'Submission Form'
+
+	elif query_type == "queue":
+		output = StringIO()
+		output.write('<TD align="center">')
+		job_list = queue(form, userid)
+		html_content = rosettaHTML.printQueue(job_list, userid)
+		title = 'Job Queue'
+
+	elif query_type == "jobinfo":
+		parameter = jobinfo(form, SID)
+		if parameter[0]:
+			html_content = rosettaHTML.jobinfo(parameter[1], parameter[2])
+		else:
+			html_content = '<td align="center">No Data<br><br></td>'
+		title = 'Job Info'
+
+	elif query_type == "register":
+		register_result = register(form, SID)
+		if register_result[0]:
+			if register_result[1] == 'updated':
+				html_content = rosettaHTML.updated()
+			else:
+				html_content = rosettaHTML.registered()
+		else:
+			html_content = rosettaHTML.register(errors=errors)
+		title = 'Registration'
+
+	elif query_type == "PDB":
+		if not(settings["LiveWebserver"]):
+			jobID = form["job"].value
+			executionserver = form["server"].value
+			nolinenums = False
+			if form.has_key("plain"):
+				nolinenums = form["plain"] 
+			
+			# This logic does not currently generalize to multiple test servers
+			StorageDBConnection = DBConnection
+			if executionserver == "kortemmelab":
+				StorageDBConnection = getKlabDBConnection()
+			
+			quotas = StorageDBConnection.execQuery("SELECT PDBComplex FROM backrub WHERE ID=%s", parameters = (jobID,))
+			s.write("Content-type: text/plain\n\n")
+			if quotas:
+				pdbfile = quotas[0][0]
+				if not nolinenums:
+					import math
+					linenum = 1
+					pdbfile = pdbfile.split("\n")
+					numzeros = math.ceil(math.log10(len(pdbfile)))
+					for line in pdbfile:
+						s.write("%0*d: %s\n" % (int(numzeros), linenum, line))
+						linenum += 1
+				else:
+				 s.write(pdbfile)
+			else:
+				s.write("Could not retrieve the PDB from the database.")
+			#html_content = rosettaHTML.adminPage(quotas, usage, users, settings)
+			title = 'Job #%s' % jobID
+
+	elif query_type == "admincmd":
+		if not(settings["LiveWebserver"]):
+			jobID = form["job"].value
+			executionserver = form["server"].value
+			cmd = form["cmd"].value
+			
+			# This logic does not currently generalize to multiple test servers
+			StorageDBConnection = DBConnection
+			if executionserver == "kortemmelab":
+				StorageDBConnection = getKlabDBConnection()
+			
+			success = True
+			error = None
+			allowedAdminCommands = ["restart", "kill", "clear", "expire", "revive"]
+			try:
+				if cmd == "clear":
+					quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=NULL WHERE ID=%s", parameters = (jobID,))
+				elif cmd == "expire":
+					quotas = StorageDBConnection.execQuery("UPDATE backrub SET Expired=1 WHERE ID=%s", parameters = (jobID,))
+				elif cmd == "revive":
+					quotas = StorageDBConnection.execQuery("UPDATE backrub SET Expired=0 WHERE ID=%s", parameters = (jobID,))
+				elif cmd in allowedAdminCommands:
+					quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=%s WHERE ID=%s", parameters = (cmd, jobID))
+				else:
+					oldcmd = cmd
+					cmd = "administrat"
+					raise Exception("Unknown command %s passed." % oldcmd)
+			except Exception, e:
+			 success = False
+			 error = "Error: '%s'<br><br>%s" % (str(e), join(traceback.format_exc().split("\n"), "<br>"))
+			html_content = rosettaHTML.jobAdminCommand(success, cmd, jobID, error)
+			title = 'Job #%s %sed' % (jobID, cmd)
+		
+	elif query_type == "admin":
+		if not(settings["LiveWebserver"]):
+			numberOfDays = 30
+			dstart = date.fromtimestamp(time.time() - (60*60*24*numberOfDays)) 
+			dend = date.today()
+			quotas = getKortemmelabUsersConnection().execQuery("SELECT Date, Quotas, DriveUsage, OtherData, GroupUsage FROM Quota WHERE Date >= %s AND Date <= %s ORDER BY Date", parameters = (dstart, dend))
+			usage = getKortemmelabUsersConnection().execQuery("SELECT * FROM DailyUsage WHERE Date >= %s AND Date <= %s ORDER BY Username, Date", parameters = (dstart, dend))
+			users = getKortemmelabUsersConnection().execQuery("SELECT * FROM Users ORDER BY Username")
+			
+			html_content = rosettaHTML.adminPage(quotas, usage, users, settings, form)
+			title = 'Admin'
+
+	elif query_type == "update":
+		user_data = getUserData(form, SID)
+		html_content = rosettaHTML.register(
+			username=user_data['username'],
+			firstname=user_data['firstname'],
+			lastname=user_data['lastname'],
+			institution=user_data['institution'],
+			email=user_data['email'],
+			address=user_data['address'],
+			city=user_data['city'],
+			zip=user_data['zip'],
+			state=user_data['state'],
+			country=user_data['country'],
+			update=True)
+		title = 'User Information'
+
+	elif query_type == "terms_of_service":
+		html_content = rosettaHTML.terms_of_service()
+		title = 'Terms of Service'
+
+	elif query_type == "doc":
+		html_content = rosettaHTML.help()
+		title = 'Documentation'
+
+	elif query_type == "delete":
+		html = deletejob(form, SID)
+		title = 'Job Deleted'
+
+	elif query_type == "oops":
+		password_result = send_password(form)
+		if password_result[0]:
+			html_content = rosettaHTML.passwordUpdated(password_result[1])
+		else:
+			html_content = rosettaHTML.sendPassword(password_result[1])
+		title = 'Password'
+
+	else:
+		html = "this is impossible" # should never happen since we only allow states from list above 
+
+	if query_type not in ["PDB"]:
+		s.write(rosettaHTML.main(html_content, title, query_type))
+	s.close() 
 
 ########################################## end of ws() ########################################
 
