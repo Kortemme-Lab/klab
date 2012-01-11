@@ -27,6 +27,8 @@ A.nav:visited { text-decoration: none; color:#365a79; font-family: Arial, Helvet
 A.nav:active { text-decoration: none; color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
 A.nav:hover { text-decoration: none; color:#365a79; font-family: Arial, Helvetica, Sans-Serif; font-size: 11pt; text-decoration: none; }
 
+span.red { color:#ff2222; }
+
 P { text-align: justify; }
 
 .header { background: #cccccc; font-size: 12px; font-family: verdana, arial; font-weight: bold; }

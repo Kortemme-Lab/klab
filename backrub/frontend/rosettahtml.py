@@ -649,27 +649,24 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         <br>
         <form name="myForm" method="post" onsubmit="return ValidateFormRegister();">
           <table border=0 cellpadding=2 cellspacing=0>
-            <tr><td colspan=2><b>Required Fields</b></td></tr>
-            <tr><td align=right class="register">Username: </td>
-                <td><input type=text size=20 maxlength=50 name="username" value="%s" %s></td>
+            <tr><td align=right class="register">Username:</td>
+                <td><input type=text size=20 maxlength=50 name="username" value="%s" %s><span class="red">*</span></td>
             </tr>
             <tr><td align=right class="register">First Name: </td>
-                <td><input type=text size=20 maxlength=50 name="firstname" value="%s"></td>
+                <td><input type=text size=20 maxlength=50 name="firstname" value="%s"><span class="red">*</span></td>
             </tr>
             <tr><td align=right class="register">Last Name: </td>
-                <td><input type=text size=20 maxlength=50 name="lastname" value="%s"></td>
+                <td><input type=text size=20 maxlength=50 name="lastname" value="%s"><span class="red">*</span></td>
             </tr>
             <tr><td align=right class="register">Email: </td>
-                <td><input type=text size=20 maxlength=50 name="email" value="%s" %s></td>
+                <td><input type=text size=20 maxlength=50 name="email" value="%s" %s onchange="validateEmail();"><span class="red">*</span></td>
             </tr>
             <tr><td align=right class="register">Password: </td>
-                <td><input type=password size=20 maxlength=50 name="password" value=""></td>
+                <td><input type=password size=20 maxlength=50 name="password" value=""><span class="red">*</span></td>
             </tr>
             <tr><td align=right class="register">Confirm Password: </td>
-                <td><input type=password size=20 maxlength=50 name="confirmpassword" value=""></td>
+                <td><input type=password size=20 maxlength=50 name="confirmpassword" value="" onchange="checkPassword();"><span class="red">*</span></td>
             </tr>                                                                
-            <tr><td colspan=2>&nbsp;</td></tr>                                                  
-            <tr><td colspan=2><b>Optional Fields</b></td></tr>
             <tr><td align=right class="register">Institution: </td>
                 <td><input type=text size=20 maxlength=50 name="institution" value="%s"></td>
             </tr>
@@ -677,7 +674,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 <td><input type=text size=20 maxlength=50 name="address" value="%s"></td>
             </tr>
             <tr><td align=right class="register">City: </td>
-                <td><input type=text size=20 maxlength=50 name="city" value="%s"></td>
+                <td><input type=text size=20 maxlength=50 name="city" value="%s"><span class="red">*</span></td>
             </tr>
             <tr><td align=right class="register">Zip: </td>
                 <td><input type=text size=20 maxlength=50 name="zip" value="%s"></td>
@@ -688,7 +685,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             <tr><td align=right class="register">Country</td>
                 <td><select name="country">
                 %s
-            </select></td>
+            </select><span class="red">*</span></td>
         </tr>
             <tr><td>&nbsp;</td></tr>
             <tr><td></td>

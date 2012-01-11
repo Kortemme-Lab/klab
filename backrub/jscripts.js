@@ -392,33 +392,70 @@ function ValidateForm()
 	ret = protocolValidators[pgroup][ptask]() && ret;
 	return ret;
 }
-	
+
+function checkPassword()
+{
+	mform = document.myForm;
+	if (mform.confirmpassword.value == "")
+	{
+		mform.password.style.background = "#ffffff";
+		mform.confirmpassword.style.background = "#ffffff";
+	}
+	else if ( mform.password.value == mform.confirmpassword.value  )
+	{
+		mform.password.style.background = "#77ff77"
+		mform.confirmpassword.style.background = "#77ff77"
+	}
+	else
+	{
+		mform.password.style.background = "#ff5555"
+		mform.confirmpassword.style.background = "#ff5555"
+	}
+}
+
+function validateEmail()
+{
+	f = document.myForm.email
+	str = f.value.replace(/^\s+|\s+$/g, '');
+	ati = str.indexOf("@")
+	doti = str.indexOf(".")
+	isValid = !(ati == -1 || doti == -1 || str.length < 6 || dot - 1 <= ati);
+	if (!isValid)
+	{
+		f.style.background = "#ff5555";
+	}
+	else
+	{
+		f.style.background = "#ffffff";
+	}
+	return isValid;
+}
+
 function ValidateFormRegister()
 { 
-	if ( document.myForm.username.value == "" ||
-			document.myForm.firstname.value == "" ||
-            document.myForm.lastname.value == "" ||
-            document.myForm.password.value == "" ||
-            document.myForm.confirmpassword.value == "")
+	mform = document.myForm
+	if (mform.username.value 		== "" ||
+		mform.firstname.value 		== "" ||
+		mform.lastname.value 		== "" ||
+		mform.password.value 		== "" ||
+		mform.confirmpassword.value == "" ||
+		mform.city.value 			== "" ||
+		mform.country.value 		== "")
 	{
 		alert("Please complete all required fields.");
-        return false;
+		return false;
 	}
-    
-	if ( document.myForm.email.value.indexOf("@") == -1 ||
-            document.myForm.email.value.indexOf(".") == -1 ||
-            document.myForm.email.value.indexOf(" ") != -1 ||
-            document.myForm.email.value.length < 6 )
+	if (!validateEmail(mform.email.value))
 	{
 		alert("Your email address is not valid.");
-        return false;
+		return false;
 	}
-	if ( document.myForm.password.value != document.myForm.confirmpassword.value  )
-    {
+	if ( mform.password.value != mform.confirmpassword.value  )
+	{
 		alert("Your password does not match your password confirmation.");
-        return false;
-    }
-    return true;
+		return false;
+	}
+	return true;
 }
 	
 function ValidateFormEmail()

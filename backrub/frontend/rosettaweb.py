@@ -775,6 +775,7 @@ def register(form, SID):
 	else:
 		process_data = False
 		return (False, None)
+	
 	if process_data:
 		# transmit values to database
 		# check whether each parameter has a value and if so append it to the database string
@@ -789,7 +790,7 @@ def register(form, SID):
 				fields += value_names[value_name] + ","
 				variables += "\"%s\"," % form[value_name].value
 			sql = "INSERT INTO Users (Date, %s) VALUES (NOW(), %s)" % (fields[:-1], variables[:-1])
-		#print sql
+		
 		DBConnection.execQuery(sql)
 
 		# send a conformation email
