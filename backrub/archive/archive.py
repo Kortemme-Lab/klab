@@ -6,19 +6,21 @@ import shutil
 sys.path.insert(0, "../common/")
 
 import colortext
-from klfilesystem import FileSysStats, FileStats, FolderStats, DiskStats, targzDirectory, safeMkdir, getSubdirectories
+from klfilesystem import FileSysStats, FileStats, FolderStats, DiskStats, targzDirectory, safeMkdir, getSubdirectories, computeMD5
 
 # Leave at least 30 GB free
 MIN_DISK_SPACE_IN_GB = 30
 
-# Leave at least 30 GB free
+# Only allow this script to be run when disk usage is above this percentage
 MIN_DISK_USAGE = 94
 
 def logmessage(str, suffix = "\n"):
 	global Log
 	str = colortext.make(str, color = 'green', suffix = suffix)
 	sys.stdout.write(str)
+	sys.stdout.flush()
 	Log.write(str)
+	Log.flush()
 	
 def main():	
 	
@@ -27,7 +29,7 @@ def main():
 	
 	# Create the directories for compressed jobs and those ready for deletion.
 	# For safety, we do not delete those ready for deletion automatically.
-	zipdir = os.path.join(cwd, "compressed")
+	zipdir = os.path.join(cwd, "forarchival")
 	deldir = os.path.join(cwd, "fordeletion")
 	safeMkdir(zipdir)
 	safeMkdir(deldir)
@@ -41,6 +43,8 @@ def main():
 	# Get a sorted list of the numbered directories
 	jobIDs = sorted([int(d) for d in getSubdirectories(cwd) if d.isdigit()])
 	
+	md5file = open("md5sum_%d-%d.txt" % (jobIDs[0], jobIDs[-1]), "w")
+	
 	# Iterate through the archived job directories, zipping and moving
 	b_folders = 0
 	b_zips = 0
@@ -49,7 +53,7 @@ def main():
 		ds = DiskStats(cwd)
 		
 		# Leave at least 30 GB free
-		colortext.error(ds.getFree(unit = ds.GB))
+		colortext.error("Disk space free: %.2f GB." % ds.getFree(unit = ds.GB))
 		if ds.getFree(unit = ds.GB) > MIN_DISK_SPACE_IN_GB:
 			# Get the directory size
 			subdir = os.path.join(cwd, str(d))
@@ -61,6 +65,13 @@ def main():
 			t, s = targzDirectory(str(d), zipfile, stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 			colortext.warning(t.strip())			
 			zStats = FileStats(zipfile)
+			
+			md5hash = computeMD5(zipfile)
+			colortext.printf("MD5 checksum: %s\n" % md5hash, color = "lightblue")
+			md5file.write("%s\n" % md5hash)
+			m5F = open(os.path.join(zipdir, "%d.tar.gz.md5" % d), "w")
+			m5F.write("%s\n" % md5hash)
+			m5F.close()
 			
 			# Update counters
 			b_folders += pStats.m_size
@@ -75,13 +86,29 @@ def main():
 			
 			logmessage("Done.")
 			count += 1
+		else:
+			break
 	
-	compression = b_folders / b_zips
-	b_folders = FileSysStats().getHumanReadable(b_folders)
-	b_zips = FileSysStats().getHumanReadable(b_zips)
+	md5file.close()
 	
-	logmessage("\nArchived %d folders. " % count, suffix = "")
-	logmessage("Compression rate %.2fx (%s -> %s)." % (compression, b_folders, b_zips))
+	if b_zips and b_folders:
+		compression = b_folders / b_zips
+		b_folders = FileSysStats().getHumanReadable(b_folders)
+		b_zips = FileSysStats().getHumanReadable(b_zips)
+
+		logmessage("\nArchived %d folders. " % count, suffix = "")
+		logmessage("Compression rate %.2fx (%s -> %s)." % (compression, b_folders, b_zips))
+
+def splitmd5file():
+	'''One-off functfile:///mnt/Tantalus/website/archive/770-1335/1245.tar.gzion for splitting a text file of md5 checksums.'''
+	F = open("md5sum_770-1335.txt", "r")
+	safeMkdir(os.path.join(os.getcwd(), "md5"))
+	for line in F.readlines():
+		filename = line.split()[1] + ".md5"
+		mF = open(os.path.join(os.getcwd(), "md5", filename), "w")
+		mF.write(line)
+		mF.close()
+	F.close()
 
 t = datetime.datetime.today()
 datestamp = "%s-%s-%s_%s.%s" % (t.year, t.month, t.day, t.hour, t.minute)
