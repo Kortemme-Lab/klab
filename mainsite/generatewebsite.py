@@ -16,7 +16,9 @@ def indexHTML(page):
 	return [(page, str)]
 
 def makePage(page, d, debug = True):
-	testprefix = "test-"
+	testprefix = ""
+	if debug:
+			testprefix = "test-"
 	for pagehtml in d["generator"](page):
 		if pagehtml:
 			html = []
@@ -42,6 +44,6 @@ def main():
 	}
 	
 	for p, d in websitepages.iteritems():
-		makePage(p, d)
+		makePage(p, d, debug=False)
 
 main()

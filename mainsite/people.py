@@ -113,7 +113,7 @@ p_ming = {
 	"extratext"	:	"Postdoctoral research in structural and computational biology at Rensselaer Polytechnic Institute",
 	"caption"	:	"",
 	"mouseover"	:	None,
-	"pub_name"	:	"Huang, Yao-Ming",
+	"pub_name"	:	"Huang, Yao-ming",
 }
 
 p_lin = {
@@ -312,7 +312,7 @@ labAlumni = [
 	{"name" : 'Greg Kapp', "qualification" : "PhD", "period" : '2004-2009', "currentJob" : 'Scientist', "jobLocation" : 'Omniox Inc.',},
 	{"name" : 'Greg Friedland', "qualification" : "PhD", "period" : '2004-2008', "currentJob" : 'Postdoc', "jobLocation" : 'Joint Bioenergy Institute & UC Berkeley', "pub_name" : 'Friedland, Gregory D.',},
 	{"name" : 'Catherine Shi', "qualification" : None, "period" : '2008', "currentJob" : 'iPQB graduate program', "jobLocation" : 'UCSF',},
-	{"name" : 'Anthony Linares ', "qualification" : None, "period" : '2006, 2007', "currentJob" : 'MD/PhD program', "jobLocation" : 'UCLA', "pub_name" : 'Linares, Anthony J.',},
+	{"name" : 'Anthony Linares ', "qualification" : None, "period" : '2006-2007', "currentJob" : 'MD/PhD program', "jobLocation" : 'UCLA', "pub_name" : 'Linares, Anthony J.',},
 	{"name" : 'David Lomelin ', "qualification" : None, "period" : '2004-2006', "currentJob" : 'BMI graduate program', "jobLocation" : 'UCSF',},
 	{"name" : 'Loren Baugh', "qualification" : "PhD", "period" : '2004-2005', "currentJob" : 'Postdoc', "jobLocation" : 'University of Washington Seattle',},
 ]
@@ -351,7 +351,7 @@ def getPeopleHTML():
 			publink_close = ""
 			if person.get("pub_name") and person["pub_name"] in publishedMembers:
 				pagename = publications.pubpageID(person["pub_name"])
-				publink_open = "<a href='test-publications-%s.html'>" % pagename
+				publink_open = "<a href='publications-%s.html'>" % pagename
 				publink_close = "</a>"
 			html.append('''
                 <table style="text-align: left; width: 481px; height: 191px;" border="0" cellpadding="0" cellspacing="2"> 
@@ -429,7 +429,7 @@ def getPastRotationStudentsHTML():
 		publink_close = ""
 		if student.get("pub_name"):
 			pagename = publications.pubpageID(student["pub_name"])
-			publink_open = "<a class='publist' href='test-publications-%s.html'>" % pagename
+			publink_open = "<a class='publist' href='publications-%s.html'>" % pagename
 			publink_close = "</a>"
 		pname = student["name"]
 		pcourse = student["course"]
@@ -452,7 +452,7 @@ def getLabAlumniHTML():
 		html.append('                  <tr>')
 		if alumnus.get("pub_name"):
 			pagename = publications.pubpageID(alumnus["pub_name"])
-			publink_open = "<a class='publist' href='test-publications-%s.html'>" % pagename
+			publink_open = "<a class='publist' href='publications-%s.html'>" % pagename
 			publink_close = "</a>"
 		
 		pname = alumnus["name"]

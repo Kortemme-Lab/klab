@@ -1669,7 +1669,7 @@ N2  - BACKGROUND:Recently, there has been much interest in relating domain-domai
 ER  - 
 TY  - JOUR
 C8  - LabMember
-A1  - Huang, Yao-Ming
+A1  - Huang, Yao-ming
 A1  - Nayak, Sasmita
 A1  - Bystroff, Christopher
 T1  - Quantitative in vivo solubility and reconstitution of truncated circular permutants of green fluorescent protein
@@ -1694,7 +1694,7 @@ TY  - JOUR
 C8  - LabMember
 T1  - A Rewired Green Fluorescent Protein: Folding and Function in a Nonsequential, Noncircular GFP Permutant
 AU  - Reeder, Philippa J.
-AU  - Huang, Yao-Ming
+AU  - Huang, Yao-ming
 AU  - Dordick, Jonathan S.
 AU  - Bystroff, Christopher
 Y1  - 2010/11/23
@@ -1718,7 +1718,7 @@ ER  -
 TY  - JOUR
 C8  - LabMember
 T1  - Complementation and Reconstitution of Fluorescence from Circularly Permuted and Truncated Green Fluorescent Protein†
-AU  - Huang, Yao-Ming
+AU  - Huang, Yao-ming
 AU  - Bystroff, Christopher
 Y1  - 2009/01/13
 PY  - 2009
@@ -1740,7 +1740,7 @@ Y2  - 2011/12/16
 ER  - 
 TY  - JOUR
 C8  - LabMember
-A1  - Huang, Yao-Ming
+A1  - Huang, Yao-ming
 A1  - Bystroff, Christopher
 T1  - Improved pairwise alignments of proteins in the Twilight Zone using local structure predictions 
 Y1  - 2006/02/15 
@@ -1756,7 +1756,7 @@ N2  - Motivation: In recent years, advances have been made in the ability of com
 ER  -
 TY  - JOUR
 C8  - LabMember
-A1  - Huang, Yao-Ming
+A1  - Huang, Yao-ming
 A1  - Chen, Shee-Uan
 A1  - Goodman, Steven D.
 A1  - Wu, Shang-Hsin
@@ -1779,7 +1779,7 @@ N2  - In human cells, large DNA loop heterologies are repaired through a nick-di
 ER  -
 TY  - JOUR
 C8  - LabMember
-A1  - Huang, Yao-Ming
+A1  - Huang, Yao-ming
 A1  - Lee, Chun-Nan
 A1  - Liang, W. C.
 A1  - Chuang, Y. K.
@@ -1893,9 +1893,9 @@ A1  - Alvarez-Fernández, M.
 A1  - Stein, Amelie
 A1  - Hibbert, R. G.
 A1  - Heidebrecht, T.
-A1  - Aloy, P.
+A1  - Aloy, Patrick
 A1  - Medema, R. H.
-A1  - Perrakis, A.
+A1  - Perrakis, Anastassis
 T1  - Structure of the FoxM1 DNA-recognition domain bound to a promoter sequence 
 Y1  - 2010/07/01 
 JF  - Nucleic Acids Research 
@@ -2267,3 +2267,84 @@ EP  - 751
 VL  - 27
 IS  - 6
 ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Liu, Lin
+A1  - Gronenborn, Angela M.
+A1  - Bahar, Ivet
+T1  - Longer simulations sample larger subspaces of conformations while maintaining robust mechanisms of motion
+JF  - Proteins: Structure, Function, and Bioinformatics
+JA  - Proteins
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1097-0134
+UR  - http://dx.doi.org/10.1002/prot.23225
+M3  - doi: 10.1002/prot.23225
+SP  - n/a
+EP  - n/a
+KW  - structure-encoded dynamics
+KW  - molecular dynamics simulations
+KW  - power law
+KW  - global motions
+KW  - equilibrium fluctuations of cyanovirin-N
+Y1  - 2011
+ER  - 
+TY  - CHAP
+C8  - LabMember
+AU  - Liu, Lin
+AU  - Gronenborn, Angela M.
+T1  - Domain swapping in proteins
+A2  - Egelman, Edward
+BT  - Comprehensive Biophysics
+PB  - Elsevier
+PY  - 2012
+UR  - http://www.elsevierdirect.com/ISBN/9780123749208/
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Liu, Lin
+A1  - Koharudin, Leonardus M. I.
+A1  - Gronenborn, Angela M.
+A1  - Bahar, Ivet
+T1  - A comparative analysis of the equilibrium dynamics of a designed protein inferred from NMR, X-ray, and computations
+JF  - Proteins: Structure, Function, and Bioinformatics
+JA  - Proteins
+VL  - 77
+IS  - 4
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1097-0134
+UR  - http://dx.doi.org/10.1002/prot.22518
+M3  - doi: 10.1002/prot.22518
+SP  - 927
+EP  - 939
+KW  - equilibrium dynamics
+KW  - ensemble of conformations
+KW  - inter-residue contact topology
+KW  - crystal contacts
+KW  - elastic network model
+KW  - sugar-binding protein
+Y1  - 2009
+ER  -  
+TY  - JOUR
+C8  - LabMember
+A1  - Iwatani, Yasumasa
+A1  - Chan, Denise S. B.
+A1  - Liu, Lin
+A1  - Yoshii, Hiroaki
+A1  - Shibata, Junko
+A1  - Yamamoto, Naoki
+A1  - Levin, Judith G.
+A1  - Gronenborn, Angela M.
+A1  - Sugiura, Wataru
+T1  - HIV-1 Vif-mediated ubiquitination/degradation of APOBEC3G involves four critical lysine residues in its C-terminal domain 
+Y1  - 2009/11/17 
+JF  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences 
+SP  - 19539 
+EP  - 19544 
+N1  - doi: 10.1073/pnas.0906652106 
+VL  - 106 
+IS  - 46 
+UR  - http://www.pnas.org/content/106/46/19539.abstract 
+N2  - During coevolution with the host, HIV-1 developed the ability to hijack the cellular ubiquitin/proteasome degradation pathway to counteract the antiviral activity of APOBEC3G (A3G), a host cytidine deaminase that can block HIV-1 replication. Abrogation of A3G function involves the HIV-1 Vif protein, which binds A3G and serves as an adapter molecule to recruit A3G to a Cullin5-based E3 ubiquitin ligase complex. Structure-guided mutagenesis of A3G focused on the 14 most surface-exposed Lys residues allowed us to identify four Lys residues (Lys-297, 301, 303, and 334) that are required for Vif-mediated A3G ubiquitination and degradation. Substitution of Arg for these residues confers Vif resistance and restores A3G's antiviral activity in the presence of Vif. In our model, the critical four Lys residues cluster at the C terminus, opposite to the known N-terminal Vif-interaction region in the protein. Thus, spatial constraints imposed by the E3 ligase complex may be an important determinant in Vif-dependent A3G ubiquitination. 
+ER  - 
+

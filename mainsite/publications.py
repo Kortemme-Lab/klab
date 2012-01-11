@@ -86,6 +86,7 @@ publication_abbreviations = {
 	"BMC Systems Biology"								: "BMC Sys Biol",
 	"Cell"												: "Cell",
 	"Chemistry & Biology"								: "Chem Biol",
+	"Comprehensive Biophysics"					: "Comprehensive Biophysics",
 	"Current Opinion in Chemical Biology"				: "Curr Opin Chem Biol",
 	"Current Opinion in Structural Biology"				: "Curr Opin Struct Biol",
 	"Current Opinion in Biotechnology"					: "Curr Opin Biotechnol",
@@ -236,7 +237,7 @@ class PublicationEntry(dict):
 			"authors_str" : join(shortFormatAuthors(authors), ", "),
 			"title" : title,
 			"journal" : journal,
-			"entry" : entry,
+			"entry" : entry or "",
 			"year" : year,
 			"doi" : doi,
 			"URL" : URL,
@@ -472,9 +473,10 @@ labmembers = [
 	("Ritterson, Ryan", None),
 	("Hoersch, Daniel", None),
 	("Akiva, Eyal", None),
-	("Huang, Yao-Ming", None),
+	("Huang, Yao-ming", None),
 	("Stein, Amelie", None),
 	("Pache, Roland A.", None),
+	("Liu, Lin", None),
 ]
 
 def getPublishedMembers():
