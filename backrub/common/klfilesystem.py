@@ -3,6 +3,7 @@ import stat
 import shutil
 import subprocess
 import colortext
+import md5
 
 # todo: Remove these from rosettahelper
 permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
@@ -57,7 +58,7 @@ class FolderStats(FileSysStats):
 		
 		p = subprocess.Popen(["du", "-b", folderpath], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
 		stdoutdata, stderrdata = p.communicate()
-		stdoutdata = stdoutdata.split("\n")[-1]
+		stdoutdata = stdoutdata.strip().split("\n")[-1]
 		
 		if stderrdata:
 			raise(colortext.Exception(stderrdata))
@@ -118,3 +119,35 @@ def getSubdirectories(d):
 			return dirs"
 	'''
 	return [f for f in os.listdir(d) if os.path.isdir(f) ]
+
+def computeMD5(filepath, relativepath = ""):
+	'''Computes an MD5 checksum.
+		Depending on the file size, we either run the computation in Python or spawn a subprocess.
+		The implementation is slower in Python than the tested OS but there is an overhead associated with the spawning.
+		On my one-machine test (CentOS release 5.4 final on the webserver), @2MB was where the times converged.
+		'''
+	filename = os.path.basename(filepath)
+	checksum = None
+	
+	sz = os.path.getsize(filepath)
+	if sz < 2 * 1024 * 1024:
+		checksum = md5.new()
+		F = open(filepath, 'rb')
+		while True:
+			bytes = F.read(65536)
+			if len(bytes) == 0:
+				break # end of file
+			checksum.update(bytes)
+		checksum = checksum.hexdigest()
+		
+	else:
+		p = subprocess.Popen(["md5sum", filepath], stdout = subprocess.PIPE, stderr = subprocess.PIPE)
+		stdoutdata, stderrdata = p.communicate()
+		if stderrdata:
+			raise Exception(stderrdata)
+		stdoutdata = stdoutdata.split()
+		checksum = stdoutdata[0]
+		filename = os.path.basename(stdoutdata[1])
+
+	return "%s  %s" % (checksum, os.path.join(relativepath, filename))
+
