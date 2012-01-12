@@ -88,7 +88,7 @@ class SchedulerStartException(TaskSchedulerException): pass
 
 class TaskScheduler(object):
 
-    def __init__(self, workingdir, files = []):
+    def __init__(self, workingdir):
         self._initialtasks = []       # As well as the initial queue, we remember the initial tasks so we can generate the dependency graph 
         self.sgec = None
         self.dbID = 0
@@ -100,7 +100,6 @@ class TaskScheduler(object):
                       ClusterTask.COMPLETED_TASK: []}
         
         self.pendingtasks = {}
-        self.initialFiles = files # todo: Unused at present
         self.workingdir = workingdir
         self.failed = False
         self.started = False
@@ -499,7 +498,7 @@ class RosettaClusterJob(object):
         """ Make a subdirectory dirname in the working directory and copy all files into it.
             Filenames should be relative to the working directory."""
         if not self.testonly:
-            taskdir = "%s/%s" % (self.workingdir, dirname)
+            taskdir = os.path.join(self.workingdir, dirname)
             if not os.path.isdir(taskdir):
                 make755Directory(taskdir)
             if not os.path.isdir(taskdir):

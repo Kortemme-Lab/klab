@@ -249,162 +249,7 @@ def make_seqtol_resfile( pdb, params, radius, residue_ids = None):
 		
 	return True, contents
 
-class ddGTask(ClusterTask):
 
-	# additional attributes
-	prefix = "SeqTolerance"
-		 
-	def __init__(self, workingdir, targetdirectory, parameters, backrub_resfile, seqtol_resfile, movemap=None, name=""):
-		self.backrub_resfile	= backrub_resfile
-		self.seqtol_resfile	 = seqtol_resfile
-		self.movemap			= movemap
-		self.residues		   = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
-		self.pivot_res		  = []   # list of pivot residues, consecutively numbered from 1 [1,...]
-		self.map_res_id		 = {}   # contains the mapping from (chain,resid) to pivot_res
-		
-		if not parameters.get("binary") or not(parameters["binary"] == "seqtolJMB" or parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol"):
-			raise Exception
-						
-		super(SequenceToleranceSKTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])		  
-	
-	def _initialize(self):
-		self._prepare_backrub()
-		parameters = self.parameters
-				
-		self.br_output_prefixes = ["%04i_" % (i + 1) for i in range(parameters["nstruct"])]
-		self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
-		self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
-		self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
-		
-		self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
-		self.parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
-		if CLUSTER_debugmode:
-			self.parameters["ntrials"] = 10   
-			self.parameters["pop_size"] = 20
-		
-		# Create script
-		
-		taskarrays = {
-			"broutprefixes" : self.br_output_prefixes, 
-			"lowfiles" : self.low_files, 
-			"prefixes" : self.prefixes}
-		ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = taskarrays)
-		
-
-		# See the backrub_seqtol.py file in the RosettaCon repository: RosettaCon2010/protocol_capture/protocol_capture/backrub_seqtol/scripts/backrub_seqtol.py		
-		if parameters["binary"] == "seqtolJMB":
-			no_hb_env_dep_weights_file = os.path.join(ct.getBinaryDir(), "standard_NO_HB_ENV_DEP.wts")
-			score_weights = no_hb_env_dep_weights_file
-			score_patch = ""
-			ref_offsets = "HIS 1.2"
-		elif parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol":
-			score_weights = "standard"
-			score_patch = "score12"
-			ref_offsets = "HIS 1.2"
-			
-		# Setup backrub
-		backrubCommand = [
-			ct.getBinary("backrub"),  
-			"-database %s" % ct.getDatabaseDir(), 
-			"-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
-			"-ignore_unrecognized_res", 
-			"-ex1 -ex2",  
-			"-extrachi_cutoff 0", 
-			 "-backrub:ntrials %d" % parameters["ntrials"], 
-			"-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
-			"-out:prefix $broutprefixesvar",
-			"-score:weights", score_weights,
-			"-score:patch", score_patch
-			]
-		if self.movemap:
-			backrubCommand.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
-
-		backrubCommand = [
-			'# Run backrub', '', 
-			join(backrubCommand, " "), '', 
-			'mv ${SGE_TASK_ID4}_%s_0001_low.pdb %s_${SGE_TASK_ID4}_low.pdb' % (parameters["pdbRootname"], parameters["pdbRootname"]),
-			'rm ${SGE_TASK_ID4}_%s_0001_last.pdb' % parameters["pdbRootname"], ''] 
-		
-		# Setup sequence tolerance
-		seqtolCommand = [
-			ct.getBinary("sequence_tolerance"),   
-			"-database %s" % ct.getDatabaseDir(), 
-			"-s $lowfilesvar",
-			"-ex1 -ex2 -extrachi_cutoff 0",
-			"-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
-			"-ms:generations 5",
-			"-ms:pop_size %d" % parameters["pop_size"],
-			"-ms:pop_from_ss 1",
-			"-ms:checkpoint:prefix $prefixesvar",
-			"-ms:checkpoint:interval 200",
-			"-ms:checkpoint:gz",
-			"-ms:numresults", "0",
-			"-out:prefix $prefixesvar", 
-			"-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
-			"-score:weights", score_weights,
-			"-score:patch", score_patch]
-
-		if ref_offsets:
-			seqtolCommand.append("-score:ref_offsets %s" % ref_offsets)
-		
-		
-		seqtolCommand = [
-			'# Run sequence tolerance', '', 
-			join(seqtolCommand, " ")]		
-		
-		self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
-		
-	def _prepare_backrub( self ):
-		"""prepare data for a full backbone backrub run"""
-		self.pdb = pdb.PDB(self.parameters["pdb_info"].split('\n'))
-		self.map_res_id = self.parameters["map_res_id"] 
-		self.residue_ids = self.pdb.aa_resids()
-
-		# backrub is applied to all residues: append all residues to the backrub list
-		backrub = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
-		for res in self.residue_ids:
-			x = [ res[0], res[1:].strip() ] # 0: chain ID, 1..: resid
-			if len(x) == 1:
-				backrub.append( ( "_", int(x[0].lstrip())) )
-			else:
-				backrub.append( ( x[0], int(x[1].lstrip())) )
-		
-		# translate resid to absolute mini rosetta res ids
-		
-		for residue in backrub:
-			if residue[1] == 0:
-				self.pivot_res.append( self.map_res_id[ '%s   0' % residue[0]  ] )
-			else:
-				self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
-	
-	def retire(self):
-		passed = super(SequenceToleranceSKTask, self).retire()
-							   
-		try:
-			# Run the analysis on the originating host
-			errors = []
-			# check whether files were created (and write the total scores to a file)
-			for x in range(1, self.parameters['nstruct']+1):
-				low_file   = self._workingdir_file_path(getOutputFilenameSK(self.parameters["pdbRootname"], x, "low"))		  
-				if not os.path.exists( low_file ): 
-					errors.append('%s missing' % low_file)
-							
-			# Copy the files from the cluster submission host back to the originating host
-			self._status('Copying pdb, gz, and resfiles back')
-			self._copyFilesBackToHost(["*.pdb", "*.gz", "*.resfile"])
-		except Exception, e:
-			errors.append(str(e))
-			errors.append(traceback.format_exc())
-			
-		# At this stage we are actually done but do not mark ourselves as completed otherwise the scheduler will get confused
-		if errors:
-			errs = join(errors,"</error>\n\t<error>")
-			print("<errors>\n\t<error>%s</error>\n</errors>" % errs)
-			self.state = FAILED_TASK
-			return False
-		  
-		return passed
-       
 class SequenceToleranceSKTask(ClusterTask):
 
 	# additional attributes
@@ -976,7 +821,7 @@ class SequenceToleranceHKJob(RosettaClusterJob):
 		self._write_resfile( "NATAA", {}, self.backrub, self.backrub_resfile )
 		self._write_seqtol_resfile()
 		   
-		scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.minimization_resfile, self.backrub_resfile, self.seqtol_resfile])
+		scheduler = TaskScheduler(self.workingdir)
 		
 		targetsubdirectory = "minimization"
 		self._write_paths_file("%s/%s" % (self.workingdir, targetsubdirectory), 0)
@@ -1462,7 +1307,7 @@ class SequenceToleranceSKJob(RosettaClusterJob):
 		self._write_seqtol_resfile()
 		self._write_backrub_movemap()
 		
-		scheduler = TaskScheduler(self.workingdir, files = [self.parameters["pdb_filename"], self.seqtol_resfile, self.backrub_resfile, self.backrub_movemap])
+		scheduler = TaskScheduler(self.workingdir)
 		 
 		targetsubdirectory = "sequence_tolerance"
 		inputfiles = [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap, self.seqtol_resfile]
@@ -1640,9 +1485,9 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
 		self.resultFilemasks.append((".", "stdout*"))
 		self.resultFilemasks.append((".", "timing_profile.txt"))
 		self.resultFilemasks.append((".", "tolerance_*"))
-		self.resultFilemasks.append((".", "*.ga.entities.gz"))
 		for i in range(self.numberOfRuns):
 			seqtolSubdirectory = "sequence_tolerance%d" % i
+			self.resultFilemasks.append((seqtolSubdirectory, "*.ga.entities.gz"))
 			self.resultFilemasks.append((seqtolSubdirectory, "*.resfile"))
 			self.resultFilemasks.append((seqtolSubdirectory, "*.movemap"))		
 			self.resultFilemasks.append((seqtolSubdirectory, "backrub_scores.dat"))
@@ -1733,7 +1578,7 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
 		self._write_seqtol_resfile()
 		self._write_backrub_movemap()
 		
-		scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
+		scheduler = TaskScheduler(self.workingdir)
 		
 		for i in range(self.numberOfRuns):
 			targetsubdirectory = "sequence_tolerance%d" % i
@@ -1750,6 +1595,7 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
 		# Run the analysis on the originating host
 		
 		self._status("Analyzing results")
+		
 		# run Colin's analysis script: filtering and profiles/motifs
 		thresh_or_temp = self.parameters['kT']
 		
@@ -1943,7 +1789,7 @@ class SequenceToleranceHKJobAnalyzer(SequenceToleranceHKJob):
 		self.targetdirectory = self.directoryToAnalyse
 		self.workingdir = self.directoryToAnalyse
 		
-		scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.minimization_resfile, self.backrub_resfile, self.seqtol_resfile])
+		scheduler = TaskScheduler(self.workingdir)
 		self.stTask = SequenceToleranceHKClusterTask(self.targetdirectory, self.targetdirectory, parameters, self.seqtol_resfile, name="Sequence tolerance step for sequence tolerance protocol")
 		numtasks = parameters["nstruct"] 
 		for i in range(1, numtasks + 1):
@@ -2009,7 +1855,7 @@ class SequenceToleranceSKMultiJobFixBB(SequenceToleranceSKMultiJob):
 		self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
 		self._write_seqtol_resfile()
 		
-		scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile])
+		scheduler = TaskScheduler(self.workingdir)
 		
 		for i in range(self.numberOfRuns):
 			targetsubdirectory = "sequence_tolerance%d" % i
@@ -2179,7 +2025,7 @@ class SequenceToleranceSKJobAnalyzer(SequenceToleranceSKJob):
 		
 		self.targetdirectory = self.directoryToAnalyse
 		
-		scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_resfile, self.backrub_movemap])
+		scheduler = TaskScheduler(self.workingdir)
 		
 		self.scheduler = scheduler
 		
@@ -2200,13 +2046,297 @@ class SequenceToleranceSKMultiJobAnalyzer(SequenceToleranceSKMultiJob):
 		self._expandParameters()
 		
 		self._import_pdb(parameters["pdb_filename"], parameters["pdb_info"])
-		self._write_backrub_resfiles()
-		self._write_seqtol_resfile()
-		self._write_backrub_movemap()
+		#self._write_backrub_resfiles()
+		#self._write_seqtol_resfile()
+		#self._write_backrub_movemap()
 		
 		# Change this to the target directory for analysis
 		self.targetdirectory = self.directoryToAnalyse
 		
-		scheduler = TaskScheduler(self.workingdir, files = [parameters["pdb_filename"], self.seqtol_resfile, self.backrub_movemap] + self.backrub_resfiles)
+		scheduler = TaskScheduler(self.workingdir)
 		
 		self.scheduler = scheduler
+
+
+
+class ddGTask(ClusterTask):
+
+	# additional attributes
+	prefix = "SeqTolerance"
+		 
+	def __init__(self, workingdir, targetdirectory, parameters, backrub_resfile, seqtol_resfile, movemap=None, name=""):
+		self.backrub_resfile	= backrub_resfile
+		self.seqtol_resfile	 = seqtol_resfile
+		self.movemap			= movemap
+		self.residues		   = {}   # contains the residues and their modes according to rosetta: { (chain, resID):["PIKAA","PHKL"] }
+		self.pivot_res		  = []   # list of pivot residues, consecutively numbered from 1 [1,...]
+		self.map_res_id		 = {}   # contains the mapping from (chain,resid) to pivot_res
+		
+		if not parameters.get("binary") or not(parameters["binary"] == "seqtolJMB" or parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol"):
+			raise Exception
+						
+		super(SequenceToleranceSKTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, parameters["nstruct"])		  
+	
+	def _initialize(self):
+		self._prepare_backrub()
+		parameters = self.parameters
+				
+		self.br_output_prefixes = ["%04i_" % (i + 1) for i in range(parameters["nstruct"])]
+		self.low_files = [getOutputFilenameSK(parameters["pdbRootname"], i + 1, "low") for i in range(parameters["nstruct"])]
+		self.prefixes = [lfilename[:-4] for lfilename in self.low_files]
+		self.low_files = [self._workingdir_file_path(lfilename) for lfilename in self.low_files]
+		
+		self.parameters["ntrials"] = 10000 # This should be 10000 on the live webserver
+		self.parameters["pop_size"] = 2000 # This should be 2000 on the live webserver
+		if CLUSTER_debugmode:
+			self.parameters["ntrials"] = 10   
+			self.parameters["pop_size"] = 20
+		
+		# Create script
+		
+		taskarrays = {
+			"broutprefixes" : self.br_output_prefixes, 
+			"lowfiles" : self.low_files, 
+			"prefixes" : self.prefixes}
+		ct = ClusterScript(self.workingdir, parameters["binary"], numtasks = self.numtasks, dataarrays = taskarrays)
+		
+
+		# See the backrub_seqtol.py file in the RosettaCon repository: RosettaCon2010/protocol_capture/protocol_capture/backrub_seqtol/scripts/backrub_seqtol.py		
+		if parameters["binary"] == "seqtolJMB":
+			no_hb_env_dep_weights_file = os.path.join(ct.getBinaryDir(), "standard_NO_HB_ENV_DEP.wts")
+			score_weights = no_hb_env_dep_weights_file
+			score_patch = ""
+			ref_offsets = "HIS 1.2"
+		elif parameters["binary"] == "seqtolP1" or parameters["binary"] == "multiseqtol":
+			score_weights = "standard"
+			score_patch = "score12"
+			ref_offsets = "HIS 1.2"
+			
+		# Setup backrub
+		backrubCommand = [
+			ct.getBinary("backrub"),  
+			"-database %s" % ct.getDatabaseDir(), 
+			"-s %s/%s" % (ct.getWorkingDir(), parameters["pdb_filename"]),
+			"-ignore_unrecognized_res", 
+			"-ex1 -ex2",  
+			"-extrachi_cutoff 0", 
+			 "-backrub:ntrials %d" % parameters["ntrials"], 
+			"-resfile %s" % os.path.join(ct.getWorkingDir(), self.backrub_resfile),
+			"-out:prefix $broutprefixesvar",
+			"-score:weights", score_weights,
+			"-score:patch", score_patch
+			]
+		if self.movemap:
+			backrubCommand.append("-backrub:minimize_movemap %s/%s" % (ct.getWorkingDir(), self.movemap))
+
+		backrubCommand = [
+			'# Run backrub', '', 
+			join(backrubCommand, " "), '', 
+			'mv ${SGE_TASK_ID4}_%s_0001_low.pdb %s_${SGE_TASK_ID4}_low.pdb' % (parameters["pdbRootname"], parameters["pdbRootname"]),
+			'rm ${SGE_TASK_ID4}_%s_0001_last.pdb' % parameters["pdbRootname"], ''] 
+		
+		# Setup sequence tolerance
+		seqtolCommand = [
+			ct.getBinary("sequence_tolerance"),   
+			"-database %s" % ct.getDatabaseDir(), 
+			"-s $lowfilesvar",
+			"-ex1 -ex2 -extrachi_cutoff 0",
+			"-seq_tol:fitness_master_weights %s" % join(map(str,parameters["Weights"]), " "),
+			"-ms:generations 5",
+			"-ms:pop_size %d" % parameters["pop_size"],
+			"-ms:pop_from_ss 1",
+			"-ms:checkpoint:prefix $prefixesvar",
+			"-ms:checkpoint:interval 200",
+			"-ms:checkpoint:gz",
+			"-ms:numresults", "0",
+			"-out:prefix $prefixesvar", 
+			"-packing:resfile %s/%s" % (self.workingdir, self.seqtol_resfile),
+			"-score:weights", score_weights,
+			"-score:patch", score_patch]
+
+		if ref_offsets:
+			seqtolCommand.append("-score:ref_offsets %s" % ref_offsets)
+		
+		
+		seqtolCommand = [
+			'# Run sequence tolerance', '', 
+			join(seqtolCommand, " ")]		
+		
+		self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
+		
+	def _prepare_backrub( self ):
+		"""prepare data for a full backbone backrub run"""
+		self.pdb = pdb.PDB(self.parameters["pdb_info"].split('\n'))
+		self.map_res_id = self.parameters["map_res_id"] 
+		self.residue_ids = self.pdb.aa_resids()
+
+		# backrub is applied to all residues: append all residues to the backrub list
+		backrub = []   # residues to which backrub should be applied: [ (chain,resid), ... ]
+		for res in self.residue_ids:
+			x = [ res[0], res[1:].strip() ] # 0: chain ID, 1..: resid
+			if len(x) == 1:
+				backrub.append( ( "_", int(x[0].lstrip())) )
+			else:
+				backrub.append( ( x[0], int(x[1].lstrip())) )
+		
+		# translate resid to absolute mini rosetta res ids
+		
+		for residue in backrub:
+			if residue[1] == 0:
+				self.pivot_res.append( self.map_res_id[ '%s   0' % residue[0]  ] )
+			else:
+				self.pivot_res.append( self.map_res_id[ '%s%4.i' % residue  ] )
+	
+	def retire(self):
+		passed = super(SequenceToleranceSKTask, self).retire()
+							   
+		try:
+			# Run the analysis on the originating host
+			errors = []
+			# check whether files were created (and write the total scores to a file)
+			for x in range(1, self.parameters['nstruct']+1):
+				low_file   = self._workingdir_file_path(getOutputFilenameSK(self.parameters["pdbRootname"], x, "low"))		  
+				if not os.path.exists( low_file ): 
+					errors.append('%s missing' % low_file)
+							
+			# Copy the files from the cluster submission host back to the originating host
+			self._status('Copying pdb, gz, and resfiles back')
+			self._copyFilesBackToHost(["*.pdb", "*.gz", "*.resfile"])
+		except Exception, e:
+			errors.append(str(e))
+			errors.append(traceback.format_exc())
+			
+		# At this stage we are actually done but do not mark ourselves as completed otherwise the scheduler will get confused
+		if errors:
+			errs = join(errors,"</error>\n\t<error>")
+			print("<errors>\n\t<error>%s</error>\n</errors>" % errs)
+			self.state = FAILED_TASK
+			return False
+		  
+		return passed
+	
+import ddgproject
+dbfields = ddgproject.FieldNames()
+class ddGK16Job(RosettaClusterJob):
+
+	suffix = "ddG"
+	flatOutputDirectory = True
+	name = "ddG (K/LF/B-16, Proteins)"
+
+	def _defineOutputFiles(self):
+		self.resultFilemasks.append((".", "*"))
+		 
+	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
+		# The tempdir is the one on the submission host e.g. chef
+		# targetdirectory is the one on your host e.g. your PC or the webserver
+		# The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
+		# The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
+		self.map_res_id = {}
+		super(ddGK16Job, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
+		
+		self.parameters['_FILE_ID'] = "%s-%s" % (self.parameters[dbfields.PDB_ID], self.parameters[dbfields.ExperimentID])
+		self.parameters['DDG_PDB_INFILE'] = "min_cst_0.5.%s_0001.pdb" % self.parameters['_FILE_ID']
+			
+	def _initialize(self):
+		self.describe()
+		
+		# Create input files
+		self._name_constraints_file()
+		self._write_pdb()
+		self._write_lst()
+		self._write_resfile()
+		
+		scheduler = TaskScheduler(self.workingdir) 
+		 
+		targetsubdirectory = "."
+		inputfiles = [self.parameters["INPUT_PDB"], self.parameters["LST_FILE"], self.parameters["RESFILE"]]
+		taskdir = self.workingdir
+		targetdir = self.targetdirectory
+		
+		preminimizationTask = ddGK16PreminimizationTask(taskdir, targetdir, self.parameters, name="Preminimization step for ddGK16 protocol")
+		ddGTask = ddGK16Task(taskdir, targetdir, self.parameters, name="ddG step for ddGK16 protocol")
+		ddGTask.addPrerequisite(preminimizationTask, [parameters["pdb_filename"]])
+		 
+		scheduler.addInitialTasks(preminimizationTask)
+		self.scheduler = scheduler
+
+	def _analyze(self):
+		# Run the analysis on the originating host
+		return False
+		#def parseResults(logfile, predictions_file):
+		scoresHeader='''
+	------------------------------------------------------------
+	 Scores                       Weight   Raw Score Wghtd.Score
+	------------------------------------------------------------'''
+		scoresFooter = '''---------------------------------------------------'''
+		
+		F = open(logfile, "r")
+		log = F.read()
+		F.close()
+		
+		componentNames = []
+		idx = log.find(scoresHeader)
+		if idx:
+			log = log[idx + len(scoresHeader):]
+			idx = log.find(scoresFooter)
+			if idx:
+				log = log[:idx].strip()
+				log = log.split("\n")
+				for line in log:
+					componentNames.append(line.strip().split()[0])
+				componentNames.remove("atom_pair_constraint")
+		
+		F = open(predictions_file, "r")
+		predictions = F.read().split('\n')
+		F.close()
+		results = {}
+		for p in predictions:
+			if p.strip():
+				components = p.split()
+				assert[components[0] == "ddG:"]
+				mutation = components[1]
+				score = components[2]
+				components = components[3:]
+				assert(len(components) == len(componentNames))
+				results["Overall"] = score
+				componentsd = {}
+				for i in range(len(componentNames)):
+					componentsd[componentNames[i]] = components[i]
+				results["Components"] = componentsd
+		return results
+
+	
+	def _name_constraints_file(self):
+		self.parameters['CONSTRAINTS_FILE'] = self._workingdir_file_path("%(_FILE_ID)s.cst" % self.parameters)
+	
+	def _write_pdb(self, filename):
+		"""Import a pdb file from the database and write it to the temporary directory"""
+		filename = self._workingdir_file_path("%(_FILE_ID)s.pdb" % self.parameters)
+		F = open(filename, "w")
+		F.write(self.parameters[dbfields.StrippedPDB])
+		F.close()
+		self.parameters['_PDB_INFILE'] = filename
+		
+	def _write_lst(self):
+		# Create lst file
+		filename = self._workingdir_file_path("%(_FILE_ID)s.lst" % self.parameters)
+		F = open(filename, "w")
+		F.write(self.parameters['_PDB_INFILE'])
+		F.close()
+		self.parameters['LST_FILE'] = filename
+
+	def _write_resfile(self):
+		"""create a resfile for the chains
+			residues in interface: NATAA (conformation can be changed)
+			residues mutation: PIKAA ADEFGHIKLMNPQRSTVWY (design sequence)"""
+		
+		resfile = self.parameters[dbfields.InputFiles]["RESFILE"]
+		if resfile:
+			filename = self._workingdir_file_path("%(_FILE_ID)s.resfile" % self.parameters)
+			F = open(filename, "w")
+			F.write(self.parameters[resfile])
+			F.close()
+			self.parameters['RESFILE'] = filename
+		else:
+			raise Exception("An error occurred creating a resfile for the ddG job.")
+	

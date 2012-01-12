@@ -138,8 +138,48 @@ def testSequenceToleranceSKAnalysis(extraparams):
     return RosettaTasks.SequenceToleranceSKJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams["dldir"])
     
 
+def testMultiSequenceToleranceSKCommon2541(extraparams):
+    global inputDirectory
+    inputDirectory = "/home/oconchus/temp/rescore2541"
+
+    nstruct = 20
+    allAAsExceptCysteine = ROSETTAWEB_SK_AAinv.keys()
+    allAAsExceptCysteine.sort()
+    allAAsExceptCysteine.remove('C')
+    
+    params = {
+                "radius"            : 10,
+                "kT"                : 0.249000,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"B" : {1109 : allAAsExceptCysteine}},
+                "Designed"          : {"A" : [96, 146, 142]}
+                }
+    setupParameters("multiseqtol", 2541, "1QAV.pdb", nstruct, params)
+    return params  
+
+def testMultiSequenceToleranceSKCommon2565(extraparams):
+    global inputDirectory
+    inputDirectory = "/home/oconchus/temp/rescore2565"
+
+    nstruct = 2
+    allAAsExceptCysteine = ROSETTAWEB_SK_AAinv.keys()
+    allAAsExceptCysteine.sort()
+    allAAsExceptCysteine.remove('C')
+    
+    params = {
+                "radius"            : 10,
+                "kT"                : 0.249000,
+                "Partners"          : ["A", "B"],
+                "Weights"           : [0.4, 0.4, 0.4, 1.0],
+                "Premutated"        : {"A" : {56 : ['A']}},
+                "Designed"          : {"B" : [1369]}
+                }
+    setupParameters("multiseqtol", 2565, "1KI1.pdb", nstruct, params)
+    return params  
+
 def testMultiSequenceToleranceSKAnalysis(extraparams):
-    params = testMultiSequenceToleranceSKCommon(extraparams) 
+    params = testMultiSequenceToleranceSKCommon2565(extraparams) 
     return RosettaTasks.SequenceToleranceSKMultiJobAnalyzer(sgec, params, netappRoot, cluster_temp, dlDirectory, extraparams)
 
 def testMultiSequenceToleranceSK(extraparams):
@@ -172,7 +212,7 @@ def testSequenceToleranceHK(extraparams):
     setupParameters("seqtolHK", 1934, "2PDZ.pdb", 49, params)            
     return RosettaTasks.SequenceToleranceHKJob(sgec, params, netappRoot, cluster_temp, dlDirectory)
 
-def run():
+def run(test):
     tests = {
         "HK"           : {"testfn" : testSequenceToleranceHK,               "analysisOnly" : False, "extraparams" : None},
         "HKAnalysis"   : {"testfn" : testSequenceToleranceHKAnalysis,       "analysisOnly" : True,  "extraparams" : ("/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/testhk/tmphYbm4h_seqtolHK/", 6217160)},
@@ -181,10 +221,9 @@ def run():
         "SKP1"         : {"testfn" : testSequenceToleranceSK,               "analysisOnly" : False, "extraparams" : {"binary" : "seqtolP1"}},
         "SKAnalysis"   : {"testfn" : testSequenceToleranceSKAnalysis,       "analysisOnly" : True,  "extraparams" : {"binary" : "seqtolP1", "dldir" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/downloads/41f7141e75998737061a3cca2e1dd7b7"}},
         "1KI1"         : {"testfn" : testMultiSequenceToleranceSK,          "analysisOnly" : False, "extraparams" : None},
-        "1KI1analysis" : {"testfn" : testMultiSequenceToleranceSKAnalysis,  "analysisOnly" : True,  "extraparams" : "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/cluster/tmpqNjqAs_seqtolMultiSK"},
+        "1KI1analysis" : {"testfn" : testMultiSequenceToleranceSKAnalysis,  "analysisOnly" : True,  "extraparams" : "/home/oconchus/temp/rescore2565"},
         "1KI1fixBB"    : {"testfn" : testMultiSequenceToleranceSKFixBB,     "analysisOnly" : False, "extraparams" : None},
      }
-    global test
     if tests.get(test):
         test = tests[test]
         clusterjob = test["testfn"](test["extraparams"])
@@ -232,5 +271,5 @@ def run():
                     print(e)
     else:
     	print("Cannot find test '%s'." % test)
-test = "1KI1fixBB"
-run()
+
+run("1KI1analysis")
