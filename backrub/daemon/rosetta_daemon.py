@@ -33,21 +33,21 @@ class RosettaDaemon(Daemon):
 	"""This class controls the rosetta simulation"""
 	
 	# those are set by configure(self, filename_config)
-	email_admin	   = ''  # server administrators email adderss
-	db_table		  = ''
-	server_name	   = ''
-	base_dir		  = ''
-	rosetta_tmp	   = ''  
-	rosetta_ens_tmp   = ''
-	rosetta_dl		= ''  # webserver accessible directory
-	rosetta_error_dir = ''  # directory were failed runs should be stored
-	store_time		= ''  # how long are we going to store the data
-	store_time_guest  = '30'  # how long are we going to store the data for guest users
-	ntrials		   = 10000 # THIS SHOULD BE 10000
-	logSQL			= False
-	logfname		  = "RosettaDaemon.log"
-	pidfile		   = settings["RosettaPID"]
-	email_text_error  = """Dear %s,
+	email_admin			= ''  # server administrators email adderss
+	db_table			= ''
+	server_name			= ''
+	base_dir			= ''
+	rosetta_tmp			= ''  
+	rosetta_ens_tmp		= ''
+	rosetta_dl			= ''  # webserver accessible directory
+	rosetta_error_dir	= ''  # directory were failed runs should be stored
+	store_time			=''  # how long are we going to store the data
+	store_time_guest	= '30'  # how long are we going to store the data for guest users
+	ntrials				= 10000 # THIS SHOULD BE 10000
+	logSQL				= False
+	logfname			= "RosettaDaemon.log"
+	pidfile				= settings["RosettaPID"]
+	email_text_error	= """Dear %s,
 
 An error occurred during your simulation. Please check 
 http://%s/backrub/cgi-bin/rosettaweb.py?query=jobinfo&jobnumber=%s 
@@ -1509,8 +1509,10 @@ class ClusterDaemon(RosettaDaemon):
 			if os.path.exists(rosetta_object.workingdir + '/specificity_boxplot_NA.png'):
 				os.remove(rosetta_object.workingdir + '/specificity_boxplot_NA.png') # boxplot tempfile I guess
 
+import ddgproject
 class ddGDaemon(RosettaDaemon):
-	
+	#todo: daemon adds self.parameters[dbfields.ExtraParameters] to dict
+		
 	MaxClusterJobs	= 1
 	logfname		= "ddGDaemon.log"
 	pidfile			= settings["ddGPID"]
@@ -1552,15 +1554,10 @@ class ddGDaemon(RosettaDaemon):
 		self.email_admin		= settings["AdminEmail"]
 		self.server_name		= settings["ServerName"]
 		self.base_dir			= settings["BaseDir"]
-		self.binDir				= settings["BinDir"]
-		self.dataDir			= settings["DataDir"]
 		self.rosetta_tmp		= settings["TempDir"]
-		self.rosetta_ens_tmp	= settings["EnsembleTempDir"]
 		self.rosetta_dl			= settings["DownloadDir"]
-		self.rosetta_remotedl	= settings["RemoteDownloadDir"]
-		self.rosetta_error_dir	= settings["ErrorDir"]
 		self.store_time			= settings["StoreTime"]
-		self.DBConnection		= rosettadb.RosettaDB(settings, host = 'localhost', db = 'ddG', user = 'kortemmelab', passwd = passwd, numTries = 32)
+		self.DBConnection		= ddgproject.ddGDatabase(passwd = passwd)
 	
 	def runSQL(self, query, alternateLocks = "", parameters = None, cursorClass = MySQLdb.cursors.DictCursor):
 		""" This function should be the only place in this class which executes SQL.
@@ -1573,7 +1570,7 @@ class ddGDaemon(RosettaDaemon):
 			self.log("SQL: %s." % query)
 		results = []
 		try: # 	TODO: check if try in old function
-			results = self.DBConnection.execInnoDBQuery(query, parameters, cursorClass)
+			results = self.DBConnection.execute(query, parameters, cursorClass)
 			
 		except Exception, e:
 			self.log("%s." % e)
@@ -1615,6 +1612,7 @@ class ddGDaemon(RosettaDaemon):
 			self.checkRunningJobs()
 			self.restartJobs()
 			self.startNewJobs()
+			continue
 			sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
 			self.printStatus()			
 			
@@ -1681,7 +1679,7 @@ class ddGDaemon(RosettaDaemon):
 		newclusterjob = None
 		if len(self.runningJobs) < self.MaxClusterJobs:			
 			# get all jobs in queue
-			results = self.runSQL("SELECT Prediction.ID as ID, StrippedPDB, InputFiles, cryptID, Tool.Name AS ToolName, Tool.Version AS ToolVersion, Tool.SVNRevision AS ToolSVNRevision, Command.Type AS CommandType, Command.Command as Command, Command.Description as Description FROM Prediction INNER JOIN Tool ON Prediction.ToolID=Tool.ID INNER JOIN Command ON Prediction.CommandID=Command.ID WHERE Prediction.Status='queued' ORDER BY EntryDate")
+			results = self.runSQL("SELECT Prediction.ID as ID, StrippedPDB, InputFiles, cryptID, Tool.Name AS ToolName, Tool.Version AS ToolVersion, Tool.SVNRevision AS ToolSVNRevision, Command.Type AS CommandType, Command.Command as Command, Command.Description as Description FROM Prediction INNER JOIN Tool ON Prediction.ToolID=Tool.ID INNER JOIN Command ON Prediction.CommandID=Command.ID WHERE Prediction.Status='%(queued)s' ORDER BY EntryDate" % dbfields)
 			try:
 				if len(results) != 0:
 					jobID = None
