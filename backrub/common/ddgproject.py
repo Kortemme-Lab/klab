@@ -552,31 +552,32 @@ class ExperimentSet(DBObject):
 
 class Prediction(DBObject):
 	
-	def __init__(self, ExperimentID, PredictionSet, ToolID, ddG, status, NumberOfMeasurements = 1):
+	def __init__(self, ExperimentID, PredictionSet, ProtocolID, ddG, status, NumberOfMeasurements = 1):
 		self.dict = {
 			FieldNames_.ExperimentID		: ExperimentID,
 			FieldNames_.PredictionSet		: PredictionSet,
-			FieldNames_.ToolID				: ToolID,
-			FieldNames_.CommandID			: None,
+			FieldNames_.ProtocolID			: ProtocolID,
 			FieldNames_.KeptHETATMLines		: None,
 			FieldNames_.StrippedPDB			: None,
+			FieldNames_.ResidueMapping		: None,
 			FieldNames_.InputFiles			: {},
 			FieldNames_.Description			: {},
 			FieldNames_.ddG					: ddG,
 			FieldNames_.NumberOfMeasurements: NumberOfMeasurements,
 			FieldNames_.Status				: status,
+			FieldNames_.ExtraParameters		: pickle.dumps({}),
 		}
 		if ExperimentID == None:
 			raise Exception("Cannot create the following Prediction - Missing ExperimentID:\n***\n%s\n***" % self)
 		
-	def setOptional(self, CommandID = None, KeptHETATMLines = None, StrippedPDB = None, InputFiles = None, Description = None):
+	def setOptional(self, KeptHETATMLines = None, StrippedPDB = None, ResidueMapping = None, InputFiles = None, Description = None):
 		d = self.dict
-		if CommandID:
-			d[FieldNames_.CommandID] = CommandID
 		if KeptHETATMLines:
 			d[FieldNames_.KeptHETATMLines] = KeptHETATMLines
 		if StrippedPDB:
 			d[FieldNames_.StrippedPDB] = StrippedPDB
+		if ResidueMapping:
+			d[FieldNames_.ResidueMapping] = ResidueMapping
 		if InputFiles:
 			d[FieldNames_.InputFiles] = InputFiles
 		if Description:
@@ -586,8 +587,9 @@ class Prediction(DBObject):
 		d = self.dict
 		d[FieldNames_.InputFiles] = pickle.dumps(d[FieldNames_.InputFiles])
 		d[FieldNames_.Description] = pickle.dumps(d[FieldNames_.Description]) 
-		fields = [FieldNames_.ExperimentID, FieldNames_.PredictionSet, FieldNames_.ToolID, FieldNames_.CommandID, FieldNames_.KeptHETATMLines, 
-				FieldNames_.StrippedPDB, FieldNames_.InputFiles, FieldNames_.Description, FieldNames_.ddG, FieldNames_.NumberOfMeasurements, FieldNames_.Status]
+		fields = [FieldNames_.ExperimentID, FieldNames_.PredictionSet, FieldNames_.ProtocolID, FieldNames_.KeptHETATMLines, 
+				FieldNames_.StrippedPDB, FieldNames_.ResidueMapping, FieldNames_.InputFiles, FieldNames_.Description, 
+				FieldNames_.ddG, FieldNames_.NumberOfMeasurements, FieldNames_.Status, FieldNames_.ExtraParameters]
 		try:
 			db.insertDict('Prediction', d, fields)
 		except Exception, e:
@@ -601,9 +603,7 @@ class Prediction(DBObject):
 		str = []
 		str.append("%s: %s" % (FieldNames_.ExperimentID, d[FieldNames_.ExperimentID]))
 		str.append("%s: %s" % (FieldNames_.PredictionSet, d[FieldNames_.PredictionSet]))
-		str.append("%s: %d" % (FieldNames_.ToolID, d[FieldNames_.ToolID]))
-		if d[FieldNames_.CommandID]:
-			str.append("%s: %d" % (FieldNames_.CommandID, d[FieldNames_.CommandID]))
+		str.append("%s: %d" % (FieldNames_.ProtocolID, d[FieldNames_.ProtocolID]))
 		if d[FieldNames_.KeptHETATMLines] == None:
 			str.append("%s: NULL" % (FieldNames_.KeptHETATMLines))
 		else:
@@ -1198,6 +1198,6 @@ if __name__ == "__main__":
 	#primer.computeBFactors()
 	#print("Removing all data")
 	#primer.deleteAllExperimentalData()
-	primer.insertKelloggLeaverFayBakerProtocols()
+	#primer.insertKelloggLeaverFayBakerProtocols()
 	#primer.insertTools()
 	
