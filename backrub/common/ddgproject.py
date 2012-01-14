@@ -141,13 +141,12 @@ class FieldNames(dict):
 		
 		self.Prediction = "Prediction"
 		self.PredictionSet = "PredictionSet"
-		self.ToolID = "ToolID"
-		self.CommandID = "CommandID"
+		self.ProtocolID = "ProtocolID"
+		self.ResidueMapping = "ResidueMapping"
 		self.KeptHETATMLines = "KeptHETATMLines"
 		self.StrippedPDB = "StrippedPDB"
 		self.InputFiles = "InputFiles"
 		self.Description = "Description"
-		self.ShortDescription = "ShortDescription"
 		self.EntryDate = "EntryDate"
 		self.StartDate = "StartDate"
 		self.EndDate = "EndDate"
@@ -155,7 +154,19 @@ class FieldNames(dict):
 		self.Status = "Status"
 		self.Errors = "Errors"
 		self.AdminCommand = "AdminCommand"
-		self.ExtraParameters = "ExtraParameters" 
+		self.ExtraParameters = "ExtraParameters"
+		
+		self.ProtocolID = "ProtocolID"
+		self.StepID = "StepID"
+		self.ToolID = "ToolID"
+		self.CommandID = "CommandID"
+		self.DatabaseToolID = "DatabaseToolID"
+		self.DirectoryName = "DirectoryName"
+		self.ClassName = "ClassName"
+		
+		self.FromStep = "FromStep" 
+		self.ToStep = "ToStep" 
+		
 
 	def __getitem__(self, key):
 		return self.__dict__[key]
@@ -941,6 +952,7 @@ class DatabasePrimer(object):
 				"Database_SVN_URL"				:	"https://svn.rosettacommons.org/source/trunk/minirosetta_database",
 			})))
 
+
 		Tools.append(('Rosetta', '3.2', 39284,
 			pickle.dumps({
 				"FirstBranchRevision"			:	39352,
@@ -1062,22 +1074,17 @@ class DatabasePrimer(object):
 			SQL = 'INSERT INTO AminoAcids (Code, LongCode, Name, Polarity, Size) VALUES (%s, %s, %s, %s, %s);'
 			self.ddGdb.execute(SQL, parameters = tuple(aa))
 	
-	def insertCommands(self):
+	def insertKelloggLeaverFayBakerProtocols(self):
 		
 		protocols = [{} for i in range(0,21)]
-		ddgexecutable = ""
-	
-		existingCommands = self.ddGdb.execute("SELECT * FROM Command")
-
-		# KL-FB Protocols
-		
+				#
 		commonstr = [
-			'-in:file:s', '%(INPUT_PDB)s',
-			'-resfile', '%(RESFILE)s',
+			'-in:file:s', '%(in:file)s',
+			'-resfile', '%(resfile)s',
 			'-database', '%(DATABASE_DIR)s',
 			'-ignore_unrecognized_res',
 			'-in:file:fullatom',
-			'-constraints::cst_file', '%(CONSTRAINTS_FILE)s'
+			'-constraints::cst_file', '%(constraints::cst_file)s'
 		]
 		
 		softrep = ['-score:weights', 'soft_rep_design']
@@ -1086,7 +1093,7 @@ class DatabasePrimer(object):
 		
 		protocols1617 = [
 			'-ddg::weight_file', 'soft_rep_design',
-			'-ddg::iterations', '1', # todo: 50
+			'-ddg::iterations', '50',
 			'-ddg::local_opt_only', 'false',
 			'-ddg::min_cst', 'true',
 			'-ddg::mean', 'false',
@@ -1097,54 +1104,91 @@ class DatabasePrimer(object):
 			'-ddg::minimization_patch', 'score12'
 		]
 		
-		protocols[16] = {
+		# Command for protocol 16 preminimization 
+		preminCmd = {
 			FieldNames_.Type : "CommandLine",
-			FieldNames_.Command : {
-				"Preminimization" : {
-					"BinaryRevision" : ("Rosetta", "3.3"),
-					"DatabaseRevision" : ("Rosetta", "3.3"),
-					'args' : [
-						'%(BIN_DIR)s/minimize_with_cst.static.linuxgccrelease',
-						'-in:file:l', '%(INPUT_PDB_LIST)s',
-						'-in:file:fullatom',
-						'-ignore_unrecognized_res',
-						'-fa_max_dis', '9.0',
-						'-database', '%(DATABASE_DIR)s',
-						'-ddg::harmonic_ca_tether', '0.5',
-						'-score:weights', 'standard',
-						'-ddg::constraint_weight','1.0',
-						'-ddg::out_pdb_prefix', 'min_cst_0.5',
-						'-ddg::sc_min_only', 'false',
-						'-score:patch', 'score12'
-					]
-				},
-				"ddG" : {
-					"BinaryRevision" : ("Rosetta", "r32231"),
-					"DatabaseRevision" : ("Rosetta", "r32257"),
-					'args' : ['%(BIN_DIR)s/fix_bb_monomer_ddg.linuxgccrelease'] + commonstr + softrep +  protocols1617
-				}
-			},
-			FieldNames_.Description : "Protocol 16 from Kellogg, Leaver-Fay, and Baker",
-			FieldNames_.ShortDescription : "Kellogg:p16:32231"
+			FieldNames_.Command : pickle.dumps([
+				'%(BIN_DIR)s/minimize_with_cst.static.linuxgccrelease',
+				'-in:file:l', '%(-in:file:l)s',
+				'-in:file:fullatom',
+				'-ignore_unrecognized_res',
+				'-fa_max_dis', '9.0',
+				'-database', '%(DATABASE_DIR)s',
+				'-ddg::harmonic_ca_tether', '0.5',
+				'-score:weights', 'standard',
+				'-ddg::constraint_weight','1.0',
+				'-ddg::out_pdb_prefix', 'min_cst_0.5',
+				'-ddg::sc_min_only', 'false',
+				'-score:patch', 'score12']),
+			FieldNames_.Description : "Preminimization for Kellogg:10.1002/prot.22921:protocol16:32231",
 		}
-		
-		for newc in protocols:
-			if newc:
-				addthis = True
-				for c in existingCommands:
-					ed = pickle.loads(c[FieldNames_.Command])
-					if c[FieldNames_.Type] == newc[FieldNames_.Type] and ed == newc[FieldNames_.Command]:
-						# Already exists, do not add a new record
-						if c[FieldNames_.Description] != newc[FieldNames_.Description]:
-							# todo:
-							print("Need to add code to update description.")
-						addthis = False
-						break
-				if addthis:
-					print("Inserting", newc)
-					newc[FieldNames_.Command] = pickle.dumps(newc[FieldNames_.Command])
-					self.ddGdb.insertDict('Command', newc)
-		
+		alreadyExists = self.ddGdb.execute("SELECT ID FROM Command WHERE Type=%s AND Command=%s", parameters = (preminCmd[FieldNames_.Type], preminCmd[FieldNames_.Command]))
+		if not alreadyExists:
+			self.ddGdb.insertDict('Command', preminCmd)
+			preminCmdID = self.ddGdb.getLastRowID()
+		else:
+			preminCmdID = alreadyExists[0]["ID"] 
+			
+		# Command for protocol 16 ddG 
+		ddGCmd = {
+			FieldNames_.Type : "CommandLine",
+			FieldNames_.Command : pickle.dumps(['%(BIN_DIR)s/fix_bb_monomer_ddg.linuxgccrelease'] + commonstr + softrep +  protocols1617),
+			FieldNames_.Description : "ddG for Kellogg:10.1002/prot.22921:protocol16:32231",
+		}
+		alreadyExists = self.ddGdb.execute("SELECT ID FROM Command WHERE Type=%s AND Command=%s", parameters = (ddGCmd[FieldNames_.Type], ddGCmd[FieldNames_.Command]))
+		if not alreadyExists:
+			self.ddGdb.insertDict('Command', ddGCmd)
+			ddGCmdID = self.ddGdb.getLastRowID()
+		else:
+			ddGCmdID = alreadyExists[0]["ID"] 
+	
+		# Protocol 16
+		name = "Kellogg:10.1002/prot.22921:protocol16:32231"
+		alreadyExists = self.ddGdb.execute("SELECT ID FROM Protocol WHERE ID=%s", parameters = (name,))
+		if not alreadyExists:
+			PreMinTool = self.ddGdb.execute("SELECT ID FROM Tool WHERE Name=%s and Version=%s", parameters = ("Rosetta", 3.3))
+			ddGTool = self.ddGdb.execute("SELECT ID FROM Tool WHERE Name=%s and SVNRevision=%s", parameters = ("Rosetta", 32231))
+			ddGDatabaseToolID = self.ddGdb.execute("SELECT ID FROM Tool WHERE Name=%s and SVNRevision=%s", parameters = ("Rosetta", 32257))
+			if PreMinTool and ddGTool and ddGDatabaseToolID:
+				PreMinTool = PreMinTool[0]["ID"]
+				ddGTool = ddGTool[0]["ID"]
+				ddGDatabaseToolID = ddGDatabaseToolID[0]["ID"]
+			else:
+				raise Exception("Cannot add protocol %s." % name)
+			print("Inserting %s." % name)
+			proto = {
+				FieldNames_.ID : name,
+				FieldNames_.Description : "Protocol 16 from Kellogg, Leaver-Fay, and Baker",
+			}
+			self.ddGdb.insertDict('Protocol', proto)
+			pstep = {
+				FieldNames_.ProtocolID : name,
+				FieldNames_.StepID : 1,
+				FieldNames_.ToolID : PreMinTool,
+				FieldNames_.CommandID : preminCmdID,
+				FieldNames_.DatabaseToolID : PreMinTool,
+				FieldNames_.DirectoryName : "",
+				FieldNames_.ClassName : None,
+				FieldNames_.Description : "Preminimization step",
+			}
+			self.ddGdb.insertDict('ProtocolStep', pstep)
+			pstep = {
+				FieldNames_.ProtocolID : name,
+				FieldNames_.StepID : 2,
+				FieldNames_.ToolID : ddGTool,
+				FieldNames_.CommandID : ddGCmdID,
+				FieldNames_.DatabaseToolID : ddGDatabaseToolID,
+				FieldNames_.DirectoryName : "",
+				FieldNames_.ClassName : None,
+				FieldNames_.Description : "ddG step",
+			}
+			self.ddGdb.insertDict('ProtocolStep', pstep)
+			pedge = {
+				FieldNames_.ProtocolID : name,
+				FieldNames_.FromStep : 1,
+				FieldNames_.ToStep : 2,
+			}
+			self.ddGdb.insertDict('ProtocolGraphEdge', pedge)
 
 	
 if __name__ == "__main__":
@@ -1154,6 +1198,6 @@ if __name__ == "__main__":
 	#primer.computeBFactors()
 	#print("Removing all data")
 	#primer.deleteAllExperimentalData()
-	primer.insertCommands()
+	primer.insertKelloggLeaverFayBakerProtocols()
 	#primer.insertTools()
 	
