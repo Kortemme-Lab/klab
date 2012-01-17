@@ -776,11 +776,12 @@ class ddGDatabase(object):
 				cursor.close()
 				return results
 			except MySQLdb.OperationalError, e:
+				caughte = str(e)
 				errcode = e[0]
 				self.connection.ping()
-				caughte = e
 				continue
-			except:                
+			except Exception, e:
+				caughte = str(e)
 				traceback.print_exc()
 				break
 		
