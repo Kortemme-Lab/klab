@@ -156,6 +156,7 @@ class FieldNames(dict):
 		self.AdminCommand = "AdminCommand"
 		self.ExtraParameters = "ExtraParameters"
 		
+		self.Protocol = "Protocol"
 		self.ProtocolID = "ProtocolID"
 		self.StepID = "StepID"
 		self.ToolID = "ToolID"
@@ -651,10 +652,15 @@ class ddGDatabase(object):
 				F.close()
 			else:
 				passwd = getpass.getpass("Enter password to connect to MySQL database:")
-		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddG", user = "kortemmelab", passwd = passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
+		self.passwd = passwd
+		self.connectToServer()
 		self.numTries = 32
 		self.lastrowid = None
 	
+	def connectToServer(self):
+		print("[CONNECTING TO SQL SERVER]")
+		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddG", user = "kortemmelab", passwd = self.passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
+		
 	def addChainWarning(self, pdbID, associatedRecords, c):
 		chainWarnings = self.chainWarnings
 		chainWarnings[pdbID] = chainWarnings.get(pdbID) or []
@@ -727,10 +733,12 @@ class ddGDatabase(object):
 				return results
 			except MySQLdb.OperationalError, e:
 				errcode = e[0]
+				if errcode == 2006:
+					self.connectToServer()
 				self.connection.ping()
 				caughte = e
 				continue
-			except:                
+			except:
 				traceback.print_exc()
 				break
 		
@@ -778,6 +786,8 @@ class ddGDatabase(object):
 			except MySQLdb.OperationalError, e:
 				caughte = str(e)
 				errcode = e[0]
+				if errcode == 2006:
+					self.connectToServer()
 				self.connection.ping()
 				continue
 			except Exception, e:
@@ -1080,7 +1090,7 @@ class DatabasePrimer(object):
 		protocols = [{} for i in range(0,21)]
 				#
 		commonstr = [
-			'-in:file:s', '%(in:file)s',
+			'-in:file:s', '%(in:file:s)s',
 			'-resfile', '%(resfile)s',
 			'-database', '%(DATABASE_DIR)s',
 			'-ignore_unrecognized_res',
@@ -1164,7 +1174,7 @@ class DatabasePrimer(object):
 			self.ddGdb.insertDict('Protocol', proto)
 			pstep = {
 				FieldNames_.ProtocolID : name,
-				FieldNames_.StepID : 1,
+				FieldNames_.StepID : "preminimization",
 				FieldNames_.ToolID : PreMinTool,
 				FieldNames_.CommandID : preminCmdID,
 				FieldNames_.DatabaseToolID : PreMinTool,
@@ -1175,7 +1185,7 @@ class DatabasePrimer(object):
 			self.ddGdb.insertDict('ProtocolStep', pstep)
 			pstep = {
 				FieldNames_.ProtocolID : name,
-				FieldNames_.StepID : 2,
+				FieldNames_.StepID : "ddG",
 				FieldNames_.ToolID : ddGTool,
 				FieldNames_.CommandID : ddGCmdID,
 				FieldNames_.DatabaseToolID : ddGDatabaseToolID,
@@ -1190,8 +1200,59 @@ class DatabasePrimer(object):
 				FieldNames_.ToStep : 2,
 			}
 			self.ddGdb.insertDict('ProtocolGraphEdge', pedge)
-
 	
+	def updateCommand(self):
+		# Command for protocol 16 ddG
+		commonstr = [
+			'-in:file:s', '%(in:file:s)s',
+			'-resfile', '%(resfile)s',
+			'-database', '%(DATABASE_DIR)s',
+			'-ignore_unrecognized_res',
+			'-in:file:fullatom',
+			'-constraints::cst_file', '%(constraints::cst_file)s'
+		]
+		
+		softrep = ['-score:weights', 'soft_rep_design']
+		hardrep = ['-score:weights standard', '-score:patch score12']
+		minnohardrep = ['-ddg::minimization_scorefunction', 'standard', '-ddg::minimization_patch', 'score12']
+		
+		protocols1617 = [
+			'-ddg::weight_file', 'soft_rep_design',
+			'-ddg::iterations', '50',
+			'-ddg::local_opt_only', 'false',
+			'-ddg::min_cst', 'true',
+			'-ddg::mean', 'false',
+			'-ddg::min', 'true',
+			'-ddg::sc_min_only', 'false', # Backbone and sidechain minimization
+			'-ddg::ramp_repulsive', 'true', 
+			'-ddg::minimization_scorefunction', 'standard',
+			'-ddg::minimization_patch', 'score12'
+		]
+		 
+		newcmd = pickle.dumps(['%(BIN_DIR)s/fix_bb_monomer_ddg.linuxgccrelease'] + commonstr + softrep +  protocols1617)
+		ddGdb.execute("UPDATE Command SET Command=%s WHERE ID=5;", parameters = (newcmd,))
+		newcmd = pickle.dumps([
+				'%(BIN_DIR)s/minimize_with_cst.static.linuxgccrelease',
+				'-in:file:l', '%(in:file:l)s',
+				'-in:file:fullatom',
+				'-ignore_unrecognized_res',
+				'-fa_max_dis', '9.0',
+				'-database', '%(DATABASE_DIR)s',
+				'-ddg::harmonic_ca_tether', '0.5',
+				'-score:weights', 'standard',
+				'-ddg::constraint_weight','1.0',
+				'-ddg::out_pdb_prefix', 'min_cst_0.5',
+				'-ddg::sc_min_only', 'false',
+				'-score:patch', 'score12'])
+		ddGdb.execute("UPDATE Command SET Command=%s WHERE ID=4;", parameters = (newcmd,))
+		
+		newcmd = "%(BIN_DIR)s/minimize_with_cst.static.linuxgccrelease -in:file:l %(in:file:l)s -in:file:fullatom -ignore_unrecognized_res -fa_max_dis 9.0 -database %(DATABASE_DIR)s -ddg::harmonic_ca_tether 0.5 -score:weights standard -ddg::constraint_weight 1.0 -ddg::out_pdb_prefix min_cst_0.5 -ddg::sc_min_only false -score:patch score12"		
+		ddGdb.execute("UPDATE Command SET Command=%s WHERE ID=4;", parameters = (newcmd,))
+		
+		newcmd = "%(BIN_DIR)s/fix_bb_monomer_ddg.linuxgccrelease -in:file:s %(in:file:s)s -resfile %(resfile)s -database %(DATABASE_DIR)s -ignore_unrecognized_res -in:file:fullatom -constraints::cst_file %(constraints::cst_file)s -score:weights soft_rep_design -ddg::weight_file soft_rep_design -ddg::iterations 50 -ddg::local_opt_only false -ddg::min_cst true -ddg::mean false -ddg::min true -ddg::sc_min_only false -ddg::ramp_repulsive true -ddg::minimization_scorefunction standard -ddg::minimization_patch score12"
+		ddGdb.execute("UPDATE Command SET Command=%s WHERE ID=5;", parameters = (newcmd,))
+		
+		
 if __name__ == "__main__":
 	ddGdb = ddGDatabase()
 	primer = DatabasePrimer(ddGdb)
@@ -1201,4 +1262,4 @@ if __name__ == "__main__":
 	#primer.deleteAllExperimentalData()
 	#primer.insertKelloggLeaverFayBakerProtocols()
 	#primer.insertTools()
-	
+	primer.updateCommand()
