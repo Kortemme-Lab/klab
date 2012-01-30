@@ -121,7 +121,7 @@ class FieldNames(dict):
 		self.ID = "ID"
 		self.Mutant = "Mutant"
 		self.ScoreVariance = "ScoreVariance"
-				
+						
 		self.ExperimentID = "ExperimentID"
 		self.Chain = "Chain"
 		self.ResidueID = "ResidueID"
@@ -131,6 +131,15 @@ class FieldNames(dict):
 		self.SourceID = "SourceID"
 		self.ddG = "ddG"
 		self.NumberOfMeasurements = "NumberOfMeasurements"
+		self.ExpConTemperature = "ExpConTemperature" 
+		self.ExpConpH = "ExpConpH"
+		self.ExpConBuffer = "ExpConBuffer"
+		self.ExpConBufferConcentration = "ExpConBufferConcentration"
+		self.ExpConIon = "ExpConIon"
+		self.ExpConIonConcentration = "ExpConIonConcentration"
+		self.ExpConProteinConcentration = "ExpConProteinConcentration"
+		self.ExpConMeasure = "ExpConMeasure"
+		self.ExpConMethodOfDenaturation = "ExpConMethodOfDenaturation"
 		
 		self.Name = "Name"
 		self.Version = "Version"
@@ -164,6 +173,15 @@ class FieldNames(dict):
 		self.DatabaseToolID = "DatabaseToolID"
 		self.DirectoryName = "DirectoryName"
 		self.ClassName = "ClassName"
+
+		self.SourceLocation = "SourceLocation"
+		self.SourceID = "SourceID"
+		self.Type = "Type"
+		self.RIS = "RIS"
+		self.URL = "URL"
+		self.DOI = "DOI"
+		self.ISSN = "ISSN"
+		self.ESSN = "ESSN"
 		
 		self.FromStep = "FromStep" 
 		self.ToStep = "ToStep" 
@@ -638,6 +656,54 @@ class Prediction(DBObject):
 
 	def __getitem__(self, key):
 		return dict_[key]
+
+class ddGPredictionDataDatabase(object):
+	
+	def __init__(self, passwd = None):
+		if not passwd:
+			if os.path.exists("pw"):
+				F = open("pw")
+				passwd = F.read().strip()
+				F.close()
+			else:
+				passwd = getpass.getpass("Enter password to connect to MySQL database:")
+		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddGPredictionData", user = "kortemmelab", passwd = passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
+		self.numTries = 32
+		self.lastrowid = None
+
+	def execute(self, sql, parameters = None, cursorClass = MySQLdb.cursors.DictCursor, quiet = False):
+		"""Execute SQL query. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		while i < self.numTries:
+			i += 1
+			try:    
+				cursor = self.connection.cursor(cursorClass)
+				if parameters:
+					errcode = cursor.execute(sql, parameters)
+				else:
+					errcode = cursor.execute(sql)
+				self.connection.commit()
+				results = cursor.fetchall()
+				self.lastrowid = int(cursor.lastrowid)
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				caughte = str(e)
+				errcode = e[0]
+				self.connection.ping()
+				continue
+			except Exception, e:
+				caughte = str(e)
+				traceback.print_exc()
+				break
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
 		
 class ddGDatabase(object):
 	
@@ -1201,6 +1267,72 @@ class DatabasePrimer(object):
 			}
 			self.ddGdb.insertDict('ProtocolGraphEdge', pedge)
 	
+	def addPDBSources (self):
+		'''A once-off function to add PDB source information to the Structure table.''' 
+		structures = self.ddGdb.execute("SELECT PDB_ID, Content FROM Structure;")
+		PUBTYPES = ['ISSN', 'ESSN']
+		for s in structures:
+			p = PDB(s["Content"].split("\n"))
+			j = p.getJournal()
+			pdbID = s["PDB_ID"].strip()
+			
+			if False:
+				print(s["PDB_ID"])
+				if j["published"]:
+					print(j["REFN"]["type"])
+					print(j["REFN"]["ID"])
+				print("doi: %s" % j["DOI"])
+				print("--------")
+				if j["DOI"]:
+					pass
+				print(join(j["lines"],"\n"))
+				for k, v in j.iteritems():
+					if k != "lines":
+						print("%s: %s" % (k, v))
+				print("********\n")
+						
+			# We identify the sources for a PDB identifier with that identifier
+			SourceID = "PDB:%s" % pdbID 
+			sourceExists = self.ddGdb.execute("SELECT ID FROM Source WHERE ID=%s", parameters=(SourceID,))
+			if not sourceExists:
+				self.ddGdb.insertDict(FieldNames_.Source, {FieldNames_.ID : SourceID})
+			
+			self.ddGdb.execute("UPDATE Structure SET Publication=%s WHERE PDB_ID=%s", parameters = (SourceID, pdbID)) 
+	
+			locations = self.ddGdb.execute("SELECT * FROM SourceLocation WHERE SourceID=%s", parameters=(SourceID,))
+			publocations = [location for location in locations if location[FieldNames_.Type] in PUBTYPES]
+			doilocations = [location for location in locations if location[FieldNames_.Type] == "DOI"]
+			assert(len(publocations) <= 1)
+			assert(len(doilocations) <= 1)
+			if j["published"]:
+				skip = False
+				if publocations:
+					location = publocations[0]
+					if j["REFN"]["type"] == location[FieldNames_.Type]:
+						if j["REFN"]["ID"] != location[FieldNames_.ID]:
+							colortext.warning("REFN: Check that the SourceLocation data ('%s') matches the PDB REFN data ('%s')." % (str(location), j["REFN"]))
+				
+				if not(publocations):
+					assert(j["REFN"]["type"] in PUBTYPES)
+					self.ddGdb.insertDict(FieldNames_.SourceLocation, {
+						FieldNames_.SourceID	: SourceID,
+						FieldNames_.ID			: j["REFN"]["ID"],
+						FieldNames_.Type		: j["REFN"]["type"],
+						})				
+			if j["DOI"]:
+				if doilocations:
+					location = doilocations[0]
+					if j["DOI"] != location[FieldNames_.ID]:
+						colortext.warning("DOI: Check that the SourceLocation data ('%s') matches the PDB DOI data ('%s')." % (str(doilocations), j["DOI"]))
+
+				if not(doilocations):
+					self.ddGdb.insertDict(FieldNames_.SourceLocation, {
+						FieldNames_.SourceID	: SourceID,
+						FieldNames_.ID			: j["DOI"],
+						FieldNames_.Type		: FieldNames_.DOI,
+						})
+		
+		
 	def updateCommand(self):
 		# Command for protocol 16 ddG
 		commonstr = [
@@ -1262,4 +1394,5 @@ if __name__ == "__main__":
 	#primer.deleteAllExperimentalData()
 	#primer.insertKelloggLeaverFayBakerProtocols()
 	#primer.insertTools()
-	primer.updateCommand()
+	#primer.addPDBSources()
+	#primer.updateCommand()
