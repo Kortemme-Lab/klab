@@ -80,7 +80,102 @@ def computeMeanAndStandardDeviation(values):
     stddev = math.sqrt(variance)
     
     return mean, stddev, variance
-   
+
+class JRNL(object):
+	
+	def __init__(self, lines):
+		self.d = {}
+		self.d["lines"] = lines
+		self.parse_REF()
+		self.parse_REFN()
+		self.parse_DOI()
+	
+	def getInfo(self):
+		return self.d
+	
+	def parse_REF(self):
+		lines = [line for line in self.d["lines"] if line.startswith("JRNL        REF ")]
+		mainline = lines[0]
+		if not mainline[19:34].startswith("TO BE PUBLISHED"):
+			numContinuationLines = mainline[16:18].strip()
+			if numContinuationLines:
+				numContinuationLines = int(numContinuationLines)
+				if not numContinuationLines + 1 == len(lines):
+					raise Exception("There are %d REF lines but the continuation field (%d) suggests there should be %d." % (len(lines), numContinuationLines, numContinuationLines + 1))
+			else:
+				numContinuationLines = 0
+			
+			pubName = [mainline[19:47].rstrip()]
+			volumeV = mainline[49:51].strip()
+			volume = mainline[51:55].strip()
+			if volumeV:
+				assert(volume)
+			page = mainline[56:61].strip()
+			year = mainline[62:66]
+			
+			# Count the number of periods, discounting certain abbreviations
+			plines = []
+			for line in lines:
+				pline = line.replace("SUPPL.", "")
+				pline = pline.replace("V.", "")
+				pline = pline.replace("NO.", "")
+				pline = pline.replace("PT.", "")
+				plines.append(pline)
+			numperiods = len([1 for c in string.join(plines,"") if c == "."])  
+			
+			# Reconstruct the publication name
+			for n in range(1, numContinuationLines + 1):
+				line = lines[n]
+				pubNameField = line[19:47]
+				lastFieldCharacter = pubNameField[-1]
+				lastLineCharacter = line.strip()[-1]
+				txt = pubNameField.rstrip()
+				pubName.append(txt)
+				if lastFieldCharacter == "-" or lastFieldCharacter == "." or lastCharacter == "-" or (lastCharacter == "." and numperiods == 1):
+					pubName.append(" ")
+			pubName = string.join(pubName, "")
+			self.d["REF"] = {
+				"pubName"	: pubName,
+				"volume"	: volume or None,
+				"page"		: page or None,
+				"year"		: year or None,
+			}
+			self.d["published"] = True
+		else:
+			self.d["REF"] = {}
+			self.d["published"] = False
+			
+	def parse_REFN(self):
+		PRELUDE = "JRNL        REFN"
+		if not self.d.get("published"):
+			self.parse_REF()
+		isPublished = self.d["published"]
+		
+		lines = [line for line in self.d["lines"] if line.startswith(PRELUDE)]
+		if not len(lines) == 1:
+			raise Exception("Exactly one JRNL REF line expected in the PDB title.")
+		line = lines[0]
+		if isPublished:
+			type = line[35:39]
+			ID = line[40:65].strip()
+			if type != "ISSN" and type != "ESSN":
+				raise Exception("Invalid type for REFN field (%s)" % type)
+			self.d["REFN"] = {"type" : type, "ID" : ID}
+		else:
+			assert(line.strip() == PRELUDE)
+
+	def parse_DOI(self):
+		lines = [line for line in self.d["lines"] if line.startswith("JRNL        DOI ")]
+		if lines:
+			line = string.join([line[19:79].strip() for line in lines], "")
+			if line.lower().startswith("doi:"):
+				self.d["DOI"] = ["%s" % line[4:]]
+			else:
+				self.d["DOI"] = line
+		else:
+			self.d["DOI"] = None
+			
+
 class PDB:
     """A class to store and manipulate PDB data"""
   
@@ -93,6 +188,7 @@ class PDB:
         self.ddGresmap = None
         self.ddGiresmap = None
         self.lines = []
+        self.journal = None
         if type(pdb) == types.StringType:
             self.read(pdb)
         elif type(pdb) == types.ListType:
@@ -100,6 +196,23 @@ class PDB:
         elif type(pdb) == type(self):
             self.lines.extend(pdb.lines)
     
+    def getJournal(self):
+        if not self.journal:
+            self.parseJRNL()
+        return self.journal.getInfo()
+
+    def parseJRNL(self):
+        journal = []
+        startedToRead = False 
+        for line in self.lines:
+            if line.startswith("JRNL  "):
+                journal.append(line)
+                startedToRead = True
+            else:
+                if startedToRead:
+                    break	# early out
+        self.journal = JRNL(journal)
+
     def read(self, pdbpath):
     
         pdbhandle = open(pdbpath)

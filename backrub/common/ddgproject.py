@@ -164,6 +164,7 @@ class FieldNames(dict):
 		self.Errors = "Errors"
 		self.AdminCommand = "AdminCommand"
 		self.ExtraParameters = "ExtraParameters"
+		self.StoreOutput = "StoreOutput"
 		
 		self.Protocol = "Protocol"
 		self.ProtocolID = "ProtocolID"
