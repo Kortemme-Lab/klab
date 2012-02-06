@@ -117,6 +117,9 @@ class FieldNames(dict):
 		self.Techniques = "Techniques"
 		self.BFactors = "BFactors"
 		
+		self.UniProtKB_AC = "UniProtKB_AC"
+		self.UniProtKB_ID = "UniProtKB_ID"
+		
 		self.Experiment = "Experiment"
 		self.ID = "ID"
 		self.Mutant = "Mutant"
@@ -1116,7 +1119,7 @@ class DatabasePrimer(object):
 				raise Exception("Database integrity failure: Cannot delete an Experiment (ID = %s) with an associated Prediction (ID = %s)." % (ID, predictions[0]['ID']))
 	
 	def insertUniProtKB(self):
-		uniprot = os.path.join("rawdata", "uniprotmapping.csv")
+		uniprot = os.path.join("..", "rawdata", "uniprotmapping.csv")
 		F = open(uniprot)
 		lines = F.read().split("\n")[1:]
 		F.close()
@@ -1127,6 +1130,9 @@ class DatabasePrimer(object):
 			data = line.split("\t")
 			if len(data) == 3:
 				PDBID, AC, ID = data 
+				PDBID = PDBID.strip() 
+				AC = AC.strip() 
+				ID = ID.strip() 
 				UniProtKB[AC] = ID
 				UniProtKBMapping[AC] = UniProtKBMapping.get(AC, []) or []
 				UniProtKBMapping[AC].append(PDBID)
@@ -1138,12 +1144,13 @@ class DatabasePrimer(object):
 		
 		for AC, pdbIDs in sorted(UniProtKBMapping.iteritems()):
 			for pdbID in pdbIDs:
+				
 				if not self.ddGdb.execute("SELECT * FROM UniProtKBMapping WHERE UniProtKB_AC=%s AND PDB_ID=%s", parameters = (AC, pdbID)):
 					SQL = 'INSERT INTO UniProtKBMapping (UniProtKB_AC, PDB_ID) VALUES (%s, %s);'
 					try:
 						self.ddGdb.execute(SQL, parameters = (AC, pdbID), quiet = True)
 					except:
-						pass
+						print("Error inserting UniProt record AC %s for PDB ID %s." % (AC, pdbID))
 			
 		
 	def insertAminoAcids(self):
@@ -1389,6 +1396,7 @@ class DatabasePrimer(object):
 if __name__ == "__main__":
 	ddGdb = ddGDatabase()
 	primer = DatabasePrimer(ddGdb)
+	#primer.insertUniProtKB()
 	#primer.checkForCSEandMSE()
 	#primer.computeBFactors()
 	#print("Removing all data")
