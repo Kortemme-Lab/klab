@@ -264,6 +264,7 @@ class TaskScheduler(object):
                 if dependent.getState() == ClusterTask.INACTIVE_TASK:
                     self.pendingtasks[dependent] = True
                     self._status("Starting %s." % dependent.getName())
+                    dependent.addInputs(task.getOutputs(dependent))
                     started = dependent.start(self.sgec, self.dbID)
                     if started:
                         self.tasks_in_order.append(dependent)
@@ -398,7 +399,7 @@ class RosettaClusterJob(object):
 
     def _analyze(self):
         '''Override this function.'''
-        raise Exception
+        raise Exception("Virtual function called where a concrete function is required.")
     
     def getprofileXML(self):
         return SimpleProfiler.listsOfTuplesToXML(self.getprofile())
@@ -423,7 +424,7 @@ class RosettaClusterJob(object):
         result = self._analyze()
         self.profiler.PROFILE_STOP("Analysis")
         if not result:
-            raise
+            raise Exception("Analysis failed")
     
     def saveProfile(self):
         contents = "<profile>\n%s</profile>" % self.getprofileXML()
@@ -467,14 +468,17 @@ class RosettaClusterJob(object):
             if not os.path.exists(destpath):
                 make755Directory(destpath)
             for mask in self.resultFilemasks:
-                self._status("moving using mask (%s, %s)\n" % (mask[0], mask[1]))
                 fromSubdirectory = os.path.join(self.targetdirectory, mask[0])
                 toSubdirectory = os.path.join(destpath, mask[0])
+                self._status("Moving files from %s to %s using mask (%s, %s)\n" % (fromSubdirectory, toSubdirectory, mask[0], mask[1]))
                 if not os.path.exists(toSubdirectory):
                     make755Directory(toSubdirectory)
                 for file in os.listdir(fromSubdirectory):
+                    self._status("File: %s" % file)
                     if fnmatch.fnmatch(file, mask[1]):
                         shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
+                        self._status("Moved.")
+                    
         else:
             if os.path.exists(destpath):
                 shutil.rmtree(destpath)

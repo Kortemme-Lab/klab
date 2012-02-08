@@ -671,9 +671,15 @@ class ddGPredictionDataDatabase(object):
 				F.close()
 			else:
 				passwd = getpass.getpass("Enter password to connect to MySQL database:")
-		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddGPredictionData", user = "kortemmelab", passwd = passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
+				
+		self.passwd = passwd
+		self.connectToServer()
 		self.numTries = 32
 		self.lastrowid = None
+
+	def connectToServer(self):
+		print("[CONNECTING TO SQL SERVER]")
+		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddGPredictionData", user = "kortemmelab", passwd = self.passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
 
 	def execute(self, sql, parameters = None, cursorClass = MySQLdb.cursors.DictCursor, quiet = False):
 		"""Execute SQL query. This uses DictCursor by default."""
@@ -696,6 +702,8 @@ class ddGPredictionDataDatabase(object):
 			except MySQLdb.OperationalError, e:
 				caughte = str(e)
 				errcode = e[0]
+				if errcode == 2006 or errcode == 2013:
+					self.connectToServer()
 				self.connection.ping()
 				continue
 			except Exception, e:
@@ -803,7 +811,7 @@ class ddGDatabase(object):
 				return results
 			except MySQLdb.OperationalError, e:
 				errcode = e[0]
-				if errcode == 2006:
+				if errcode == 2006 or errcode == 2013:
 					self.connectToServer()
 				self.connection.ping()
 				caughte = e
@@ -856,7 +864,7 @@ class ddGDatabase(object):
 			except MySQLdb.OperationalError, e:
 				caughte = str(e)
 				errcode = e[0]
-				if errcode == 2006:
+				if errcode == 2006 or errcode == 2013:  
 					self.connectToServer()
 				self.connection.ping()
 				continue

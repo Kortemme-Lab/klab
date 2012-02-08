@@ -152,6 +152,7 @@ class SGEConnection(object):
             command.append('-N')
             command.append('%s' % name)
         if CLUSTER_debugmode:
+            #todo: This should be done based on the time in the script, not otherwise
             command.append('-q')
             command.append('short.q')
         if hold_jobid:

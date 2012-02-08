@@ -38,6 +38,12 @@ def readFile(filepath):
     output_handle.close()
     return contents
 
+def readFileLines(filepath):
+    output_handle = open(filepath,'r')
+    contents = output_handle.read().splitlines()
+    output_handle.close()
+    return contents
+
 def writeFile(filepath, contents):
     output_handle = open(filepath,'w')
     output_handle.write(contents)
@@ -201,7 +207,8 @@ class WebsiteSettings(object):
             settings["ClusterTemp"] = os.path.join(base_dir, "temp", "cluster")
         if not settings.get("ddGTemp"):
             settings["ddGTemp"] = os.path.join(base_dir, "temp", "ddG")
-        settings["ClusterddGDir"] = None
+        if not settings.get("ClusterddGDir"):
+            settings["ClusterddGDir"] = None
 
     def _getSourceRoot(self, scriptfilename):
         fe = scriptfilename.find("frontend")

@@ -1,0 +1,5 @@
+#!/bin/sh
+echo "Loading script"
+. /ccpr1/sge6/qb3/common/settings.sh
+echo "Calling stop"
+python ddgdaemon.py stop
