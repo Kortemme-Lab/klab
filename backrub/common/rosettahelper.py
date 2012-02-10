@@ -49,6 +49,10 @@ def writeFile(filepath, contents):
     output_handle.write(contents)
     output_handle.close()
 
+def normalize_for_bash(s):
+    t = [c for c in s if c.isalnum() or c == "_"]
+    return string.join(t, "")
+
 # Tasks
 def write_file(filename, contents):
    file = open(filename, 'w')

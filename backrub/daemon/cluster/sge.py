@@ -315,7 +315,7 @@ class SGEPlainPrinter(object):
         summary = []
         summarylist = self.sgec.summary()
         for item in summarylist:
-            summary.append("DBJob #%d: %d jobs, %d tasks" % (item[0], item[1], item[2]))
+            summary.append("DBJob #%s: %d jobs, %d tasks" % (item[0], item[1], item[2]))
         return join(summary, "\n")
         
     def qdiff(self): 
@@ -328,27 +328,27 @@ class SGEPlainPrinter(object):
             uj = ["Updates:"]
             jobsByDBID = self.sgec._getJobsByDBID(updatedjobs)
             for dbid, jobids in sorted(jobsByDBID.iteritems()):
-                uj.append("  #%d: " % dbid)
+                uj.append("  #%s: " % dbid)
                 js = []
                 for jobid in jobids:
                     tasks = updatedjobs[jobid]
                     for taskid, details in tasks.iteritems():
                         status = qstatus.get(details["state"])
                         status = status or ("(%s)" % details["state"]) 
-                        js.append('%d-%d => %s' % (jobid, taskid, status))
+                        js.append('%s-%d => %s' % (jobid, taskid, status))
                 uj.append("    %s" % join(js, ", "))
             s.append("%s\n" % join(uj, "\n"))
         
         if completedjobs:
             cj = ["Completed:"]
             for dbid, jobs in completedjobs.iteritems():
-                cj.append("  #%d: " % dbid)
+                cj.append("  #%s: " % dbid)
                 for jobid, tasks in jobs.iteritems():
                     js = []
                     if type(tasks) == type({}):
                         for taskid in tasks.keys():
                             js.append('%d' % taskid)
-                    cj.append('    job #%d: %s' % (jobid, join(js, ", ")))
+                    cj.append('    job #%s: %s' % (jobid, join(js, ", ")))
             s.append("%s" % join(cj, "\n"))
         
         return join(s, "")    
@@ -364,15 +364,15 @@ class SGEXMLPrinter(SGEPlainPrinter):
         if slist:
             slxml = []
             for dbid, jobs in sorted(slist.iteritems()):
-                slxml.append('<dbjob id="%d">' % dbid)
+                slxml.append('<dbjob id="%s">' % dbid)
                 s = {}
                 for jobid, tasks in sorted(jobs.iteritems()):
                     for taskid, ts in tasks.iteritems():
                         s[ts] = s.get(ts) or []
                         if str(taskid) != "0":
-                            s[ts].append("%d-%s" % (jobid, str(taskid)))
+                            s[ts].append("%s-%s" % (jobid, str(taskid)))
                         else:
-                            s[ts].append("%d" % jobid)
+                            s[ts].append("%s" % jobid)
                 
                 for abb, status in qstatus.iteritems():
                     if s.get(status):
@@ -389,7 +389,7 @@ class SGEXMLPrinter(SGEPlainPrinter):
         summarylist = self.sgec.summary()
         if summarylist:
             for item in summarylist:
-                summary.append('<dbjob id="%d" numjobs="%d" numtasks="%d"/>' % (item[0], item[1], item[2]))
+                summary.append('<dbjob id="%s" numjobs="%d" numtasks="%d"/>' % (item[0], item[1], item[2]))
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             return '<sge type="summary" time="%s">\n%s\n</sge>' % (timestamp, join(summary, "\n"))
         return None
@@ -413,9 +413,9 @@ class SGEXMLPrinter(SGEPlainPrinter):
             #    jobsByDB[dbid].append(jobid)
             
             for dbid, jobids in sorted(jobsByDBID.iteritems()):
-                s.append('\n<dbjob id="%d">' % dbid)
+                s.append('\n<dbjob id="%s">' % dbid)
                 for jobid in jobids:
-                    s.append('\n<job id="%d">' % jobid)
+                    s.append('\n<job id="%s">' % jobid)
                     tasks = updatedjobs[jobid]
                     for taskid, details in tasks.iteritems():
                         status = qstatus.get(details["state"])
@@ -433,9 +433,9 @@ class SGEXMLPrinter(SGEPlainPrinter):
         if completedjobs:
             s.append("<completed>")
             for dbid, jobs in completedjobs.iteritems():
-                s.append('\n<dbjob id="%d">' % dbid)
+                s.append('\n<dbjob id="%s">' % dbid)
                 for jobid, tasks in jobs.iteritems():
-                    s.append('\n<job id="%d">' % jobid)
+                    s.append('\n<job id="%s">' % jobid)
                     if type(tasks) == type({}):
                         for taskid in tasks.keys():
                             if str(taskid) != "0":

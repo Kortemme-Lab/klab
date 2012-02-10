@@ -18,11 +18,19 @@ from cluster import ddgTasks
 from cluster.RosettaTasks import PostProcessingException
 from conf_daemon import *
 from cluster.sge import SGEConnection, SGEXMLPrinter, ClusterException
+from string import join
+
+#todo: Define this in the database
+ProtocolMap = {
+	"Kellogg:10.1002/prot.22921:protocol16:32231" : ddgTasks.ddGK16Job,
+}
+
 
 dbfields = ddgproject.FieldNames()
 class ddGDaemon(RosettaDaemon):
 	#todo: daemon adds self.parameters[dbfields.ExtraParameters] to dict
 		
+	MaxBatchSize	= 100
 	MaxClusterJobs	= 200
 	logfname		= "ddGDaemon.log"
 	pidfile			= settings["ddGPID"]
@@ -134,8 +142,8 @@ class ddGDaemon(RosettaDaemon):
 		else:
 			print("FAILED")
 			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s" % (errormsg, timestamp), jobID))
-		self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
-		self.notifyAdminOfError(jobID, description = "ddG")
+		self.log("Error: The %s job %s failed at some point:\n%s" % (suffix, jobID, errormsg))
+		#todo: enable this self.notifyAdminOfError(jobID, description = "ddG")
 		
 	def run(self):
 		"""The main loop and job controller of the daemon."""
@@ -186,7 +194,7 @@ class ddGDaemon(RosettaDaemon):
 					print(clusterjob.getprofileXML())
 					print("</profile>")
 																		   
-			except RosettaTasks.PostProcessingException, e:
+			except PostProcessingException, e:
 				self.recordErrorInJob(clusterjob, "Post-processing error.", traceback.format_exc(), e)
 				self.end_job(clusterjob, Failed = True)
 				clusterjob.dumpJITGraph()
@@ -250,40 +258,68 @@ class ddGDaemon(RosettaDaemon):
 	def startNewJobs(self):
 		# Start more jobs
 		newclusterjob = None
-		if len(self.runningJobs) < self.MaxClusterJobs:
-			# get all jobs in queue
-			#results = self.runSQL("SELECT Prediction.ID as ID, StrippedPDB, InputFiles, cryptID, Tool.Name AS ToolName, Tool.Version AS ToolVersion, Tool.SVNRevision AS ToolSVNRevision, Command.Type AS CommandType, Command.Command as Command, Command.Description as Description FROM Prediction INNER JOIN Tool ON Prediction.ToolID=Tool.ID INNER JOIN Command ON Prediction.CommandID=Command.ID WHERE Prediction.Status='%(queued)s' ORDER BY EntryDate" % dbfields)
-
-			results = self.runSQL("SELECT %(Prediction)s.%(ID)s as ID, %(Experiment)s.%(ID)s as ExperimentID, %(Experiment)s.%(Structure)s as PDB_ID, %(ResidueMapping)s, %(StrippedPDB)s, %(InputFiles)s, %(CryptID)s, %(Protocol)s.%(ID)s AS ProtocolID, %(Protocol)s.%(Description)s AS Description FROM %(Prediction)s INNER JOIN %(Protocol)s ON %(Prediction)s.%(ProtocolID)s=%(Protocol)s.%(ID)s INNER JOIN %(Experiment)s ON %(Prediction)s.%(ExperimentID)s=%(Experiment)s.%(ID)s WHERE %(Prediction)s.%(Status)s='%(queued)s' ORDER BY %(EntryDate)s" % dbfields)
+		MaxBatchSize = self.MaxBatchSize
+		
+		numRunningJobs = 0
+		for job in self.runningJobs:
+			numRunningJobs += len(job.jobIDs)
+			
+		if numRunningJobs < self.MaxClusterJobs:
+			batches = {}
+			results = self.runSQL(("SELECT %(Prediction)s.%(ID)s as ID, %(Prediction)s.%(PredictionSet)s as PredictionSet, %(Experiment)s.%(ID)s as ExperimentID, %(Experiment)s.%(Structure)s as PDB_ID, %(ResidueMapping)s, %(StrippedPDB)s, %(InputFiles)s, %(CryptID)s, %(Protocol)s.%(ID)s AS ProtocolID, %(Protocol)s.%(Description)s AS Description FROM %(Prediction)s INNER JOIN %(Protocol)s ON %(Prediction)s.%(ProtocolID)s=%(Protocol)s.%(ID)s INNER JOIN %(Experiment)s ON %(Prediction)s.%(ExperimentID)s=%(Experiment)s.%(ID)s WHERE %(Prediction)s.%(Status)s='%(queued)s' ORDER BY %(ProtocolID)s, %(EntryDate)s" % dbfields) + (" LIMIT %d" % MaxBatchSize))
 			try:
+				jobID = None
 				if len(results) != 0:
-					jobID = None
+					
+					# Create batches of jobs grouped together by protocol and prediction set
 					for params in results:
+						protocolID = (params["ProtocolID"], params["PredictionSet"])
+						if not batches.get(protocolID):
+							batches[protocolID] = {}
+							batches[protocolID]["jobs"] = {}
+							batches[protocolID]["cryptID"] = params["PredictionSet"]
+							self.addProtocolStructureToParameters(batches[protocolID], params["ProtocolID"])
+						protocol_job_batch = batches[protocolID]["jobs"]
+						
 						# Set up the parameters. We assume ProtocolParameters keys do not overlap with params.
 						jobID = params["ID"]
 						params["ResidueMapping"] = pickle.loads(params["ResidueMapping"])
 						params["InputFiles"] = pickle.loads(params["InputFiles"])
-						self.addProtocolStructureToParameters(params, params["ProtocolID"])
 						
+						protocol_job_batch[jobID] = params
+						
+						
+					for protocolID, batchdetails in batches.iteritems():
 						# Remember that we are about to start this job to avoid repeatedly submitting the same job to the cluster
 						# This should not happen but just in case.
-						# Also, never let the list grow too large as the daemon should be able to run a long time						
-						self.log("Starting job %(ID)d (%(ProtocolID)s)." % params)
-						if jobID in self.recentDBJobs:
-							self.log("Error: Trying to run database job %d multiple times." % jobID)
-							raise Exception("Trying to run database job %d multiple times")
-						self.recentDBJobs.append(jobID)
-						if len(self.recentDBJobs) > 400:
-							self.recentDBJobs = self.recentDBJobs[200:]
+						# Also, never let the list grow too large as the daemon should be able to run a long time
+						newclusterjob = None
+						jobIDs = sorted(batchdetails["jobs"].keys())
+						self.log("Starting jobs with protocol %s: %s" % (protocolID, join(map(str, jobIDs), ",")))
+						for jobID in jobIDs:
+							if jobID in self.recentDBJobs:
+								self.log("Error: Trying to run database job %d multiple times." % jobID)
+								raise Exception("Trying to run database job %d multiple times")
+							self.recentDBJobs.append(jobID)
+							if len(self.recentDBJobs) > 2000:
+								self.recentDBJobs = self.recentDBJobs[1000:]
 						
 						# Start the job						
-						newclusterjob = self.start_job(params)
+						newclusterjob = self.start_job(protocolID[0], batchdetails)
 						if newclusterjob:
 							#change status and write start time to DB
 							self.runningJobs.append(newclusterjob)
-							self.runSQL("UPDATE Prediction SET Status='active', StartDate=NOW() WHERE ID=%s", parameters = (jobID,))
-																						
-						if len(self.runningJobs) >= self.MaxClusterJobs:
+							jobs = sorted(batchdetails["jobs"].keys())
+							if len(jobs) == 1:
+								joblist = "(%s)" % jobs[0]
+							else:
+								joblist = "%s" % tuple(jobs)
+							self.runSQL("UPDATE Prediction SET Status='active', StartDate=NOW() WHERE ID IN %s" % joblist)
+				
+						numRunningJobs = 0
+						for job in self.runningJobs:
+							numRunningJobs += len(job.jobIDs)
+						if numRunningJobs >= self.MaxClusterJobs:
 							break
 						
 			except ClusterException, e:
@@ -311,22 +347,24 @@ class ddGDaemon(RosettaDaemon):
 									 
 			self._clusterjobjuststarted = None
 
-	def start_job(self, params):
+	def start_job(self, protocolID, batchdetails):
 
 		clusterjob = None
-		jobID = params["ID"]
 		
 		# Leave the results for remote jobs in a different directory 
 		dldir = cluster_ddGdir
-			
-		self.log("Start new job ID = %s. %s" % (jobID, params["Description"]) )
-		clusterjob = ddgTasks.ddGK16Job(self.sgec, params, netappRoot, cluster_temp, dldir) # todo: generalise to different classes   
+		
+		for jobID in batchdetails["jobs"]:	
+			self.log("Start new job ID = %s. %s" % (jobID, batchdetails["jobs"][jobID]["Description"]))
+		
+		jobclass = ProtocolMap[protocolID]
+		clusterjob = jobclass(self.sgec, batchdetails, netappRoot, cluster_temp, dldir)
 						
 		# clusterjob will not be returned on exception and the reference will be lost
 		self._clusterjobjuststarted = clusterjob 
 		
 		# Remove any old files in the same target location
-		destpath = os.path.join(clusterjob.dldir, params["cryptID"])
+		destpath = os.path.join(clusterjob.dldir, batchdetails["cryptID"])
 		if os.path.exists(destpath):
 			shutil.rmtree(destpath)
 		
@@ -396,52 +434,54 @@ class ddGDaemon(RosettaDaemon):
 			self.log("%s\n%s" % (str(e), traceback.print_exc()))		
 	
 	def copyAndZipOutputFiles(self, clusterjob):
+		
+		for ID in clusterjob.jobIDs:
 			
-		ID = clusterjob.jobID						
-		
-		# move the data to a webserver accessible directory 
-		result_dir = self.moveFilesOnJobCompletion(clusterjob)
-		
-		# remember directory
-		current_dir = os.getcwd()
-		os.chdir(result_dir)
-		
-		# let's remove all empty files to not confuse the user
-		self.exec_cmd('find . -size 0 -exec rm {} \";\"', result_dir)
-		
-		# store all files also in a zip file, to make it easier accessible
-		filename_zip = "data_%s.zip" % ( ID )
-		all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
-		abs_files = get_files('./')
-		
-		# Do not include the timing profile in the zip
-		timingprofile = os.path.join(result_dir, "timing_profile.txt")
-		if timingprofile in abs_files:
-			abs_files.remove(timingprofile)
+			#ID = clusterjob.jobID						
 			
-		os.chdir(result_dir)
-		filenames_for_zip = [ string.replace(fn, os.getcwd()+'/','') for fn in abs_files ] # os.listdir(result_dir)
-								
-		for file in filenames_for_zip:
-			if file != filename_zip:
-				all_output.write( file )
+			# move the data to a webserver accessible directory 
+			result_dir = self.moveFilesOnJobCompletion(clusterjob)
+			
+			# remember directory
+			current_dir = os.getcwd()
+			os.chdir(result_dir)
+			
+			# let's remove all empty files to not confuse the user
+			self.exec_cmd('find . -size 0 -exec rm {} \";\"', result_dir)
+			
+			# store all files also in a zip file, to make it easier accessible
+			filename_zip = "data_%s.zip" % ( ID )
+			all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
+			abs_files = get_files('./')
+			
+			# Do not include the timing profile in the zip
+			timingprofile = os.path.join(result_dir, "timing_profile.txt")
+			if timingprofile in abs_files:
+				abs_files.remove(timingprofile)
 				
-		all_output.close()
-		
-		results = self.runSQL('SELECT StoreOutput FROM Prediction WHERE ID=%s', parameters = (ID,))
-		if results[0]["StoreOutput"]:
-			F = open(os.path.join(result_dir, filename_zip), "rb")
-			blob = F.read()
-			F.close() 
-			existingRecord = self.PredictionDBConnection.execute('SELECT ID FROM PredictionData WHERE ID=%s', parameters = (ID, ))
-			# todo: We may need to ask whether we want to overwrite		
-			if existingRecord:
-				self.PredictionDBConnection.execute('UPDATE PredictionData SET Data=%s WHERE ID=%s', parameters = (blob, ID))		
-			else:
-				self.PredictionDBConnection.execute('INSERT INTO PredictionData (ID, Data) VALUES(%s,%s)', parameters = (ID, blob))		
-
-		# go back to our working dir 
-		os.chdir(current_dir)
+			os.chdir(result_dir)
+			filenames_for_zip = [ string.replace(fn, os.getcwd()+'/','') for fn in abs_files ] # os.listdir(result_dir)
+									
+			for file in filenames_for_zip:
+				if file != filename_zip:
+					all_output.write( file )
+					
+			all_output.close()
+			
+			results = self.runSQL('SELECT StoreOutput FROM Prediction WHERE ID=%s', parameters = (ID,))
+			if results[0]["StoreOutput"]:
+				F = open(os.path.join(result_dir, filename_zip), "rb")
+				blob = F.read()
+				F.close() 
+				existingRecord = self.PredictionDBConnection.execute('SELECT ID FROM PredictionData WHERE ID=%s', parameters = (ID, ))
+				# todo: We may need to ask whether we want to overwrite		
+				if existingRecord:
+					self.PredictionDBConnection.execute('UPDATE PredictionData SET Data=%s WHERE ID=%s', parameters = (blob, ID))		
+				else:
+					self.PredictionDBConnection.execute('INSERT INTO PredictionData (ID, Data) VALUES(%s,%s)', parameters = (ID, blob))		
+	
+			# go back to our working dir 
+			os.chdir(current_dir)
 	
 	def removeClusterTempDir(self, clusterjob):
 		try:
