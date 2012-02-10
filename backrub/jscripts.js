@@ -416,9 +416,9 @@ function checkPassword()
 function validateEmail()
 {
 	f = document.myForm.email
-	str = f.value.replace(/^\s+|\s+$/g, '');
+	str = f.value.replace(/^\s+|\s+$/g, '');	// strip trailing and leading whitespace
 	ati = str.indexOf("@")
-	doti = str.indexOf(".")
+	doti = str.lastIndexOf(".")
 	isValid = !(ati == -1 || doti == -1 || str.length < 6 || doti - 1 <= ati);
 	if (!isValid)
 	{
