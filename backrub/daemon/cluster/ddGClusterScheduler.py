@@ -73,7 +73,7 @@ class ClusterBatchJob(RosettaClusterJob):
 			if self.resultFilemasks:
 				for mask in self.resultFilemasks:
 					fromSubdirectory = os.path.join(targetjobpath, mask[0])
-					toSubdirectory = os.path.join(targetjobpath, mask[0])
+					toSubdirectory = os.path.join(destjobpath, mask[0])
 					self._status("Moving files from %s to %s using mask '%s'.\n" % (fromSubdirectory, toSubdirectory, mask[1]))
 					if not os.path.exists(toSubdirectory):
 						make755Directory(toSubdirectory)
