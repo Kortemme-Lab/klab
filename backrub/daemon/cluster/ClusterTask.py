@@ -207,6 +207,7 @@ class ClusterTask(object):
 		self.debug = True
 		self.targetdirectory = targetdirectory
 		self.jobid = 0
+		self.jobIDs = [] # Added for ddG compatibility
 		self.script = None
 		self.state = INACTIVE_TASK
 		self.dependents = []

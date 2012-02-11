@@ -20,7 +20,15 @@ import traceback
 from datetime import datetime
 
 #import sge
-import ClusterTask  
+
+from ClusterTask import INITIAL_TASK 	as ClusterTask_INITIAL_TASK
+from ClusterTask import INACTIVE_TASK 	as ClusterTask_INACTIVE_TASK
+from ClusterTask import ACTIVE_TASK 	as ClusterTask_ACTIVE_TASK
+from ClusterTask import RETIRED_TASK 	as ClusterTask_RETIRED_TASK
+from ClusterTask import COMPLETED_TASK 	as ClusterTask_COMPLETED_TASK
+from ClusterTask import FAILED_TASK 	as ClusterTask_FAILED_TASK
+from ClusterTask import status		 	as ClusterTask_status
+
 import SimpleProfiler
 from Graph import JITGraph
 
@@ -94,10 +102,10 @@ class TaskScheduler(object):
         self.dbID = 0
         self.debug = True
         # todo: The task states here have different meanings to those of ClusterTask. Maybe separate them entirely.
-        self.tasks = {ClusterTask.INITIAL_TASK: [],
-                      ClusterTask.ACTIVE_TASK: [],
-                      ClusterTask.RETIRED_TASK: [],
-                      ClusterTask.COMPLETED_TASK: []}
+        self.tasks = {ClusterTask_INITIAL_TASK: [],
+                      ClusterTask_ACTIVE_TASK: [],
+                      ClusterTask_RETIRED_TASK: [],
+                      ClusterTask_COMPLETED_TASK: []}
         
         self.pendingtasks = {}
         self.workingdir = workingdir
@@ -113,32 +121,22 @@ class TaskScheduler(object):
             if plain:
                 print(timestamp, message)
             else:
-                print('<debug id="%d" type="scheduler" time="%s">%s</debug>' % (self.dbID, timestamp, message))
+                print('<debug id="%s" type="scheduler" time="%s">%s</debug>' % (str(self.dbID), timestamp, message))
             
     def _movequeue(self, task, oldqueue, newqueue):
         # todo: The active queue actually contains both queued and active jobs w.r.t. the cluster head node 
-        self._status("Moving %d (%s) from %s to %s" % (task.jobid, task.getName(), ClusterTask.status.get(oldqueue), ClusterTask.status.get(newqueue)))
+        self._status("Moving %d (%s) from %s to %s" % (task.jobid, task.getName(), ClusterTask_status.get(oldqueue), ClusterTask_status.get(newqueue)))
         self.tasks[oldqueue].remove(task)
         self.tasks[newqueue].append(task)
         
     def _getAllTasks(self):
         tasks = []
-        tasks.extend(self.tasks[ClusterTask.INITIAL_TASK])
-        tasks.extend(self.tasks[ClusterTask.ACTIVE_TASK])
-        tasks.extend(self.tasks[ClusterTask.RETIRED_TASK])
-        tasks.extend(self.tasks[ClusterTask.COMPLETED_TASK])
+        tasks.extend(self.tasks[ClusterTask_INITIAL_TASK])
+        tasks.extend(self.tasks[ClusterTask_ACTIVE_TASK])
+        tasks.extend(self.tasks[ClusterTask_RETIRED_TASK])
+        tasks.extend(self.tasks[ClusterTask_COMPLETED_TASK])
         return tasks        
     
-    # todo: Unused at present. Remove if not used in future. 
-    def getAllJIDs(self):
-        checkGraphReachability(self._initialtasks)
-        tasklist = traverseGraph(self._initialtasks, [])
-        activeJIDs = []
-        for task in tasklist:
-            if task.isActiveOnCluster():
-                activeJIDs.append(task.jobid)
-        return activeJIDs
-
     def killAllTasks(self):
         success = True
         checkGraphReachability(self._initialtasks)
@@ -154,7 +152,7 @@ class TaskScheduler(object):
         ts = self._getAllTasks()
         
         for task in self.tasks_in_order:
-            status = ClusterTask.status.get(task.getState(allowToRetire = False))
+            status = ClusterTask_status.get(task.getState(allowToRetire = False))
             profile.append(('task id="%d" name="%s" status="%s"' % (count, task.getName(), status), task.getprofile()))
             ts.remove(task)
             count += 1
@@ -172,10 +170,10 @@ class TaskScheduler(object):
     
     def addInitialTasks(self, *tasks):
         if self.started:
-            raise SchedulerTaskAddedAfterStartException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "Exception adding initial task: %s" % task.getName())
+            raise SchedulerTaskAddedAfterStartException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "Exception adding initial task: %s" % task.getName())
         for task in tasks:
             self._initialtasks.append(task)
-            self.tasks[ClusterTask.INITIAL_TASK].append(task)
+            self.tasks[ClusterTask_INITIAL_TASK].append(task)
 
     def raiseFailure(self, exception = None):
         self.failed = True
@@ -194,10 +192,10 @@ class TaskScheduler(object):
         # todo: Check the reachability and acyclicity of the graph here
         self.sgec = sgec
         self.dbID = dbID
-        checkGraphReachability(self.tasks[ClusterTask.INITIAL_TASK])
+        checkGraphReachability(self.tasks[ClusterTask_INITIAL_TASK])
             
         tasksToStart = []
-        for task in self.tasks[ClusterTask.INITIAL_TASK]:
+        for task in self.tasks[ClusterTask_INITIAL_TASK]:
             tasksToStart.append(task)
             
         for task in tasksToStart:
@@ -206,9 +204,9 @@ class TaskScheduler(object):
             if started:
                 self._status("Queued %d (%s)" % (task.jobid, task.getName()))
                 self.tasks_in_order.append(task)
-                self._movequeue(task, ClusterTask.INITIAL_TASK, ClusterTask.ACTIVE_TASK)    
+                self._movequeue(task, ClusterTask_INITIAL_TASK, ClusterTask_ACTIVE_TASK)    
             else:
-                self.raiseFailure(SchedulerStartException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "Exception starting: %s" % task.getName()))
+                self.raiseFailure(SchedulerStartException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "Exception starting: %s" % task.getName()))
                 return False
         
         return True
@@ -228,62 +226,64 @@ class TaskScheduler(object):
         
         # I told you I was sick. Don't step a broken scheduler.
         if self.failed:
-             raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The scheduler has failed.") 
+             raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "The scheduler has failed.") 
                               
         # Retire tasks
-        activeTasks = self.tasks[ClusterTask.ACTIVE_TASK][:]
+        activeTasks = self.tasks[ClusterTask_ACTIVE_TASK][:]
         for task in activeTasks:
             tstate = task.getState()
-            if tstate == ClusterTask.RETIRED_TASK:
-                self._movequeue(task, ClusterTask.ACTIVE_TASK, ClusterTask.RETIRED_TASK)
-            elif tstate == ClusterTask.FAILED_TASK:
-                self._movequeue(task, ClusterTask.ACTIVE_TASK, ClusterTask.RETIRED_TASK)
-                self.raiseFailure(TaskCompletionException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The task %s failed." % task.getName()))
+            if tstate == ClusterTask_RETIRED_TASK:
+                self._movequeue(task, ClusterTask_ACTIVE_TASK, ClusterTask_RETIRED_TASK)
+            elif tstate == ClusterTask_FAILED_TASK:
+                self._movequeue(task, ClusterTask_ACTIVE_TASK, ClusterTask_RETIRED_TASK)
+                self.raiseFailure(TaskCompletionException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "The task %s failed." % task.getName()))
                 return False
         
         # Complete tasks
-        retiredTasks = self.tasks[ClusterTask.RETIRED_TASK][:]
+        retiredTasks = self.tasks[ClusterTask_RETIRED_TASK][:]
         for task in retiredTasks:
             dependents = task.getDependents()
             completed = True
             for dependent in dependents:
-                if dependent.getState() != ClusterTask.COMPLETED_TASK:
+                if dependent.getState() != ClusterTask_COMPLETED_TASK:
                     completed = False
                     break
             if completed:
                 completed = task.complete()
                 if completed:
-                    self._movequeue(task, ClusterTask.RETIRED_TASK, ClusterTask.COMPLETED_TASK)
+                    self._movequeue(task, ClusterTask_RETIRED_TASK, ClusterTask_COMPLETED_TASK)
                 else:
-                    self.raiseFailure(TaskCompletionException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The task %s failed." % task.getName()))
+                    self.raiseFailure(TaskCompletionException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "The task %s failed." % task.getName()))
             
             # Try to start any dependents if we can
             # A dependent *should* fire once all its prerequisite tasks have finished
             dependents = task.getDependents()
             for dependent in dependents:
-                if dependent.getState() == ClusterTask.INACTIVE_TASK:
+                assert(task.jobIDs == dependent.jobIDs)
+                if dependent.getState() == ClusterTask_INACTIVE_TASK:
                     self.pendingtasks[dependent] = True
                     self._status("Starting %s." % dependent.getName())
-                    dependent.addInputs(task.getOutputs(dependent))
+                    for jobID in task.jobIDs:
+                        dependent.addInputs(jobID, task.getOutputs(jobID, dependent))
                     started = dependent.start(self.sgec, self.dbID)
                     if started:
                         self.tasks_in_order.append(dependent)
                         del self.pendingtasks[dependent]
-                        self.tasks[ClusterTask.ACTIVE_TASK].append(dependent)
+                        self.tasks[ClusterTask_ACTIVE_TASK].append(dependent)
 
         
         # Bad scheduler. No biscuit.
-        if self.tasks[ClusterTask.INITIAL_TASK]:
-            raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK], msg = "The scheduler has failed.")  
+        if self.tasks[ClusterTask_INITIAL_TASK]:
+            raise BadSchedulerException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "The scheduler has failed.")  
         
         # If we have no more tasks which will trigger other tasks to start i.e. active tasks
         # and we have pending tasks which have not been started, they never will be started.
         # John Hodgman - "Halting problem - solved. You're welcome."
-        if self.pendingtasks and not (self.tasks[ClusterTask.ACTIVE_TASK]):
-             raise SchedulerDeadlockException(self.pendingtasks, self.tasks[ClusterTask.RETIRED_TASK], self.tasks[ClusterTask.COMPLETED_TASK])
+        if self.pendingtasks and not (self.tasks[ClusterTask_ACTIVE_TASK]):
+             raise SchedulerDeadlockException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK])
                                     
         # We are finished when there are no active or retired tasks
-        return not(self.tasks[ClusterTask.ACTIVE_TASK] or self.tasks[ClusterTask.RETIRED_TASK]) 
+        return not(self.tasks[ClusterTask_ACTIVE_TASK] or self.tasks[ClusterTask_RETIRED_TASK]) 
     
     def cleanup(self):
         tasks = self._getAllTasks()
@@ -299,6 +299,9 @@ class RosettaClusterJob(object):
     name = "Cluster job"
         
     def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
+        self.jobIDs = []
+        self.jobID = self.parameters.get("ID") or 0
+        self.profiler = SimpleProfiler.SimpleProfiler("%s-%d" % (self.suffix, self.jobID))
         self.parameters = parameters
         self.sgec = sgec
         self.debug = True
@@ -307,15 +310,13 @@ class RosettaClusterJob(object):
         self.testonly = testonly
         self.dldir = os.path.join(dldir, parameters["cryptID"])
         if not testonly:
-            self._make_workingdir() 
+            self._make_workingdir()
             self._make_targetdir()
         else:
             self.workingdir = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/test" #todo
             self.targetdirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/test"
-        self.jobID = self.parameters.get("ID") or 0
         self.filename_stdout = "stdout_%s_%d.txt" % (self.suffix, self.jobID)
         self.filename_stderr = "stderr_%s_%d.txt" % (self.suffix, self.jobID)
-        self.profiler = SimpleProfiler.SimpleProfiler("%s-%d" % (self.suffix, self.jobID))
         self.profiler.PROFILE_START("Initialization")
         self._initialize()
         self.profiler.PROFILE_STOP("Initialization")
@@ -340,11 +341,11 @@ class RosettaClusterJob(object):
     def _status(self, message):
         if self.debug:
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print('<debug id="%d" type="job" time="%s">%s</debug>' % (self.jobID, timestamp, message))
+            print('<debug id="%s" type="job" time="%s">%s</debug>' % (str(self.jobID), timestamp, message))
             
     def start(self):
         try:
-            self.scheduler.start(self.sgec, self.parameters["ID"])
+            self.scheduler.start(self.sgec, self.jobID)
             self.dumpJITGraph()
         except TaskSchedulerException, e:
             self.error = "The job failed during startup"
@@ -389,7 +390,7 @@ class RosettaClusterJob(object):
                 return True
             else:
                 # A little hacky but avoids waiting another cycle if all jobs have completed
-                if not(self.scheduler.tasks[ClusterTask.ACTIVE_TASK]):
+                if not(self.scheduler.tasks[ClusterTask_ACTIVE_TASK]):
                     if self.scheduler.step():
                         self.scheduler.cleanup()
                         return True
@@ -414,7 +415,7 @@ class RosettaClusterJob(object):
         else:    
             attr = 'succeeded="true"' 
         
-        stats = [('%s %s workingDir="%s" targetDir="%s" downloadsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory, self.parameters["cryptID"]), stats)]
+        stats = [('%s %s workingDir="%s" targetDir="%s" downloadsDir="%s"' % (self.suffix, attr, self.workingdir, self.targetdirectory, self.dldir), stats)]
         SimpleProfiler.sumTuples(stats)
         return stats
         
@@ -435,7 +436,9 @@ class RosettaClusterJob(object):
         # make a tempdir on the host
         try:
             self.workingdir = makeTemp755Directory(self.tempdir, self.suffix)
-        except:
+            for jobID in self.jobIDs:
+                make755Directory(os.path.join(self.workingdir, str(jobID)))
+        except Exception, e:
             # This is a fatal error.
             print("The cluster daemon could not create the working directory inside %s. Are you running it under the correct user?" % self.tempdir)
             os._exit(0)
@@ -450,6 +453,8 @@ class RosettaClusterJob(object):
         # make a tempdir on the host
         try:
             self.targetdirectory = makeTemp755Directory(self.targetroot, self.suffix) 
+            for jobID in self.jobIDs:
+                make755Directory(os.path.join(self.targetdirectory, str(jobID)))
         except:
             # This is a fatal error.
             print("The cluster daemon could not create the target directory inside %s. Are you running it under the correct user?" % self.targetroot)
@@ -512,9 +517,9 @@ class RosettaClusterJob(object):
             return taskdir
         return self.workingdir
 
-    def _workingdir_file_path(self, filename):
+    def _workingdir_file_path(self, filename, jobID = "."):
         """Get the path for a file within the working directory"""
-        return os.path.join(self.workingdir, filename)
+        return os.path.normpath(os.path.join(self.workingdir, str(jobID), filename))
 
     def dumpJITGraph(self):
         destpath = self.dldir

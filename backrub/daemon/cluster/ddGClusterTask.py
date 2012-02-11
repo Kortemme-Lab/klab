@@ -378,7 +378,7 @@ class ddGClusterTask(object):
 					sge_scriptfile = self._workingdir_file_path(self.scriptfilename)
 					shutil.copy(sge_scriptfile, targetJobSubDir)
 					shutil.move(sge_scriptfile, workingJobSubDir)
-					sge_scriptfile_temp = self.scriptfilename + ".temp.out"
+					sge_scriptfile_temp = sge_scriptfile + ".temp.out"
 					if os.path.exists(sge_scriptfile_temp):
 						os.remove(sge_scriptfile_temp)
 						

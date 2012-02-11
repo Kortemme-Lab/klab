@@ -5,7 +5,8 @@ import traceback
 import rosettahelper
 from conf_daemon import *
 from ddGClusterTask import ddGClusterTask, ddGClusterScript, FAILED_TASK
-from ddGClusterScheduler import TaskScheduler, ClusterBatchJob
+from ClusterScheduler import TaskScheduler
+from ddGClusterScheduler import ClusterBatchJob
 from RosettaTasks import PostProcessingException
 import ddgproject
 ddgfields = ddgproject.FieldNames()
