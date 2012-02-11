@@ -153,46 +153,7 @@ echo "</enddate>"
 	def getWorkingDir(self):
 		return self.workingdir
 
-class ddGClusterScript(ClusterScript):
-	
-	def _addTask(self, lines, type, attributes):
-		attstring = ""
-		if attributes:
-			for k,v in attributes:
-				attstring += '%s = "%s" ' % (k, v)
-		if attstring:
-			attstring = " " + attstring	   
-		if type:
-			self.contents.append('echo -n "<%s%s"' % (type, attstring))
-			self.contents.append('if [ -n "${SGE_TASK_ID+x}" ]; then')
-			self.contents.append('echo -n " \\"subtask=$SGE_TASK_ID\\"" ')
-			self.contents.append('fi')
-			self.contents.append('echo ">"')
-		self.contents.append(join(lines, "\n") % self.taskparameters)
-		
-		if type:
-			self.contents.append('echo "</%s>"\n' % type)
 
-	def __init__(self, workingdir, taskparameters, numtasks = 0, dataarrays = {}, maxhours = CLUSTER_maxhoursforjob, maxmins = CLUSTER_maxminsforjob):
-		self.contents = []
-		self.tasks = []
-		self.parameters = {"workingdir": workingdir, "taskline": "", "taskparam" : "", "taskvar" : "", "maxhours": maxhours, "maxmins": maxmins}
-		if numtasks > 0:
-			if dataarrays:
-				for arrayname, contents in sorted(dataarrays.iteritems()):
-					self.parameters["taskline"] += "%s=( dummy %s )\n" % (arrayname, join(contents, " "))
-					self.parameters["taskvar"]  += '%svar=${%s[$SGE_TASK_ID]}\n' % (arrayname, arrayname)	 
-			self.parameters["taskparam"] = "#$ -t 1-%d" % numtasks #len(tasks)
-		taskparameters["BIN_DIR"] = os.path.join(clusterRootDir, taskparameters["BIN_DIR"]) 
-		self.revision = taskparameters["BIN_DIR"]
-		self.bindir = os.path.join(clusterRootDir, self.revision)
-		taskparameters["DATABASE_DIR"] = os.path.join(clusterRootDir, taskparameters["DATABASE_DIR"], "rosetta_database") 
-		self.dbrevision = taskparameters["DATABASE_DIR"]
-		self.databasedir = os.path.join(clusterRootDir, self.dbrevision)
-		self.workingdir = workingdir
-		self.script = None
-		self.taskparameters = taskparameters
-	
 class ClusterTask(object):
 	prefix = "task"
 	
@@ -241,15 +202,15 @@ class ClusterTask(object):
 	def _initialize(self):
 		'''Override this function.'''
 		raise Exception
-	
-	def _workingdir_file_path(self, filename):
-		"""Get the path for a file within the working directory"""
-		return os.path.join(self.workingdir, filename)   
 
-	def _targetdir_file_path(self, filename):
+	def _workingdir_file_path(self, filename, jobID = "."):
 		"""Get the path for a file within the working directory"""
-		return os.path.join(self.targetdirectory, filename)   
-	
+		return os.path.normpath(os.path.join(self.workingdir, str(jobID), filename))   
+
+	def _targetdir_file_path(self, filename, jobID = "."):
+		"""Get the path for a file within the working directory"""
+		return os.path.normpath(os.path.join(self.targetdirectory, str(jobID), filename))   
+
 	def getOutputStreams(self):
 		return self.outputstreams
 

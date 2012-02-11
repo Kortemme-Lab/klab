@@ -415,33 +415,3 @@ class K16ddGTask(GenericDDGTask):
 	pass
 
 
-
-
-
-
-
-
-### Test functions (not maintained)
-def test(ProtocolGraph, InitialTasks, CommandParameters):
-	from sge import SGEConnection, SGEXMLPrinter, ClusterException
-	sgec = SGEConnection()
-	netappRoot = "/netapp/home/klabqb3backrub/temp"
-	cluster_temp = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/cluster"
-	dldir = "/clustertest/temp/ddG" 
-	params = {
-		"ID" : 1,
-		"ExperimentID" : 10,
-		"PDB_ID" : "AAAA",
-		"%(ResidueMapping)s" % ddgfields : {},  
-		"%(StrippedPDB)s" % ddgfields : "", 
-		"%(InputFiles)s" % ddgfields : {"RESFILE" : " "}, 
-		"%(CryptID)s" % ddgfields : "abcdtestrun", 
-		"ProtocolID" % ddgfields : "Kellogg:10.1002/prot.22921:protocol16:32231",
-		"Description" % ddgfields : "Protocol 16 from Kellogg, Leaver-Fay, and Baker",
-		"ProtocolGraph" : ProtocolGraph,
-		"InitialTasks" : InitialTasks,
-		"CommandParameters" : CommandParameters,
-	}	
-	clusterjob = ddGK16Job(sgec, params, netappRoot, cluster_temp, dldir)
-	print("done")
-	sys.exit(0)
