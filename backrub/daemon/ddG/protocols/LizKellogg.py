@@ -1,4 +1,4 @@
-from cluster.ddgTasks import GenericDDGJob, GenericDDGTask
+from ddG.tasks import GenericDDGJob, GenericDDGTask
 
 # Jobs and tasks for specific protocols
 
