@@ -14,17 +14,13 @@ from rosetta_daemon import RosettaDaemon
 import ddgproject
 from rosettahelper import * #RosettaError, get_files, grep, make755Directory, makeTemp755Directory
 from RosettaProtocols import *
-from cluster import ddgTasks
 from cluster.RosettaTasks import PostProcessingException
 from conf_daemon import *
 from cluster.sge import SGEConnection, SGEXMLPrinter, ClusterException
 from string import join
 
-#todo: Define this in the database
-ProtocolMap = {
-	"Kellogg:10.1002/prot.22921:protocol16:32231" : ddgTasks.ddGK16Job,
-}
-
+import ddG
+from ddG.protocols import *
 
 dbfields = ddgproject.FieldNames()
 class ddGDaemon(RosettaDaemon):
@@ -80,7 +76,20 @@ class ddGDaemon(RosettaDaemon):
 		self.store_time			= settings["StoreTime"]
 		self.DBConnection		= ddgproject.ddGDatabase(passwd = passwd)
 		self.PredictionDBConnection		= ddgproject.ddGPredictionDataDatabase(passwd = passwd)
-	
+		self.setUpProtocolMap()
+
+	def setUpProtocolMap(self):
+		ProtocolMap = {}
+		for r in self.runSQL("SELECT ID, ClassName FROM Protocol"):
+			jobclass = r["ClassName"]
+			if jobclass:
+				m_parts = jobclass.split(".")
+				jobclass = globals()[m_parts[0]]
+				for i in range(1, len(m_parts)):
+					jobclass = getattr(jobclass, m_parts[i])
+				ProtocolMap[r["ID"]] = jobclass
+		self.ProtocolMap = ProtocolMap
+		
 	def callproc(self, procname, parameters = None, cursorClass = ddgproject.DictCursor):
 		""" This function should be the only place in this class which calls stored procedures SQL.
 			Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
@@ -233,6 +242,7 @@ class ddGDaemon(RosettaDaemon):
 			ProtocolGraph[stepID] = result
 			ProtocolGraph[stepID]["Dependents"] = []
 			ProtocolGraph[stepID]["Parents"] = []
+			ProtocolGraph[stepID]["Cleaners"] = []
 		edges = self.runSQL("SELECT FromStep, ToStep FROM ProtocolGraphEdge WHERE ProtocolID=%s", parameters = (PROTOCOL_ID,))
 		for e in edges:
 			s = e["FromStep"]
@@ -250,6 +260,9 @@ class ddGDaemon(RosettaDaemon):
 			tpl = (s, p["ToStep"])
 			CommandParameters[tpl] = CommandParameters.get(tpl, [])
 			CommandParameters[tpl].append((p["ParameterID"], p["Value"]))
+		for stepID in ProtocolGraph.keys():
+			stepCleaners = self.runSQL("SELECT FileMask, Operation, Arguments FROM ProtocolCleaner WHERE ProtocolID=%s AND StepID=%s", parameters = (PROTOCOL_ID, stepID))
+			ProtocolGraph[stepID]["Cleaners"] = [{"mask" : cleaner["FileMask"] , "operation" : cleaner["Operation"], "arguments" : cleaner["Arguments"]} for cleaner in stepCleaners]
 		
 		params["ProtocolGraph"] = ProtocolGraph
 		params["InitialTasks"] = InitialTasks
@@ -357,7 +370,7 @@ class ddGDaemon(RosettaDaemon):
 		for jobID in batchdetails["jobs"]:	
 			self.log("Start new job ID = %s. %s" % (jobID, batchdetails["jobs"][jobID]["Description"]))
 		
-		jobclass = ProtocolMap[protocolID]
+		jobclass = self.ProtocolMap[protocolID]
 		clusterjob = jobclass(self.sgec, batchdetails, netappRoot, cluster_temp, dldir)
 						
 		# clusterjob will not be returned on exception and the reference will be lost
@@ -504,53 +517,6 @@ if __name__ == "__main__":
 				daemon.stop()
 			elif 'restart' == sys.argv[1]:
 				daemon.restart()
-			elif 'test' == sys.argv[1]:
-				passwd = None
-				F = open("../sqlpw", "r")
-				while True:
-					line = F.readline()
-					if line == "":
-						break
-					else:
-						line = line.split("=")
-						if line[0].strip() == "ddGSQLPassword":
-							passwd = line[1].strip()
-							break
-				F.close()
-				if not passwd:
-					raise Exception("Did not find password.")
-				DBConnection = ddgproject.ddGDatabase(passwd = passwd)
-				
-				# Extract the graph information from the database
-				#Kellogg:10.1002/prot.22921:protocol16:32231
-				PROTOCOL_ID = "Kellogg:10.1002/prot.22921:protocol16:32231"
-				ProtocolGraph = {}
-				initialTasks = []
-				results = DBConnection.callproc("GetProtocolSteps", parameters = (PROTOCOL_ID,))
-				for result in results:
-					stepID = result["ProtocolStepID"]
-					initialTasks.append(stepID)
-					ProtocolGraph[stepID] = result
-					ProtocolGraph[stepID]["Dependents"] = []
-					ProtocolGraph[stepID]["Parents"] = []
-				edges = DBConnection.execute("SELECT FromStep, ToStep FROM ProtocolGraphEdge WHERE ProtocolID=%s", parameters = (PROTOCOL_ID,))
-				for e in edges:
-					s = e["FromStep"]
-					t = e["ToStep"]
-					ProtocolGraph[s]["Dependents"].append(t)
-					ProtocolGraph[t]["Parents"].append(s)
-					if t in initialTasks:
-						initialTasks.remove(t)
-				CommandParameters = {}
-				CmdParameters = DBConnection.execute("SELECT FromStep, ToStep, ParameterID, Filename FROM ProtocolParameter WHERE ProtocolID=%s", parameters = (PROTOCOL_ID,))
-				for p in CmdParameters:
-					s = p["FromStep"]
-					if s < 0:
-						s = None
-					tpl = (s, p["ToStep"])
-					CommandParameters[tpl] = CommandParameters.get(tpl, [])
-					CommandParameters[tpl].append((p["ParameterID"], p["Filename"]))
-				ddgTasks.test(ProtocolGraph, initialTasks, CommandParameters)
 			else:
 				printUsageString = True
 		

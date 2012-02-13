@@ -63,6 +63,10 @@ class ClusterBatchJob(RosettaClusterJob):
 
 		if not os.path.exists(destpath):
 			make755Directory(destpath)
+			
+		timing_profile = self._targetdir_file_path("timing_profile.txt")
+		if os.path.exists(timing_profile):
+			shutil.move(timing_profile, destpath)
 
 		for jobID in self.jobIDs:
 			destjobpath = os.path.join(destpath, str(jobID))
@@ -81,8 +85,12 @@ class ClusterBatchJob(RosettaClusterJob):
 						self._status("File: %s" % file)
 						if fnmatch.fnmatch(file, mask[1]):
 							try:
+								print(os.path.join(fromSubdirectory, file), toSubdirectory)
 								shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
-								self._status("Moved.")
+								if not os.path.exists(os.path.join(toSubdirectory, file)):
+									self._status("Error moving.")
+								else:
+									self._status("Moved.")
 							except Exception, e:
 								self._status("Exception moving %s to %s: %s" % (os.path.join(fromSubdirectory, file), toSubdirectory, str(e)))
 			else:

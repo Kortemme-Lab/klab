@@ -13,6 +13,7 @@ import shutil
 import glob
 from string import join, split
 import traceback
+import fnmatch
 import rosettahelper
 from conf_daemon import *
 from ClusterScheduler import TaskScheduler
@@ -23,7 +24,6 @@ ddgfields = ddgproject.FieldNames()
 from conf_daemon import CLUSTER_maxhoursforjob, CLUSTER_maxminsforjob, clusterRootDir
 import SimpleProfiler
 from rosettahelper import make755Directory, writeFile
-
 from ClusterTask import INITIAL_TASK, INACTIVE_TASK, QUEUED_TASK, ACTIVE_TASK, RETIRED_TASK, COMPLETED_TASK, FAILED_TASK, status
 from ClusterTask import ClusterScript, ClusterTask
 
@@ -139,7 +139,6 @@ class GenericDDGTask(ClusterTask):
 		# Do not allow spaces in the script filename so that the SGE qstat parsing works
 		scriptfilename.replace(" ", "_")
 		self.scriptfilename = scriptfilename
-		self.shortname = split(scriptfilename, ".")[0] # todo: do this better
 		self.shortname = split(scriptfilename, "_")[0] # todo: do this better
 		self.filename = os.path.join(workingdir, scriptfilename)
 		self.cleanedup = False
@@ -149,6 +148,7 @@ class GenericDDGTask(ClusterTask):
 		self.outputstreams = []
 		self._initialize()
 		self.profiler.PROFILE_STOP("Initialization")
+		self.cleaners = []
 		
 	def addInputs(self, jobID, inpts):
 		self._status("Adding inputs: %s for job %d" % (inpts, jobID))
@@ -247,11 +247,7 @@ class GenericDDGTask(ClusterTask):
 			jobDir = os.path.join(self.targetdirectory, str(jobID))
 			if not os.path.isdir(jobDir):
 				make755Directory(jobDir)
-		
-		clusterScript = self._workingdir_file_path(self.scriptfilename)
-		if os.path.exists(clusterScript):
-			shutil.copy(clusterScript, self.targetdirectory)
-					
+
 		if self.scriptfilename:
 			failedOutput = False
 			self._status('Copying stdout and stderr output to %s' % (self.targetdirectory))		
@@ -301,6 +297,21 @@ class GenericDDGTask(ClusterTask):
 						self.outputstreams.append({"stdout" : filename_stdout, "stderr" : filename_stderr})
 					else:
 						self.outputstreams.append({"stdout" : filename_stdout})
+						
+					for cleaner in self.cleaners:
+						#todo: factor in taskdetails["DirectoryName"] here when it becomes an issue
+						if cleaner["operation"] == "keep":
+							mask = cleaner["mask"]
+							self._status("Moving files from %s to %s using mask '%s'.\n" % (workingJobSubDir, targetJobSubDir, mask))
+							for file in os.listdir(workingJobSubDir):
+								self._status("File: %s" % file)
+								if fnmatch.fnmatch(file, mask):
+									try:
+										shutil.copy(os.path.join(workingJobSubDir, file), targetJobSubDir)
+										self._status("Moved.")
+									except Exception, e:
+										self._status("Exception moving %s to %s: %s" % (os.path.join(fromSubdirectory, file), toSubdirectory, str(e)))
+								 
 			except Exception, e:
 				self._status("Exception: %s" % str(e))
 			
@@ -385,8 +396,12 @@ class GenericDDGJob(ClusterBatchJob):
 		ProtocolGraph = parameters["ProtocolGraph"]
 		for taskID, taskdetails in ProtocolGraph.iteritems():
 			taskcls = taskdetails["ClassName"] or "GenericDDGTask"
-			taskcls = taskcls.split(".")[-1] # todo : remove this step later when everything is separated into modules
-			taskcls = globals()[taskcls]
+			#taskcls = taskcls.split(".")[-1] # todo : remove this step later when everything is separated into modules
+			m_parts = taskcls.split(".")
+			taskcls = globals()[m_parts[0]]
+			for i in range(1, len(m_parts)):
+				taskcls = getattr(taskcls, m_parts[i])
+			#taskcls = globals()[taskcls]
 			targetsubdirectory = taskdetails["DirectoryName"] or "."
 			taskdir = self._make_taskdir(targetsubdirectory)
 			taskdetails["_task"] = taskcls(taskdir, self.targetdirectory, parameters, taskdetails, name=taskdetails["ProtocolStepID"], prefix=taskdetails["ProtocolStepID"])
@@ -417,6 +432,8 @@ class GenericDDGJob(ClusterBatchJob):
 								task_inputs[cmdparam[0]] = cmdparam[1] or jobparam
 				ProtocolGraph[stepID]["_task"].addInputs(jobid, task_inputs)
 				ProtocolGraph[stepID]["_task"].addOutputs(jobid, task_outputs)
+				ProtocolGraph[stepID]["_task"].cleaners = ProtocolGraph[stepID]["Cleaners"]
+				
 		
 		self.ProtocolGraph = ProtocolGraph
 				 
@@ -512,48 +529,6 @@ class ddGK16Job(GenericDDGJob):
 		self.ddG.setData(ScoresForJobs)
 		return wasSuccessful	
 
-		#def parseResults(logfile, predictions_file):
-		scoresHeader='''
-	------------------------------------------------------------
-	 Scores                       Weight   Raw Score Wghtd.Score
-	------------------------------------------------------------'''
-		scoresFooter = '''---------------------------------------------------'''
-		
-		F = open(logfile, "r")
-		log = F.read()
-		F.close()
-		
-		componentNames = []
-		idx = log.find(scoresHeader)
-		if idx:
-			log = log[idx + len(scoresHeader):]
-			idx = log.find(scoresFooter)
-			if idx:
-				log = log[:idx].strip()
-				log = log.split("\n")
-				for line in log:
-					componentNames.append(line.strip().split()[0])
-				componentNames.remove("atom_pair_constraint")
-		
-		F = open(predictions_file, "r")
-		predictions = F.read().split('\n')
-		F.close()
-		results = {}
-		for p in predictions:
-			if p.strip():
-				components = p.split()
-				assert[components[0] == "ddG:"]
-				mutation = components[1]
-				score = components[2]
-				components = components[3:]
-				assert(len(components) == len(componentNames))
-				results["Overall"] = score
-				componentsd = {}
-				for i in range(len(componentNames)):
-					componentsd[componentNames[i]] = components[i]
-				results["Components"] = componentsd
-		return results
-
 class K16PreminTask(GenericDDGTask):
 
 	def getOutputFilename(self, preminimizationLog):
@@ -594,9 +569,8 @@ class K16PreminTask(GenericDDGTask):
 		passed = super(K16PreminTask, self).retire()
 		for i in range(len(self.jobIDs)):
 			jobID = self.jobIDs[i]
-			# self.jobIDs is sorted so we can rely on the indexing of getExpectedOutputFileNames
 			try:
-				# todo: Expecting only one output file
+				# self.jobIDs is sorted so we can rely on the indexing of getExpectedOutputFileNames
 				stdoutfile = self._workingdir_file_path(self.getExpectedOutputFileNames()[i], jobID)
 				
 				# Set the input PDB filename for the ddG step
@@ -608,10 +582,6 @@ class K16PreminTask(GenericDDGTask):
 				self.setOutput(jobID, "constraints::cst_file", cstfile, taskID = "ddG")
 				self._status("Set outputs: %s" % self.outputs)
 				
-				# Check whether files were created (and write the total scores to a file)
-				# Copy the files from the cluster submission host back to the originating host
-				#self._status('Copying pdb, gz, and resfiles back')
-				#self._copyFilesBackToHost(["*.pdb", "*.gz", "*.resfile"])
 			except Exception, e:
 				passed = False
 				self.state = FAILED_TASK
@@ -620,7 +590,6 @@ class K16PreminTask(GenericDDGTask):
 		  
 		return passed
 
-class K16ddGTask(GenericDDGTask):
-	pass
+class K16ddGTask(GenericDDGTask): pass
 
 
