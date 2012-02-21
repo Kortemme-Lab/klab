@@ -18,7 +18,7 @@ TYPICAL_LAPSE = 1.5
 
 # If you call these functions from multiple scripts, you can use this value to ensure all scripts read the same
 # amount of log
-DEFAULT_LOG_SIZE = 25 * 65536 # Read 25x64KB from the end of the log. Change this value to suit
+DEFAULT_LOG_SIZE = 25 * 65536 * 30 # Read 30* 25x64KB from the end of the log. Change this value to suit
 
 SECONDS_IN_A_DAY = 60 * 60 * 24
 
