@@ -48,7 +48,7 @@ def getClusterDatabasePath(binary, cluster_database_index = 0):
 		return "%s/%s/%s" % (clusterRootDir, RosettaBinaries[binary]["clusterrev"], RosettaBinaries[binary]["cluster_databases"][cluster_database_index])
 
 class ClusterScript:
-	
+
 	def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}, maxhours = CLUSTER_maxhoursforjob, maxmins = CLUSTER_maxminsforjob):
 		self.contents = []
 		self.tasks = []
@@ -170,6 +170,7 @@ class ClusterTask(object):
 		self.jobid = 0
 		self.jobIDs = [] # Added for ddG compatibility
 		self.script = None
+		self.runlength = None
 		self.state = INACTIVE_TASK
 		self.dependents = []
 		self.prerequisites = {}
@@ -249,7 +250,7 @@ class ClusterTask(object):
 				prereq.copyFiles(self.workingdir, files)
 				
 			writeFile(self.filename, self.script)
-			self.jobid, stdo = sgec.qsub_submit(self.filename, self.workingdir, dbID, name = self.scriptfilename, showstdout = self.debug)
+			self.jobid, stdo = sgec.qsub_submit(self.filename, self.workingdir, dbID, name = self.scriptfilename, showstdout = self.debug, timeInMinutes = self.runlength)
 			self._status("Job started with id %d." % self.jobid)
 			if self.jobid != 0:
 				self.profiler.PROFILE_START("Execution")

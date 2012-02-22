@@ -459,9 +459,6 @@ class ddGDaemon(RosettaDaemon):
 			current_dir = os.getcwd()
 			os.chdir(result_dir)
 			
-			# let's remove all empty files to not confuse the user
-			self.exec_cmd('find . -size 0 -exec rm {} \";\"', result_dir)
-			
 			# store all files also in a zip file, to make it easier accessible
 			filename_zip = "data_%s.zip" % ( ID )
 			all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)

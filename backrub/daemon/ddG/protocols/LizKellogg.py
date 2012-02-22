@@ -1,44 +1,45 @@
+#!/usr/bin/python2.4
+# encoding: utf-8
+"""
+LizKellogg.py
+Classes to run jobs based on a paper by Elizabeth H. Kellogg, Andrew Leaver-Fay, and David Baker (doi: 10.1002/prot.22921).
+
+Created by Shane O'Connor 2012.
+Copyright (c) 2012 __UCSF__. All rights reserved.
+"""
+
 import os
 import re
 import traceback
+from string import join
 import rosettahelper
-from ddG.jobs import GenericDDGJob, GenericDDGTask
+from ddG.jobs import GenericDDGJob, GenericDDGTask, ddgfields
+from ClusterTask import FAILED_TASK
 
 # Jobs and tasks for specific protocols
 
 class Protocol16(GenericDDGJob):
 	
-	def _generateFiles(self):
-		# Create input files
-		for jobID in self.jobIDs:
-			try:
-				thisfile = None
-				jobParameters = self.parameters["jobs"][jobID]
-				
-				# Create PDB file
-				thisfile = "PDB"
-				pdb_filename = self._workingdir_file_path("%(_FILE_ID)s.pdb" % jobParameters, jobID = jobID)
-				rosettahelper.writeFile(pdb_filename, jobParameters[ddgfields.StrippedPDB])
-	
-				# Create lst
-				thisfile = "lst"
-				lst_filename = self._workingdir_file_path("%(_FILE_ID)s.lst" % jobParameters, jobID = jobID)
-				rosettahelper.writeFile(lst_filename, pdb_filename)
-				jobParameters['_CMD']['in:file:l'] = lst_filename
-				
-				# Create resfile
-				thisfile = "resfile"
-				resfile = jobParameters[ddgfields.InputFiles].get("RESFILE")
-				if resfile:
-					res_filename = self._workingdir_file_path("%(_FILE_ID)s.resfile" % jobParameters, jobID = jobID)
-					rosettahelper.writeFile(res_filename, resfile)
-					jobParameters['_CMD']['resfile'] = res_filename
-				else:
-					raise Exception("An error occurred creating a resfile for the ddG job.")
-			except Exception, e:
-				estr = str(e) + "\n" + traceback.format_exc()
-				raise Exception("An error occurred creating the %(thisfile)s file for the ddG job %(jobID)d.\n%(estr)s" % vars())
-	
+	def _generateFiles(self, jobID):
+		'''Creates input files.'''
+		jobParameters = self.parameters["jobs"][jobID]
+		
+		# Create PDB file
+		pdb_filename = self._workingdir_file_path("%(_FILE_ID)s.pdb" % jobParameters, jobID = jobID)
+		rosettahelper.writeFile(pdb_filename, jobParameters[ddgfields.StrippedPDB])
+
+		# Create lst
+		lst_filename = self._workingdir_file_path("%(_FILE_ID)s.lst" % jobParameters, jobID = jobID)
+		rosettahelper.writeFile(lst_filename, pdb_filename)
+		jobParameters['_CMD']['in:file:l'] = lst_filename
+		
+		# Create resfile
+		resfile = jobParameters[ddgfields.InputFiles].get("RESFILE")
+		if resfile:
+			res_filename = self._workingdir_file_path("%(_FILE_ID)s.resfile" % jobParameters, jobID = jobID)
+			rosettahelper.writeFile(res_filename, resfile)
+			jobParameters['_CMD']['resfile'] = res_filename
+		
 	def _analyze(self):
 		# Run the analysis on the originating host
 		
@@ -115,7 +116,7 @@ class Protocol16Preminimization(GenericDDGTask):
 		rosettahelper.writeFile(outfilepath, join(constraints, "\n"))
 
 	def retire(self):
-		passed = super(K16PreminTask, self).retire()
+		passed = super(Protocol16Preminimization, self).retire()
 		for i in range(len(self.jobIDs)):
 			jobID = self.jobIDs[i]
 			try:

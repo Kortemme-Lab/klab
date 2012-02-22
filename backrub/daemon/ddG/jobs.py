@@ -1,7 +1,7 @@
 #!/usr/bin/python2.4
 # encoding: utf-8
 """
-ddGTasks.py
+jobs.py
 
 Created by Shane O'Connor 2012.
 Copyright (c) 2012 __UCSF__. All rights reserved.
@@ -18,12 +18,14 @@ from ClusterScheduler import checkGraphReachability, traverseGraph, TaskSchedule
 from ClusterScheduler import TaskScheduler, RosettaClusterJob 
 from RosettaTasks import PostProcessingException
 import ddgproject
-ddgfields = ddgproject.FieldNames()
 from conf_daemon import CLUSTER_maxhoursforjob, CLUSTER_maxminsforjob, clusterRootDir
 import SimpleProfiler
 from ClusterTask import INITIAL_TASK, INACTIVE_TASK, QUEUED_TASK, ACTIVE_TASK, RETIRED_TASK, COMPLETED_TASK, FAILED_TASK, status
 from ClusterTask import ClusterScript, ClusterTask
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775, normalize_for_bash
+import ddG
+
+ddgfields = ddgproject.FieldNames()
 
 # Generic classes
 
@@ -221,6 +223,8 @@ class GenericDDGTask(ClusterTask):
 		
 		ct = ddGClusterScript(self.workingdir, self.targetdirectory, self.taskglobals, normalized_inputs, self.numtasks, self.jobIDs)
 		self.script = ct.createScript(commandLines, type="ddG")
+		self.runlength = ct.parameters["maxhours"] * 60 + ct.parameters["maxmins"]
+			
 		return super(GenericDDGTask, self).start(sgec, dbID)
 
 	def retire(self):
@@ -295,18 +299,16 @@ class GenericDDGTask(ClusterTask):
 						self.outputstreams.append({"stdout" : filename_stdout, "stderr" : filename_stderr})
 					else:
 						self.outputstreams.append({"stdout" : filename_stdout})
-						
+					
 					for cleaner in self.cleaners:
 						#todo: factor in taskdetails["DirectoryName"] here when it becomes an issue
 						if cleaner["operation"] == "keep":
 							mask = cleaner["mask"]
 							self._status("Moving files from %s to %s using mask '%s'.\n" % (workingJobSubDir, targetJobSubDir, mask))
 							for file in os.listdir(workingJobSubDir):
-								self._status("File: %s" % file)
 								if fnmatch.fnmatch(file, mask):
 									try:
 										shutil.copy(os.path.join(workingJobSubDir, file), targetJobSubDir)
-										self._status("Moved.")
 									except Exception, e:
 										self._status("Exception moving %s to %s: %s" % (os.path.join(fromSubdirectory, file), toSubdirectory, str(e)))
 								 
@@ -382,7 +384,7 @@ class ClusterBatchJob(RosettaClusterJob):
 		timing_profile = self._targetdir_file_path("timing_profile.txt")
 		if os.path.exists(timing_profile):
 			shutil.move(timing_profile, destpath)
-
+		
 		for jobID in self.jobIDs:
 			destjobpath = os.path.join(destpath, str(jobID))
 			targetjobpath = os.path.join(self.targetdirectory, str(jobID))
@@ -412,7 +414,7 @@ class ClusterBatchJob(RosettaClusterJob):
 				if os.path.exists(destjobpath):
 					shutil.rmtree(destjobpath)
 				shutil.move(targetjobpath, destjobpath)
-
+		
 		os.chmod( destpath, permissions )
 		return destpath
 
@@ -472,8 +474,14 @@ class GenericDDGJob(ClusterBatchJob):
 		
 		# Create files
 		self.describe()
-		self._generateFiles()
-		
+		try:
+			jobID = None
+			for jobID in self.jobIDs:
+				self._generateFiles(jobID)
+		except Exception, e:
+			estr = str(e) + "\n" + traceback.format_exc()
+			raise Exception("An error occurred creating the files for the ddG job %(jobID)s.\n%(estr)s" % vars())
+			
 		# Create tasks from the protocol steps
 		tasks = {}
 		ProtocolGraph = parameters["ProtocolGraph"]
@@ -529,7 +537,7 @@ class GenericDDGJob(ClusterBatchJob):
 			scheduler.addInitialTasks(ProtocolGraph[itask]["_task"])
 		self.scheduler = scheduler
 
-	def _generateFiles(self):
+	def _generateFiles(self, jobID):
 		'''Create input files here. This function must be implemented.'''
 		# todo: Add profiling step for this
 		raise Exception("Implement this function.")
@@ -538,3 +546,4 @@ class GenericDDGJob(ClusterBatchJob):
 		'''Run analysis here.'''
 		raise Exception("Implement this function.")
 	
+
