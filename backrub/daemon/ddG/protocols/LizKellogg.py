@@ -43,17 +43,19 @@ class Protocol16(GenericDDGJob):
 	def _analyze(self):
 		# Run the analysis on the originating host
 		
-		ScoresForJobs = {}
 		wasSuccessful = True
-		for jobID in self.jobIDs:
+
+
+		for i in range(len(self.jobIDs)):
+			jobID = self.jobIDs[i]
 			try:
 				Scores = {}
 				
 				ddGtask = self.ProtocolGraph["ddG"]["_task"] 
-				ddGout = rosettahelper.readFileLines(ddGtask._workingdir_file_path(ddGtask.getExpectedOutputFileNames()[0], jobID))
-				self._status("examining ddg output:")
+				ddGout = rosettahelper.readFileLines(ddGtask._workingdir_file_path(ddGtask.getExpectedOutputFileNames()[i], jobID))
+				self._status("examining ddg output:", level = 5)
 				ddGout = [l for l in ddGout if l.startswith("protocols.moves.ddGMover: mutate")]
-				self._status(ddGout)
+				self._status(join(ddGout, "\n"))
 				assert(len(ddGout) == 1)
 				ddGout = ddGout[0].strip()
 				ddGregex = re.compile("^protocols.moves.ddGMover:\s*mutate\s*.*?\s*wildtype_dG\s*is:\s*.*?and\s*mutant_dG\s*is:\s*.*?\s*ddG\s*is:\s*(.*)$")
@@ -63,20 +65,20 @@ class Protocol16(GenericDDGJob):
 				
 				score_data = rosettahelper.readFileLines(ddGtask._workingdir_file_path("ddg_predictions.out", jobID))
 				score_data = [l for l in score_data if l.strip()]
-				self._status("examining ddg_predictions.out:")
+				self._status("examining ddg_predictions.out:", level = 5)
 				assert(len(score_data) == 1) # Assuming only one line here
 				score_data = score_data[0].split() 
 				assert(len(score_data) > 2)
 				assert(score_data[0] == "ddG:")
 				scores = map(float, score_data[2:])
 				Scores["components"] = scores
-				ScoresForJobs[jobID] = Scores
+				self.ddG[jobID].setData(Scores)
+		
 			except Exception, e:
 				errors = [str(e), traceback.format_exc()]
 				self._status("<errors>\n\t<error>%s</error>\n</errors>" % join(errors,"</error>\n\t<error>"))
 				wasSuccessful = False
 		
-		self.ddG.setData(ScoresForJobs)
 		return wasSuccessful	
 
 class Protocol16Preminimization(GenericDDGTask):
@@ -130,7 +132,7 @@ class Protocol16Preminimization(GenericDDGTask):
 				cstfile = self._workingdir_file_path("constraints.cst", jobID)
 				constraints = self.createConstraintsFile(stdoutfile, cstfile)
 				self.setOutput(jobID, "constraints::cst_file", cstfile, taskID = "ddG")
-				self._status("Set outputs: %s" % self.outputs)
+				self._status("Set outputs: %s" % self.outputs, level = 5)
 				
 			except Exception, e:
 				passed = False

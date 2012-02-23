@@ -122,7 +122,7 @@ class GenericDDGTask(ClusterTask):
 			self.inputs[jobID] = {}
 			self.outputs[jobID] = {}
 		
-		scriptfilename = '%s_%d.cmd' % (self.prefix, jobparameters["ID"])
+		scriptfilename = '%s_%s.cmd' % (self.prefix, jobparameters["ID"])
 		self.sgec = None
 		self.profiler = SimpleProfiler.SimpleProfiler(name)
 		self.profiler.PROFILE_START("Initialization")
@@ -131,6 +131,7 @@ class GenericDDGTask(ClusterTask):
 		self.debug = True
 		self.targetdirectory = targetdirectory
 		self.jobid = 0
+		self._setStatusPrintingParameters(self.jobid, "task", level = 0, color = "purple")
 		self.script = None
 		self.state = INACTIVE_TASK
 		self.dependents = []
@@ -149,9 +150,9 @@ class GenericDDGTask(ClusterTask):
 		self._initialize()
 		self.profiler.PROFILE_STOP("Initialization")
 		self.cleaners = []
-		
+	
 	def addInputs(self, jobID, inpts):
-		self._status("Adding inputs: %s for job %d" % (inpts, jobID))
+		self._status("Adding inputs: %s for job %d" % (inpts, jobID), level = 4)
 		for k, v in inpts.iteritems():
 			if self.inputs[jobID].get(k):
 				raise Exception("Overwriting task input %s (old value = %s, attempted new value = %s)", (k, self.inputs[jobID][k], v))
@@ -161,10 +162,10 @@ class GenericDDGTask(ClusterTask):
 		self.outputs[jobID] = outputs
 	
 	def getOutputs(self, jobID, taskref):
-		self._status("Asking for outputs for %s for job %d" % (str(taskref), jobID))
+		self._status("Asking for outputs for %s for job %d" % (str(taskref), jobID), level = 4)
 		for taskRefandIDPair, params in self.outputs[jobID].iteritems():
 			if taskRefandIDPair[0] == taskref:
-				self._status("Found a match: %s" % params)
+				self._status("Found a match: %s" % params, level = 10)
 				return params
 		self._status("No match for you! Come back, one year!")
 		return {}			
@@ -195,7 +196,7 @@ class GenericDDGTask(ClusterTask):
 		
 	def start(self, sgec, dbID):
 		# Create script
-		self._status("starting")
+		self._status("Preparing %s" % self.name)
 		
 		input_strings = {}
 		commandLines = self.taskparameters["Command"]
@@ -242,7 +243,7 @@ class GenericDDGTask(ClusterTask):
 		if not os.path.isdir(self.targetdirectory):
 			# The root of self.targetdirectory should exists - otherwise we should not
 			# create the tree here as there is probably a bug in the code
-			self._status("Creating %s" % self.targetdirectory)
+			self._status("Creating %s" % self.targetdirectory, level = 10)
 			make755Directory(self.targetdirectory)
 
 		for jobID in self.jobIDs:
@@ -252,7 +253,7 @@ class GenericDDGTask(ClusterTask):
 
 		if self.scriptfilename:
 			failedOutput = False
-			self._status('Copying stdout and stderr output to %s' % (self.targetdirectory))		
+			self._status('Copying stdout and stderr output to %s' % (self.targetdirectory), level = 5)		
 			try:
 				for i in range(1, self.numtasks + 1):
 					
@@ -262,11 +263,13 @@ class GenericDDGTask(ClusterTask):
 					
 					# Move the SGE script and delete the temp file
 					sge_scriptfile = self._workingdir_file_path(self.scriptfilename)
-					shutil.copy(sge_scriptfile, targetJobSubDir)
-					shutil.move(sge_scriptfile, workingJobSubDir)
-					sge_scriptfile_temp = sge_scriptfile + ".temp.out"
-					if os.path.exists(sge_scriptfile_temp):
-						os.remove(sge_scriptfile_temp)
+					if i == 1:
+						shutil.copy(sge_scriptfile, targetJobSubDir)
+						shutil.move(sge_scriptfile, workingJobSubDir)
+						
+						sge_scriptfile_temp = sge_scriptfile + ".temp.out"
+						if os.path.exists(sge_scriptfile_temp):
+							os.remove(sge_scriptfile_temp)
 						
 					filename_stdout = "%s.o%s.%d" % (self.scriptfilename, self.jobid, i)
 					filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
@@ -304,7 +307,7 @@ class GenericDDGTask(ClusterTask):
 						#todo: factor in taskdetails["DirectoryName"] here when it becomes an issue
 						if cleaner["operation"] == "keep":
 							mask = cleaner["mask"]
-							self._status("Moving files from %s to %s using mask '%s'.\n" % (workingJobSubDir, targetJobSubDir, mask))
+							self._status("Cleaner (keep): Moving files from %s to %s using mask '%s'.\n" % (workingJobSubDir, targetJobSubDir, mask), level = 10)
 							for file in os.listdir(workingJobSubDir):
 								if fnmatch.fnmatch(file, mask):
 									try:
@@ -325,9 +328,9 @@ class GenericDDGTask(ClusterTask):
 			for jobID in self.jobIDs:
 				jobID = str(jobID)
 				tdir = os.path.join(targetdirectory, jobID)
-				self._status('Copying %s/%s/%s to %s' % (self.workingdir, jobID, mask, tdir))
+				self._status('Copying %s/%s/%s to %s' % (self.workingdir, jobID, mask, tdir), level = 10)
 				if not os.path.isdir(tdir):
-					self._status("Creating %s" % self.targetdirectory)
+					self._status("Creating %s" % self.targetdirectory, level = 10)
 					make755Directory(tdir)
 				for file in glob.glob(self._workingdir_file_path(mask, jobID)):
 					shutil.copy(file, tdir)
@@ -339,9 +342,9 @@ class GenericDDGTask(ClusterTask):
 			for jobID in self.jobIDs:
 				jobID = str(jobID)
 				tdir = os.path.join(targetdirectory, jobID)
-				self._status('Copying %s/%s to %s' % (self.workingdir, p, tdir))
+				self._status('Copying %s/%s to %s' % (self.workingdir, p, tdir), level = 10)
 				if not os.path.isdir(tdir):
-					self._status("Creating %s" % self.targetdirectory)
+					self._status("Creating %s" % self.targetdirectory, level = 10)
 					make755Directory(tdir)
 				for file in glob.glob(self._workingdir_file_path(p)):
 					shutil.copy(file, tdir)	
@@ -351,6 +354,7 @@ class ClusterBatchJob(RosettaClusterJob):
 	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
 		self.jobIDs = sorted(parameters["jobs"].keys()) # The fact that this is a sorted list is important
 		self.jobID = "%s-%s" % (parameters["cryptID"], parameters["ID"])
+		self._setStatusPrintingParameters(self.jobID, statustype = "job", level = 0, color = "lightpurple")
 		self.profiler = SimpleProfiler.SimpleProfiler("%s-%s" % (self.suffix, parameters["ID"]))
 		self.parameters = parameters
 		self.sgec = sgec
@@ -376,7 +380,7 @@ class ClusterBatchJob(RosettaClusterJob):
 	def moveFilesTo(self, permissions = permissions755):
 		destpath = self.dldir
 		
-		self._status("Moving files to %s" % destpath)
+		self._status("Moving files to %s" % destpath, level = 0)
 
 		if not os.path.exists(destpath):
 			make755Directory(destpath)
@@ -395,19 +399,18 @@ class ClusterBatchJob(RosettaClusterJob):
 				for mask in self.resultFilemasks:
 					fromSubdirectory = os.path.join(targetjobpath, mask[0])
 					toSubdirectory = os.path.join(destjobpath, mask[0])
-					self._status("Moving files from %s to %s using mask '%s'.\n" % (fromSubdirectory, toSubdirectory, mask[1]))
+					self._status("Moving files from %s to %s using mask '%s'.\n" % (fromSubdirectory, toSubdirectory, mask[1]), level = 5)
 					if not os.path.exists(toSubdirectory):
 						make755Directory(toSubdirectory)
 					for file in os.listdir(fromSubdirectory):
-						self._status("File: %s" % file)
+						self._status("File: %s" % file, level = 10)
 						if fnmatch.fnmatch(file, mask[1]):
 							try:
-								print(os.path.join(fromSubdirectory, file), toSubdirectory)
 								shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
 								if not os.path.exists(os.path.join(toSubdirectory, file)):
-									self._status("Error moving.")
+									self._status("Error moving %s." % file)
 								else:
-									self._status("Moved.")
+									self._status("Moved.", level = 10)
 							except Exception, e:
 								self._status("Exception moving %s to %s: %s" % (os.path.join(fromSubdirectory, file), toSubdirectory, str(e)))
 			else:
@@ -441,18 +444,20 @@ class GenericDDGJob(ClusterBatchJob):
 	def _defineOutputFiles(self):
 		self.resultFilemasks.append((".", "*"))
 		
-	def getddG(self):
-		return self.ddG.getScores()
+	def getddG(self, jobID):
+		return self.ddG[jobID].getScores()
 
 	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
 		# The tempdir is the one on the submission host e.g. chef
 		# targetdirectory is the one on your host e.g. your PC or the webserver
 		# The taskdirs are subdirectories of the tempdir on the submission host and the working directories for the tasks
 		# The targetdirectories of the tasks are subdirectories of the targetdirectory named like the taskdirs
-		self.ddG = ddgTestScore()
 		jobs = sorted(parameters["jobs"].keys())
+		self.ddG = {}
+		for job in jobs:
+			self.ddG[job] = ddgTestScore()
 		if len(jobs) > 1:
-			parameters["ID"] = "%d-%d" % join([parameters["jobs"][0], parameters["jobs"][-1]])
+			parameters["ID"] = "%d-%d" % (jobs[0], jobs[-1])
 		else:
 			parameters["ID"] = jobs[0]
 		super(GenericDDGJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)

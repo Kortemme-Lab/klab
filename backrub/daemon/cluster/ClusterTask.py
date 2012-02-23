@@ -17,13 +17,13 @@ import re
 import glob
 from string import join, split
 import traceback
-from datetime import datetime
 
 from conf_daemon import *
 import SimpleProfiler
 #import sge
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile
 from RosettaProtocols import *
+from statusprinter import StatusPrinter
 
 INITIAL_TASK    = 0
 INACTIVE_TASK   = 1
@@ -154,7 +154,7 @@ echo "</enddate>"
 		return self.workingdir
 
 
-class ClusterTask(object):
+class ClusterTask(StatusPrinter):
 	prefix = "task"
 	
 	# SGE-Queued jobs have a non-zero jobid and a state of QUEUED_TASK
@@ -168,6 +168,7 @@ class ClusterTask(object):
 		self.debug = True
 		self.targetdirectory = targetdirectory
 		self.jobid = 0
+		self._setStatusPrintingParameters(self.jobid, "task", level = 0)
 		self.jobIDs = [] # Added for ddG compatibility
 		self.script = None
 		self.runlength = None
@@ -218,7 +219,7 @@ class ClusterTask(object):
 	def getExpectedOutputFileNames(self):
 		outputFilenames = []
 		for i in range(1, self.numtasks + 1):
-			outputFilenames.append("%s_%d.cmd.o%d.%d" % (self.prefix, self.parameters["ID"], self.jobid, i))
+			outputFilenames.append("%s_%s.cmd.o%d.%d" % (self.prefix, str(self.parameters["ID"]), self.jobid, i))
 		return outputFilenames 
 
 	def getName(self):
@@ -251,7 +252,8 @@ class ClusterTask(object):
 				
 			writeFile(self.filename, self.script)
 			self.jobid, stdo = sgec.qsub_submit(self.filename, self.workingdir, dbID, name = self.scriptfilename, showstdout = self.debug, timeInMinutes = self.runlength)
-			self._status("Job started with id %d." % self.jobid)
+			self._setStatusPrintingParameters(self.jobid)
+			self._status("Task started with id %d." % self.jobid)
 			if self.jobid != 0:
 				self.profiler.PROFILE_START("Execution")
 				self.state = QUEUED_TASK
@@ -261,7 +263,7 @@ class ClusterTask(object):
 	
 	def copyFiles(self, targetdirectory, filemasks = ["*"]):
 		for mask in filemasks:
-			self._status('Copying %s/%s to %s' % (self.workingdir, mask, self.targetdirectory))
+			self._status('Copying %s/%s to %s' % (self.workingdir, mask, self.targetdirectory), level = 2)
 			for file in glob.glob(self._workingdir_file_path(mask)):
 				shutil.copy(file, targetdirectory)
 		   
@@ -270,7 +272,7 @@ class ClusterTask(object):
 		if type(filemasks) == type(""):
 			filemasks = [filemasks]
 		for p in filemasks:
-			self._status('Copying %s/%s to %s' % (self.workingdir, p, self.targetdirectory))
+			self._status('Copying %s/%s to %s' % (self.workingdir, p, self.targetdirectory), level = 2)
 			for file in glob.glob(self._workingdir_file_path(p)):
 				shutil.copy(file, self.targetdirectory)	
 		
@@ -357,14 +359,6 @@ class ClusterTask(object):
 	def getprofile(self, warn = True):
 		return self.profiler.PROFILE_STATS(warn)
 
-	def _status(self, message, plain = False):
-		if self.debug:
-			timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			if plain:
-				print(timestamp, message)
-			else:
-				print('<debug id="%d" type="task" time="%s">%s</debug>' % (self.jobid, timestamp, message))
-		
 	def cleanup(self):
 		"""this is the place to remove any remaining files left by your application"""
 		self._status("Cleaning up %s" % self.name)
@@ -430,8 +424,7 @@ class ClusterTask(object):
 					self._status("Failed while retiring task %s." % self.name)
 					self.state = FAILED_TASK
 				else:
-					self._status("Retiring task %s was successful." % self.name)
-					self._status("state = %d" % self.state) 
+					self._status("Retiring task %s was successful." % self.name, level = 5)
 				self.profiler.PROFILE_STOP("Retirement")
 				# look at stderr
 				# determine scratch dir

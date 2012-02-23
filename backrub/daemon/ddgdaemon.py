@@ -18,6 +18,7 @@ from cluster.RosettaTasks import PostProcessingException
 from conf_daemon import *
 from cluster.sge import SGEConnection, SGEXMLPrinter, ClusterException
 from string import join
+from statusprinter import StatusPrinter
 
 import ddG
 from ddG.protocols import *
@@ -33,6 +34,7 @@ class ddGDaemon(RosettaDaemon):
 	
 	def __init__(self, stdout, stderr):
 		
+		self._setStatusPrintingParameters("_", statustype = "daemon", level = 0, color = "lightgreen")
 		super(RosettaDaemon, self).__init__(self.pidfile, settings, stdout = stdout, stderr = stderr)
 		self.configure()
 		self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
@@ -42,12 +44,13 @@ class ddGDaemon(RosettaDaemon):
 		# Maintain a list of recent DB jobs started. This is to avoid any logical errors which 
 		# would repeatedly start a job and spam the cluster. This should never happen but let's be cautious. 
 		self.recentDBJobs = []				  
+		self.JobsToDBIds = {}
 		
 		if not os.path.exists(netappRoot):
 			make755Directory(netappRoot)
 		if not os.path.exists(cluster_temp):
 			make755Directory(cluster_temp)
-	
+		
 	def __del__(self):
 		self.DBConnection.close()
 		
@@ -104,8 +107,8 @@ class ddGDaemon(RosettaDaemon):
 			results = self.DBConnection.callproc(procname, parameters, cursorClass)
 			
 		except Exception, e:
-			self.log("%s." % e)
-			self.log(traceback.format_exc())
+			self.log("%s." % e, error = True)
+			self.log(traceback.format_exc(), error = True)
 			raise Exception()
 		return results
 
@@ -117,22 +120,25 @@ class ddGDaemon(RosettaDaemon):
 			We use DictCursor by default for this class.
 			""" 
 		if self.logSQL:
-			self.log("SQL: %s." % query)
+			if parameters:
+				self.log("SQL: %s, parameters = %s" % (query, parameters))
+			else:
+				self.log("SQL: %s" % query)
 		results = []
 		try: # 	TODO: check if try in old function
 			results = self.DBConnection.execute(query, parameters, cursorClass)
 			
 		except Exception, e:
-			self.log("%s." % e)
-			self.log(traceback.format_exc())
+			self.log("%s." % e, error = True)
+			self.log(traceback.format_exc(), error = True)
 			raise Exception()
 		return results
 	
 	def recordSuccessfulJob(self, clusterjob):
-		jobID = clusterjob.jobID		
-		ddG = pickle.dumps(clusterjob.getddG())
-		self.runSQL('UPDATE Prediction SET Status="done", ddG=%s, NumberOfMeasurements=1, EndDate=NOW() WHERE ID=%s', 
-				parameters = (ddG, jobID))
+		for ID in clusterjob.jobIDs:
+			ddG = pickle.dumps(clusterjob.getddG(ID))
+			self.runSQL('UPDATE Prediction SET Status="done", ddG=%s, NumberOfMeasurements=1, EndDate=NOW() WHERE ID=%s', 
+				parameters = (ddG, ID))
 						
 	def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None, jobID = None):
 		suffix = ""
@@ -145,13 +151,13 @@ class ddGDaemon(RosettaDaemon):
 		timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 		if _traceback and _exception:
 			print("FAILED")
-			self.log(_traceback)
-			self.log(_exception)
-			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception)), jobID))
+			self.log(_traceback, error = True)
+			self.log(_exception, error = True)
+			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() ''' + ('WHERE ID IN (%s)' % self.JobsToDBIds[clusterjob]), parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception))))
 		else:
 			print("FAILED")
-			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s" % (errormsg, timestamp), jobID))
-		self.log("Error: The %s job %s failed at some point:\n%s" % (suffix, jobID, errormsg))
+			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() ''' + ('WHERE ID IN (%s)' % self.JobsToDBIds[clusterjob]), parameters = ("%s. %s" % (errormsg, timestamp)))
+		self.log("Error: The %s job %s failed at some point:\n%s" % (suffix, jobID, errormsg), error = True)
 		#todo: enable this self.notifyAdminOfError(jobID, description = "ddG")
 		
 	def run(self):
@@ -184,7 +190,7 @@ class ddGDaemon(RosettaDaemon):
 				self.recordErrorInJob(clusterjob, clusterjob.error)
 		for clusterjob in failedjobs:
 			self.runningJobs.remove(clusterjob)
-					
+				
 		# Check if jobs are finished
 		for clusterjob in self.runningJobs:
 			try:
@@ -311,7 +317,7 @@ class ddGDaemon(RosettaDaemon):
 						self.log("Starting jobs with protocol %s: %s" % (protocolID, join(map(str, jobIDs), ",")))
 						for jobID in jobIDs:
 							if jobID in self.recentDBJobs:
-								self.log("Error: Trying to run database job %d multiple times." % jobID)
+								self.log("Error: Trying to run database job %d multiple times." % jobID, error = True)
 								raise Exception("Trying to run database job %d multiple times")
 							self.recentDBJobs.append(jobID)
 							if len(self.recentDBJobs) > 2000:
@@ -323,11 +329,9 @@ class ddGDaemon(RosettaDaemon):
 							#change status and write start time to DB
 							self.runningJobs.append(newclusterjob)
 							jobs = sorted(batchdetails["jobs"].keys())
-							if len(jobs) == 1:
-								joblist = "(%s)" % jobs[0]
-							else:
-								joblist = "%s" % tuple(jobs)
-							self.runSQL("UPDATE Prediction SET Status='active', StartDate=NOW() WHERE ID IN %s" % joblist)
+							joblist = join(map(str, jobs), ",")
+							self.JobsToDBIds[newclusterjob] = joblist 
+							self.runSQL("UPDATE Prediction SET Status='active', StartDate=NOW() WHERE ID IN (%s)" % joblist)
 				
 						numRunningJobs = 0
 						for job in self.runningJobs:
@@ -338,7 +342,7 @@ class ddGDaemon(RosettaDaemon):
 			except ClusterException, e:
 				newclusterjob = newclusterjob or self._clusterjobjuststarted
 				self._clusterjobjuststarted = None
-				self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc())
+				self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc(), error = True)
 				if newclusterjob:
 					newclusterjob.kill()
 					self.recordErrorInJob(newclusterjob, "Problem with cluster. Job to be rerun.", traceback.format_exc(), e)
@@ -349,7 +353,7 @@ class ddGDaemon(RosettaDaemon):
 			except Exception, e:
 				newclusterjob = newclusterjob or self._clusterjobjuststarted
 				self._clusterjobjuststarted = None
-				self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc())
+				self.log("Error: startNewJobs()\nTraceback:''%s''" % traceback.format_exc(), error = True)
 				if newclusterjob:
 					newclusterjob.kill()
 					self.recordErrorInJob(newclusterjob, "Error starting job.", traceback.format_exc(), e)
@@ -443,62 +447,57 @@ class ddGDaemon(RosettaDaemon):
 		try:
 			return clusterjob.moveFilesTo()
 		except Exception, e:
-			self.log("moveFilesOnJobCompletion failure. Error moving files to the download directory.")
-			self.log("%s\n%s" % (str(e), traceback.print_exc()))		
+			self.log("moveFilesOnJobCompletion failure. Error moving files to the download directory.", error = True)
+			self.log("%s\n%s" % (str(e), traceback.print_exc()), error = True)		
 	
 	def copyAndZipOutputFiles(self, clusterjob):
 		
-		for ID in clusterjob.jobIDs:
-			
-			#ID = clusterjob.jobID						
-			
-			# move the data to a webserver accessible directory 
-			result_dir = self.moveFilesOnJobCompletion(clusterjob)
-			
-			# remember directory
-			current_dir = os.getcwd()
-			os.chdir(result_dir)
-			
-			# store all files also in a zip file, to make it easier accessible
-			filename_zip = "data_%s.zip" % ( ID )
-			all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
-			abs_files = get_files('./')
-			
-			# Do not include the timing profile in the zip
-			timingprofile = os.path.join(result_dir, "timing_profile.txt")
-			if timingprofile in abs_files:
-				abs_files.remove(timingprofile)
+		# move the data to a webserver accessible directory 
+		result_dir = self.moveFilesOnJobCompletion(clusterjob)
+		current_dir = os.getcwd()
+		try:
+			for ID in clusterjob.jobIDs:
 				
-			os.chdir(result_dir)
-			filenames_for_zip = [ string.replace(fn, os.getcwd()+'/','') for fn in abs_files ] # os.listdir(result_dir)
-									
-			for file in filenames_for_zip:
-				if file != filename_zip:
+				# Create the zip file
+				os.chdir(result_dir)
+				filename_zip = "data_%s.zip" % ( ID )
+				all_output = zipfile.ZipFile(filename_zip, 'w', zipfile.ZIP_DEFLATED)
+				abs_files = get_files(os.path.join(result_dir, str(ID)))
+				os.chdir(result_dir)
+				
+				filenames_for_zip = [ string.replace(fn, os.getcwd()+'/','') for fn in abs_files ]
+				if filename_zip in filenames_for_zip:
+					filenames_for_zip.remove(filename_zip)
+				for file in filenames_for_zip:
 					all_output.write( file )
-					
-			all_output.close()
-			
-			results = self.runSQL('SELECT StoreOutput FROM Prediction WHERE ID=%s', parameters = (ID,))
-			if results[0]["StoreOutput"]:
-				F = open(os.path.join(result_dir, filename_zip), "rb")
-				blob = F.read()
-				F.close() 
-				existingRecord = self.PredictionDBConnection.execute('SELECT ID FROM PredictionData WHERE ID=%s', parameters = (ID, ))
-				# todo: We may need to ask whether we want to overwrite		
-				if existingRecord:
-					self.PredictionDBConnection.execute('UPDATE PredictionData SET Data=%s WHERE ID=%s', parameters = (blob, ID))		
-				else:
-					self.PredictionDBConnection.execute('INSERT INTO PredictionData (ID, Data) VALUES(%s,%s)', parameters = (ID, blob))		
-	
-			# go back to our working dir 
+				all_output.close()
+
+				# Save the zip in the database
+				results = self.runSQL('SELECT StoreOutput FROM Prediction WHERE ID=%s', parameters = (ID,))
+				if results[0]["StoreOutput"]:
+					F = open(os.path.join(result_dir, filename_zip), "rb")
+					blob = F.read()
+					F.close() 
+					existingRecord = self.PredictionDBConnection.execute('SELECT ID FROM PredictionData WHERE ID=%s', parameters = (ID, ))
+					# todo: We may need to ask whether we want to overwrite		
+					if existingRecord:
+						self.PredictionDBConnection.execute('UPDATE PredictionData SET Data=%s WHERE ID=%s', parameters = (blob, ID))		
+					else:
+						self.PredictionDBConnection.execute('INSERT INTO PredictionData (ID, Data) VALUES(%s,%s)', parameters = (ID, blob))		
+		except Exception, e: 
 			os.chdir(current_dir)
-	
+			self.log("%s." % e, error = True)
+			self.log(traceback.format_exc(), error = True)
+			raise Exception()
+
+		os.chdir(current_dir)
+		
 	def removeClusterTempDir(self, clusterjob):
 		try:
 			clusterjob.removeClusterTempDir()
 		except Exception, e:
-			self.log("Error removing the temporary directory on the cluster.")
-			self.log("%s\n%s" % (str(e), traceback.print_exc()))		
+			self.log("Error removing the temporary directory on the cluster.", error = True)
+			self.log("%s\n%s" % (str(e), traceback.print_exc()), error = True)		
 
 
 if __name__ == "__main__":

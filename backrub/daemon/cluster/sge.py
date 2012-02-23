@@ -18,6 +18,7 @@ import time
 from string import join, strip
 from conf_daemon import *
 from datetime import datetime
+from statusprinter import StatusPrinter
 
 DEBUG = False
 
@@ -29,9 +30,10 @@ qstatus = {
 
 class ClusterException(Exception): pass
 
-class SGEConnection(object):
+class SGEConnection(StatusPrinter):
 		 
 	def __init__(self):
+		self._setStatusPrintingParameters("_", "sge", level = 0, color = "yellow")
 		self.pauseBetweenQStats = float(CLUSTER_qstatpause) - 0.2
 		self.lastCalled = time.time() - self.pauseBetweenQStats - 0.2	# So we can be called immediately
 		self.OldCachedList = {}
@@ -60,7 +62,7 @@ class SGEConnection(object):
 			
 		if force or self.CachedList == None:
 			if self.lastCalled > 0 and ((time.time() - self.lastCalled) < self.pauseBetweenQStats):
-				print('<sge warning="QSTAT is being called more regularly than %fs."/>' % qstatWaitingPeriod)
+				self._status('Warning: QSTAT is being called more regularly than %fs.' % qstatWaitingPeriod)
 			
 			self.lastCalled = time.time()
 			
@@ -169,7 +171,7 @@ class SGEConnection(object):
 		try:
 			subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
 		except Exception, e:
-			print('<sge message="Failed running qsub command: %s in cwd %s"/>' % (command, workingdir))
+			self._status('Failed running qsub command: %s in cwd %s' % (command, workingdir))
 			raise
 		
 		waitfor = 0
@@ -182,7 +184,7 @@ class SGEConnection(object):
 		file_stderr.close()
 
 		if errorcode != 0:
-			print('<sge message="Failed running qsub command: %s in cwd %s"/>' % (command, workingdir))
+			self._status('Failed running qsub command: %s in cwd %s' % (command, workingdir))
 			if output.find("unable to contact qmaster") != -1:
 				raise ClusterException("qsub failed: unable to contact qmaster")
 			else:
@@ -201,10 +203,9 @@ class SGEConnection(object):
 			jobid = -1
 		
 		output = output.replace('"', "'")
-		msg = '<sge message="%s" queue="%s", walltime_limit_in_minutes="%s"/>' % (output, queue, timeInMinutes or "unknown")
+		self._status(output, tags = [("queue", queue), ("walltime_limit_in_minutes", timeInMinutes or "unknown")])
 		if output.startswith("qsub: ERROR"):
 			raise Exception(msg)			
-		print(msg)
 			
 		return jobid, output
 		

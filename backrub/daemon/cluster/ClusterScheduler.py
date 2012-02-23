@@ -17,7 +17,6 @@ from string import join
 import distutils.dir_util
 import fnmatch
 import traceback
-from datetime import datetime
 
 #import sge
 
@@ -31,6 +30,7 @@ from ClusterTask import status		 	as ClusterTask_status
 
 import SimpleProfiler
 from Graph import JITGraph
+from statusprinter import StatusPrinter
 
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775
 
@@ -94,12 +94,13 @@ class TaskCompletionException(TaskSchedulerException): pass
 class SchedulerDeadlockException(TaskSchedulerException): pass
 class SchedulerStartException(TaskSchedulerException): pass
 
-class TaskScheduler(object):
+class TaskScheduler(StatusPrinter):
 
 	def __init__(self, workingdir):
 		self._initialtasks = []	   # As well as the initial queue, we remember the initial tasks so we can generate the dependency graph 
 		self.sgec = None
 		self.dbID = 0
+		self._setStatusPrintingParameters(self.dbID, statustype = "scheduler", level = 0, color = "green")
 		self.debug = True
 		# todo: The task states here have different meanings to those of ClusterTask. Maybe separate them entirely.
 		self.tasks = {ClusterTask_INITIAL_TASK: [],
@@ -114,15 +115,6 @@ class TaskScheduler(object):
 		self.tasks_in_order = []
 		self.graph = None
 	
-	#todo: Use multiple inheritance for this and ClusterTask and SGEConnection classes	
-	def _status(self, message, plain = False):
-		if self.debug:
-			timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			if plain:
-				print(timestamp, message)
-			else:
-				print('<debug id="%s" type="scheduler" time="%s">%s</debug>' % (str(self.dbID), timestamp, message))
-			
 	def _movequeue(self, task, oldqueue, newqueue):
 		# todo: The active queue actually contains both queued and active jobs w.r.t. the cluster head node 
 		self._status("Moving %d (%s) from %s to %s" % (task.jobid, task.getName(), ClusterTask_status.get(oldqueue), ClusterTask_status.get(newqueue)))
@@ -192,6 +184,7 @@ class TaskScheduler(object):
 		# todo: Check the reachability and acyclicity of the graph here
 		self.sgec = sgec
 		self.dbID = dbID
+		self._setStatusPrintingParameters(self.dbID)
 		checkGraphReachability(self.tasks[ClusterTask_INITIAL_TASK])
 			
 		tasksToStart = []
@@ -292,7 +285,7 @@ class TaskScheduler(object):
 				
 
 import pprint
-class RosettaClusterJob(object):
+class RosettaClusterJob(StatusPrinter):
 	
 	suffix = "job"
 	flatOutputDirectory = False
@@ -301,6 +294,7 @@ class RosettaClusterJob(object):
 	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
 		self.jobIDs = []
 		self.jobID = self.parameters.get("ID") or 0
+		self._setStatusPrintingParameters(self.jobID, statustype = "job", level = 0, color = "lightpurple")
 		self.profiler = SimpleProfiler.SimpleProfiler("%s-%d" % (self.suffix, self.jobID))
 		self.parameters = parameters
 		self.sgec = sgec
@@ -338,11 +332,6 @@ class RosettaClusterJob(object):
 		'''Override this function.'''
 		raise Exception
 	
-	def _status(self, message):
-		if self.debug:
-			timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-			print('<debug id="%s" type="job" time="%s">%s</debug>' % (str(self.jobID), timestamp, message))
-			
 	def start(self):
 		try:
 			self.scheduler.start(self.sgec, self.jobID)
@@ -479,10 +468,10 @@ class RosettaClusterJob(object):
 				if not os.path.exists(toSubdirectory):
 					make755Directory(toSubdirectory)
 				for file in os.listdir(fromSubdirectory):
-					self._status("File: %s" % file)
+					self._status("File: %s" % file, level = 10)
 					if fnmatch.fnmatch(file, mask[1]):
 						shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
-						self._status("Moved.")
+						self._status("Moved.", level = 10)
 					
 		else:
 			if os.path.exists(destpath):

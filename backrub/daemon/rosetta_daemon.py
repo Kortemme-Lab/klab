@@ -26,10 +26,11 @@ import RosettaTasks
 from conf_daemon import *
 from sge import SGEConnection, SGEXMLPrinter, ClusterException
 import MySQLdb.cursors
+from statusprinter import StatusPrinter
 
 cwd = str(os.getcwd())
 
-class RosettaDaemon(Daemon):
+class RosettaDaemon(Daemon, StatusPrinter):
 	"""This class controls the rosetta simulation"""
 	
 	# those are set by configure(self, filename_config)
@@ -74,6 +75,7 @@ The Kortemme Lab Server Daemon
 """
 
 	def __init__(self, stdout, stderr):
+		self._setStatusPrintingParameters("_", statustype = "daemon", level = 0, color = "lightgreen")
 		super(RosettaDaemon, self).__init__(self.pidfile, settings, stdout = stdout, stderr = stderr)
 		self.configure()
 		self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
@@ -106,13 +108,17 @@ The Kortemme Lab Server Daemon
 		except:
 			return False
 	
-	def log(self, str):
-		str = "<daemon time='%s'>%s</daemon>\n" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str)
+	def log(self, str, error = False):
 		if CLUSTER_debugmode:
-			print(str)
+			if error:
+				self._status("\n" + str, color = "red")
+			else:
+				self._status(str)
 		else:
+			str = "<daemon time='%s'>%s</daemon>" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str)
 			log = open(self.logfile, 'a+')
 			log.write(str)
+			log.write("\n")
 			log.close()
 		
 	def run(self):
