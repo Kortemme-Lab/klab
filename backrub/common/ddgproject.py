@@ -677,6 +677,9 @@ class ddGPredictionDataDatabase(object):
 		self.numTries = 32
 		self.lastrowid = None
 
+	def close(self):
+		self.connection.close()
+
 	def connectToServer(self):
 		print("[CONNECTING TO SQL SERVER]")
 		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddGPredictionData", user = "kortemmelab", passwd = self.passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
