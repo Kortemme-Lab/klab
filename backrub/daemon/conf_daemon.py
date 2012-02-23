@@ -36,5 +36,5 @@ CLUSTER_maxminsforjob = 59
 
 if CLUSTER_debugmode:
     CLUSTER_qstatpause = 60
-    CLUSTER_maxhoursforjob = 0
+    CLUSTER_maxhoursforjob = 196
     CLUSTER_maxminsforjob = 29

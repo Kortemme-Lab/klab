@@ -24,33 +24,10 @@ from ClusterTask import INITIAL_TASK, INACTIVE_TASK, QUEUED_TASK, ACTIVE_TASK, R
 from ClusterTask import ClusterScript, ClusterTask
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775, normalize_for_bash
 import ddG
-
+from ddglib.score import ddgTestScore
 ddgfields = ddgproject.FieldNames()
 
 # Generic classes
-
-class ddgScore(object):
-	type = None
-	version = None
-	
-	def __init__(self, data = {}):
-		self.data = data
-	
-	def getType(self):
-		return type
-	
-	def getVersion(self):
-		return version
-	
-	def setData(self, data):
-		self.data = data
-
-	def getScores(self):
-		return {"type" : self.type, "version" : self.version, "data" : self.data}
-
-class ddgTestScore(ddgScore):
-	type = "test"
-	version = "0.1"
 
 class ddGClusterScript(ClusterScript):
 	
