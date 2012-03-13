@@ -1,4 +1,7 @@
-rosetta_weights = {
+# A dict of Rosetta score types generated from ScoreType.hh
+# The tuples are of the form (English description, comments from ScoreType.hh - not necessarily meaningful, and the corresponding weights file)
+
+score_types = {
 	"fa_atr"                                            	:	("Lennard-Jones attractive", "enumeration starts at 1 for indexing utility::vector1", ['standard_weights']),
 	"fa_rep"                                            	:	("Lennard-Jones repulsive", None, ['standard_weights']),
 	"fa_sol"                                            	:	("Lazaridis-Jarplus solvation energy", None, ['standard_weights']),
