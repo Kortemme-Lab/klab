@@ -33,6 +33,7 @@ permissions755     =                stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
 permissions775     =                stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | stat.S_IRGRP | stat.S_IWGRP | stat.S_IXGRP | stat.S_IROTH | stat.S_IXOTH
 
 NUMBER_KJ_IN_KCAL = 4.184 # Thermochemical calorie
+NUMBER_KELVIN_AT_ZERO_CELSIUS = 273.15
 
 def kcaltokJ(x):
 	return x * NUMBER_KJ_IN_KCAL

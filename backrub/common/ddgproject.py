@@ -143,6 +143,7 @@ class FieldNames(dict):
 		self.ExpConProteinConcentration = "ExpConProteinConcentration"
 		self.ExpConMeasure = "ExpConMeasure"
 		self.ExpConMethodOfDenaturation = "ExpConMethodOfDenaturation"
+		self.ExpConAdditives = "ExpConAdditives"
 		self.Publication = "Publication"
 		
 		self.Name = "Name"
