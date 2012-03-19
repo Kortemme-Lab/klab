@@ -222,7 +222,7 @@ class DBObject(object):
 	
 class PDBStructure(DBObject):
 	
-	def __init__(self, pdbID, content = None, protein = None, source = None):
+	def __init__(self, pdbID, content = None, protein = None, source = None, filepath = None):
 		self.dict = {
 			FieldNames_.PDB_ID : pdbID,
 			FieldNames_.Content : content,
@@ -231,14 +231,18 @@ class PDBStructure(DBObject):
 			FieldNames_.Resolution : None,
 			FieldNames_.Techniques : None,
 		}
+		self.filepath = filepath
 	
 	def getPDBContents(self):
 		d = self.dict
 		id = d[FieldNames_.PDB_ID]
 		if len(id) != 4:
 			print(id)
-		assert(len(id) == 4)
-		filename = os.path.join("pdbs", id + ".pdb")
+		assert(len(id) <= 10)
+		if self.filepath:
+			filename = self.filepath
+		else:
+			filename = os.path.join("pdbs", id + ".pdb")
 		contents = None
 		chains = {}
 		
@@ -278,8 +282,7 @@ class PDBStructure(DBObject):
 				elif line[31:].startswith("ANGSTROMS."):
 					resolution = float(line[22:30])
 				else:
-					print(line)
-					raise Exception("Error parsing PDB file.")
+					raise Exception("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard." % line )
 				
 		PDBChains[d[FieldNames_.PDB_ID]] = chains.keys()
 		
@@ -309,7 +312,6 @@ class PDBStructure(DBObject):
 				colortext.error("The PDB %s contains MSE. Check." % pdbID)
 
 		d[FieldNames_.BFactors] = pickle.dumps(pdb.ComputeBFactors()) 
-		
 		return contents
 			
 	def commit(self, db):
@@ -336,8 +338,8 @@ class PDBStructure(DBObject):
 						SQL += "=%s WHERE PDB_ID=%s" 
 						results = db.execute(SQL, parameters = (v, pdbID))
 		else:
-			SQL = 'INSERT INTO Structure (PDB_ID, Content, Resolution, Protein, Source) VALUES (%s, %s, %s, %s, %s);'
-			vals = (d[FieldNames_.PDB_ID], d[FieldNames_.Content], d[FieldNames_.Resolution], d[FieldNames_.Protein], d[FieldNames_.Source]) 
+			SQL = 'INSERT INTO Structure (PDB_ID, Content, Resolution, Protein, Source, Techniques, BFactors) VALUES (%s, %s, %s, %s, %s, %s, %s);'
+			vals = (d[FieldNames_.PDB_ID], d[FieldNames_.Content], d[FieldNames_.Resolution], d[FieldNames_.Protein], d[FieldNames_.Source], d[FieldNames_.Techniques], d[FieldNames_.BFactors]) 
 			db.execute(SQL, parameters = vals)
 			self.databaseID = db.getLastRowID()
 		
