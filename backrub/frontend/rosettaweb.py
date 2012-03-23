@@ -9,9 +9,13 @@
 import sys, os
 # Append document_root to sys.path to be able to find user modulesface
 
+sys.path.insert(0, "..")
 sys.path.insert(0, "../common/")
 sys.path.insert(1, "../daemon/")
-sys.path.insert(2, "../daemon/cluster/")
+sys.path.insert(2, "../daemon/ddglib")
+sys.path.insert(3, "../daemon/cluster/")
+import common
+
 import shutil
 import sha, time
 import cgi
@@ -45,6 +49,7 @@ from cgi import escape
 import string
 import pickle
 import admin
+import ddgweb
 
 # Get IP address and hostname
 IP = os.environ['REMOTE_ADDR']
@@ -238,8 +243,8 @@ def ws():
 			allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
 			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
 			if not(settings["LiveWebserver"]):
-				allowedQueries.extend(["admin","PDB", "admincmd"])
-				subAllowedQueries.extend(["admin","PDB", "admincmd"])
+				allowedQueries.extend(["admin", "ddg", "PDB", "admincmd"])
+				subAllowedQueries.extend(["admin", "ddg", "PDB", "admincmd"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
 			if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
@@ -520,6 +525,11 @@ def ws():
 			
 			html_content = rosettaHTML.adminPage(quotas, usage, users, settings, form)
 			title = 'Admin'
+
+	elif query_type == "ddg":
+		if not(settings["LiveWebserver"]):
+			html_content = rosettaHTML.ddgPage(settings, form)
+			title = '&#916;&#916;G'
 
 	elif query_type == "update":
 		user_data = getUserData(form, SID)
@@ -831,12 +841,13 @@ A new user account for %s was created:
 
 login:       %s
 Name:        %s %s
+Country:     %s
 
 Have a nice day!
 
 The Kortemme Lab Server Daemon
 
-    """ % (settings["ServerTitle"], form["username"].value, form["firstname"].value, form["lastname"].value)
+    """ % (settings["ServerTitle"], form["username"].value, form["firstname"].value, form["lastname"].value, form["country"].value)
 
 		sendMail(settings["SendmailBinary"], settings["AdminEmail"], settings["AdminEmail"], "[Kortemme Lab Server] New Account created", text_to_admin)
 

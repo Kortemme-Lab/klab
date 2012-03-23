@@ -16,6 +16,7 @@ import pickle
 import gzip
 import Graph
 import admin
+import ddgweb
 
 from rosettahelper import readFile
 from rwebhelper import *
@@ -853,6 +854,10 @@ This site has known issues under Internet Explorer. Until these issues are fixed
     	html = admin.generateAdminPage(quotas, usage, users, settings, self, form)
         return join(html, "")
     
+    def ddgPage(self, settings, form):
+        html = ddgweb.generateDDGPage(settings, self, form)
+        return join(html, "")
+
 ###############################################################################################
 # jobinfo function and related subfunctions                                                                                  #
 # This function creates the HTML for the Job Info page accessed by clicking a job in the queue
@@ -2496,6 +2501,7 @@ var MaxMultiplePointMutations = %d;
         #todo : Change this based on if not(settings["LiveWebserver"]) rather than albana
         if self.server_shortname == 'albana':
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
+            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=ddg">&#916;&#916;G</A>&nbsp;]'''  % (self.script_filename)
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
 
         
