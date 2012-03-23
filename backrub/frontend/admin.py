@@ -219,6 +219,71 @@ def webstatsJobsByProtocol(stats):
 	
 	return title, html, chartsfns
 
+def webstatsJobsByProtocolCumulative(stats):
+	# Return values
+	title = "Jobs by protocol (cumulative)"
+	html = []
+	fnname = "drawStatsJobsByProtocolCumulative"
+	chartsfns = [fnname]
+	protocols = ["Point/multiple mutation", "Backrub Ensemble", "Backrub Ensemble Design", "Sequence Tolerance (Elisabeth)", "Sequence Tolerance (Colin)"]
+	protocolGroups = WebserverProtocols().getProtocols()[0]
+	seriesColors = [
+		saturateHexColor(protocolGroups[0].color, 2),
+		saturateHexColor(protocolGroups[1].color, 1.5),
+		saturateHexColor(protocolGroups[1].color, 3.5),
+		saturateHexColor(protocolGroups[2].color, 2),
+		saturateHexColor(protocolGroups[2].color, 3.5)
+	]
+	# mkeys are the months of the years
+	mkeys = sorted(stats.keys())[-12:]
+	c = len(mkeys)
+	html.append('''
+	<script type="text/javascript">
+	function %(fnname)s() {''' % vars())
+	
+	if c:
+		html.append('''
+		// Create our data table.
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Month');''')
+		
+		for p in protocols:
+			html.append('''		data.addColumn('number', '%s');\n''' % p)
+		
+		html.append('''		data.addRows([''')
+		
+		cumulative = {}
+		for p in protocols:
+			cumulative[p] = 0
+			
+		for k in mkeys:
+			v = stats[k]
+			key = map(int, k.split("-"))
+			dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+			html.append('''["%s", ''' % dt)
+			for p in protocols:
+				cumulative[p] += v.get(p, 0)
+				html.append('''%d,''' % cumulative[p])
+			html.append('''],''')
+		html.append(''']);
+		
+		// Instantiate and draw our chart, passing in some options.
+		var chart = new google.visualization.ColumnChart(document.getElementById('webstatsJobsByProtocolCumulativeChart'));
+		seriesstyle = {''')
+		
+		for i in range(len(seriesColors)):
+			html.append('''%d:{color: '%s'}, ''' % (i, seriesColors[i]))
+		html.append('''}
+		chart.draw(data, {width: 1200, height: 600, isStacked:true, series:seriesstyle});''')
+	html.append('''
+	}
+	</script>
+	''')
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span>''' % vars())
+	html.append('''<div id="webstatsJobsByProtocolCumulativeChart"></div>''')
+	
+	return title, html, chartsfns
+
 def websiteUserGeoChart(userGeoFreqCount):
 	# Return values
 	title = "Users by country"
@@ -249,7 +314,7 @@ def websiteUserGeoChart(userGeoFreqCount):
 		height = width / 1.6
 		html.append('''
 		userGeoChart = new google.visualization.GeoChart(document.getElementById('webstatsUserGeoChart'));
-		userGeoChart.draw(userGeoData, {width: %d, height: %d, colors:['#FFF8C6', 'yellow', 'orange', 'red']});''' % (width, height))
+		userGeoChart.draw(userGeoData, {width: %d, height: %d, colors:['yellow', 'orange', 'red']});''' % (width, height))
 	html.append('''
 	}
 	</script>
@@ -266,7 +331,7 @@ def addDriveUsageChart(DriveUsage):
     html = []
     chartsfns = []
  
-    drives = ["ganon", "zin", "link", "zelda", "hyrule", "Webserver", "Test webserver"]
+    drives = ["ganon", "link", "zelda", "hyrule", "Webserver", "Test webserver"] # "zin
     #colors = {CurrentMembers : "#ADA", LabAlumni : "#AAD", PastRotationStudents : "#D8A9DE", Unaccounted : "#EFEFEF"}
     for drive in drives:
         nospdrive = drive.replace(" ", "")
@@ -318,7 +383,7 @@ function %(fnname)s() {
         if DriveUsage.get(drive):
             html.append('''<td><table><tr><td id="DriveUsageChart%s"></td></tr><tr><td align=center>Size: %s</td></tr></table></td>''' % (nospdrive, DriveUsage[drive]["Size"]))
         counter += 1
-        if counter >= 5:
+        if counter >= 4:
             # Show 5 drives per row
             html.append('''</tr><tr>''')
             counter = 0
@@ -717,7 +782,7 @@ def addStorageSpaceChart(quotas, usage, users):
 		
 		if userdir == "archive":
 			usages = pickle.loads(quotas[-1][2])
-			tuserdir = "/%s usage (current : %s)" % (userdir, usages["zin"]["Use%"])
+			tuserdir = "/%s usage (current : %s)" % (userdir, usages["ganon"]["Use%"])
 		else:
 			sumUsageInTB = sumUsageInGB / 1024
 			tuserdir = '/%(userdir)s usage (current = %(sumUsageInTB).2fTB)' % vars()
@@ -951,6 +1016,27 @@ def getWebsiteUsers():
 	result = connection.execQuery(sql, cursorClass = rosettadb.DictCursor)
 	return result
 
+def getInventory():
+	# Get all jobs on the live webserver which were submitted from this server and which have not expired
+	connection = getKortemmelabUsersConnection()
+	sql = '''SELECT PCInventory.*, Users.FirstName, IPAddresses.IPv4Address FROM PCInventory LEFT JOIN Users ON PrimaryUser=Username LEFT JOIN IPAddresses ON PCInventory.Hostname=IPAddresses.Hostname  ORDER BY IPAddresses.IPv4Address, Hostname''' 
+	result = list(connection.execQuery(sql, cursorClass = rosettadb.DictCursor))
+	return result
+
+def getIPAddresses():
+	# Get all jobs on the live webserver which were submitted from this server and which have not expired
+	connection = getKortemmelabUsersConnection()
+	sql = '''SELECT * FROM IPAddresses''' 
+	result = list(connection.execQuery(sql, cursorClass = rosettadb.DictCursor))
+	hostToIP = {}
+	unassignedAddresses = []
+	for address in result:
+		hostname = address["Hostname"]
+		if hostname:
+			hostToIP[hostname] = hostToIP.get(hostname, [])
+			hostToIP[hostname].append(address["IPv4Address"])
+	return hostToIP
+
 def getUsers():
 	# Get all jobs on the live webserver which were submitted from this server and which have not expired
 	connection = getKortemmelabUsersConnection()
@@ -973,6 +1059,190 @@ def getUsers():
 						"update" : record[8],
 					})
 	return users
+
+def generateITInventory():
+	html = []
+	inventory = getInventory()
+	hostToIP = getIPAddresses()
+	fieldnames = ["Hostname", "Label", "Location", "InUse", "PrimaryUser", "Model", "OS", "CPU",
+			"CPUSpeedGHz", "NumCoresThreads", "RamInGB", "RAMType", "HDSizes"]
+	
+	rowcols = {
+		"Computational lab"			: ("#5566cc", "#FFFFFF"),
+		"Experimental lab"			: ("#cc4444", "#000000"),
+		"Tanja's office"			: ("#5566cc", "#FFFFFF"),
+		"Server room 101"			: ("#ffcc33", "#000000"),
+		"Dogpatch Network Centre"	: ("#66ff66", "#000000"),
+		"None"						: ("#cc9999", "#000000"),
+	}
+	
+	IPRanges = {
+		"Computational lab"			: "169.230.84.",
+		"Experimental lab"			: "169.230.86.",
+		"Server room 101"			: "169.230.81.",
+		"Dogpatch Network Centre"	: "64.54.136.",
+	}
+	# Get all IP addresses  which either have no corresponding PC Inventory entry or which have one but the PC is unused 
+	machineNames = set([machine["Hostname"] for machine in inventory])
+	unusedMachineNames = set([machine["Hostname"] for machine in inventory if not(machine["InUse"])])
+	unusedHostnames = list(set(hostToIP.keys()).difference(machineNames).union(set(hostToIP.keys()).intersection(unusedMachineNames)))
+	unusedIPAddresses = []
+	for h in unusedHostnames:
+		if len(hostToIP[h]) > 1:
+			print("Unhandled case in PC Inventory : %s, %s" % (h, hostToIP[h]))
+			continue
+		else:
+			IPaddress = hostToIP[h][0]
+		location = None
+		for loc, r in IPRanges.iteritems():
+			if IPaddress.startswith(r):
+				location = loc
+		unusedIPAddresses.append((IPaddress, h, location or "Unhanded location"))
+	
+	html.append("""<center><div><i>All machines must have unique labels.</i></div></center>""")
+		
+	if unusedIPAddresses:
+		html.append("""<H1 align=left > Unused IP addresses </H1><br>
+			<div>""")
+		html.append("""<table border=1 cellpadding=2 cellspacing=0>
+			<tr style="font-weight:normal;font-size:10pt"><th>IP address</th><th>DNS name</th><th>Location</th></tr>""")
+		for machine in unusedIPAddresses:
+			html.append("		<tr><td>%s</td><td>%s</td><td>%s</td></tr>" % machine)
+		html.append("</table><br><br></div>")
+	else:
+		html.append("""<H1 align=left > All IP addresses are used </H1><br>""")
+		
+	html.append("""<H1 align=left > IT inventory </H1><br>
+		<div>""")
+	
+	columns = [
+		("IP", [80], [""]),
+		("Hostname", [80], [""]),
+		("Location", [160], [""]),
+		("In use", [50], [""]),
+		("Primary user", [100], [""]),
+		("Model", [150], [""]),
+		("OS", [200], [""]),
+		("CPU type, speed, #cores / threads", [190, 70, 40], ["Chip", "Speed", "Cores/threads"]),
+		("RAM", [40, 40, 70, 40, 40], ["Total", "Sticks", "Speed", "Type", "Slots"]),
+		("HDs", [150], [""])
+	]
+	
+	count = 0
+	for c in columns:
+		count += sum(c[1])
+	html.append("""		<table class="sortable" border=1 cellpadding=4 cellspacing=0  width="%dpx">""" % (count + 100))
+			
+	html.append('''
+		<tr bgcolor="#828282" style="text-align:center;color:white;">''')
+	for c in columns:
+		html.append('''			<th style="font-weight:normal;font-size:10pt" colspan=%d> %s </th>''' % (len(c[1]), c[0]))
+	html.append('''		</tr>''')
+
+	html.append('''<tr bgcolor="#828282">''')
+	for c in columns:
+		assert(len(c[1]) == len(c[2]))
+		for i in range(len(c[1])):
+			w = c[1][i]
+			hdr = c[2][i]
+			html.append('''<td width="%dpx">%s</td>''' % (w, hdr))
+	html.append('''</tr>''')
+		
+	alreadyPrinted = {}
+	
+	machinestrings = []
+	for machine in inventory:
+		machinestring = []
+		if alreadyPrinted.get(machine["Hostname"]):
+			continue
+		alreadyPrinted[machine["Hostname"]] = True
+		
+		colors = rowcols.get(machine["Location"], rowcols["None"])
+		
+		if not machine["InUse"]:
+			IPAddress = "None"
+			colors = rowcols["None"]
+		elif hostToIP.get(machine["Hostname"]):
+			IPAddress = join(hostToIP.get(machine["Hostname"]), ", ")
+		else:
+			if IPRanges.get(machine["Location"]):
+				IPAddress = IPRanges[machine["Location"]] + "*"
+			else:
+				IPAddress = "Dynamic"
+		
+		machinestring.append("<tr style='background-color:%s;color:%s'>" % colors)
+		if machine["InUse"] == 1:
+			machine["InUse"] = "Yes"
+		else:
+			machine["InUse"] = "No"
+		machinestring.append("<td>%s</td>" % IPAddress)
+		machinestring.append("<td>%(Hostname)s</td>" % machine)
+		machinestring.append("<td>%(Location)s</td>" % machine)
+		machinestring.append("<td>%(InUse)s</td>" % machine)
+		machinestring.append("<td>%s</td>" % (machine["FirstName"] or machine["PrimaryUse"]))
+		
+		if machine.get("Model"):
+			machinestring.append("<td>%s</td>" % machine.get("Model", ""))
+		else:
+			machinestring.append("<td></td>")
+		
+		if machine.get("OS"):
+			machinestring.append("<td>%s</td>" % machine.get("OS", ""))
+		else:
+			machinestring.append("<td></td>")
+		
+		if machine.get("CPU"):
+			machinestring.append("<td>%s</td>" % machine.get("CPU", ""))
+		else:
+			machinestring.append("<td></td>")
+		
+		if machine.get("CPUSpeedGHz"):
+			machinestring.append("<td>%s GHz</td>" % machine.get("CPUSpeedGHz"))
+		else:
+			machinestring.append("<td></td>")
+		
+		if machine.get("NumCores"):
+			if machine.get("NumThreads"):
+				machinestring.append("<td>%(NumCores)d/%(NumThreads)d</td>" % machine)
+			else:
+				machinestring.append("<td>%s</td>" % machine.get("NumCores"))
+		else:
+			machinestring.append("<td></td>")
+		
+		if machine.get("RAMInGB"):
+			machinestring.append("<td>%d GB</td>" % machine.get("RAMInGB"))
+		else:
+			machinestring.append("<td></td>")
+		if machine.get("RAMSticks"):
+			machinestring.append("<td>%s</td>" % machine.get("RAMSticks"))
+		else:
+			machinestring.append("<td></td>")
+		if machine.get("RAMSpeedInMHz"):
+			machinestring.append("<td>%s MHz</td>" % machine.get("RAMSpeedInMHz"))
+		else:
+			machinestring.append("<td></td>")
+		if machine.get("RAMType"):
+			machinestring.append("<td>%s</td>" % machine.get("RAMType"))
+		else:
+			machinestring.append("<td></td>")
+		if machine.get("RAMNumberOfSlots"):
+			machinestring.append("<td>%s slots</td>" % machine.get("RAMNumberOfSlots"))
+		else:
+			machinestring.append("<td></td>")
+		
+		if machine.get("HDSizes"):
+			machinestring.append("<td>%s</td>" % machine.get("HDSizes", ""))
+		else:
+			machinestring.append("<td></td>")
+		
+		machinestring.append("</tr>")
+		machinestrings.append((IPAddress, machinestring))
+	
+	for ms in sorted(machinestrings):
+		html.extend(ms[1])
+	
+	html.append('</table> </div>')
+	return html, []
 
 def generateWebUsersSubpage():
 	html = []
@@ -1521,6 +1791,7 @@ def generateWebserverStatsSubpage():
 		"Iran (Islamic Republic of)" : "Iran",
 		"Russian Federation" : "Russia",
 		"Taiwan, Province of China" : "Taiwan",
+		"Korea, Republic of" : "South Korea",
 	}
 	
 	for r in results:
@@ -1537,6 +1808,7 @@ def generateWebserverStatsSubpage():
 	generators = [
 		[webstatsSuccessFailure, stats],
 		[webstatsJobsByProtocol, stats],
+		[webstatsJobsByProtocolCumulative, stats],
 		[websiteUserGeoChart, userGeoFreqCount]
 	]
 	
@@ -1644,6 +1916,7 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 	subpages = [
 		{"name" : "retrospect",	"desc" : "Backups",				"fn" : generateRetrospectLogPage,	"generate" :True,	"params" : []},
 		{"name" : "diskstats",	"desc" : "Disk stats",			"fn" : generateDiskStatsSubpage,	"generate" :True,	"params" : [quotas, usage, users]},
+		{"name" : "inventory",	"desc" : "IT inventory",		"fn" : generateITInventory,			"generate" :True,	"params" : []},
 		{"name" : "jobadmin",	"desc" : "Job administration",	"fn" : generateJobAdminSubpage,		"generate" :True,	"params" : []},
 		{"name" : "webusers",	"desc" : "Website users",		"fn" : generateWebUsersSubpage,		"generate" :True,	"params" : []},
 		{"name" : "sitestats",	"desc" : "Website stats",		"fn" : generateWebserverStatsSubpage,"generate" :True,	"params" : []},
@@ -1683,6 +1956,8 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 
 	html.append("</td>")
 	html.extend(initGoogleCharts(gchartfns))
-	html.append('''<script src="/backrub/frontend/admin.js" type="text/javascript"></script>''')
+	html.append('''
+<script src="/backrub/frontend/admin.js" type="text/javascript"></script>
+<script src="/javascripts/sorttable.js"></script>''')
 
 	return html

@@ -1,4 +1,4 @@
-subpages = ["retrospect", "sitestats", "diskstats", "jobadmin", "webusers", "labusers"]
+subpages = ["inventory", "retrospect", "sitestats", "diskstats", "jobadmin", "webusers", "labusers"]
 
 function showPage(page)
 {
