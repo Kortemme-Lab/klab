@@ -130,6 +130,7 @@ class FieldNames(dict):
 		self.ResidueID = "ResidueID"
 		self.WildTypeAA = "WildTypeAA"
 		self.MutantAA = "MutantAA"
+		self.SecondaryStructurePosition = "SecondaryStructurePosition"
 		
 		self.SourceID = "SourceID"
 		self.ddG = "ddG"
@@ -232,8 +233,11 @@ class PDBStructure(DBObject):
 			FieldNames_.Source : source,
 			FieldNames_.Resolution : None,
 			FieldNames_.Techniques : None,
+			FieldNames_.Publication : None,
 		}
 		self.filepath = filepath
+		raise Exception("I need to test the getPublication function.")
+
 		self.UniProtAC = UniProtAC
 		self.UniProtID = UniProtID
 		
@@ -318,7 +322,71 @@ class PDBStructure(DBObject):
 
 		d[FieldNames_.BFactors] = pickle.dumps(pdb.ComputeBFactors()) 
 		return contents
-			
+	
+	def getPublication(self):
+		'''Extracts the PDB source information.'''
+		d = self.dict
+		 
+		PUBTYPES = ['ISSN', 'ESSN']
+		
+		p = PDB(d[FieldNames_.Content].split("\n"))
+		j = p.getJournal()
+		pdbID = d[FieldNames_.PDB_ID].strip()
+		raise Exception("Need to test this function.")
+		if True:
+			print(s["PDB_ID"])
+			if j["published"]:
+				print(j["REFN"]["type"])
+				print(j["REFN"]["ID"])
+			print("doi: %s" % j["DOI"])
+			print("--------")
+			if j["DOI"]:
+				pass
+			print(join(j["lines"],"\n"))
+			for k, v in j.iteritems():
+				if k != "lines":
+					print("%s: %s" % (k, v))
+			print("********\n")
+					
+		# We identify the sources for a PDB identifier with that identifier
+		SourceID = "PDB:%s" % pdbID 
+		sourceExists = self.ddGdb.execute("SELECT ID FROM Source WHERE ID=%s", parameters=(SourceID,))
+		if not sourceExists:
+			self.ddGdb.insertDict(FieldNames_.Source, {FieldNames_.ID : SourceID})
+		
+		d[FieldNames_.Publication] = SourceID
+		
+		locations = self.ddGdb.execute("SELECT * FROM SourceLocation WHERE SourceID=%s", parameters=(SourceID,))
+		publocations = [location for location in locations if location[FieldNames_.Type] in PUBTYPES]
+		doilocations = [location for location in locations if location[FieldNames_.Type] == "DOI"]
+		assert(len(publocations) <= 1)
+		assert(len(doilocations) <= 1)
+		if j["published"]:
+			skip = False
+			if publocations:
+				location = publocations[0]
+				if j["REFN"]["type"] == location[FieldNames_.Type]:
+					if j["REFN"]["ID"] != location[FieldNames_.ID]:
+						colortext.warning("REFN: Check that the SourceLocation data ('%s') matches the PDB REFN data ('%s')." % (str(location), j["REFN"]))			
+			else:
+				assert(j["REFN"]["type"] in PUBTYPES)
+				self.ddGdb.insertDict(FieldNames_.SourceLocation, {
+					FieldNames_.SourceID	: SourceID,
+					FieldNames_.ID			: j["REFN"]["ID"],
+					FieldNames_.Type		: j["REFN"]["type"],
+					})				
+		if j["DOI"]:
+			if doilocations:
+				location = doilocations[0]
+				if j["DOI"] != location[FieldNames_.ID]:
+					colortext.warning("DOI: Check that the SourceLocation data ('%s') matches the PDB DOI data ('%s')." % (str(doilocations), j["DOI"]))
+			else:
+				self.ddGdb.insertDict(FieldNames_.SourceLocation, {
+					FieldNames_.SourceID	: SourceID,
+					FieldNames_.ID			: j["DOI"],
+					FieldNames_.Type		: FieldNames_.DOI,
+					})
+					
 	def commit(self, db):
 		'''Returns the database record ID if an insert occurs but will typically return None if the PDB is already in the database.'''
 		d = self.dict
@@ -401,7 +469,7 @@ class ExperimentSet(DBObject):
 	def addMutant(self, mutant):
 		self.dict["Mutants"][mutant] = True
 
-	def addMutation(self, chainID, residueID, wildtypeAA, mutantAA, ID = None):
+	def addMutation(self, chainID, residueID, wildtypeAA, mutantAA, ID = None, SecondaryStructureLocation=None):
 		errors = []
 		residueID = ("%s" % residueID).strip()
 		if not chainID in AllowedChainLetters:
@@ -1320,73 +1388,7 @@ class DatabasePrimer(object):
 				FieldNames_.ToStep : 2,
 			}
 			self.ddGdb.insertDict('ProtocolGraphEdge', pedge)
-	
-	def addPDBSources (self):
-		'''A once-off function to add PDB source information to the Structure table.''' 
-		structures = self.ddGdb.execute("SELECT PDB_ID, Content FROM Structure;")
-		PUBTYPES = ['ISSN', 'ESSN']
-		for s in structures:
-			p = PDB(s["Content"].split("\n"))
-			j = p.getJournal()
-			pdbID = s["PDB_ID"].strip()
 			
-			if False:
-				print(s["PDB_ID"])
-				if j["published"]:
-					print(j["REFN"]["type"])
-					print(j["REFN"]["ID"])
-				print("doi: %s" % j["DOI"])
-				print("--------")
-				if j["DOI"]:
-					pass
-				print(join(j["lines"],"\n"))
-				for k, v in j.iteritems():
-					if k != "lines":
-						print("%s: %s" % (k, v))
-				print("********\n")
-						
-			# We identify the sources for a PDB identifier with that identifier
-			SourceID = "PDB:%s" % pdbID 
-			sourceExists = self.ddGdb.execute("SELECT ID FROM Source WHERE ID=%s", parameters=(SourceID,))
-			if not sourceExists:
-				self.ddGdb.insertDict(FieldNames_.Source, {FieldNames_.ID : SourceID})
-			
-			self.ddGdb.execute("UPDATE Structure SET Publication=%s WHERE PDB_ID=%s", parameters = (SourceID, pdbID)) 
-	
-			locations = self.ddGdb.execute("SELECT * FROM SourceLocation WHERE SourceID=%s", parameters=(SourceID,))
-			publocations = [location for location in locations if location[FieldNames_.Type] in PUBTYPES]
-			doilocations = [location for location in locations if location[FieldNames_.Type] == "DOI"]
-			assert(len(publocations) <= 1)
-			assert(len(doilocations) <= 1)
-			if j["published"]:
-				skip = False
-				if publocations:
-					location = publocations[0]
-					if j["REFN"]["type"] == location[FieldNames_.Type]:
-						if j["REFN"]["ID"] != location[FieldNames_.ID]:
-							colortext.warning("REFN: Check that the SourceLocation data ('%s') matches the PDB REFN data ('%s')." % (str(location), j["REFN"]))
-				
-				if not(publocations):
-					assert(j["REFN"]["type"] in PUBTYPES)
-					self.ddGdb.insertDict(FieldNames_.SourceLocation, {
-						FieldNames_.SourceID	: SourceID,
-						FieldNames_.ID			: j["REFN"]["ID"],
-						FieldNames_.Type		: j["REFN"]["type"],
-						})				
-			if j["DOI"]:
-				if doilocations:
-					location = doilocations[0]
-					if j["DOI"] != location[FieldNames_.ID]:
-						colortext.warning("DOI: Check that the SourceLocation data ('%s') matches the PDB DOI data ('%s')." % (str(doilocations), j["DOI"]))
-
-				if not(doilocations):
-					self.ddGdb.insertDict(FieldNames_.SourceLocation, {
-						FieldNames_.SourceID	: SourceID,
-						FieldNames_.ID			: j["DOI"],
-						FieldNames_.Type		: FieldNames_.DOI,
-						})
-		
-		
 	def updateCommand(self):
 		# Command for protocol 16 ddG
 		commonstr = [
