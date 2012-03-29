@@ -222,7 +222,9 @@ class DBObject(object):
 	
 class PDBStructure(DBObject):
 	
-	def __init__(self, pdbID, content = None, protein = None, source = None, filepath = None):
+	def __init__(self, pdbID, content = None, protein = None, source = None, filepath = None, UniProtAC = None, UniProtID = None):
+		'''UniProtACs have forms like 'P62937' whereas UniProtIDs have forms like 'PPIA_HUMAN.'''
+		
 		self.dict = {
 			FieldNames_.PDB_ID : pdbID,
 			FieldNames_.Content : content,
@@ -232,7 +234,9 @@ class PDBStructure(DBObject):
 			FieldNames_.Techniques : None,
 		}
 		self.filepath = filepath
-	
+		self.UniProtAC = UniProtAC
+		self.UniProtID = UniProtID
+		
 	def getPDBContents(self):
 		d = self.dict
 		id = d[FieldNames_.PDB_ID]
@@ -296,7 +300,8 @@ class PDBStructure(DBObject):
 		if not PDBToUniProt:
 			readUniProtMap()
 		if not PDBToUniProt.get(id):
-			raise Exception("Could not find a UniProt mapping for %s in %s." % (id, uniprotmapping))
+			if not (self.UniProtAC and self.UniProtID):
+				raise Exception("Could not find a UniProt mapping for %s in %s." % (id, uniprotmapping))
 		d[FieldNames_.Content] = contents
 		d[FieldNames_.Resolution] = resolution
 		d[FieldNames_.Techniques] = techniques
@@ -321,6 +326,19 @@ class PDBStructure(DBObject):
 		self.getPDBContents()
 		assert(PDBChains.get(d[FieldNames_.PDB_ID]))
 		
+		if self.UniProtAC and self.UniProtID:
+			# todo: Append to uniprotmapping.csv file
+			results = db.execute(("SELECT * FROM UniProtKB WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(self.UniProtAC,))
+			if results:
+				if results[0][FieldNames_.UniProtKB_ID] != self.UniProtID:
+					raise Exception("Existing UniProt mapping (%s->%s) does not agree with the passed-in parameters (%s->%s)." % (results[0][FieldNames_.UniProtKB_AC],results[0][FieldNames_.UniProtKB_ID],self.UniProtAC,self.UniProtID))
+			else:
+				UniProtMapping = {
+					FieldNames_.UniProtKB_AC : self.UniProtAC,
+					FieldNames_.UniProtKB_ID : self.UniProtID,
+				}
+				db.insertDict('UniProtKB', UniProtMapping)
+		
 		results = db.execute("SELECT * FROM Structure WHERE PDB_ID=%s", parameters = (d[FieldNames_.PDB_ID]))
 		
 		if results:
@@ -342,6 +360,18 @@ class PDBStructure(DBObject):
 			vals = (d[FieldNames_.PDB_ID], d[FieldNames_.Content], d[FieldNames_.Resolution], d[FieldNames_.Protein], d[FieldNames_.Source], d[FieldNames_.Techniques], d[FieldNames_.BFactors]) 
 			db.execute(SQL, parameters = vals)
 			self.databaseID = db.getLastRowID()
+		
+		if self.UniProtAC and self.UniProtID:
+			results = db.execute(("SELECT * FROM UniProtKBMapping WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(self.UniProtAC,))
+			if results:
+				if results[0][FieldNames_.PDB_ID] != d[FieldNames_.PDB_ID]:
+					raise Exception("Existing UniProt mapping (%s->%s) does not agree with the passed-in parameters (%s->%s)." % (results[0][FieldNames_.UniProtKB_AC],results[0][FieldNames_.PDB_ID],self.UniProtAC,d[FieldNames_.PDB_ID]))
+			else:
+				UniProtPDBMapping = {
+					FieldNames_.UniProtKB_AC : self.UniProtAC,
+					FieldNames_.PDB_ID : d[FieldNames_.PDB_ID],
+				}
+				db.insertDict('UniProtKBMapping', UniProtPDBMapping)
 		
 		return self.databaseID			
 		
@@ -496,6 +526,7 @@ class ExperimentSet(DBObject):
 		pdbID = d[FieldNames_.Structure] 
 		associatedRecords = sorted([score[FieldNames_.SourceID] for score in d["ExperimentScores"]])
 		associatedRecordsStr = "%s (records: %s)" % (d[FieldNames_.Source], join(map(str, sorted([score[FieldNames_.SourceID] for score in d["ExperimentScores"]])),", "))
+		# todo PDBChains["3K0NB_lin"] = ["A"]
 		chainsInPDB = PDBChains.get(d[FieldNames_.Structure])
 		if not chainsInPDB:
 			raise Exception("The chains for %s were not read in properly." % associatedRecordsStr)
@@ -743,7 +774,7 @@ class ddGDatabase(object):
 		self.lastrowid = None
 	
 	def connectToServer(self):
-		print("[CONNECTING TO SQL SERVER]")
+		#print("[CONNECTING TO SQL SERVER]")
 		self.connection = MySQLdb.Connection(host = "kortemmelab.ucsf.edu", db = "ddG", user = "kortemmelab", passwd = self.passwd, port = 3306, unix_socket = "/var/lib/mysql/mysql.sock")
 		
 	def addChainWarning(self, pdbID, associatedRecords, c):
