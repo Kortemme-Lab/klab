@@ -59,6 +59,92 @@ AllowedChainLetters = [c for c in AllowedChainLetters if c not in CommonChainLet
 AllowedChainLetters = CommonChainLetters + AllowedChainLetters
 AllowedInsertionCodes = list(itertools.chain(*[[letters[i+26], letters[i]] for i in range(26)]))
 
+def getUniProtMapping(pdbIDs, storeInDatabase = False):
+	'''Takes in  a list of PDB IDs or one single ID string and returns a tuple of two values:
+		- a table mapping PDB IDs to UniProt ACCs (not necessarily a bijection) and
+		- a table mapping the above UniProt ACCs to UniProt IDs (necessarily a bijection).'''
+	db = ddGDatabase()
+	if type(pdbIDs) == type(""):
+		pdbIDs = [pdbIDs]
+	if type(pdbIDs) == type([]):
+		import urllib,urllib2
+		url = 'http://www.uniprot.org/mapping/'
+		
+		PDBtoAC_mapping = {}
+		params = {
+			'from':'PDB_ID',
+			'to':'ACC',
+			'format':'tab',
+			'query':join(pdbIDs, " ")
+		}
+		data = urllib.urlencode(params)
+		request = urllib2.Request(url, data)
+		response = urllib2.urlopen(request)
+		lines = [l for l in response.read(200000).split("\n") if l]
+		assert(lines[0]=="From\tTo")
+		ACCs = set()
+		for line in lines[1:]:
+			line = line.split("\t")
+			assert(len(line) == 2)
+			pdbID = line[0]
+			uniprotACC = line[1]
+			PDBtoAC_mapping[pdbID] = PDBtoAC_mapping.get(pdbID) or []
+			PDBtoAC_mapping[pdbID].append(uniprotACC)
+			ACCs.add(uniprotACC)
+		ACCs = sorted(list(ACCs))
+
+		ACtoID_mapping = {}
+		params = {
+			'from':'ACC',
+			'to':'ID',
+			'format':'tab',
+			'query':join(ACCs, " ")
+		}
+		data = urllib.urlencode(params)
+		request = urllib2.Request(url, data)
+		response = urllib2.urlopen(request)
+		lines = [l for l in response.read(200000).split("\n") if l]
+		assert(len(lines) == len(ACCs) + 1)
+		assert(lines[0]=="From\tTo")
+		for line in lines[1:]:
+			line = line.split("\t")
+			assert(len(line) == 2)
+			uniprotACC = line[0]
+			uniprotID = line[1]
+			assert(not(ACtoID_mapping.get(uniprotACC)))
+			ACtoID_mapping[uniprotACC] = uniprotID 
+		
+		if storeInDatabase:
+			for uACC, uID in ACtoID_mapping.iteritems():
+				results = db.execute(("SELECT * FROM UniProtKB WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(uACC,))
+				if results:
+					if results[0][FieldNames_.UniProtKB_ID] != uID:
+						raise Exception("Existing UniProt mapping (%s->%s) does not agree with the passed-in parameters (%s->%s)." % (results[0][FieldNames_.UniProtKB_AC],results[0][FieldNames_.UniProtKB_ID],uACC,uID))
+				else:			
+					UniProtMapping = {
+						FieldNames_.UniProtKB_AC : uACC,
+						FieldNames_.UniProtKB_ID : uID,
+					}
+					db.insertDict('UniProtKB', UniProtMapping)
+			for updbID, uACCs in PDBtoAC_mapping.iteritems():
+				for uACC in uACCs:
+					results = db.execute(("SELECT * FROM UniProtKBMapping WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(uACC,))
+					associatedPDBsInDB = []
+					if results:
+						associatedPDBsInDB = [r[FieldNames_.PDB_ID] for r in results]
+					if updbID not in associatedPDBsInDB:
+						UniProtPDBMapping = {
+							FieldNames_.UniProtKB_AC : uACC,
+							FieldNames_.PDB_ID : updbID,
+						}
+						db.insertDict('UniProtKBMapping', UniProtPDBMapping)
+		db.close()
+		return (PDBtoAC_mapping, ACtoID_mapping) 
+	else:
+		db.close()
+		raise Exception("Expected a list of PDB IDs or a string with a single ID.")
+
+
 def computeStandardDeviation(values):
 	sum = 0
 	n = len(values)
@@ -255,7 +341,7 @@ class PDBStructure(DBObject):
 		chains = {}
 		
 		if not os.path.exists(filename):
-			print("Missing file for %s %s" % (id, filename))
+			print("Missing file for %s %s. Retrieving from RCSB." % (id, filename))
 			c = HTTPConnection("www.rcsb.org")
 			c.request("GET", "/pdb/files/%s.pdb" % id)
 			response = c.getresponse()
@@ -305,7 +391,9 @@ class PDBStructure(DBObject):
 			readUniProtMap()
 		if not PDBToUniProt.get(id):
 			if not (self.UniProtAC and self.UniProtID):
-				raise Exception("Could not find a UniProt mapping for %s in %s." % (id, uniprotmapping))
+				PDBtoAC_mapping, ACtoID_mapping = getUniProtMapping(id, storeInDatabase = False)
+				if not (PDBtoAC_mapping and ACtoID_mapping):
+					raise Exception("Could not find a UniProt mapping for %s in %s." % (id, uniprotmapping))
 		d[FieldNames_.Content] = contents
 		d[FieldNames_.Resolution] = resolution
 		d[FieldNames_.Techniques] = techniques
@@ -440,6 +528,8 @@ class PDBStructure(DBObject):
 					FieldNames_.PDB_ID : d[FieldNames_.PDB_ID],
 				}
 				db.insertDict('UniProtKBMapping', UniProtPDBMapping)
+		
+		PDBtoAC_mapping, ACtoID_mapping = getUniProtMapping(d[FieldNames_.PDB_ID], storeInDatabase = True)
 		
 		return self.databaseID			
 		
