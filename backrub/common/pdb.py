@@ -312,7 +312,7 @@ class PDB:
         checkPDBAgainstMutations(pdbID, self, remappedMutations)
         return remappedMutations
 
-    def stripForDDG(self, chains = True, keepHETATM = False):
+    def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
         '''Strips a PDB to ATOM lines. If keepHETATM is True then also retain HETATM lines.
            By default all PDB chains are kept. The chains parameter should be True or a list.
            In the latter case, only those chains in the list are kept.
@@ -324,8 +324,15 @@ class PDB:
         newlines = []
         residx = 0
         oldres = None
+        model_number = 1
         for line in self.lines:
             fieldtype = line[0:6].strip()
+            if fieldtype == "ENDMDL":
+                model_number += 1
+                if numberOfModels and (model_number > numberOfModels):
+                    break
+                if not numberOfModels:
+                    raise Exception("The logic here does not handle multiple models yet.")
             if (fieldtype == "ATOM" or (fieldtype == "HETATM" and keepHETATM)) and (float(line[54:60]) != 0):
                 chain = line[21:22]
                 if (chains == True) or (chain in chains): 
