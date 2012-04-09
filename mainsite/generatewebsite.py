@@ -18,7 +18,7 @@ def indexHTML(page):
 def makePage(page, d, debug = True):
 	testprefix = ""
 	if debug:
-			testprefix = "test-"
+		testprefix = "test-"
 	for pagehtml in d["generator"](page):
 		if pagehtml:
 			html = []

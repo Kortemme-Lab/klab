@@ -10,6 +10,79 @@
 #    - Make sure the date has the proper format - YYYY/MM/DD/other. The other field can contain other information e.g. a range of days for a conference.
 # Any text before the first ER line is ignored for parsing and stripped from the public RIS file.
 #
+ER  - 
+TY  - JOUR
+C8  - 2012 Publications 
+A1  - Kapp, Gregory T.
+A1  - Liu, Sen
+A1  - Stein, Amelie
+A1  - Wong, Derek T.
+A1  - Reményi, Attila
+A1  - Yeh, Brian J.
+A1  - Fraser, James S.
+A1  - Taunton, Jack
+A1  - Lim, Wendell A.
+A1  - Kortemme, Tanja
+T1  - Control of protein signaling using a computationally designed GTPase/GEF orthogonal pair 
+Y1  - 2012/03/07 
+JF  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences 
+N1  - doi: 10.1073/pnas.1114487109 
+UR  - http://www.pnas.org/content/early/2012/03/01/1114487109.abstract 
+N2  - Signaling pathways depend on regulatory protein-protein interactions; controlling these interactions in cells has important applications for reengineering biological functions. As many regulatory proteins are modular, considerable progress in engineering signaling circuits has been made by recombining commonly occurring domains. Our ability to predictably engineer cellular functions, however, is constrained by complex crosstalk observed in naturally occurring domains. Here we demonstrate a strategy for improving and simplifying protein network engineering: using computational design to create orthogonal (non-crossreacting) protein-protein interfaces. We validated the design of the interface between a key signaling protein, the GTPase Cdc42, and its activator, Intersectin, biochemically and by solving the crystal structure of the engineered complex. The designed GTPase (orthoCdc42) is activated exclusively by its engineered cognate partner (orthoIntersectin), but maintains the ability to interface with other GTPase signaling circuit components in vitro. In mammalian cells, orthoCdc42 activity can be regulated by orthoIntersectin, but not wild-type Intersectin, showing that the designed interaction can trigger complex processes. Computational design of protein interfaces thus promises to provide specific components that facilitate the predictable engineering of cellular functions. 
+ER  -
+TY  - JOUR
+C8  - 2011 Publications 
+AU  - Jager, Stefanie
+AU  - Cimermancic, Peter
+AU  - Gulbahce, Natali
+AU  - Johnson, Jeffrey R.
+AU  - McGovern, Kathryn E.
+AU  - Clarke, Starlynn C.
+AU  - Shales, Michael
+AU  - Mercenne, Gaelle
+AU  - Pache, Lars
+AU  - Li, Kathy
+AU  - Hernandez, Hilda
+AU  - Jang, Gwendolyn M.
+AU  - Roth, Shoshannah L.
+AU  - Akiva, Eyal
+AU  - Marlett, John
+AU  - Stephens, Melanie
+AU  - D/'Orso, Ivan
+AU  - Fernandes, Jason
+AU  - Fahey, Marie
+AU  - Mahon, Cathal
+AU  - O/'Donoghue, Anthony J.
+AU  - Todorovic, Aleksandar
+AU  - Morris, John H.
+AU  - Maltby, David A.
+AU  - Alber, Tom
+AU  - Cagney, Gerard
+AU  - Bushman, Frederic D.
+AU  - Young, John A.
+AU  - Chanda, Sumit K.
+AU  - Sundquist, Wesley I.
+AU  - Kortemme, Tanja
+AU  - Hernandez, Ryan D.
+AU  - Craik, Charles S.
+AU  - Burlingame, Alma L.
+AU  - Sali, Andrej
+AU  - Frankel, Alan D.
+AU  - Krogan, Nevan J.
+TI  - Global landscape of HIV-human protein complexes
+JA  - Nature
+PY  - 2011/12/21/online
+VL  - 481
+IS  - 7381
+SP  - 365
+EP  - 370
+PB  - Nature Publishing Group, a division of Macmillan Publishers Limited. All Rights Reserved.
+SN  - 1476-4687
+UR  - http://dx.doi.org/10.1038/nature10719
+M3  - doi: 10.1038/nature10719
+N1  - doi: 10.1038/nature10719
+L3  - http://www.nature.com/nature/journal/vaop/ncurrent/abs/nature10719.html#supplementary-information
 ER  -
 TY  - JOUR
 C8  - 2011 Publications 
@@ -2160,6 +2233,35 @@ Y2  - 2011/12/16
 ER  - 
 TY  - JOUR
 C8  - LabMember
+N2  - Comprehensive detection and quantitation of metabolites from a biological source constitute the major challenges of current metabolomics research. Two chemical derivatization methodologies, butylation and amination, were applied to human serum for ionization enhancement of a broad spectrum of metabolite classes, including steroids and amino acids. LC-ESI-MS analysis of the derivatized serum samples provided a significant signal elevation across the total ion chromatogram to over a 100-fold increase in ionization efficiency. It was also demonstrated that derivatization combined with isotopically labeled reagents facilitated the relative quantitation of derivatized metabolites from individual as well as pooled samples.
+AD  - Nieuwe Hemweg 6B, Amsterdam, The Netherlands
+AU  - O'Maille, Grace
+AU  - Go, Eden P.
+AU  - Hoang, Linh
+AU  - Want, Elizabeth J.
+AU  - Smith, Colin A.
+AU  - O'Maille, Paul
+AU  - Nordstrom, Anders
+AU  - Morita, Hirotoshi
+AU  - Qin, Chuan
+AU  - Uritboonthai, Wilasinee
+AU  - Apon, Junefredo
+AU  - Moore, Richard
+AU  - Garrett, James
+AU  - Siuzdak, Gary
+JO  - Spectroscopy: An International Journal
+PB  - IOS PRESS
+T1  - Metabolomics relative quantitation with mass spectrometry using chemical derivatization and isotope labeling
+VL  - 22
+IS  - 5
+SP  - 327
+EP  - 343
+PY  - 2008
+N1  - doi: 10.3233/SPE-2008-0361
+UR  - http://iospress.metapress.com/index/358838254R930073.pdf
+ER  - 
+TY  - JOUR
+C8  - LabMember
 T1  - Discovery of novel inhibitors targeting enoyl–acyl carrier protein reductase in Plasmodium falciparum by structure-based virtual screening
 JO  - Biochemical and Biophysical Research Communications
 VL  - 358
@@ -2190,6 +2292,26 @@ KW  - ICM
 KW  - Inhibitor
 KW  - Malaria
 KW  - Molecular modeling
+ER  - 
+TY  - JOUR
+C8  - LabMember
+N2  - Serum analysis with LC/MS can yield thousands of potential metabolites. However, in metabolomics, biomarkers of interest will often be of low abundance, and ionization suppression from high abundance endogenous metabolites such as phospholipids may prevent the detection of these metabolites. Here a cerium-modified column and methyl-tert-butyl-ether (MTBE) liquid-liquid extraction were employed to remove phospholipids from serum in order to obtain a more comprehensive metabolite profile. XCMS, an in-house developed data analysis software platform, showed that the intensity of existing endogenous metabolites increased, and that new metabolites were observed. This application of phospholipid capture in combination with XCMS non-linear data processing has enormous potential in metabolite profiling, for biomarker detection and quantitation.
+AD  - 233 Spring St, New York, NY 10013 USA
+AU  - Want, Elizabeth J.
+AU  - Smith, Colin A.
+AU  - Qin, Chuan
+AU  - VanHorne, K. C.
+AU  - Siuzdak, Gary
+JO  - Metabolomics
+PB  - Springer
+T1  - Phospholipid capture combined with non-linear chromatographic correction for improved serum metabolite profiling
+PY  - 2006
+Y2  - SEP
+VL  - 2
+IS  - 3
+SP  - 145
+EP  - 154
+N1  - doi: 10.1007/s11306-006-0028-0
 ER  - 
 TY  - JOUR
 C8  - LabMember
@@ -2336,15 +2458,301 @@ A1  - Levin, Judith G.
 A1  - Gronenborn, Angela M.
 A1  - Sugiura, Wataru
 T1  - HIV-1 Vif-mediated ubiquitination/degradation of APOBEC3G involves four critical lysine residues in its C-terminal domain 
-Y1  - 2009/11/17 
+Y1  - 2009/11/17
 JF  - Proceedings of the National Academy of Sciences 
 JO  - Proceedings of the National Academy of Sciences 
 SP  - 19539 
 EP  - 19544 
-N1  - doi: 10.1073/pnas.0906652106 
+N1  - doi: 10.1073/pnas.0906652106
 VL  - 106 
 IS  - 46 
 UR  - http://www.pnas.org/content/106/46/19539.abstract 
 N2  - During coevolution with the host, HIV-1 developed the ability to hijack the cellular ubiquitin/proteasome degradation pathway to counteract the antiviral activity of APOBEC3G (A3G), a host cytidine deaminase that can block HIV-1 replication. Abrogation of A3G function involves the HIV-1 Vif protein, which binds A3G and serves as an adapter molecule to recruit A3G to a Cullin5-based E3 ubiquitin ligase complex. Structure-guided mutagenesis of A3G focused on the 14 most surface-exposed Lys residues allowed us to identify four Lys residues (Lys-297, 301, 303, and 334) that are required for Vif-mediated A3G ubiquitination and degradation. Substitution of Arg for these residues confers Vif resistance and restores A3G's antiviral activity in the presence of Vif. In our model, the critical four Lys residues cluster at the C terminus, opposite to the known N-terminal Vif-interaction region in the protein. Thus, spatial constraints imposed by the E3 ligase complex may be an important determinant in Vif-dependent A3G ubiquitination. 
 ER  - 
-
+TY  - JOUR
+C8  - LabMember
+N2  - CD59 is a 77-amino acid membrane glycoprotein that plays an important role in regulating the terminal pathway of complement by inhibiting formation of the cytolytic membrane attack complex ( MAC or C5b-9). The MAC is formed by the self assembly of C5b, C6, C7, C8, and multiple C9 molecules, with CD59 functioning by binding C5b-8 and C5b-9 in the assembling complex. We performed a scanning alanine mutagenesis screen of residues 16 - 57, a region previously identified to contain the C8/C9 binding interface. We have also created an improved NMR model from previously published data for structural understanding of CD59. Based on the scanning mutagenesis data, refined models, and additional site-specific mutations, we identified a binding interface that is much broader than previously thought. In addition to identifying substitutions that decreased CD59 activity, a surprising number of substitutions significantly enhanced CD59 activity. Because CD59 has significant therapeutic potential for the treatment of various inflammatory conditions, we investigated further the ability to enhance CD59 activity by additional mutagenesis studies. Based on the enhanced activity of membrane-bound mutant CD59 molecules, clinically relevant soluble mutant CD59-based proteins were prepared and shown to have up to a 3-fold increase in complement inhibitory activity.
+AD  - 9650 Rockville Pike Bethesda, MD 20814-3996 USA
+AU  - Huang, YX
+AU  - Smith, Colin A.
+AU  - Song, HB
+AU  - Morgan, BP
+AU  - Abagyan, Ruben
+AU  - Tomlinson, S
+JO  - Journal of Biological Chemistry
+IS  - 40
+SP  - 34073
+EP  - 34079
+PB  - The American Society for Biochemistry and Molecular Biology Inc.
+T1  - Insights into the human CD59 complement binding interface toward engineering new therapeutics
+VL  - 280
+PY  - 2005
+Y1  - 2005/10/07 
+Y2  - OCT 7
+N1  - doi: 10.1074/jbc.M504922200
+ER  - 
+TY  - JOUR
+C8  - LabMember
+N2  - The Bioconductor project is an initiative for the collaborative creation of extensible software for computational biology and bioinformatics. The goals of the project include: fostering collaborative development and widespread use of innovative software, reducing barriers to entry into interdisciplinary scientific research, and promoting the achievement of remote reproducibility of research results. We describe details of our aims and methods, identify current challenges, compare Bioconductor to other open bioinformatics projects, and provide working examples.
+AD  - Middlesex House, 34-42 Cleveland Street, London W1T 4LB, UK
+AU  - Gentleman, RC
+AU  - Carey, VJ
+AU  - Bates, DM
+AU  - Bolstad, B
+AU  - Dettling, M
+AU  - Dudoit, S
+AU  - Ellis, B
+AU  - Gautier, L
+AU  - Ge, YC
+AU  - Gentry, J
+AU  - Hornik, K
+AU  - Hothorn, T
+AU  - Huber, W
+AU  - Iacus, S
+AU  - Irizarry, R
+AU  - Leisch, F
+AU  - Li, C
+AU  - Maechler, M
+AU  - Rossini, AJ
+AU  - Sawitzki, G
+AU  - Smith, Colin A.
+AU  - Smyth, G
+AU  - Tierney, L
+AU  - Yang, JYH
+AU  - Zhang, JH
+JO  - Genome Biology
+PB  - BioMed Central Ltd.
+T1  - Bioconductor: open software development for computational biology and bioinformatics
+VL  - 5
+IS  - 10
+SP  - R80
+PY  - 2004
+N1  - doi: 10.1186/gb-2004-5-10-r80
+SN  - 1465-6906
+UR  - http://genomebiology.com/2004/5/10/R80
+Y1  - 2004/09/15
+ER  - 
+TY  - JOUR
+C8  - LabMember
+AU  - Titov, Denis V
+AU  - Gilman, Benjamin
+AU  - He, Qing-Li
+AU  - Bhat, Shridhar
+AU  - Low, Woon-Kai
+AU  - Dang, Yongjun
+AU  - Smeaton, Michael B.
+AU  - Demain, Arnold L
+AU  - Miller, Paul S.
+AU  - Kugel, Jennifer F
+AU  - Goodrich, James A
+AU  - Liu, Jun O
+TI  - XPB, a subunit of TFIIH, is a target of the natural product triptolide
+JA  - Nature Chemical Biology
+PY  - 2011/03//print
+VL  - 7
+IS  - 3
+SP  - 182
+EP  - 188
+PB  - Nature Publishing Group, a division of Macmillan Publishers Limited. All Rights Reserved.
+SN  - 1552-4450
+UR  - http://dx.doi.org/10.1038/nchembio.522
+M3  - doi: 10.1038/nchembio.522
+N1  - doi: 10.1038/nchembio.522
+L3  - http://www.nature.com/nchembio/journal/v7/n3/abs/nchembio.522.html#supplementary-information
+ER  - 
+TY  - JOUR
+C8  - LabMember
+AU  - Hlavin, Erica M.
+AU  - Smeaton, Michael B.
+AU  - Miller, Paul S.
+TI  - Initiation of DNA interstrand cross-link repair in mammalian cells
+JO  - Environmental and Molecular Mutagenesis
+JA  - Environmental and Molecular Mutagenesis
+VL  - 51
+IS  - 6
+PY  - 2010/07//print
+PB  - Wiley Subscription Services, Inc., A Wiley Company
+SN  - 1098-2280
+UR  - http://dx.doi.org/10.1002/em.20559
+DO  - doi: 10.1002/em.20559
+SP  - 604
+EP  - 624
+KW  - cross-link structure
+KW  - transcription-coupled repair
+KW  - replication-coupled repair
+KW  - global genome repair
+KW  - cross-link unhooking
+PY  - 2010
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Cross-Link Structure Affects Replication-Independent DNA Interstrand Cross-Link Repair in Mammalian Cells
+AU  - Hlavin, Erica M.
+AU  - Smeaton, Michael B.
+AU  - Noronha, Anne M.
+AU  - Wilds, Christopher J.
+AU  - Miller, Paul S.
+Y1  - 2010/04/07
+PY  - 2010
+DA  - 2010/05/11
+N1  - doi: 10.1021/bi902169q
+DO  - doi: 10.1021/bi902169q
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 3977
+EP  - 3988
+VL  - 49
+IS  - 18
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi902169q
+UR  - http://dx.doi.org/10.1021/bi902169q
+Y2  - 2012/04/09
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Effect of Cross-Link Structure on DNA Interstrand Cross-Link Repair Synthesis
+AU  - Smeaton, Michael B.
+AU  - Hlavin, Erica M.
+AU  - Noronha, Anne M.
+AU  - Murphy, Sebastian P.
+AU  - Wilds, Christopher J.
+AU  - Miller, Paul S.
+Y1  - 2009/07/06
+PY  - 2009
+DA  - 2009/07/20
+N1  - doi: 10.1021/tx9000896
+DO  - doi: 10.1021/tx9000896
+T2  - Chemical Research in Toxicology
+JF  - Chemical Research in Toxicology
+JO  - Chemical Research in Toxicology
+SP  - 1285
+EP  - 1297
+VL  - 22
+IS  - 7
+PB  - American Chemical Society
+SN  - 0893-228X
+M3  - doi: 10.1021/tx9000896
+UR  - http://dx.doi.org/10.1021/tx9000896
+Y2  - 2012/04/09
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Distortion-Dependent Unhooking of Interstrand Cross-Links in Mammalian Cell Extracts
+AU  - Smeaton, Michael B.
+AU  - Hlavin, Erica M.
+AU  - McGregor Mason, Tracey
+AU  - Noronha, Anne M.
+AU  - Wilds, Christopher J.
+AU  - Miller, Paul S.
+Y1  - 2008/08/15
+PY  - 2008
+DA  - 2008/09/16
+N1  - doi: 10.1021/bi800925e
+DO  - doi: 10.1021/bi800925e
+T2  - Biochemistry
+JF  - Biochemistry
+JO  - Biochemistry
+SP  - 9920
+EP  - 9930
+VL  - 47
+IS  - 37
+PB  - American Chemical Society
+SN  - 0006-2960
+M3  - doi: 10.1021/bi800925e
+UR  - http://dx.doi.org/10.1021/bi800925e
+Y2  - 2012/04/09
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - End Modification of a Linear DNA Duplex Enhances NER-Mediated Excision of an Internal Pt(II)-Lesion
+AU  - Mason, Tracey McGregor
+AU  - Smeaton, Michael B.
+AU  - Cheung, Joyce C. Y.
+AU  - Hanakahi, Les A.
+AU  - Miller, Paul S.
+Y1  - 2008/05/01
+PY  - 2008
+DA  - 2008/05/01
+N1  - doi: 10.1021/bc7004363
+DO  - doi: 10.1021/bc7004363
+T2  - Bioconjugate Chemistry
+JF  - Bioconjugate Chemistry
+JO  - Bioconjugate Chemistry
+SP  - 1064
+EP  - 1070
+VL  - 19
+IS  - 5
+PB  - American Chemical Society
+SN  - 1043-1802
+M3  - doi: 10.1021/bc7004363
+UR  - http://dx.doi.org/10.1021/bc7004363
+Y2  - 2012/04/09
+ER  - 
+TY  - JOUR
+C8  - LabMember
+A1  - Smeaton, Michael B.
+A1  - Miller, Paul S.
+A1  - Ketner, Gary
+A1  - Hanakahi, Les A.
+T1  - Small-scale extracts for the study of nucleotide excision repair and non-homologous end joining 
+Y1  - 2007/12/01 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+SP  - e152 
+EP  - e152 
+N1  - doi: 10.1093/nar/gkm974 
+VL  - 35 
+IS  - 22 
+UR  - http://nar.oxfordjournals.org/content/35/22/e152.abstract 
+N2  - The repair of DNA by nucleotide excision repair (NER) and non-homologous end joining (NHEJ) is essential for maintenance of genomic integrity and cell viability. Examination of NHEJ and NER in vitro using cell-free extracts has led to a deeper understanding of the biochemical mechanisms that underlie these processes. Current methods for production of whole-cell extracts (WCEs) to investigate NER and NHEJ start with one or more liters of culture containing 1–5 × 109 cells. Here, we describe a small-scale method for production of WCE that can be used to study NER. We also describe a rapid, small-scale method for the preparation of WCE that can be used in the study of NHEJ. These methods require less time, 20- to 1000-fold fewer cells than large-scale extracts, facilitate examination of numerous samples and are ideal for such applications as the study of host–virus interactions and analysis of mutant cell lines. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+T1  - The Vitamin E analog Trolox reduces copper toxicity in the annelid Lumbriculus variegatus but is also toxic on its own
+JO  - NeuroToxicology
+VL  - 27
+IS  - 4
+SP  - 604
+EP  - 614
+PY  - 2006/7//
+T2  - 
+AU  - O’Gara, Bruce A.
+AU  - Murray, Phillip M.
+AU  - Hoyt, Erik M.
+AU  - Leigh-Logan, Tifany
+AU  - Smeaton, Michael B.
+SN  - 0161-813X
+M3  - doi: 10.1016/j.neuro.2006.03.023
+UR  - http://www.sciencedirect.com/science/article/pii/S0161813X06000982
+KW  - Metals
+KW  - Reactive oxygen species
+KW  - Antioxidant
+KW  - Behavior
+KW  - Neurophysiology
+ER  - 
+TY  - JOUR
+C8  - LabMember
+T1  - Copper-induced changes in locomotor behaviors and neuronal physiology of the freshwater oligochaete, Lumbriculus variegatus
+JO  - Aquatic Toxicology
+VL  - 69
+IS  - 1
+SP  - 51
+EP  - 66
+PY  - 2004/7/30/
+T2  - 
+AU  - O’Gara, Bruce A.
+AU  - Bohannon, V.Kim
+AU  - Teague, Matthew W.
+AU  - Smeaton, Michael B.
+SN  - 0166-445X
+M3  - doi: 10.1016/j.aquatox.2004.04.006
+UR  - http://www.sciencedirect.com/science/article/pii/S0166445X04001341
+KW  - Copper
+KW  - Metals
+KW  - Oligochaete
+KW  - Sublethal
+KW  - Behavior
+KW  - Electrophysiology
+ER  - 

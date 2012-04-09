@@ -249,6 +249,39 @@ p_shane = {
 	"pub_name"	:	"Ó Conchúir, Shane",
 }
 
+p_mike = {
+	"name"		:	"Mike Smeaton",
+	"image"		:	"img/mike.jpg",
+	"text"		:	"My previous work focused on mechanisms of genomic integrity and evolution utilizing techniques at the chemistry/biology interface. I am combining my background with the protein design capacity of Rosetta in order to engineer novel DNA repair enzymes with altered fidelity and/or substrate specificities.",
+	"degrees"	:	[
+		('Bachelor of Science', 'Cell and Molecular Biology', 'Humboldt State University'),
+		('Bachelor of Arts', 'Chemistry', 'Humboldt State University'),
+		('Ph.D.', 'Biochemistry', 'Johns Hopkins University'),
+	],
+	"degree_w"	:	("width:110px;", "width:120px;", "width:160px;"),
+	"extratext"	:	"Postdoctoral fellow of chemical engineering at the California Institute of Technology",
+	"caption"	:	"",
+	"mouseover"	:	None,
+	"pub_name"	:	"Smeaton, Michael B.",
+}
+
+Todo='''
+p_ashley = {
+	"name"		:	"Ashley Custer",
+	"image"		:	"img/.jpg",
+	"text"		:	"",
+	"degrees"	:	[
+		('Bachelor of Science', '', ''),
+		('Master of Science', '', ''),
+		('Ph.D.', '', ''),
+	],
+	"degree_w"	:	("width:110px;", "width:120px;", "width:160px;"),
+	"extratext"	:	"",
+	"caption"	:	"",
+	"mouseover"	:	None,
+	"pub_name"	:	", ",
+}'''
+
 p_bob = {
 	"name"		:	"",
 	"image"		:	"img/.jpg",
@@ -268,14 +301,18 @@ p_bob = {
 # This list creates the sections for current members of the group
 peopleByGroup = [
 	('Principal Investigator', (p_tanja,)),
-	('Postdoctoral Scholars', (p_daniel, p_eyal, p_amelie, p_roland, p_ming, p_lin)),
+	('Postdoctoral Scholars', (p_daniel, p_amelie, p_roland, p_ming, p_lin, p_mike)),
 	('Specialist', (p_cristina,)),
-	('Graduate Students', (p_rich, p_colin, p_ryan, p_noah, p_laurens)),
+	('Graduate Students', (p_ryan, p_noah, p_laurens)),
 	('Staff Research Associate', (p_debbie,)),
-	('Software Engineer', (p_shane,))
+	('Software Engineer', (p_shane,)),
+	#('Lab admin', (p_ashley,))
 ]
 
 pastRotationStudents = [
+	{"name" : 'Kyle Barlow', "course" : 'BMI', "rotation" : 'Winter 2012',},
+	{"name" : 'Russell Goodman', "course" : 'Biophysics', "rotation" : 'Winter 2012',},
+	{"name" : 'Lawrence Uricchio', "course" : 'Bioengineering', "rotation" : 'Winter 2012',},
 	{"name" : 'Alec Nielsen', "course" : 'Biophysics', "rotation" : 'Winter 2011',},
 	{"name" : 'David Mavor', "course" : 'Biophysics', "rotation" : 'Summer 2011',},
 	{"name" : 'Joel Karpiak', "course" : 'CCB', "rotation" : 'Winter 2010',},
@@ -298,10 +335,12 @@ pastRotationStudents = [
 ]
 
 labAlumni = [
+	{"name" : 'Eyal Akiva', "qualification" : "PhD", "period" : '2010-2011', "currentJob" : 'Postdoc', "jobLocation" : 'UCSF', "pub_name" : "Akiva, Eyal"},
+	{"name" : 'Rich Oberdorf', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : '', "jobLocation" : '', "pub_name" : "Oberdorf, Richard"},
 	{"name" : 'Colin Smith', "qualification" : "PhD", "period" : '2006-2011', "currentJob" : 'Postdoc', "jobLocation" : 'Max Planck Institute Goettingen, Germany', "pub_name" : "Smith, Colin A."},
 	{"name" : 'Dan Mandell', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Postdoc', "jobLocation" : 'Harvard University', "pub_name" : 'Mandell, Daniel J.',},
 	{"name" : 'Matt Eames', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Patent Scientist', "jobLocation" : 'Davis Wright Tremaine', "pub_name" : 'Eames, Matt',},
-	{"name" : 'Sen Liu', "qualification" : "PhD", "period" : '2008-2010', "currentJob" : 'Associate Professor', "jobLocation" : 'Three Gorges University, China',},
+	{"name" : 'Sen Liu', "qualification" : "PhD", "period" : '2008-2010', "currentJob" : 'Associate Professor', "jobLocation" : 'Three Gorges University, China', "pub_name" : 'Liu, Sen',},
 	{"name" : 'Florian Lauck', "qualification" : "MSc", "period" : '2008-2010', "currentJob" : 'Specialist', "jobLocation" : 'UCSF', "pub_name" : 'Lauck, Florian',},
 	{"name" : 'Michael Michalik', "qualification" : None, "period" : '2009-2010', "currentJob" : 'Graduate Program', "jobLocation" : 'University of Bonn, Germany',},
 	{"name" : 'Thomas Bliska', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'Williams College',},
@@ -309,7 +348,7 @@ labAlumni = [
 	{"name" : 'Elisabeth Humphris', "qualification" : "PhD", "period" : '2005-2009', "currentJob" : 'Postdoc', "jobLocation" : 'Yale', "pub_name" : 'Humphris, Elisabeth L.',},
 	{"name" : 'Matt Chroust', "qualification" : None, "period" : '2009', "currentJob" : 'Dentistry Graduate Program', "jobLocation" : 'UCSF',},
 	{"name" : 'Mariana Babor', "qualification" : "PhD", "period" : '2006-2009', "currentJob" : '', "jobLocation" : 'Burnham Institute San Diego', "pub_name" : 'Babor, Mariana',},
-	{"name" : 'Greg Kapp', "qualification" : "PhD", "period" : '2004-2009', "currentJob" : 'Scientist', "jobLocation" : 'Omniox Inc.',},
+	{"name" : 'Greg Kapp', "qualification" : "PhD", "period" : '2004-2009', "currentJob" : 'Scientist', "jobLocation" : 'Omniox Inc.', "pub_name" : 'Kapp, Gregory T.',},
 	{"name" : 'Greg Friedland', "qualification" : "PhD", "period" : '2004-2008', "currentJob" : 'Postdoc', "jobLocation" : 'Joint Bioenergy Institute & UC Berkeley', "pub_name" : 'Friedland, Gregory D.',},
 	{"name" : 'Catherine Shi', "qualification" : None, "period" : '2008', "currentJob" : 'iPQB graduate program', "jobLocation" : 'UCSF',},
 	{"name" : 'Anthony Linares ', "qualification" : None, "period" : '2006-2007', "currentJob" : 'MD/PhD program', "jobLocation" : 'UCLA', "pub_name" : 'Linares, Anthony J.',},
@@ -369,11 +408,7 @@ def getPeopleHTML():
                       <td style="vertical-align: top; width: 369px; height: 157px;">
                         <span class="u_people_text">%(ptext)s</span>''' % vars())
 			if publink_open and publink_close:
-				if firstname[-1] == "s":
-					html.append('''
-                        <p class="u_people_text">%(publink_open)sSee %(firstname)s's publications.%(publink_close)s</p>''' % vars())
-				else:
-					html.append('''
+				html.append('''
                         <p class="u_people_text">%(publink_open)sSee %(firstname)s's publications.%(publink_close)s</p>''' % vars())
 			else:
 				html.append('''
