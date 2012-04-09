@@ -331,6 +331,7 @@ class ClusterBatchJob(RosettaClusterJob):
 	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
 		self.jobIDs = sorted(parameters["jobs"].keys()) # The fact that this is a sorted list is important
 		self.jobID = "%s-%s" % (parameters["cryptID"], parameters["ID"])
+		self.failedIDs = []
 		self._setStatusPrintingParameters(self.jobID, statustype = "job", level = 0, color = "lightpurple")
 		self.profiler = SimpleProfiler.SimpleProfiler("%s-%s" % (self.suffix, parameters["ID"]))
 		self.parameters = parameters

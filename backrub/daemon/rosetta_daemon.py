@@ -108,16 +108,16 @@ The Kortemme Lab Server Daemon
 		except:
 			return False
 	
-	def log(self, str, error = False):
+	def log(self, s, error = False):
 		if CLUSTER_debugmode:
 			if error:
-				self._status("\n" + str, color = "red")
+				self._status("\n" + str(s), color = "red")
 			else:
-				self._status(str)
+				self._status(str(s))
 		else:
-			str = "<daemon time='%s'>%s</daemon>" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str)
+			s = "<daemon time='%s'>%s</daemon>" % (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), s)
 			log = open(self.logfile, 'a+')
-			log.write(str)
+			log.write(s)
 			log.write("\n")
 			log.close()
 		

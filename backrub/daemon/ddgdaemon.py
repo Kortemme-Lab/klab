@@ -27,8 +27,8 @@ dbfields = ddgproject.FieldNames()
 class ddGDaemon(RosettaDaemon):
 	#todo: daemon adds self.parameters[dbfields.ExtraParameters] to dict
 		
-	MaxBatchSize	= 100
-	MaxClusterJobs	= 200
+	MaxBatchSize	= 30
+	MaxClusterJobs	= 270
 	logfname		= "ddGDaemon.log"
 	pidfile			= settings["ddGPID"]
 	
@@ -136,9 +136,11 @@ class ddGDaemon(RosettaDaemon):
 	
 	def recordSuccessfulJob(self, clusterjob):
 		for ID in clusterjob.jobIDs:
-			ddG = pickle.dumps(clusterjob.getddG(ID))
-			self.runSQL('UPDATE Prediction SET Status="done", ddG=%s, NumberOfMeasurements=1, EndDate=NOW() WHERE ID=%s', 
-				parameters = (ddG, ID))
+			if ID in clusterjob.failedIDs:
+				self.runSQL('UPDATE Prediction SET Status="failed", Errors="Analysis", EndDate=NOW() WHERE ID=%s', parameters = (ID,)) 
+			else:
+				ddG = pickle.dumps(clusterjob.getddG(ID))
+				self.runSQL('UPDATE Prediction SET Status="done", ddG=%s, NumberOfMeasurements=1, EndDate=NOW() WHERE ID=%s', parameters = (ddG, ID))
 						
 	def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None, jobID = None):
 		suffix = ""
@@ -151,6 +153,7 @@ class ddGDaemon(RosettaDaemon):
 		timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 		if _traceback and _exception:
 			print("FAILED")
+			_exception = str(_exception)
 			self.log(_traceback, error = True)
 			self.log(_exception, error = True)
 			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() ''' + ('WHERE ID IN (%s)' % self.JobsToDBIds[clusterjob]), parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception))))
@@ -200,7 +203,10 @@ class ddGDaemon(RosettaDaemon):
 					completedJobs.append(clusterjob)
 
 					clusterjob.saveProfile()
-					clusterjob.analyze()
+					try:
+						clusterjob.analyze()
+					except Exception:
+						self.log("Analysis failed.")
 					
 					self.end_job(clusterjob)
 					clusterjob.dumpJITGraph()
@@ -425,7 +431,7 @@ class ddGDaemon(RosettaDaemon):
 			
 	def end_job(self, clusterjob, Failed = False):
 		
-		ID = clusterjob.jobID				  
+		ID = clusterjob.jobID 
 				
 		try:
 			self.copyAndZipOutputFiles(clusterjob)

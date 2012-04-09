@@ -10,10 +10,10 @@ from rosettahelper import WebsiteSettings
 
 # Local directories
 if os.environ.get('PWD'):
-    settings = WebsiteSettings(sys.argv, os.environ['PWD'])
+	settings = WebsiteSettings(sys.argv, os.environ['PWD'])
 else:
-    settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
-    
+	settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+
 server_root = settings["BaseDir"]
 cluster_ddGdir = settings["ClusterddGDir"]
 cluster_dldir = settings["ClusterDownloadDir"]
@@ -35,6 +35,6 @@ CLUSTER_maxhoursforjob = 335
 CLUSTER_maxminsforjob = 59
 
 if CLUSTER_debugmode:
-    CLUSTER_qstatpause = 60
-    CLUSTER_maxhoursforjob = 196
-    CLUSTER_maxminsforjob = 29
+	CLUSTER_qstatpause = 60
+	CLUSTER_maxhoursforjob = 196
+	CLUSTER_maxminsforjob = 29

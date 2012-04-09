@@ -45,7 +45,6 @@ class Protocol16(GenericDDGJob):
 		
 		wasSuccessful = True
 
-
 		for i in range(len(self.jobIDs)):
 			jobID = self.jobIDs[i]
 			try:
@@ -53,8 +52,8 @@ class Protocol16(GenericDDGJob):
 				
 				ddGtask = self.ProtocolGraph["ddG"]["_task"] 
 				ddGout = rosettahelper.readFileLines(ddGtask._workingdir_file_path(ddGtask.getExpectedOutputFileNames()[i], jobID))
-				self._status("examining ddg output:", level = 5)
-				ddGout = [l for l in ddGout if l.startswith("protocols.moves.ddGMover: mutate")]
+				self._status("Examining ddg output for DB job %s:" % str(jobID), level = 0)
+				ddGout = [l for l in ddGout if l.strip() and l.startswith("protocols.moves.ddGMover: mutate")]
 				self._status(join(ddGout, "\n"))
 				assert(len(ddGout) == 1)
 				ddGout = ddGout[0].strip()
@@ -75,6 +74,7 @@ class Protocol16(GenericDDGJob):
 				self.ddG[jobID].setData(Scores)
 		
 			except Exception, e:
+				self.failedIDs.append(jobID)
 				errors = [str(e), traceback.format_exc()]
 				self._status("<errors>\n\t<error>%s</error>\n</errors>" % join(errors,"</error>\n\t<error>"))
 				wasSuccessful = False
