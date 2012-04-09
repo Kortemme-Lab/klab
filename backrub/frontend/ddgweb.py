@@ -15,7 +15,7 @@ from sys import maxint
 import rosettadb
 import calendar
 import socket
-from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, saturateHexColor
+from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, saturateHexColor, make755Directory, ROSETTAWEB_SK_AAinv
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
 import retrospect
@@ -129,6 +129,7 @@ def generateJmolPage(form):
 			results = ddGdb.callproc("GetMutations", parameters = ExperimentID)
 			mutations = results
 			estring = None
+			ddGdb.close()			
 		elif form.has_key("ddgJmolPredictionID"):
 			estring = "Could not retrieve results from prediction %s." % form["ddgJmolPredictionID"].value
 			PredictionID = form["ddgJmolPredictionID"].value
@@ -140,6 +141,7 @@ def generateJmolPage(form):
 			
 			ExperimentID = pr.getFilteredResults()[0]["ExperimentID"]
 			results = ddGdb.callproc("GetMutations", parameters = ExperimentID)
+			ddGdb.close()
 			mutations = results
 			estring = None
 	except Exception, e:
@@ -178,12 +180,13 @@ def generateJmolPage(form):
 	return html, chartfns
 
 def generateProThermPage(form):
-	prothermfile = os.path.join("/backrub", "daemon" ,"ddglib", "ProTherm25616.dat")
+	prothermfile = os.path.join("/backrub", "ddgpdbs", "ProTherm25616.dat")
+	prothermindices = os.path.join("/backrub", "ddgpdbs", "ProTherm25616-indices.dat")
 	html = []
 	chartfns = []
 	html.append('''<table width="900px">''')
 	html.append('''<tr align="center">''')
-	html.append('''<td colspan=2>''')
+	html.append('''<td colspan=1>''')
 
 	if not os.path.exists(prothermfile):
 		html.append("Cannot locate ProTherm file %s" % prothermfile)
@@ -198,6 +201,7 @@ def generateProThermPage(form):
 			 	onkeydown="if (event.keyCode == 13){document.ddgform.ddgProThermID.value = this.value;document.ddgform.query.value='ddg'; document.ddgform.submit();}"></td>
 		</tr>
 	</table>
+	</td></tr>
 	''')
 
 		if form.has_key("ddgProThermID"):
@@ -205,16 +209,265 @@ def generateProThermPage(form):
 			if ID.isdigit():
 				ID = int(ID)
 				ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
-				ptReader = protherm_api.ProThermReader(prothermfile, ddgDB = ddGdb, quiet = True)
+				ptReader = protherm_api.ProThermReader(prothermfile, ddgDB = ddGdb, quiet = True, skipIndexStore = True)
+				
+				# Caching the indices speeds up the ptReader construction from @2s to 0.2s
+				if not os.path.exists(prothermindices):
+					ptReader.storeRecordIndices()
+					ptReader.saveIndicesToFile(prothermindices)
+				else:
+					ptReader.loadIndicesFromFile(prothermindices)
+				
 				try:
 					record = ptReader.readRecord(ID)
 					if not record:
 						raise Exception("")
+					html.append("<tr><td>")
 					html.extend(ptReader.getRecordHTML(ID))
+					html.append("</td></tr>")
 				except:
 					html.append("<br><br>Could not find a record with ID #%s." % str(ID))
+				scoreresults = ddGdb.execute('SELECT SourceID, ExperimentID, ExperimentScore.ID as ExperimentScoreID, ddG AS ddG_in_kcal, NumberOfMeasurements, Publication, Experiment.Source as Source, Experiment.Structure as Structure FROM ExperimentScore INNER JOIN Experiment ON ExperimentScore.ExperimentID=Experiment.ID WHERE SourceID=%s AND Source LIKE "ProTherm%%"', parameters=(ID,))
+				assert(len(scoreresults) <= 1)
+				if scoreresults:
+					scoreresults = scoreresults[0]
+					experimentID = scoreresults["ExperimentID"]
+					mutation_results = ddGdb.execute('SELECT ExperimentMutation.* FROM ExperimentMutation INNER JOIN Experiment ON ExperimentMutation.ExperimentID=Experiment.ID WHERE Experiment.ID=%s', parameters=(experimentID,))
+					experiment_rows = [
+						"ExperimentID",
+						"Source",
+						"Structure",
+					]
+					experiment_score_rows = [
+						"ExperimentScoreID",
+						"SourceID",
+						"ddG_in_kcal",
+						"NumberOfMeasurements",
+						"Publication",
+					]
+					mutation_rows = [
+						"Chain",
+						"ResidueID",
+						"WildTypeAA",
+						"MutantAA",
+						"SecondaryStructurePosition",
+					]
+					
+					html.append("<tr><td align='center'>")
+					html.append("<br><br><b>Record as stored in our database</b><br>")
+					html.append("<table align='center'>")
+					html.append('<tr><td style="background-color:#bb8888; border:1px solid black;">Experiment</td></tr>')
+					for r in experiment_rows:
+						html.append("<tr><td></td><td style='background-color:#bbbbbb; border:1px solid black;'>%s</td><td style='background-color:#bbbbee; border:1px solid black;'>%s</td></tr>" % (r, str(scoreresults[r])))
+					html.append('<tr><td style="background-color:#bb8888; border:1px solid black;">ExperimentScore</td></tr>')
+					for r in experiment_score_rows:
+						html.append("<tr><td></td><td style='background-color:#bbbbbb; border:1px solid black;'>%s</td><td style='background-color:#bbbbee; border:1px solid black;'>%s</td></tr>" % (r.replace("_", " "), str(scoreresults[r])))
+					html.append('<tr><td style="background-color:#bb8888; border:1px solid black;">ExperimentMutation</td></tr>')
+					count = 1
+					for m in mutation_results:
+						if m["SecondaryStructurePosition"]:
+							m["SecondaryStructurePosition"] = "(%s)" % m["SecondaryStructurePosition"]
+						else:
+							m["SecondaryStructurePosition"] = ""
+						html.append("<tr><td></td><td style='background-color:#bbbbbb; border:1px solid black;'>Mutation %d</td>" % count)
+						html.append("<td style='background-color:#bbbbee; border:1px solid black;'>Chain %(Chain)s, %(WildTypeAA)s %(ResidueID)s %(MutantAA)s %(SecondaryStructurePosition)s</td></tr>" % (m))
+						count += 1
+					html.append("</table>")
+					html.append("</td></tr>")
 				ddGdb.close()
+				
+	html.append('''</td>''')
+	html.append('''</tr>''')
+	html.append('''</table>''')
+	return html, chartfns
+
+def getLinsData(PredictionSet):
+	ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
 	
+	FilePrefix = "%s_" % PredictionSet.split("-")[1]
+	PDBID = "%s_lin" % PredictionSet.split("-")[1]
+	
+	numMissingResults = ddGdb.execute('''SELECT COUNT(ID) FROM `Prediction` WHERE PredictionSet= %s AND Status<>"done"''', parameters=(PredictionSet,), cursorClass=common.ddgproject.StdCursor)[0][0]
+	
+	dlpath = os.path.join(settings["DownloadDir"], "ddG", PredictionSet)
+	if not os.path.exists(dlpath):
+		make755Directory(dlpath)
+	
+	results = ddGdb.execute('''
+	SELECT ID, Chain, ResidueID, WildTypeAA, MutantAA, ddG, TIME_TO_SEC(TIMEDIFF(EndDate,StartDate))/60 as TimeTakenInMinutes FROM  `Prediction` 
+	INNER JOIN ExperimentMutation ON Prediction.ExperimentID = ExperimentMutation.ExperimentID
+	WHERE PredictionSet= %s AND Status="done"''', parameters=(PredictionSet,))
+	
+	individual_results_by_position = {}
+	results_grouped_by_position = {}
+	wildtypes = {}
+	for r in results:
+		assert(r["Chain"] == "A")
+		assert(r["WildTypeAA"] != r["MutantAA"])
+		resid = r["ResidueID"]
+		ddG = pickle.loads(r["ddG"])["data"]["ddG"]
+		
+		individual_results_by_position[resid] = individual_results_by_position.get(resid) or {}
+		individual_results_by_position[resid][r["MutantAA"]] = (r["WildTypeAA"], ddG, r["TimeTakenInMinutes"])
+		
+		wildtypes[resid] = r["WildTypeAA"]
+		
+		#results_grouped_by_position[resid] = results_grouped_by_position.get(resid) or []
+		#results_grouped_by_position[resid].append((ddG, r["MutantAA"]))
+	
+	F = open(os.path.join(dlpath, "%sPredictionsByMutation.csv" % FilePrefix), "w")
+	F.write("Chain\tResidueID\tWildType\tMutant\tddG\tWallTimeInMinutes\n")
+	# Warning: This sorting only works because there are no insertion codes (casting to int is okay)
+	for position in sorted(individual_results_by_position.keys(), key=lambda pos : int(pos)):
+		for mutant, values in individual_results_by_position[position].iteritems():
+			F.write("A\t%s\t%s\t%s\t%s\t%s\n" % (position, values[0], mutant, values[1], values[2]))
+	F.close()
+	
+	aas = ROSETTAWEB_SK_AAinv.keys()
+	F = open(os.path.join(dlpath, "%sPredictionsByResidueID.csv" % FilePrefix), "w")
+	F.write("Chain\tResidueID\tWildType\tBestMutant\tBestMutant_ddG\t%s\n" % join(sorted(aas),"\t"))
+	
+	# Warning: This sorting only works because there are no insertion codes (casting to int is okay)
+	minimum_best_mutant = 900
+	maximum_best_mutant = -900
+	best_mutants = {}
+	for position in sorted(individual_results_by_position.keys(), key=lambda pos : int(pos)):
+		F.write("A\t%s\t%s\t" % (position, wildtypes[position]))
+		
+		results_grouped_by_position = [] 
+		for mutant, values in individual_results_by_position[position].iteritems():
+			results_grouped_by_position.append((values[1], mutant))
+		
+		best_mutant = sorted(results_grouped_by_position, key=lambda ddg_aa_pair : ddg_aa_pair[0])[0]
+		best_mutants[position] = best_mutant[0] 
+		minimum_best_mutant = min(minimum_best_mutant, best_mutant[0])
+		maximum_best_mutant = max(maximum_best_mutant, best_mutant[0])
+		F.write("%s\t%s\t" % (best_mutant[1], best_mutant[0]))
+		
+		results_grouped_by_position.append((0, wildtypes[position]))
+		existingAAs = [r[1] for r in results_grouped_by_position]
+		missingAAs = set(aas).difference(existingAAs)
+		for missingAA in missingAAs:
+			results_grouped_by_position.append(('N/A', missingAA))
+		
+		sorted_by_AA = sorted(results_grouped_by_position, key=lambda ddg_aa_pair : ddg_aa_pair[1])
+		F.write(join([str(mtscore[0]) for mtscore in sorted_by_AA], "\t")) 
+		F.write("\n")
+	F.close()
+	
+	scaling_factor = min(50/abs(minimum_best_mutant), 50/abs(maximum_best_mutant)) - 0.05 # For scaling numbers from 0-100
+	if numMissingResults == 0:
+		F = open(os.path.join(dlpath, "%sbfactors.pdb" % FilePrefix), "w")
+		pdbcontents = ddGdb.execute('''SELECT Content FROM Structure WHERE PDB_ID=%s''', parameters = (PDBID,))[0]["Content"].split("\n")
+		for line in pdbcontents:
+			if line.startswith("ATOM  "):
+				assert(line[21] == "A")
+				assert(line[26] == " ")
+				position = line[22:27].strip()
+				newbfactor = "%.4f" % ((50.0 + (best_mutants[position] * scaling_factor))/100.0)
+				assert(0 <= float(newbfactor) <= 1.0)
+				assert(len(newbfactor) == 6)
+				F.write("%s%s%s\n" % (line[0:60], newbfactor, line[66:]))
+			else:
+				F.write("%s\n" % line)
+		F.close()
+	
+	
+def generateStatusPage(form):
+	html = []
+	html.append('''<table width="900px">''')
+	html.append('''<tr align="center">''')
+	html.append('''<td colspan=2>''')
+	
+	# Create chart
+	title = "Job status"
+	fnname = "drawDDGJobProgress"
+	chartfns = [fnname]
+	
+	ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
+	results = ddGdb.execute('''SELECT PredictionSet, Status, COUNT(*) AS Count FROM Prediction WHERE PredictionSet <> "testrun" GROUP BY PredictionSet, Status;''')
+	predictionSets =  {}
+	
+	statusOrder = ["done", "active", "queued", "failed"]
+	statusColors = {
+		"done" : "#404040", #00bb00",
+		"active" : "#00bb00", #00FFFF",
+		"queued" : "#FFFF44", #8888ff",
+		"failed" : "#ff0000",
+	}
+	for r in results:
+		if not predictionSets.get(r["PredictionSet"]):
+			newtbl = {}
+			for color in statusColors:
+				newtbl[color] = 0
+			predictionSets[r["PredictionSet"]] = newtbl
+		assert(r["Status"] in statusColors.keys())
+		predictionSets[r["PredictionSet"]][r["Status"]] = r["Count"]
+	ddGdb.close()
+	
+	for predictionSet in predictionSets.keys(): 
+		if predictionSet.startswith("lin-"):
+			getLinsData(predictionSet)
+	
+	ddG_dlpath = "http://albana.ucsf.edu/backrub/downloads/ddG/"
+	html.append('''
+	<script type="text/javascript">
+	ddG_dlpath = "%(ddG_dlpath)s"; 
+	function %(fnname)s() {''' % vars())
+	if results:
+		html.append('''
+		// Create our data table.
+		var data = new google.visualization.DataTable();
+		data.addColumn('string', 'Prediction set');''')
+		for status in statusOrder:
+			html.append('''data.addColumn('number', '%s');\n''' % status)
+		html.append('''data.addRows([\n''')
+		for predictionSet, data in sorted(predictionSets.iteritems()):
+			html.append('''["%s", ''' % predictionSet)
+			html.append(join(map(str, [data[status] for status in statusOrder]), ","))
+			html.append('''],''')
+		html.append(''']);
+		
+		// Instantiate and draw our chart, passing in some options.
+		var chart = new google.visualization.BarChart(document.getElementById('ddgJobStatusChart'));
+		seriesstyle = {''')
+		count = 0
+		for status in statusOrder:
+			html.append('''%d:{color: '%s'},''' % (count, statusColors[status]))
+			count += 1
+		html.append('''}
+		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle, backgroundColor:'#f2f2ff'});
+		google.visualization.events.addListener(chart, 'select', ddGStatusSelectHandler);
+		
+		function ddGStatusSelectHandler() {
+			var selection = chart.getSelection();
+			var message = '';
+			var predictionSet = null;
+			for (var i = 0; i < selection.length; i++) {
+				var item = selection[i];
+				if (item.row != null)
+				{
+					predictionSet = data.getFormattedValue(item.row, 0);
+					if ((predictionSet.length > 4) && (predictionSet.substring(0, 4) == "lin-"))
+					{
+						window.open(ddG_dlpath + predictionSet, "ddGresults");
+					}
+				}
+			}
+		}
+		''')
+	html.append('''
+	}
+	</script>
+	''')
+	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s<br><br></span>''' % vars())
+	html.append('''<div id="ddgJobStatusChart"></div>''')
+	
+	for predictionSet, data in sorted(predictionSets.iteritems()):
+		if data["active"]:
+			html.append('''<div><br><b>%s has %d active jobs.</b><div>''' % (predictionSet, data["active"]))
+
+	#if form.has_key("ddgJmolPDB"):
 	html.append('''</td>''')
 	html.append('''</tr>''')
 	html.append('''</table>''')
@@ -249,6 +502,7 @@ def generateDDGPage(settings_, rosettahtml, form):
 	subpages = [
 		{"name" : "jmol",		"desc" : "Jmol viewer",			"fn" : generateJmolPage,			"generate" :True,	"params" : [form]},
 		{"name" : "protherm",	"desc" : "ProTherm viewer",		"fn" : generateProThermPage,		"generate" :True,	"params" : [form]},
+		{"name" : "status",		"desc" : "Job status",			"fn" : generateStatusPage,			"generate" :True,	"params" : [form]},
 		]
 	
 	# Create menu

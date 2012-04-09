@@ -1,4 +1,4 @@
-subpages = ["protherm", "jmol"]
+subpages = ["status", "protherm", "jmol"]
 
 function showPage(page)
 {
