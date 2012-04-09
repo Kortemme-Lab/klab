@@ -30,7 +30,7 @@ netappRoot = "%s/temp" % clusterRootDir
 # Cluster constants
 CLUSTER_UserAccount = "klabqb3backrub"
 CLUSTER_printstatusperiod = 5
-CLUSTER_qstatpause = 60
+CLUSTER_qstatpause = 180
 CLUSTER_maxhoursforjob = 335
 CLUSTER_maxminsforjob = 59
 
