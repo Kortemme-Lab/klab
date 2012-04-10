@@ -1087,7 +1087,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
           detailed_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' % detailed_scores_html
           if not os.path.exists('../downloads/%s/scores_detailed.html'):
             writeFile('../downloads/%s/scores_detailed.html' % cryptID, detailed_scores_html)
-          if os.path.exists( score_file_res ) and not os.path.exists('../downloads/%s/scores_residues.html'):
+          if os.path.exists(score_file_res) and not os.path.exists(score_file_res_html):
               residues_scores_html = analysis_obj.residues_scores_to_html(readFile(score_file_res), tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
               residues_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' %  residues_scores_html
               writeFile(score_file_res_html, residues_scores_html)
