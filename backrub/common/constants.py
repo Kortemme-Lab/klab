@@ -21,7 +21,7 @@ rosetta_weights = {
 	"mm_lj_inter_rep"                                   	:	(None, None, []),
 	"mm_lj_inter_atr"                                   	:	(None, None, []),
 	"mm_twist"                                          	:	(None, "could be lr 2benergy and not in energy graph", []),
-	"mm_bend"                                           	:	(None, "could be lr 2benergy and not in energy graph", []),
+	"mm_bend"                                           	:	("Deviation of bond angles from the mean", "could be lr 2benergy and not in energy graph", []),
 	"mm_stretch"                                        	:	(None, "could be lr 2benergy and not in energy graph", []),
 	"lk_costheta"                                       	:	(None, None, []),
 	"lk_polar"                                          	:	(None, None, []),

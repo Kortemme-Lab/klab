@@ -31,7 +31,6 @@ from corebio.seq import unambiguous_protein_alphabet
 from conf_daemon import *
 import chainsequence       
 import pdb
-from analyze_mini import AnalyzeMini
 from ClusterTask import ClusterTask, ClusterScript, getClusterDatabasePath, FAILED_TASK
 from ClusterScheduler import TaskScheduler, RosettaClusterJob
 

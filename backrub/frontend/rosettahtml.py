@@ -17,8 +17,9 @@ import gzip
 import Graph
 import admin
 import ddgweb
+import pdb
 
-from rosettahelper import readFile
+from rosettahelper import readFile, writeFile
 from rwebhelper import *
 from RosettaProtocols import *
 
@@ -115,6 +116,7 @@ class RosettaHTML(object):
                 <link rel="STYLESHEET" type="text/css" href="../style.css">
                 
                 <script src="/javascripts/prototype.js" type="text/javascript"></script>
+                <script src="/javascripts/sorttable.js"></script>
                 <script src="/javascripts/scriptaculous.js" type="text/javascript"></script>
                 <script src="/javascripts/niftycube.js" type="text/javascript"></script>
                 <script src="/javascripts/boxover.js" type="text/javascript"></script>
@@ -1071,31 +1073,46 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         else:
             return None
         
-    def _show_scores_file(self, cryptID, size_of_ensemble):
+    def _show_scores_file(self, cryptID, jobID, size_of_ensemble):
+        stdout_file     = '../downloads/%s/stdout_%d.dat' % (cryptID, jobID)
         score_file     = '../downloads/%s/scores_overall.txt' % cryptID
         score_file_res = '../downloads/%s/scores_residues.txt' % cryptID
+        score_file_res_html = '../downloads/%s/scores_residues.html' % cryptID
         html = ''
         if os.path.exists( score_file ):
-          handle = open(score_file,'r')
+          from analyze_mini import AnalyzeMini
+          analysis_obj = AnalyzeMini(stdout_file, size_of_ensemble)
+          total_scores_html = analysis_obj.total_scores_to_html(tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
+          detailed_scores_html = analysis_obj.detailed_scores_to_html(tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
+          detailed_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' % detailed_scores_html
+          if not os.path.exists('../downloads/%s/scores_detailed.html'):
+            writeFile('../downloads/%s/scores_detailed.html' % cryptID, detailed_scores_html)
+          if os.path.exists( score_file_res ) and not os.path.exists('../downloads/%s/scores_residues.html'):
+              residues_scores_html = analysis_obj.residues_scores_to_html(readFile(score_file_res), tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
+              residues_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' %  residues_scores_html
+              writeFile(score_file_res_html, residues_scores_html)
+
+          
           html = '''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Total scores for the generated structures. Download files:<br>
                                                             <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
-                                                                <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>''' % (cryptID, cryptID)
+                                                                <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>
+                                                                <li><a href="../downloads/%s/scores_detailed.html">detailed scores (HTML)</a></li>''' % (cryptID, cryptID, cryptID)
           if os.path.exists( score_file_res ):
             html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
+          if os.path.exists( score_file_res_html ):
+            html += '''                                         <li><a href="%s">detailed scores for residues (HTML)</a></li>''' % (score_file_res_html)
           html += '''                                      </ul>
                         </td>
-                      <td style="width=100px;" bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre></a></td></tr>
-              ''' % ( score_file, join(handle.readlines()[:10], '') + '...\n' )
-          handle.close()
+                      <td style="width=100px;" bgcolor="#FFFCD8">%s</td></tr>
+              ''' % (total_scores_html )
           
           # the next 5 lines get the 10 best scoring structures from the overall energies file
-          handle = open(score_file,'r')
+          handle = open(score_file, 'r')
           import operator
           L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' ]
           L = L[:size_of_ensemble]
           L.sort(key = lambda x:float(x[1]))
           self.lowest_structs = L[:10] #todo: declare as constant
-          #print(self.lowest_structs)
           handle.close()
         
         return html
@@ -1489,18 +1506,25 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         chain = ProtocolParameters["Mutations"][0][0]
         resid = ProtocolParameters["Mutations"][0][1]
         newaa = ProtocolParameters["Mutations"][0][2]
-        #todo: not shown radius= ProtocolParameters["Mutations"][0][3]
-        
+        wt = "wildtype"
+        try:
+            pdbmodel = pdb.PDB(parameters["PDBComplex"].split("\n"))
+            pdbmodel.stripForDDG(numberOfModels = 1)
+            chainresid = "%s%s " % (chain, str(resid).rjust(4))
+            wt = ROSETTAWEB_SK_AAinv[pdbmodel.ProperResidueIDToAAMap()[chainresid]]
+        except:
+            pass
+        mutation_str = "Chain %s: %s %s %s, radius %s &#197;" % (chain, wt, resid, newaa, ProtocolParameters["Mutations"][0][3])
         html = ["""
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Point Mutation</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
-                <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td><td bgcolor="#EEEEFF">Chain: %s<br>Residue: %s<br>Mutation: %s</td></tr>
-                """ % ( input_filename, size_of_ensemble, chain, resid, newaa )]
+                <tr><td align=right bgcolor="#EEEEFF">Mutation:    </td><td bgcolor="#EEEEFF">%s</td></tr>
+                """ % ( input_filename, size_of_ensemble, mutation_str )]
                 
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
-          html.append(self._show_scores_file(cryptID, size_of_ensemble))
+          html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
           
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = {chain : [resid]}))
@@ -1557,7 +1581,16 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         list_resids = []
         list_newres = []
         list_radius = []
+        mutation_strs = []
         mutated = {}
+        
+        pdbmodel = None
+        try:
+            pdbmodel = pdb.PDB(parameters["PDBComplex"].split("\n"))
+            pdbmodel.stripForDDG(numberOfModels = 1)
+        except:
+            pass
+        
         for entry in ProtocolParameters["Mutations"]:
             chain = entry[0]
             resid = entry[1] 
@@ -1567,6 +1600,15 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             list_radius.append(entry[3])
             mutated[chain] = mutated.get(chain) or []
             mutated[chain].append(resid)
+            wt = "wildtype"
+            if pdbmodel:
+                try:
+                    chainresid = "%s%s " % (chain, str(resid).rjust(4))
+                    wt = ROSETTAWEB_SK_AAinv[pdbmodel.ProperResidueIDToAAMap()[chainresid]]
+                except:
+                    pass
+            mutation_strs.append("<td>Chain %s:</td><td>%s</td><td>%s</td><td>%s,</td><td>radius %s &#197;</td>" % (chain, wt, resid, entry[2], entry[3]))
+        mutation_strs = '''<tr style="text-align:left;">%s</tr>''' % join(mutation_strs, '''</tr><tr style="text-align:left;">''')
             
         multiple_mutations_html = ''
         for x in range(len(list_chains)):
@@ -1576,21 +1618,16 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 <tr><td align=right bgcolor="#EEEEFF">Task:           </td><td bgcolor="#EEEEFF">Multiple Point Mutations</td></tr>
                 <tr><td align=right bgcolor="#EEEEFF">Input file:     </td><td bgcolor="#EEEEFF">%s</td></tr> 
                 <tr><td align=right bgcolor="#EEEEFF">No. Generated structures: </td><td bgcolor="#EEEEFF">%s</td></tr>
-                <tr><td align=right bgcolor="#EEEEFF">Parameters:    </td>
-                          <td bgcolor="#EEEEFF"><table border="0" rules="rows" style="text-align:center;" align="center"><tr>
-                                                <td style="padding-left:10px;padding-right:10px;">Mutation No.</td>
-                                                <td style="padding-left:10px;padding-right:10px;">Chain</td>
-                                                <td style="padding-left:10px;padding-right:10px;">Residue</td>
-                                                <td style="padding-left:10px;padding-right:10px;">Mutation</td>
-                                                <td style="padding-left:10px;padding-right:10px;">Radius</td></tr>
+                <tr><td style="vertical-align:top; text-align:right;" bgcolor="#EEEEFF">Mutations:    </td>
+                          <td style="vertical-align:top;" bgcolor="#EEEEFF"><table border="0" style="border-collapse:collapse;text-align:left;" align="left">
                                                 %s
                                                 </table>
                           </td></tr>
-                    """ % ( input_filename, size_of_ensemble, multiple_mutations_html )]
+                    """ % ( input_filename, size_of_ensemble, mutation_strs)]#multiple_mutations_html )]
         
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
-          html.append(self._show_scores_file(cryptID, size_of_ensemble))
+          html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = mutated ))
@@ -1616,7 +1653,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
-            html.append(self._show_scores_file(cryptID, size_of_ensemble))        
+            html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble))        
         
             comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red.'
             html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters, ForEnsemble=True)))

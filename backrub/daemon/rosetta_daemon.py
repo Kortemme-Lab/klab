@@ -954,8 +954,8 @@ The Kortemme Lab Server Daemon
 			if usingMini:
 				databaseDir = os.path.join(self.dataDir, binary["database"])			  
 				postprocessingBinary = os.path.join(self.binDir, binary["postprocessing"])			  
-				analysis = AnalyzeMini(filename=os.path.join(workingdir, "stdout_%s.dat" % job_id) )
-				if not analysis.analyze(outfile=os.path.join(workingdir, "scores_detailed.txt"), outfile2=os.path.join(workingdir, "scores_overall.txt")):
+				analysis = AnalyzeMini(os.path.join(workingdir, "stdout_%s.dat" % job_id), ensembleSize)
+				if not analysis.analyze(os.path.join(workingdir, "scores_detailed.txt"), os.path.join(workingdir, "scores_overall.txt")):
 					self.log("Check_files() ID = %s : individual scores could not be created." % job_id )
 				if not analysis.calculate_residue_scores( self.base_dir, postprocessingBinary, databaseDir, workingdir, os.path.join(workingdir, "scores_residues.txt" ) ):
 					self.log("Check_files() ID = %s : residue energies could not be calculated." % job_id )
