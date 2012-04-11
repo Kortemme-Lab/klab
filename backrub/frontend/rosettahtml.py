@@ -1509,10 +1509,14 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         wt = "wildtype"
         try:
             pdbmodel = pdb.PDB(parameters["PDBComplex"].split("\n"))
-            pdbmodel.stripForDDG(numberOfModels = 1)
             chainresid = "%s%s " % (chain, str(resid).rjust(4))
-            wt = ROSETTAWEB_SK_AAinv[pdbmodel.ProperResidueIDToAAMap()[chainresid]]
-        except:
+            wt_short = pdbmodel.ProperResidueIDToAAMap().get(chainresid)
+            if wt_short:
+              wt = ROSETTAWEB_SK_AAinv.get(wt_short)
+        except Exception, e:
+            #print(str(e))
+            #import traceback
+            #print(traceback.format_exc())
             pass
         mutation_str = "Chain %s: %s %s %s, radius %s &#197;" % (chain, wt, resid, newaa, ProtocolParameters["Mutations"][0][3])
         html = ["""
