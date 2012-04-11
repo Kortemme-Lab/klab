@@ -1591,7 +1591,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         pdbmodel = None
         try:
             pdbmodel = pdb.PDB(parameters["PDBComplex"].split("\n"))
-            pdbmodel.stripForDDG(numberOfModels = 1)
         except:
             pass
         
@@ -1608,7 +1607,9 @@ This site has known issues under Internet Explorer. Until these issues are fixed
             if pdbmodel:
                 try:
                     chainresid = "%s%s " % (chain, str(resid).rjust(4))
-                    wt = ROSETTAWEB_SK_AAinv[pdbmodel.ProperResidueIDToAAMap()[chainresid]]
+                    wt_short = pdbmodel.ProperResidueIDToAAMap().get(chainresid)
+                    if wt_short:
+                          wt = ROSETTAWEB_SK_AAinv.get(wt_short)
                 except:
                     pass
             mutation_strs.append("<td>Chain %s:</td><td>%s</td><td>%s</td><td>%s,</td><td>radius %s &#197;</td>" % (chain, wt, resid, entry[2], entry[3]))
