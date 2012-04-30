@@ -63,7 +63,7 @@ def normalize_for_bash(s):
     return string.join(t, "")
 
 # Tasks
-def write_file(filename, contents):
+def write_file(filename, contents): #todo: elide this with writeFile above
    file = open(filename, 'w')
    file.write(contents)
    file.close()

@@ -53,12 +53,19 @@ class FASTA(dict):
 		return len(self.unique_sequences)
 	
 	def addSequence(self, pdbID, chainID, sequence):
+		pdbID = pdbID.upper() 
 		self[pdbID] = self.get(pdbID, {})
 		self[pdbID][chainID] = sequence
-		self.sequences.append((pdbID,chainID,sequence))
+		self.sequences.append((pdbID, chainID, sequence))
 		if not self.unique_sequences.get(sequence):
 			self.unique_sequences[sequence] = visible_colors[len(self.unique_sequences) % len(visible_colors)]
 		self.identical_sequences = None
+	
+	def getChains(self, pdbID):
+		pdbID = pdbID.upper() 
+		if not self.get(pdbID):
+			raise Exception("FASTA object does not contain sequences for PDB %s." % pdbID)
+		return self[pdbID].keys()
 	
 	def findIdenticalSequences(self):
 		sequences = self.sequences

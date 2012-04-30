@@ -177,90 +177,121 @@ def mapBetweenUniProtandPDB(IDs, fromtype, totype):
 				MappingBetweenIDs[line[ACIndex]].append(line[pdbIndex])			
 			assert(MappedUniProtACs == IDs)
 		return MappedPDBIDs, MappedUniProtACs, MappingBetweenIDs 
-		
+
+def commitUniProtMapping(db, ACtoID_mapping, PDBtoAC_mapping):
+	for uACC, uID in ACtoID_mapping.iteritems():
+		results = db.execute(("SELECT * FROM UniProtKB WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(uACC,))
+		if results:
+			if results[0][FieldNames_.UniProtKB_ID] != uID:
+				raise Exception("Existing UniProt mapping (%s->%s) does not agree with the passed-in parameters (%s->%s)." % (results[0][FieldNames_.UniProtKB_AC],results[0][FieldNames_.UniProtKB_ID],uACC,uID))
+		else:			
+			UniProtMapping = {
+				FieldNames_.UniProtKB_AC : uACC,
+				FieldNames_.UniProtKB_ID : uID,
+			}
+			db.insertDict('UniProtKB', UniProtMapping)
+	for updbID, uACCs in PDBtoAC_mapping.iteritems():
+		for uACC in uACCs:
+			results = db.execute(("SELECT * FROM UniProtKBMapping WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(uACC,))
+			associatedPDBsInDB = []
+			if results:
+				associatedPDBsInDB = [r[FieldNames_.PDB_ID] for r in results]
+			if updbID not in associatedPDBsInDB:
+				UniProtPDBMapping = {
+					FieldNames_.UniProtKB_AC : uACC,
+					FieldNames_.PDB_ID : updbID,
+				}
+				db.insertDict('UniProtKBMapping', UniProtPDBMapping)
+
+class UPFatalException(Exception): pass
 def getUniProtMapping(pdbIDs, storeInDatabase = False):
 	'''Takes in  a list of PDB IDs or one single ID string and returns a tuple of two values:
 		- a table mapping PDB IDs to UniProt ACCs (not necessarily a bijection) and
 		- a table mapping the above UniProt ACCs to UniProt IDs (necessarily a bijection).'''
-	db = ddGDatabase()
+	numtries = 1
+	maxtries = 3
 	if type(pdbIDs) == type(""):
 		pdbIDs = [pdbIDs]
 	if type(pdbIDs) == type([]):
-		import urllib,urllib2
-		url = 'http://www.uniprot.org/mapping/'
+		db = ddGDatabase()
+		for numtries in range(1, maxtries + 1):
+			try:
+				import urllib,urllib2
+				url = 'http://www.uniprot.org/mapping/'
+				sys.stdout.write("Querying UniProt: ")
+				PDBtoAC_mapping = {}
+				params = {
+					'from':'PDB_ID',
+					'to':'ACC',
+					'format':'tab',
+					'query':join(pdbIDs, " ")
+				}
+				data = urllib.urlencode(params)
+				request = urllib2.Request(url, data)
+				response = urllib2.urlopen(request)
+				lines = [l for l in response.read(200000).split("\n") if l]
+				if len(lines) <= 1:
+					raise UPFatalException("No PDB->ACC mapping returned for PDB IDs: %s." % join(pdbIDs, ", "))
+				assert(lines[0]=="From\tTo")
+				ACCs = set()
+				for line in lines[1:]:
+					line = line.split("\t")
+					assert(len(line) == 2)
+					pdbID = line[0]
+					uniprotACC = line[1]
+					PDBtoAC_mapping[pdbID] = PDBtoAC_mapping.get(pdbID) or []
+					PDBtoAC_mapping[pdbID].append(uniprotACC)
+					ACCs.add(uniprotACC)
+				ACCs = sorted(list(ACCs))
 		
-		PDBtoAC_mapping = {}
-		params = {
-			'from':'PDB_ID',
-			'to':'ACC',
-			'format':'tab',
-			'query':join(pdbIDs, " ")
-		}
-		data = urllib.urlencode(params)
-		request = urllib2.Request(url, data)
-		response = urllib2.urlopen(request)
-		lines = [l for l in response.read(200000).split("\n") if l]
-		assert(lines[0]=="From\tTo")
-		ACCs = set()
-		for line in lines[1:]:
-			line = line.split("\t")
-			assert(len(line) == 2)
-			pdbID = line[0]
-			uniprotACC = line[1]
-			PDBtoAC_mapping[pdbID] = PDBtoAC_mapping.get(pdbID) or []
-			PDBtoAC_mapping[pdbID].append(uniprotACC)
-			ACCs.add(uniprotACC)
-		ACCs = sorted(list(ACCs))
-
-		ACtoID_mapping = {}
-		params = {
-			'from':'ACC',
-			'to':'ID',
-			'format':'tab',
-			'query':join(ACCs, " ")
-		}
-		data = urllib.urlencode(params)
-		request = urllib2.Request(url, data)
-		response = urllib2.urlopen(request)
-		lines = [l for l in response.read(200000).split("\n") if l]
-		assert(len(lines) == len(ACCs) + 1)
-		assert(lines[0]=="From\tTo")
-		for line in lines[1:]:
-			line = line.split("\t")
-			assert(len(line) == 2)
-			uniprotACC = line[0]
-			uniprotID = line[1]
-			assert(not(ACtoID_mapping.get(uniprotACC)))
-			ACtoID_mapping[uniprotACC] = uniprotID 
-		
-		if storeInDatabase:
-			for uACC, uID in ACtoID_mapping.iteritems():
-				results = db.execute(("SELECT * FROM UniProtKB WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(uACC,))
-				if results:
-					if results[0][FieldNames_.UniProtKB_ID] != uID:
-						raise Exception("Existing UniProt mapping (%s->%s) does not agree with the passed-in parameters (%s->%s)." % (results[0][FieldNames_.UniProtKB_AC],results[0][FieldNames_.UniProtKB_ID],uACC,uID))
-				else:			
-					UniProtMapping = {
-						FieldNames_.UniProtKB_AC : uACC,
-						FieldNames_.UniProtKB_ID : uID,
-					}
-					db.insertDict('UniProtKB', UniProtMapping)
-			for updbID, uACCs in PDBtoAC_mapping.iteritems():
-				for uACC in uACCs:
-					results = db.execute(("SELECT * FROM UniProtKBMapping WHERE %s" % FieldNames_.UniProtKB_AC)+"=%s", parameters=(uACC,))
-					associatedPDBsInDB = []
-					if results:
-						associatedPDBsInDB = [r[FieldNames_.PDB_ID] for r in results]
-					if updbID not in associatedPDBsInDB:
-						UniProtPDBMapping = {
-							FieldNames_.UniProtKB_AC : uACC,
-							FieldNames_.PDB_ID : updbID,
-						}
-						db.insertDict('UniProtKBMapping', UniProtPDBMapping)
-		return (PDBtoAC_mapping, ACtoID_mapping) 
+				ACtoID_mapping = {}
+				params = {
+					'from':'ACC',
+					'to':'ID',
+					'format':'tab',
+					'query':join(ACCs, " ")
+				}
+				data = urllib.urlencode(params)
+				request = urllib2.Request(url, data)
+				response = urllib2.urlopen(request)
+				lines = [l for l in response.read(200000).split("\n") if l]
+				if len(lines) <= 1:
+					raise UPFatalException("No ACC->ID mapping returned for ACCs: %s." % join(pdbIDs, ", "))
+				assert(lines[0]=="From\tTo")
+				assert(len(lines) == len(ACCs) + 1)
+				for line in lines[1:]:
+					line = line.split("\t")
+					assert(len(line) == 2)
+					uniprotACC = line[0]
+					uniprotID = line[1]
+					assert(not(ACtoID_mapping.get(uniprotACC)))
+					ACtoID_mapping[uniprotACC] = uniprotID 
+				
+				if storeInDatabase:
+					commitUniProtMapping(db, ACtoID_mapping, PDBtoAC_mapping)
+				db.close()
+				colortext.message("success")
+				return (ACtoID_mapping, PDBtoAC_mapping)
+			except UPFatalException, e:
+				raise(str(e).strip())
+			except Exception, e:
+				emsg = str(e).strip() 
+				if emsg and emsg.startswith("HTTP Error 500"):
+					colortext.error("failed (HTTP Error 500)")
+				else:
+					colortext.error("failed")
+					if emsg:
+						colortext.error(emsg)
+					colortext.error(traceback.format_exc())
+					#print("Lines:\n%s" % lines)
+					#print("ACCs:\n%s" % ACCs)
+				time.sleep(1)
 	else:
 		raise Exception("Expected a list of PDB IDs or a string with a single ID.")
 
+	db.close()
+	raise Exception("The request to UniProt failed %d times." % (numtries))
+		
 
 def computeStandardDeviation(values):
 	sum = 0
@@ -428,7 +459,13 @@ class DBObject(object):
 	
 class PDBStructure(DBObject):
 	
-	def __init__(self, pdbID, content = None, protein = None, source = None, filepath = None, UniProtAC = None, UniProtID = None):
+	# At the time of writing, these PDB IDs had no UniProt entries
+	NoUniProtIDs = ['1GTX', '1UOX', '1WSY', '2MBP']
+	
+	# At the time of writing, these PDB IDs had no JRNL lines
+	NoPublicationData = ['2FX5']
+	
+	def __init__(self, pdbID, content = None, protein = None, source = None, filepath = None, UniProtAC = None, UniProtID = None, testonly = False):
 		'''UniProtACs have forms like 'P62937' whereas UniProtIDs have forms like 'PPIA_HUMAN.'''
 		
 		self.dict = {
@@ -441,9 +478,12 @@ class PDBStructure(DBObject):
 			FieldNames_.Techniques : None,
 			FieldNames_.Publication : None,
 		}
+		self.testonly = testonly
 		self.filepath = filepath
 		self.UniProtAC = UniProtAC
 		self.UniProtID = UniProtID
+		self.ACtoID_mapping = None
+		self.PDBtoAC_mapping = None
 		
 	def getPDBContents(self, db):
 		d = self.dict
@@ -451,6 +491,7 @@ class PDBStructure(DBObject):
 		if len(id) != 4:
 			print(id)
 		assert(len(id) <= 10)
+		
 		if self.filepath:
 			filename = self.filepath
 		else:
@@ -459,12 +500,16 @@ class PDBStructure(DBObject):
 		chains = {}
 		
 		if not os.path.exists(filename):
-			print("The file for %s is missing. Retrieving it now from RCSB:" % (id, filename))
+			sys.stdout.write("The file for %s is missing. Retrieving it now from RCSB: " % (id))
+			sys.stdout.flush()
 			try:
 				contents = rcsb.getPDB(id)
-				rosettahelper.write_file(filename, contents)
+				#todo: remove this line rosettahelper.write_file("/home/oconchus/ddgadmin/matchers/1A2I.pdb", contents)
+				colortext.message("success")
 			except:
+				colortext.error("failure")
 				raise Exception("Error retrieving %s." % filename)
+			
 		else:
 			contents = rosettahelper.readFile(filename)
 		
@@ -478,11 +523,36 @@ class PDBStructure(DBObject):
 				for k in range(len(techniques)):
 					techniques[k] = techniques[k].strip() 
 				techniques = join(techniques, ";")
-			elif line.startswith("REMARK   2 RESOLUTION."):
-				if line[23:38] == "NOT APPLICABLE.":
+			elif line[0:6] == "REMARK" and line[9] == "2" and line[11:22] == "RESOLUTION.":
+				#if id == :
+				#	line = "REMARK   2 RESOLUTION. 3.00 ANGSTROMS.
+
+								# This code SHOULD work but there are badly formatted PDBs in the RCSB database.
+				# e.g. "1GTX"
+				#if line[31:41] == "ANGSTROMS.":
+				#	try:
+				#		resolution = float(line[23:30])
+				#	except:
+				#		raise Exception("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard. Expected data for diffraction experiments." % line )
+				#if line[23:38] == "NOT APPLICABLE.":
+				#	resolution = "N/A"
+				#else:
+				#	raise Exception("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard." % line )
+				#
+				# Instead, we use the code below:
+				strippedline = line[22:].strip()
+				Aindex = strippedline.find("ANGSTROMS.")
+				NA = strippedline == "NOT APPLICABLE."
+				if NA:
 					resolution = "N/A"
-				elif line[31:].startswith("ANGSTROMS."):
-					resolution = float(line[22:30])
+				elif Aindex != -1 and strippedline.endswith("ANGSTROMS."):
+					if strippedline[:Aindex].strip() == "NULL":
+						resolution = "N/A" # Yes, yes, yes, I know. Look at 1WSY.pdb.
+					else:
+						try:
+							resolution = float(strippedline[:Aindex].strip())
+						except:
+							raise Exception("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard. Expected data for diffraction experiments." % line )
 				else:
 					raise Exception("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard." % line )
 		
@@ -495,16 +565,22 @@ class PDBStructure(DBObject):
 		
 		UniqueIDs[id] = True
 			
-		readUniProtMap(db)
-		if not PDBToUniProt.get(id):
-			if not (self.UniProtAC and self.UniProtID):
-				PDBtoAC_mapping, ACtoID_mapping = getUniProtMapping(id, storeInDatabase = False)
-				if not (PDBtoAC_mapping and ACtoID_mapping):
-					raise Exception("Could not find a UniProt mapping for %s in %s." % (id, uniprotmapping))
+		if id not in self.NoUniProtIDs:
+			readUniProtMap(db)
+			if not PDBToUniProt.get(id):
+				if not (self.UniProtAC and self.UniProtID):
+					ACtoID_mapping, PDBtoAC_mapping = getUniProtMapping(id, storeInDatabase = False)
+					if not (PDBtoAC_mapping and ACtoID_mapping):
+						raise Exception("Could not find a UniProt mapping for %s in %s." % (id, uniprotmapping))
+					self.ACtoID_mapping = ACtoID_mapping
+					self.PDBtoAC_mapping = PDBtoAC_mapping
+		
 		d[FieldNames_.Content] = contents
 		d[FieldNames_.Resolution] = resolution
 		d[FieldNames_.Techniques] = techniques
 		
+		if id not in self.NoPublicationData:
+			self.getPublication(db)
 		self.getFASTA()
 		
 		pdb = PDB(lines)
@@ -520,7 +596,7 @@ class PDBStructure(DBObject):
 		d[FieldNames_.BFactors] = pickle.dumps(pdb.ComputeBFactors()) 
 		return contents
 	
-	def getPublication(self):
+	def getPublication(self, db):
 		'''Extracts the PDB source information.'''
 		d = self.dict
 		 
@@ -529,9 +605,8 @@ class PDBStructure(DBObject):
 		p = PDB(d[FieldNames_.Content].split("\n"))
 		j = p.getJournal()
 		pdbID = d[FieldNames_.PDB_ID].strip()
-		raise Exception("Need to test this function.")
-		if True:
-			print(s["PDB_ID"])
+		
+		if False:
 			if j["published"]:
 				print(j["REFN"]["type"])
 				print(j["REFN"]["ID"])
@@ -544,16 +619,17 @@ class PDBStructure(DBObject):
 				if k != "lines":
 					print("%s: %s" % (k, v))
 			print("********\n")
-					
+		
 		# We identify the sources for a PDB identifier with that identifier
 		SourceID = "PDB:%s" % pdbID 
-		sourceExists = self.ddGdb.execute("SELECT ID FROM Source WHERE ID=%s", parameters=(SourceID,))
+		sourceExists = db.execute("SELECT ID FROM Source WHERE ID=%s", parameters=(SourceID,))
 		if not sourceExists:
-			self.ddGdb.insertDict(FieldNames_.Source, {FieldNames_.ID : SourceID})
+			if not self.testonly:
+				db.insertDict(FieldNames_.Source, {FieldNames_.ID : SourceID})
 		
 		d[FieldNames_.Publication] = SourceID
 		
-		locations = self.ddGdb.execute("SELECT * FROM SourceLocation WHERE SourceID=%s", parameters=(SourceID,))
+		locations = db.execute("SELECT * FROM SourceLocation WHERE SourceID=%s", parameters=(SourceID,))
 		publocations = [location for location in locations if location[FieldNames_.Type] in PUBTYPES]
 		doilocations = [location for location in locations if location[FieldNames_.Type] == "DOI"]
 		assert(len(publocations) <= 1)
@@ -567,22 +643,30 @@ class PDBStructure(DBObject):
 						colortext.warning("REFN: Check that the SourceLocation data ('%s') matches the PDB REFN data ('%s')." % (str(location), j["REFN"]))			
 			else:
 				assert(j["REFN"]["type"] in PUBTYPES)
-				self.ddGdb.insertDict(FieldNames_.SourceLocation, {
+				source_location_dict  =  {
 					FieldNames_.SourceID	: SourceID,
 					FieldNames_.ID			: j["REFN"]["ID"],
 					FieldNames_.Type		: j["REFN"]["type"],
-					})				
+				}
+				if not self.testonly:
+					db.insertDict(FieldNames_.SourceLocation, source_location_dict)		
+				else:
+					print(source_location_dict)		
 		if j["DOI"]:
 			if doilocations:
 				location = doilocations[0]
 				if j["DOI"] != location[FieldNames_.ID]:
 					colortext.warning("DOI: Check that the SourceLocation data ('%s') matches the PDB DOI data ('%s')." % (str(doilocations), j["DOI"]))
 			else:
-				self.ddGdb.insertDict(FieldNames_.SourceLocation, {
+				source_location_dict = {
 					FieldNames_.SourceID	: SourceID,
 					FieldNames_.ID			: j["DOI"],
 					FieldNames_.Type		: FieldNames_.DOI,
-					})
+				}
+				if not self.testonly:
+					db.insertDict(FieldNames_.SourceLocation, source_location_dict)
+				else:
+					print(source_location_dict)		
 	
 	def getFASTA(self):
 		pdbID = self.dict[FieldNames_.PDB_ID]
@@ -594,13 +678,11 @@ class PDBStructure(DBObject):
 			except:
 				pass
 		raise Exception("No FASTA file could be found for %s." % pdbID)
-		self.dict[FieldNames_.FASTA] = ""
 	
 	def commit(self, db, testonly = False):
 		'''Returns the database record ID if an insert occurs but will typically return None if the PDB is already in the database.'''
 		d = self.dict
-		
-		raise Exception("I need to test the getPublication and get FASTA functions.")
+		testonly = testonly or self.testonly
 		
 		self.getPDBContents(db)
 		assert(PDBChains.get(d[FieldNames_.PDB_ID]))
@@ -638,10 +720,19 @@ class PDBStructure(DBObject):
 						if not testonly:
 							results = db.execute(SQL, parameters = (v, pdbID))
 		else:
-			SQL = 'INSERT INTO Structure (PDB_ID, Content, Resolution, Protein, Source, Techniques, BFactors) VALUES (%s, %s, %s, %s, %s, %s, %s);'
-			vals = (d[FieldNames_.PDB_ID], d[FieldNames_.Content], d[FieldNames_.Resolution], d[FieldNames_.Protein], d[FieldNames_.Source], d[FieldNames_.Techniques], d[FieldNames_.BFactors]) 
 			if not testonly:
-				db.execute(SQL, parameters = vals)
+				pdb_dict = { 
+					FieldNames_.PDB_ID		: d[FieldNames_.PDB_ID],
+					FieldNames_.FASTA		: d[FieldNames_.FASTA], 
+					FieldNames_.Publication	: d[FieldNames_.Publication], 
+					FieldNames_.Content		: d[FieldNames_.Content], 
+					FieldNames_.Resolution	: d[FieldNames_.Resolution], 
+					FieldNames_.Protein		: d[FieldNames_.Protein], 
+					FieldNames_.Source		: d[FieldNames_.Source], 
+					FieldNames_.Techniques	: d[FieldNames_.Techniques], 
+					FieldNames_.BFactors	: d[FieldNames_.BFactors],
+				}
+				db.insertDict(FieldNames_.Structure, pdb_dict)
 				self.databaseID = db.getLastRowID()
 		
 		if self.UniProtAC and self.UniProtID:
@@ -658,8 +749,12 @@ class PDBStructure(DBObject):
 					db.insertDict('UniProtKBMapping', UniProtPDBMapping)
 		
 		# Store the UniProt mapping in the database
-		PDBtoAC_mapping, ACtoID_mapping = getUniProtMapping(d[FieldNames_.PDB_ID], storeInDatabase = True)
-
+		if d[FieldNames_.PDB_ID] not in self.NoUniProtIDs:
+			if not (self.ACtoID_mapping and self.PDBtoAC_mapping):
+				self.ACtoID_mapping, self.PDBtoAC_mapping = getUniProtMapping(d[FieldNames_.PDB_ID], storeInDatabase = False)
+			assert(self.ACtoID_mapping and self.PDBtoAC_mapping)
+			commitUniProtMapping(db, self.ACtoID_mapping, self.PDBtoAC_mapping)
+		
 		if not testonly:
 			return self.databaseID
 		else:

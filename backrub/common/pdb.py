@@ -84,6 +84,8 @@ def computeMeanAndStandardDeviation(values):
 class JRNL(object):
 	
 	def __init__(self, lines):
+		if not lines:
+			raise Exception("Could not parse JRNL: No lines to parse.")
 		self.d = {}
 		self.d["lines"] = lines
 		self.parse_REF()
