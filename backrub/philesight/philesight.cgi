@@ -37,21 +37,31 @@ if Socket.gethostname == 'albana.ucsf.edu' then
 			@ps = Philesight.new($img_rings, $img_size, $img_gradients)
 			
 			cgi = CGI.new
-			cmd = cgi.params['cmd'][0]
-			userdir = cgi.params['userdir'][0]
-			if cgi.params['path'][0] then
-				if cgi.params['path'][0] == "/" then
-					cgi.params['path'][0] = "/kortemmelab"
-				end
-			end
-			if userdir then
-				path = cgi.params['path'][0] || "/kortemmelab/" + userdir || @ps.prop_get("root") || "/"
-			else
-				path = cgi.params['path'][0] || "/kortemmelab"
-			end
-			$path_db = "/var/www/html/rosettaweb/backrub/philesight/userspace.db"
-	
-			# Create philesight object and open database			
+      cmd = cgi.params['cmd'][0]
+      userdir = cgi.params['userdir'][0]
+      #$psdatabase = cgi.params['psdatabase'][0] or "ganon" # Not sure what's wrong here but this doesn't work
+      $psdatabase = "ganon" # "webserver" or "ganon"
+      
+      if $psdatabase == "ganon" then
+       $path_db = "/var/www/html/rosettaweb/backrub/philesight/userspace.db"
+        if cgi.params['path'][0] then
+          if cgi.params['path'][0] == "/" then
+            cgi.params['path'][0] = "/kortemmelab"
+          end
+        end
+        if userdir then
+          path = cgi.params['path'][0] || "/kortemmelab/" + userdir || @ps.prop_get("root") || "/"
+        else
+          path = cgi.params['path'][0] || "/kortemmelab"
+        end
+      end
+      
+      if $psdatabase == "webserver" then
+        $path_db = "/var/www/html/rosettaweb/backrub/philesight/webserver_diskusage.db"
+        path = "/"
+      end
+      
+      # Create philesight object and open database			
 			@ps.db_open($path_db)
 			
 			# Get parameters from environment and CGI. 
@@ -88,7 +98,7 @@ if Socket.gethostname == 'albana.ucsf.edu' then
 					end
 	
 				else 
-					do_show(path)
+					do_show(path, $psdatabase)
 	
 			end
 		end
@@ -184,7 +194,7 @@ if Socket.gethostname == 'albana.ucsf.edu' then
 		# Generate HTML page with list and graph
 		#
 		
-		def do_show(path)
+		def do_show(path, psdatabase)
 			random = ""
 			puts "Content-type: text/html"
 			puts "Cache-Control: no-cache, must-revalidate"
@@ -245,21 +255,29 @@ if Socket.gethostname == 'albana.ucsf.edu' then
 			puts '		<tr><td><p></p></td></tr>'
 			puts '		<tr>'
 			puts '			<td><table style="width:250px;text-align:left">'
-			puts '				<tr>'
-			puts '				<td>Current members:</td>'
-			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?userdir=home\',\'_self\')">home</button></td>'
-			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?userdir=data\',\'_self\')">data</button></td>'
-			puts '				</tr>'
-			puts '				<tr>'
-			puts '				<td>Lab alumni:</td>'
-			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?path=%2Fkortemmelab%2Falumni%2Fahome\',\'_self\')">home</button></td>'
-			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?path=%2Fkortemmelab%2Falumni%2Fadata\',\'_self\')">data</button></td>'
-			puts '				</tr>'
-			puts '				<tr>'
-			puts '				<td></td>'
-			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?userdir=archive\',\'_self\')">archive</button></td>'
-			puts '				</tr>'
-			puts '			</table></td>'
+			if psdatabase == "ganon" then
+  			puts '				<tr>'
+  			puts '				<td>Current members:</td>'
+  			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?psdatabase=ganon&userdir=home\',\'_self\')">home</button></td>'
+  			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?psdatabase=ganon&userdir=data\',\'_self\')">data</button></td>'
+  			puts '				</tr>'
+  			puts '				<tr>'
+  			puts '				<td>Lab alumni:</td>'
+  			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?psdatabase=ganon&path=%2Fkortemmelab%2Falumni%2Fahome\',\'_self\')">home</button></td>'
+  			puts '				<td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?psdatabase=ganon&path=%2Fkortemmelab%2Falumni%2Fadata\',\'_self\')">data</button></td>'
+  			puts '				</tr>'
+  			puts '       <tr>'
+        puts '        <td></td>'
+        puts '        <td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?psdatabase=ganon&userdir=archive\',\'_self\')">archive</button></td>'
+        puts '        </tr>'
+      end
+      if psdatabase == "webserver" then
+        puts '        <tr>'
+        puts '        <td>Webserver</td>'
+        puts '        <td><button onclick="window.open(\'/backrub/philesight/philesight.cgi?psdatabase=webserver\',\'_self\')">webserver</button></td>'
+        puts '        </tr>'
+      end
+      puts '			</table></td>'
 			puts '		</tr>'
 			puts '		<tr>'
 			puts '		<td>'
