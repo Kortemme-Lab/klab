@@ -18,7 +18,7 @@ TYPICAL_LAPSE = 1.5
 
 # If you call these functions from multiple scripts, you can use this value to ensure all scripts read the same
 # amount of log
-DEFAULT_LOG_SIZE = 25 * 65536 * 30 # Read 30* 25x64KB from the end of the log. Change this value to suit
+DEFAULT_LOG_SIZE = 60 * 1024 * 1024 # Read 60 MB from the end of the log. Change this value to suit
 
 SECONDS_IN_A_DAY = 60 * 60 * 24
 
@@ -289,7 +289,7 @@ class LogReader(object):
 		missingScripts = expectedScripts.SymmetricDifference(scriptsRun.keys())
 		
 		# NOTE: We ignore these special script types. This list is probably not comprehensive and so may need to be added to.
-		for t in ['Ming', 'Ming (offsite)', 'Restore', 'Grooming', 'Engine start', 'Rebuild', 'Retrieve Snapshot']:
+		for t in ['Kortemme (offsite)', 'Ming', 'Ming (offsite)', 'Restore', 'Grooming', 'Engine start', 'Rebuild', 'Retrieve Snapshot']:
 			if t in missingScripts:
 				missingScripts.remove(t)
 				del scriptsRun[t]
@@ -505,7 +505,7 @@ for s in ["kortemme-cd", "kortemme-fplc", "kortemme-hplc", "kortemme-spec",
 		"Epona", "Ganon", "Web Server", "Workstations"]:
 	expectedScripts.add(s, SimpleScript(1))
 for s in ["kortemme-cd (offsite)", "kortemme-fplc (offsite)", "kortemme-hplc (offsite)", "kortemme-spec (offsite)",
-		"kortemmelab-alumni-data", "kortemmelab-alumni-home",
-		"AmelieStein (offsite)", "Bobal (offsite)", "Kortemme (offsite)", "Lab Admin (offsite)", 
+		"kortemmelab-alumni-data", "kortemmelab-alumni-home", "kortemmelab-weekly",
+		"AmelieStein (offsite)", "Bobal (offsite)", "Kortemme (offsite backup)", "Lab Admin (offsite)", 
 		"Epona (offsite)", "Ganon", "Web Server (offsite)", "Workstations (offsite)"]:
 	expectedScripts.add(s, SimpleScript(7))
