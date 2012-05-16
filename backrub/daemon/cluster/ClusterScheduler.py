@@ -520,3 +520,92 @@ class RosettaClusterJob(StatusPrinter):
 			make755Directory(destpath)
 		writeFile(JITjs, contents[0])
 		writeFile(JIThtml, contents[1])
+
+class ClusterBatchJob(RosettaClusterJob):
+
+	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
+		self.jobIDs = sorted(parameters["jobs"].keys()) # The fact that this is a sorted list is important
+		self.jobID = "%s-%s" % (parameters["cryptID"], parameters["ID"])
+		self.failedIDs = []
+		self._setStatusPrintingParameters(self.jobID, statustype = "job", level = 0, color = "lightpurple")
+		self.profiler = SimpleProfiler.SimpleProfiler("%s-%s" % (self.suffix, parameters["ID"]))
+		self.parameters = parameters
+		self.sgec = sgec
+		self.debug = True
+		self.tempdir = tempdir
+		self.targetroot = targetroot
+		self.testonly = testonly
+		self.dldir = os.path.join(dldir, parameters["cryptID"])
+		if not testonly:
+			self._make_workingdir()
+			self._make_targetdir()
+		else:
+			raise Exception("Implement this case")
+			#todo: used to be 
+			#  self.workingdir = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/test" #todo
+			#  self.targetdirectory = "/home/oconchus/clustertest110428/rosettawebclustertest/backrub/temp/test"
+		self.profiler.PROFILE_START("Initialization")
+		self._initialize()
+		self.profiler.PROFILE_STOP("Initialization")
+		self.failed = False
+		self.error = None
+		self.resultFilemasks = []
+		self._defineOutputFiles()
+
+	def moveFilesTo(self, permissions = permissions755):
+		destpath = self.dldir
+		
+		self._status("Moving files to %s" % destpath, level = 0)
+
+		if not os.path.exists(destpath):
+			make755Directory(destpath)
+			
+		timing_profile = self._targetdir_file_path("timing_profile.txt")
+		if os.path.exists(timing_profile):
+			shutil.move(timing_profile, destpath)
+		
+		for jobID in self.jobIDs:
+			destjobpath = os.path.join(destpath, str(jobID))
+			targetjobpath = os.path.join(self.targetdirectory, str(jobID))
+			if os.path.exists(destjobpath):
+				shutil.rmtree(destjobpath)
+			make755Directory(destjobpath)
+			if self.resultFilemasks:
+				for mask in self.resultFilemasks:
+					fromSubdirectory = os.path.join(targetjobpath, mask[0])
+					toSubdirectory = os.path.join(destjobpath, mask[0])
+					self._status("Moving files from %s to %s using mask '%s'.\n" % (fromSubdirectory, toSubdirectory, mask[1]), level = 5)
+					if not os.path.exists(toSubdirectory):
+						make755Directory(toSubdirectory)
+					for file in os.listdir(fromSubdirectory):
+						self._status("File: %s" % file, level = 10)
+						if fnmatch.fnmatch(file, mask[1]):
+							try:
+								shutil.move(os.path.join(fromSubdirectory, file), toSubdirectory)
+								if not os.path.exists(os.path.join(toSubdirectory, file)):
+									self._status("Error moving %s." % file)
+								else:
+									self._status("Moved.", level = 10)
+							except Exception, e:
+								self._status("Exception moving %s to %s: %s" % (os.path.join(fromSubdirectory, file), toSubdirectory, str(e)))
+			else:
+				if os.path.exists(destjobpath):
+					shutil.rmtree(destjobpath)
+				shutil.move(targetjobpath, destjobpath)
+		
+		os.chmod( destpath, permissions )
+		return destpath
+
+	def _make_taskdir(self, dirname, files = []):
+		""" Make a subdirectory dirname in the working directory and copy all files into it.
+			Filenames should be relative to the working directory."""
+		if not self.testonly:
+			for jobID in self.jobIDs: 
+				taskdir = os.path.join(self.workingdir, str(jobID), dirname)
+				if not os.path.isdir(taskdir):
+					make755Directory(taskdir)
+				if not os.path.isdir(taskdir):
+					raise os.error
+				for file in files:
+					shutil.copyfile("%s/%s" % (self.workingdir, file), "%s/%s" % (taskdir, file))
+		return self.workingdir

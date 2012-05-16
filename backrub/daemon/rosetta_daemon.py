@@ -266,7 +266,10 @@ The Kortemme Lab Server Daemon
 			We are lock-happy here but SQL performance is not currently an issue daemon-side. 
 			""" 
 		if self.logSQL:
-			self.log("SQL: %s." % query)
+			if parameters:
+				self.log("SQL: %s, parameters = %s" % (query, parameters))
+			else:
+				self.log("SQL: %s" % query)
 		results = []
 		try:
 			lockstr = alternateLocks or "%s WRITE, Users READ" % self.db_table		 
@@ -1209,8 +1212,8 @@ class ClusterDaemon(RosettaDaemon):
 			# get all jobs in queue
 			data = self.runSQL("SELECT ID,Date,Status,PDBComplex,PDBComplexFile,Mini,EnsembleSize,task,ProtocolParameters,cryptID,BackrubServer FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
 			try:
+				jobID = None
 				if len(data) != 0:
-					jobID = None
 					for i in range(0, len(data)):
 						# (data[i][10] == 'kortemmelab') == not(settings["LiveWebserver"]) covers both conditions below
 						
