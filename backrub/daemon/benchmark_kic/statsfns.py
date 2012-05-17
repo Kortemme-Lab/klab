@@ -1,3 +1,46 @@
+#This file was developed and written by Roland A. Pache, Ph.D., Copyright (C) 2011, 2012.
+
+#Quantile
+#input: list of values (floats/ints), p in [0,1)
+#output: p-Quantile, 'n/a' if not applicable
+def quantile(values, p):
+	quantile='n/a'
+	if values!=[]:
+		dummy_values=[]
+		for value in values:
+			if value!='n/a':
+				dummy_values.append(value)
+		if not dummy_values:
+			raise Exception("The list of values did not contain any valid entries.")
+		dummy_values.sort()
+		num_values=len(dummy_values)
+		index=int(float(num_values)*p)
+		quantile=dummy_values[index]
+	return quantile
+
+#Median
+#input: list of values (floats/ints)
+#output: median, 'n/a' if not applicable
+def median(values):
+	median=quantile(values,0.5)
+	return median
+
+#Box-and-Whisker plot with median bars
+#input: map x (float/int) -> list of y (float/int)
+#output: list of (x,min,1st_quartile,median,3rd_quartile,max) tuples ready for gnuplot
+def boxAndWhisker(data):
+	tuples=[]
+	for x in data:
+		y_values=data[x]
+		if y_values!=[]:
+			minimum=min(y_values)
+			maximum=max(y_values)
+			median_value=median(y_values)
+			first_quartile=quantile(y_values,0.25)
+			third_quartile=quantile(y_values,0.75)
+			tuples.append([x,minimum,first_quartile,median_value,third_quartile,maximum])
+	return tuples
+
 #Kruskal-Wallis nonparametric test p-value
 #input: two lists of values (float/int), one of {'two.sided','greater','less'}
 #output: one or two-sided p-value (float), depending on the given alternative
