@@ -48,8 +48,9 @@ from cgi import escape
 
 import string
 import pickle
-import admin
-import ddgweb
+#import admin
+#import ddgweb
+#import benchmarks
 
 # Get IP address and hostname
 IP = os.environ['REMOTE_ADDR']
@@ -86,6 +87,9 @@ def getKlabDBConnection():
 
 def getKortemmelabUsersConnection():
 	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab")
+
+def getBenchmarksConnection():
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "Benchmarks")
 
 def fixFilename(filename):
 	
@@ -243,8 +247,8 @@ def ws():
 			allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
 			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
 			if not(settings["LiveWebserver"]):
-				allowedQueries.extend(["admin", "ddg", "PDB", "admincmd"])
-				subAllowedQueries.extend(["admin", "ddg", "PDB", "admincmd"])
+				allowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd"])
+				subAllowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
 			if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
@@ -506,7 +510,7 @@ def ws():
 					quotas = StorageDBConnection.execQuery("UPDATE backrub SET AdminCommand=%s WHERE ID=%s", parameters = (cmd, jobID))
 				else:
 					oldcmd = cmd
-					cmd = "administrat"
+					#cmd = "administrat"
 					raise Exception("Unknown command %s passed." % oldcmd)
 			except Exception, e:
 			 success = False
@@ -530,6 +534,56 @@ def ws():
 		if not(settings["LiveWebserver"]):
 			html_content = rosettaHTML.ddgPage(settings, form)
 			title = '&#916;&#916;G'
+
+	elif query_type == "benchmarks":
+		if not(settings["LiveWebserver"]):
+			
+			benchmarks = {}
+			for b in getBenchmarksConnection().execQuery('SELECT * FROM Benchmark', cursorClass = rosettadb.DictCursor):
+				benchmarkID = b['BenchmarkID']
+				benchmarks[benchmarkID] = {}
+				benchmarks[benchmarkID]['ParameterizedFlags'] = b['ParameterizedFlags']
+				benchmarks[benchmarkID]['SimpleFlags'] = b['SimpleFlags']
+				
+			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "RunLength"'
+			runlengths = getBenchmarksConnection().execQuery(qry)[0][0]
+			if runlengths.startswith("enum(") and runlengths.endswith(")"):
+				runlengths = (runlengths[5:-1]).split(",")
+				runlengths = [b.strip()[1:-1] for b in runlengths]
+			
+			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "ClusterQueue"'
+			ClusterQueues = getBenchmarksConnection().execQuery(qry)[0][0]
+			if ClusterQueues.startswith("enum(") and ClusterQueues.endswith(")"):
+				ClusterQueues = (ClusterQueues[5:-1]).split(",")
+				ClusterQueues = [b.strip()[1:-1] for b in ClusterQueues]
+			
+			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "ClusterArchitecture"'
+			ClusterArchitectures = getBenchmarksConnection().execQuery(qry)[0][0]
+			if ClusterArchitectures.startswith("enum(") and ClusterArchitectures.endswith(")"):
+				ClusterArchitectures = (ClusterArchitectures[5:-1]).split(",")
+				ClusterArchitectures = [b.strip()[1:-1] for b in ClusterArchitectures]
+			
+			qry = 'SELECT BenchmarkID, AlternateFlags FROM BenchmarkAlternateFlags ORDER BY ID'
+			for alternate_flags in getBenchmarksConnection().execQuery(qry):
+				benchmarks[alternate_flags[0]]['alternate_flags'] = benchmarks[alternate_flags[0]].get('alternate_flags', [])
+				benchmarks[alternate_flags[0]]['alternate_flags'].append(alternate_flags[1])
+				
+			qry = 'SELECT * FROM BenchmarkOption ORDER BY ID'
+			for benchmark_options in getBenchmarksConnection().execQuery(qry, cursorClass = rosettadb.DictCursor):
+				benchmarks[benchmark_options["BenchmarkID"]]['options'] = benchmarks[benchmark_options["BenchmarkID"]].get('options', [])
+				benchmarks[benchmark_options["BenchmarkID"]]['options'].append(benchmark_options)
+			
+			if not(benchmarks and runlengths):
+				raise Exception("Failed parsing Benchmarks database schema.")
+			
+			benchmark_options = {
+				"benchmarks" 			: benchmarks,
+				"runlengths" 			: runlengths,
+				"ClusterQueues"			: ClusterQueues,
+				"ClusterArchitectures"	: ClusterArchitectures,
+			}
+			html_content = rosettaHTML.benchmarksPage(settings, form, benchmark_options)
+			title = 'Benchmarks'
 
 	elif query_type == "update":
 		user_data = getUserData(form, SID)

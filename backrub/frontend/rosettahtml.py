@@ -17,6 +17,7 @@ import gzip
 import Graph
 import admin
 import ddgweb
+import benchmarks
 import pdb
 
 from rosettahelper import readFile, writeFile
@@ -858,6 +859,10 @@ This site has known issues under Internet Explorer. Until these issues are fixed
     
     def ddgPage(self, settings, form):
         html = ddgweb.generateDDGPage(settings, self, form)
+        return join(html, "")
+
+    def benchmarksPage(self, settings, form, benchmark_options):
+        html = benchmarks.generateBenchmarksPage(settings, self, form, benchmark_options)
         return join(html, "")
 
 ###############################################################################################
@@ -2544,6 +2549,7 @@ var MaxMultiplePointMutations = %d;
         if self.server_shortname == 'albana':
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=ddg">&#916;&#916;G</A>&nbsp;]'''  % (self.script_filename)
+            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=benchmarks">Benchmarks</A>&nbsp;]''' % (self.script_filename)
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
 
         
