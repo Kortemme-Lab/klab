@@ -23,20 +23,22 @@ import SimpleProfiler
 from ClusterTask import INITIAL_TASK, INACTIVE_TASK, QUEUED_TASK, ACTIVE_TASK, RETIRED_TASK, COMPLETED_TASK, FAILED_TASK, status
 from ClusterTask import ClusterScript, ClusterTask
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775, normalize_for_bash
+import time
+import datetime
+import pickle
+
+strftime = datetime.datetime.strftime
+def strptime(date_string, format):
+	'''For 2.4.3 compatibility'''
+	return datetime.datetime(*(time.strptime(date_string, format)[0:6]))
 
 # Generic classes
-
 
 class benchmarkClusterScript(ClusterScript):
 	
 	def __init__(self, workingdir, targetdirectory, taskparameters, benchmarksettings, numtasks, firsttaskindex = 1, dataarrays = {}, benchmark_name = ""):
-		
-		
-		benchmarksettings
-		
 		self.contents = []
 		self.tasks = []
-		lasttaskindex = firsttaskindex + numtasks - 1
 		self.parameters = {
 			"workingdir": workingdir,
 			"targetdirectory" : targetdirectory,
@@ -44,12 +46,10 @@ class benchmarkClusterScript(ClusterScript):
 			"taskparam" : "",
 			"taskvar" : "",
 			"benchmark_name" : "%s_Scientific_Benchmark" % benchmark_name,
-			"ClusterQueue" : benchmarksettings['ClusterQueue'],
-			"ClusterArchitecture" : benchmarksettings['ClusterArchitecture'],
-			"ClusterMemoryRequirementInGB" : benchmarksettings['ClusterMemoryRequirementInGB'],
-			"ClusterWalltime" : "%2d:%2d:00" % (int(benchmarksettings["ClusterWalltimeLimitInMinutes"] / 60), benchmarksettings["ClusterWalltimeLimitInMinutes"] % 60),
-			"FirstTaskIndex" : firsttaskindex,
-			"LastTaskIndex" : lasttaskindex,
+			"ClusterQueue" : taskparameters['ClusterQueue'],
+			"ClusterArchitecture" : taskparameters['ClusterArchitecture'],
+			"ClusterMemoryRequirementInMB" : int(taskparameters['ClusterMemoryRequirementInGB'] * 1024),
+			"ClusterWalltime" : "%02d:%02d:00" % (int(taskparameters["ClusterWalltimeLimitInMinutes"] / 60), taskparameters["ClusterWalltimeLimitInMinutes"] % 60),
 		}
 		
 		if numtasks > 0:
@@ -57,20 +57,25 @@ class benchmarkClusterScript(ClusterScript):
 				for arrayname, contents in sorted(dataarrays.iteritems()):
 					self.parameters["taskline"] += "%s=( dummy %s )\n" % (arrayname, join(contents, " "))
 					self.parameters["taskvar"]  += '%svar=${%s[$SGE_TASK_ID]}\n' % (arrayname, arrayname)	 
-				#self.parameters["taskline"] = "tasks=( dummy %s )" % join(tasks, " ")
-				#self.parameters["taskvar"] = 'taskvar=${tasks[$SGE_TASK_ID]}"'
-			self.parameters["taskparam"] = "#$ -t %d-%d" % (firsttaskindex, lasttaskindex) 
+			self.parameters["taskparam"] = "#$ -t %d-%d" % (firsttaskindex, firsttaskindex + numtasks - 1) 
 		
-		if taskparameters:
-			for arrayname, parametersbyjobid in sorted(taskparameters.iteritems()):
-				sortedkeys = sorted(parametersbyjobid.keys())
-				assert(jobIDs == sortedkeys) 
-				contents = [parametersbyjobid[k] for k in sortedkeys]
-				self.parameters["taskline"] += "%s=( dummy %s )\n" % (arrayname, join(contents, " "))
-				self.parameters["taskvar"]  += '%svar=${%s[$SGE_TASK_ID]}\n' % (arrayname, arrayname)
-		self.parameters["taskparam"] = "#$ -t 1-%d" % numtasks #len(tasks)
-		self.bindir = os.path.join(clusterRootDir, self.revision)
-		self.databasedir = os.path.join(clusterRootDir, self.dbrevision)
+		bin_revision = "r%s" % int(taskparameters["RosettaSVNRevision"])
+		self.revision = bin_revision
+		self.bindir = os.path.join(clusterRootDir, bin_revision)
+		db_revision = "r%s" % int(taskparameters["RosettaDBSVNRevision"])
+		self.databasedir = os.path.join(clusterRootDir, db_revision)
+		missing_dirs = []
+		if not os.path.exists(self.bindir):
+			missing_dirs.append(self.bindir)
+		if not os.path.exists(self.databasedir):
+			missing_dirs.append(self.databasedir)
+		if missing_dirs:
+			raise Exception("The required Rosetta directories %s are missing." % join(missing_dirs, " and "))
+		benchmark_binary = self.getBinary(benchmarksettings.rosetta_executable)
+		if not os.path.exists(benchmark_binary):
+			raise Exception("The required Rosetta binary %s is missing." % benchmark_binary)
+			
+		 
 		self.workingdir = workingdir
 		self.script = None
 		self.taskparameters = taskparameters
@@ -89,10 +94,9 @@ class benchmarkClusterScript(ClusterScript):
 #$ -j n
 #$ -q %(ClusterQueue)s
 #$ -l arch=%(ClusterArchitecture)s
-#$ -l mem_free=%(ClusterMemoryRequirementInGB)s
+#$ -l mem_free=%(ClusterMemoryRequirementInMB)sM
 #$ -l netapp=1G,scratch=1G,mem_total=3G
 #$ -l h_rt=%(ClusterWalltime)s
-#$ -t %(FirstTaskIndex)d-%(LastTaskIndex)s'
 		
 %(taskparam)s
 %(taskline)s
@@ -124,17 +128,25 @@ if [ "$SGE_TASK_ID" != "undefined" ]; then SGE_TASK_ID4=`printf %%04d $SGE_TASK_
 		
 
 class GenericBenchmarkJob(RosettaClusterJob):
+	
 	def __init__(self, sgec, parameters, benchmarksettings, tempdir, targetroot, dldir, testonly = False):
+		self.results = None
+		parameters["BenchmarkOptions"] = pickle.loads(parameters["BenchmarkOptions"])
 		self.benchmarksettings = benchmarksettings
-		super(GenericBenchmarkJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly)
-
+		super(GenericBenchmarkJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly, jobsubdir = str(parameters["ID"]))
+	
+	def getResults(self):
+		raise Exception("Implement this method")
+	
 class KICBenchmarkTask(ClusterTask):
 
 	# additional attributes
 	benchmark_name = "KIC"
 	prefix = "KICBenchmark"
-		 
-	def __init__(self, taskdir, targetdir, parameters, benchmarksettings, input_pdb, loop_file, pdb_prefix, numtasks, firsttaskindex, name = ""):
+	input_time_format = "%a %b %d %H:%M:%S %Z %Y"
+
+	def __init__(self, workingdir, targetdirectory, parameters, benchmarksettings, input_pdb, loop_file, pdb_prefix, numtasks, firsttaskindex, name = ""):
+		'''Note: firsttaskindex is 1-based to conform the SGE's task IDs. If your array is 0-based you will need to add 1 to the firsttaskindex when creating the ClusterTask.'''  
 		self.benchmarksettings = benchmarksettings
 		self.input_pdb = input_pdb
 		self.loop_file = loop_file
@@ -142,41 +154,48 @@ class KICBenchmarkTask(ClusterTask):
 		super(KICBenchmarkTask, self).__init__(workingdir, targetdirectory, '%s_%d.cmd' % (self.prefix, parameters["ID"]), parameters, name, numtasks = numtasks, firsttaskindex = firsttaskindex)		  
 	
 	def _initialize(self):
-		self._prepare_backrub()
 		parameters = self.parameters
 		benchmarksettings = self.benchmarksettings
 				
 		# Create working directory paths
 		for i in range(self.firsttaskindex, self.firsttaskindex + self.numtasks):
-			rosettahelper.make755Directory(self._workingdir_file_path(str(i)))
+			make755Directory(self._workingdir_file_path(str(i)))
 
 		# Create script
 		ct = benchmarkClusterScript(self.workingdir, self.targetdirectory, parameters, benchmarksettings, self.numtasks, self.firsttaskindex, benchmark_name = self.benchmark_name)
 	
-		# Setup backrub
+		# Setup command
+		commandLineParams = {
+			"loops:input_pdb" : self.input_pdb,
+			"loops:loop_file" : self.loop_file,
+			"in:file:native" : self.input_pdb,
+			"out:prefix" : self.pdb_prefix,
+			"loops:max_kic_build_attempts" : parameters["BenchmarkOptions"]["MaxKICBuildAttempts"],
+		}
 		kicCommand = [
-			benchmarksettings["Rosetta_executable"] % parameters,  
-			"-database %s" % benchmarksettings["Rosetta_database"] % parameters, 
-			"-loops:input_pdb %s" % self.input_pdb,
-			"-in:file:fullatom",
-			"-loops:loop_file %s" % self.loop_file,
-			"-loops:remodel perturb_kic",
-			"-loops:refine refine_kic",
-			"-in:file:native %s" % self.input_pdb,
-			"-out:prefix %s" % self.pdb_prefix,
-			"-overwrite",
-			"-out:path $SGE_TASK_ID/",
-			"-ex1", "-ex2",
-			"-nstruct 1",
-			"-out:pdb_gz",
-			"-loops:max_kic_build_attempts %d" % benchmarksettings["MaxKICBuildAttempts"],
+			ct.getBinary(benchmarksettings.rosetta_executable),
+			"-database %s" % ct.getDatabaseDir(),
+			self.parameters["CommandLine"] % commandLineParams
+			#"-loops:input_pdb %s" % self.input_pdb,
+			#"-in:file:fullatom",
+			#"#-loops:loop_file %s" % self.loop_file,
+			#"-loops:remodel perturb_kic",
+			#"-loops:refine refine_kic",
+			#"-in:file:native %s" % self.input_pdb,
+			#"-out:prefix %s" % self.pdb_prefix,
+			#"-overwrite",
+			#"-out:path $SGE_TASK_ID/",
+			#"-ex1", "-ex2",
+			#"-nstruct 1",
+			#"-out:pdb_gz",
+			#"-loops:max_kic_build_attempts %d" % parameters["BenchmarkOptions"]["MaxKICBuildAttempts"],
 		]
-		if benchmarksettings["RunLength"] == 'Test':
+		if parameters["RunLength"] == 'Test':
 			kicCommand.append('-run:test_cycles')
 			kicCommand.append('-constant_seed')
 		
 		kicCommand = [
-			'# Run backrub', '', 
+			'# Run KIC', '', 
 			'cd $SGE_TASK_ID',
 			join(kicCommand, " "), '', 
 			'echo',
@@ -186,7 +205,8 @@ class KICBenchmarkTask(ClusterTask):
 			'',
 		] 
 		
-		self.script = ct.createScript(kicCommand, type="BenchmarkKIC", benchmark_name = benchmark_name)
+		self.script = ct.createScript(kicCommand, type="BenchmarkKIC")
+		print(self.script)
 		
 		def retire(self):
 			pass
@@ -196,11 +216,13 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 	suffix = "bmarkKIC"
 	flatOutputDirectory = True
 	name = "KIC Benchmark"
-
+	results_flatfile = "scientific_benchmark_KIC_score12prime.results"
+	
 	def _initialize(self):
 		self.describe()
 		
 		parameters = self.parameters
+		benchmarksettings = self.benchmarksettings
 
 		scheduler = TaskScheduler(self.workingdir)
 		 
@@ -219,15 +241,88 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 					self._status(errormsg)
 					raise Exception(errormsg)
 		
-				inputfiles = [self.parameters["pdb_filename"], self.backrub_resfile, self.backrub_movemap, self.seqtol_resfile]
 				taskdir = self._make_taskdir(pdb_prefix)
 				targetdir = os.path.join(self.targetdirectory, pdb_prefix)
-				print(taskdir, targetdir)
-				sys.exit(0)
-				kicTask = KICBenchmarkTask(taskdir, targetdir, self.parameters, self.benchmarksettings, input_pdb, loop_file, pdb_prefix, self.parameters["NumberOfModelsPerPDB"], self.parameters["NumberOfModelsOffset"], name=self.jobname)
+				# The task indexing in ClusterTask is 1-based. NumberOfModelsOffset is 0-based so add 1.
+				kicTask = KICBenchmarkTask(taskdir, targetdir, self.parameters, self.benchmarksettings, input_pdb, loop_file, pdb_prefix, self.parameters["BenchmarkOptions"]["NumberOfModelsPerPDB"], self.parameters["BenchmarkOptions"]["NumberOfModelsOffset"] + 1, name=self.name)
 				scheduler.addInitialTasks(kicTask)
 				
 		self.scheduler = scheduler
+	
+	def _parse(self):
+		'''Parses the KIC scientific benchmark results into a flat file.'''
+	
+		start_time = time.time()
+		
+		# Write headers
+		outfile = open(self._workingdir_file_path(self.results_flatfile), 'w')
+		outfile.write('#PDB\tModel\tLoop_rmsd\tTotal_energy\tRuntime\n')
+		
+		# Parse benchmark results
+		start_index = self.parameters["BenchmarkOptions"]["NumberOfModelsOffset"] + 1
+		end_index = self.parameters["BenchmarkOptions"]["NumberOfModelsOffset"] + self.parameters["BenchmarkOptions"]["NumberOfModelsPerPDB"]
+		sorted_indir_contents = sorted(os.walk(self.workingdir).next()[1])
+		
+		for pdbID in sorted_indir_contents:
+			self._status(pdbID)
+			num_models = 0
+			pdb_dir = os.path.join(self.workingdir, pdbID)
+			pdb_dir_contents = os.listdir(pdb_dir)
+			continue # todo
+		
+			# Copy output and error files to model subdirectories
+			for flname in pdb_dir_contents:
+				if '.o' in flname or '.e' in flname: # todo: make this more robust
+					model_subdir=flname.split('.')[-1]
+					assert(os.path.isdir(model_subdir))
+					shutil.copy(os.path.join(pdb_dir, flname), os.path.join(pdb_dir, model_subdir))
+		
+			#parse output files to collect energies, rmsds and runtimes
+			for flname in pdb_dir_contents:
+				flpath = os.path.join(pdb_dir, flname)
+				# Iterate through numbered directories
+				if os.path.isdir(flpath) and flname.isdigit() and int(flname) >= start_index and int(flname) <= end_index:
+					model_subdir = flpath
+					model_subdir_contents = os.listdir(model_subdir)
+					for taskflname in model_subdir_contents:
+						if '.o' in taskflname: # todo: make this more robust
+							stats=[]
+							stdout_contents = rosettahelp.readFileLines(os.path.join(flpath, taskflname))
+							lines = stdout_contents[0:4] + stdout_contents[-9:] # get the first 4 lines and the last 9 lines 
+							#todo : I'll need to parse the file here
+							if len(lines) > 11 and lines[-3] == 'end_date:':
+								
+								#calculate runtime
+								_start_time = 0 #todo int(strftime(strptime(lines[3],self.input_time_format), "%s"))
+								_end_time = 0 #todo int(strftime(strptime(lines[-2],self.input_time_format), "%s"))
+								runtime=_end_time - _start_time
+								
+								total_energy = None
+								loop_rms = None
+		
+								#determine loop rmsd and total energy of the pose
+								for line in lines:
+									if 'total_energy' in line:
+										total_energy = float(line.split('total_energy:')[1].strip(' '))
+									elif 'loop_rms' in line:
+										loop_rms = float(line.split('loop_rms:')[1].strip(' '))
+		
+								if total_energy != None and loop_rms != None:
+									num_models += 1
+									outfile.write('%s\t%s\t%s\t%s\t%s\n' % (pdbID, flname, str(loop_rms), str(total_energy), str(runtime)))
+		
+		outfile.close()
+		self._status("Time consumed: " + str(time.time() - start_time))
+
+
+	def _analyze(self):
+		if not self._parse():
+			return False
+		return True
+
+	#def getResults(self):
+		#return self.results
+
 
 class GenericKICTask(ClusterTask):
 

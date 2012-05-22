@@ -35,12 +35,12 @@ FAILED_TASK     = 6
 
 status = {
 	INITIAL_TASK	: "pending",
-	INACTIVE_TASK   : "pending",
-	QUEUED_TASK	 : "queued",
-	ACTIVE_TASK	 : "active",
+	INACTIVE_TASK	: "pending",
+	QUEUED_TASK		: "queued",
+	ACTIVE_TASK		: "active",
 	RETIRED_TASK	: "retired",
-	COMPLETED_TASK  : "completed",
-	FAILED_TASK	 : "failed",
+	COMPLETED_TASK	: "completed",
+	FAILED_TASK		: "failed",
 	}
 	
 def getClusterDatabasePath(binary, cluster_database_index = 0):
@@ -49,7 +49,8 @@ def getClusterDatabasePath(binary, cluster_database_index = 0):
 
 class ClusterScript:
 
-	def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}, maxhours = CLUSTER_maxhoursforjob, maxmins = CLUSTER_maxminsforjob):
+	def __init__(self, workingdir, binary, numtasks = 0, dataarrays = {}, maxhours = CLUSTER_maxhoursforjob, maxmins = CLUSTER_maxminsforjob, firsttaskindex = 1):
+		'''Note: firsttaskindex is 1-based to conform the SGE's task IDs. If your array is 0-based you will need to add 1 to the firsttaskindex when creating the ClusterTask.'''  
 		self.contents = []
 		self.tasks = []
 		self.parameters = {"workingdir": workingdir, "taskline": "", "taskparam" : "", "taskvar" : "", "maxhours": maxhours, "maxmins": maxmins}
@@ -60,7 +61,7 @@ class ClusterScript:
 					self.parameters["taskvar"]  += '%svar=${%s[$SGE_TASK_ID]}\n' % (arrayname, arrayname)	 
 				#self.parameters["taskline"] = "tasks=( dummy %s )" % join(tasks, " ")
 				#self.parameters["taskvar"] = 'taskvar=${tasks[$SGE_TASK_ID]}"'
-			self.parameters["taskparam"] = "#$ -t 1-%d" % numtasks #len(tasks)
+			self.parameters["taskparam"] = "#$ -t %d-%d" % (firsttaskindex, firsttaskindex + numtasks - 1) #len(tasks)
 		self.revision = RosettaBinaries[binary]["clusterrev"]
 		self.bindir = "%s/%s" % (clusterRootDir, self.revision)
 		self.workingdir = workingdir
@@ -141,8 +142,8 @@ echo "</enddate>"
 		self.script = join(self.contents, "\n")
 		return self.script
 	
-	def getBinary(self, binname):
-		return "%s/%s_%s_static" % (self.bindir, binname, self.revision)
+	def getBinary(self, binname, suffix = "_static"):
+		return "%s/%s_%s%s" % (self.bindir, binname, self.revision, suffix)
 	
 	def getBinaryDir(self):
 		return self.bindir
@@ -159,7 +160,8 @@ class ClusterTask(StatusPrinter):
 	
 	# SGE-Queued jobs have a non-zero jobid and a state of QUEUED_TASK
 	# SGE-Running jobs have a non-zero jobid and a state of ACTIVE_TASK
-	def __init__(self, workingdir, targetdirectory, scriptfilename, parameters = {}, name = "", numtasks = 1):
+	def __init__(self, workingdir, targetdirectory, scriptfilename, parameters = {}, name = "", numtasks = 1, firsttaskindex = 1):
+		'''Note: firsttaskindex is 1-based to conform the SGE's task IDs. If your array is 0-based you will need to add 1 to the firsttaskindex when creating the ClusterTask.'''  
 		self.sgec = None
 		self.profiler = SimpleProfiler.SimpleProfiler(name)
 		self.profiler.PROFILE_START("Initialization")
@@ -168,7 +170,7 @@ class ClusterTask(StatusPrinter):
 		self.debug = True
 		self.targetdirectory = targetdirectory
 		self.jobid = 0
-		self._setStatusPrintingParameters(self.jobid, "task", level = 0)
+		self._setStatusPrintingParameters(self.jobid, "task", level = 0, color = "purple")
 		self.jobIDs = [] # Added for ddG compatibility
 		self.script = None
 		self.runlength = None
@@ -187,6 +189,7 @@ class ClusterTask(StatusPrinter):
 		self.filename_stderr = None
 		self.name = name or "unnamed"
 		self.numtasks = numtasks
+		self.firsttaskindex = firsttaskindex
 		self.outputstreams = []
 		if parameters.get("pdb_filename"):
 			parameters["pdbRootname"] = parameters["pdb_filename"][:-4]
@@ -218,7 +221,7 @@ class ClusterTask(StatusPrinter):
 
 	def getExpectedOutputFileNames(self):
 		outputFilenames = []
-		for i in range(1, self.numtasks + 1):
+		for i in range(self.firsttaskindex, self.firsttaskindex + self.numtasks):
 			outputFilenames.append("%s_%s.cmd.o%d.%d" % (self.prefix, str(self.parameters["ID"]), self.jobid, i))
 		return outputFilenames 
 
@@ -300,7 +303,7 @@ class ClusterTask(StatusPrinter):
 		if self.scriptfilename:
 			failedOutput = False
 			self._status('Copying stdout and stderr output to %s' % (self.targetdirectory))		
-			for i in range(1, self.numtasks + 1):
+			for i in range(self.firsttaskindex, self.firsttaskindex + self.numtasks):
 				filename_stdout = "%s.o%s.%d" % (self.scriptfilename, self.jobid, i)
 				filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
 				stdoutfile = self._workingdir_file_path(filename_stdout)

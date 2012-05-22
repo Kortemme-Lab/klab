@@ -291,18 +291,18 @@ class RosettaClusterJob(StatusPrinter):
 	flatOutputDirectory = False
 	name = "Cluster job"
 		
-	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False):
+	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False, jobsubdir = None):
+		self.parameters = parameters
 		self.jobIDs = []
 		self.jobID = self.parameters.get("ID") or 0
 		self._setStatusPrintingParameters(self.jobID, statustype = "job", level = 0, color = "lightpurple")
 		self.profiler = SimpleProfiler.SimpleProfiler("%s-%d" % (self.suffix, self.jobID))
-		self.parameters = parameters
 		self.sgec = sgec
 		self.debug = True
 		self.tempdir = tempdir
 		self.targetroot = targetroot
 		self.testonly = testonly
-		self.dldir = os.path.join(dldir, parameters["cryptID"])
+		self.dldir = os.path.join(dldir, jobsubdir or parameters["cryptID"])
 		if not testonly:
 			self._make_workingdir()
 			self._make_targetdir()
@@ -364,8 +364,10 @@ class RosettaClusterJob(StatusPrinter):
 					self._status("Error: Unexpected common prefix %s found when removing %s directory." % (commonprefix, dirpair[2]))
 					raise
 				else:
-					self._status("Removing %s directory %s." % (dirpair[2], dirpair[1]))
-					shutil.rmtree(dirpair[1])
+					#todo: remove if statement
+					if dirpair[2] != "working":
+						self._status("Removing %s directory %s." % (dirpair[2], dirpair[1]))
+						shutil.rmtree(dirpair[1])
 			except Exception, e:
 				self._status("Error removing %s directory:\n%s\n%s" % (dirpair[2], e, traceback.print_exc()))
 				success = False			
@@ -429,7 +431,7 @@ class RosettaClusterJob(StatusPrinter):
 				make755Directory(os.path.join(self.workingdir, str(jobID)))
 		except Exception, e:
 			# This is a fatal error.
-			print("The cluster daemon could not create the working directory inside %s. Are you running it under the correct user?" % self.tempdir)
+			raise Exception("The cluster daemon could not create the working directory inside %s. Are you running it under the correct user?" % self.tempdir)
 			os._exit(0)
 		return self.workingdir
 
