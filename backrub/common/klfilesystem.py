@@ -118,7 +118,7 @@ def getSubdirectories(d):
 		"for root, dirs, files in os.walk(d):
 			return dirs"
 	'''
-	return [f for f in os.listdir(d) if os.path.isdir(f) ]
+	return [f for f in os.listdir(d) if os.path.isdir(os.path.join(d, f)) ]
 
 def computeMD5(filepath, relativepath = ""):
 	'''Computes an MD5 checksum.

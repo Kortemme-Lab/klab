@@ -16,323 +16,399 @@ import traceback
 import md5
 import pickle
 import time
+import re
 
 from datetime import datetime
 
 from string import join
 
 DictCursor = MySQLdb.cursors.DictCursor
+StdCursor = MySQLdb.cursors.Cursor
 
 def _lowercaseToStr(x):
-    return str.lower(str(x))   
-    
+	return str.lower(str(x))   
+	
 def _getSortedString(o):
-    """
-    Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
-    """
-    # todo: replace this with something like pprint on Python upgrade 
-    # We assume here that any container type is either list or tuple which may not always hold 
-    if isinstance(o, (dict)):
-        pkeys = sorted(o.keys(), key=_lowercaseToStr)
-        l = []
-        for k in pkeys:
-            l.append(str(k) + ":" + _getSortedString(o[k]))
-        return "{" + join(l, ",") + "}"    
-    else:
-        return str(o)
-    
+	"""
+	Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
+	"""
+	# todo: replace this with something like pprint on Python upgrade 
+	# We assume here that any container type is either list or tuple which may not always hold 
+	if isinstance(o, (dict)):
+		pkeys = sorted(o.keys(), key=_lowercaseToStr)
+		l = []
+		for k in pkeys:
+			l.append(str(k) + ":" + _getSortedString(o[k]))
+		return "{" + join(l, ",") + "}"	
+	else:
+		return str(o)
+
+import getpass
+import rosettahelper
+class DatabaseInterface(object):
+	
+	data = {}
+	
+	def __init__(self, settings, isInnoDB = True, numTries = 1, host = None, db = None, user = None, passwd = None, port = None, unix_socket = None, passwdfile = None):
+		self.connection = None
+		self.isInnoDB = isInnoDB
+		self.host = host or settings["SQLHost"]
+		self.db = db or settings["SQLDatabase"]
+		self.user = user or settings["SQLUser"]
+		self.passwd = passwd or settings["SQLPassword"]
+		self.port = port or settings["SQLPort"]
+		self.unix_socket	= unix_socket or settings["SQLSocket"]
+		self.numTries = numTries
+		self.lastrowid = None
+		if (not self.passwd) and passwdfile:
+			if os.path.exists(passwdfile):
+				passwd = rosettahelper.readFile(passwdfile).strip()
+			else:
+				passwd = getpass.getpass("Enter password to connect to MySQL database:")
+				
+		self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r[0] for r in self.execute("SHOW TABLES", cursorClass = StdCursor)], ", ")
+		self.unlockstring = "UNLOCK TABLES"
+		self.locked = False
+	
+	def __del__(self):	
+		if self.connection and self.connection.open:
+			self.connection.close()
+
+	def _get_connection(self, cursorClass):
+		self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = cursorClass)
+		
+	def _close_connection(self):
+		if self.connection and self.connection.open:
+			self.connection.close()
+			
+	def getLastRowID(self):
+		return self.lastrowid
+	
+	def locked_execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False):
+		'''We are lock-happy here but SQL performance is not currently an issue daemon-side.''' 
+		return self.execute(sql, parameters, cursorClass, quiet, locked = True)
+	
+	def execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False, locked = False):
+		"""Execute SQL query. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		cursor = None
+		if sql.find(";") != -1 or sql.find("\\G") != -1:
+			# Catches some injections
+			raise Exception("The SQL command '%s' contains a semi-colon or \\G. This is a potential SQL injection." % sql)
+		while i < self.numTries:
+			i += 1
+			try:
+				assert(not(self.connection) or not(self.connection.open))
+				self._get_connection(cursorClass)
+				cursor = self.connection.cursor()
+				if locked:
+					cursor.execute(self.lockstring)
+					self.locked = True
+				if parameters:
+					errcode = cursor.execute(sql, parameters)
+				else:
+					errcode = cursor.execute(sql)
+				if self.isInnoDB:
+					self.connection.commit()
+				results = cursor.fetchall()
+				if locked:
+					cursor.execute(self.unlockstring)
+					self.locked = False
+				self.lastrowid = int(cursor.lastrowid)
+				cursor.close()
+				self._close_connection()
+				return results
+			except MySQLdb.OperationalError, e:
+				if cursor:
+					if self.locked:
+						cursor.execute(self.unlockstring)
+						self.locked = False
+					cursor.close()
+				self._close_connection()
+				caughte = str(e)
+				errcode = e[0]
+				continue
+			except Exception, e:
+				if cursor:
+					if self.locked:
+						cursor.execute(self.unlockstring)
+						self.locked = False
+					cursor.close()
+				self._close_connection()
+				caughte = str(e)
+				traceback.print_exc()
+				break
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+	
+	def insertDict(self, tblname, d, fields = None):
+		'''Simple function for inserting a dictionary whose keys match the fieldnames of tblname.'''
+		
+		if fields == None:
+			fields = sorted(d.keys())
+		values = None
+		try:
+			SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
+			values = tuple([d[k] for k in fields])
+	 		self.execute(SQL, parameters = values)
+		except Exception, e:
+			if SQL and values:
+				sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nError: '%s'.\n" % (str(e)))
+			sys.stderr.flush()
+			raise Exception("Error occurred during database insertion.")
+
+	def callproc(self, procname, parameters = (), cursorClass = DictCursor, quiet = False):
+		"""Calls a MySQL stored procedure procname. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		
+		if not re.match("^\s*\w+\s*$", procname):
+			raise Exception("Expected a stored procedure name in callproc but received '%s'." % procname)
+		while i < self.numTries:
+			i += 1
+			try:
+				assert(not(self.connection))
+				self._get_connection(cursorClass)
+				cursor = self.connection.cursor()
+				if type(parameters) != type(()):
+					parameters = (parameters,)
+				errcode = cursor.callproc(procname, parameters)
+				results = cursor.fetchall()
+				self.lastrowid = int(cursor.lastrowid)
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				self._close_connection()
+				errcode = e[0]
+				caughte = e
+				continue
+			except:
+				self._close_connection()
+				traceback.print_exc()
+				break
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error call stored procedure %s at %s:" % (procname, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+	
+
 class RosettaDB:
-    
-    data = {}
-    store_time = 7 # how long will the stuff be stored
-    
-    def close(self):
-        self.connection.close()
-        
-    def __init__(self, settings, numTries = 1, host = None, db = None, user = None, passwd = None):
-        self.connection = MySQLdb.Connection(host           = host or settings["SQLHost"],
-                                             db             = db or settings["SQLDatabase"],
-                                             user           = user or settings["SQLUser"],
-                                             passwd         = passwd or settings["SQLPassword"],
-                                             port           = settings["SQLPort"],
-                                             unix_socket    = settings["SQLSocket"])
-        self.store_time = settings["StoreTime"]
-        self.numTries = numTries
-        self.lastrowid = None
-    
-    def getLastRowID(self):
-        return self.lastrowid
-                                                     
-    def getData4ID(self, tablename, ID):
-        """get the whole row from the database and store it in a dict"""
-               
-        fields = self._getFieldsInDB(tablename)
-        #DATE_ADD(EndDate, INTERVAL 8 DAY), TIMEDIFF(DATE_ADD(EndDate, INTERVAL 7 DAY), NOW()), TIMEDIFF(EndDate, StartDate)
-        SQL = '''SELECT *,DATE_ADD(EndDate, INTERVAL %s DAY),TIMEDIFF(DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMEDIFF(EndDate, StartDate) 
-                 FROM %s WHERE ID=%s''' % (self.store_time, self.store_time, tablename, ID)
+	
+	data = {}
+	store_time = 7 # how long will the stuff be stored
+	
+	def close(self):
+		self.connection.close()
+		
+	def __init__(self, settings, numTries = 1, host = None, db = None, user = None, passwd = None, port = None, unix_socket = None):
+		host = host or settings["SQLHost"]
+		db = db or settings["SQLDatabase"]
+		user = user or settings["SQLUser"]
+		passwd = passwd or settings["SQLPassword"]
+		port = port or settings["SQLPort"],
+		unix_socket	= unix_socket or settings["SQLSocket"]
+		
+		self.connection = MySQLdb.Connection(host, db, user, passwd, port, unix_socket)
+		self.store_time = settings["StoreTime"]
+		self.numTries = numTries
+		self.lastrowid = None
+	
+	def getLastRowID(self):
+		return self.lastrowid
+													 
+	def getData4ID(self, tablename, ID):
+		"""get the whole row from the database and store it in a dict"""
+			   
+		fields = self._getFieldsInDB(tablename)
+		#DATE_ADD(EndDate, INTERVAL 8 DAY), TIMEDIFF(DATE_ADD(EndDate, INTERVAL 7 DAY), NOW()), TIMEDIFF(EndDate, StartDate)
+		SQL = '''SELECT *,DATE_ADD(EndDate, INTERVAL %s DAY),TIMEDIFF(DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMEDIFF(EndDate, StartDate) 
+				 FROM %s WHERE ID=%s''' % (self.store_time, self.store_time, tablename, ID)
 
-        array_data = self.execQuery(SQL)
-        
-        if len(array_data) > 0:
-            for x in range( len(fields) ):
-                self.data[fields[x]] = array_data[0][x]
-            self.data['date_expiration']  = array_data[0][-3]
-            self.data['time_expiration']  = array_data[0][-2]
-            self.data['time_computation'] = array_data[0][-1]
+		array_data = self.execQuery(SQL)
+		
+		if len(array_data) > 0:
+			for x in range( len(fields) ):
+				self.data[fields[x]] = array_data[0][x]
+			self.data['date_expiration']  = array_data[0][-3]
+			self.data['time_expiration']  = array_data[0][-2]
+			self.data['time_computation'] = array_data[0][-1]
 
-        return self.data
-        
-    def getData4cryptID(self, tablename, ID):
-        """get the whole row from the database and store it in a dict"""
-               
-        fields = self._getFieldsInDB(tablename)
-        
-        SQL = 'SELECT *,MAKETIME(0,0,TIMESTAMPDIFF(SECOND, StartDate, EndDate)),DATE_ADD(EndDate, INTERVAL %s DAY),TIMESTAMPDIFF(DAY,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMESTAMPDIFF(HOUR,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()) FROM %s WHERE cryptID="%s"' % (self.store_time, self.store_time, self.store_time, tablename, ID)
-        
-        array_data = self.execQuery(SQL)
-        
-        if len(array_data) > 0:
-            for x in range( len(fields) ):
-                self.data[fields[x]] = array_data[0][x]
-            self.data['date_expiration']  = array_data[0][-3]
-            time_expiration = None
-            if array_data[0][-2] and array_data[0][-1]:
-                time_expiration = "%d days, %d hours" % (abs(array_data[0][-2]),abs(array_data[0][-1]) - abs(array_data[0][-2] * 24))            
-            self.data['time_expiration']  = time_expiration
-            self.data['time_computation'] = array_data[0][-4]
-                         
-        return self.data
-        
-            
-    def insertData(self, tablename, list_value_pairs, list_SQLCMD_pairs=None):
-        """insert data into table
-            - ID: identifier of the updated value
-            - list_value_pairs: contains the table field ID and the according value
-            - list_SQLCMD_pairs: contains the table field ID and a SQL command
-            """
-        
-        fields = self._getFieldsInDB(tablename)
-        
-        lst_field = []
-        lst_value = []
-        
-        # normal field-value-pairs
-        for pair in list_value_pairs:
-            if pair[0] in fields:
-                lst_field.append( pair[0] )
-                lst_value.append( '"%s"' % pair[1] )
-            else:
-                print "err: field %s can't be found in the table" % pair[0]
-                return False
-            
-        # field-SQL-command-pairs: the only difference is the missing double quotes in the SQL command
-        if list_SQLCMD_pairs != None:
-            for pair in list_SQLCMD_pairs:
-                if pair[0] in fields:
-                    lst_field.append( pair[0] )
-                    lst_value.append( pair[1] )
-                else:
-                    print "err: field %s can't be found in the table" % pair[0]
-                    return False
-                
-        # build the command
-        SQL = 'INSERT INTO %s (%s) VALUES (%s)' % ( tablename, join(lst_field, ','), join(lst_value, ',') )
-        
-        self.execQuery( SQL )
-        
-        return True
+		return self.data
+		
+	def getData4cryptID(self, tablename, ID):
+		"""get the whole row from the database and store it in a dict"""
+			   
+		fields = self._getFieldsInDB(tablename)
+		
+		SQL = 'SELECT *,MAKETIME(0,0,TIMESTAMPDIFF(SECOND, StartDate, EndDate)),DATE_ADD(EndDate, INTERVAL %s DAY),TIMESTAMPDIFF(DAY,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()),TIMESTAMPDIFF(HOUR,DATE_ADD(EndDate, INTERVAL %s DAY), NOW()) FROM %s WHERE cryptID="%s"' % (self.store_time, self.store_time, self.store_time, tablename, ID)
+		
+		array_data = self.execQuery(SQL)
+		
+		if len(array_data) > 0:
+			for x in range( len(fields) ):
+				self.data[fields[x]] = array_data[0][x]
+			self.data['date_expiration']  = array_data[0][-3]
+			time_expiration = None
+			if array_data[0][-2] and array_data[0][-1]:
+				time_expiration = "%d days, %d hours" % (abs(array_data[0][-2]),abs(array_data[0][-1]) - abs(array_data[0][-2] * 24))			
+			self.data['time_expiration']  = time_expiration
+			self.data['time_computation'] = array_data[0][-4]
+						 
+		return self.data
+		
+			
+	def insertData(self, tablename, list_value_pairs, list_SQLCMD_pairs=None):
+		"""insert data into table
+			- ID: identifier of the updated value
+			- list_value_pairs: contains the table field ID and the according value
+			- list_SQLCMD_pairs: contains the table field ID and a SQL command
+			"""
+		
+		fields = self._getFieldsInDB(tablename)
+		
+		lst_field = []
+		lst_value = []
+		
+		# normal field-value-pairs
+		for pair in list_value_pairs:
+			if pair[0] in fields:
+				lst_field.append( pair[0] )
+				lst_value.append( '"%s"' % pair[1] )
+			else:
+				print "err: field %s can't be found in the table" % pair[0]
+				return False
+			
+		# field-SQL-command-pairs: the only difference is the missing double quotes in the SQL command
+		if list_SQLCMD_pairs != None:
+			for pair in list_SQLCMD_pairs:
+				if pair[0] in fields:
+					lst_field.append( pair[0] )
+					lst_value.append( pair[1] )
+				else:
+					print "err: field %s can't be found in the table" % pair[0]
+					return False
+				
+		# build the command
+		SQL = 'INSERT INTO %s (%s) VALUES (%s)' % ( tablename, join(lst_field, ','), join(lst_value, ',') )
+		self.execQuery( SQL )
+		
+		return True
 
+	def getData4User(self, ID):
+		"""get all rows for a user from the database and store it to a dict
+		   do we need this?
+		   function is empty
+		"""
+		pass	
+	
+	def callproc(self, procname, parameters = (), cursorClass = DictCursor, quiet = False):
+		"""Calls a MySQL stored procedure procname. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		while i < self.numTries:
+			i += 1
+			try:	
+				cursor = self.connection.cursor(cursorClass)
+				if type(parameters) != type(()):
+					parameters = (parameters,)
+				errcode = cursor.callproc(procname, parameters)
+				results = cursor.fetchall()
+				self.lastrowid = int(cursor.lastrowid)
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				errcode = e[0]
+				self.connection.ping()
+				caughte = e
+				continue
+			except:				
+				traceback.print_exc()
+				break
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error call stored procedure %s at %s:" % (procname, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+	
+	def execInnoDBQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor):
+		self.connection.ping(True)
+		return self.execQuery(sql, parameters, cursorClass, InnoDB = True)
+		
+	def execQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor, InnoDB = False):
+		"""Execute SQL query."""
+		i = 0
+		errcode = 0
+		caughte = None
+		while i < self.numTries:
+			i += 1
+			try:	
+				cursor = self.connection.cursor(cursorClass)
+				if parameters:
+					errcode = cursor.execute(sql, parameters)
+				else:
+					errcode = cursor.execute(sql)
+				if InnoDB:
+					self.connection.commit()
+				results = cursor.fetchall()
+				self.lastrowid = int(cursor.lastrowid)
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				errcode = e[0]
+				# errcode 1100 is an error with table locking
+				print(e)
+				self.connection.ping(True)
+				caughte = e
+				continue
+			except:				
+				traceback.print_exc()
+				break
+		
+		sys.stderr.write("\nSQL execution error in query at %s:" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+		sys.stderr.write("\n %s." % sql)
+		sys.stderr.flush()
+		sys.stderr.write("\nErrorcode: '%s'.\n" % (str(caughte)))
+		sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+		#return None
 
-    def getData4User(self, ID):
-        """get all rows for a user from the database and store it to a dict
-           do we need this?
-           function is empty
-        """
-        pass    
-    
-    def callproc(self, procname, parameters = (), cursorClass = MySQLdb.cursors.DictCursor, quiet = False):
-        """Calls a MySQL stored procedure procname. This uses DictCursor by default."""
-        i = 0
-        errcode = 0
-        caughte = None
-        while i < self.numTries:
-            i += 1
-            try:    
-                cursor = self.connection.cursor(cursorClass)
-                if type(parameters) != type(()):
-                    parameters = (parameters,)
-                errcode = cursor.callproc(procname, parameters)
-                results = cursor.fetchall()
-                self.lastrowid = int(cursor.lastrowid)
-                cursor.close()
-                return results
-            except MySQLdb.OperationalError, e:
-                errcode = e[0]
-                self.connection.ping()
-                caughte = e
-                continue
-            except:                
-                traceback.print_exc()
-                break
-        
-        if not quiet:
-            sys.stderr.write("\nSQL execution error call stored procedure %s at %s:" % (procname, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-            sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
-            sys.stderr.flush()
-        raise MySQLdb.OperationalError(caughte)
-    
-    def execInnoDBQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor):
-    	self.connection.ping(True)
-    	return self.execQuery(sql, parameters, cursorClass, InnoDB = True)
-    	
-    def execQuery(self, sql, parameters = None, cursorClass = MySQLdb.cursors.Cursor, InnoDB = False):
-        """Execute SQL query."""
-        i = 0
-        errcode = 0
-        caughte = None
-        while i < self.numTries:
-            i += 1
-            try:    
-                cursor = self.connection.cursor(cursorClass)
-                if parameters:
-                    errcode = cursor.execute(sql, parameters)
-                else:
-                    errcode = cursor.execute(sql)
-                if InnoDB:
-               	    self.connection.commit()
-                results = cursor.fetchall()
-                self.lastrowid = int(cursor.lastrowid)
-                cursor.close()
-                return results
-            except MySQLdb.OperationalError, e:
-                errcode = e[0]
-                # errcode 1100 is an error with table locking
-                self.connection.ping(True)
-                caughte = e
-                continue
-            except:                
-                traceback.print_exc()
-                break
-        
-        sys.stderr.write("\nSQL execution error in query at %s:" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-        sys.stderr.write("\n %s." % sql)
-        sys.stderr.flush()
-        sys.stderr.write("\nErrorcode: '%s'.\n" % (str(caughte)))
-        sys.stderr.flush()
-        raise MySQLdb.OperationalError(caughte)
-        #return None
-
-    def _getFieldsInDB(self, tablename):
-        """get all the fields from a specific table"""
-        SQL = 'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.Columns where TABLE_NAME="%s"' % tablename
-    
-        array_data = self.execQuery(SQL)
-        
-        return [x[0] for x in array_data]
-    
-    def generateHash(self, ID, debug = False):
-        # create a hash key for the entry we just made
-        sql = '''SELECT PDBComplex, PDBComplexFile, Mini, EnsembleSize, task, ProtocolParameters
-                   FROM backrub 
-                  WHERE ID="%s" ''' % ID # get data
-        result = self.execQuery(sql)
-        value_string = "" 
-        for value in result[0][0:5]: # combine it to a string
-            value_string += str(value)
-        
-        # We sort the complex datatypes to get deterministic hashes
-        # todo: This works better than before (it works!) but could be cleverer.
-        value_string += _getSortedString(pickle.loads(result[0][5]))
-        
-        hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
-        sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
-        if not debug:
-            result = self.execQuery(sql)
-        else:
-            print(sql)
-        return hash_key
+	def _getFieldsInDB(self, tablename):
+		"""get all the fields from a specific table"""
+		SQL = 'SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.Columns where TABLE_NAME="%s"' % tablename
+	
+		array_data = self.execQuery(SQL)
+		
+		return [x[0] for x in array_data]
+	
+	def generateHash(self, ID, debug = False):
+		# create a hash key for the entry we just made
+		sql = '''SELECT PDBComplex, PDBComplexFile, Mini, EnsembleSize, task, ProtocolParameters FROM backrub WHERE ID="%s" ''' % ID # get data
+		result = self.execQuery(sql)
+		value_string = "" 
+		for value in result[0][0:5]: # combine it to a string
+			value_string += str(value)
+		
+		# We sort the complex datatypes to get deterministic hashes
+		# todo: This works better than before (it works!) but could be cleverer.
+		value_string += _getSortedString(pickle.loads(result[0][5]))
+		
+		hash_key = md5.new(value_string.encode('utf-8')).hexdigest() # encode this string
+		sql = 'UPDATE backrub SET hashkey="%s" WHERE ID="%s"' % (hash_key, ID) # store it in the database
+		if not debug:
+			result = self.execQuery(sql)
+		else:
+			print(sql)
+		return hash_key
  
-
-
-if __name__ == "__main__":
-    """here goes our testcode"""
-    
-    test_fields = [ 'ID', 'cryptID', 'Date', 'StartDate', 'EndDate', 'UserID', 'Email', 'Status', 'Notes', 'task', 'PDBComplex', 'ExperimentalValues', 'Errors', 'IPAddress', 'Host', 'ResultsTable', 'PDBComplexFile', 'ResultsRasmol', 'Mini', 'EnsembleSize', 'KeepOutput', 'RDC_temperature', 'RDC_num_designs_per_struct', 'RDC_segment_length'] 
-
-    SQL = 'SELECT Username FROM Users WHERE ID=1'
-    print 'test: execQuery()',
-    try:
-        assert test_db.execQuery(SQL)[0][0] == 'flo', 'test: execQuery() failed'
-        print "success"
-    except AssertionError:
-        print "failed"
-    print    
-    
-    print 'test: _getFieldsInDB()',
-    try:
-        assert test_db._getFieldsInDB('backrub') == test_fields, 'test: _getFieldsInDB() failed'
-        print "success"
-    except AssertionError:
-        print "failed"
-    print
-    
-    print 'test: getData4ID()',
-    try:
-        #test some random parameters
-        test_data = test_db.getData4ID('backrub', 328)
-        assert test_data['ID'] == 328, 'test: getData4ID():ID failed'
-        assert test_data['cryptID'] == '7b355bbbe07755de00daf8fc66938229', 'test: getData4ID():cryptID failed'
-        assert str(test_data['EndDate']) == '2009-03-19 11:38:53', 'test: getData4ID():EndDate failed'
-        assert test_data['Status'] == 2, 'test: getData4ID():Status failed'
-        assert test_data['Host'] == 'exception', 'test: getData4ID():Host failed'
-        assert test_data['IPAddress'] == '169.230.90.84', 'test: getData4ID():IPAddress failed'
-        assert test_data['Mini'] == 0, 'test: getData4ID():Mini failed'
-        assert test_data['EnsembleSize'] == 2, 'test: getData4ID():EnsembleSize failed'
-        print "success"
-    except AssertionError:
-        print "failed"
-    print    
-    
-    #print 'test: insertData()'
-    ##right
-    #print test_db.insertData('backrub', [('Errors','help'),('Host','abaer'),('Mini','2'),('EnsembleSize','101')],[('Date','NOW()')])
-    ## and wrong#
-    #print test_db.insertData('backrub', [('Errors','help'),('Host','abaer'),('Mini','2'),('EnsembleSize','101')],[('Date','NOW()')])
-    #print
-    
-    #print 'test: updateData()'
-    ##right
-    #print test_db.updateData(328,'backrub', [('Errors','help'),('Host','abaer'),('Mini','2'),('EnsembleSize','101')],[('Date','NOW()')])
-    ## and wrong#
-    #print test_db.updateData(328,'backrub', [('Errors','help'),('Host','abaer'),('Mini','2'),('EnsembleSize','101')],[('Date','NOW()')])
-    #print
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    

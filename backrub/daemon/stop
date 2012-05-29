@@ -1,0 +1,18 @@
+#!/bin/sh
+
+if [ $1 = ddg ]; then
+  SCRIPTNAME="ddgdaemon.py"
+elif  [ $1 = cluster ]; then
+  SCRIPTNAME="rosetta_daemon.py cluster"
+elif  [ $1 = benchmark ]; then
+  SCRIPTNAME="benchmark-kic-daemon.py"
+elif  [ $1 = binarybuilder ]; then
+  SCRIPTNAME="binary_builder.py"
+else
+ echo "Bad option $1. The following are valid options: benchmark, binarybuilder, cluster, ddg."
+ exit 1
+fi
+echo $SCRIPTNAME
+
+. /ccpr1/sge6/qb3/common/settings.sh
+python $SCRIPTNAME stop
