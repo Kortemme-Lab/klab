@@ -124,58 +124,82 @@ class BinaryBuilderDaemon(Daemon, StatusPrinter):
 				filename += "_graphics"
 			if record['MySQL']:
 				filename += "_mysql"
-			expectedPath = os.path.join(account_home, dir, filename)
+			if record['Tool'] == "database":
+				expectedPath = os.path.join(account_home, dir, "rosetta_database")
+			else:
+				expectedPath = os.path.join(account_home, dir, filename)
 			if not os.path.exists(expectedPath):
-				# Remove records with missing associated binaries
+				# Remove records with missing associated binaries/databases
 				self.runSQL('DELETE FROM Binaries WHERE ID=%s', parameters = (record["ID"],))
 					
 		for subdir in subdirs:
 			for f in os.listdir(os.path.join(account_home, subdir)):
-				m = re.match("^(?P<Tool>.*?)_r(?P<Version>[\d.]+)(?P<BuildType>(_debug)?)(?P<Extras>(_.*)*)$", f)
-				if m:
+				if f == "rosetta_database":
 					details = {
-						'Tool'			: m.group('Tool'),
+						'Tool'			: "database",
 						'VersionType'	: None,
-						'Version'	 	: m.group('Version'),
-						'BuildType'		: m.group('BuildType') or 'release',
+						'Version'	 	: subdir[1:],
+						'BuildType'		: "database",
 						'Static'		: False,
 						'Graphics'		: False,
 						'MySQL'			: False,
 					}
-					if ("r%s" % details['Version']) != subdir:
-						# VERSION MISMATCH - FILE %s with version %s found in subdirectory %s." % (f, details['Version'], subdir))
-						continue
-						
+					
 					if details['Version'].isdigit() and details['Version'] > 100:
 						details['VersionType'] = 'SVN Revision'
 					else:
 						details['VersionType'] = 'Release'
-					extras = [e for e in m.group('Extras').split('_') if e]
-					if 'static' in extras:
-						details['Static'] = True
-						extras.remove('static')
-					if 'graphics' in extras:
-						details['Graphics'] = True
-						extras.remove('graphics')
-					if 'mysql' in extras:
-						details['MySQL'] = True
-						extras.remove('mysql')
-					
-					# todo: remove these lines when all binaries are consistently named
-					if extras:
-						if 'unpatched' in extras:
-							extras.remove('unpatched')
-						if 'alwaysfailed' in extras:
-							extras.remove('alwaysfailed')
+					sql = "SELECT ID FROM Binaries WHERE Tool=%s AND VersionType=%s AND Version=%s AND BuildType=%s AND Static=%s AND Graphics=%s AND MySQL=%s"
+					parameters = (details["Tool"], details["VersionType"], details["Version"], details["BuildType"], details["Static"], details["Graphics"], details["MySQL"])
+					existingRecord = self.runSQL(sql, parameters)
+					if not existingRecord:
+						self.DBInterface.insertDict("Binaries", details)
+				else:				
+					m = re.match("^(?P<Tool>.*?)_r(?P<Version>[\d.]+)(?P<BuildType>(_debug)?)(?P<Extras>(_.*)*)$", f)
+					if m:
+						details = {
+							'Tool'			: m.group('Tool'),
+							'VersionType'	: None,
+							'Version'	 	: m.group('Version'),
+							'BuildType'		: m.group('BuildType') or 'release',
+							'Static'		: False,
+							'Graphics'		: False,
+							'MySQL'			: False,
+						}
+						if ("r%s" % details['Version']) != subdir:
+							# VERSION MISMATCH - FILE %s with version %s found in subdirectory %s." % (f, details['Version'], subdir))
+							continue
+							
+						if details['Version'].isdigit() and details['Version'] > 100:
+							details['VersionType'] = 'SVN Revision'
+						else:
+							details['VersionType'] = 'Release'
+						extras = [e for e in m.group('Extras').split('_') if e]
+						if 'static' in extras:
+							details['Static'] = True
+							extras.remove('static')
+						if 'graphics' in extras:
+							details['Graphics'] = True
+							extras.remove('graphics')
+						if 'mysql' in extras:
+							details['MySQL'] = True
+							extras.remove('mysql')
+						
+						# todo: remove these lines when all binaries are consistently named
 						if extras:
-							self.log("Found unexpected extra build flags: %s" % extras)
-							print("Found unexpected extra build flags: %s" % extras)
-					else:
-						sql = "SELECT ID FROM Binaries WHERE Tool=%s AND VersionType=%s AND Version=%s AND BuildType=%s AND Static=%s AND Graphics=%s AND MySQL=%s"
-						parameters = (details["Tool"], details["VersionType"], details["Version"], details["BuildType"], details["Static"], details["Graphics"], details["MySQL"])
-						existingRecord = self.runSQL(sql, parameters)
-						if not existingRecord:
-							self.DBInterface.insertDict("Binaries", details)
+							if 'unpatched' in extras:
+								extras.remove('unpatched')
+							if 'alwaysfailed' in extras:
+								extras.remove('alwaysfailed')
+							if extras:
+								self.log("Found unexpected extra build flags: %s" % extras)
+								print("Found unexpected extra build flags: %s" % extras)
+						else:
+							sql = "SELECT ID FROM Binaries WHERE Tool=%s AND VersionType=%s AND Version=%s AND BuildType=%s AND Static=%s AND Graphics=%s AND MySQL=%s"
+							parameters = (details["Tool"], details["VersionType"], details["Version"], details["BuildType"], details["Static"], details["Graphics"], details["MySQL"])
+							existingRecord = self.runSQL(sql, parameters)
+							if not existingRecord:
+								self.DBInterface.insertDict("Binaries", details)
 				
 			
 	def checkRunningJobs(self):
