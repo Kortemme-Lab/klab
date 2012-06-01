@@ -215,10 +215,10 @@ class RosettaDB:
 		db = db or settings["SQLDatabase"]
 		user = user or settings["SQLUser"]
 		passwd = passwd or settings["SQLPassword"]
-		port = port or settings["SQLPort"],
+		port = port or settings["SQLPort"]
 		unix_socket	= unix_socket or settings["SQLSocket"]
 		
-		self.connection = MySQLdb.Connection(host, db, user, passwd, port, unix_socket)
+		self.connection = MySQLdb.Connection(host = host, db = db, user = user, passwd = passwd, port = port, unix_socket = unix_socket)
 		self.store_time = settings["StoreTime"]
 		self.numTries = numTries
 		self.lastrowid = None
