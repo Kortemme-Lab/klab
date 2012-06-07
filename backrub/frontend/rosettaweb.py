@@ -16,10 +16,36 @@ sys.path.insert(2, "../daemon/ddglib")
 sys.path.insert(3, "../daemon/cluster/")
 import common
 
+if False:
+	import rosettadb
+	from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory, writeFile
+	settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
+	def getBenchmarksConnection():
+		return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Benchmarks")
+	PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=1")
+	if PDFReport:
+		PDFReport = PDFReport[0]
+		report = PDFReport['PDFReport']
+		if True:
+			# todo: This should work but the filename always ends up being rosettaweb.py
+			print('Content-type: application/octet-stream\n')
+			print('Content-Disposition: attachment; filename=\"mytest.pdf\"\n')
+			#print("Content-Type: application/force-download")
+			#print("Content-Type: application/octet-stream")
+			#print("Content-Type: application/download")
+			#print("Content-Description: File Transfer")
+			#print("Content-Length: %d" % len(report))
+			print(report)
+			sys.stdout.close()
+	sys.exit(0)
+	
+	
+	
 import shutil
 import sha, time
 import cgi
-import cgitb; cgitb.enable()
+import cgitb
+cgitb.enable()
 import Cookie
 
 # set Python egg dir MscOSX only
@@ -37,7 +63,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
-from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory
+from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory, writeFile
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
@@ -48,9 +74,6 @@ from cgi import escape
 
 import string
 import pickle
-#import admin
-#import ddgweb
-#import benchmarks
 
 # Get IP address and hostname
 IP = os.environ['REMOTE_ADDR']
@@ -72,7 +95,7 @@ if not(settings["LiveWebserver"]):
 	import profile 
 
 # open connection to MySQL
-DBConnection = rosettadb.RosettaDB(settings)
+DBConnection = None
 
 # Keep a reference to the Apache error stream in case we need to use it for debugging scripts timing out.
 apacheerr = sys.stderr
@@ -89,7 +112,11 @@ def getKortemmelabUsersConnection():
 	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "KortemmeLab")
 
 def getBenchmarksConnection():
-	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "Benchmarks")
+	return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Benchmarks")
+
+def getLabServicesConnection():
+	#return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "LabServices")
+	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "LabServices")
 
 def fixFilename(filename):
 	
@@ -167,7 +194,8 @@ def ws():
 	s = sys.stdout
 	if not(settings["LiveWebserver"]):
 		sys.stderr = s
-		#cgitb.enable(display=0, logdir="/tmp")
+		cgitb.enable(display=0, logdir="/tmp")
+		#cgitb(False,'/var/log/rosettaweb')
 	debug = ''
 
 	html_content = ''
@@ -247,8 +275,8 @@ def ws():
 			allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
 			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
 			if not(settings["LiveWebserver"]):
-				allowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd"])
-				subAllowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd"])
+				allowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+				subAllowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
 			if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
@@ -267,8 +295,7 @@ def ws():
 		# send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
 		s.write(str(my_session.cookie) + '\n')
 		
-
-		if form["query"].value not in ["PDB"]:
+		if not(form.has_key("query")) or form["query"].value not in ["PDB", "benchmarkreport"]:
 			s.write("Content-type: text/html\n\n")
 		s.write(debug)
 		my_session.close()
@@ -300,6 +327,7 @@ def ws():
 	#######################################
 	if form.has_key("query") and form["query"].value == "datadir":
 		s.write("Content-type: text/html\n\n")
+		
 		cryptID = ''
 		status = ''
 		task = ''
@@ -535,54 +563,111 @@ def ws():
 			html_content = rosettaHTML.ddgPage(settings, form)
 			title = '&#916;&#916;G'
 
+	elif query_type == "benchmarkreport":
+		if form.has_key("id"):
+			PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=%s", parameters = (form["id"].value,))
+			if PDFReport:
+				PDFReport = PDFReport[0]
+				report = PDFReport['PDFReport']
+				if report:
+					if True:
+						if form.has_key("action") and form['action'].value == "download":
+							# Push the file to the user
+							print 'Content-Type: application/octet-stream'
+							print 'Content-Disposition: attachment; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
+							print "Content-Length: %d" % len(report)
+							print
+							sys.stdout.write(report)
+							sys.stdout.flush()
+						else:
+							# Instead, show the PDF on the page
+							print 'Content-Type: application/pdf'
+							print 'Content-Disposition: inline; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
+							print "Content-Length: %d" % len(report)
+							print
+							sys.stdout.write(report)
+							sys.stdout.flush()
+						#print("Content-Type: application/force-download")
+						#print("Content-Type: application/octet-stream")
+						#print("Content-Type: application/download")
+						#print("Content-Description: File Transfer")
+					else:
+						# todo: delete this code
+						tempdir = os.path.join(settings["TempDir"], "benchmarkdata") 
+						if not os.path.exists(tempdir):
+							os.mkdir(tempdir, 0775)
+						filepath = os.path.join(tempdir, "%(BenchmarkID)s-%(ID)s.pdf" % PDFReport)
+						writeFile(filepath, report)
+						filepath = os.path.join("..", "temp", "benchmarkdata", "%(BenchmarkID)s-%(ID)s.pdf" % PDFReport)
+						s.write("Content-type: text/html\n\n")
+						s.write("<html><body><a href='%s'>Download here</a></body></html>" % filepath)
+				else:
+					s.write("Content-type: text/html\n\n")
+					s.write("The report has not been created.")
+			else:
+				s.write("Content-type: text/html\n\n")
+				s.write("Could not retrieve the PDB from the database.")
+
 	elif query_type == "benchmarks":
 		if not(settings["LiveWebserver"]):
 			
+			ExistingBinaries = getLabServicesConnection().execQuery('SELECT ID, Tool, VersionType, Version, BuildType, Static, Graphics, MySQL FROM Binaries', cursorClass = rosettadb.DictCursor)
+			
 			benchmarks = {}
-			for b in getBenchmarksConnection().execQuery('SELECT * FROM Benchmark', cursorClass = rosettadb.DictCursor):
-				benchmarkID = b['BenchmarkID']
-				benchmarks[benchmarkID] = {}
-				benchmarks[benchmarkID]['ParameterizedFlags'] = b['ParameterizedFlags']
-				benchmarks[benchmarkID]['SimpleFlags'] = b['SimpleFlags']
-				
+			BenchmarksDB = getBenchmarksConnection()
+			for b in BenchmarksDB.execute('SELECT * FROM Benchmark', cursorClass = rosettadb.DictCursor):
+				benchmarks[b['BenchmarkID']] = b
+			
 			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "RunLength"'
-			runlengths = getBenchmarksConnection().execQuery(qry)[0][0]
+			runlengths = BenchmarksDB.execute(qry)[0]['COLUMN_TYPE']
 			if runlengths.startswith("enum(") and runlengths.endswith(")"):
 				runlengths = (runlengths[5:-1]).split(",")
 				runlengths = [b.strip()[1:-1] for b in runlengths]
 			
 			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "ClusterQueue"'
-			ClusterQueues = getBenchmarksConnection().execQuery(qry)[0][0]
+			ClusterQueues = BenchmarksDB.execute(qry)[0]['COLUMN_TYPE']
 			if ClusterQueues.startswith("enum(") and ClusterQueues.endswith(")"):
 				ClusterQueues = (ClusterQueues[5:-1]).split(",")
 				ClusterQueues = [b.strip()[1:-1] for b in ClusterQueues]
 			
 			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "ClusterArchitecture"'
-			ClusterArchitectures = getBenchmarksConnection().execQuery(qry)[0][0]
+			ClusterArchitectures = BenchmarksDB.execute(qry)[0]['COLUMN_TYPE']
 			if ClusterArchitectures.startswith("enum(") and ClusterArchitectures.endswith(")"):
 				ClusterArchitectures = (ClusterArchitectures[5:-1]).split(",")
 				ClusterArchitectures = [b.strip()[1:-1] for b in ClusterArchitectures]
 			
 			qry = 'SELECT BenchmarkID, AlternateFlags FROM BenchmarkAlternateFlags ORDER BY ID'
-			for alternate_flags in getBenchmarksConnection().execQuery(qry):
-				benchmarks[alternate_flags[0]]['alternate_flags'] = benchmarks[alternate_flags[0]].get('alternate_flags', [])
-				benchmarks[alternate_flags[0]]['alternate_flags'].append(alternate_flags[1])
-				
+			for alternate_flags in BenchmarksDB.execute(qry):
+				benchmarks[alternate_flags['BenchmarkID']]['alternate_flags'] = benchmarks[alternate_flags['BenchmarkID']].get('alternate_flags', [])
+				benchmarks[alternate_flags['BenchmarkID']]['alternate_flags'].append(alternate_flags['AlternateFlags'])
+			
 			qry = 'SELECT * FROM BenchmarkOption ORDER BY ID'
-			for benchmark_options in getBenchmarksConnection().execQuery(qry, cursorClass = rosettadb.DictCursor):
+			for benchmark_options in BenchmarksDB.execute(qry, cursorClass = rosettadb.DictCursor):
 				benchmarks[benchmark_options["BenchmarkID"]]['options'] = benchmarks[benchmark_options["BenchmarkID"]].get('options', [])
 				benchmarks[benchmark_options["BenchmarkID"]]['options'].append(benchmark_options)
 			
 			if not(benchmarks and runlengths):
 				raise Exception("Failed parsing Benchmarks database schema.")
 			
-			benchmark_options = {
+			if form.has_key('submitted') and form['submitted'].value == "T":
+				import benchmarks as benchmarkspage
+				parameters = benchmarkspage.getRunParameters(form, benchmarks)
+				BenchmarksDB.insertDict("BenchmarkRun", parameters)
+				BenchmarksDB.execute('UPDATE BenchmarkRun SET EntryDate=NOW() WHERE ID=%s', parameters = (BenchmarksDB.getLastRowID(),))
+			
+			benchmark_runs = BenchmarksDB.execute('SELECT ID, BenchmarkID, RunLength, RosettaSVNRevision, RosettaDBSVNRevision, RunType, CommandLine, BenchmarkOptions, ClusterQueue, ClusterArchitecture, ClusterMemoryRequirementInGB, ClusterWalltimeLimitInMinutes, NotificationEmailAddress, EntryDate, StartDate, EndDate, Status, AdminCommand, Errors FROM BenchmarkRun ORDER BY ID')
+			
+			benchmark_details = {
 				"benchmarks" 			: benchmarks,
+				"revisions"				: [],
 				"runlengths" 			: runlengths,
 				"ClusterQueues"			: ClusterQueues,
 				"ClusterArchitectures"	: ClusterArchitectures,
+				"ExistingBinaries"		: ExistingBinaries,
+				"BenchmarkRuns"			: benchmark_runs,
 			}
-			html_content = rosettaHTML.benchmarksPage(settings, form, benchmark_options)
+			
+			html_content = rosettaHTML.benchmarksPage(settings, form, benchmark_details)
 			title = 'Benchmarks'
 
 	elif query_type == "update":
@@ -624,7 +709,7 @@ def ws():
 	else:
 		html = "this is impossible" # should never happen since we only allow states from list above 
 
-	if query_type not in ["PDB"]:
+	if query_type not in ["PDB", "benchmarkreport"]:
 		s.write(rosettaHTML.main(html_content, title, query_type))
 	
 	s.close()
@@ -1994,6 +2079,7 @@ try:
 	# Change True to False here to display the maintenance page
 	# The maintenance page should be updated before doing so e.g. go to the website, copy the source, paste into maintenance.html, and edit to remove links etc.
 	if True or hostname in DEVELOPMENT_HOSTS: 
+		DBConnection = rosettadb.RosettaDB(settings)
 		ws()
 	else:
 		F=open("maintenance.html")
@@ -2003,10 +2089,11 @@ try:
 		sys.stdout.write(contents)
 		sys.stdout.close()		
 except Exception, e:
+	sys.stdout.write("Content-type: text/html\n\n")
 	if hostname in DEVELOPMENT_HOSTS:
 		cgitb.handler()
-		#print(e)
-		#print("<br>")
-		#print(str(traceback.print_exc()).replace("\n", "<br>"))
-		#print("*<br>")
-	print "An error occurred. Please check your input and contact us if the problem persists."
+		print("<br><pre>e = %s" % e)
+		print("\n")
+		print(str(traceback.format_exc()))
+		print("<pre>")
+	print "An unhandled exception occurred on the server. Please contact us if the problem persists."

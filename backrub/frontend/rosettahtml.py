@@ -117,7 +117,7 @@ class RosettaHTML(object):
                 <link rel="STYLESHEET" type="text/css" href="../style.css">
                 
                 <script src="/javascripts/prototype.js" type="text/javascript"></script>
-                <script src="/javascripts/sorttable.js"></script>
+                <script src="/javascripts/sorttable.js" type="text/javascript"></script>
                 <script src="/javascripts/scriptaculous.js" type="text/javascript"></script>
                 <script src="/javascripts/niftycube.js" type="text/javascript"></script>
                 <script src="/javascripts/boxover.js" type="text/javascript"></script>

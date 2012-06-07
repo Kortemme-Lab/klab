@@ -67,6 +67,27 @@ a.blacklink { color:black; font-family: Arial, Helvetica, Sans-Serif; font-size:
             /*layer-background-color:#FFFFE0;*/
             text-align:justify; }
 
+table.benchmarks {}
+td.benchmarks {border: 0}
+tr.benchmarks {border: 0}
+
+.tthbenchmark {  font:12px/14px Arial,Helvetica,sans-serif; 
+            border:solid 1px #666666; 
+            width:380px; 
+            padding:3px;
+            color:#FFFFFF; 
+            background-color:#6A6A6A;
+            text-align:justify; } /*header*/
+.tooltipbenchmark {  font:12px/14px Arial,Helvetica,sans-serif; 
+            border:solid 1px #666666; 
+            width:380px; 
+            height:180px; 
+            padding:3px; 
+            color:#000000; 
+            background-color:#ffffcc; 
+            /*layer-background-color:#FFFFE0;*/
+            text-align:justify; }
+
 .activeLT { border-left:1px solid black; border-top:1px solid black; border-bottom:1px solid black; }
 .inactiveLT { border-right:1px solid black; }
 

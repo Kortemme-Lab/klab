@@ -11,6 +11,7 @@ import os
 import sys
 import re
 import string
+from string import join
 import stat
 import tempfile
 import colorsys
@@ -60,7 +61,7 @@ def writeFile(filepath, contents):
 
 def normalize_for_bash(s):
     t = [c for c in s if c.isalnum() or c == "_"]
-    return string.join(t, "")
+    return join(t, "")
 
 # Tasks
 def write_file(filename, contents): #todo: elide this with writeFile above
@@ -150,6 +151,14 @@ def saturateHexColor(hexcolor, adjustment = 1.0):
 		hsvColor[1] = min(1.0, hsvColor[1] * adjustment)
 		rgbColor = [min(255, 255 * v) for v in colorsys.hsv_to_rgb(hsvColor[0], hsvColor[1], hsvColor[2])]
 		return "%s%.2x%.2x%.2x" % (prefix, rgbColor[0], rgbColor[1], rgbColor[2]) 
+
+def ggplotColorWheel(n, start = 15, saturation_adjustment = None):
+	hues = range(start, start + 360, 360/n)
+	rgbcolors = ['%x%x%x' % (255 * hlscol[0], 255 * hlscol[1], 255 * hlscol[2]) for hlscol in [colorsys.hls_to_rgb(float(h % 360) / 360.0, 0.65, 1.00) for h in hues]]
+	if saturation_adjustment:
+		return [saturateHexColor(rgbcol, saturation_adjustment) for rgbcol in rgbcolors]
+	else:
+		return rgbcolors
 
 class WebsiteSettings(object):
     settings = {}

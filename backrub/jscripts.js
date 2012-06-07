@@ -413,8 +413,68 @@ function checkPassword()
 	}
 }
 
+function validateSingleEmailAddressString(str)
+{
+	ati = str.indexOf("@")
+	doti = str.lastIndexOf(".")
+	return !(ati == -1 || doti == -1 || str.length < 6 || doti - 1 <= ati);
+}
+
+function validateEmailAddress(formelement, allowempty, allowmultiple)
+{
+	isValid = true
+	str = formelement.value.replace(/^\s+|\s+$/g, '');	// strip trailing and leading whitespace
+	if (allowempty && str == "")
+	{
+		return true;
+	}
+	delimiter = ',';
+	baddelimiter = ';';
+	if (str.indexOf(";") != -1)
+	{
+		delimiter = ';';
+		baddelimiter = ',';
+	}
+	if (str.indexOf(baddelimiter) != -1 || (!allowmultiple && (str.indexOf(delimiter) != -1)))
+	{
+		isValid = false;
+	}
+	if (isValid)
+	{
+		if (allowmultiple)
+		{
+			count = 0
+			strs = str.split(delimiter);
+			for (i = 0; i < strs.length; i++)
+			{
+				str = strs[i].replace(/^\s+|\s+$/g, '')
+				if (str != "")
+				{
+					isValid = isValid && validateSingleEmailAddressString(str);
+					count += 1
+				}
+			}
+			isValid = isValid && count > 0;
+		}
+		else
+		{
+			isValid = isValid && validateSingleEmailAddressString(str);
+		}
+	}
+	if (!isValid)
+	{
+		formelement.style.background = "#ff5555";
+	}
+	else
+	{
+		formelement.style.background = "#ffffff";
+	}
+	return isValid;
+}
+
 function validateEmail()
 {
+	// todo: remove
 	f = document.myForm.email
 	str = f.value.replace(/^\s+|\s+$/g, '');	// strip trailing and leading whitespace
 	ati = str.indexOf("@")
