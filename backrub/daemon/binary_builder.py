@@ -193,7 +193,7 @@ class BinaryBuilderDaemon(Daemon, StatusPrinter):
 								extras.remove('alwaysfailed')
 							if extras:
 								self.log("Found unexpected extra build flags: %s" % extras)
-								print("Found unexpected extra build flags: %s" % extras)
+								#print("Found unexpected extra build flags: %s" % extras)
 						else:
 							sql = "SELECT ID FROM Binaries WHERE Tool=%s AND VersionType=%s AND Version=%s AND BuildType=%s AND Static=%s AND Graphics=%s AND MySQL=%s"
 							parameters = (details["Tool"], details["VersionType"], details["Version"], details["BuildType"], details["Static"], details["Graphics"], details["MySQL"])

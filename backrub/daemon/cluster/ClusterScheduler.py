@@ -435,10 +435,6 @@ class RosettaClusterJob(StatusPrinter):
 			os._exit(0)
 		return self.workingdir
 
-	def _targetdir_file_path(self, filename):
-		"""Get the path for a file within the working directory"""
-		return os.path.join(self.targetdirectory, filename)   
-
 	def _make_targetdir(self):
 		"""Make a single used target directory inside the target directory"""
 		# make a tempdir on the host
@@ -452,9 +448,6 @@ class RosettaClusterJob(StatusPrinter):
 			os._exit(0)
 		return self.targetdirectory
 	
-	def _taskresultsdir_file_path(self, taskdir, filename):
-		return os.path.join(self.targetdirectory, taskdir, filename)
-
 	def moveFilesTo(self, permissions = permissions755):
 		destpath = self.dldir
 		
@@ -511,6 +504,13 @@ class RosettaClusterJob(StatusPrinter):
 	def _workingdir_file_path(self, filename, jobID = "."):
 		"""Get the path for a file within the working directory"""
 		return os.path.normpath(os.path.join(self.workingdir, str(jobID), filename))
+
+	def _targetdir_file_path(self, filename):
+		"""Get the path for a file within the working directory"""
+		return os.path.join(self.targetdirectory, filename)   
+
+	def _taskresultsdir_file_path(self, taskdir, filename):
+		return os.path.join(self.targetdirectory, taskdir, filename)
 
 	def dumpJITGraph(self):
 		destpath = self.dldir

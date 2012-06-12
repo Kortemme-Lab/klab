@@ -1,4 +1,4 @@
-# Copyright (C) 2011,2012 Shane O'Connor, Roland A. Pache, and the Regents of the University of California, San Francisco
+# Copyright (C) 2011,2012 Shane O'Connor and the Regents of the University of California, San Francisco
 
 import sys
 import os
@@ -22,7 +22,8 @@ from string import join
 from statusprinter import StatusPrinter
 import rosettadb
 import rosettahelper
-			
+import klfilesystem
+					
 import benchmark_kic
 import benchmark_kic.jobs as jobs
 
@@ -76,10 +77,6 @@ class KICSettings(object):
 			self.local_temp_dir = settings['local_temp_dir']
 			self.local_results_dir = settings['local_results_dir'] 
 			
-			# Rosetta version-dependent settings
-			self.rosetta_executable=settings['Rosetta_executable']
-			self.outdir=settings['models_outdir']
-			
 		except IOError:
 			raise Exception("settings.ini could not be found in %s." % base_dir)
 			sys.exit(2)
@@ -95,7 +92,7 @@ class KICSettings(object):
 
 
 class KICDaemon(RosettaDaemon):
-	MaxClusterJobs	= 1
+	MaxClusterJobs	= 2
 	logfname		= "KICDaemon.log"
 	pidfile			= settings["benchmarkKICPID"]
 	
@@ -105,7 +102,6 @@ class KICDaemon(RosettaDaemon):
 		super(RosettaDaemon, self).__init__(self.pidfile, settings, stdout = stdout, stderr = stderr)
 		self.configure()
 		self.logfile = os.path.join(self.rosetta_tmp, self.logfname)
-		print(self.logfile)
 		self.sgec = SGEConnection()
 		self._clusterjobjuststarted = None
 		if os.environ.get('PWD'):
@@ -115,6 +111,7 @@ class KICDaemon(RosettaDaemon):
 		self.log("KIC Benchmark daemon")
 		
 		self.BenchmarkMap = {"KIC" : jobs.KICBenchmarkJob}
+		#self.BenchmarkMap = {"KIC" : jobs.KICBenchmarkJobAnalyzer}
 		self.BenchmarkSettings = {"KIC" : self.KICSettings}
 		
 		# Maintain a list of recent DB jobs started. This is to avoid any logical errors which 
@@ -128,9 +125,10 @@ class KICDaemon(RosettaDaemon):
 			make755Directory(cluster_temp)
 		
 	def __del__(self):
-		self.DBConnection.close()
+		if self.DBInterface:
+			del self.DBInterface
 	
-	def runSQL(self, query, parameters = None, cursorClass = rosettadb.DictCursor):
+	def runSQL(self, sql, parameters = None, cursorClass = rosettadb.DictCursor):
 		""" This function should be the only place in this class which executes SQL.
 			Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
 			Using this function and passing the string in reduces the likelihood of these errors.
@@ -140,21 +138,16 @@ class KICDaemon(RosettaDaemon):
 			""" 
 		if self.logSQL:
 			if parameters:
-				self.log("SQL: %s, parameters = %s" % (query, parameters))
+				self.log("SQL: %s, parameters = %s" % (sql, parameters))
 			else:
-				self.log("SQL: %s" % query)
+				self.log("SQL: %s" % sql)
 		results = []
 		try:
-			self.DBConnection.execQuery("LOCK TABLES Benchmark WRITE, BenchmarkRun WRITE")
-			results = self.DBConnection.execQuery(query, parameters, cursorClass)
+			return self.DBInterface.locked_execute(sql, parameters, cursorClass)
 		except Exception, e:
-			self.DBConnection.execQuery("UNLOCK TABLES")
-			self.log("%s." % e)
-			self.log(traceback.format_exc())
-			raise Exception
-		self.DBConnection.execQuery("UNLOCK TABLES")
+			raise
 		return results
-	
+
 	def configure(self):
 		passwd = None
 		F = open("../sqlpw", "r")
@@ -177,12 +170,11 @@ class KICDaemon(RosettaDaemon):
 		self.base_dir			= settings["BaseDir"]
 		self.rosetta_tmp		= settings["TempDir"]
 		
-		self.DBConnection		= rosettadb.RosettaDB(settings, db = "Benchmarks", numTries = 32)
+		self.DBInterface		= rosettadb.DatabaseInterface(settings, db = "Benchmarks")  # RosettaDB(settings, db = "Benchmarks", numTries = 32)
 
 	def recordSuccessfulJob(self, clusterjob):
 		jobID = clusterjob.jobID
-		Results = pickle.dumps(clusterjob.getResults(jobID))
-		self.runSQL('UPDATE BenchmarkRun SET Status="done", Results=%s, NumberOfMeasurements=1, EndDate=NOW() WHERE ID=%s', parameters = (Results, jobID))
+		self.runSQL('UPDATE BenchmarkRun SET Status="done", EndDate=NOW() WHERE ID=%s', parameters = (jobID,))
 					
 	def recordErrorInJob(self, clusterjob, errormsg, _traceback = None, _exception = None, jobID = None):
 		suffix = ""
@@ -194,16 +186,32 @@ class KICDaemon(RosettaDaemon):
 		
 		timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 		if _traceback and _exception:
-			print("FAILED")
 			_exception = str(_exception)
 			self.log(_traceback, error = True)
 			self.log(_exception, error = True)
 			self.runSQL('''UPDATE BenchmarkRun SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception)), jobID))
 		else:
-			print("FAILED")
 			self.runSQL('''UPDATE BenchmarkRun SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s" % (errormsg, timestamp), jobID))
 		self.log("Error: The %s job %s failed at some point:\n%s" % (suffix, jobID, errormsg), error = True)
-		
+	
+	def notifyUsersOfCompletedJob(self, clusterjob):
+		parameters = clusterjob.parameters 
+		if parameters['NotificationEmailAddress']:
+			addresses = [address for address in parameters['NotificationEmailAddress'].split(";") if address]
+			if addresses:			
+				if clusterjob.failed or clusterjob.error:
+					subject  = "Kortemme Lab Benchmark Server - %(BenchmarkID)s job #%(ID)d failed" % parameters
+					mailTXT = "An error occurred during the job.\n%s" % str(clusterjob.error)
+					for address in addresses:
+						if not self.sendMail(address, self.email_admin, subject, mailTXT):
+							self.log("Error: sendMail() ID = %s." % ID )				 
+				else:
+					subject  = "Kortemme Lab Benchmark Server - %(BenchmarkID)s job #%(ID)d passed" % parameters
+					mailTXT = "The benchmark run completed successfully."
+					for address in addresses:
+						if not self.sendMail(address, self.email_admin, subject, mailTXT):
+							self.log("Error: sendMail() ID = %s." % ID )				 
+						
 	def run(self):
 		"""The main loop and job controller of the daemon."""
 		
@@ -218,10 +226,15 @@ class KICDaemon(RosettaDaemon):
 			self.checkRunningJobs()
 			self.restartJobs()
 			self.startNewJobs()
-			sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
-			time.sleep(5)
-			self.printStatus()
-			
+			check_cluster = False
+			for clusterjob in self.runningJobs:
+				if not(clusterjob.testonly):
+					check_cluster = True
+			if True or check_cluster:
+				sgec.qstat(waitForFresh = True) # This should sleep until qstat can be called again
+				time.sleep(5)
+				self.printStatus()
+	
 	def checkRunningJobs(self):
 		completedJobs = []
 		failedjobs = []
@@ -243,10 +256,13 @@ class KICDaemon(RosettaDaemon):
 				if clusterjob.isCompleted():
 					completedJobs.append(clusterjob)
 
-					clusterjob.saveProfile()
+					if not clusterjob.testonly:
+						clusterjob.saveProfile()
 					try:
 						clusterjob.analyze()
-					except Exception:
+					except Exception, e:
+						clusterjob.error = "Analysis failed. %s" % str(e)
+						clusterjob.failed = True
 						self.log("Analysis failed.")
 					
 					self.end_job(clusterjob)
@@ -288,19 +304,26 @@ class KICDaemon(RosettaDaemon):
 		
 		numRunningJobs = 0
 		numRunningJobs = len(self.runningJobs)
-			
+		
+		#tmpparameters = {
+		#	'NumberOfLowestEnergyModelsToConsiderForBestModel'	:	5,
+		#	'MaxKICBuildAttempts'								:	1000,
+		#	'NumberOfModelsPerPDB'								:	20,
+		#	'NumberOfModelsOffset'								:	0,
+		#}
+		#self.runSQL("UPDATE BenchmarkRun SET BenchmarkOptions=%s WHERE ID=2", parameters = (pickle.dumps(tmpparameters),))
 		if numRunningJobs < self.MaxClusterJobs:
-			results = self.runSQL("SELECT * FROM BenchmarkRun WHERE BenchmarkRun.Status='queued' ORDER BY EntryDate")
+			results = self.runSQL("SELECT BenchmarkRun.*, Benchmark.BinaryName AS BinaryName FROM BenchmarkRun INNER JOIN Benchmark ON BenchmarkRun.BenchmarkID=Benchmark.BenchmarkID WHERE BenchmarkRun.Status='queued' ORDER BY EntryDate LIMIT %d" % self.MaxClusterJobs)
 			try:
 				jobID = None
 				if len(results) != 0:
-					for params in results:
+					for parameters in results:
 						# Remember that we are about to start this job to avoid repeatedly submitting the same job to the cluster
 						# This should not happen but just in case.
 						# Also, never let the list grow too large as the daemon should be able to run a long time
 						newclusterjob = None
-						jobID = params["ID"]
-						self.log("Starting %s benchmark run with ID %d." % (params["BenchmarkID"], jobID))
+						jobID = parameters["ID"]
+						self.log("Starting %s benchmark run with ID %d." % (parameters["BenchmarkID"], jobID))
 						if jobID in self.recentDBJobs:
 							self.log("Error: Trying to run database job %d multiple times." % jobID, error = True)
 							raise Exception("Trying to run database job %d multiple times")
@@ -309,12 +332,12 @@ class KICDaemon(RosettaDaemon):
 							self.recentDBJobs = self.recentDBJobs[100:]
 						
 						# Start the job						
-						newclusterjob = self.start_job(params)
+						newclusterjob = self.start_job(parameters)
 						if newclusterjob:
 							#change status and write start time to DB
 							self.runningJobs.append(newclusterjob)
 							self.JobsToDBId[newclusterjob] = jobID 
-							self.runSQL("UPDATE BenchmarkRun SET Status='active', StartDate=NOW() WHERE ID=%s" % jobID)
+							self.runSQL("UPDATE BenchmarkRun SET Status='active', StartDate=NOW(), EndDate=NULL WHERE ID=%s" % jobID)
 				
 						if len(self.runningJobs) >= self.MaxClusterJobs:
 							break
@@ -344,14 +367,14 @@ class KICDaemon(RosettaDaemon):
 									 
 			self._clusterjobjuststarted = None
 
-	def start_job(self, params):
+	def start_job(self, parameters):
 
 		clusterjob = None
 
-		self.log("Start new job ID = %(ID)s. %(BenchmarkID)s benchmark." % params)
+		self.log("Start new job ID = %(ID)s. %(BenchmarkID)s benchmark." % parameters)
 		
-		bsettings = self.BenchmarkSettings[params["BenchmarkID"]]
-		jobclass = self.BenchmarkMap[params["BenchmarkID"]]
+		bsettings = self.BenchmarkSettings[parameters["BenchmarkID"]]
+		jobclass = self.BenchmarkMap[parameters["BenchmarkID"]]
 		
 		if not os.path.exists(bsettings.cluster_results_dir):
 			rosettahelper.make755Directory(bsettings.cluster_results_dir)
@@ -360,8 +383,8 @@ class KICDaemon(RosettaDaemon):
 		if not os.path.exists(bsettings.local_temp_dir):
 			rosettahelper.make755Directory(bsettings.local_temp_dir)
 		
-		clusterjob = jobclass(self.sgec, params, bsettings, bsettings.cluster_results_dir, bsettings.local_temp_dir, bsettings.local_results_dir)
-					
+		clusterjob = jobclass(self.sgec, parameters, bsettings, bsettings.cluster_results_dir, bsettings.local_temp_dir, bsettings.local_results_dir)
+			
 		# clusterjob will not be returned on exception and the reference will be lost
 		self._clusterjobjuststarted = clusterjob 
 		
@@ -409,12 +432,10 @@ class KICDaemon(RosettaDaemon):
 			
 			
 	def end_job(self, clusterjob, Failed = False):
-		
 		ID = clusterjob.jobID 
 				
 		try:
 			self.copyAndZipOutputFiles(clusterjob)
-			pass
 		except Exception, e:
 			self.recordErrorInJob(clusterjob, "Error archiving files.", traceback.format_exc(), e)
 		
@@ -442,22 +463,31 @@ class KICDaemon(RosettaDaemon):
 		result_dir = self.moveFilesOnJobCompletion(clusterjob)
 		current_dir = os.getcwd()
 		try:
-			ID = clusterjob.params["ID"]
+			ID = clusterjob.parameters["ID"]
 			
 			# Save the output in the database
-			F = open(os.path.join(result_dir, clusterjob.reportPDF), "rb")
-			blob = F.read()
-			F.close() 
 			existingRecord = self.runSQL('SELECT ID FROM BenchmarkRun WHERE ID=%s', parameters = (ID, ))
-			if existingRecord:
-				self.runSQL('UPDATE BenchmarkRun SET Results=%s WHERE ID=%s', parameters = (blob, ID))		
-			else:
-				self.runSQL('INSERT INTO BenchmarkRun (ID, Results) VALUES(%s,%s)', parameters = (ID, blob))		
+			#if existingRecord:
+			self.runSQL('UPDATE BenchmarkRun SET PDFReport=%s WHERE ID=%s', parameters = (clusterjob.PDFReport, ID))		
+			#else:
+			#self.runSQL('INSERT INTO BenchmarkRun (ID, PDFReport) VALUES(%s,%s)', parameters = (ID, clusterjob.PDFReport))
+			
+			existingRecord = self.runSQL('DELETE FROM BenchmarkRunOutputFile WHERE BenchmarkRunID=%s', parameters = (ID, ))
+			for outputFilePath in clusterjob.getOutputFilePaths():
+				d = {
+					'BenchmarkRunID'	: ID,
+					'FileType'			: outputFilePath.filetype, 
+					'FileID'			: outputFilePath.fileID,
+					'Filename'			: outputFilePath.filename,
+					'File'				: rosettahelper.readFile(outputFilePath.path_to_file),
+				}
+				self.DBInterface.insertDict('BenchmarkRunOutputFile', d)
+			
 		except Exception, e: 
 			os.chdir(current_dir)
 			self.log("%s." % e, error = True)
 			self.log(traceback.format_exc(), error = True)
-			raise Exception()
+			raise Exception("Failed while copying and zipping output files.")
 
 		os.chdir(current_dir)
 		

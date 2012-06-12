@@ -324,7 +324,7 @@ class ClusterTask(StatusPrinter):
 						os.remove(stderrfile)
 					elif self.failOnStdErr:
 						shutil.copy(stderrfile, self.targetdirectory)
-						self._status("Failed on %s, subtask %d. stderr file %s has size %d" % (self.name, i, stderrfile, stderrHasFailed))
+						self._status("Failed on %s, subtask %d. stderr file %s has size %d" % (self.name, i, stderrfile, os.path.getsize(stderrfile)))
 						self.state = FAILED_TASK
 						failedOutput = True
 				else:

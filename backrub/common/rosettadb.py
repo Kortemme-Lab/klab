@@ -162,7 +162,7 @@ class DatabaseInterface(object):
 				sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 			sys.stderr.write("\nError: '%s'.\n" % (str(e)))
 			sys.stderr.flush()
-			raise Exception("Error occurred during database insertion.")
+			raise Exception("Error occurred during database insertion: '%s'." % str(e))
 
 	def callproc(self, procname, parameters = (), cursorClass = DictCursor, quiet = False):
 		"""Calls a MySQL stored procedure procname. This uses DictCursor by default."""
