@@ -298,7 +298,9 @@ def getRunParameters(form, benchmarks):
 	emailList = None
 	if form.has_key('BenchmarkNotificationEmailAddresses'):
 		emailList = form['BenchmarkNotificationEmailAddresses'].value
-		
+		if emailList.find(",") != -1:
+			emailList = emailList.replace(",", ";")
+			
 	return {
 		'BenchmarkID': benchmark, 
 		'RunLength': form['BenchmarkRunLength'].value, 
@@ -629,7 +631,7 @@ line-height:15px;
 		#	document.reportpageform.benchmarkrunID.value='%(ID)s';
 		#	document.reportpageform.submit();
 		#	''' % run
-		if run["Status"] == "done":
+		if run["Status"] == "done" and run["HasPDF"]:
 			html.append('''<td style='text-align:center; width:20px;'>
 				<span style='cursor:pointer;' onclick="%(pdfjavascript)s"><img src='../images/pdf16.png'></img></span>
 				<span style='cursor:pointer;' onclick="%(filesaveasjavascript)s"><img src='../images/filesaveas16.png'></img></span>

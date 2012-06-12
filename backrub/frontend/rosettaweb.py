@@ -615,6 +615,7 @@ def ws():
 			
 			benchmarks = {}
 			BenchmarksDB = getBenchmarksConnection()
+			
 			for b in BenchmarksDB.execute('SELECT * FROM Benchmark', cursorClass = rosettadb.DictCursor):
 				benchmarks[b['BenchmarkID']] = b
 			
@@ -656,6 +657,12 @@ def ws():
 				BenchmarksDB.execute('UPDATE BenchmarkRun SET EntryDate=NOW() WHERE ID=%s', parameters = (BenchmarksDB.getLastRowID(),))
 			
 			benchmark_runs = BenchmarksDB.execute('SELECT ID, BenchmarkID, RunLength, RosettaSVNRevision, RosettaDBSVNRevision, RunType, CommandLine, BenchmarkOptions, ClusterQueue, ClusterArchitecture, ClusterMemoryRequirementInGB, ClusterWalltimeLimitInMinutes, NotificationEmailAddress, EntryDate, StartDate, EndDate, Status, AdminCommand, Errors FROM BenchmarkRun ORDER BY ID')
+			runsWithPDFs = set([result["ID"] for result in BenchmarksDB.execute('SELECT ID FROM BenchmarkRun WHERE PDFReport IS NOT NULL')])
+			for benchmark_run in benchmark_runs:
+				if benchmark_run["ID"] in runsWithPDFs:
+					benchmark_run["HasPDF"] = True
+				else:
+					benchmark_run["HasPDF"] = False
 			
 			benchmark_details = {
 				"benchmarks" 			: benchmarks,
