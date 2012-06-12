@@ -104,6 +104,14 @@ table.backrubscores {border : 1px solid black; border-collapse:collapse; }
 table.backrubscores th { padding: 2px; border : 1px solid black; font-size: 9pt; text-align: left;}
 table.backrubscores td { padding: 2px; border : 1px solid black; text-align: left; }
 
+/* PDF document links */
+a.benchmarks[href$='.pdf'] {
+  background: transparent url(../images/pdf16.png) center left no-repeat;
+  display:inline-block;
+  padding-left:20px;
+  line-height:15px;
+}
+
 div#box{float:right; width: 440px; padding: 20px; margin:0px auto; color:#000; }
 div#news_box_good{float:center; width: 600px; padding: 5px; margin:0px auto; color:#000; background-color:#66CC66; }
 div#news_box_warning{float:center; width: 600px; padding: 5px; margin:0px auto; color:#000; background-color:#CC3333; }

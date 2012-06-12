@@ -558,20 +558,10 @@ def generateReportPage(benchmark_details):
 	html = []
 	html.append('''<center><div>''')
 	html.append('''<H1 align=left>Benchmark runs</H1><br>''')
-	html.append('''<FORM name="reportpageform" method="post">''')
+	html.append('''<FORM name="reportpageform" method="post" action="#">''')
 	html.append('''<table style="width:800px;">''')
 	html.append('''<tr><td>''')
 	html.append('''<table class="sortable" border=1 cellpadding=4 cellspacing=0  width="1100px" style="font-size:12px;text-align:left">''')
-	html.append('''
-<style media="screen" type="text/css">
-/* PDF document links */
-a[href$='.pdf'] {
-background: transparent url(../images/pdf16.png) center left no-repeat;
-display:inline-block;
-padding-left:20px;
-line-height:15px;
-}
-</style>''')
 	
 	html.append("<tr style='background-color:#dddddd'>")
 	html.append("<th>ID</th><th>Benchmark</th><th>Length</th><th>Status</th><th>Revision</th><th>DB Revision</th><th style='width:100px;'>Command line</th><th>Benchmark Options</th><th>Run time</th><th>Errors</th><th>Report</th><th colspan=2>Compare</th>")
@@ -633,8 +623,8 @@ line-height:15px;
 		#	''' % run
 		if run["Status"] == "done" and run["HasPDF"]:
 			html.append('''<td style='text-align:center; width:20px;'>
-				<span style='cursor:pointer;' onclick="%(pdfjavascript)s"><img src='../images/pdf16.png'></img></span>
-				<span style='cursor:pointer;' onclick="%(filesaveasjavascript)s"><img src='../images/filesaveas16.png'></img></span>
+				<span style='cursor:pointer;' onclick="%(pdfjavascript)s"><img src='../images/pdf16.png' alt='pdf'></span>
+				<span style='cursor:pointer;' onclick="%(filesaveasjavascript)s"><img src='../images/filesaveas16.png' alt='save'></span>
 				</td>''' % vars())
 		else:
 			html.append('''<td></td>''')
@@ -644,12 +634,17 @@ line-height:15px;
 		html.append("</tr>")
 	
 	html.append('''</table>''')
-	html.append('''<div style='text-align:right'><button onclick="return false;">Compare</button></div>''')
+	html.append('''<div style='text-align:right'><button onclick="
+getBenchmarkNames();
+return false;
+">Compare</button></div>''')
 	html.append('''</td></tr>''')
 	html.append('''</table>''')
 	html.append('''<input type="hidden" NAME="benchmarkrunID" VALUE="">''')
 	html.append('''<input type="hidden" NAME="query" VALUE="">''')
 	html.append('''<input type="hidden" NAME="BenchmarksPage" VALUE="">''')
+	html.append('''<input type="hidden" NAME="Benchmark1Name" VALUE="">''')
+	html.append('''<input type="hidden" NAME="Benchmark2Name" VALUE="">''')
 	html.append('''</FORM></div></center>''')
 	
 	return html, []
@@ -696,7 +691,7 @@ def generateBenchmarksPage(settings_, rosettahtml, form, benchmark_details):
 		]
 	
 	# Create menu
-	html = []
+	html = ['''''']
 	html.append("<td align=center>")
 	html.append('''<FORM name="benchmarksform" method="post" action="#">''')
 	
