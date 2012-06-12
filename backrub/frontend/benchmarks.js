@@ -90,6 +90,31 @@ function validate()
 }
 
 
+function getBenchmarkNames()
+{
+	var subform = document.reportpageform;
+	var benchmark1=prompt('[Optional] Enter a title for the left-selected benchmark.', null);
+	var benchmark2=prompt('[Optional] Enter a title for the right-selected benchmark.', null);
+	if (benchmark1 != null)
+	{
+		benchmark1 = benchmark1.replace(/^\s+|\s+$/g, '');
+		if (benchmark1 != '')
+		{
+			subform.Benchmark1Name.value = benchmark1;
+		}
+	}
+	if (benchmark2 != null)
+	{
+		benchmark2 = benchmark2.replace(/^\s+|\s+$/g, '');
+		if (benchmark2 != '')
+		{
+			subform.Benchmark2Name.value = benchmark2;
+		}
+	}
+	alert(subform.Benchmark1Name.value );
+	alert(subform.Benchmark2Name.value );
+}
+
 function ChangeBenchmark()
 {
 	//Select the database of the corresponding Rosetta revision if it exists
@@ -203,10 +228,9 @@ function editCommandLine()
 		}
 	}
 }
-
 ChangeBenchmark();
-
 if (document.benchmarksform.BenchmarksPage.value != null)
 {
 	showPage(document.benchmarksform.BenchmarksPage.value)
 }
+
