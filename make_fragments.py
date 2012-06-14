@@ -25,8 +25,10 @@ errcode = 0
 configurationFilesLocation = "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
 
 # The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
-cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -id %(pdbid)s%(chain)s %(fasta)s'
+make_fragments_script = "/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl"
 
+# Command line template
+make_fragments_cmd = make_fragments_script + ' -verbose -id %(pdbid)s%(chain)s %(fasta)s %(no_homologs)s'
 template ='''
 #!/bin/csh	    
 #$ -N %(jobname)s 
@@ -56,9 +58,9 @@ cd %(outpath)s
 '''
 
 template += '''
-echo "<cmd>%(cmd)s</cmd>"
+echo "<cmd>%(make_fragments_cmd)s</cmd>"
 echo "<output>"
-%(cmd)s
+%(make_fragments_cmd)s
 '''  % vars()
 
 template += '''
@@ -80,9 +82,6 @@ class LogFile(object):
 		self.format = "%s: Job ID %s results will be saved in %s.%s"
 		self.regex = re.compile(self.format % ("^(.*)", "(\\d+)", "(.+)\\", "$"))
 		
-	def getName(self):
-		return self.logfile
-	
 	def readFromLogfile(self):
 		joblist = {}
 		F = open(self.logfile, "r")
@@ -144,20 +143,23 @@ def parseArgs():
 	description.append("Example 2: make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA")
 	description.append("-----------------------------------------------------------------------------")
 	description.append("The output of the computation will be saved in the output directory, along with the input FASTA file which is generated from the supplied FASTA file.")
-	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.getName())
+	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.logfile)
 	description.append("Warning: Do not reuse the same output directory for multiple runs. Results from a previous run may confuse the executable chain and lead to erroneous results.")
 	description.append("To prevent this occurring e.g. in batch submissions, use the -S option to create the results in a subdirectory of the output directory.")
+	description.append("If multiple runs are run in the same subdirectory using the -S option, successive runs will be stored in increasingly-numbered subdirectories.")
 	description = join(description, "\n")
 	parser = OptionParser(usage="usage: %prog [options]", version="%prog 1.0A", description = description)
 	parser.add_option("-f", "--fasta", dest="fasta", help="The input FASTA file. This defaults to OUTPUT_DIRECTORY/PDBID.fasta.txt if the PDB ID is supplied.", metavar="FASTA")
 	parser.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
 	parser.add_option("-p", "--pdbid", dest="pdbid", help="The input PDB identifier. This is optional if the FASTA file is specified and only contains one PDB identifier.", metavar="PDBID")
+	parser.add_option("-H", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
 	parser.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
+	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.logfile, metavar="JOBID")
 	parser.add_option("-N", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
 	parser.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
-	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against %s and then quit." % logfile.getName())
+	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against job IDs stored in %s and then quit." % logfile.logfile)
 	parser.set_defaults(outdir = os.getcwd())
+	parser.set_defaults(nohoms = False)
 	parser.set_defaults(noprompt = False)
 	parser.set_defaults(subdirs = False)
 	parser.set_defaults(qstat = False)
@@ -181,9 +183,9 @@ def parseArgs():
 			jobIsRunning = qstat(int(options.check))
 			if not joblist.get(jobID):
 				if not jobIsRunning:
-					errors.append("Job %d is not running but also has no entry in the logfile %s." % (jobID, logfile.getName()))
+					errors.append("Job %d is not running but also has no entry in the logfile %s." % (jobID, logfile.logfile))
 				else:
-					errors.append("Job %d is running but has no entry in the logfile %s." % (jobID, logfile.getName()))
+					errors.append("Job %d is running but has no entry in the logfile %s." % (jobID, logfile.logfile))
 			else:
 				global clusterJobName
 				cname = clusterJobName
@@ -212,6 +214,8 @@ def parseArgs():
 	# PDB ID
 	if options.pdbid and not pdbpattern.match(options.pdbid): 
 		errors.append("Please enter a valid PDB identifier.")
+	
+	
 	
 	# CHAIN
 	if options.chain and not (len(options.chain) == 1):
@@ -358,7 +362,12 @@ def parseArgs():
 		parser.print_help()
 		sys.exit(ERRCODE_ARGUMENTS)
 	
+	no_homologs = ""
+	if options.nohoms:
+		no_homologs = "-nohoms"
+		
 	return {
+		"no_homologs"	: no_homologs,
 		"user"			: username,
 		"outpath"		: outpath,
 		"pdbid"			: options.pdbid,
@@ -405,7 +414,7 @@ def parseFASTA(fastafile):
 
 def qstat(jobID = None):
 	"""If jobID is an integer then return False if the job has finished and True if it is still running.
-	   Otherwise, returns a table of jobs run by the user."""
+	   Otherwise, print the jobs run by the user."""
 	
 	joblist = logfile.readFromLogfile()
 	
@@ -428,7 +437,7 @@ def qstat(jobID = None):
 	output = output.strip().split("\n")
 	if len(output) > 2:
 		for line in output[2:]:
-			# We assume that our script names contain no spaces for the parsing below to work (this should be ensured by ClusterTask) 
+			# We assume that our script names contain no spaces for the parsing below to work
 			tokens = line.split()
 			jid = int(tokens[0])
 			jobstate = tokens[4]
