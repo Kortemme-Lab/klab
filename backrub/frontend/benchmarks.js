@@ -86,34 +86,10 @@ function validate()
 	{
 		success = false;
 	}
+	return false;
 	return success;
 }
 
-
-function getBenchmarkNames()
-{
-	var subform = document.reportpageform;
-	var benchmark1=prompt('[Optional] Enter a title for the left-selected benchmark.', null);
-	var benchmark2=prompt('[Optional] Enter a title for the right-selected benchmark.', null);
-	if (benchmark1 != null)
-	{
-		benchmark1 = benchmark1.replace(/^\s+|\s+$/g, '');
-		if (benchmark1 != '')
-		{
-			subform.Benchmark1Name.value = benchmark1;
-		}
-	}
-	if (benchmark2 != null)
-	{
-		benchmark2 = benchmark2.replace(/^\s+|\s+$/g, '');
-		if (benchmark2 != '')
-		{
-			subform.Benchmark2Name.value = benchmark2;
-		}
-	}
-	alert(subform.Benchmark1Name.value );
-	alert(subform.Benchmark2Name.value );
-}
 
 function ChangeBenchmark()
 {
@@ -228,9 +204,77 @@ function editCommandLine()
 		}
 	}
 }
+
+function getBenchmarkNames()
+{
+	var subform = document.reportpageform;
+	var benchmark1 = prompt('[Optional] Enter a title for the left-selected benchmark.', null);
+	var benchmark2 = prompt('[Optional] Enter a title for the right-selected benchmark.', null);
+	var query = [];
+	query[query.length] = 'query=benchmarkreport';
+	if (benchmark1 != null)
+	{
+		benchmark1 = benchmark1.replace(/^\s+|\s+$/g, '');
+		if (benchmark1 != '')
+		{
+			subform.Benchmark1Name.value = benchmark1;
+			query[query.length] = 'Benchmark1Name=' + benchmark1;
+		}
+	}
+	if (benchmark2 != null)
+	{
+		benchmark2 = benchmark2.replace(/^\s+|\s+$/g, '');
+		if (benchmark2 != '')
+		{
+			subform.Benchmark2Name.value = benchmark2;
+			query[query.length] = 'Benchmark2Name=' + benchmark2;
+		}
+	}
+	vals = benchmarkWasSelected();
+	subform.Benchmark1ID.value = vals[0]; 
+	subform.Benchmark2ID.value = vals[1];
+	subform.BenchmarksType.value = "KIC" // todo: generalize
+
+	query[query.length] = 'Benchmark1ID=' + vals[0];
+	query[query.length] = 'Benchmark2ID=' + vals[1];
+	query[query.length] = 'BenchmarksType=' + "KIC"; // todo: generalize
+	
+	return query.join('&amp;');
+}
+
+function benchmarkWasSelected()
+{
+	count = 0;
+	leftvalue = null;
+	rightvalue = null;
+	radioset = document.reportpageform.benchmarkresults1;
+	document.reportpageform.CompareButton.disabled = true;
+	for(var i = 0; i < radioset.length; i++) {
+		if(radioset[i].checked) {
+			leftvalue = radioset[i].value;
+			count = count + 1;
+		}
+	}
+	radioset = document.reportpageform.benchmarkresults2;
+	for(var i = 0; i < radioset.length; i++) {
+		if(radioset[i].checked) {
+			rightvalue = radioset[i].value; 
+			if (leftvalue != rightvalue )
+			{
+				count = count + 1;
+			}
+		}
+	}
+	if (count == 2)
+	{
+		document.reportpageform.CompareButton.disabled = false;
+	}
+	return [leftvalue, rightvalue];
+}
 ChangeBenchmark();
 if (document.benchmarksform.BenchmarksPage.value != null)
 {
-	showPage(document.benchmarksform.BenchmarksPage.value)
+	showPage(document.benchmarksform.BenchmarksPage.value);
+	benchmarkWasSelected();
 }
 

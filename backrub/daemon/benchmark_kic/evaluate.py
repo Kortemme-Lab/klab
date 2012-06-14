@@ -13,21 +13,16 @@ from subprocess import *
 sys.path.insert(0, "../../common")
 import rosettahelper
 import statsfns
+import shutil
 
-def log(*msg):
-	return
-	if len(msg) == 1:
-		print(msg[0])
-	else:
-		print(msg)
-		
 class BenchmarkEvaluator(object):
 	'''Evaluates KIC scientific benchmark runs to test for significant improvement.'''
 
-	placeholder_image='/clustertest/daemon/benchmark_kic/data/placeholder_image.eps'
+	placeholder_image='/backrub/daemon/benchmark_kic/data/placeholder_image.eps'
 	
-	def __init__(self, outdir, benchmarkname1, benchmarkname2, flatfile1, flatfile2, model_start_index = 1, model_end_index = 500, num_models_per_run = 500, num_bins = 100, top_X = 5):
-		self.outdir = outdir
+	def __init__(self, outdir, benchmarkname1, benchmarkname2, flatfile1, flatfile2, passingFileContents = False, model_start_index = 1, model_end_index = 500, num_models_per_run = 500, num_bins = 100, top_X = 5, quiet = False):
+		self.outdir = rosettahelper.makeTemp755Directory(outdir)
+		self.PDF = None
 		self.benchmarkname1 = benchmarkname1
 		self.benchmarkname2 = benchmarkname2
 		self.model_start_index = model_start_index
@@ -35,7 +30,15 @@ class BenchmarkEvaluator(object):
 		self.num_models_per_run = num_models_per_run
 		self.num_bins = num_bins
 		self.top_X = top_X
+		self.quiet = quiet
 		
+		if not passingFileContents:
+			flatfile1 = rosettahelper.readFileLines(flatfile1)
+			flatfile2 = rosettahelper.readFileLines(flatfile2)
+		else:
+			flatfile1 = flatfile1.split('\n')
+			flatfile2 = flatfile2.split('\n')
+			
 		self.models = {1: self.parseModels(flatfile1), 2: self.parseModels(flatfile2)}
 		
 		assert(self.models[1].keys() == self.models[2].keys())
@@ -47,14 +50,21 @@ class BenchmarkEvaluator(object):
 			self.resultsByPDB[pdbID][1] = dict.fromkeys(keys, None)
 			self.resultsByPDB[pdbID][2] = dict.fromkeys(keys, None)
 		
-	def parseModels(self, infile_name):
+	def log(self, *msg):
+		if self.quiet:
+			return
+		if len(msg) == 1:
+			print(msg[0])
+		else:
+			print(msg)
+		print("<br>")
+
+	def parseModels(self, filelines):
 		'Parse models.'
 		pdb_runtimes = {}
 		models = {}
-		log(infile_name)
 		total_runtime = 0
-		lines = rosettahelper.readFileLines(infile_name)
-		for line in lines:
+		for line in filelines:
 			if not line.startswith('#'):
 				data = line.strip('\n').split('\t')
 				if len(data) > 3:
@@ -74,7 +84,7 @@ class BenchmarkEvaluator(object):
 							pdb_runtimes[pdb].append(int(data[4]))
 	
 		if total_runtime != 0:
-			log('total runtime [hours]:', int(total_runtime/float(3600)))
+			self.log('total runtime [hours]:', int(total_runtime/float(3600)))
 	
 		return models
 
@@ -96,11 +106,12 @@ class BenchmarkEvaluator(object):
 			lowest_energy_model = sorted_energy_models[0]
 			#when looking for the best model, consider the top X lowest energy models and pick the one with lowest rmsd
 			for i in range(self.top_X):
-				best_model_candidate = sorted_energy_models[i]
-				if best_model_candidate.loop_rms < lowest_energy_model.loop_rms:
-					lowest_energy_model = best_model_candidate
+				if i < len(sorted_energy_models):
+					best_model_candidate = sorted_energy_models[i]
+					if best_model_candidate.loop_rms < lowest_energy_model.loop_rms:
+						lowest_energy_model = best_model_candidate
 			
-			log('best model (i.e. lowest rmsd of top %d lowest energy models):' % self.top_X, lowest_energy_model.id, lowest_energy_model.loop_rms, lowest_energy_model.total_energy)
+			self.log('best model (i.e. lowest rmsd of top %d lowest energy models):' % self.top_X, lowest_energy_model.id, lowest_energy_model.loop_rms, lowest_energy_model.total_energy)
 			
 			self.resultsByPDB[pdb][benchmarkNumber]["NumberOfModels"] = len(self.models[benchmarkNumber][pdb])
 			self.resultsByPDB[pdb][benchmarkNumber]["TopXBestModel"] = lowest_energy_model
@@ -116,6 +127,8 @@ class BenchmarkEvaluator(object):
 		return [self.resultsByPDB[pdb][benchmarkNumber]["TopXBestModel"].total_energy for pdb in self.sorted_benchmark_pdbs]
 	
 	def rmsdScatterplot(self, y_label, all_best_rmsds_models1, x_label, all_best_rmsds_models2, outfile_name):
+		y_label = "Benchmark 1" # override
+		x_label = "Benchmark 2" # override
 		sorted_benchmark_pdbs = self.sorted_benchmark_pdbs
 		top_X = self.top_X
 		outfile = open(outfile_name, 'w')
@@ -129,26 +142,26 @@ class BenchmarkEvaluator(object):
 		outfile.write('\n\n')
 		
 		#highlight those datapoints that are subangstrom in only one of the datasets
-		log('')
-		log('PDB\t%(x_label)s\t%(y_label)s' % vars())
+		self.log('')
+		self.log('PDB\t%(x_label)s\t%(y_label)s' % vars())
 		for i in range(len(sorted_benchmark_pdbs)):
 			pdb = sorted_benchmark_pdbs[i]
 			rmsd1 = all_best_rmsds_models1[i]
 			rmsd2 = all_best_rmsds_models2[i]
 			if rmsd1 < 1 and rmsd2 >= 1:
 				outstr = '%s\t%s\t%s\n'% (pdb, str(all_best_rmsds_models2[i]), str(all_best_rmsds_models1[i]))
-				sys.stdout.write(outstr)
+				self.log(outstr)
 				outfile.write(outstr)
 		#--
 		outfile.write('\n\n')
-		log('')
+		self.log('')
 		for i in range(len(sorted_benchmark_pdbs)):
 			pdb = sorted_benchmark_pdbs[i]
 			rmsd1 = all_best_rmsds_models1[i]
 			rmsd2 = all_best_rmsds_models2[i]
 			if rmsd2 < 1 and rmsd1 >= 1:
 				outstr = '%s\t%s\t%s\n'% (pdb, str(all_best_rmsds_models2[i]), str(all_best_rmsds_models1[i]))
-				sys.stdout.write(outstr)
+				self.log(outstr)
 				outfile.write(outstr)
 		
 		outfile.close()
@@ -209,6 +222,8 @@ plot g(x) ls 10 notitle axes x1y1, "%(outfile_name)s" index 0 using ($2):($3) wi
 
 
 	def densityplot(self, title1, sorted_models1, title2, sorted_models2, outfile_name):
+		title1 = "Benchmark 1" # override
+		title2 = "Benchmark 2" # override
 		outfile = open(outfile_name, 'w')
 		outfile.write('#Loop_rmsd\tPercentage_of_models\n')
 		values = [model.loop_rms for model in sorted_models1]
@@ -310,8 +325,8 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 	def run(self):
 		top_X = self.top_X
 		#plot density comparison
-		log('\n')
-		log('plotting sampling density comparisons...')
+		self.log('\n')
+		self.log('plotting sampling density comparisons...')
 		for pdb in self.sorted_benchmark_pdbs:
 			sorted_models1 = self.models[1][pdb]
 			sorted_models2 = self.models[2][pdb]
@@ -325,8 +340,8 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 		num_cols = 2
 		num_plots_per_page = num_rows * num_cols
 		num_pages = int(math.ceil(num_pdbs/float(num_plots_per_page)))
-		log(num_pdbs, 'pdbs')
-		log(num_pages, 'pages')
+		self.log(num_pdbs, 'pdbs')
+		self.log(num_pages, 'pages')
 		index = 0
 		for i in range(num_pages):
 			outfile_name = os.path.join(self.outdir, 'density_comparison_%d.tex' % (i+1))
@@ -355,28 +370,28 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 		'''
 			rosettahelper.writeFile(outfile_name, outstring)
 			density_comparison_plots.append(outfile_name)
-			log('')
-			log(outfile_name)
+			self.log('')
+			self.log(outfile_name)
 		#-
 		#compute rmsds of best models
-		log('\n')
-		log('computing rmsds of best models,',self.num_models_per_run,'models per run')
+		self.log('\n')
+		self.log('computing rmsds of best models,',self.num_models_per_run,'models per run')
 		all_best_rmsds_models1 = []
 		all_best_rmsds_models2 = []
 		i = self.model_start_index
 		while i < self.model_end_index:
 			j = i + self.num_models_per_run - 1
-			log('')
-			log(i,'-',j)
+			self.log('')
+			self.log(i,'-',j)
 			
-			log('benchmark 1:')
+			self.log('benchmark 1:')
 			best_rmsds_models1 = self.computeBestModelRmsds(1, i, j)
-			log('median rmsd:', round(statsfns.median(best_rmsds_models1), 2))
+			self.log('median rmsd:', round(statsfns.median(best_rmsds_models1), 2))
 			all_best_rmsds_models1.extend(best_rmsds_models1)
 			
-			log('benchmark 2:')
+			self.log('benchmark 2:')
 			best_rmsds_models2 = self.computeBestModelRmsds(2, i, j)
-			log('median rmsd:',round(statsfns.median(best_rmsds_models2), 2))
+			self.log('median rmsd:',round(statsfns.median(best_rmsds_models2), 2))
 			all_best_rmsds_models2.extend(best_rmsds_models2)
 			
 			i += self.num_models_per_run
@@ -385,16 +400,16 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 		best_model_energies2 = self.computeBestModelEnergies(2, i, j)
 		MedianResult1 = statsfns.MedianResult(statsfns.median(best_rmsds_models1), statsfns.median(best_model_energies1))
 		MedianResult2 = statsfns.MedianResult(statsfns.median(best_rmsds_models2), statsfns.median(best_model_energies2)) 
-		log(MedianResult1)
-		log(MedianResult2)
+		self.log(MedianResult1)
+		self.log(MedianResult2)
 		
 		# Print all_best_rmsds_models1
 		num_cases = len(all_best_rmsds_models1)
-		log(num_cases,'rmsds per benchmark in total')
+		self.log(num_cases,'rmsds per benchmark in total')
 		
 		#calculate percentage of improved cases
-		log('')
-		log('calculating percentage of improved cases...')
+		self.log('')
+		self.log('calculating percentage of improved cases...')
 		percent_improved_cases = 0
 		for i in range(num_cases):
 			rmsd1 = all_best_rmsds_models1[i]
@@ -403,31 +418,31 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 				percent_improved_cases += 1
 		#--
 		percent_improved_cases = round(100 * percent_improved_cases/float(num_cases), 2)
-		log(percent_improved_cases,'% improved cases')
+		self.log(percent_improved_cases,'% improved cases')
 		if percent_improved_cases > 50:
-			log('improvement in benchmark performance')
+			self.log('improvement in benchmark performance')
 		
 		#perform KS test to check for statistical significance of difference in rmsd distributions
 		R_interface = statsfns.RInterface(self.outdir)
-		log('')
-		log('performing KS-test to check for statistical significance of difference in rmsd distributions...')
+		self.log('')
+		self.log('performing KS-test to check for statistical significance of difference in rmsd distributions...')
 		KS_p_value = statsfns.KSTestPValue(R_interface, all_best_rmsds_models1, all_best_rmsds_models2, 'two.sided', False)
-		log('p-value:', KS_p_value)
-		log('performing Kruskal-Wallis test to check for statistical significance of difference in rmsd distributions...')
+		self.log('p-value:', KS_p_value)
+		self.log('performing Kruskal-Wallis test to check for statistical significance of difference in rmsd distributions...')
 		KW_p_value = statsfns.KruskalWallisTestPValue(R_interface, all_best_rmsds_models1, all_best_rmsds_models2, 'two.sided', False)
-		log('p-value:', KW_p_value)
-		log('performing paired t-test (more statistical power) to check for statistical significance of difference in rmsd distributions...')
+		self.log('p-value:', KW_p_value)
+		self.log('performing paired t-test (more statistical power) to check for statistical significance of difference in rmsd distributions...')
 		pairedT_p_value = statsfns.pairedTTestPValue(R_interface, all_best_rmsds_models1, all_best_rmsds_models2, 'two.sided', False)
-		log('p-value:', pairedT_p_value)
+		self.log('p-value:', pairedT_p_value)
 		
 		#plot rmsd comparison
-		log('')
-		log('plotting rmsd comparison...')
+		self.log('')
+		self.log('plotting rmsd comparison...')
 		rmsd_comparison_outfile_name = os.path.join(self.outdir, 'rmsd_comparison.out')
 		
 		self.rmsdScatterplot(self.benchmarkname1, all_best_rmsds_models1, self.benchmarkname2, all_best_rmsds_models2, rmsd_comparison_outfile_name)
-		log('')
-		log(self.outdir)
+		self.log('')
+		self.log(self.outdir)
 		
 		#create report pdf
 		reportname = 'KIC_scientific_benchmark_changes_report_top%d' % top_X
@@ -450,13 +465,16 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 \\section{Benchmark details}'''
 
 		BenchmarkTex = '''
-\\paragraph{Benchmark %(BenchmarkNumber)d}
+\\paragraph{Benchmark %(BenchmarkNumber)d%(description)s}
 Rosetta version %(RosettaVersion)s%(RosettaDBVersion)s
 \\begin{lstlisting}
 %(RosettaCommandLine)s
 \\end{lstlisting}
 '''
 		BenchmarkNumber = 1
+		description = ""
+		if self.benchmarkname1 != "Benchmark 1":
+			description = ' (%s)' % self.benchmarkname1 
 		RosettaVersion = 'r3.3'
 		RosettaDBVersion = 'r3.3'
 		if RosettaDBVersion != RosettaVersion:
@@ -468,6 +486,9 @@ Rosetta version %(RosettaVersion)s%(RosettaDBVersion)s
 		outstring += BenchmarkTex % vars() 
 		
 		BenchmarkNumber = 2
+		description = ""
+		if self.benchmarkname2 != "Benchmark 2":
+			description = ' (%s)' % self.benchmarkname2 
 		RosettaVersion = 'r3.4'
 		RosettaDBVersion = 'r3.43'
 		if RosettaDBVersion != RosettaVersion:
@@ -544,23 +565,34 @@ The Top %(top_X)d best model is the model with the lowest rmsd out of the top %(
 		#-
 		outstring += '\\end{document}\n'
 		rosettahelper.writeFile(outfile_name, outstring)
-		for i in range(2):
-			log(self.outdir)
-			log(outfile_name)
+		for i in range(3):
+			self.log(self.outdir)
+			self.log(outfile_name)
 			error = statsfns.Popen(self.outdir, ['latex', '-output-directory', self.outdir, outfile_name]).getError()
 			if error:
 				raise Exception(error)
-			error = statsfns.Popen(self.outdir, ['dvips', '%s.dvi' % reportname]).getError()
-			if error:
-				raise Exception(error)
-			error = statsfns.Popen(self.outdir, ['ps2pdf', '%s.ps' % reportname]).getError()
-			if error:
-				raise Exception(error)
-			#functions_lib.run('pdflatex -output-directory '+self.outdir+' '+outfile_name)
+			if not os.path.exists(os.path.join(self.outdir, '%s.dvi' % reportname)):
+				raise Exception("DVI file could not be created.")
+			
+		error = statsfns.Popen(self.outdir, ['dvips', '%s.dvi' % reportname, '-o', '%s.ps' % reportname]).getError()
+		if error:
+			raise Exception(error)
+		if not os.path.exists(os.path.join(self.outdir, '%s.ps' % reportname)):
+			raise Exception("Postscript file could not be created.")
+		
+		error = statsfns.Popen(self.outdir, ['ps2pdf', '%s.ps' % reportname]).getError()
+		if error:
+			raise Exception(error)
+		if not os.path.exists(os.path.join(self.outdir, '%s.pdf' % reportname)):
+			raise Exception("PDF file could not be created.")
+		#functions_lib.run('pdflatex -output-directory '+self.outdir+' '+outfile_name)
 		#-
-		log('')
-		log('Final comparison report:')
-		log(outfile_name.split('.tex')[0]+'.pdf')
+		self.log('')
+		self.log('Final comparison report:')
+		self.log(outfile_name.split('.tex')[0]+'.pdf')
+		self.PDF = rosettahelper.readFile(outfile_name.split('.tex')[0]+'.pdf')
+		shutil.rmtree(self.outdir)
 
-evaluator = BenchmarkEvaluator('/clustertest/daemon/benchmark_kic/test', 'Dun02', 'Dun02_bicubic', '10.txt', '10.txt', top_X = 2)
-evaluator.run()
+if __name__ == "__main__":
+	evaluator = BenchmarkEvaluator('/backrub/daemon/benchmark_kic/test', 'Dun02', 'Dun02_bicubic', '10.txt', '10.txt', top_X = 2)
+	evaluator.run()

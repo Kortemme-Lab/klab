@@ -564,6 +564,23 @@ def ws():
 			title = '&#916;&#916;G'
 
 	elif query_type == "benchmarkreport":
+		if form.has_key('Benchmark1ID') and form.has_key('Benchmark2ID') and form.has_key('BenchmarksType'):
+				#print 'Content-type: text/html'
+				#print
+				import benchmarks as benchmarkspage
+				PDFReport = benchmarkspage.generateReport(form, getBenchmarksConnection())
+				if PDFReport:
+					print 'Content-Type: application/pdf'
+					print 'Content-Disposition: inline; filename="%s-Run_%s_vs_Run_%s.pdf"' % (form['BenchmarksType'].value, form['Benchmark1ID'].value, form['Benchmark2ID'].value)
+					print "Content-Length: %d" % len(PDFReport)
+					print
+					sys.stdout.write(PDFReport)
+					sys.stdout.flush()
+				else:
+					print 'Content-type: text/html'
+					print
+					print("<html><body>The PDF report was not created.</body></html>")
+
 		if form.has_key("id"):
 			PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=%s", parameters = (form["id"].value,))
 			if PDFReport:

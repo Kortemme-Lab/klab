@@ -15,7 +15,6 @@ import rosettadb
 from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, ggplotColorWheel
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
-
 script_filename = None
 
 def initGoogleCharts(chartfnlist):
@@ -317,6 +316,54 @@ def getRunParameters(form, benchmarks):
 		'Status': 'queued', 
 		}
 
+def generateKICReport(BenchmarksDB, Benchmark1ID, Benchmark2ID, Benchmark1Name, Benchmark2Name):
+	import sys
+	sys.path.insert(0, "../daemon")
+	import benchmark_kic.evaluate as KICEvaluation
+
+	flatfile1 = None
+	flatfile2 = None
+	top_X = []
+	results = BenchmarksDB.execute('SELECT BenchmarkOptions, File FROM BenchmarkRunOutputFile INNER JOIN BenchmarkRun ON BenchmarkRunID=BenchmarkRun.ID WHERE BenchmarkRunID=%s AND FileID=1 AND FileType="Flat file"', parameters = (Benchmark1ID, ))
+	if results and results[0]:
+		flatfile1 = results[0]["File"]
+		options = pickle.loads(results[0]['BenchmarkOptions'])
+		top_X.append(options['NumberOfLowestEnergyModelsToConsiderForBestModel'])
+		top_X.append(options['NumberOfModelsPerPDB'])
+	results = BenchmarksDB.execute('SELECT BenchmarkOptions, File FROM BenchmarkRunOutputFile INNER JOIN BenchmarkRun ON BenchmarkRunID=BenchmarkRun.ID WHERE BenchmarkRunID=%s AND FileID=1 AND FileType="Flat file"', parameters = (Benchmark2ID, ))
+	if results and results[0]:
+		flatfile2 = results[0]["File"]
+		options = pickle.loads(results[0]['BenchmarkOptions'])
+		top_X.append(options['NumberOfLowestEnergyModelsToConsiderForBestModel'])
+		top_X.append(options['NumberOfModelsPerPDB'])
+	if not flatfile1:
+		print('''<script type="text/javascript">alert("Could not find the results file for benchmark run %s in the database.")</script>''' % Benchmark1ID) 
+		return
+	if not flatfile2:
+		print('''<script type="text/javascript">alert("Could not find the results file for benchmark run %s in the database.")</script>''' % Benchmark2ID) 
+		return
+	
+	top_X = min(top_X)
+	evaluator = KICEvaluation.BenchmarkEvaluator('/backrub/temp/benchmarkdata/', Benchmark1Name, Benchmark2Name, flatfile1, flatfile2, passingFileContents = True, top_X = top_X, quiet = True)
+	try:
+		evaluator.run()
+		return evaluator.PDF 
+	except Exception, e:
+		import traceback
+		print("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
+	
+def generateReport(form, BenchmarksDB):
+	Benchmark1Name = "Benchmark 1"
+	if form.has_key('Benchmark1Name'):
+		Benchmark1Name = form['Benchmark1Name'].value
+	Benchmark2Name = "Benchmark 2"
+	if form.has_key('Benchmark2Name'):
+		Benchmark2Name = form['Benchmark2Name'].value
+	Benchmark1ID = form['Benchmark1ID'].value
+	Benchmark2ID = form['Benchmark2ID'].value
+	if True: # todo: generalize KIC:
+		return generateKICReport(BenchmarksDB, Benchmark1ID, Benchmark2ID, Benchmark1Name, Benchmark2Name)
+	
 def generateSubmissionPage(benchmark_details):
 	html = []
 	
@@ -629,22 +676,26 @@ def generateReportPage(benchmark_details):
 		else:
 			html.append('''<td></td>''')
 		#html.append("<td style='width:20px;'><a href='../images/pdf16.pdf'>PDF</a></td>") # PDFReport
-		html.append("<td><input type='radio' name='benchmarkresults1' value='%(ID)d'></td>" % run)
-		html.append("<td><input type='radio' name='benchmarkresults2' value='%(ID)d'></td>" % run)
+		html.append("<td><input type='radio' name='benchmarkresults1' onchange='benchmarkWasSelected();' value='%(ID)d'></td>" % run)
+		html.append("<td><input type='radio' name='benchmarkresults2' onchange='benchmarkWasSelected();' value='%(ID)d'></td>" % run)
 		html.append("</tr>")
 	
 	html.append('''</table>''')
-	html.append('''<div style='text-align:right'><button onclick="
-getBenchmarkNames();
+	html.append('''<div style='text-align:right'><button name="CompareButton" disabled="disabled" onclick="
+querystring = getBenchmarkNames(); // set the Benchmark1Name/ID and Benchmark2Name/ID values
+window.open('%s?' + querystring);
 return false;
-">Compare</button></div>''')
+">Compare</button></div>''' % (script_filename))
 	html.append('''</td></tr>''')
 	html.append('''</table>''')
 	html.append('''<input type="hidden" NAME="benchmarkrunID" VALUE="">''')
 	html.append('''<input type="hidden" NAME="query" VALUE="">''')
 	html.append('''<input type="hidden" NAME="BenchmarksPage" VALUE="">''')
+	html.append('''<input type="hidden" NAME="BenchmarksType" VALUE="">''')
 	html.append('''<input type="hidden" NAME="Benchmark1Name" VALUE="">''')
 	html.append('''<input type="hidden" NAME="Benchmark2Name" VALUE="">''')
+	html.append('''<input type="hidden" NAME="Benchmark1ID" VALUE="">''')
+	html.append('''<input type="hidden" NAME="Benchmark2ID" VALUE="">''')
 	html.append('''</FORM></div></center>''')
 	
 	return html, []
