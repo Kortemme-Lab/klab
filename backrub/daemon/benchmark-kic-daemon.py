@@ -27,18 +27,6 @@ import klfilesystem
 import benchmark_kic
 import benchmark_kic.jobs as jobs
 
-class KICRunParameters(object):
-	
-	def __init__(self, dbrecord):
-		# Runlength-dependent settings
-		self.use_constant_seed	= False 
-
-		if dbrecord["RunLength"] == 'Test':
-			self.run_test_cycles = False
-		else:
-			self.run_test_cycles = True 
-
-		
 class KICSettings(object):
 	settings = {}
 	base_dir = None
