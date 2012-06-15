@@ -86,7 +86,7 @@ function validate()
 	{
 		success = false;
 	}
-	return false;
+	//return false;
 	return success;
 }
 
