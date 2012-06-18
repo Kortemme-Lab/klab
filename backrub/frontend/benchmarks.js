@@ -82,11 +82,67 @@ function validate()
 	{
 		success = false;
 	}
-	if (!validateElem(subform.elements['BenchmarkWalltimeLimit'], integralExpression)) 
+	if (!validateElem(subform.elements['BenchmarkWalltimeLimitDays'], integralExpression, 0, 14)) 
 	{
 		success = false;
 	}
-	//return false;
+	if (!validateElem(subform.elements['BenchmarkWalltimeLimitHours'], integralExpression, 0, 23)) 
+	{
+		success = false;
+	}
+	if (!validateElem(subform.elements['BenchmarkWalltimeLimitMinutes'], integralExpression, 0, 59)) 
+	{
+		success = false;
+	}
+	if (subform.elements['BenchmarkWalltimeLimitDays'].value == 14)
+	{
+		if (subform.elements['BenchmarkWalltimeLimitHours'].value > 0)
+		{
+			markError(subform.elements['BenchmarkWalltimeLimitHours']);
+			success = false;
+		}
+		if (subform.elements['BenchmarkWalltimeLimitMinutes'].value > 0)
+		{
+			markError(subform.elements['BenchmarkWalltimeLimitMinutes']);
+			success = false;
+		}
+	}
+	
+	minmaxErrors = []
+	for (i = 0; i < benchmarkoptions.length; i++)
+	{
+		benchmarkoption = benchmarkoptions[i];
+		formElement = subform.elements[benchmarkoption['FormElement']];
+		optionValue = formElement.value
+		if (benchmarkoption['Type'] == 'int')
+		{
+			if (benchmarkoption['MinimumValue'] != 'null')
+			{
+				minValue = parseInt(benchmarkoption['MinimumValue']);
+				if (optionValue < minValue)
+				{
+					minmaxErrors.push("Benchmark option '" + benchmarkoption['Description'] + "' has a minimum value of " + minValue + ".");
+					markError(formElement);
+				}
+			}
+			if (benchmarkoption['MaximumValue'] != 'null')
+			{
+				maxValue = parseInt(benchmarkoption['MaximumValue']);
+				if (optionValue > maxValue)
+				{
+					minmaxErrors.push("Benchmark option '" + benchmarkoption['Description'] + "' has a maximum value of " + maxValue + ".");
+					markError(formElement);
+				}
+			}
+		}
+	}
+	if (minmaxErrors.length > 0)
+	{
+		alert(minmaxErrors.join("\n"));
+		return false;
+	}
+	
+	return false;
 	return success;
 }
 
@@ -164,7 +220,44 @@ function ChangeBenchmark()
 	}
 	
 	document.getElementById('benchmarkseparator').style.color = benchmarks[benchmarkName]['color'];
+	subform.elements['BenchmarkRunLength'].value = 'Normal';
+	ChangedRunLength();
+}
+
+defaultWalltimes = {
+	'Test' : {'Days' : 0, 'Hours' : 6, 'Minutes' : 0},
+	'Normal' : {'Days' : 7, 'Hours' : 0, 'Minutes' : 0},
+	'Long' : {'Days' : 14, 'Hours' : 0, 'Minutes' : 0},
+};
+
+function ChangedRunLength()
+{
+	var subform = document.benchmarkoptionsform;
+	var benchmarkName = subform.elements['BenchmarkType'].value;
+	var BenchmarkRunLength = subform.elements['BenchmarkRunLength'].value;
+	benchmarkoptions = benchmarks[benchmarkName]['options'];
 	
+	if (BenchmarkRunLength == "Custom")
+	{
+		for (i = 0; i < benchmarkoptions.length; i++)
+		{
+			formElement = subform.elements[benchmarkoptions[i]['FormElement']];
+			formElement.disabled = false;
+		}
+	}
+	else
+	{
+		subform.elements['BenchmarkWalltimeLimitDays'].value = defaultWalltimes[BenchmarkRunLength]['Days'];
+		subform.elements['BenchmarkWalltimeLimitHours'].value = defaultWalltimes[BenchmarkRunLength]['Hours'];
+		subform.elements['BenchmarkWalltimeLimitMinutes'].value = defaultWalltimes[BenchmarkRunLength]['Minutes'];
+		for (i = 0; i < benchmarkoptions.length; i++)
+		{
+			benchmarkoption = benchmarkoptions[i];
+			formElement = subform.elements[benchmarkoption['FormElement']];
+			formElement.value = benchmarkoption[BenchmarkRunLength + "RunValue"];
+			formElement.disabled = true;
+		}
+	}
 }
 
 function editCommandLine()
@@ -271,6 +364,7 @@ function benchmarkWasSelected()
 	}
 	return [leftvalue, rightvalue];
 }
+
 ChangeBenchmark();
 if (document.benchmarksform.BenchmarksPage.value != null)
 {

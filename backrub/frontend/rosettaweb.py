@@ -20,9 +20,9 @@ if False:
 	import rosettadb
 	from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory, writeFile
 	settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
-	def getBenchmarksConnection():
+	def getBenchmarksConnection2():
 		return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Benchmarks")
-	PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=1")
+	PDFReport = getBenchmarksConnection2().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=1")
 	if PDFReport:
 		PDFReport = PDFReport[0]
 		report = PDFReport['PDFReport']
@@ -580,8 +580,7 @@ def ws():
 					print 'Content-type: text/html'
 					print
 					print("<html><body>The PDF report was not created.</body></html>")
-
-		if form.has_key("id"):
+		elif form.has_key("id"):
 			PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=%s", parameters = (form["id"].value,))
 			if PDFReport:
 				PDFReport = PDFReport[0]
@@ -1770,7 +1769,7 @@ def storeSequenceToleranceSK(form, pdb_object):
 			mkey = "seqtol_SK_kP%dP%d" % (uI, uI)
 			if not(form.has_key(mkey)) or form[mkey].value == '':
 				success = False
-				errors.append("Partner %d was specified but its interaction energy k<sub>P<sub>%d</sub>P<sub>%d</sub></sub> was missing." % (x, x, x))
+				errors.append("Partner %d was specified but its interaction energy k<sub>P<sub>%d</sub>P<sub>%d</sub></sub> was missing." % (x, x, x)) # todo: x is undefined
 			else:
 				Weights.append(float(form[mkey].value))
 							

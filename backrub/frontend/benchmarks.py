@@ -5,14 +5,9 @@
 # Code for the benchmarks page
 ########################################
 
-import os, re
-import datetime
-from datetime import date
 from string import join
 import pickle
-import string
-import rosettadb
-from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, ggplotColorWheel
+from rosettahelper import ggplotColorWheel
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
 script_filename = None
@@ -299,7 +294,10 @@ def getRunParameters(form, benchmarks):
 		emailList = form['BenchmarkNotificationEmailAddresses'].value
 		if emailList.find(",") != -1:
 			emailList = emailList.replace(",", ";")
-			
+		
+	WallTimeInMinutes = int(form['BenchmarkWalltimeLimitDays'].value) * 24 * 60
+	WallTimeInMinutes += int(form['BenchmarkWalltimeLimitHours'].value) * 60
+	WallTimeInMinutes += int(form['BenchmarkWalltimeLimitMinutes'].value)
 	return {
 		'BenchmarkID': benchmark, 
 		'RunLength': form['BenchmarkRunLength'].value, 
@@ -311,7 +309,7 @@ def getRunParameters(form, benchmarks):
 		'ClusterQueue': form['BenchmarkClusterQueue'].value, 
 		'ClusterArchitecture': form['BenchmarkClusterArchitecture'].value, 
 		'ClusterMemoryRequirementInGB': float(form['BenchmarkMemoryRequirement'].value), 
-		'ClusterWalltimeLimitInMinutes': int(form['BenchmarkWalltimeLimit'].value), 
+		'ClusterWalltimeLimitInMinutes':  WallTimeInMinutes, 
 		'NotificationEmailAddress': emailList, 
 		'Status': 'queued', 
 		}
@@ -385,7 +383,7 @@ def generateSubmissionPage(benchmark_details):
 	benchmarkselector_html.append('</select>')
 
 	runlengths = benchmark_details['runlengths']
-	runlengthselector_html = ['<select name="BenchmarkRunLength">']
+	runlengthselector_html = ['<select name="BenchmarkRunLength" onchange="ChangedRunLength();">']
 	for runlength in runlengths:
 		runlengthselector_html.append('<option value="%(runlength)s">%(runlength)s</option>' % vars())
 	runlengthselector_html.append('</select>')
@@ -468,7 +466,7 @@ def generateSubmissionPage(benchmark_details):
 		for option in benchmarks[benchmark]['options']:
 			if option["Type"] == 'int':
 				html.append('''<tr class="benchmark_%(benchmark)s_options" style="display:none;"><td><div style="width:%(tablewidth)dpx">''' % vars())
-				html.append('''%(Description)s</div></td><td><input type="text" style="width:75px" maxlength=8 name="%(FormElement)s" value="%(DefaultValue)s"></td></tr>''' % option)
+				html.append('''%(Description)s</div></td><td><input type="text" style="width:75px" maxlength=8 name="%(FormElement)s" value="%(NormalRunValue)s"></td></tr>''' % option)
 			else:
 				raise Exception("Unhandled benchmark option type '%s'. New code needs to be written to handle this case." % option["Type"])
 	html.append('''</table>''')
@@ -484,8 +482,13 @@ def generateSubmissionPage(benchmark_details):
 	html.append('''<td>%s</td></tr>''' % join(clusterarchitectureselector_html,""))
 	html.append('''<tr><td><div style="width:%(tablewidth)dpx">Memory requirement (GB)</div></td>''' % vars())
 	html.append('''<td><input type="text" style="width:75px" maxlength=8 name="BenchmarkMemoryRequirement" value="2"></td></tr>''' % option) # todo: use default here
-	html.append('''<tr><td><div style="width:%(tablewidth)dpx">Wall-time limit (mins)</div></td>''' % vars())
-	html.append('''<td><input type="text" style="width:75px" maxlength=8 name="BenchmarkWalltimeLimit" value="360"></td></tr>''' % option) # todo: use default here
+	html.append('''<tr><td><div style="width:%(tablewidth)dpx">Wall-time limit</div></td>''' % vars())
+	html.append('''<td>
+					Days <input type="text" style="width:25px" maxlength=2 name="BenchmarkWalltimeLimitDays" value="0"> 
+					Hours <input type="text" style="width:25px" maxlength=2 name="BenchmarkWalltimeLimitHours" value="6"> 
+					Minutes <input type="text" style="width:25px" maxlength=2 name="BenchmarkWalltimeLimitMinutes" value="0">
+					<div style="width:200px">(Maximum run-length is 14 days)</div> 
+				</td></tr>''' % option) # todo: use default here
 	html.append('''</table>''')
 	html.append('''</td></tr>''')
 	
@@ -506,16 +509,6 @@ def generateSubmissionPage(benchmark_details):
 		}">Submit</button></td></tr>''')
 	
 	#html.append('''<tr><td><INPUT TYPE="Submit" VALUE="Submit"></td></tr>''')
-	
-	if False:
-		bm_parameters = {}
-		for option in benchmarks[selected_benchmark]['options']:
-			if option["Type"] == 'int':
-				bm_parameters[options['OptionName']] = int(valueof("Benchmark%sOption%s" %(selected_benchmark, options['OptionName'])))
-			else:
-				raise Exception("Unknown datatype '%s'. Write code to handle more option datatypes here." % option["Type"])
-		result = getBenchmarksConnection().execInnoDBQuery("UPDATE BenchmarkRun SET BenchmarkOptions=%s WHERE ID=1", parameters = (pickle.dumps(bm_parameters),))
-			
 	
 	html.append('''</table>''')
 	html.append('''<input type="hidden" NAME="submitted" VALUE="F">''')
@@ -719,7 +712,7 @@ def generateBenchmarksPage(settings_, rosettahtml, form, benchmark_details):
 		benchmarks['backrub']['ParameterizedFlags'] = 'backrub pflags'
 		benchmarks['backrub']['SimpleFlags'] = 'backrub simple flags'
 		benchmarks['backrub']['alternate_flags'] = ['none']
-		benchmarks['backrub']['options'] = [{'Description': 'Test option', 'OptionName': 'TestOptionName', 'DefaultValue': '33', 'BenchmarkID': 'backrub', 'MaximumValue': None, 'MinimumValue': '0', 'Type': 'int', 'ID': 9999}]
+		benchmarks['backrub']['options'] = [{'Description': 'Test option', 'OptionName': 'TestOptionName', 'NormalRunValue': '33', 'BenchmarkID': 'backrub', 'MaximumValue': None, 'MinimumValue': '0', 'Type': 'int', 'ID': 9999}]
 
 	benchmarktypes = set()
 	for run in benchmark_details['BenchmarkRuns']:
