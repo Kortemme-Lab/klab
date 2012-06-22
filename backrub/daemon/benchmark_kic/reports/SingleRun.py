@@ -10,6 +10,7 @@ import math
 import shutil
 import statsfns
 import rosettahelper
+from benchmark_kic.analysis import BenchmarkAnalyzer
 from string import join
 
 class SingleRunReport(BenchmarkAnalyzer):

@@ -15,32 +15,6 @@ sys.path.insert(1, "../daemon/")
 sys.path.insert(2, "../daemon/ddglib")
 sys.path.insert(3, "../daemon/cluster/")
 import common
-
-if False:
-	import rosettadb
-	from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory, writeFile
-	settings = WebsiteSettings(sys.argv, os.environ['SCRIPT_NAME'])
-	def getBenchmarksConnection2():
-		return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Benchmarks")
-	PDFReport = getBenchmarksConnection2().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=1")
-	if PDFReport:
-		PDFReport = PDFReport[0]
-		report = PDFReport['PDFReport']
-		if True:
-			# todo: This should work but the filename always ends up being rosettaweb.py
-			print('Content-type: application/octet-stream\n')
-			print('Content-Disposition: attachment; filename=\"mytest.pdf\"\n')
-			#print("Content-Type: application/force-download")
-			#print("Content-Type: application/octet-stream")
-			#print("Content-Type: application/download")
-			#print("Content-Description: File Transfer")
-			#print("Content-Length: %d" % len(report))
-			print(report)
-			sys.stdout.close()
-	sys.exit(0)
-	
-	
-	
 import shutil
 import sha, time
 import cgi
@@ -564,69 +538,91 @@ def ws():
 			title = '&#916;&#916;G'
 
 	elif query_type == "benchmarkreport":
-		if form.has_key('Benchmark1ID') and form.has_key('Benchmark2ID') and form.has_key('BenchmarksType'):
-				#print 'Content-type: text/html'
-				#print
-				import benchmarks as benchmarkspage
-				PDFReport = benchmarkspage.generateReport(form, getBenchmarksConnection())
-				if PDFReport:
-					print 'Content-Type: application/pdf'
-					print 'Content-Disposition: inline; filename="%s-Run_%s_vs_Run_%s.pdf"' % (form['BenchmarksType'].value, form['Benchmark1ID'].value, form['Benchmark2ID'].value)
-					print "Content-Length: %d" % len(PDFReport)
-					print
-					sys.stdout.write(PDFReport)
-					sys.stdout.flush()
-				else:
-					print 'Content-type: text/html'
-					print
-					print("<html><body>The PDF report was not created.</body></html>")
-		elif form.has_key("id"):
-			PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=%s", parameters = (form["id"].value,))
-			if PDFReport:
-				PDFReport = PDFReport[0]
-				report = PDFReport['PDFReport']
-				if report:
-					if True:
-						if form.has_key("action") and form['action'].value == "download":
-							# Push the file to the user
-							print 'Content-Type: application/octet-stream'
-							print 'Content-Disposition: attachment; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
-							print "Content-Length: %d" % len(report)
-							print
-							sys.stdout.write(report)
-							sys.stdout.flush()
-						else:
-							# Instead, show the PDF on the page
-							print 'Content-Type: application/pdf'
-							print 'Content-Disposition: inline; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
-							print "Content-Length: %d" % len(report)
-							print
-							sys.stdout.write(report)
-							sys.stdout.flush()
-						#print("Content-Type: application/force-download")
-						#print("Content-Type: application/octet-stream")
-						#print("Content-Type: application/download")
-						#print("Content-Description: File Transfer")
+		if not(settings["LiveWebserver"]):
+			import benchmarks as benchmarkspage
+			if form.has_key('Benchmark1ID') and form.has_key('Benchmark2ID') and form.has_key('BenchmarksType'):
+				try:
+					PDFReport = benchmarkspage.generateComparisonReport(form, getBenchmarksConnection())
+					if PDFReport:
+						print 'Content-Type: application/pdf'
+						print 'Content-Disposition: inline; filename="%s-Run_%s_vs_Run_%s.pdf"' % (form['BenchmarksType'].value, form['Benchmark1ID'].value, form['Benchmark2ID'].value)
+						print "Content-Length: %d" % len(PDFReport)
+						print
+						sys.stdout.write(PDFReport)
+						sys.stdout.flush()
 					else:
-						# todo: delete this code
-						tempdir = os.path.join(settings["TempDir"], "benchmarkdata") 
-						if not os.path.exists(tempdir):
-							os.mkdir(tempdir, 0775)
-						filepath = os.path.join(tempdir, "%(BenchmarkID)s-%(ID)s.pdf" % PDFReport)
-						writeFile(filepath, report)
-						filepath = os.path.join("..", "temp", "benchmarkdata", "%(BenchmarkID)s-%(ID)s.pdf" % PDFReport)
+						print 'Content-type: text/html'
+						print
+						print("<html><body>The PDF report was not created.</body></html>")
+				except Exception, e:
+						print 'Content-type: text/html'
+						print
+						print("<html><body>The PDF report was not created.<br>%s<br>%s</body></html>" % (e, traceback.format_exc().replace('\n', '<br>')))
+			elif form.has_key("id"):
+				PDFReport = getBenchmarksConnection().execute("SELECT ID, BenchmarkID, PDFReport FROM BenchmarkRun WHERE ID=%s", parameters = (form["id"].value,))
+				if PDFReport:
+					PDFReport = PDFReport[0]
+					report = PDFReport['PDFReport']
+					if report:
+						if True:
+							if form.has_key("action") and form['action'].value == "download":
+								# Push the file to the user
+								print 'Content-Type: application/octet-stream'
+								print 'Content-Disposition: attachment; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
+								print "Content-Length: %d" % len(report)
+								print
+								sys.stdout.write(report)
+								sys.stdout.flush()
+							elif form.has_key("action") and form['action'].value == "regenerate":
+								report = None
+								try:
+									report = benchmarkspage.generateSingleRunReport(form, getBenchmarksConnection())
+								except Exception, e:
+									print 'Content-type: text/html'
+									print
+									print("<html><body>The PDF report was not created.<br>%s<br>%s</body></html>" % (e, traceback.format_exc().replace('\n', '<br>')))
+									
+								if report:
+									# Enable this line to store generated reports back into the database e.g. in case the report creation script gets updated
+									# getBenchmarksConnection().execute("UPDATE BenchmarkRun SET PDFReport=%s WHERE ID=%s", parameters = (report, form["id"].value,))
+									print 'Content-Type: application/pdf'
+									print 'Content-Disposition: inline; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
+									print "Content-Length: %d" % len(report)
+									print
+									sys.stdout.write(report)
+									sys.stdout.flush()
+							else:
+								# Instead, show the PDF on the page
+								print 'Content-Type: application/pdf'
+								print 'Content-Disposition: inline; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
+								print "Content-Length: %d" % len(report)
+								print
+								sys.stdout.write(report)
+								sys.stdout.flush()
+							#print("Content-Type: application/force-download")
+							#print("Content-Type: application/octet-stream")
+							#print("Content-Type: application/download")
+							#print("Content-Description: File Transfer")
+						else:
+							# todo: delete this code
+							tempdir = os.path.join(settings["TempDir"], "benchmarkdata") 
+							if not os.path.exists(tempdir):
+								os.mkdir(tempdir, 0775)
+							filepath = os.path.join(tempdir, "%(BenchmarkID)s-%(ID)s.pdf" % PDFReport)
+							writeFile(filepath, report)
+							filepath = os.path.join("..", "temp", "benchmarkdata", "%(BenchmarkID)s-%(ID)s.pdf" % PDFReport)
+							s.write("Content-type: text/html\n\n")
+							s.write("<html><body><a href='%s'>Download here</a></body></html>" % filepath)
+					else:
 						s.write("Content-type: text/html\n\n")
-						s.write("<html><body><a href='%s'>Download here</a></body></html>" % filepath)
+						s.write("The report has not been created.")
 				else:
 					s.write("Content-type: text/html\n\n")
-					s.write("The report has not been created.")
-			else:
-				s.write("Content-type: text/html\n\n")
-				s.write("Could not retrieve the PDB from the database.")
+					s.write("Could not retrieve the PDB from the database.")
 
 	elif query_type == "benchmarks":
 		if not(settings["LiveWebserver"]):
-			
+			import benchmarks as benchmarkspage
 			ExistingBinaries = getLabServicesConnection().execQuery('SELECT ID, Tool, VersionType, Version, BuildType, Static, Graphics, MySQL FROM Binaries', cursorClass = rosettadb.DictCursor)
 			
 			benchmarks = {}
@@ -667,7 +663,6 @@ def ws():
 				raise Exception("Failed parsing Benchmarks database schema.")
 			
 			if form.has_key('submitted') and form['submitted'].value == "T":
-				import benchmarks as benchmarkspage
 				parameters = benchmarkspage.getRunParameters(form, benchmarks)
 				BenchmarksDB.insertDict("BenchmarkRun", parameters)
 				BenchmarksDB.execute('UPDATE BenchmarkRun SET EntryDate=NOW() WHERE ID=%s', parameters = (BenchmarksDB.getLastRowID(),))

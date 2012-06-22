@@ -62,7 +62,7 @@ class SGEConnection(StatusPrinter):
 			
 		if force or self.CachedList == None:
 			if self.lastCalled > 0 and ((time.time() - self.lastCalled) < self.pauseBetweenQStats):
-				self._status('Warning: QSTAT is being called more regularly than %fs.' % qstatWaitingPeriod)
+				self._status('Warning: QSTAT is being called more regularly than %fs.' % self.pauseBetweenQStats)
 			
 			self.lastCalled = time.time()
 			

@@ -335,6 +335,25 @@ function getBenchmarkNames()
 	return query.join('&amp;');
 }
 
+function generateSingleRunReport(runID)
+{
+	var subform = document.reportpageform;
+	var numbins = prompt('Enter the number of bins.', 100);
+	if (numbins == null || !numbins.match(integralExpression))
+	{
+		alert("Bad value for the number of bins. Using the default value of 100.")
+		numbins = 100;
+	}
+	var topX = prompt('Enter the number of lowest energy models to consider for the best model.', 5);
+	if (topX == null || !topX.match(integralExpression))
+	{
+		alert("Bad value for the number of lowest energy models. Using the default value of 5.")
+		topX = 5;
+	}
+	var query = ['query=benchmarkreport', 'id=' + runID, 'numbins=' + numbins, 'topx=' + topX, 'action=regenerate']; 
+	return query.join('&amp;');
+}
+
 function benchmarkWasSelected()
 {
 	count = 0;

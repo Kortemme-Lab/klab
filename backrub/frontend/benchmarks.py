@@ -314,53 +314,121 @@ def getRunParameters(form, benchmarks):
 		'Status': 'queued', 
 		}
 
-def generateKICReport(BenchmarksDB, Benchmark1ID, Benchmark2ID, Benchmark1Name, Benchmark2Name):
-	import sys
-	sys.path.insert(0, "../daemon")
-	import benchmark_kic.evaluate as KICEvaluation
+def getBenchmarkSettings(BenchmarksDB, runID):
+	benchmarkRunSettings = BenchmarksDB.execute('SELECT ID, BenchmarkID, RosettaSVNRevision, RosettaDBSVNRevision, CommandLine, BenchmarkOptions FROM BenchmarkRun WHERE ID=%s', parameters = (runID, ))
+	if not benchmarkRunSettings:
+		raise Exception('''Could not find the results for benchmark run %(runID)d in the database. <script type="text/javascript">alert("Could not find the results for benchmark run %(runID)d in the database.")</script>''' % vars())
+	assert(len(benchmarkRunSettings) == 1)
+	benchmarkRunSettings = benchmarkRunSettings[0]
+	benchmarkoptions = pickle.loads(benchmarkRunSettings['BenchmarkOptions'])
+	replacementPatterns = BenchmarksDB.execute('SELECT OptionName, ShowInReport, Description, CommandLineVariable FROM BenchmarkOption WHERE BenchmarkID=%s', parameters = (benchmarkRunSettings["BenchmarkID"], ))
+	optionReplacementPatterns = {}
+	for rp in replacementPatterns:
+		optionReplacementPatterns[rp["OptionName"]] = {"Pattern" : rp["CommandLineVariable"], "Description" : rp["Description"], "ShowInReport" : rp["ShowInReport"]}
+	return benchmarkRunSettings, benchmarkoptions, optionReplacementPatterns
 
-	flatfile1 = None
-	flatfile2 = None
-	top_X = []
-	results = BenchmarksDB.execute('SELECT BenchmarkOptions, File FROM BenchmarkRunOutputFile INNER JOIN BenchmarkRun ON BenchmarkRunID=BenchmarkRun.ID WHERE BenchmarkRunID=%s AND FileID=1 AND FileType="Flat file"', parameters = (Benchmark1ID, ))
-	if results and results[0]:
-		flatfile1 = results[0]["File"]
-		options = pickle.loads(results[0]['BenchmarkOptions'])
-		top_X.append(options['NumberOfLowestEnergyModelsToConsiderForBestModel'])
-		top_X.append(options['NumberOfModelsPerPDB'])
-	results = BenchmarksDB.execute('SELECT BenchmarkOptions, File FROM BenchmarkRunOutputFile INNER JOIN BenchmarkRun ON BenchmarkRunID=BenchmarkRun.ID WHERE BenchmarkRunID=%s AND FileID=1 AND FileType="Flat file"', parameters = (Benchmark2ID, ))
-	if results and results[0]:
-		flatfile2 = results[0]["File"]
-		options = pickle.loads(results[0]['BenchmarkOptions'])
-		top_X.append(options['NumberOfLowestEnergyModelsToConsiderForBestModel'])
-		top_X.append(options['NumberOfModelsPerPDB'])
-	if not flatfile1:
-		print('''<script type="text/javascript">alert("Could not find the results file for benchmark run %s in the database.")</script>''' % Benchmark1ID) 
-		return
-	if not flatfile2:
-		print('''<script type="text/javascript">alert("Could not find the results file for benchmark run %s in the database.")</script>''' % Benchmark2ID) 
-		return
+def generateSingleRunReport(form, BenchmarksDB):
+	BenchmarkRunID = int(form['id'].value)
 	
-	top_X = min(top_X)
-	evaluator = KICEvaluation.BenchmarkEvaluator('/backrub/temp/benchmarkdata/', Benchmark1Name, Benchmark2Name, flatfile1, flatfile2, passingFileContents = True, top_X = top_X, quiet = True)
-	try:
-		evaluator.run()
-		return evaluator.PDF 
-	except Exception, e:
-		import traceback
-		print("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
+	benchmarkRunSettings, benchmarkoptions, optionReplacementPatterns = getBenchmarkSettings(BenchmarksDB, BenchmarkRunID)
+		
+	if benchmarkRunSettings["BenchmarkID"] == "KIC":
+		return generateKICSingleRunReport(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, optionReplacementPatterns)
+
+def generateComparisonReport(form, BenchmarksDB):
+	Benchmark1RunID = form['Benchmark1ID'].value
+	Benchmark2RunID = form['Benchmark2ID'].value
 	
-def generateReport(form, BenchmarksDB):
+	benchmark1RunSettings, benchmark1options, optionReplacementPatterns1 = getBenchmarkSettings(BenchmarksDB, Benchmark1RunID)
+	benchmark2RunSettings, benchmark2options, optionReplacementPatterns2 = getBenchmarkSettings(BenchmarksDB, Benchmark2RunID)
+	
 	Benchmark1Name = "Benchmark 1"
 	if form.has_key('Benchmark1Name'):
 		Benchmark1Name = form['Benchmark1Name'].value
+	benchmark1RunSettings["BenchmarkDescription"] = Benchmark1Name
+	 
 	Benchmark2Name = "Benchmark 2"
 	if form.has_key('Benchmark2Name'):
 		Benchmark2Name = form['Benchmark2Name'].value
-	Benchmark1ID = form['Benchmark1ID'].value
-	Benchmark2ID = form['Benchmark2ID'].value
-	if True: # todo: generalize KIC:
-		return generateKICReport(BenchmarksDB, Benchmark1ID, Benchmark2ID, Benchmark1Name, Benchmark2Name)
+	benchmark2RunSettings["BenchmarkDescription"] = Benchmark2Name
+	
+	if Benchmark1RunID == Benchmark2RunID:
+		raise Exception("Error: You are trying to compare the same benchmark run against itself.")
+		
+	if benchmark1RunSettings["BenchmarkID"] != benchmark2RunSettings["BenchmarkID"] or optionReplacementPatterns1 != optionReplacementPatterns2:
+		raise Exception("Benchmark 1 is %s but Benchmark 2 is %s. These cannot be compared." % (benchmark1RunSettings["BenchmarkID"], benchmark2RunSettings["BenchmarkID"]))
+	
+	if benchmark1RunSettings["BenchmarkID"] == "KIC":
+		return generateKICComparisonReport(form, BenchmarksDB, benchmark1RunSettings, benchmark1options, benchmark2RunSettings, benchmark2options, optionReplacementPatterns1)
+
+def getFlatfileAndSetOptions(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, top_X): 
+	flatfile = None
+	results = BenchmarksDB.execute('SELECT File FROM BenchmarkRunOutputFile INNER JOIN BenchmarkRun ON BenchmarkRunID=BenchmarkRun.ID WHERE BenchmarkRunID=%s AND FileID=1 AND FileType="Flat file"', parameters = (benchmarkRunSettings["ID"], ))
+	assert(len(results) == 1)
+	flatfile = results[0]["File"]
+	if form.has_key('topx') and form['topx'].value.isdigit():
+		top_X.append(int(form['topx'].value))
+	else:
+		top_X.append(benchmarkoptions['NumberOfLowestEnergyModelsToConsiderForBestModel'])
+	top_X.append(benchmarkoptions['NumberOfModelsPerPDB'])
+	if not flatfile:
+		raise Exception('''Could not find the results file for benchmark run %(ID)d in the database. <script type="text/javascript">alert("Could not find the results file for benchmark run %(ID)d in the database.")</script>''' % benchmarkRunSettings)
+	return flatfile
+
+def generateKICSingleRunReport(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, optionReplacementPatterns):
+	import sys
+	sys.path.insert(0, "../daemon")
+	import benchmark_kic.analysis as KICAnalysis
+
+	top_X = []
+	flatfile = getFlatfileAndSetOptions(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, top_X)
+	
+	try:
+		numbins = 100
+		if form.has_key('numbins') and form['numbins'].value.isdigit():
+			numbins = int(form['numbins'].value)
+		reportsettings = {"NumberOfBins" : numbins, "TopX" : min(top_X)}
+		report = KICAnalysis.BenchmarkReport('/backrub/temp/benchmarkdata/', reportsettings, quiet = True, html = True)
+		report.addBenchmark(benchmarkRunSettings["ID"], None, flatfile, benchmarkRunSettings['RosettaSVNRevision'], benchmarkRunSettings['RosettaDBSVNRevision'], benchmarkRunSettings['CommandLine'], benchmarkoptions, optionReplacementPatterns, passingFileContents = True)
+		return report.run()
+	except Exception, e:
+		import traceback
+		raise Exception("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
+
+def generateKICComparisonReport(form, BenchmarksDB, benchmark1RunSettings, benchmark1options, benchmark2RunSettings, benchmark2options, optionReplacementPatterns):
+	import sys
+	sys.path.insert(0, "../daemon")
+	import benchmark_kic.analysis as KICAnalysis
+
+	if benchmark1options['NumberOfModelsPerPDB'] != benchmark2options['NumberOfModelsPerPDB']:
+		raise Exception("Benchmark 1 has %d models per PDB but Benchmark 2 has %d models per PDB. These cannot be compared at present." % (benchmark1options['NumberOfModelsPerPDB'],  benchmark2options['NumberOfModelsPerPDB']))
+
+	top_X = []
+	flatfile1 = getFlatfileAndSetOptions(form, BenchmarksDB, benchmark1RunSettings, benchmark1options, top_X)
+	flatfile2 = getFlatfileAndSetOptions(form, BenchmarksDB, benchmark2RunSettings, benchmark2options, top_X)
+
+	try:
+		numbins = 100
+		if form.has_key('numbins') and form['numbins'].value.isdigit():
+			numbins = int(form['numbins'].value)
+		reportsettings = {"NumberOfBins" : numbins, "TopX" : min(top_X)}
+		report = KICAnalysis.BenchmarkReport('/backrub/temp/benchmarkdata/', reportsettings, quiet = True, html = True)
+		report.addBenchmark(benchmark1RunSettings["ID"], benchmark1RunSettings["BenchmarkDescription"], flatfile1, benchmark1RunSettings['RosettaSVNRevision'], benchmark1RunSettings['RosettaDBSVNRevision'], benchmark1RunSettings['CommandLine'], benchmark1options, optionReplacementPatterns, passingFileContents = True)
+		report.addBenchmark(benchmark2RunSettings["ID"], benchmark2RunSettings["BenchmarkDescription"], flatfile2, benchmark2RunSettings['RosettaSVNRevision'], benchmark2RunSettings['RosettaDBSVNRevision'], benchmark2RunSettings['CommandLine'], benchmark2options, optionReplacementPatterns, passingFileContents = True)
+		return report.run()
+	except Exception, e:
+		import traceback
+		raise Exception("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
+	
+	#top_X = min(top_X)
+	#evaluator = KICAnalysis.BenchmarkEvaluator('/backrub/temp/benchmarkdata/', Benchmark1Name, Benchmark2Name, flatfile1, flatfile2, passingFileContents = True, top_X = top_X, quiet = True)
+	#try:
+	#	evaluator.run()
+	#	return evaluator.PDF 
+	#except Exception, e:
+	#	import traceback
+	#	print("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
+
 	
 def generateSubmissionPage(benchmark_details):
 	html = []
@@ -597,11 +665,19 @@ def generateBinaryBuilderPage():
 def generateReportPage(benchmark_details):
 	html = []
 	html.append('''<center><div>''')
-	html.append('''<H1 align=left>Benchmark runs</H1><br>''')
+	html.append('''<H1 align="left">Benchmark runs</H1><br>''')
+	html.append('''
+<div align="right">
+<table style="border-style:solid; border-width:1px;">
+<tr><td>View stored PDF</td><td><img width="20" height="20" src='../images/pdf48.png' alt='pdf'></td></tr>
+<tr><td>Download stored PDF</td><td><img width="18" height="18" src='../images/filesaveas128.png' alt='pdf'></td></tr>
+<tr><td>Regenerate PDF</td><td><img width="20" height="20" src='../images/regenerate32.png' alt='pdf'></td></tr>
+</table>
+</div>''')
 	html.append('''<FORM name="reportpageform" method="post" action="#">''')
 	html.append('''<table style="width:800px;">''')
 	html.append('''<tr><td>''')
-	html.append('''<table class="sortable" border=1 cellpadding=4 cellspacing=0  width="1100px" style="font-size:12px;text-align:left">''')
+	html.append('''<table class="sortable" border=1 cellpadding=4 cellspacing=0  width="1200px" style="font-size:12px;text-align:left">''')
 	
 	html.append("<tr style='background-color:#dddddd'>")
 	html.append("<th>ID</th><th>Benchmark</th><th>Length</th><th>Status</th><th>Revision</th><th>DB Revision</th><th style='width:100px;'>Command line</th><th>Benchmark Options</th><th>Run time</th><th>Errors</th><th>Report</th><th colspan=2>Compare</th>")
@@ -653,22 +729,23 @@ def generateReportPage(benchmark_details):
 		else:
 			html.append("<td>None</td>" % run)
 		
-		pdfjavascript = '''window.open('%s?query=benchmarkreport&amp;id=%s&amp;action=view');''' % (script_filename, run["ID"])
-		#filesaveasjavascript = '''window.open('%s?query=benchmarkreport&amp;id=%s&amp;action=download','KortemmeLabAdmin','height=400,width=850');''' % (script_filename, run["ID"])
+		pdfjavascript 		 = '''window.open('%s?query=benchmarkreport&amp;id=%s&amp;action=view');''' % (script_filename, run["ID"])
 		filesaveasjavascript = '''window.location.href = '%s?query=benchmarkreport&amp;id=%s&amp;action=download';''' % (script_filename, run["ID"])
-		#	document.reportpageform.BenchmarksPage.value='report';
-		#	document.reportpageform.query.value='benchmarks';
-		#	document.reportpageform.benchmarkrunID.value='%(ID)s';
-		#	document.reportpageform.submit();
-		#	''' % run
+		regeneratejavascript = '''
+querystring = generateSingleRunReport(%d); // set the Benchmark1Name/ID and Benchmark2Name/ID values
+window.open('%s?' + querystring);
+return false;
+''' % (run["ID"], script_filename)
+		#//window.open('%s?query=benchmarkreport&amp;id=%s&amp;action=regenerate'); % (script_filename, run["ID"])
+		
 		if run["Status"] == "done" and run["HasPDF"]:
-			html.append('''<td style='text-align:center; width:20px;'>
-				<span style='cursor:pointer;' onclick="%(pdfjavascript)s"><img src='../images/pdf16.png' alt='pdf'></span>
-				<span style='cursor:pointer;' onclick="%(filesaveasjavascript)s"><img src='../images/filesaveas16.png' alt='save'></span>
+			html.append('''<td style='text-align:center; width:80px;'>
+				<span style='cursor:pointer;' onclick="%(pdfjavascript)s"><img width="20" height="20" src='../images/pdf48.png' alt='pdf'></span>
+				<span style='cursor:pointer;' onclick="%(filesaveasjavascript)s"><img width="18" height="18" src='../images/filesaveas128.png' alt='save'></span>
+				<span style='cursor:pointer;' onclick="%(regeneratejavascript)s"><img width="20" height="20" src='../images/regenerate32.png' alt='save'></span>
 				</td>''' % vars())
 		else:
 			html.append('''<td></td>''')
-		#html.append("<td style='width:20px;'><a href='../images/pdf16.pdf'>PDF</a></td>") # PDFReport
 		html.append("<td><input type='radio' name='benchmarkresults1' onchange='benchmarkWasSelected();' value='%(ID)d'></td>" % run)
 		html.append("<td><input type='radio' name='benchmarkresults2' onchange='benchmarkWasSelected();' value='%(ID)d'></td>" % run)
 		html.append("</tr>")

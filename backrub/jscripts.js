@@ -1524,11 +1524,20 @@ function checkValue(v, expression)
 	return v.match(expression)
 }
 
-function validateElem(elem, expression)
+function validateElem(elem, expression, min, max)
 {
 	var val = elem.value
 	if(val.length > 0 && val.match(expression))
 	{
+		if ((expression == numericExpression || expression == integralExpression) && (min != null) && (max != null))
+		{
+			if (val < min || val > max)
+			{
+				elem.focus();
+				elem.style.background="red";
+				return false;
+			}
+		}
 		elem.style.background="white";
 		return true;
 	}

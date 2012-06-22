@@ -28,7 +28,7 @@ import time
 import datetime
 import pickle
 import traceback
-from analysis import BenchmarkAnalyzer
+import analysis
 			
 strftime = datetime.datetime.strftime
 def strptime(date_string, format):
@@ -144,10 +144,11 @@ class OutputFilePath(object):
 		
 class GenericBenchmarkJob(RosettaClusterJob):
 	
-	def __init__(self, sgec, parameters, benchmarksettings, tempdir, targetroot, dldir, testonly = False):
+	def __init__(self, sgec, parameters, benchmarksettings, benchmarkoptions, tempdir, targetroot, dldir, testonly = False):
 		self.results = None
 		self.PDFReport = None
 		self.output_file_paths = []
+		self.benchmarkoptions = benchmarkoptions
 		parameters["BenchmarkOptions"] = pickle.loads(parameters["BenchmarkOptions"])
 		self.benchmarksettings = benchmarksettings
 		super(GenericBenchmarkJob, self).__init__(sgec, parameters, tempdir, targetroot, dldir, testonly, jobsubdir = str(parameters["ID"]))
@@ -227,7 +228,8 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 	flatOutputDirectory = True
 	name = "KIC Benchmark"
 	results_flatfile = "scientific_benchmark_KIC.results"
-	
+	NumberOfBins = 100
+				
 	def _initialize(self):
 		self.describe()
 		
@@ -330,10 +332,21 @@ protocols.loop_build.LoopBuild: Initial kinematic closure failed. Not outputting
 				return False
 		self._status("analyzing")
 		try:
-			evaluator = BenchmarkAnalyzer(self.targetdirectory, None, flatfile, passingFileContents = True, top_X = top_X, quiet = True)
-			evaluator.run()
+			benchmarkRunSettings = self.parameters
+			benchmarkoptions = self.parameters["BenchmarkOptions"]
+			replacementPatterns = self.benchmarkoptions
+			optionReplacementPatterns = {}
+			for rp in replacementPatterns:
+				optionReplacementPatterns[rp["OptionName"]] = {"Pattern" : rp["CommandLineVariable"], "Description" : rp["Description"], "ShowInReport" : rp["ShowInReport"]}
+				
+			try:
+				reportsettings = {"NumberOfBins" : self.NumberOfBins, "TopX" : benchmarkoptions['NumberOfLowestEnergyModelsToConsiderForBestModel']}
+				report = analysis.BenchmarkReport(self.targetdirectory, reportsettings, quiet = True, html = True)
+				report.addBenchmark(benchmarkRunSettings["ID"], None, self._workingdir_file_path(self.results_flatfile), benchmarkRunSettings['RosettaSVNRevision'], benchmarkRunSettings['RosettaDBSVNRevision'], benchmarkRunSettings['CommandLine'], benchmarkoptions, optionReplacementPatterns, passingFileContents = False)
+				self.PDFReport = report.run()
+			except Exception, e:
+				raise Exception("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
 		except Exception, e:
-			import traceback
 			self._status(str(e))
 			self._status(traceback.format_exc())
 			return False
@@ -342,8 +355,8 @@ protocols.loop_build.LoopBuild: Initial kinematic closure failed. Not outputting
 
 class KICBenchmarkJobAnalyzer(KICBenchmarkJob):
 	
-	def __init__(self, sgec, parameters, benchmarksettings, tempdir, targetroot, dldir, testonly = False):
-		super(KICBenchmarkJobAnalyzer, self).__init__(sgec, parameters, benchmarksettings, tempdir, targetroot, dldir, testonly = True)
+	def __init__(self, sgec, parameters, benchmarksettings, benchmarkoptions, tempdir, targetroot, dldir, testonly = False):
+		super(KICBenchmarkJobAnalyzer, self).__init__(sgec, parameters, benchmarksettings, benchmarkoptions, tempdir, targetroot, dldir, testonly = True)
 
 	def _initialize(self):
 		scheduler = TaskScheduler(self.workingdir)

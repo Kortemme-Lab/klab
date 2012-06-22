@@ -371,7 +371,9 @@ class KICDaemon(RosettaDaemon):
 		if not os.path.exists(bsettings.local_temp_dir):
 			rosettahelper.make755Directory(bsettings.local_temp_dir)
 		
-		clusterjob = jobclass(self.sgec, parameters, bsettings, bsettings.cluster_results_dir, bsettings.local_temp_dir, bsettings.local_results_dir)
+		benchmarkoptions = self.runSQL('SELECT OptionName, ShowInReport, Description, CommandLineVariable FROM BenchmarkOption WHERE BenchmarkID=%s', parameters = (parameters["BenchmarkID"],))
+			
+		clusterjob = jobclass(self.sgec, parameters, bsettings, benchmarkoptions, bsettings.cluster_results_dir, bsettings.local_temp_dir, bsettings.local_results_dir)
 			
 		# clusterjob will not be returned on exception and the reference will be lost
 		self._clusterjobjuststarted = clusterjob 

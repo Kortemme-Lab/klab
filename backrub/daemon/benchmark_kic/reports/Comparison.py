@@ -7,9 +7,8 @@ import os
 import math
 import statsfns
 import rosettahelper
+from benchmark_kic.analysis import BenchmarkAnalyzer
 from string import join
-#import sys
-#sys.path.insert(0, "../../../common")
 
 class ComparisonReport(BenchmarkAnalyzer):
 	'''Evaluates KIC scientific benchmark runs to test for significant improvement.'''
@@ -20,8 +19,8 @@ class ComparisonReport(BenchmarkAnalyzer):
 		self.reportSettings = reportSettings
 		self.benchmark1RunSettings = benchmark1RunSettings
 		self.benchmark2RunSettings = benchmark2RunSettings
-		self.benchmarkname1 = benchmark1RunSettings['Options']["BenchmarkName"]
-		self.benchmarkname2 = benchmark2RunSettings['Options']["BenchmarkName"]
+		self.benchmarkname1 = benchmark1RunSettings["Description"]
+		self.benchmarkname2 = benchmark2RunSettings["Description"]
 		
 		assert(benchmark1RunSettings['Options']['NumberOfModelsPerPDB'] == benchmark2RunSettings['Options']['NumberOfModelsPerPDB'])
 		self.num_models_per_run = benchmark1RunSettings['Options']['NumberOfModelsPerPDB']
@@ -277,22 +276,38 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 		if error:
 			raise Exception(error)
 
-	def generateBenchmarkDetailsTex(self, BenchmarkNumber, BenchmarkName, RosettaVersion, RosettaDBVersion, RosettaCommandLine):
-		description = ""
-		if BenchmarkName != "Benchmark %d" % BenchmarkNumber:
-			description = ' (%s)' % BenchmarkName 
-		if RosettaDBVersion != RosettaVersion:
-			RosettaDBVersion = " (Rosetta database version %s)" % RosettaDBVersion
+	def generateBenchmarkDetailsTex(self, BenchmarkNumber, benchmarkRunSettings):
+		benchmarkRunSettings['ReportDescription'] = ""
+		if benchmarkRunSettings['Description'] != "Benchmark %d" % BenchmarkNumber:
+			benchmarkRunSettings['ReportDescription'] = ' (%s)' % benchmarkRunSettings['Description'] 
+		if benchmarkRunSettings['RosettaDBSVNRevision'] != benchmarkRunSettings['RosettaSVNRevision']:
+			benchmarkRunSettings['DBDescription'] = ' (Rosetta database version %s)' % benchmarkRunSettings['RosettaDBSVNRevision']
 		else:
-			RosettaDBVersion = ''
-		RosettaCommandLine = statsfns.breakCommandLine(RosettaCommandLine) 
+			benchmarkRunSettings['DBDescription'] = ''
+		
+		commandLine = benchmarkRunSettings['RosettaCommandLine']
+		for Option, d in benchmarkRunSettings['OptionReplacementPatterns'].iteritems():
+			commandLine = re.sub("%%[(]%s[)]\w" % d['Pattern'], str(benchmarkRunSettings['Options'][Option]), commandLine)
+		benchmarkRunSettings['RosettaSplitCommandLine'] = statsfns.breakCommandLine(commandLine) 
+		benchmarkRunSettings['BenchmarkNumber'] = BenchmarkNumber
+		
 		return '''
-\\paragraph{Benchmark %(BenchmarkNumber)d%(description)s}
-Rosetta version %(RosettaVersion)s%(RosettaDBVersion)s
+\\paragraph{Benchmark %(BenchmarkNumber)d (run %(RunID)d) %(ReportDescription)s \\textnormal{Rosetta version %(RosettaSVNRevision)s%(DBDescription)s}}
 \\begin{lstlisting}
-%(RosettaCommandLine)s
+%(RosettaSplitCommandLine)s
 \\end{lstlisting}
-''' % vars()
+		''' % benchmarkRunSettings
+		
+	def generateBenchmarkOptionsTex(self, benchmarkRunSettings):
+		LaTeX = '''
+\\paragraph{Options}
+\\begin{tabular}{ll}
+'''
+		for option, value in benchmarkRunSettings['Options'].iteritems():
+			if benchmarkRunSettings['OptionReplacementPatterns'][option]['ShowInReport']:
+				LaTeX += "%s & %s \\\\\n" % (benchmarkRunSettings['OptionReplacementPatterns'][option]['Description'], value)	
+		LaTeX += "\\end{tabular}\n"
+		return LaTeX
 
 	def run(self):
 		top_X = self.top_X
@@ -308,7 +323,7 @@ Rosetta version %(RosettaVersion)s%(RosettaDBVersion)s
 		#put all density comparison figures into a tex table
 		density_comparison_plots = []
 		num_pdbs = len(self.sorted_benchmark_pdbs)
-		num_rows = 3
+		num_rows = 4
 		num_cols = 2
 		num_plots_per_page = num_rows * num_cols
 		num_pages = int(math.ceil(num_pdbs/float(num_plots_per_page)))
@@ -432,25 +447,20 @@ Rosetta version %(RosettaVersion)s%(RosettaDBVersion)s
 		KW_p_value_str = str(KW_p_value)
 		pairedT_p_value_str = str(pairedT_p_value)
 		
-
 		outstring += '''
 \\section{Benchmark details}'''
 
-		RosettaVersion = 'r3.3' # todo
-		RosettaDBVersion = 'r3.3'
-		RosettaCommandLine = '''-loops:input_pdb %(loops:input_pdb)s -in:file:fullatom -loops:loop_file %(loops:loop_file)s -loops:remodel perturb_kic -loops:refine refine_kic -in:file:native %(in:file:native)s -out:prefix %(out:prefix)s -overwrite -ex1 -ex2 -nstruct 1 -out:pdb_gz -loops:max_kic_build_attempts %(loops:max_kic_build_attempts)d'''
-		outstring += self.generateBenchmarkDetailsTex(1, self.benchmarkname1, RosettaVersion, RosettaDBVersion, RosettaCommandLine) 
-		
-		RosettaVersion = 'r3.4'
-		RosettaDBVersion = 'r3.43'
-		RosettaCommandLine = '''-loops:input_pdb %(loops:input_pdb)s -in:file:fullatom -loops:loop_file %(loops:loop_file)s -loops:remodel perturb_kic -loops:refine refine_kic -in:file:native %(in:file:native)s -out:prefix %(out:prefix)s -overwrite -ex1 -ex2 -nstruct 1 -out:pdb_gz -loops:max_kic_build_attempts %(loops:max_kic_build_attempts)d'''
-		outstring += self.generateBenchmarkDetailsTex(2, self.benchmarkname2, RosettaVersion, RosettaDBVersion, RosettaCommandLine) 
+		outstring += self.generateBenchmarkDetailsTex(1, self.benchmark1RunSettings)
+		outstring += self.generateBenchmarkOptionsTex(self.benchmark1RunSettings)
+		outstring += self.generateBenchmarkDetailsTex(2, self.benchmark2RunSettings) 
+		outstring += self.generateBenchmarkOptionsTex(self.benchmark2RunSettings)
 		
 		medianrmsd1 = MedianResult1.loop_rmsd
 		medianrmsd2 = MedianResult2.loop_rmsd
 		medianenergy1 = MedianResult1.energy
 		medianenergy2 = MedianResult2.energy
 		outstring += '''
+\\pagebreak
 \\section{Overall benchmark performance comparison}
 \\begin{tabular}{lrr}
 Top %(top_X)d best model &Median loop rmsd &Median energy\\\\\\hline
@@ -463,7 +473,6 @@ Benchmark 2 & %(medianrmsd2)f & %(medianenergy2)f\\\\
 
 %(percent_improved_cases_text)s
 
-\\newpage
 {\\bf Statistical significance of differences in RMSD distributions:}
 \\begin{table}[ht]
 \\begin{center}
@@ -477,8 +486,10 @@ Paired T-test &%(pairedT_p_value_str)s\\\\
 \\end{table}''' % vars()
 
 		outstring += '''
+\\pagebreak
 \\section{Individual results per input structure}
 \\begin{table}[ht]
+\\scalebox{0.85}{
 \\begin{tabular}{r||r|rrr||r|rrr}
 \\multicolumn{1}{c}{} & \\multicolumn{4}{c}{Benchmark 1} & \\multicolumn{4}{c}{Benchmark 2} \\\\ 
 \\hline
@@ -498,6 +509,7 @@ PDB & \# models & Top %(top_X)d best model & Loop rmsd & Energy & \# models & To
 			outstring += "%s\\\\\n" % join(map(str, vals), " & ")
 		outstring += '''
 \\end{tabular}
+}
 \\end{table}
 
 The Top %(top_X)d best model is the model with the lowest rmsd out of the top %(top_X)d lowest energy models.''' % vars()
@@ -505,7 +517,7 @@ The Top %(top_X)d best model is the model with the lowest rmsd out of the top %(
 
 		outstring += '''
 \\clearpage
-\\section{Individual comparisons per input structure}
+%\\section{Individual comparisons per input structure}
 '''
 		for i in range(len(density_comparison_plots)):
 			outstring+='\\input{%s}\n' % density_comparison_plots[i]

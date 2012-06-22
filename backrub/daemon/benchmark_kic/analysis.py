@@ -7,7 +7,7 @@ import time
 import sys
 import math
 import shutil
-import statsfns
+import reports.statsfns as statsfns
 import rosettahelper
 from string import join
 
@@ -58,7 +58,7 @@ class BenchmarkReport(object):
 		return self.PDFReport 
 		
 class BenchmarkAnalyzer(object):
-	placeholder_image='/backrub/daemon/benchmark_kic/data/placeholder_image.eps'
+	placeholder_image ='/backrub/daemon/benchmark_kic/data/placeholder_image.eps'
 	
 	texHeader = '''
 \\documentclass[a4paper,10pt]{article}
