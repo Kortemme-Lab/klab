@@ -186,7 +186,8 @@ class KICBenchmarkTask(ClusterTask):
 	
 		# Setup command
 		commandLineParams = {
-			"loops:input_pdb" : self.input_pdb,
+			"in:file:s" : self.input_pdb, # Revisions 49521 upwards
+			"loops:input_pdb" : self.input_pdb, # Revisions 49520 downwards
 			"loops:loop_file" : self.loop_file,
 			"in:file:native" : self.input_pdb,
 			"out:prefix" : self.pdb_prefix,
@@ -241,8 +242,19 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 		StartingStructuresDirectory = benchmarksettings.StartingStructuresDirectory
 		LoopsInputDirectory = benchmarksettings.LoopsInputDirectory 
 		StartingStructuresDirectory_contents=os.listdir(benchmarksettings.StartingStructuresDirectory)
+		
+		pdblist = []
 		for item in StartingStructuresDirectory_contents:
 			if item.endswith('.pdb'):
+				pdblist.append(item)
+		
+		groupsize = int(round(len(pdblist) / 10.0))
+		pdbsublists = [pdblist[i:i+groupsize] for i in range(0, len(pdblist), groupsize)]
+		
+		for sublist in pdbsublists:
+			previousKICTask = None
+			#previousPDB_prefix = None
+			for item in sublist:
 				input_pdb = os.path.join(StartingStructuresDirectory, item)
 				pdb_prefix = item.split('.pdb')[0].split('_')[0]
 				
@@ -257,7 +269,16 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 				targetdir = os.path.join(self.targetdirectory, pdb_prefix)
 				# The task indexing in ClusterTask is 1-based. NumberOfModelsOffset is 0-based so add 1.
 				kicTask = KICBenchmarkTask(taskdir, targetdir, self.parameters, self.benchmarksettings, input_pdb, loop_file, pdb_prefix, self.parameters["BenchmarkOptions"]["NumberOfModelsPerPDB"], self.parameters["BenchmarkOptions"]["NumberOfModelsOffset"] + 1, name=self.name)
-				scheduler.addInitialTasks(kicTask)
+				if previousKICTask:
+					kicTask.addPrerequisite(previousKICTask, [])
+				else:
+					scheduler.addInitialTasks(kicTask)
+				previousKICTask = kicTask
+				#previousPDB_prefix = pdb_prefix
+				if parameters["RunLength"] == 'Test':
+					break
+			if parameters["RunLength"] == 'Test':
+				break
 				
 		self.scheduler = scheduler
 	
@@ -293,12 +314,21 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 						loop_rms = None
 		
 						# Determine loop RMSD and total energy of the pose
-						for line in stdout_contents.split("\n")[-9:]:
-							if 'total_energy' in line:
-								total_energy = float(line.split('total_energy:')[1].strip(' '))
-							elif 'loop_rms' in line:
-								loop_rms = float(line.split('loop_rms:')[1].strip(' '))
-						
+						if self.parameters["RosettaSVNRevision"] < 49521:
+							for line in stdout_contents.split("\n")[-9:]:
+								if 'total_energy' in line:
+									total_energy = float(line.split('total_energy:')[1].strip(' '))
+								elif 'loop_rms' in line:
+									loop_rms = float(line.split('loop_rms:')[1].strip(' '))
+						else:
+							for line in stdout_contents.split("\n")[-30:]:
+								energystr = "protocols.loop_build.LoopBuildMover: total_energy"
+								looprmsstr = "protocols.loop_build.LoopBuildMover: loop_rms"
+								if line.startswith(energystr):
+									total_energy = float(line[len(energystr):])
+								if line.startswith(looprmsstr):
+									loop_rms = float(line[len(looprmsstr):])
+							
 						failstr = '''protocols.loops.loop_mover.perturb.LoopMover_Perturb_KIC: Unable to build this loop - a critical error occured. Moving on .. 
 protocols.loops.loop_mover.perturb.LoopMover_Perturb_KIC: result of loop closure:0 success, 3 failure 1
 protocols.looprelax: Structure  failed initial kinematic closure. Skipping...
@@ -341,7 +371,7 @@ protocols.loop_build.LoopBuild: Initial kinematic closure failed. Not outputting
 				
 			try:
 				reportsettings = {"NumberOfBins" : self.NumberOfBins, "TopX" : benchmarkoptions['NumberOfLowestEnergyModelsToConsiderForBestModel']}
-				report = analysis.BenchmarkReport(self.targetdirectory, reportsettings, quiet = True, html = True)
+				report = analysis.BenchmarkReport(self.targetdirectory, reportsettings, quiet = False, html = False)
 				report.addBenchmark(benchmarkRunSettings["ID"], None, self._workingdir_file_path(self.results_flatfile), benchmarkRunSettings['RosettaSVNRevision'], benchmarkRunSettings['RosettaDBSVNRevision'], benchmarkRunSettings['CommandLine'], benchmarkoptions, optionReplacementPatterns, passingFileContents = False)
 				self.PDFReport = report.run()
 			except Exception, e:

@@ -301,7 +301,7 @@ class KICDaemon(RosettaDaemon):
 		#}
 		#self.runSQL("UPDATE BenchmarkRun SET BenchmarkOptions=%s WHERE ID=2", parameters = (pickle.dumps(tmpparameters),))
 		if numRunningJobs < self.MaxClusterJobs:
-			results = self.runSQL("SELECT BenchmarkRun.*, Benchmark.BinaryName AS BinaryName FROM BenchmarkRun INNER JOIN Benchmark ON BenchmarkRun.BenchmarkID=Benchmark.BenchmarkID WHERE BenchmarkRun.Status='queued' ORDER BY EntryDate LIMIT %d" % self.MaxClusterJobs)
+			results = self.runSQL("SELECT BenchmarkRun.*, BenchmarkRevision.BinaryName AS BinaryName FROM BenchmarkRun INNER JOIN BenchmarkRevision ON BenchmarkRun.BenchmarkID=BenchmarkRevision.BenchmarkID WHERE BenchmarkRun.Status='queued' AND RevisionFrom <= RosettaSVNRevision AND (RevisionTo IS NULL OR RevisionTo >= RosettaSVNRevision) ORDER BY EntryDate LIMIT %d" % self.MaxClusterJobs)
 			try:
 				jobID = None
 				if len(results) != 0:

@@ -225,7 +225,7 @@ function init(){
         injectInto: 'infovis',
         //set duration for the animation
         duration: 250,
-        levelsToShow: 3,
+        levelsToShow: 5,
         constrained: false,
         //set animation transition type
         transition: $jit.Trans.Quart.easeInOut,
