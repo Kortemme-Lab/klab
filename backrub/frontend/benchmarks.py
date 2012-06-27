@@ -266,16 +266,22 @@ def setupBenchmarkOptions(benchmarks):
 						raise Exception("Need to reformat longs for JSON.")
 			option['FormElement'] = 'Benchmark%(BenchmarkID)sOption%(OptionName)s' % option
 
-def getRunParameters(form, benchmarks):
+def getRunParameters(form, benchmark_details):
+	benchmarks = benchmark_details['benchmarks']
+	
 	setupBenchmarkOptions(benchmarks)
+	matchRevisionGroupsToRevisions(benchmark_details)
 	
 	runtype = None
 	benchmark = form['BenchmarkType'].value
+	RosettaRevision = int(form['BenchmarkRosettaRevision'].value)
+	RosettaRevisionGroup = benchmarks[benchmark]['BinaryRevisionsToBenchmarkRevisionsMap'][RosettaRevision]
+	RosettaRevisionGroupSettings = benchmarks[benchmark]['Revisions'][RosettaRevisionGroup]
 	if form['BenchmarkCommandLineType'].value == 'Standard':
-		cmdline = "%s %s" % (benchmarks[benchmark]['ParameterizedFlags'], benchmarks[benchmark]['SimpleFlags'])
+		cmdline = "%s %s" % (RosettaRevisionGroupSettings['ParameterizedFlags'], RosettaRevisionGroupSettings['SimpleFlags'])
 		runtype = "Standard" 
 	elif form['BenchmarkCommandLineType'].value == 'ExtraFlags':
-		cmdline = "%s %s %s" % (benchmarks[benchmark]['ParameterizedFlags'], benchmarks[benchmark]['SimpleFlags'], form['BenchmarkAlternateFlags'].value)
+		cmdline = "%s %s %s" % (RosettaRevisionGroupSettings['ParameterizedFlags'], RosettaRevisionGroupSettings['SimpleFlags'], form['BenchmarkAlternateFlags'].value)
 		runtype = form['BenchmarkAlternateFlags'].value 
 	elif form['BenchmarkCommandLineType'].value == 'Custom':
 		cmdline = "%s %s" % (form['BenchmarkCommandLine_1'].value.replace("\n", " "), form['BenchmarkCommandLine_2'].value.replace("\n", " "))
@@ -301,7 +307,7 @@ def getRunParameters(form, benchmarks):
 	return {
 		'BenchmarkID': benchmark, 
 		'RunLength': form['BenchmarkRunLength'].value, 
-		'RosettaSVNRevision': form['BenchmarkRosettaRevision'].value, 
+		'RosettaSVNRevision': RosettaRevision, 
 		'RosettaDBSVNRevision': form['BenchmarkRosettaDBRevision'].value,
 		'RunType' : runtype, 
 		'CommandLine': cmdline,
@@ -429,19 +435,88 @@ def generateKICComparisonReport(form, BenchmarksDB, benchmark1RunSettings, bench
 	#	import traceback
 	#	print("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
 
+def matchRevisionGroupsToRevisions(benchmark_details):
+	releaseVersionToSVNRevision = {
+		"2.1"	: 8075, 
+		"2.1.1" : 13074, 
+		"2.1.2" : 15393, 
+		"2.2.0" : 16310, 
+		"2.3.0" : 20729, 
+		"2.3.1" : 36012, # SnugDock 
+		"3.0" 	: 26316, 
+		"3.1"	: 32528, 
+		"3.2"	: 39284, 
+		"3.2.1" : 40878, 
+		"3.3"	: 42941, 
+		"3.4"	: 48002, 
+	}
+	
+	benchmarks = benchmark_details['benchmarks']
+	for benchmarkID, details in benchmarks.iteritems():
+		benchmarkRevisionPairs = []
+		details['availablerevisions'] = [] 
+		benchmarkRevisions = details['Revisions']
+		details['Description'] = 'null'
+		details['BinaryRevisionsToBenchmarkRevisionsMap'] = {}
+		for SVNRevision, brevision in benchmarkRevisions.iteritems():
+			#print(brevision)
+			# Collect pair of revisions to check for overlap
+			brevision['RevisionFrom'] = int(brevision['RevisionFrom']) # For JSON export
+			if brevision['RevisionTo']:
+				brevision['RevisionTo'] = int(brevision['RevisionTo']) # For JSON export
+			binaryRevisionFrom = brevision['RevisionFrom']
+			binaryRevisionTo = brevision['RevisionTo'] or None
+			benchmarkRevisionPairs.append((binaryRevisionFrom, binaryRevisionTo))			
+			
+			for b in benchmark_details['ExistingBinaries']:
+				existingBinaryVersion = b['Version']
+				
+				if existingBinaryVersion.find('.') != -1:
+					assert(existingBinaryVersion in releaseVersionToSVNRevision.keys())
+					existingBinaryVersion = releaseVersionToSVNRevision[existingBinaryVersion]
+				else:
+					assert(existingBinaryVersion.isdigit())
+					existingBinaryVersion = int(existingBinaryVersion)
+
+				# Both SVN revisions
+				assert(str(existingBinaryVersion).isdigit())
+			
+				if b['Tool'] == brevision['BinaryName'] and binaryRevisionFrom <= existingBinaryVersion:
+					if not(binaryRevisionTo) or (binaryRevisionTo >= existingBinaryVersion):
+						details['availablerevisions'].append(existingBinaryVersion)
+						details['BinaryRevisionsToBenchmarkRevisionsMap'][existingBinaryVersion] = binaryRevisionFrom 
+		details['availablerevisions'] = sorted(list(set(details['availablerevisions'])), reverse = True) # the list should contain unique elements but just in case
+		
+		# Check for overlapping revisions
+		benchmarkRevisionPairs = sorted(benchmarkRevisionPairs)
+		for i in range(len(benchmarkRevisionPairs) - 1):
+			failed = False
+			assert(benchmarkRevisionPairs[i][0] <= benchmarkRevisionPairs[i + 1][0])
+			if benchmarkRevisionPairs[i][0] == benchmarkRevisionPairs[i + 1][0]:
+				failed = True
+			elif not(benchmarkRevisionPairs[i][1]):
+				failed = True
+			elif benchmarkRevisionPairs[i][1] >= benchmarkRevisionPairs[i + 1][0]: 
+				failed = True
+			if failed:
+				print "Benchmark %s has overlapping revision ranges or missing RevisionTo information: %s and %s." % (benchmarkID, benchmarkRevisionPairs[i], benchmarkRevisionPairs[i + 1])
 	
 def generateSubmissionPage(benchmark_details):
 	html = []
 	
 	default_benchmark = "KIC"
+	default_benchmark_revision = 49521
+	
 	benchmarks = benchmark_details['benchmarks']
-		
+
 	benchmark_names = sorted(benchmarks.keys(), key=str.lower)
 	
-	for benchmarkID, details in benchmarks.iteritems():
-		details['revisions'] = sorted([b['Version'] for b in benchmark_details['ExistingBinaries'] if b['Tool'] == details['BinaryName']], reverse = True)
-	dbrevisions = sorted([b['Version'] for b in benchmark_details['ExistingBinaries'] if b['Tool'] == 'database'], reverse = True)
+	# Store the binary revisions
+	matchRevisionGroupsToRevisions(benchmark_details)
 	
+	# Store the DB revisions
+	dbrevisions = sorted([b['Version'] for b in benchmark_details['ExistingBinaries'] if b['Tool'] == 'database'], reverse = True)
+
 	benchmarkselector_html = ['<select name="BenchmarkType" onchange="ChangeBenchmark();">']
 	for benchmark in benchmark_names:
 		if benchmark == default_benchmark:
@@ -456,7 +531,7 @@ def generateSubmissionPage(benchmark_details):
 		runlengthselector_html.append('<option value="%(runlength)s">%(runlength)s</option>' % vars())
 	runlengthselector_html.append('</select>')
 
-	rosettarevisionselector_html = ['<select name="BenchmarkRosettaRevision"><option value=""></option></select>']
+	rosettarevisionselector_html = ['<select name="BenchmarkRosettaRevision" onchange="ChangedRevision();"><option value=""></option></select>']
 	
 	rosettadbrevisionselector_html = ['<select name="BenchmarkRosettaDBRevision">']
 	for rosettadbrevision in dbrevisions:
@@ -474,23 +549,43 @@ def generateSubmissionPage(benchmark_details):
 	for clusterarchitecture in clusterarchitectures:
 		clusterarchitectureselector_html.append('<option value="%(clusterarchitecture)s">%(clusterarchitecture)s</option>' % vars())
 	clusterarchitectureselector_html.append('</select>')
-
+	
 	# Prepare the record for viewing on the webpage
-	for benchmark in benchmark_names:
-		ParameterizedFlags = benchmarks[benchmark]['ParameterizedFlags']
-		ParameterizedFlags = ParameterizedFlags.replace(" -", "\n-")
-		benchmarks[benchmark]['ParameterizedFlags'] = ParameterizedFlags
-		SimpleFlags = benchmarks[benchmark]['SimpleFlags']
-		SimpleFlags = SimpleFlags.replace(" -", "\n-")
-		benchmarks[benchmark]['SimpleFlags'] = SimpleFlags
-		benchmarks[benchmark]['CustomFlagsDimensions'] = [
-			len(ParameterizedFlags.split("\n")), # Number of rows for ParameterizedFlags 
-			1 + len(SimpleFlags.split("\n")), # Number of rows for SimpleFlags
-			2 + max(max(map(len, ParameterizedFlags.split("\n"))), max(map(len, SimpleFlags.split("\n")))) # Number of columns for ParameterizedFlags and SimpleFlags 
-		]
+	for benchmarkID, details in benchmarks.iteritems():
+		benchmarkRevisions = details['Revisions']
+		for SVNRevision, brevision in benchmarkRevisions.iteritems():
+			ParameterizedFlags = brevision['ParameterizedFlags']
+			ParameterizedFlags = ParameterizedFlags.replace(" -", "\n-")
+			brevision['ParameterizedFlags'] = ParameterizedFlags
+			SimpleFlags = brevision['SimpleFlags']
+			SimpleFlags = SimpleFlags.replace(" -", "\n-")
+			brevision['SimpleFlags'] = SimpleFlags
+			brevision['CustomFlagsDimensions'] = [
+				len(ParameterizedFlags.split("\n")), # Number of rows for ParameterizedFlags 
+				1 + len(SimpleFlags.split("\n")), # Number of rows for SimpleFlags
+				2 + max(max(map(len, ParameterizedFlags.split("\n"))), max(map(len, SimpleFlags.split("\n")))) # Number of columns for ParameterizedFlags and SimpleFlags 
+			]
+	if False:
+		for benchmark in benchmark_names:
+			ParameterizedFlags = benchmarks[benchmark]['ParameterizedFlags']
+			ParameterizedFlags = ParameterizedFlags.replace(" -", "\n-")
+			benchmarks[benchmark]['ParameterizedFlags'] = ParameterizedFlags
+			SimpleFlags = benchmarks[benchmark]['SimpleFlags']
+			SimpleFlags = SimpleFlags.replace(" -", "\n-")
+			benchmarks[benchmark]['SimpleFlags'] = SimpleFlags
+			benchmarks[benchmark]['CustomFlagsDimensions'] = [
+				len(ParameterizedFlags.split("\n")), # Number of rows for ParameterizedFlags 
+				1 + len(SimpleFlags.split("\n")), # Number of rows for SimpleFlags
+				2 + max(max(map(len, ParameterizedFlags.split("\n"))), max(map(len, SimpleFlags.split("\n")))) # Number of columns for ParameterizedFlags and SimpleFlags 
+			]
 	setupBenchmarkOptions(benchmarks)
 	
-	html.append('''<script type="text/javascript">benchmarks=%(benchmarks)s;</script>''' % vars())
+	for benchmarkID, details in benchmarks.iteritems():
+		for SVNRevision, brevision in details['Revisions'].iteritems():
+			if not brevision['RevisionTo']:
+				brevision['RevisionTo'] = 'null' # For JSON export 
+
+	html.append('''\n<script type="text/javascript">benchmarks=%(benchmarks)s;</script>''' % vars())
 	
 	benchmark_alternate_flags_selector_html = '<select style="display:none;" name="BenchmarkAlternateFlags"><option value=""></option></select>'
 
@@ -525,8 +620,10 @@ def generateSubmissionPage(benchmark_details):
 	</td></tr>''' % vars())
 	html.append('''<tr><td></td><td>%s</td></tr>''' % join(benchmark_alternate_flags_selector_html,""))
 	
-	ParameterizedFlags = benchmarks[default_benchmark]['ParameterizedFlags']
-	SimpleFlags = benchmarks[default_benchmark]['SimpleFlags']
+	
+	ParameterizedFlags = benchmarks[default_benchmark]['Revisions'][default_benchmark_revision]['ParameterizedFlags']
+	SimpleFlags = benchmarks[default_benchmark]['Revisions'][default_benchmark_revision]['SimpleFlags']
+	
 	html.append('''<tr><td></td><td><div id="BenchmarkCustomSettingsMessage" style="display:none;">The parameters in the first box are fixed as they are interpreted by benchmark's Python class in the scheduler.</div></td></tr>''')
 	html.append('''<tr><td></td><td><textarea style="display:none;" readonly="readonly" name="BenchmarkCommandLine_1" rows="1" cols="1"></textarea></td></tr>''')
 	html.append('''<tr><td></td><td><textarea style="display:none;" name="BenchmarkCommandLine_2" rows="1" cols="1"></textarea></td></tr>''')
@@ -669,6 +766,7 @@ def generateReportPage(benchmark_details):
 	html.append('''
 <div align="right">
 <table style="border-style:solid; border-width:1px;">
+<tr><td>Show progress</td><td><img width="20" height="10" src='../images/progress-active82x30.png' alt='progress'></td></tr>
 <tr><td>View stored PDF</td><td><img width="20" height="20" src='../images/pdf48.png' alt='pdf'></td></tr>
 <tr><td>Download stored PDF</td><td><img width="18" height="18" src='../images/filesaveas128.png' alt='pdf'></td></tr>
 <tr><td>Regenerate PDF</td><td><img width="20" height="20" src='../images/regenerate32.png' alt='pdf'></td></tr>
@@ -688,14 +786,19 @@ def generateReportPage(benchmark_details):
 		html.append("<td>%(ID)d</td>" % run)
 		html.append("<td>%(BenchmarkID)s</td>" % run)
 		html.append("<td>%(RunLength)s</td>" % run)
+
+		showprogressjavascript = '''window.location.href = 'https://kortemmelab.ucsf.edu/backrub/benchmarks/KIC/%d/progress.html';''' % run["ID"]
 		if run['Status'] == 'queued':
 			html.append("<td style='text-align:center; background-color:#ffffff'>%(Status)s</td>" % run)
 		elif run['Status'] == 'active':
-			html.append("<td style='text-align:center; background-color:#ffff00'>%(Status)s</td>" % run)
+			html.append("<td style='text-align:center; background-color:#ffff00'>%(Status)s" % run)
+			html.append('''<br><span style='cursor:pointer;' onclick="%(showprogressjavascript)s"><img width="20" height="10" src='../images/progress-active82x30.png' alt='progress'></span></td>''' % vars())
 		elif run['Status'] == 'done':
-			html.append("<td style='text-align:center; text-align:center; background-color:#00aa00'>%(Status)s</td>" % run)
+			html.append("<td style='text-align:center; text-align:center; background-color:#00aa00'>%(Status)s" % run)
+			html.append('''<br><span style='cursor:pointer;' onclick="%(showprogressjavascript)s"><img width="20" height="10" src='../images/progress-done82x30.png' alt='progress'></span></td>''' % vars())
 		elif run['Status'] == 'failed':
-			html.append("<td style='text-align:center; background-color:#aa0000'>%(Status)s</td>" % run)
+			html.append("<td style='text-align:center; background-color:#aa0000'>%(Status)s" % run)
+			html.append('''<br><span style='cursor:pointer;' onclick="%(showprogressjavascript)s"><img width="20" height="10" src='../images/progress-failed82x30.png' alt='progress'></span></td>''' % vars())
 		html.append("<td>%(RosettaSVNRevision)s</td>" % run)
 		html.append("<td>%(RosettaDBSVNRevision)s</td>" % run)
 	
@@ -742,7 +845,7 @@ return false;
 			html.append('''<td style='text-align:center; width:80px;'>
 				<span style='cursor:pointer;' onclick="%(pdfjavascript)s"><img width="20" height="20" src='../images/pdf48.png' alt='pdf'></span>
 				<span style='cursor:pointer;' onclick="%(filesaveasjavascript)s"><img width="18" height="18" src='../images/filesaveas128.png' alt='save'></span>
-				<span style='cursor:pointer;' onclick="%(regeneratejavascript)s"><img width="20" height="20" src='../images/regenerate32.png' alt='save'></span>
+				<span style='cursor:pointer;' onclick="%(regeneratejavascript)s"><img width="20" height="20" src='../images/regenerate32.png' alt='regenerate'></span>
 				</td>''' % vars())
 		else:
 			html.append('''<td></td>''')
@@ -789,8 +892,9 @@ def generateBenchmarksPage(settings_, rosettahtml, form, benchmark_details):
 		benchmarks['backrub']['ParameterizedFlags'] = 'backrub pflags'
 		benchmarks['backrub']['SimpleFlags'] = 'backrub simple flags'
 		benchmarks['backrub']['alternate_flags'] = ['none']
-		benchmarks['backrub']['options'] = [{'Description': 'Test option', 'OptionName': 'TestOptionName', 'NormalRunValue': '33', 'BenchmarkID': 'backrub', 'MaximumValue': None, 'MinimumValue': '0', 'Type': 'int', 'ID': 9999}]
-
+		benchmarks['backrub']['options'] = [{'Description': 'Test option', 'OptionName': 'TestOptionName', 'NormalRunValue': '33', 'BenchmarkID': 'backrub', 'MaximumValue': 'null', 'MinimumValue': '0', 'Type': 'int', 'ID': 9999}]
+		benchmarks['backrub']['Revisions'] = {49521: {'ParameterizedFlags': '-in:file:s %(in:file:s)s -loops:loop_file %(loops:loop_file)s -in:file:native %(in:file:native)s -out:prefix %(out:prefix)s -loops:max_kic_build_attempts %(loops:max_kic_build_attempts)d', 'alternate_flags': ['-score12prime'], 'RevisionTo': None, 'BinaryName': 'loopmodel', 'RevisionFrom': 49521, 'SimpleFlags': '-in:file:fullatom -loops:remodel perturb_kic -loops:refine refine_kic -overwrite -ex1 -ex2 -nstruct 1 -out:pdb_gz', 'BenchmarkID': 'KIC'}, 48255: {'ParameterizedFlags': '-loops:input_pdb %(loops:input_pdb)s -loops:loop_file %(loops:loop_file)s -in:file:native %(in:file:native)s -out:prefix %(out:prefix)s -loops:max_kic_build_attempts %(loops:max_kic_build_attempts)d', 'alternate_flags': ['-score12prime'], 'RevisionTo': 49520, 'BinaryName': 'loopmodel', 'RevisionFrom': 48255, 'SimpleFlags': '-in:file:fullatom -loops:remodel perturb_kic -loops:refine refine_kic -overwrite -ex1 -ex2 -nstruct 1 -out:pdb_gz', 'BenchmarkID': 'backrub'}}
+		
 	benchmarktypes = set()
 	for run in benchmark_details['BenchmarkRuns']:
 		benchmarktypes.add(run['BenchmarkID'])

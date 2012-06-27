@@ -285,7 +285,7 @@ def ws():
 	########## DEBUG Cookies ##########
 
 	if not os.path.exists('/tmp/rosettaweb-rosettadaemon.pid'): #upgradetodo: Store this filename in the conf file
-		if hostname in DEVELOPMENT_HOSTS:
+		if hostname in DEVELOPMENT_HOSTS and False:
 			adminWarning = 'Backend not running. Jobs will not be processed immediately.'
 
 	rosettaDD = RosettaDataDir(settings["ServerName"], settings["ServerTitle"], settings["ServerScript"], settings["ContactName"], settings["DownloadDir"])
@@ -296,7 +296,7 @@ def ws():
 	feProtocols = FrontendProtocols(rosettaDD, rosettaHTML)
 	protocolGroups, protocols = feProtocols.getProtocols()
 	
-	  #######################################
+	#######################################
 	# show the result files, no login     #
 	#######################################
 	if form.has_key("query") and form["query"].value == "datadir":
@@ -630,6 +630,11 @@ def ws():
 			
 			for b in BenchmarksDB.execute('SELECT * FROM Benchmark', cursorClass = rosettadb.DictCursor):
 				benchmarks[b['BenchmarkID']] = b
+				benchmarks[b['BenchmarkID']]['Revisions'] = {}
+			
+			for brevision in BenchmarksDB.execute('SELECT * FROM BenchmarkRevision', cursorClass = rosettadb.DictCursor):
+				benchmarks[brevision['BenchmarkID']]['Revisions'][int(brevision['RevisionFrom'])] = brevision # Cast to int for JSON
+				benchmarks[brevision['BenchmarkID']]['Revisions'][int(brevision['RevisionFrom'])]['alternate_flags'] = [] # Cast to int for JSON
 			
 			qry = 'SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = "BenchmarkRun" AND COLUMN_NAME = "RunLength"'
 			runlengths = BenchmarksDB.execute(qry)[0]['COLUMN_TYPE']
@@ -649,11 +654,10 @@ def ws():
 				ClusterArchitectures = (ClusterArchitectures[5:-1]).split(",")
 				ClusterArchitectures = [b.strip()[1:-1] for b in ClusterArchitectures]
 			
-			qry = 'SELECT BenchmarkID, AlternateFlags FROM BenchmarkAlternateFlags ORDER BY ID'
+			qry = 'SELECT BenchmarkID, RevisionFrom, AlternateFlags FROM BenchmarkAlternateFlags ORDER BY ID'
 			for alternate_flags in BenchmarksDB.execute(qry):
-				benchmarks[alternate_flags['BenchmarkID']]['alternate_flags'] = benchmarks[alternate_flags['BenchmarkID']].get('alternate_flags', [])
-				benchmarks[alternate_flags['BenchmarkID']]['alternate_flags'].append(alternate_flags['AlternateFlags'])
-			
+				benchmarks[alternate_flags['BenchmarkID']]['Revisions'][int(alternate_flags['RevisionFrom'])]['alternate_flags'].append(alternate_flags['AlternateFlags']) # Cast to int for JSON
+				
 			qry = 'SELECT * FROM BenchmarkOption ORDER BY ID'
 			for benchmark_options in BenchmarksDB.execute(qry, cursorClass = rosettadb.DictCursor):
 				benchmarks[benchmark_options["BenchmarkID"]]['options'] = benchmarks[benchmark_options["BenchmarkID"]].get('options', [])
@@ -662,8 +666,17 @@ def ws():
 			if not(benchmarks and runlengths):
 				raise Exception("Failed parsing Benchmarks database schema.")
 			
+			benchmark_details = {
+				"benchmarks" 			: benchmarks,
+				#"revisions"				: [],
+				"runlengths" 			: runlengths,
+				"ClusterQueues"			: ClusterQueues,
+				"ClusterArchitectures"	: ClusterArchitectures,
+				"ExistingBinaries"		: ExistingBinaries,
+			}
+			
 			if form.has_key('submitted') and form['submitted'].value == "T":
-				parameters = benchmarkspage.getRunParameters(form, benchmarks)
+				parameters = benchmarkspage.getRunParameters(form, benchmark_details)
 				BenchmarksDB.insertDict("BenchmarkRun", parameters)
 				BenchmarksDB.execute('UPDATE BenchmarkRun SET EntryDate=NOW() WHERE ID=%s', parameters = (BenchmarksDB.getLastRowID(),))
 			
@@ -675,15 +688,7 @@ def ws():
 				else:
 					benchmark_run["HasPDF"] = False
 			
-			benchmark_details = {
-				"benchmarks" 			: benchmarks,
-				"revisions"				: [],
-				"runlengths" 			: runlengths,
-				"ClusterQueues"			: ClusterQueues,
-				"ClusterArchitectures"	: ClusterArchitectures,
-				"ExistingBinaries"		: ExistingBinaries,
-				"BenchmarkRuns"			: benchmark_runs,
-			}
+			benchmark_details["BenchmarkRuns"] = benchmark_runs
 			
 			html_content = rosettaHTML.benchmarksPage(settings, form, benchmark_details)
 			title = 'Benchmarks'

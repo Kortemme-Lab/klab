@@ -142,10 +142,62 @@ function validate()
 		return false;
 	}
 	
-	return false;
+	// We need to enable all form elements or else their values will not be posted (or else use hidden variables)
+	for (i = 0; i < benchmarkoptions.length; i++)
+	{
+		formElement = subform.elements[benchmarkoptions[i]['FormElement']];
+		formElement.disabled = false;
+	}
+
+	
 	return success;
 }
 
+function UpdateOptionsAndCommandLineForRevision()
+{
+	var subform = document.benchmarkoptionsform;
+	var benchmarkName = subform.elements['BenchmarkType'].value;
+	revisionSelector = subform.elements['BenchmarkRosettaRevision'];
+	
+	// We could just update here when the revision selection moves between revision groups e.g. from a KIC revision < 49521 to a revision >= 49521  
+	
+	// Add the alternate flags
+	currentRevision = revisionSelector.value
+	currentRevisionGroup = benchmarks[benchmarkName]['BinaryRevisionsToBenchmarkRevisionsMap'][currentRevision]
+	alternate_flags = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['alternate_flags']
+	alternateFlagsSelector = subform.elements['BenchmarkAlternateFlags']
+	clearSelect(alternateFlagsSelector);
+	for (i = 0; i < alternate_flags.length; i++)
+	{
+		alternate_flag = alternate_flags[i];
+		alternateFlagsSelector.options[alternateFlagsSelector.options.length] = new Option(alternate_flag, alternate_flag);
+	}
+	alternateFlagsSelector.options[0].selected = true;
+	
+	// Set up the custom flag text areas
+	subform.elements['BenchmarkCommandLine_1'].rows  = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['CustomFlagsDimensions'][0]; 
+	subform.elements['BenchmarkCommandLine_1'].cols  = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['CustomFlagsDimensions'][2];
+	subform.elements['BenchmarkCommandLine_1'].value = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['ParameterizedFlags']; 
+	subform.elements['BenchmarkCommandLine_2'].rows  = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['CustomFlagsDimensions'][1]; 
+	subform.elements['BenchmarkCommandLine_2'].cols  = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['CustomFlagsDimensions'][2];
+	subform.elements['BenchmarkCommandLine_2'].value = benchmarks[benchmarkName]['Revisions'][currentRevisionGroup]['SimpleFlags']; 
+}
+
+function ChangedRevision()
+{
+	var subform = document.benchmarkoptionsform;
+	revisionSelector = subform.elements['BenchmarkRosettaRevision'];
+	dbRevisionSelector = subform.elements['BenchmarkRosettaDBRevision'];
+	for (i = 0; i < dbRevisionSelector.length; i++)
+	{
+		if (dbRevisionSelector.options[i].value <= revisionSelector.value) // select a database revision equal or lower to the binary's revision
+		{
+			dbRevisionSelector.options[i].selected = true;
+			break;
+		}
+	}
+	UpdateOptionsAndCommandLineForRevision();
+}
 
 function ChangeBenchmark()
 {
@@ -154,7 +206,7 @@ function ChangeBenchmark()
 	var benchmarkName = subform.elements['BenchmarkType'].value;
 	
 	// Add the binary revisions
-	binary_revisions = benchmarks[benchmarkName]['revisions']
+	binary_revisions = benchmarks[benchmarkName]['availablerevisions']
 	revisionSelector = subform.elements['BenchmarkRosettaRevision']
 	clearSelect(revisionSelector);
 	for (i = 0; i < binary_revisions.length; i++)
@@ -164,16 +216,7 @@ function ChangeBenchmark()
 	}
 	revisionSelector.options[0].selected = true;
 	
-	// Add the alternate flags
-	alternate_flags = benchmarks[benchmarkName]['alternate_flags']
-	alternateFlagsSelector = subform.elements['BenchmarkAlternateFlags']
-	clearSelect(alternateFlagsSelector);
-	for (i = 0; i < alternate_flags.length; i++)
-	{
-		alternate_flag = alternate_flags[i];
-		alternateFlagsSelector.options[alternateFlagsSelector.options.length] = new Option(alternate_flag, alternate_flag);
-	}
-	alternateFlagsSelector.options[0].selected = true;
+	ChangedRevision();		
 	
 	fadefx = { duration: 0.0, queue: { position: '0', scope: 'task' } }
 	if (document.getElementsByClassName == undefined)
@@ -199,14 +242,6 @@ function ChangeBenchmark()
 			new Effect.Appear(optionfields[i], fadefx);
 		}
 	}
-	// Set up the custom flag text areas
-	subform.elements['BenchmarkCommandLine_1'].rows = benchmarks[benchmarkName]['CustomFlagsDimensions'][0]; 
-	subform.elements['BenchmarkCommandLine_1'].cols = benchmarks[benchmarkName]['CustomFlagsDimensions'][2];
-	subform.elements['BenchmarkCommandLine_1'].value = benchmarks[benchmarkName]['ParameterizedFlags']; 
-	subform.elements['BenchmarkCommandLine_2'].rows = benchmarks[benchmarkName]['CustomFlagsDimensions'][1]; 
-	subform.elements['BenchmarkCommandLine_2'].cols = benchmarks[benchmarkName]['CustomFlagsDimensions'][2];
-	subform.elements['BenchmarkCommandLine_2'].value = benchmarks[benchmarkName]['SimpleFlags']; 
-			
 			
 	x = revisionSelector.value;
 	dbrevisionoptions = subform.elements['BenchmarkRosettaDBRevision'].options
