@@ -233,6 +233,7 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 				
 	def _initialize(self):
 		self.describe()
+		self.pdblist = []
 		
 		parameters = self.parameters
 		benchmarksettings = self.benchmarksettings
@@ -256,6 +257,7 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 			#previousPDB_prefix = None
 			for item in sublist:
 				input_pdb = os.path.join(StartingStructuresDirectory, item)
+				self.pdblist.append(input_pdb)
 				pdb_prefix = item.split('.pdb')[0].split('_')[0]
 				
 				#check for existence of corresponding loop file
@@ -289,7 +291,7 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 			outfile = open(outfilepath, 'w')
 			outfile.write('#PDB\tModel\tLoop_rmsd\tTotal_energy\tRuntime\n')
 			input_time_format = "%a %b %d %H:%M:%S %Z %Y"
-			for kicTask in self.scheduler._initialtasks:
+			for kicTask in self.scheduler.tasks_in_order:
 				pdbID = kicTask.pdb_prefix
 				self._status(pdbID)
 				num_models = 0
@@ -301,7 +303,7 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 					stdoutfilename = "%s.o%s.%d" % (kicTask.scriptfilename, kicTask.jobid, i)
 					stdoutfile = os.path.join(kicTask._workingdir_file_path(str(i)), stdoutfilename)
 					stdout_contents = readFile(stdoutfile)
-					self.addOutputFilePath("stdout", "%s-%04d" % (pdbID, i), stdoutfilename, stdoutfile)
+					#self.addOutputFilePath("stdout", "%s-%04d" % (pdbID, i), stdoutfilename, stdoutfile)
 					startdate = re.match(".*?<startdate>\s*(.*?)\s*</startdate>", stdout_contents, re.DOTALL)
 					enddate = re.match(".*?<enddate>\s*(.*?)\s*</enddate>", stdout_contents, re.DOTALL)
 					if startdate and enddate:

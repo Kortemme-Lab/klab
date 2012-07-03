@@ -168,27 +168,36 @@ class SGEConnection(StatusPrinter):
 		command.append('%s' % command_filename)
 		
 		# Submit the job and capture output.
-		try:
-			subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
-		except Exception, e:
-			self._status('Failed running qsub command: %s in cwd %s' % (command, workingdir))
-			raise
-		
-		waitfor = 0
-		errorcode = subp.wait()
-
-		file_stdout.close()
-		file_stdout = open(command_filename + ".temp.out", 'r')
-		output = strip(file_stdout.read())
-		file_stdout.close()
-		file_stderr.close()
-
-		if errorcode != 0:
-			self._status('Failed running qsub command: %s in cwd %s' % (command, workingdir))
-			if output.find("unable to contact qmaster") != -1:
-				raise ClusterException("qsub failed: unable to contact qmaster")
+		numTries = 5
+		for i in range(1, numTries + 1):
+			try:
+				subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
+			except Exception, e:
+				self._status('Failed running qsub command: %s in cwd %s' % (command, workingdir))
+				raise
+			
+			waitfor = 0
+			errorcode = subp.wait()
+	
+			file_stdout.close()
+			file_stdout = open(command_filename + ".temp.out", 'r')
+			output = strip(file_stdout.read())
+			file_stdout.close()
+			file_stderr.close()
+	
+			if errorcode != 0:
+				if i == numTries:
+					self._status('Failed running qsub command: %s in cwd %s. Return code=%d.' % (command, workingdir, errorcode))
+					errmsg = 'Failed running qsub command: %s in cwd %s. The output was "%s". Return code=%d.' % (command, workingdir, output, errorcode)
+					if output.find("unable to contact qmaster") != -1:
+						raise ClusterException("qsub failed: unable to contact qmaster.\n%s" % errmsg)
+					else:
+						raise ClusterException(errmsg)
+				else:
+					self._status('qsub command failed: %s in cwd %s. Return code=%d. Retrying...' % (command, workingdir, errorcode))
+					time.sleep(60)
 			else:
-				raise ClusterException(output)
+				break
 			
 		# Match job id
 		# This part of the script is probably error-prone as it depends on the server message.

@@ -173,14 +173,14 @@ class KICDaemon(RosettaDaemon):
 			suffix = clusterjob.suffix
 		
 		timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-		if _traceback and _exception:
-			_exception = str(_exception)
+		if _traceback:
 			self.log(_traceback, error = True)
+		if _exception:
+			_exception = str(_exception)
 			self.log(_exception, error = True)
-			self.runSQL('''UPDATE BenchmarkRun SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception)), jobID))
-		else:
-			self.runSQL('''UPDATE BenchmarkRun SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s" % (errormsg, timestamp), jobID))
-		self.log("Error: The %s job %s failed at some point:\n%s" % (suffix, jobID, errormsg), error = True)
+		
+		self.runSQL('''UPDATE BenchmarkRun SET Status='failed', Errors=%s, EndDate=NOW() WHERE ID=%s''', parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception)), jobID))
+		self.log("Error: The %s job %s failed at some point:\n%s\n%s\n%s" % (suffix, jobID, errormsg,  str(_traceback), str(_exception)), error = True)
 	
 	def notifyUsersOfCompletedJob(self, clusterjob):
 		parameters = clusterjob.parameters 
@@ -240,7 +240,10 @@ class KICDaemon(RosettaDaemon):
 		for clusterjob in self.runningJobs:
 			try:
 				jobID = clusterjob.jobID
-				clusterjob.dumpJITGraph()
+				try:
+					clusterjob.dumpJITGraph()
+				except Exception, e:
+					self.log("Exception caught dumping the JIT graph.")
 				if clusterjob.isCompleted():
 					completedJobs.append(clusterjob)
 
@@ -269,7 +272,7 @@ class KICDaemon(RosettaDaemon):
 				self.end_job(clusterjob, Failed = True)
 				clusterjob.dumpJITGraph()
 			except Exception, e:
-				self.recordErrorInJob(clusterjob, "Failed.", traceback.format_exc(), e)
+				self.recordErrorInJob(clusterjob, "Failed (A814) with some exception.", traceback.format_exc(), str(e))
 				self.end_job(clusterjob, Failed = True)
 				clusterjob.dumpJITGraph()
 							

@@ -2,4 +2,6 @@
 . /ccpr1/sge6/qb3/common/settings.sh
 cd /netapp/home/klabqb3backrub
 rm -rf /netapp/home/klabqb3backrub/temp/*
+rm -rf /netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmp*
+
 
