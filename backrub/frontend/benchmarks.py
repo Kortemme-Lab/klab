@@ -854,6 +854,7 @@ return false;
 		html.append("</tr>")
 	
 	html.append('''</table>''')
+	html.append('''<div style='text-align:right'><input type="checkbox" name="GenerateFreshComparison" value="false" />Regenerate comparison report''')
 	html.append('''<div style='text-align:right'><button name="CompareButton" disabled="disabled" onclick="
 querystring = getBenchmarkNames(); // set the Benchmark1Name/ID and Benchmark2Name/ID values
 window.open('%s?' + querystring);

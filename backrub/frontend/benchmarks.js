@@ -336,8 +336,19 @@ function editCommandLine()
 function getBenchmarkNames()
 {
 	var subform = document.reportpageform;
-	var benchmark1 = prompt('[Optional] Enter a title for the left-selected benchmark.', null);
-	var benchmark2 = prompt('[Optional] Enter a title for the right-selected benchmark.', null);
+	var benchmark1;
+	var benchmark2;
+	generateFreshComparison = subform.GenerateFreshComparison.checked
+	if (generateFreshComparison)
+	{
+		benchmark1 = prompt('[Optional] Enter a title for the left-selected benchmark.', null);
+		benchmark2 = prompt('[Optional] Enter a title for the right-selected benchmark.', null);
+	}
+	else
+	{
+		benchmark1 = null;
+		benchmark2 = null;
+	}
 	var query = [];
 	query[query.length] = 'query=benchmarkreport';
 	if (benchmark1 != null)
@@ -366,7 +377,10 @@ function getBenchmarkNames()
 	query[query.length] = 'Benchmark1ID=' + vals[0];
 	query[query.length] = 'Benchmark2ID=' + vals[1];
 	query[query.length] = 'BenchmarksType=' + "KIC"; // todo: generalize
-	
+	if (generateFreshComparison)
+	{
+		query[query.length] = 'generatefresh=True';
+	}
 	return query.join('&amp;');
 }
 

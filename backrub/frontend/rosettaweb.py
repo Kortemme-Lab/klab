@@ -515,8 +515,8 @@ def ws():
 					#cmd = "administrat"
 					raise Exception("Unknown command %s passed." % oldcmd)
 			except Exception, e:
-			 success = False
-			 error = "Error: '%s'<br><br>%s" % (str(e), join(traceback.format_exc().split("\n"), "<br>"))
+				success = False
+				error = "Error: '%s'<br><br>%s" % (str(e), join(traceback.format_exc().split("\n"), "<br>"))
 			html_content = rosettaHTML.jobAdminCommand(success, cmd, jobID, error)
 			title = 'Job #%s %sed' % (jobID, cmd)
 		
@@ -542,8 +542,11 @@ def ws():
 			import benchmarks as benchmarkspage
 			if form.has_key('Benchmark1ID') and form.has_key('Benchmark2ID') and form.has_key('BenchmarksType'):
 				try:
-					PDFReport = benchmarkspage.generateComparisonReport(form, getBenchmarksConnection())
+					PDFReport = None
+					if not(form.has_key('generatefresh')):
+						PDFReport = getBenchmarksConnection().execute("SELECT PDFReport FROM BenchmarkRunComparison WHERE BenchmarkRunID1=%s AND BenchmarkRunID2=%s", parameters = (form["Benchmark1ID"].value,form["Benchmark2ID"].value))
 					if PDFReport:
+						PDFReport = PDFReport[0]['PDFReport']
 						print 'Content-Type: application/pdf'
 						print 'Content-Disposition: inline; filename="%s-Run_%s_vs_Run_%s.pdf"' % (form['BenchmarksType'].value, form['Benchmark1ID'].value, form['Benchmark2ID'].value)
 						print "Content-Length: %d" % len(PDFReport)
@@ -551,9 +554,23 @@ def ws():
 						sys.stdout.write(PDFReport)
 						sys.stdout.flush()
 					else:
-						print 'Content-type: text/html'
-						print
-						print("<html><body>The PDF report was not created.</body></html>")
+						PDFReport = benchmarkspage.generateComparisonReport(form, getBenchmarksConnection())
+						if PDFReport:
+							ExistingPDFReport = getBenchmarksConnection().execute("SELECT PDFReport FROM BenchmarkRunComparison WHERE BenchmarkRunID1=%s AND BenchmarkRunID2=%s", parameters = (form["Benchmark1ID"].value,form["Benchmark2ID"].value))
+							if ExistingPDFReport:
+								getBenchmarksConnection().execute("UPDATE BenchmarkRunComparison SET PDFReport=%s WHERE BenchmarkRunID1=%s AND BenchmarkRunID2=%s", parameters = (PDFReport, form["Benchmark1ID"].value,form["Benchmark2ID"].value))
+							else:
+								getBenchmarksConnection().insertDict("BenchmarkRunComparison", {'BenchmarkRunID1' : form["Benchmark1ID"].value, 'BenchmarkRunID2' : form["Benchmark2ID"].value, 'PDFReport' : PDFReport})
+							print 'Content-Type: application/pdf'
+							print 'Content-Disposition: inline; filename="%s-Run_%s_vs_Run_%s.pdf"' % (form['BenchmarksType'].value, form['Benchmark1ID'].value, form['Benchmark2ID'].value)
+							print "Content-Length: %d" % len(PDFReport)
+							print
+							sys.stdout.write(PDFReport)
+							sys.stdout.flush()
+						else:
+							print 'Content-type: text/html'
+							print
+							print("<html><body>The PDF report was not created.</body></html>")
 				except Exception, e:
 						print 'Content-type: text/html'
 						print
@@ -584,7 +601,7 @@ def ws():
 									
 								if report:
 									# Enable this line to store generated reports back into the database e.g. in case the report creation script gets updated
-									# getBenchmarksConnection().execute("UPDATE BenchmarkRun SET PDFReport=%s WHERE ID=%s", parameters = (report, form["id"].value,))
+									#getBenchmarksConnection().execute("UPDATE BenchmarkRun SET PDFReport=%s WHERE ID=%s", parameters = (report, form["id"].value,))
 									print 'Content-Type: application/pdf'
 									print 'Content-Disposition: inline; filename="%(BenchmarkID)s-%(ID)s.pdf"' % PDFReport
 									print "Content-Length: %d" % len(report)

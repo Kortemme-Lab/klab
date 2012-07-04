@@ -35,8 +35,8 @@ class ComparisonReport(BenchmarkAnalyzer):
 		self.quiet = quiet
 
 		self.models = {1: self.parseModels(benchmark1RunSettings["FlatfileLines"]), 2: self.parseModels(benchmark2RunSettings["FlatfileLines"])}
-
-		assert(self.models[1].keys() == self.models[2].keys())
+		
+		assert(sorted(self.models[1].keys()) == sorted(self.models[2].keys()))
 		self.sorted_benchmark_pdbs = sorted(self.models[1].keys())
 		keys = ["NumberOfModels", "TopXBestModel"]
 		self.resultsByPDB = dict.fromkeys(self.sorted_benchmark_pdbs, None)
