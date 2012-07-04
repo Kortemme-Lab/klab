@@ -22,7 +22,7 @@ import retrospect
 from RosettaProtocols import WebserverProtocols
 import sys
 import common
-from ddglib import ddgfilters, protherm_api
+from ddglib import ddgfilters, protherm_api, ddgdbapi
 
 settings = None
 script_filename = None
@@ -120,7 +120,7 @@ def generateJmolPage(form):
 		elif form.has_key("ddgJmolExperimentID"):
 			estring = "Could not retrieve results from experiment %s." % form["ddgJmolExperimentID"].value
 			ExperimentID = form["ddgJmolExperimentID"].value
-			ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
+			ddGdb = ddgdbapi.ddGDatabase(passwd = settings["ddGPassword"])
 			er = ddgfilters.ExperimentResultSet.fromIDs(ddGdb, [int(ExperimentID)])
 			IDs = er.getStructures()[0].IDs
 			assert(len(IDs) == 1)
@@ -133,7 +133,7 @@ def generateJmolPage(form):
 		elif form.has_key("ddgJmolPredictionID"):
 			estring = "Could not retrieve results from prediction %s." % form["ddgJmolPredictionID"].value
 			PredictionID = form["ddgJmolPredictionID"].value
-			ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
+			ddGdb = ddgdbapi.ddGDatabase(passwd = settings["ddGPassword"])
 			pr = ddgfilters.PredictionResultSet.fromIDs(ddGdb, [int(PredictionID)])
 			IDs = pr.getStructures()[0].IDs
 			assert(len(IDs) == 1)
@@ -208,7 +208,7 @@ def generateProThermPage(form):
 			ID = form["ddgProThermID"].value
 			if ID.isdigit():
 				ID = int(ID)
-				ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
+				ddGdb = ddgdbapi.ddGDatabase(passwd = settings["ddGPassword"])
 				ptReader = protherm_api.ProThermReader(prothermfile, ddgDB = ddGdb, quiet = True, skipIndexStore = True)
 				
 				# Caching the indices speeds up the ptReader construction from @2s to 0.2s
@@ -282,12 +282,12 @@ def generateProThermPage(form):
 	return html, chartfns
 
 def getLinsData(PredictionSet):
-	ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
+	ddGdb = ddgdbapi.ddGDatabase(passwd = settings["ddGPassword"])
 	
 	FilePrefix = "%s_" % PredictionSet.split("-")[1]
 	PDBID = "%s_lin" % PredictionSet.split("-")[1]
 	
-	numMissingResults = ddGdb.execute('''SELECT COUNT(ID) FROM `Prediction` WHERE PredictionSet= %s AND Status<>"done"''', parameters=(PredictionSet,), cursorClass=common.ddgproject.StdCursor)[0][0]
+	numMissingResults = ddGdb.execute('''SELECT COUNT(ID) FROM `Prediction` WHERE PredictionSet= %s AND Status<>"done"''', parameters=(PredictionSet,), cursorClass=ddgdbapi.StdCursor)[0][0]
 	
 	dlpath = os.path.join(settings["DownloadDir"], "ddG", PredictionSet)
 	if not os.path.exists(dlpath):
@@ -384,7 +384,7 @@ def generateStatusPage(form):
 	fnname = "drawDDGJobProgress"
 	chartfns = [fnname]
 	
-	ddGdb = common.ddgproject.ddGDatabase(passwd = settings["ddGPassword"])
+	ddGdb = ddgdbapi.ddGDatabase(passwd = settings["ddGPassword"])
 	results = ddGdb.execute('''SELECT PredictionSet, Status, COUNT(*) AS Count FROM Prediction WHERE PredictionSet <> "testrun" GROUP BY PredictionSet, Status;''')
 	predictionSets =  {}
 	

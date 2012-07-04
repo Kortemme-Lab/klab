@@ -11,7 +11,7 @@ import traceback
 sys.path.insert(0, "../common/")
 #sys.path.insert(1, "cluster")
 from rosetta_daemon import RosettaDaemon
-import ddgproject
+import ddglib.ddgdbapi as ddgdbapi
 from rosettahelper import * #RosettaError, get_files, grep, make755Directory, makeTemp755Directory
 from RosettaProtocols import *
 from cluster.RosettaTasks import PostProcessingException
@@ -23,7 +23,7 @@ from statusprinter import StatusPrinter
 import ddG
 from ddG.protocols import *
 
-dbfields = ddgproject.FieldNames()
+dbfields = ddgdbapi.FieldNames()
 class ddGDaemon(RosettaDaemon):
 	#todo: daemon adds self.parameters[dbfields.ExtraParameters] to dict
 		
@@ -77,8 +77,8 @@ class ddGDaemon(RosettaDaemon):
 		self.rosetta_tmp		= settings["TempDir"]
 		self.rosetta_dl			= settings["DownloadDir"]
 		self.store_time			= settings["StoreTime"]
-		self.DBConnection		= ddgproject.ddGDatabase(passwd = passwd)
-		self.PredictionDBConnection		= ddgproject.ddGPredictionDataDatabase(passwd = passwd)
+		self.DBConnection		= ddgdbapi.ddGDatabase(passwd = passwd)
+		self.PredictionDBConnection		= ddgdbapi.ddGPredictionDataDatabase(passwd = passwd)
 		self.setUpProtocolMap()
 
 	def setUpProtocolMap(self):
@@ -93,7 +93,7 @@ class ddGDaemon(RosettaDaemon):
 				ProtocolMap[r["ID"]] = jobclass
 		self.ProtocolMap = ProtocolMap
 		
-	def callproc(self, procname, parameters = None, cursorClass = ddgproject.DictCursor):
+	def callproc(self, procname, parameters = None, cursorClass = ddgdbapi.DictCursor):
 		""" This function should be the only place in this class which calls stored procedures SQL.
 			Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
 			Using this function and passing the string in reduces the likelihood of these errors.
@@ -112,7 +112,7 @@ class ddGDaemon(RosettaDaemon):
 			raise Exception()
 		return results
 
-	def runSQL(self, query, parameters = None, cursorClass = ddgproject.DictCursor):
+	def runSQL(self, query, parameters = None, cursorClass = ddgdbapi.DictCursor):
 		""" This function should be the only place in this class which executes SQL.
 			Previously, bugs were introduced by copy and pasting and executing the wrong SQL commands (stored as strings in copy and pasted variables).
 			Using this function and passing the string in reduces the likelihood of these errors.
@@ -233,7 +233,7 @@ class ddGDaemon(RosettaDaemon):
 			self.runningJobs.remove(cj)
 	
 	def restartJobs(self):
-		results = self.runSQL('SELECT ID from Prediction WHERE AdminCommand="restart" ORDER BY EntryDate', cursorClass = ddgproject.DictCursor)
+		results = self.runSQL('SELECT ID from Prediction WHERE AdminCommand="restart" ORDER BY EntryDate', cursorClass = ddgdbapi.DictCursor)
 		for result in results:
 			jobID = result["ID"]
 			self.runSQL('UPDATE Prediction SET AdminCommand=NULL, Errors=Null, Status="queued" WHERE ID=%s', parameters = (jobID,))

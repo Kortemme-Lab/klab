@@ -17,7 +17,7 @@ from conf_daemon import *
 from ClusterScheduler import checkGraphReachability, traverseGraph, TaskSchedulerException, SchedulerTaskAddedAfterStartException, BadSchedulerException, TaskCompletionException, SchedulerDeadlockException, SchedulerStartException
 from ClusterScheduler import TaskScheduler, RosettaClusterJob, ClusterBatchJob
 from RosettaTasks import PostProcessingException
-import ddgproject
+import ddglib.ddgdbapi as ddgdbapi
 from conf_daemon import CLUSTER_maxhoursforjob, CLUSTER_maxminsforjob, clusterRootDir
 import SimpleProfiler
 from ClusterTask import INITIAL_TASK, INACTIVE_TASK, QUEUED_TASK, ACTIVE_TASK, RETIRED_TASK, COMPLETED_TASK, FAILED_TASK, status
@@ -25,7 +25,7 @@ from ClusterTask import ClusterScript, ClusterTask
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775, normalize_for_bash
 import ddG
 from ddglib.score import ddgTestScore
-ddgfields = ddgproject.FieldNames()
+ddgfields = ddgdbapi.FieldNames()
 
 # Generic classes
 
