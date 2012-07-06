@@ -96,7 +96,7 @@ class SchedulerStartException(TaskSchedulerException): pass
 
 class TaskScheduler(StatusPrinter):
 
-	def __init__(self, workingdir):
+	def __init__(self, workingdir, parentjob = None):
 		self._initialtasks = []	   # As well as the initial queue, we remember the initial tasks so we can generate the dependency graph 
 		self.sgec = None
 		self.dbID = 0
@@ -114,6 +114,7 @@ class TaskScheduler(StatusPrinter):
 		self.started = False
 		self.tasks_in_order = []
 		self.graph = None
+		self.parentjob = parentjob
 	
 	def _movequeue(self, task, oldqueue, newqueue):
 		# todo: The active queue actually contains both queued and active jobs w.r.t. the cluster head node 
@@ -247,7 +248,9 @@ class TaskScheduler(StatusPrinter):
 					self._movequeue(task, ClusterTask_RETIRED_TASK, ClusterTask_COMPLETED_TASK)
 				else:
 					self.raiseFailure(TaskCompletionException(self.pendingtasks, self.tasks[ClusterTask_RETIRED_TASK], self.tasks[ClusterTask_COMPLETED_TASK], msg = "The task %s failed." % task.getName()))
-			
+				if self.parentjob:
+					self.parentjob.dumpJITGraph()
+				
 			# Try to start any dependents if we can
 			# A dependent *should* fire once all its prerequisite tasks have finished
 			dependents = task.getDependents()
@@ -517,6 +520,7 @@ class RosettaClusterJob(StatusPrinter):
 		rootname = os.path.join(destpath, "progress")
 		JITjs = "%s.js" % rootname 
 		JIThtml = "%s.html" % rootname 
+		self._status("DUMPING JIT GRAPH")
 		contents = self.scheduler.getJITGraph()
 		if not os.path.exists(destpath):
 			make755Directory(destpath)

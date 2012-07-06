@@ -184,6 +184,7 @@ class KICDaemon(RosettaDaemon):
 	
 	def notifyUsersOfCompletedJob(self, clusterjob):
 		parameters = clusterjob.parameters 
+		
 		if parameters['NotificationEmailAddress']:
 			addresses = [address for address in parameters['NotificationEmailAddress'].split(";") if address]
 			if addresses:			
@@ -194,7 +195,7 @@ class KICDaemon(RosettaDaemon):
 						if not self.sendMail(address, self.email_admin, subject, mailTXT):
 							self.log("Error: sendMail() ID = %s." % ID )				 
 				else:
-					subject  = "Kortemme Lab Benchmark Server - %(BenchmarkID)s job #%(ID)d passed" % parameters
+					subject  = "Kortemme Lab Benchmark Server - %(BenchmarkID)s job #%(ID)d (Rosetta r%(RosettaSVNRevision)s) passed" % parameters
 					mailTXT = "The benchmark run completed successfully."
 					for address in addresses:
 						if not self.sendMail(address, self.email_admin, subject, mailTXT):
@@ -255,7 +256,7 @@ class KICDaemon(RosettaDaemon):
 						clusterjob.error = "Analysis failed. %s" % str(e)
 						clusterjob.failed = True
 						self.log("Analysis failed.")
-					
+						
 					self.end_job(clusterjob)
 					clusterjob.dumpJITGraph()
 					
@@ -442,6 +443,10 @@ class KICDaemon(RosettaDaemon):
 		
 		if not clusterjob.error:
 			self.recordSuccessfulJob(clusterjob)
+		else:
+			self.recordErrorInJob(clusterjob, clusterjob.error)
+			
+		self.notifyUsersOfCompletedJob(clusterjob)
 
 	def moveFilesOnJobCompletion(self, clusterjob):
 		try:

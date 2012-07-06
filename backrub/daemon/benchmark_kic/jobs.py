@@ -8,6 +8,11 @@ KIC code adapted from code written by Roland A. Pache, Ph.D., Copyright (c) 2011
 Copyright (c) 2012 __UCSF__. All rights reserved.
 """
 
+if __name__ == "__main__":
+	import sys
+	sys.path.insert(0, "../../common")
+	sys.path.insert(1, "..")
+	sys.path.insert(2, "../cluster")
 import os
 import re
 import math
@@ -238,7 +243,7 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 		parameters = self.parameters
 		benchmarksettings = self.benchmarksettings
 
-		scheduler = TaskScheduler(self.workingdir)
+		scheduler = TaskScheduler(self.workingdir, self)
 		 
 		StartingStructuresDirectory = benchmarksettings.StartingStructuresDirectory
 		LoopsInputDirectory = benchmarksettings.LoopsInputDirectory 
@@ -279,8 +284,8 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 				#previousPDB_prefix = pdb_prefix
 				if parameters["RunLength"] == 'Test':
 					break
-			if parameters["RunLength"] == 'Test':
-				break
+			#if parameters["RunLength"] == 'Test':
+			#	break
 				
 		self.scheduler = scheduler
 	
@@ -316,21 +321,30 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 						loop_rms = None
 		
 						# Determine loop RMSD and total energy of the pose
-						if self.parameters["RosettaSVNRevision"] < 49521:
+						RosettaSVNRevision = int(self.parameters["RosettaSVNRevision"])
+						if RosettaSVNRevision < 48490:
 							for line in stdout_contents.split("\n")[-9:]:
 								if 'total_energy' in line:
 									total_energy = float(line.split('total_energy:')[1].strip(' '))
 								elif 'loop_rms' in line:
 									loop_rms = float(line.split('loop_rms:')[1].strip(' '))
-						else:
+						elif RosettaSVNRevision < 49521:
+							energystr  = "protocols.loop_build.LoopBuild: total_energy:"
+							looprmsstr = "protocols.loop_build.LoopBuild: loop_rms:"
 							for line in stdout_contents.split("\n")[-30:]:
-								energystr = "protocols.loop_build.LoopBuildMover: total_energy"
-								looprmsstr = "protocols.loop_build.LoopBuildMover: loop_rms"
 								if line.startswith(energystr):
 									total_energy = float(line[len(energystr):])
 								if line.startswith(looprmsstr):
 									loop_rms = float(line[len(looprmsstr):])
-							
+						else:
+							energystr  = "protocols.loop_build.LoopBuildMover: total_energy"
+							looprmsstr = "protocols.loop_build.LoopBuildMover: loop_rms"
+							for line in stdout_contents.split("\n")[-30:]:
+								if line.startswith(energystr):
+									total_energy = float(line[len(energystr):])
+								if line.startswith(looprmsstr):
+									loop_rms = float(line[len(looprmsstr):])
+						
 						failstr = '''protocols.loops.loop_mover.perturb.LoopMover_Perturb_KIC: Unable to build this loop - a critical error occured. Moving on .. 
 protocols.loops.loop_mover.perturb.LoopMover_Perturb_KIC: result of loop closure:0 success, 3 failure 1
 protocols.looprelax: Structure  failed initial kinematic closure. Skipping...
@@ -393,15 +407,96 @@ class KICBenchmarkJobAnalyzer(KICBenchmarkJob):
 	def _initialize(self):
 		scheduler = TaskScheduler(self.workingdir)
 		self.scheduler = scheduler
-		self.workingdir = "/netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmpHlhXOv_bmarkKIC" 
+		self.workingdir = "/netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmpdsi1lq_bmarkKIC" 
 		#"/netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmpoQ_A6y_bmarkKIC"
 		#"/netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmpdB7VvK_bmarkKIC"
-		self.targetdirectory = "/backrub/benchmarks/KIC/temp/tmpXgi577_bmarkKIC"
+		self.targetdirectory = "/backrub/benchmarks/KIC/temp/tmpKv9v3h_bmarkKIC"
 		#"/backrub/benchmarks/KIC/temp/tmp9NUsVU_bmarkKIC"
 		self.describe()
 		self.addOutputFilePath("Flat file", 1, KICBenchmarkJob.results_flatfile, self._workingdir_file_path(KICBenchmarkJob.results_flatfile))
 
+if __name__ == "__main__":
+	# Parse test
+	workingdir = "/netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmpdsi1lq_bmarkKIC" 
+	outfilepath = os.path.join(workingdir, KICBenchmarkJob.results_flatfile)
+	try:
+		outfile = open(outfilepath, 'w')
+		outfile.write('#PDB\tModel\tLoop_rmsd\tTotal_energy\tRuntime\n')
+		input_time_format = "%a %b %d %H:%M:%S %Z %Y"
+		pdbIDs = ['1dqz','1ezm','1i7p','1onc','1oyc','1rro','1srp','1tml','2rn2']
+		for pdbID in pdbIDs:
+			print(pdbID)
+			num_models = 0
+			pdb_dir = os.path.join(workingdir, pdbID)
+			for i in range(1, 3):
+				stdout_contents = None
+				model_subdir = os.path.join(pdb_dir, str(i))
+				model_subdir_contents = os.listdir(model_subdir)
+				for fname in model_subdir_contents:
+					if fname.startswith("KICBenchmark_26.cmd.o"):
+						stdoutfilename = fname
+				stdoutfile = os.path.join(model_subdir, stdoutfilename)
+				stdout_contents = readFile(stdoutfile)
+				#self.addOutputFilePath("stdout", "%s-%04d" % (pdbID, i), stdoutfilename, stdoutfile)
+				startdate = re.match(".*?<startdate>\s*(.*?)\s*</startdate>", stdout_contents, re.DOTALL)
+				enddate = re.match(".*?<enddate>\s*(.*?)\s*</enddate>", stdout_contents, re.DOTALL)
+				if startdate and enddate:
+					# Calculate runtime
+					_start_time = int(strftime(strptime(startdate.group(1), input_time_format), "%s"))
+					_end_time = int(strftime(strptime(enddate.group(1), input_time_format), "%s"))
+					runtime=_end_time - _start_time
+					
+					total_energy = None
+					loop_rms = None
+	
+					# Determine loop RMSD and total energy of the pose
+					if False and i < 48490:
+						for line in stdout_contents.split("\n")[-9:]:
+							if 'total_energy' in line:
+								total_energy = float(line.split('total_energy:')[1].strip(' '))
+							elif 'loop_rms' in line:
+								loop_rms = float(line.split('loop_rms:')[1].strip(' '))
+					elif True or self.parameters["RosettaSVNRevision"] < 49521:
+						energystr  = "protocols.loop_build.LoopBuild: total_energy:"
+						looprmsstr = "protocols.loop_build.LoopBuild: loop_rms:"
+						for line in stdout_contents.split("\n")[-30:]:
+							if line.startswith(energystr):
+								total_energy = float(line[len(energystr):])
+							if line.startswith(looprmsstr):
+								loop_rms = float(line[len(looprmsstr):])
+						print(total_energy, loop_rms)
+					else:
+						energystr  = "protocols.loop_build.LoopBuildMover: total_energy"
+						looprmsstr = "protocols.loop_build.LoopBuildMover: loop_rms"
+						for line in stdout_contents.split("\n")[-30:]:
+							if line.startswith(energystr):
+								total_energy = float(line[len(energystr):])
+							if line.startswith(looprmsstr):
+								loop_rms = float(line[len(looprmsstr):])
+					
+					failstr = '''protocols.loops.loop_mover.perturb.LoopMover_Perturb_KIC: Unable to build this loop - a critical error occured. Moving on .. 
+protocols.loops.loop_mover.perturb.LoopMover_Perturb_KIC: result of loop closure:0 success, 3 failure 1
+protocols.looprelax: Structure  failed initial kinematic closure. Skipping...
+protocols::checkpoint: Deleting checkpoints of Remodel
+protocols::checkpoint: Deleting checkpoints of Loopbuild
+protocols.loop_build.LoopBuild: Initial kinematic closure failed. Not outputting.'''
 
+					if total_energy == None:
+						print("Could not find total_energy in %s." % stdoutfile)
+					elif loop_rms == None:
+						print("Could not find loop_rms in %s." % stdoutfile)
+					else:
+						num_models += 1
+						outfile.write('%s\t%d\t%f\t%f\t%d\n' % (pdbID, i, loop_rms, total_energy, runtime))
+				else:
+					raise Exception("Error parsing start/end date.")
+	except Exception, e:
+		if outfile:
+			outfile.close()
+		print(str(e))
+		print(traceback.format_exc())
+				
+	outfile.close()
 		
 
 
