@@ -815,13 +815,17 @@ def generateReportPage(benchmark_details):
 		html.append("</td>")
 		
 		if run["StartDate"] and run["EndDate"]:
-			dInMinutes = int((run["EndDate"] - run["StartDate"]).seconds/60)
+			tdelta = run["EndDate"] - run["StartDate"] 
+			dInMinutes = int(tdelta.seconds/60) 
+			dDays = ""
+			if tdelta.days:
+				dDays = "%dd " % tdelta.days
 			if dInMinutes >= 60:
 				dHours = int(dInMinutes / 60)
 				dMinutes = dInMinutes % 60
-				html.append("<td>%(dHours)dh %(dMinutes)dm</td>" % vars())
+				html.append("<td>%(dDays)s%(dHours)dh %(dMinutes)dm</td>" % vars())
 			else:
-				html.append("<td>%(dInMinutes)dm</td>" % vars())
+				html.append("<td>%(dDays)s%(dInMinutes)dm</td>" % vars())
 		else:
 			html.append("<td></td>")
 			#html.append("<td>%(EntryDate)s</td>" % run)
