@@ -45,6 +45,27 @@ def _getSortedString(o):
 
 import getpass
 import rosettahelper
+
+class _FieldNames(object):
+	'''This class is used to store the database structure accessed via element access rather than using raw strings or doing a dict lookup. 
+	   The class can be made read-only to prevent accidental updates.''' 
+	def __init__(self, name):
+		try:
+			# If we are creating a new class and the class has already been made read-only then we need to remove the lock.
+			# It is the responsibility of the programmer to lock the class as read-only again after creation.
+			# A better implementation may be to append this instance to a list and change readonly_setattr to allow updates only to elements in that list.
+			getattr(self.__class__, 'original_setattr')
+			self.__class__.__setattr__ = self.__class__.original_setattr
+		except:
+			self.__class__.original_setattr = self.__class__.__setattr__
+		self._name = name
+			
+	def makeReadOnly(self):
+		self.__class__.__setattr__ = self.readonly_setattr
+		 
+	def readonly_setattr(self, name, value):
+		raise Exception("Attempted to add/change an element of a read-only class.")
+
 class DatabaseInterface(object):
 	
 	data = {}
@@ -66,11 +87,29 @@ class DatabaseInterface(object):
 			else:
 				passwd = getpass.getpass("Enter password to connect to MySQL database:")
 				
+		self.locked = False
 		self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r[0] for r in self.execute("SHOW TABLES", cursorClass = StdCursor)], ", ")
 		self.unlockstring = "UNLOCK TABLES"
-		self.locked = False
-	
-	def __del__(self):	
+		
+		# Store a list of the table names  
+		self.TableNames = [r[0] for r in self.execute("SHOW TABLES", cursorClass = StdCursor)]
+		
+		# Store a hierarchy of objects corresponding to the table names and their field names  
+		self.FieldNames = _FieldNames(None)
+		self.FlatFieldNames = _FieldNames(None)
+		tablenames = self.TableNames 
+		for tbl in tablenames:
+			setattr(self.FieldNames, tbl, _FieldNames(tbl))
+			fieldDescriptions = self.execute("SHOW COLUMNS FROM %s" % tbl)
+			for field in fieldDescriptions:
+				fieldname = field["Field"]
+				setattr(getattr(self.FieldNames, tbl), fieldname, fieldname)
+				setattr(self.FlatFieldNames, fieldname, fieldname)
+			getattr(self.FieldNames, tbl).makeReadOnly()
+		self.FieldNames.makeReadOnly()
+		self.FlatFieldNames.makeReadOnly()
+		
+	def __del__(self):
 		if self.connection and self.connection.open:
 			self.connection.close()
 
@@ -156,7 +195,43 @@ class DatabaseInterface(object):
 		try:
 			SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
 			values = tuple([d[k] for k in fields])
-	 		self.execute(SQL, parameters = values)
+	 		self.locked_execute(SQL, parameters = values)
+		except Exception, e:
+			if SQL and values:
+				sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nError: '%s'.\n" % (str(e)))
+			sys.stderr.flush()
+			raise Exception("Error occurred during database insertion: '%s'." % str(e))
+
+	def insertDictIfNew(self, tblname, d, PKfields, fields = None):
+		'''Simple function for inserting a dictionary whose keys match the fieldnames of tblname. The function returns two values, the
+			second of which is a dict containing the primary keys of the record. If a record already exists then no insertion is performed and
+			(False, the dictionary of existing primary keys) is returned. Otherwise, the record is inserted into the database and (True, d)
+			is returned.'''
+		
+		if type(PKfields) == type(""):
+			PKfields = [PKfields]
+			
+		if fields == None:
+			fields = sorted(d.keys())
+		values = None
+		try:
+			# Search for existing records
+			wherestr = []
+			PKvalues = []
+			for PKfield in PKfields:
+				wherestr.append("%s=%%s" % PKfield)
+				PKvalues.append(d[PKfield])
+			PKfields = join(PKfields, ",")
+			wherestr = join(wherestr, " AND ")
+			existingRecord = self.locked_execute("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr, parameters = tuple(PKvalues))
+			if existingRecord:
+				return False, existingRecord[0] 
+			
+			SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
+			values = tuple([d[k] for k in fields])
+			self.locked_execute(SQL, parameters = values)
+	 		return True, d 
 		except Exception, e:
 			if SQL and values:
 				sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -367,6 +442,7 @@ class RosettaDB:
 				return results
 			except MySQLdb.OperationalError, e:
 				errcode = e[0]
+				# errcodes of 2006 or 2013 usually indicate a dropped connection  
 				# errcode 1100 is an error with table locking
 				print(e)
 				self.connection.ping(True)
