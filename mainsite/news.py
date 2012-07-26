@@ -25,6 +25,8 @@ footer = '''
       </td>'''
 
 news_items = [
+	('July 2012',			'''Daniel's work on engineering molecular machines is funded by a grant from the UCSF Program for Breakthrough Biomedical Research'''),
+	('July 2012',			'''Matt's paper on cost / benefit tradeoffs in the lac operon is highlighted by Faculty of 1000'''),
 	('December 2011',		'''Rich graduates'''),
 	('September, 2011', 	'''Ryan’s work on engineering light-controlled cadherins is funded by a grant from the NSF'''),
 	('August, 2011', 		'''A new project on quantifying systems-level protein interaction specificity is funded by the NIH, in collaboration with Nevan Krogan’s group'''),

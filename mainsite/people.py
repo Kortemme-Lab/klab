@@ -336,7 +336,7 @@ pastRotationStudents = [
 
 labAlumni = [
 	{"name" : 'Eyal Akiva', "qualification" : "PhD", "period" : '2010-2011', "currentJob" : 'Postdoc', "jobLocation" : 'UCSF', "pub_name" : "Akiva, Eyal"},
-	{"name" : 'Rich Oberdorf', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : '', "jobLocation" : '', "pub_name" : "Oberdorf, Richard"},
+	{"name" : 'Rich Oberdorf', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : '', "jobLocation" : 'Ab Initio Software Corporation', "pub_name" : "Oberdorf, Richard"},
 	{"name" : 'Colin Smith', "qualification" : "PhD", "period" : '2006-2011', "currentJob" : 'Postdoc', "jobLocation" : 'Max Planck Institute Goettingen, Germany', "pub_name" : "Smith, Colin A."},
 	{"name" : 'Dan Mandell', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Postdoc', "jobLocation" : 'Harvard University', "pub_name" : 'Mandell, Daniel J.',},
 	{"name" : 'Matt Eames', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Patent Scientist', "jobLocation" : 'Davis Wright Tremaine', "pub_name" : 'Eames, Matt',},
@@ -347,7 +347,7 @@ labAlumni = [
 	{"name" : 'Aaron Nichols', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'UC Riverside',},
 	{"name" : 'Elisabeth Humphris', "qualification" : "PhD", "period" : '2005-2009', "currentJob" : 'Postdoc', "jobLocation" : 'Yale', "pub_name" : 'Humphris, Elisabeth L.',},
 	{"name" : 'Matt Chroust', "qualification" : None, "period" : '2009', "currentJob" : 'Dentistry Graduate Program', "jobLocation" : 'UCSF',},
-	{"name" : 'Mariana Babor', "qualification" : "PhD", "period" : '2006-2009', "currentJob" : '', "jobLocation" : 'Burnham Institute San Diego', "pub_name" : 'Babor, Mariana',},
+	{"name" : 'Mariana Babor', "qualification" : "PhD", "period" : '2006-2009', "currentJob" : '', "jobLocation" : 'University of Toronto', "pub_name" : 'Babor, Mariana',},
 	{"name" : 'Greg Kapp', "qualification" : "PhD", "period" : '2004-2009', "currentJob" : 'Scientist', "jobLocation" : 'Omniox Inc.', "pub_name" : 'Kapp, Gregory T.',},
 	{"name" : 'Greg Friedland', "qualification" : "PhD", "period" : '2004-2008', "currentJob" : 'Postdoc', "jobLocation" : 'Joint Bioenergy Institute & UC Berkeley', "pub_name" : 'Friedland, Gregory D.',},
 	{"name" : 'Catherine Shi', "qualification" : None, "period" : '2008', "currentJob" : 'iPQB graduate program', "jobLocation" : 'UCSF',},

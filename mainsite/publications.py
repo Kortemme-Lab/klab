@@ -75,7 +75,7 @@ taglist = [
 ]
 
 publication_abbreviations = {
-	"Advances in Protein Chemistry"						: "Adv Protein Chem",
+	#"Advances in Protein Chemistry"						: "Adv Protein Chem",
 	"Analytical Chemistry"								: "Analyt Chem",
 	"Aquatic Toxicology"								: "Aquatic Toxicol",
 	"Biochemical and Biophysical Research Communications": "Biochem Biophys Res Comms",
@@ -104,9 +104,11 @@ publication_abbreviations = {
 	"Journal of Biomedical & Laboratory Sciences"		: "J Biomed Lab Sci",
 	"Journal of Chemical Information and Modeling"		: "J Chem Inf Model",
 	"Journal of Computational Biology"					: "J Comp Biol",
-	"Methods in Enzymology"								: "Meth Enzym",
+	"Journal of the American Chemical Society"			: "J Am Chem Soc",
+	#"Methods in Enzymology"								: "Meth Enzym",
 	"Journal of Molecular Biology"						: "J Mol Biol",
 	"Metabolomics"										: "Metabolomics",
+	"Molecular & Cellular Proteomics"					: "Mol Cell Proteomics",
 	"Molecular Cell"									: "Mol Cell",
 	"Molecular Systems Biology"							: "Mol Syst Biol",
 	"Nature"											: "Nature",
@@ -131,6 +133,7 @@ publication_abbreviations = {
 	"Structure"											: "Structure",
 	"The Journal of Physical Chemistry B" 				: "J Phys Chem B",
 	"The Journal of Cell Biology"						: "J Cell Biol",
+	"The Journal of Immunology"							: "J Immunol",
 	"Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)"	: "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)",
 }
 	
@@ -239,16 +242,19 @@ def getShortPageRange(startpage, endpage):
 
 class PublicationEntry(dict):
 	
-	def __init__(self, authors, title, journal, entry, year, doi, URL):
+	def __init__(self, publicationtype, authors, title, journal, entry, year, doi, URL, ReferralURL, subtitle):
 		self.dict = {
-			"authors" : authors,
-			"authors_str" : join(shortFormatAuthors(authors), ", "),
-			"title" : title,
-			"journal" : journal,
-			"entry" : entry or "",
-			"year" : year,
-			"doi" : doi,
-			"URL" : URL,
+			"Type"			: publicationtype,
+			"authors"		: authors,
+			"authors_str"	: join(shortFormatAuthors(authors), ", "),
+			"title"			: title,
+			"journal"		: journal,
+			"entry"			: entry or "",
+			"year"			: year,
+			"doi"			: doi,
+			"URL"			: URL,
+			"ReferralURL"	: ReferralURL or "",
+			"Subtitle"		: "",
 		}
 
 	def __getitem__(self, k):
@@ -257,15 +263,23 @@ class PublicationEntry(dict):
 	def getHTML(self, showyear = True):
 		d = self.dict
 		if showyear:
-			self.dict["year_str"] = ", %s" % d["year"]
+			d["year_str"] = ", %s" % d["year"]
 		else:
-			self.dict["year_str"] = ""
+			d["year_str"] = ""
+		if d["ReferralURL"]:
+			d["ReferralURL"] = " <a class='publist' href='%(ReferralURL)s'>[free download]</a>" % d
+		
+		if d["Type"] == "CHAP":
+			d["titlesuffix"] = " in"
+		else:
+			d["titlesuffix"] = "."
+		
 		if d.get("doi"):
-			return '''%(authors_str)s. %(title)s. %(journal)s %(entry)s%(year_str)s. doi: <a class="publist" href="http://dx.doi.org/%(doi)s">%(doi)s</a>''' % d
+			return '''%(authors_str)s. %(title)s%(titlesuffix)s %(journal)s %(entry)s%(year_str)s. doi: <a class="publist" href="http://dx.doi.org/%(doi)s">%(doi)s</a>%(ReferralURL)s''' % d
 		elif d.get("URL"):
-			return '''%(authors_str)s. <a class="publist" href="%(URL)s">%(title)s</a>. %(journal)s %(entry)s%(year_str)s.''' % d
+			return '''%(authors_str)s. <a class="publist" href="%(URL)s">%(title)s</a>%(titlesuffix)s %(journal)s %(entry)s%(year_str)s.%(ReferralURL)s''' % d
 		else:
-			return '''%(authors_str)s. %(title)s. %(journal)s %(entry)s%(year_str)s.''' % d
+			return '''%(authors_str)s. %(title)s%(titlesuffix)s %(journal)s %(entry)s%(year_str)s.%(ReferralURL)s''' % d
 	
 	def __repr__(self):
 		d = self.dict
@@ -274,7 +288,6 @@ class PublicationEntry(dict):
 		else:
 			return '''%(authors_str)s. %(title)s. %(journal)s %(entry)s%(year)s.''' % d
 		
-			
 def parsePublist(saveRis = True):
 	F = open("publist.txt", "r")
 	contents = F.read()
@@ -286,7 +299,7 @@ def parsePublist(saveRis = True):
 		if risfile[i].startswith("ER"):
 			risfile = risfile[i+1:]
 			break
-	risfile = join([line for line in risfile if line[0:2] != "C8"], "\n")
+	risfile = join([line for line in risfile if line[0:2] != "C8" and line[0:2] != "C7"], "\n")
 	if saveRis:
 		F = open("publications.ris", "w")
 		F.write(risfile)
@@ -360,6 +373,8 @@ def parsePublist(saveRis = True):
 			endpage = d.get("EP")
 			if volume:
 				entry = volume
+				if d.get("T2"):
+					entry += " (%(T2)s)" % d
 				if issue:
 					entry += "(%s)" % issue
 				elif d.get("TY") != "CHAP":
@@ -372,7 +387,10 @@ def parsePublist(saveRis = True):
 				#entry = "%s(%s):%s-%s" % (d.get("VL"), d.get("IS"), d.get("SP"), d.get("EP"))
 			else:
 				if startpage and endpage and startpage.isdigit() and endpage.isdigit():
-					entry = ":%s" % getShortPageRange(startpage, endpage)
+					entry = ""
+					if d.get("T2"):
+						entry = " (%(T2)s)" % d
+					entry += ":%s" % getShortPageRange(startpage, endpage)
 				else:
 					errors.append("No start or endpage found.")
 			
@@ -390,13 +408,15 @@ def parsePublist(saveRis = True):
 				errors.append("No DOI or URL available.")
 			
 			if authors and title and journal and year:
-				if not(publication_abbreviations.get(journal)):
+				if d["TY"] != "CHAP" and not(publication_abbreviations.get(journal)):
 					errors.append("Missing abbreviation for '%s'. Skipping entry." % journal)
 				else:
 					# Abbreviate the journal name
-					journal = publication_abbreviations[journal]
-					pubEntry = PublicationEntry(authors, title, journal, entry, year, doi, d.get("UR"))
+					if d["TY"] != "CHAP":
+						journal = publication_abbreviations[journal]
+					pubEntry = PublicationEntry(d["TY"], authors, title, journal, entry, year, doi, d.get("UR"), d.get("C7"), d.get("T2"))
 					pubsBySection[sectiontitle].append(pubEntry)
+					
 					for author in authors:
 						author_publications[author] = author_publications.get(author) or []
 						author_publications[author].append(pubEntry)

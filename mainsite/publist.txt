@@ -3,6 +3,7 @@
 # file. 
 # There are a few changes needed to make the parsing work:
 #    - Add a C8 field indicating the group for the website. This will be stripped from the public RIS file.
+#    - Add a C7 field indicating the URL for the Science free download service when applicable. This will be stripped from the public RIS file.
 #    - If the DOI is present in an entry, prefix it with "doi: " if not already so. This helps parse the doi which appears in different fields from different sources. 
 #    - If no DOI is present but the article has a URL, add a UR field. One example of this below is "Computer-aided design of functional protein interactions".
 #    - Add the full journal name. This will be abbreviated for the website.
@@ -10,7 +11,25 @@
 #    - Make sure the date has the proper format - YYYY/MM/DD/other. The other field can contain other information e.g. a range of days for a conference.
 # Any text before the first ER line is ignored for parsing and stripped from the public RIS file.
 #
+# If the publication is a book chapter (CHAP), use the T2 field for a subtitle when applicable.
 ER  - 
+TY  - JOUR
+C8  - 2012 Publications
+C7  - http://www.sciencemag.org/cgi/content/full/336/6083/911?ijkey=RAm8AM.4LYaJU&keytype=ref&siteid=sci 
+A1  - Eames, Matt
+A1  - Kortemme, Tanja
+T1  - Cost-Benefit Tradeoffs in Engineered lac Operons 
+Y1  - 2012/05/18 
+JF  - Science 
+JO  - Science 
+SP  - 911 
+EP  - 915 
+N1  - doi: 10.1126/science.1219083 
+VL  - 336 
+IS  - 6083 
+UR  - http://www.sciencemag.org/content/336/6083/911.abstract 
+N2  - Cells must balance the cost and benefit of protein expression to optimize organismal fitness. The lac operon of the bacterium Escherichia coli has been a model for quantifying the physiological impact of costly protein production and for elucidating the resulting regulatory mechanisms. We report quantitative fitness measurements in 27 redesigned operons that suggested that protein production is not the primary origin of fitness costs. Instead, we discovered that the lac permease activity, which relates linearly to cost, is the major physiological burden to the cell. These findings explain control points in the lac operon that minimize the cost of lac permease activity, not protein expression. Characterizing similar relationships in other systems will be important to map the impact of cost/benefit tradeoffs on cell physiology and regulation. 
+ER  -
 TY  - JOUR
 C8  - 2012 Publications 
 A1  - Kapp, Gregory T.
@@ -26,7 +45,9 @@ A1  - Kortemme, Tanja
 T1  - Control of protein signaling using a computationally designed GTPase/GEF orthogonal pair 
 Y1  - 2012/03/07 
 JF  - Proceedings of the National Academy of Sciences 
-JO  - Proceedings of the National Academy of Sciences 
+JO  - Proceedings of the National Academy of Sciences
+SP  - 5277
+EP  - 5282
 N1  - doi: 10.1073/pnas.1114487109 
 UR  - http://www.pnas.org/content/early/2012/03/01/1114487109.abstract 
 N2  - Signaling pathways depend on regulatory protein-protein interactions; controlling these interactions in cells has important applications for reengineering biological functions. As many regulatory proteins are modular, considerable progress in engineering signaling circuits has been made by recombining commonly occurring domains. Our ability to predictably engineer cellular functions, however, is constrained by complex crosstalk observed in naturally occurring domains. Here we demonstrate a strategy for improving and simplifying protein network engineering: using computational design to create orthogonal (non-crossreacting) protein-protein interfaces. We validated the design of the interface between a key signaling protein, the GTPase Cdc42, and its activator, Intersectin, biochemically and by solving the crystal structure of the engineered complex. The designed GTPase (orthoCdc42) is activated exclusively by its engineered cognate partner (orthoIntersectin), but maintains the ability to interface with other GTPase signaling circuit components in vitro. In mammalian cells, orthoCdc42 activity can be regulated by orthoIntersectin, but not wild-type Intersectin, showing that the designed interaction can trigger complex processes. Computational design of protein interfaces thus promises to provide specific components that facilitate the predictable engineering of cellular functions. 
@@ -1362,6 +1383,26 @@ Y2  - 2011/12/13
 ER  - 
 TY  - JOUR
 C8  - LabMember
+A1  - Zwiers, Antonie
+A1  - Kraal, Laurens
+A1  - van de Pouw Kraan, Tineke C. T. M.
+A1  - Wurdinger, Thomas
+A1  - Bouma, Gerd
+A1  - Kraal, Georg
+T1  - Cutting Edge: A Variant of the IL-23R Gene Associated with Inflammatory Bowel Disease Induces Loss of MicroRNA Regulation and Enhanced Protein Production 
+Y1  - 2012/02/15 
+JF  - The Journal of Immunology 
+JO  - The Journal of Immunology 
+SP  - 1573 
+EP  - 1577 
+N1  - doi: 10.4049/jimmunol.1101494 
+VL  - 188 
+IS  - 4 
+UR  - http://jimmunol.org/content/188/4/1573.abstract 
+N2  - IL-23R gene variants have been identified as risk factors for two major inflammatory bowel diseases (IBDs), Crohn’s disease and ulcerative colitis, but how they contribute to disease is poorly understood. In this study, we show that the rs10889677 variant in the 3′-untranslated region of the IL-23R gene displays enhanced levels of both mRNA and protein production of IL-23R. This can be attributed to a loss of binding capacity for the microRNAs (miRNAs) Let-7e and Let-7f by the variant allele. Indeed, inhibition and overexpression of these miRNAs influenced the expression of the wild type but not the variant allele. Our data clearly demonstrate a role for miRNA-mediated dysregulation of IL-23R signaling, correlated with a single nucleotide polymorphism in the IL-23R strongly associated with IBD susceptibility. This implies that this mutation, in combination with other genetic risk factors, can lead to disease through sustained IL-23R signaling, contributing to the chronicity of IBD. 
+ER  -
+TY  - JOUR
+C8  - LabMember
 A1  - Isaacs, Farren J.
 A1  - Carr, Peter A.
 A1  - Wang, Harris H.
@@ -1905,6 +1946,49 @@ UR  - http://www.sciencedirect.com/science/article/pii/S0959440X11000078
 ER  - 
 TY  - JOUR
 C8  - LabMember
+T1  - A Novel Framework for the Comparative Analysis of Biological Networks
+A1  - Pache, Roland A. 
+A1  - Aloy, Patrick 
+Y1  - 2012/02/21
+N2  - <p>Genome sequencing projects provide nearly complete lists of the individual components present in an organism, but reveal little about how they work together. Follow-up initiatives have deciphered thousands of dynamic and context-dependent interrelationships between gene products that need to be analyzed with novel bioinformatics approaches able to capture their complex emerging properties. Here, we present a novel framework for the alignment and comparative analysis of biological networks of arbitrary topology. Our strategy includes the prediction of likely conserved interactions, based on evolutionary distances, to counter the high number of missing interactions in the current interactome networks, and a fast assessment of the statistical significance of individual alignment solutions, which vastly increases its performance with respect to existing tools. Finally, we illustrate the biological significance of the results through the identification of novel complex components and potential cases of cross-talk between pathways and alternative signaling routes.</p>
+JF  - PLoS ONE
+JA  - PLoS ONE
+VL  - 7
+IS  - 2
+UR  - http://dx.doi.org/10.1371%2Fjournal.pone.0031220
+SP  - e31220
+EP  -
+PB  - Public Library of Science
+M3  - doi: 10.1371/journal.pone.0031220
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Mosca, Roberto
+A1  - Pache, Roland A.
+A1  - Aloy, Patrick
+T1  - The role of structural disorder in the rewiring of protein interactions through evolution 
+Y1  - 2012/03/02 
+JF  - Molecular & Cellular Proteomics 
+JO  - Molecular & Cellular Proteomics 
+N1  - doi: 10.1074/mcp.M111.014969 
+UR  - http://www.mcponline.org/content/early/2012/03/02/mcp.M111.014969.abstract 
+N2  - Structurally disordered regions play a key role in protein-protein interaction networks and the evolution of highly connected proteins, enabling the molecular mechanisms for multiple binding. However, the role of protein disorder in the evolution of interaction networks has been only investigated through the analysis of individual proteins, being impossible to distinguish its specific impact in the (re) shaping of their interaction environments. Now, the availability of large interactomes for several model organisms permits to explore the role of disorder in protein interaction networks not only at the level of the interacting proteins, but of the interactions themselves. By comparing the interactomes of human, fly and yeast, we discovered that, despite being much more abundant, disordered interactions are significantly less conserved than their ordered counterparts. Furthermore, our analyses provide evidence that this happens not only because disordered proteins are less conserved, but also because they display a higher capacity to rewire their interaction neighborhood through evolution. Overall, our results support the hypothesis that conservation of disorder gives a clear evolutionary advantage, facilitating the change of interaction partners during evolution. Moreover, this mechanism is not exclusive of a few anecdotal cases but a global feature present in the interactome networks of entire organisms. 
+ER  -
+TY  - JOUR
+C8  - LabMember
+A1  - Pache, Roland A.
+A1  - Céol, Arnaud
+A1  - Aloy, Patrick
+T1  - NetAligner—a network alignment server to compare complexes, pathways and whole interactomes 
+Y1  - 2012/05/22 
+JF  - Nucleic Acids Research 
+JO  - Nucleic Acids Research 
+N1  - doi: 10.1093/nar/gks446 
+UR  - http://nar.oxfordjournals.org/content/early/2012/05/22/nar.gks446.abstract 
+N2  - The many ongoing genome sequencing initiatives are delivering comprehensive lists of the individual molecular components present in an organism, but these reveal little about how they work together. Follow-up initiatives are revealing thousands of interrelationships between gene products that need to be analyzed with novel bioinformatics approaches able to capture their complex emerging properties. Recently, we developed NetAligner, a novel network alignment tool that allows the identification of conserved protein complexes and pathways across organisms, providing valuable hints as to how those interaction networks evolved. NetAligner includes the prediction of likely conserved interactions, based on evolutionary distances, to counter the high number of missing interactions in current interactome networks, and a fast assessment of the statistical significance of individual alignment solutions, which increases its performance with respect to existing tools. The web server implementation of the NetAligner algorithm presented here features complex, pathway and interactome to interactome alignments for seven model organisms, namely Homo sapiens, Mus musculus, Drosophila melanogaster, Caenorhabditis elegans, Arabidopsis thaliana, Saccharomyces cerevisiae and Escherichia coli. The user can query complexes and pathways of arbitrary topology against a target species interactome, or directly compare two complete interactomes to identify conserved complexes and subnetworks. Alignment solutions can be downloaded or directly visualized in the browser. The NetAligner web server is publicly available at http://netaligner.irbbarcelona.org/. 
+ER  -
+TY  - JOUR
+C8  - LabMember
 AU  - Sardon, Teresa
 AU  - Pache, Roland A.
 AU  - Stein, Amelie
@@ -2391,34 +2475,66 @@ IS  - 6
 ER  - 
 TY  - JOUR
 C8  - LabMember
+T1  - Domain Swapping Proceeds via Complete Unfolding: A 19F- and 1H-NMR Study of the Cyanovirin-N Protein
+AU  - Liu, Lin
+AU  - Byeon, In-Ja L.
+AU  - Bahar, Ivet
+AU  - Gronenborn, Angela M.
+Y1  - 2012/02/01
+PY  - 2012
+DA  - 2012/03/07
+N1  - doi: 10.1021/ja210118w
+DO  - 10.1021/ja210118w
+T2  - Journal of the American Chemical Society
+JF  - Journal of the American Chemical Society
+JO  - Journal of the American Chemical Society
+SP  - 4229
+EP  - 4235
+VL  - 134
+IS  - 9
+PB  - American Chemical Society
+SN  - 0002-7863
+M3  - doi: 10.1021/ja210118w
+UR  - http://dx.doi.org/10.1021/ja210118w
+Y2  - 2012/06/08
+ER  -
+TY  - JOUR
+C8  - LabMember
 A1  - Liu, Lin
 A1  - Gronenborn, Angela M.
 A1  - Bahar, Ivet
 T1  - Longer simulations sample larger subspaces of conformations while maintaining robust mechanisms of motion
 JF  - Proteins: Structure, Function, and Bioinformatics
 JA  - Proteins
+VL  - 80
+IS  - 2
 PB  - Wiley Subscription Services, Inc., A Wiley Company
 SN  - 1097-0134
 UR  - http://dx.doi.org/10.1002/prot.23225
 M3  - doi: 10.1002/prot.23225
-SP  - n/a
-EP  - n/a
+SP  - 616
+EP  - 625
 KW  - structure-encoded dynamics
 KW  - molecular dynamics simulations
 KW  - power law
 KW  - global motions
 KW  - equilibrium fluctuations of cyanovirin-N
-Y1  - 2011
+Y1  - 2012
 ER  - 
 TY  - CHAP
 C8  - LabMember
 AU  - Liu, Lin
 AU  - Gronenborn, Angela M.
-T1  - Domain swapping in proteins
+T1  - Protein and Nucleic Acid Folding: Domain Swapping in Proteins
+VL  - 3
+SP  - 148
+EP  - 169
+T2  - The Folding of Proteins and Nucleic Acids
 A2  - Egelman, Edward
 BT  - Comprehensive Biophysics
 PB  - Elsevier
 PY  - 2012
+Y1  - 2012/05/17
 UR  - http://www.elsevierdirect.com/ISBN/9780123749208/
 ER  -
 TY  - JOUR
@@ -2755,4 +2871,4 @@ KW  - Oligochaete
 KW  - Sublethal
 KW  - Behavior
 KW  - Electrophysiology
-ER  - 
+ER  -
