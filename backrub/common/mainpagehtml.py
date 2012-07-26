@@ -146,21 +146,7 @@ leftpane = '''
               <tr valign="top"> 
                 <td style="width:0px">  
                 <td style="width:228px">
-                  <span class="lpanel"><a href="http://www.ucsf.edu/ccb/">Graduate Program in Chemistry and Chemical Biology (CCB)</a></span> 
-              <tr valign="top"> 
-                <td style="width:0px">  
-                <td style="width:228px">
-                  <span class="lpanel"><a href="http://www.ucsf.edu/dbps/pspg.html">Graduate Program in Pharmaceutical Sciences and Pharmacogenomics (PSPG)</a></span>
-              <tr valign="top">
-                <td style="width:0px">  
-                <td style="width:228px">
-                  <span class="lpanel"><a href="http://ncmi.bcm.tmc.edu/nanomedicine">NIH Center for Protein Folding Machinery</a></span>
-                </td>
-              <tr valign="top">
-                <td style="width:0px">  
-                <td style="width:228px">
-                  <span class="lpanel"><a href="http://qb3.org/cpl">NIH Center on &quot;Engineering Cellular Control: Synthetic Signaling and Motility Systems&quot;</a></span>
-                </td>
+                  <span class="lpanel"><a href="http://ccb.ucsf.edu/">Graduate Program in Chemistry and Chemical Biology (CCB)</a></span> 
               <tr valign="top">
                 <td style="width:0px">  
                 <td style="width:228px">
@@ -179,7 +165,7 @@ leftpane = '''
                   <span class="lpanel">
                     1700 4th Street, Byers Hall 308E<br>
                     UCSF MC 2530<br>
-                    San Francisco, CA 94143-2540 <br>
+                    San Francisco, CA 94143-2530 <br>
                     (CA 94158 for courier delivery)<br>
                     301 (computational lab)<br>
                     309 (experimental lab)<br>
