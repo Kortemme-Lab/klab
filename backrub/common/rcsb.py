@@ -19,6 +19,7 @@ visible_colors = [
 	]
 
 def getPDB(pdbID):
+	colortext.printf("Retrieving PDB file", color = "aqua")
 	c = HTTPConnection("www.rcsb.org")
 	c.request("GET", "/pdb/files/%s.pdb" % pdbID)
 	response = c.getresponse()
@@ -29,6 +30,7 @@ def getPDB(pdbID):
 	return contents
 
 def getFASTA(pdbID):
+	colortext.printf("Retrieving FASTA file", color = "aqua")
 	c = HTTPConnection("www.rcsb.org")
 	c.request("GET", "/pdb/files/fasta.txt?structureIdList=%s" % pdbID)
 	response = c.getresponse()
@@ -139,7 +141,6 @@ class FASTA(dict):
 				
 		return join(s, "\n")
 	
-
 def parseFASTAs(fasta_list, printthis = False):
 	if type(fasta_list) == type(""):
 		fasta_list = [fasta_list]
