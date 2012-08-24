@@ -149,13 +149,13 @@ class DatabaseInterface(object):
 					errcode = cursor.execute(sql, parameters)
 				else:
 					errcode = cursor.execute(sql)
+				self.lastrowid = int(cursor.lastrowid)
 				if self.isInnoDB:
 					self.connection.commit()
 				results = cursor.fetchall()
 				if locked:
 					cursor.execute(self.unlockstring)
 					self.locked = False
-				self.lastrowid = int(cursor.lastrowid)
 				cursor.close()
 				self._close_connection()
 				return results
