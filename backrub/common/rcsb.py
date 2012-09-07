@@ -29,7 +29,12 @@ def getPDB(pdbID):
 		raise Exception("Error retrieving %s." % filename)
 	return contents
 
-def getFASTA(pdbID):
+def getFASTA(pdbID, database_ref = None, database_table = None, database_field = None, database_IDfield = None):
+	if database_ref and database_table and database_field and database_IDfield:
+		results = database_ref.execute(("SELECT %s FROM %s WHERE %s=" % (database_field, database_table, database_IDfield)) + "%s", parameters = (pdbID,))
+		if results:
+			assert(len(results) == 1)
+			return results[0][database_field] 
 	colortext.printf("Retrieving FASTA file", color = "aqua")
 	c = HTTPConnection("www.rcsb.org")
 	c.request("GET", "/pdb/files/fasta.txt?structureIdList=%s" % pdbID)
@@ -141,7 +146,8 @@ class FASTA(dict):
 				
 		return join(s, "\n")
 	
-def parseFASTAs(fasta_list, printthis = False):
+def parseFASTAs(fasta_list, silent = False, database_ref = None, database_table = None, database_field = None, database_IDfield = None):
+			
 	if type(fasta_list) == type(""):
 		fasta_list = [fasta_list]
 	assert(type(fasta_list) == type([]))
@@ -156,8 +162,9 @@ def parseFASTAs(fasta_list, printthis = False):
 	if allPDBIDs:
 		new_list = []
 		for pdbID in fasta_list:
-			colortext.message("Retrieving %s.fasta." % pdbID)
-			new_list.append(getFASTA(pdbID))
+			if not(silent):
+				colortext.message("Retrieving %s.fasta." % pdbID)
+			new_list.append(getFASTA(pdbID, database_ref = database_ref, database_table = database_table, database_field = database_field, database_IDfield = database_IDfield))
 		fasta_list = new_list
 	
 	fasta = join(fasta_list, "\n")
