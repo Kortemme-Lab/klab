@@ -17,7 +17,8 @@ import md5
 import pickle
 import time
 import re
-
+from time import sleep
+			
 from datetime import datetime
 
 from string import join
@@ -179,6 +180,7 @@ class DatabaseInterface(object):
 				caughte = str(e)
 				traceback.print_exc()
 				break
+			sleep(0.2)
 		
 		if not quiet:
 			sys.stderr.write("\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
