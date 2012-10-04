@@ -88,6 +88,10 @@ class benchmarkClusterScript(ClusterScript):
 		self.script = None
 		self.taskparameters = taskparameters
 
+	def getDatabaseDir(self):
+		return os.path.join(self.databasedir, "rosetta_database")
+
+
 	def _addPreamble(self):
 
 		self.contents.insert(0, """\
@@ -257,6 +261,10 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 		groupsize = int(round(len(pdblist) / 10.0))
 		pdbsublists = [pdblist[i:i+groupsize] for i in range(0, len(pdblist), groupsize)]
 		
+		PDBIDs = None
+		if parameters["BenchmarkOptions"]["PDBsToBenchmark"]:
+			PDBIDs = [pdbID.strip() for pdbID in parameters["BenchmarkOptions"]["PDBsToBenchmark"].split(",")]
+		
 		for sublist in pdbsublists:
 			previousKICTask = None
 			#previousPDB_prefix = None
@@ -264,26 +272,26 @@ class KICBenchmarkJob(GenericBenchmarkJob):
 				input_pdb = os.path.join(StartingStructuresDirectory, item)
 				self.pdblist.append(input_pdb)
 				pdb_prefix = item.split('.pdb')[0].split('_')[0]
-				
-				#check for existence of corresponding loop file
-				loop_file = os.path.join(LoopsInputDirectory, '%s.loop' % pdb_prefix)
-				if not os.path.isfile(loop_file):
-					errormsg = 'ERROR: loop file of %s not found in %s' % (item, LoopsInputDirectory)
-					self._status(errormsg)
-					raise Exception(errormsg)
-		
-				taskdir = self._make_taskdir(pdb_prefix)
-				targetdir = os.path.join(self.targetdirectory, pdb_prefix)
-				# The task indexing in ClusterTask is 1-based. NumberOfModelsOffset is 0-based so add 1.
-				kicTask = KICBenchmarkTask(taskdir, targetdir, self.parameters, self.benchmarksettings, input_pdb, loop_file, pdb_prefix, self.parameters["BenchmarkOptions"]["NumberOfModelsPerPDB"], self.parameters["BenchmarkOptions"]["NumberOfModelsOffset"] + 1, name=self.name)
-				if previousKICTask:
-					kicTask.addPrerequisite(previousKICTask, [])
-				else:
-					scheduler.addInitialTasks(kicTask)
-				previousKICTask = kicTask
-				#previousPDB_prefix = pdb_prefix
-				if parameters["RunLength"] == 'Test':
-					break
+				if not(PDBIDs) or (pdb_prefix in PDBIDs):
+					#check for existence of corresponding loop file
+					loop_file = os.path.join(LoopsInputDirectory, '%s.loop' % pdb_prefix)
+					if not os.path.isfile(loop_file):
+						errormsg = 'ERROR: loop file of %s not found in %s' % (item, LoopsInputDirectory)
+						self._status(errormsg)
+						raise Exception(errormsg)
+			
+					taskdir = self._make_taskdir(pdb_prefix)
+					targetdir = os.path.join(self.targetdirectory, pdb_prefix)
+					# The task indexing in ClusterTask is 1-based. NumberOfModelsOffset is 0-based so add 1.
+					kicTask = KICBenchmarkTask(taskdir, targetdir, self.parameters, self.benchmarksettings, input_pdb, loop_file, pdb_prefix, self.parameters["BenchmarkOptions"]["NumberOfModelsPerPDB"], self.parameters["BenchmarkOptions"]["NumberOfModelsOffset"] + 1, name=self.name)
+					if previousKICTask:
+						kicTask.addPrerequisite(previousKICTask, [])
+					else:
+						scheduler.addInitialTasks(kicTask)
+					previousKICTask = kicTask
+					#previousPDB_prefix = pdb_prefix
+					if parameters["RunLength"] == 'Test':
+						break
 			#if parameters["RunLength"] == 'Test':
 			#	break
 				
