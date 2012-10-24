@@ -19,6 +19,7 @@ from string import join, strip
 from conf_daemon import *
 from datetime import datetime
 from statusprinter import StatusPrinter
+import rosettahelper
 
 DEBUG = False
 
@@ -144,10 +145,6 @@ class SGEConnection(StatusPrinter):
 		if DEBUG:
 			return 1
 	
-		# Open streams
-		file_stdout = open(command_filename + ".temp.out", 'w')
-		file_stderr = open(command_filename + ".temp.out", 'w')
-			
 		# Form command
 		command = ['qsub']
 		if name:
@@ -170,21 +167,21 @@ class SGEConnection(StatusPrinter):
 		# Submit the job and capture output.
 		numTries = 5
 		for i in range(1, numTries + 1):
+			# Open streams
+			filenm_stdout = command_filename + ".temp.out"
+			
+			file_stdout = open(filenm_stdout, 'w')
 			try:
-				subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stderr, cwd=workingdir)
+				#print("Trying qsub command: Call #%d" % i)
+				subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stdout, cwd=workingdir)
 			except Exception, e:
 				self._status('Failed running qsub command: %s in cwd %s' % (command, workingdir))
 				raise
-			
 			waitfor = 0
 			errorcode = subp.wait()
-	
 			file_stdout.close()
-			file_stdout = open(command_filename + ".temp.out", 'r')
-			output = strip(file_stdout.read())
-			file_stdout.close()
-			file_stderr.close()
-	
+			output = strip(rosettahelper.readFile(filenm_stdout))
+			
 			if errorcode != 0:
 				if i == numTries:
 					self._status('Failed running qsub command: %s in cwd %s. Return code=%d.' % (command, workingdir, errorcode))
@@ -197,6 +194,7 @@ class SGEConnection(StatusPrinter):
 					self._status('qsub command failed: %s in cwd %s. Return code=%d. Retrying...' % (command, workingdir, errorcode))
 					time.sleep(60)
 			else:
+				#print("qsub command succeeded on call #%d" % i)
 				break
 			
 		# Match job id
