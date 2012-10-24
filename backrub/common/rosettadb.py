@@ -252,7 +252,7 @@ class DatabaseInterface(object):
 		while i < self.numTries:
 			i += 1
 			try:
-				assert(not(self.connection))
+				assert(not(self.connection) or not(self.connection.open))
 				self._get_connection(cursorClass)
 				cursor = self.connection.cursor()
 				if type(parameters) != type(()):
@@ -261,6 +261,7 @@ class DatabaseInterface(object):
 				results = cursor.fetchall()
 				self.lastrowid = int(cursor.lastrowid)
 				cursor.close()
+				self._close_connection()
 				return results
 			except MySQLdb.OperationalError, e:
 				self._close_connection()
