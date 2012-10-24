@@ -98,9 +98,9 @@ class KICDaemon(RosettaDaemon):
 			self.KICSettings = KICSettings(sys.argv, os.environ['SCRIPT_NAME'])
 		self.log("KIC Benchmark daemon")
 		
-		self.BenchmarkMap = {"KIC" : jobs.KICBenchmarkJob}
+		self.BenchmarkMap = {"KIC" : jobs.KICBenchmarkJob, "NGK" : jobs.KICBenchmarkJob}
 		#self.BenchmarkMap = {"KIC" : jobs.KICBenchmarkJobAnalyzer}
-		self.BenchmarkSettings = {"KIC" : self.KICSettings}
+		self.BenchmarkSettings = {"KIC" : self.KICSettings, "NGK" : self.KICSettings}
 		
 		# Maintain a list of recent DB jobs started. This is to avoid any logical errors which 
 		# would repeatedly start a job and spam the cluster. This should never happen but let's be cautious. 
