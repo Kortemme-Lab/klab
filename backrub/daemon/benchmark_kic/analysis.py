@@ -10,6 +10,7 @@ import shutil
 import reports.statsfns as statsfns
 import rosettahelper
 from string import join
+import latex
 
 class BenchmarkReport(object):
 	def __init__(self, outdir, reportsettings, quiet = False, html = False):

@@ -123,7 +123,7 @@ def webstatsSuccessFailure(stats):
 	fnname = "drawStatsSuccessFailure"
 	chartsfns = [fnname]
 		
-	mkeys = sorted(stats.keys())[-12:]
+	mkeys = sorted(stats.keys())[:]
 	c = len(mkeys)
 	html.append('''
 	<script type="text/javascript">
@@ -141,14 +141,14 @@ def webstatsSuccessFailure(stats):
 		for k in mkeys:
 			v = stats[k]
 			key = map(int, k.split("-"))
-			dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+			dt = ("%s %d" % (calendar.month_abbr[key[1]], key[0]))
 			html.append('''["%s", %d, %d],''' % (dt, v.get("failed", 0), v.get("successful", 0))) 
 		html.append(''']);
 		
 		// Instantiate and draw our chart, passing in some options.
 		var chart = new google.visualization.ColumnChart(document.getElementById('webstatsSuccessFailureChart'));
 		seriesstyle = {0:{color: 'red'}, 1:{color: 'green'}}
-		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle});
+		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle, hAxis:{slantedText:true,slantedTextAngle:60}});
 		''')
 	html.append('''
 	}
@@ -175,7 +175,7 @@ def webstatsJobsByProtocol(stats):
 		saturateHexColor(protocolGroups[2].color, 2),
 		saturateHexColor(protocolGroups[2].color, 3.5)
 	]
-	mkeys = sorted(stats.keys())[-12:]
+	mkeys = sorted(stats.keys())[:]
 	c = len(mkeys)
 	html.append('''
 	<script type="text/javascript">
@@ -195,7 +195,7 @@ def webstatsJobsByProtocol(stats):
 		for k in mkeys:
 			v = stats[k]
 			key = map(int, k.split("-"))
-			dt = ("%s %d" % (calendar.month_name[key[1]], key[0]))
+			dt = ("%s %d" % (calendar.month_abbr[key[1]], key[0]))
 			html.append('''["%s", ''' % dt)
 			for p in protocols:
 				html.append('''%d,''' % v.get(p, 0))
@@ -209,7 +209,7 @@ def webstatsJobsByProtocol(stats):
 		for i in range(len(seriesColors)):
 			html.append('''%d:{color: '%s'}, ''' % (i, seriesColors[i]))
 		html.append('''}
-		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle});''')
+		chart.draw(data, {width: 800, height: 360, isStacked:true, series:seriesstyle, hAxis:{slantedText:true,slantedTextAngle:60}});''')
 	html.append('''
 	}
 	</script>
@@ -235,7 +235,7 @@ def webstatsJobsByProtocolCumulative(stats):
 		saturateHexColor(protocolGroups[2].color, 3.5)
 	]
 	# mkeys are the months of the years
-	mkeys = sorted(stats.keys())[-12:]
+	mkeys = sorted(stats.keys())[:]
 	c = len(mkeys)
 	html.append('''
 	<script type="text/javascript">

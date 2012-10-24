@@ -73,6 +73,41 @@ function validate()
 				success = false;
 			}
 		}
+		else if (benchmarkoption['Type'] == 'string' && benchmarkoption['OptionName'] == 'PDBsToBenchmark')
+		{
+			allowedPDBIDs = {};
+			if (benchmarkName == "KIC" || benchmarkName == "NGK")
+			{
+				allowedPDBIDs = {
+					'1a8d' : true, '1cnv' : true, '1ede' : true, '1ms9' : true, '1pbe' : true, '1thg' : true, '2ebn' : true, '3cla' : true, '1arb' : true,
+					'1cs6' : true, '1exm' : true, '1msc' : true, '1qlw' : true, '1thw' : true, '2exo' : true, '3hsc' : true, '1bhe' : true, '1cyo' : true,
+					'1ezm' : true, '1my7' : true, '1rro' : true, '1tib' : true, '2pia' : true, '4i1b' : true, '1bn8' : true, '1dqz' : true, '1f46' : true,
+					'1onc' : true, '1srp' : true, '1tml' : true, '2rn2' : true, '1c5e' : true, '1dts' : true, '1i7p' : true, '1oth' : true, '1t1d' : true,
+					'1xif' : true, '2sil' : true, '1cb0' : true, '1eco' : true, '1m3s' : true, '1oyc' : true, '1tca' : true, '2cpl' : true, '2tgi' : true
+				};
+			}
+			formelement = subform.elements['Benchmark' + benchmarkName + 'Option' + benchmarkoption['OptionName']];
+			
+			failedPDBIDs = new Array();
+			passedPDBIDs = formelement.value.split(',');
+			for (j = 0; j < passedPDBIDs.length; j++)
+			{
+				formPDBID = passedPDBIDs[j].toLowerCase().replace(/^\s+|\s+$/g, '');
+				if (formPDBID != "")
+				{
+					if (!allowedPDBIDs[passedPDBIDs[j].toLowerCase().replace(/^\s+|\s+$/g, '')])
+					{
+						failedPDBIDs.push(passedPDBIDs[j]);
+					}
+				}
+			}
+			if (failedPDBIDs.length > 0)
+			{
+				alert('The following PDB IDs are not valid for the ' + benchmarkName + ' benchmark: "' + failedPDBIDs.join('", "') + '".')
+				markError(formelement);
+				success = false;
+			}
+		}
 		else
 		{
 			alert("The type '" + benchmarkoption['Type'] + "' of " + benchmarkoption['OptionName'] + " is not handled yet. Get the admin to write a JavaScript validator.")
@@ -198,7 +233,56 @@ function ChangedRevision()
 	}
 	UpdateOptionsAndCommandLineForRevision();
 }
-
+function AddEmail(email_address)
+{
+	try
+	{
+		var subform = document.benchmarkoptionsform;
+		emailAddressElement = subform.elements['BenchmarkNotificationEmailAddresses'];
+		currentEmailAddresses = emailAddressElement.value;
+		if (!validateEmailAddress(emailAddressElement, true, true))
+		{
+			alert("Existing email addresses are invalid. Cannot add a new one.")
+			return;
+		}
+		if (currentEmailAddresses.indexOf(email_address) == -1)
+		{
+			if (currentEmailAddresses.replace(/^\s+|\s+$/g, '') == "")
+			{
+				emailAddressElement.value = email_address;
+			}
+			else
+			{
+				emailAddressElement.value += ", " + email_address;
+			}
+		}
+		else
+		{
+			if (false && currentEmailAddresses.replace(/^\s+|\s+$/g, '') == email_address)
+			{
+				emailAddressElement.value = "";
+			}
+			else
+			{
+				new_addresses = []
+				existingAddresses = emailAddressElement.value.split(",")
+				for (i = 0; i < existingAddresses.length; i++)
+				{
+					existingAddress = existingAddresses[i].replace(/^\s+|\s+$/g, '');
+					if (existingAddress != email_address)
+					{
+						new_addresses.push(existingAddress)
+					}
+				}
+				emailAddressElement.value = new_addresses.join(", ")
+			}
+		}
+	}
+	catch(err)
+	{
+		alert(err)
+	}
+}
 function ChangeBenchmark()
 {
 	//Select the database of the corresponding Rosetta revision if it exists
@@ -214,9 +298,11 @@ function ChangeBenchmark()
 		binary_revision = binary_revisions[i];
 		revisionSelector.options[revisionSelector.options.length] = new Option(binary_revision, binary_revision);
 	}
-	revisionSelector.options[0].selected = true;
-	
-	ChangedRevision();		
+	if (revisionSelector.options.length > 0)
+	{
+		revisionSelector.options[0].selected = true;
+		ChangedRevision();
+	}
 	
 	fadefx = { duration: 0.0, queue: { position: '0', scope: 'task' } }
 	if (document.getElementsByClassName == undefined)
@@ -242,7 +328,7 @@ function ChangeBenchmark()
 			new Effect.Appear(optionfields[i], fadefx);
 		}
 	}
-			
+	
 	x = revisionSelector.value;
 	dbrevisionoptions = subform.elements['BenchmarkRosettaDBRevision'].options
 	for (i = 0; i < dbrevisionoptions.length; i++)
@@ -256,13 +342,14 @@ function ChangeBenchmark()
 	
 	document.getElementById('benchmarkseparator').style.color = benchmarks[benchmarkName]['color'];
 	subform.elements['BenchmarkRunLength'].value = 'Normal';
+	subform.elements['BenchmarkMemoryRequirement'].value = JSON.parse(benchmarks[benchmarkName]["MemoryRequirementsInGB"])["normal"];
 	ChangedRunLength();
 }
 
 defaultWalltimes = {
 	'Test' : {'Days' : 0, 'Hours' : 6, 'Minutes' : 0},
 	'Normal' : {'Days' : 7, 'Hours' : 0, 'Minutes' : 0},
-	'Long' : {'Days' : 14, 'Hours' : 0, 'Minutes' : 0},
+	'Long' : {'Days' : 14, 'Hours' : 0, 'Minutes' : 0}
 };
 
 function ChangedRunLength()

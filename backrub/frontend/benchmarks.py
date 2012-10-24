@@ -257,7 +257,9 @@ def setupBenchmarkOptions(benchmarks):
 	for b in benchmarks.keys():
 		for option in benchmarks[b]['options']:
 			for k, v in option.iteritems():
-				if v == None:
+				if option['Type'] == 'string' and v == None:
+					option[k] = ''
+				elif v == None:
 					option[k] = 'null'
 				elif type(v) == type(1L):
 					if v < 2^31:
@@ -290,11 +292,16 @@ def getRunParameters(form, benchmark_details):
 		
 	runoptions = {}
 	for option in benchmarks[benchmark]['options']:
-		val = form[option['FormElement']].value
-		if option["Type"] == 'int':
-			runoptions[option['OptionName']] = int(val)
+		if form.has_key(option['FormElement']):
+			val = form[option['FormElement']].value
+			if option["Type"] == 'int':
+				runoptions[option['OptionName']] = int(val)
+			elif option["Type"] == 'string':
+				runoptions[option['OptionName']] = val.strip()
+			else:
+				raise Exception("Unhandled benchmark option type '%s'. New code needs to be written to handle this case." % option["Type"])
 		else:
-			raise Exception("Unhandled benchmark option type '%s'. New code needs to be written to handle this case." % option["Type"])
+			runoptions[option['OptionName']] = None
 	emailList = None
 	if form.has_key('BenchmarkNotificationEmailAddresses'):
 		emailList = form['BenchmarkNotificationEmailAddresses'].value
@@ -340,6 +347,8 @@ def generateSingleRunReport(form, BenchmarksDB):
 		
 	if benchmarkRunSettings["BenchmarkID"] == "KIC":
 		return generateKICSingleRunReport(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, optionReplacementPatterns)
+	if benchmarkRunSettings["BenchmarkID"] == "NGT":
+		return generateKICSingleRunReport(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, optionReplacementPatterns)
 
 def generateComparisonReport(form, BenchmarksDB):
 	Benchmark1RunID = form['Benchmark1ID'].value
@@ -352,7 +361,7 @@ def generateComparisonReport(form, BenchmarksDB):
 	if form.has_key('Benchmark1Name'):
 		Benchmark1Name = form['Benchmark1Name'].value
 	benchmark1RunSettings["BenchmarkDescription"] = Benchmark1Name
-	 
+	
 	Benchmark2Name = "Benchmark 2"
 	if form.has_key('Benchmark2Name'):
 		Benchmark2Name = form['Benchmark2Name'].value
@@ -366,9 +375,10 @@ def generateComparisonReport(form, BenchmarksDB):
 	
 	if benchmark1RunSettings["BenchmarkID"] == "KIC":
 		return generateKICComparisonReport(form, BenchmarksDB, benchmark1RunSettings, benchmark1options, benchmark2RunSettings, benchmark2options, optionReplacementPatterns1)
-
+	if benchmark1RunSettings["BenchmarkID"] == "NGT":
+		return generateKICComparisonReport(form, BenchmarksDB, benchmark1RunSettings, benchmark1options, benchmark2RunSettings, benchmark2options, optionReplacementPatterns1)
+	
 def getFlatfileAndSetOptions(form, BenchmarksDB, benchmarkRunSettings, benchmarkoptions, top_X): 
-	flatfile = None
 	results = BenchmarksDB.execute('SELECT File FROM BenchmarkRunOutputFile INNER JOIN BenchmarkRun ON BenchmarkRunID=BenchmarkRun.ID WHERE BenchmarkRunID=%s AND FileID=1 AND FileType="Flat file"', parameters = (benchmarkRunSettings["ID"], ))
 	assert(len(results) == 1)
 	flatfile = results[0]["File"]
@@ -426,15 +436,6 @@ def generateKICComparisonReport(form, BenchmarksDB, benchmark1RunSettings, bench
 		import traceback
 		raise Exception("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
 	
-	#top_X = min(top_X)
-	#evaluator = KICAnalysis.BenchmarkEvaluator('/backrub/temp/benchmarkdata/', Benchmark1Name, Benchmark2Name, flatfile1, flatfile2, passingFileContents = True, top_X = top_X, quiet = True)
-	#try:
-	#	evaluator.run()
-	#	return evaluator.PDF 
-	#except Exception, e:
-	#	import traceback
-	#	print("An error occurred creating the report.<br>Error: '%s'<br>Traceback:<br>%s" % (str(e), traceback.format_exc().replace("\n", "<br>")))
-
 def matchRevisionGroupsToRevisions(benchmark_details):
 	releaseVersionToSVNRevision = {
 		"2.1"	: 8075, 
@@ -504,8 +505,8 @@ def matchRevisionGroupsToRevisions(benchmark_details):
 def generateSubmissionPage(benchmark_details):
 	html = []
 	
-	default_benchmark = "KIC"
-	default_benchmark_revision = 49521
+	default_benchmark = "NGK"
+	default_benchmark_revision = 51608
 	
 	benchmarks = benchmark_details['benchmarks']
 
@@ -607,6 +608,12 @@ def generateSubmissionPage(benchmark_details):
 	html.append('''<td>%s</td></tr>''' % join(rosettadbrevisionselector_html,""))
 	html.append('''<tr><td><div style="width:%(tablewidth)dpx">Notification email list</div></td>''' % vars())
 	html.append('''<td><input type="text" style="width:200px" maxlength="256" name="BenchmarkNotificationEmailAddresses" value=""></td></tr>''')
+	html.append('''<tr><td></td><td>
+						<button onclick="AddEmail('Amelie.Stein@ucsf.edu'); return false;">Amelie</button>
+						<button onclick="AddEmail('Roland.Pache@ucsf.edu'); return false;">Roland</button>
+						<button onclick="AddEmail('Shane.OConnor@ucsf.edu'); return false;">Shane</button>
+						<button onclick="AddEmail('Tanja.Kortemme@ucsf.edu'); return false;">Tanja</button>
+				</td></tr>''')
 	html.append('''</table>''')
 	html.append('''</td></tr>''')
 	html.append('''<tr><td><span id="benchmarkseparator">%s</span></td></tr>''' % ('&#8226; ' * 45))
@@ -627,11 +634,15 @@ def generateSubmissionPage(benchmark_details):
 	html.append('''<tr><td></td><td><div id="BenchmarkCustomSettingsMessage" style="display:none;">The parameters in the first box are fixed as they are interpreted by benchmark's Python class in the scheduler.</div></td></tr>''')
 	html.append('''<tr><td></td><td><textarea style="display:none;" readonly="readonly" name="BenchmarkCommandLine_1" rows="1" cols="1"></textarea></td></tr>''')
 	html.append('''<tr><td></td><td><textarea style="display:none;" name="BenchmarkCommandLine_2" rows="1" cols="1"></textarea></td></tr>''')
+	
 	for benchmark in benchmark_names:
 		for option in benchmarks[benchmark]['options']:
 			if option["Type"] == 'int':
 				html.append('''<tr class="benchmark_%(benchmark)s_options" style="display:none;"><td><div style="width:%(tablewidth)dpx">''' % vars())
 				html.append('''%(Description)s</div></td><td><input type="text" style="width:75px" maxlength=8 name="%(FormElement)s" value="%(NormalRunValue)s"></td></tr>''' % option)
+			elif option["Type"] == 'string':
+				html.append('''<tr class="benchmark_%(benchmark)s_options" style="display:none;"><td><div style="width:%(tablewidth)dpx">''' % vars())
+				html.append('''%(Description)s</div></td><td><input type="text" style="width:75px" name="%(FormElement)s" value="%(NormalRunValue)s"></td></tr>''' % option)
 			else:
 				raise Exception("Unhandled benchmark option type '%s'. New code needs to be written to handle this case." % option["Type"])
 	html.append('''</table>''')
@@ -780,7 +791,7 @@ def generateReportPage(benchmark_details):
 	html.append("<tr style='background-color:#dddddd'>")
 	html.append("<th>ID</th><th>Benchmark</th><th>Length</th><th>Status</th><th>Revision</th><th>DB Revision</th><th style='width:100px;'>Command line</th><th>Benchmark Options</th><th>Run time</th><th>Errors</th><th>Report</th><th colspan=2>Compare</th>")
 	html.append("</tr>")
-	for run in benchmark_details['BenchmarkRuns']:
+	for run in reversed(benchmark_details['BenchmarkRuns']):
 		benchmark_color = benchmark_details['benchmarks'][run['BenchmarkID']]['color']
 		html.append("<tr style='background-color:%s'>" % benchmark_color)
 		html.append("<td>%(ID)d</td>" % run)
@@ -890,7 +901,7 @@ def generateBenchmarksPage(settings_, rosettahtml, form, benchmark_details):
 		benchmarkspage = form["BenchmarksPage"].value
 	
 	benchmarks = benchmark_details['benchmarks']
-	if True:
+	if False:
 		# For testing Javascript on multiple benchmarks
 		benchmarks['backrub'] = {}
 		benchmarks['backrub']['BinaryName'] = 'backrub'
@@ -915,7 +926,7 @@ def generateBenchmarksPage(settings_, rosettahtml, form, benchmark_details):
 	
 	# Set generate to False to hide pages for quicker testing
 	subpages = [
-		{"name" : "submission",	"desc" : "Submit",			"fn" : generateSubmissionPage,	"generate" :True,	"params" : [benchmark_details]},
+		{"name" : "submission",	"desc" : "Create new run",			"fn" : generateSubmissionPage,	"generate" :True,	"params" : [benchmark_details]},
 		{"name" : "report",		"desc" : "View reports",	"fn" : generateReportPage,		"generate" :True,	"params" : [benchmark_details]},
 		{"name" : "binaries",	"desc" : "Build binaries",	"fn" : generateBinaryBuilderPage,"generate" :True,	"params" : []},
 		]

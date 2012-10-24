@@ -287,7 +287,8 @@ plot "'''+outfile_name+'''" index 0 using ($1):($2) with lines smooth bezier ls 
 		
 		commandLine = benchmarkRunSettings['RosettaCommandLine']
 		for Option, d in benchmarkRunSettings['OptionReplacementPatterns'].iteritems():
-			commandLine = re.sub("%%[(]%s[)]\w" % d['Pattern'], str(benchmarkRunSettings['Options'][Option]), commandLine)
+			if benchmarkRunSettings['Options'].get(Option):	# todo: remove later - should not be necessary unless items missing from dict
+				commandLine = re.sub("%%[(]%s[)]\w" % d['Pattern'], str(benchmarkRunSettings['Options'][Option]), commandLine)
 		benchmarkRunSettings['RosettaSplitCommandLine'] = statsfns.breakCommandLine(commandLine) 
 		benchmarkRunSettings['BenchmarkNumber'] = BenchmarkNumber
 		
