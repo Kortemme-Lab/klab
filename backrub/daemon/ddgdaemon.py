@@ -8,9 +8,9 @@ import pickle
 import shutil
 import zipfile
 import traceback
-sys.path.insert(0, "../common/")
 #sys.path.insert(1, "cluster")
 from rosetta_daemon import RosettaDaemon
+sys.path.insert(0, "/clustertest/")
 import ddglib.ddgdbapi as ddgdbapi
 from rosettahelper import * #RosettaError, get_files, grep, make755Directory, makeTemp755Directory
 from RosettaProtocols import *
@@ -23,12 +23,10 @@ from statusprinter import StatusPrinter
 import ddG
 from ddG.protocols import *
 
-dbfields = ddgdbapi.FieldNames()
 class ddGDaemon(RosettaDaemon):
-	#todo: daemon adds self.parameters[dbfields.ExtraParameters] to dict
 		
-	MaxBatchSize	= 30
-	MaxClusterJobs	= 270
+	MaxBatchSize	= 40
+	MaxClusterJobs	= 600
 	logfname		= "ddGDaemon.log"
 	pidfile			= settings["ddGPID"]
 	
@@ -52,7 +50,8 @@ class ddGDaemon(RosettaDaemon):
 			make755Directory(cluster_temp)
 		
 	def __del__(self):
-		self.DBConnection.close()
+		pass
+		#self.DBConnection.close()
 		
 	def configure(self):
 		passwd = None
@@ -156,6 +155,8 @@ class ddGDaemon(RosettaDaemon):
 			_exception = str(_exception)
 			self.log(_traceback, error = True)
 			self.log(_exception, error = True)
+			self.log("clusterjob is %s" % str(clusterjob))
+			self.log("self.JobsToDBIds.get(clusterjob) = %s" % str(self.JobsToDBIds.get(clusterjob)))
 			self.runSQL('''UPDATE Prediction SET Status='failed', Errors=%s, EndDate=NOW() ''' + ('WHERE ID IN (%s)' % self.JobsToDBIds[clusterjob]), parameters = ("%s. %s. %s. %s." % (timestamp, errormsg, str(_traceback), str(_exception))))
 		else:
 			print("FAILED")
@@ -291,7 +292,7 @@ class ddGDaemon(RosettaDaemon):
 			
 		if numRunningJobs < self.MaxClusterJobs:
 			batches = {}
-			results = self.runSQL(("SELECT %(Prediction)s.%(ID)s as ID, %(Prediction)s.%(PredictionSet)s as PredictionSet, %(Experiment)s.%(ID)s as ExperimentID, %(Experiment)s.%(Structure)s as PDB_ID, %(ResidueMapping)s, %(StrippedPDB)s, %(InputFiles)s, %(CryptID)s, %(Protocol)s.%(ID)s AS ProtocolID, %(Protocol)s.%(Description)s AS Description FROM %(Prediction)s INNER JOIN %(Protocol)s ON %(Prediction)s.%(ProtocolID)s=%(Protocol)s.%(ID)s INNER JOIN %(Experiment)s ON %(Prediction)s.%(ExperimentID)s=%(Experiment)s.%(ID)s WHERE %(Prediction)s.%(Status)s='%(queued)s' ORDER BY %(ProtocolID)s, %(EntryDate)s" % dbfields) + (" LIMIT %d" % MaxBatchSize))
+			results = self.runSQL("SELECT Prediction.ID as ID, Prediction.PredictionSet as PredictionSet, Experiment.ID as ExperimentID, Experiment.Structure as PDB_ID, ResidueMapping, StrippedPDB, InputFiles, CryptID, Protocol.ID AS ProtocolID, Protocol.Description AS Description FROM Prediction INNER JOIN Protocol ON Prediction.ProtocolID=Protocol.ID INNER JOIN Experiment ON Prediction.ExperimentID=Experiment.ID WHERE Prediction.Status='queued' ORDER BY ProtocolID, EntryDate LIMIT %d" % MaxBatchSize)
 			try:
 				jobID = None
 				if len(results) != 0:
@@ -366,6 +367,10 @@ class ddGDaemon(RosettaDaemon):
 					if newclusterjob in self.runningJobs:
 						self.runningJobs.remove(newclusterjob)
 				else:
+					import colortext
+					colortext.error(traceback.format_exc())
+					colortext.error(e)
+					colortext.error(jobID)
 					self.recordErrorInJob(None, "Error starting job.", traceback.format_exc(), e, jobID)
 									 
 			self._clusterjobjuststarted = None
@@ -381,7 +386,9 @@ class ddGDaemon(RosettaDaemon):
 			self.log("Start new job ID = %s. %s" % (jobID, batchdetails["jobs"][jobID]["Description"]))
 		
 		jobclass = self.ProtocolMap[protocolID]
+		self.log("Creating job object")
 		clusterjob = jobclass(self.sgec, batchdetails, netappRoot, cluster_temp, dldir)
+		self.log("Finished job object")
 						
 		# clusterjob will not be returned on exception and the reference will be lost
 		self._clusterjobjuststarted = clusterjob 
@@ -390,6 +397,7 @@ class ddGDaemon(RosettaDaemon):
 		destpath = os.path.join(clusterjob.dldir, batchdetails["cryptID"])
 		if os.path.exists(destpath):
 			shutil.rmtree(destpath)
+		self.log("Finished removing files")
 		
 		# Start the job
 		clusterjob.start()

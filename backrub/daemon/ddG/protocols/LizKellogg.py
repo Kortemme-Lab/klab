@@ -13,7 +13,7 @@ import re
 import traceback
 from string import join
 import rosettahelper
-from ddG.jobs import GenericDDGJob, GenericDDGTask, ddgfields
+from ddG.jobs import GenericDDGJob, GenericDDGTask
 from ClusterTask import FAILED_TASK
 
 # Jobs and tasks for specific protocols
@@ -26,7 +26,7 @@ class Protocol16(GenericDDGJob):
 		
 		# Create PDB file
 		pdb_filename = self._workingdir_file_path("%(_FILE_ID)s.pdb" % jobParameters, jobID = jobID)
-		rosettahelper.writeFile(pdb_filename, jobParameters[ddgfields.StrippedPDB])
+		rosettahelper.writeFile(pdb_filename, jobParameters["StrippedPDB"])
 
 		# Create lst
 		lst_filename = self._workingdir_file_path("%(_FILE_ID)s.lst" % jobParameters, jobID = jobID)
@@ -34,7 +34,7 @@ class Protocol16(GenericDDGJob):
 		jobParameters['_CMD']['in:file:l'] = lst_filename
 		
 		# Create resfile
-		resfile = jobParameters[ddgfields.InputFiles].get("RESFILE")
+		resfile = jobParameters["InputFiles"].get("RESFILE")
 		if resfile:
 			res_filename = self._workingdir_file_path("%(_FILE_ID)s.resfile" % jobParameters, jobID = jobID)
 			rosettahelper.writeFile(res_filename, resfile)

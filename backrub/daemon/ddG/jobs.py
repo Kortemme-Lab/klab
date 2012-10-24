@@ -17,7 +17,6 @@ from conf_daemon import *
 from ClusterScheduler import checkGraphReachability, traverseGraph, TaskSchedulerException, SchedulerTaskAddedAfterStartException, BadSchedulerException, TaskCompletionException, SchedulerDeadlockException, SchedulerStartException
 from ClusterScheduler import TaskScheduler, RosettaClusterJob, ClusterBatchJob
 from RosettaTasks import PostProcessingException
-import ddglib.ddgdbapi as ddgdbapi
 from conf_daemon import CLUSTER_maxhoursforjob, CLUSTER_maxminsforjob, clusterRootDir
 import SimpleProfiler
 from ClusterTask import INITIAL_TASK, INACTIVE_TASK, QUEUED_TASK, ACTIVE_TASK, RETIRED_TASK, COMPLETED_TASK, FAILED_TASK, status
@@ -25,7 +24,6 @@ from ClusterTask import ClusterScript, ClusterTask
 from rosettahelper import make755Directory, makeTemp755Directory, writeFile, permissions755, permissions775, normalize_for_bash
 import ddG
 from ddglib.score import ddgTestScore
-ddgfields = ddgdbapi.FieldNames()
 
 # Generic classes
 
@@ -89,7 +87,7 @@ class GenericDDGTask(ClusterTask):
 
 	# additional attributes
 	
-	def __init__(self, workingdir, targetdirectory, jobparameters, taskparameters, name="", prefix = "ddG"):
+	def __init__(self, workingdir, targetdirectory, jobparameters, taskparameters, name="", prefix = "ddG", firsttaskindex = 1):
 		self.prefix = prefix
 		self.taskparameters = taskparameters
 		self.inputs = {}
@@ -121,6 +119,7 @@ class GenericDDGTask(ClusterTask):
 		self.filename = os.path.join(workingdir, scriptfilename)
 		self.cleanedup = False
 		self.name = name or "unnamed"
+		self.firsttaskindex = firsttaskindex
 		self.jobIDs = sorted(jobparameters["jobs"].keys()) # The fact that this is a sorted list is important
 		self.numtasks = len(self.jobIDs)
 		self.outputstreams = []
@@ -202,6 +201,7 @@ class GenericDDGTask(ClusterTask):
 		ct = ddGClusterScript(self.workingdir, self.targetdirectory, self.taskglobals, normalized_inputs, self.numtasks, self.jobIDs)
 		self.script = ct.createScript(commandLines, type="ddG")
 		self.runlength = ct.parameters["maxhours"] * 60 + ct.parameters["maxmins"]
+		self._status("Finished preparing %s" % self.name)
 			
 		return super(GenericDDGTask, self).start(sgec, dbID)
 
@@ -357,6 +357,7 @@ class GenericDDGJob(ClusterBatchJob):
 	def _initialize(self):
 		parameters = self.parameters
 		
+		self._status("initialize start")
 		ProtocolGraph = parameters["ProtocolGraph"]
 		for taskID, taskdetails in ProtocolGraph.iteritems():
 			if taskdetails["ToolVersion"][0] != "r":
@@ -366,7 +367,7 @@ class GenericDDGJob(ClusterBatchJob):
 		
 		for jobid, jobparams in parameters["jobs"].iteritems():
 			jobparams['_CMD'] = {} # This stores task parameters set up by the Job. The keys must have unique names per task if different values are required for each task.
-			jobparams['_FILE_ID'] = "%s-%s" % (jobparams[ddgfields.ExperimentID], jobparams[ddgfields.PDB_ID])
+			jobparams['_FILE_ID'] = "%s-%s" % (jobparams["ExperimentID"], jobparams["PDB_ID"])
 		
 		# Create files
 		self.describe()
@@ -379,9 +380,11 @@ class GenericDDGJob(ClusterBatchJob):
 			raise Exception("An error occurred creating the files for the ddG job %(jobID)s.\n%(estr)s" % vars())
 			
 		# Create tasks from the protocol steps
+		self._status("creating tasks")
 		tasks = {}
 		ProtocolGraph = parameters["ProtocolGraph"]
 		for taskID, taskdetails in ProtocolGraph.iteritems():
+			self._status("taskID: %s" % str(taskID))
 			taskcls = taskdetails["ClassName"] or "GenericDDGTask"
 			#taskcls = taskcls.split(".")[-1] # todo : remove this step later when everything is separated into modules
 			m_parts = taskcls.split(".")
