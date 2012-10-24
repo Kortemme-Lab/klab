@@ -33,6 +33,8 @@ class RosettaHTML(object):
     def __init__(self, server_url, server_title, script_filename, contact_name, download_dir,
                   username='', comment= '', adminWarning=''):
         
+        #comment = '''The Ensemble Design protocol is currently disabled as we are preparing to move it to our computational cluster in early August. Please contact support@kortemmelab.ucsf.edu if you need more information.'''
+        
         # Calls the init function of object (important)
         super(RosettaHTML, self).__init__()
         
@@ -304,9 +306,12 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                             r = self.refs.refsDOIs[ref]
                             refs.append('''<font style="font-size:8pt">[ <a href="%s" style="font-size: 8pt">%s</a> ]</font>''' % (r[1], r[0]))
                             refstr = "<br>%s" % join(refs, "<br>")
-                        
-                    html.append('''<tr><td id="protocolarrow%d_%d" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td>
+                    if True or i != 1 or j != 1:
+                        html.append('''<tr><td id="protocolarrow%d_%d" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td>
                                     <a href="javascript:void(0)" onclick="changeApplication(%d, %d); ">%s</a>%s</td></tr>''' % (i, j, i, j, protocolGroups[i][j].name, refstr))
+                    else:
+                        html.append('''<tr><td id="protocolarrow%d_%d" width="30" style="vertical-align:top; text-align:right;">&#8680;</td><td>
+                                    %s%s</td></tr>''' % (i, j, protocolGroups[i][j].name, refstr))
                 html.append('''</table></div></li>''')            
         
         html.append('''
@@ -1036,18 +1041,26 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         dir_results = ospathjoin(self.download_dir, cryptID)
         if os.path.exists( dir_results ):
             list_files = os.listdir( dir_results )
-            
             # Add the original PDB at the beginning of the list
             list_pdb_files = [input_filename]
             if self.lowest_structs != []:
                 rootname = input_filename[0:input_filename.rfind(".")]
-                for x in self.lowest_structs:
-                    id = x[0]
-                    if parameters['Mini'] == 'classic':  
+                if parameters['Mini'] == 'classic' and parameters['task'] == 'no_mutation':  
+                    for x in self.lowest_structs:
+                        id = x[0]
                         lowfile = "BR%slow_%s.pdb" % (rootname, id)
-                    else:
-                        lowfile = "%s_%s_low.pdb" % (rootname, id)
-                    list_pdb_files.append(lowfile)
+                        list_pdb_files.append(lowfile)
+                elif parameters["ID"] <= 3805:
+                    for x in self.lowest_structs:
+                        id = x[0]
+                        if parameters['Mini'] == 'classic':  
+                            lowfile = "BR%slow_%s.pdb" % (rootname, id)
+                        else:
+                            lowfile = "%s_%s_low.pdb" % (rootname, id)
+                        list_pdb_files.append(lowfile)
+                else:
+                    for x in self.lowest_structs:
+                        list_pdb_files.append(x[0]) 
             else:
                 if ForEnsemble == True:
                     lowfileregex = re.compile(".*low_\d{4}.pdb$")
@@ -1058,7 +1071,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                     for filename in list_files:
                         if filename.endswith("_low.pdb"):
                             list_pdb_files.append(filename)
-                        
             dlpath = ospathjoin(self.download_dir, cryptID)
             for i in range(len(list_pdb_files)):
                 pdb_file = list_pdb_files[i]
@@ -1078,43 +1090,82 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         else:
             return None
         
-    def _show_scores_file(self, cryptID, jobID, size_of_ensemble):
+    def _show_scores_file(self, cryptID, jobID, size_of_ensemble, parameters):
+        if parameters['Mini'] == 'classic':
+            score_file     = '../downloads/%s/scores_overall.txt' % cryptID
+            score_file_res = '../downloads/%s/scores_residues.txt' % cryptID
+            html = ''
+            if os.path.exists( score_file ):
+              handle = open(score_file,'r')
+              html = '''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Total scores for the generated structures. Download files:<br>
+                                                                <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
+                                                                    <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>''' % (cryptID, cryptID)
+              if os.path.exists( score_file_res ):
+                html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
+              html += '''                                      </ul>
+                            </td>
+                          <td style="width=100px;" bgcolor="#FFFCD8"><a class="blacklink" href="%s"><pre>%s</pre></a></td></tr>
+                  ''' % ( score_file, join(handle.readlines()[:10], '') + '...\n' )
+              handle.close()
+              
+              # the next 5 lines get the 10 best scoring structures from the overall energies file
+              handle = open(score_file,'r')
+              import operator
+              L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' ]
+              L = L[:size_of_ensemble]
+              L.sort(key = lambda x:float(x[1]))
+              self.lowest_structs = L[:10] #todo: declare as constant
+              handle.close()
+            
+            return html
+        
         stdout_file     = '../downloads/%s/stdout_%d.dat' % (cryptID, jobID)
+        if not os.path.exists(stdout_file):
+            #print(os.listdir('../downloads/%s/' % cryptID))
+            # Bug fix / hack for when a job is repeated but the stdout filename is not updated with the new ID
+            stdout_files = [filenm for filenm in os.listdir('../downloads/%s/' % cryptID) if filenm[:7]== 'stdout_' and filenm[-4:] == '.dat']
+            if len(stdout_files) != 1:
+                return "Could not find stdout file."
+            else:
+                stdout_file = '../downloads/%s/%s' % (cryptID, stdout_files[0])
         score_file     = '../downloads/%s/scores_overall.txt' % cryptID
         score_file_res = '../downloads/%s/scores_residues.txt' % cryptID
         score_file_res_html = '../downloads/%s/scores_residues.html' % cryptID
         html = ''
         if os.path.exists( score_file ):
           from analyze_mini import AnalyzeMini
-          analysis_obj = AnalyzeMini(stdout_file, size_of_ensemble)
-          total_scores_html = analysis_obj.total_scores_to_html(tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
-          detailed_scores_html = analysis_obj.detailed_scores_to_html(tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
-          detailed_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' % detailed_scores_html
-          if not os.path.exists('../downloads/%s/scores_detailed.html'):
-            writeFile('../downloads/%s/scores_detailed.html' % cryptID, detailed_scores_html)
-          if os.path.exists(score_file_res) and not os.path.exists(score_file_res_html):
-              residues_scores_html = analysis_obj.residues_scores_to_html(readFile(score_file_res), tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
-              residues_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' %  residues_scores_html
-              writeFile(score_file_res_html, residues_scores_html)
+          try:
+              analysis_obj = AnalyzeMini(stdout_file, size_of_ensemble)
+              total_scores_html = analysis_obj.total_scores_to_html(tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
+              detailed_scores_html = analysis_obj.detailed_scores_to_html(tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
+              detailed_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' % detailed_scores_html
+              if not os.path.exists('../downloads/%s/scores_detailed.html'):
+                writeFile('../downloads/%s/scores_detailed.html' % cryptID, detailed_scores_html)
+              if os.path.exists(score_file_res) and not os.path.exists(score_file_res_html):
+                  residues_scores_html = analysis_obj.residues_scores_to_html(readFile(score_file_res), tableclass = "backrubscores", headerthstyle = "background-color:#dddddd;", tablestyle = "background-color:#eeeeee;")
+                  residues_scores_html = '''<html><head></head><body><script src="/javascripts/sorttable.js"></script>%s</body></html>''' %  residues_scores_html
+                  writeFile(score_file_res_html, residues_scores_html)
+              html += '''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Total scores for the generated structures. Download files:<br>
+                                                                <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
+                                                                    <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>
+                                                                    <li><a href="../downloads/%s/scores_detailed.html">detailed scores (HTML)</a></li>''' % (cryptID, cryptID, cryptID)
+              if os.path.exists( score_file_res ):
+                html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
+              if os.path.exists( score_file_res_html ):
+                html += '''                                         <li><a href="%s">detailed scores for residues (HTML)</a></li>''' % (score_file_res_html)
+              html += '''                                      </ul>
+                            </td>
+                          <td style="width=240px;" bgcolor="#FFFCD8">%s</td></tr>
+                  ''' % (total_scores_html )
+          except:
+              html += "<span style='color:red'>An error occurred analyzing the run data. Please contact the webserver administrator.</span>"
 
           
-          html = '''<tr><td style="text-align:left;vertical-align:top" bgcolor="#FFFCD8"><br>Total scores for the generated structures. Download files:<br>
-                                                            <ul><li><a href="../downloads/%s/scores_overall.txt">total scores only</a></li>
-                                                                <li><a href="../downloads/%s/scores_detailed.txt">detailed scores</a></li>
-                                                                <li><a href="../downloads/%s/scores_detailed.html">detailed scores (HTML)</a></li>''' % (cryptID, cryptID, cryptID)
-          if os.path.exists( score_file_res ):
-            html += '''                                         <li><a href="%s">detailed scores for residues (also in individual pdb files)</a></li>''' % (score_file_res)
-          if os.path.exists( score_file_res_html ):
-            html += '''                                         <li><a href="%s">detailed scores for residues (HTML)</a></li>''' % (score_file_res_html)
-          html += '''                                      </ul>
-                        </td>
-                      <td style="width=100px;" bgcolor="#FFFCD8">%s</td></tr>
-              ''' % (total_scores_html )
           
           # the next 5 lines get the 10 best scoring structures from the overall energies file
           handle = open(score_file, 'r')
           import operator
-          L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' ]
+          L = [ line.split() for line in handle if line[0] != '#' and line[0] != 'i' and line[:8] != 'Filename']
           L = L[:size_of_ensemble]
           L.sort(key = lambda x:float(x[1]))
           self.lowest_structs = L[:10] #todo: declare as constant
@@ -1215,7 +1266,6 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 jmolModelSelectors.append("</tr>")
             jmolModelSelectors.append("</table>")
             
-            #print(list_pdb_files)
             # html code
             html = """
                      <tr>
@@ -1533,7 +1583,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
-          html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble))
+          html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble, parameters))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residue is shown as sticks representation.'
           
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = {chain : [resid]}))
@@ -1637,7 +1687,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         
         if status == 'done' or status == 'sample':
           html.append('<tr><td align=right></td><td></td></tr>')
-          html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble))
+          html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble, parameters))
           comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red, the mutated residues are shown as sticks representation.'
         
           html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters), mutated = mutated ))
@@ -1663,7 +1713,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         
         if status == 'done' or status == 'sample':
             html.append('<tr><td align=right></td><td></td></tr>')
-            html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble))        
+            html.append(self._show_scores_file(cryptID, parameters["ID"], size_of_ensemble, parameters))        
         
             comment = '<br>Structural models for up to 10 of the best-scoring structures. The query structure is shown in red.'
             html.append(self._showApplet4MultipleFiles( comment, self._getPDBfiles(input_filename, cryptID, parameters, ForEnsemble=True)))
