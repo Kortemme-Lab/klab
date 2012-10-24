@@ -4,6 +4,7 @@
 untitled.py
 
 Created by Florian Lauck on 2009-10-06.
+Updated and extended by Shane O'Connor 2011-2012.
 Copyright (c) 2009 __UCSF__. All rights reserved.
 """
 
