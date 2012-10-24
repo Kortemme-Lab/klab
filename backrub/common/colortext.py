@@ -53,8 +53,10 @@ def make(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None):
 	else:
 		return '%s%s' % (s, suffix)
 
-def write(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None):
+def write(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None, flush = False):
 	sys.stdout.write(make(s, color = color, bgcolor = bgcolor, suffix = suffix, effect = effect))
+	if flush:
+		sys.stdout.flush()
 
 def printf(s, color = 'silver', bgcolor = None, suffix = "", effect = None):
 	sys.stdout.write(make(s, color = color, bgcolor = bgcolor, suffix = "%s\n" % suffix, effect = effect))

@@ -16,6 +16,7 @@ from string import join
 import stat
 import tempfile
 import colorsys
+from tempfile import mkstemp
 
 ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
                     "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
@@ -49,6 +50,12 @@ def readFile(filepath):
     output_handle.close()
     return contents
 
+def readBinaryFile(filepath):
+    output_handle = open(filepath,'rb')
+    contents = output_handle.read()
+    output_handle.close()
+    return contents
+
 def readFileLines(filepath):
     output_handle = open(filepath,'r')
     contents = output_handle.read().splitlines()
@@ -59,6 +66,18 @@ def writeFile(filepath, contents):
     output_handle = open(filepath,'w')
     output_handle.write(contents)
     output_handle.close()
+    
+def openTempFile(path):
+    F, fname = mkstemp(dir = path)
+    output_handle = os.fdopen(F, "w")
+    return output_handle, fname
+
+def writeTempFile(path, contents):
+    F, fname = mkstemp(dir = path)
+    output_handle = os.fdopen(F, "w")
+    output_handle.write(contents)
+    output_handle.close()
+    return fname
 
 def normalize_for_bash(s):
     t = [c for c in s if c.isalnum() or c == "_"]
