@@ -296,6 +296,7 @@ class RosettaClusterJob(StatusPrinter):
 		
 	def __init__(self, sgec, parameters, tempdir, targetroot, dldir, testonly = False, jobsubdir = None):
 		self.parameters = parameters
+		self.parameters = parameters
 		self.jobIDs = []
 		self.jobID = self.parameters.get("ID") or 0
 		self._setStatusPrintingParameters(self.jobID, statustype = "job", level = 0, color = "lightpurple")

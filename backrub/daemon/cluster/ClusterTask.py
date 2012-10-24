@@ -305,8 +305,13 @@ class ClusterTask(StatusPrinter):
 			failedOutput = False
 			self._status('Copying stdout and stderr output to %s' % (self.targetdirectory))		
 			for i in range(self.firsttaskindex, self.firsttaskindex + self.numtasks):
-				filename_stdout = "%s.o%s.%d" % (self.scriptfilename, self.jobid, i)
-				filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
+				if self.numtasks == 1:
+					# This is necessary for when jobs have 1 task e.g. minimization in Elisabeth's protocol
+					filename_stdout = "%s.o%s" % (self.scriptfilename, self.jobid)
+					filename_stderr = "%s.e%s" % (self.scriptfilename, self.jobid)
+				else:
+					filename_stdout = "%s.o%s.%d" % (self.scriptfilename, self.jobid, i)
+					filename_stderr = "%s.e%s.%d" % (self.scriptfilename, self.jobid, i)
 				stdoutfile = self._workingdir_file_path(filename_stdout)
 				if os.path.exists(stdoutfile):
 					self.filename_stdout = filename_stdout

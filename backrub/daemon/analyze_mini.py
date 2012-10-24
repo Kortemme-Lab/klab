@@ -51,7 +51,7 @@ class AnalyzeMini(object):
 		handle_in = open(filename,'r')
 		
 		firstline = handle_in.readline().strip()
-		if firstline.startswith("core.init: command: "):
+		if firstline.startswith("core.init: command: ") or firstline.startswith("command executed"):
 			self._parse_command(firstline)
 		else:
 			raise Exception("Expected core.init at the start of stdout.")
@@ -70,7 +70,8 @@ class AnalyzeMini(object):
 				i+=1
 		
 		if len(self.scores) != self.nstruct + 1:
-			raise Exception("Expected %d low structures but found %d scores in the stdout." % (self.nstruct, len(self.dict_scores.keys())))
+			print("Expected %d low structures but found %d scores in the stdout." % (self.nstruct, len(self.scores)))
+			raise Exception("Expected %d low structures but found %d scores in the stdout." % (self.nstruct, len(self.scores)))
 		handle_in.close()
 		
 		self._make_totals_table()

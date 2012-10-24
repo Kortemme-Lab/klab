@@ -204,7 +204,7 @@ The Kortemme Lab Server Daemon
 					data = self.runSQL("SELECT ID,Date,Status,task,PDBComplex,PDBComplexFile,Mini,EnsembleSize,ProtocolParameters,cryptID,BackrubServer FROM %s WHERE Status=0 AND (%s) ORDER BY Date" % (self.db_table, self.SQLJobSelectString))
 					
 					if len(data) == 0:
-						time.sleep(10) # wait 10 seconds if there's no job in queue
+						time.sleep(30) # wait 30 seconds if there's no job in queue
 						continue
 					
 					for i in range(0,len(data)):
@@ -221,7 +221,7 @@ The Kortemme Lab Server Daemon
 						self.runSQL('UPDATE %s SET Errors="Start", Status=4 WHERE ID=%s' % ( self.db_table, ID ))				  
 					time.sleep(10)
 			else:
-				time.sleep(30)  # wait 5 seconds if max number of jobs is running
+				time.sleep(60)  # wait 60 seconds if max number of jobs is running
 
 		
 	# split this one up in individual functions at some point
@@ -449,19 +449,19 @@ The Kortemme Lab Server Daemon
 				self.log("Error: sendMail() ID = %s." % ID )				
 				self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
 	
-	def notifyAdminOfError(self, ID, description = ""):
+	def notifyAdminOfError(self, clusterjob, description = ""):
+		jobID = clusterjob.jobID
 		if description:
 			description = "(%s): " % description
-		subject  = "%sKortemme Lab Backrub Server - Your Job #%s" % (description, ID)
+		subject  = "%sKortemme Lab Backrub Server - Your Job #%s (%s)" % (description, jobID, str(clusterjob.name))
 		if self.server_name == 'albana.ucsf.edu':
-			subject = 'Albana test job %d failed.' % ID
-			adminTXT = 'An error occurred during TEST server simulation #%s.' % ID
+			subject = 'Albana test job %d failed.' % jobID
+			adminTXT = 'An error occurred during TEST server simulation #%s.' % jobID
 		else:
-			adminTXT = 'An error occurred during simulation #%s.' % ID
+			adminTXT = 'An error occurred during simulation #%s.' % jobID
 		if not self.sendMail(self.email_admin, self.email_admin, subject, adminTXT):
-			self.log("Error: sendMail() ID = %s." % ID )				
-			self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, ID ))
-
+			self.log("Error: sendMail() jobID = %s." % jobID )				
+			self.runSQL('UPDATE %s SET Errors="No email sent" WHERE ID=%s' % ( self.db_table, jobID ))
 				
 				
 	def exec_cmd(self, cmd, run_dir):
@@ -1111,7 +1111,7 @@ class ClusterDaemon(RosettaDaemon):
 		else:
 			self.runSQL(('''UPDATE %s''' % self.db_table) + ''' SET Status=4, Errors=%s, AdminErrors=%s, EndDate=NOW() WHERE ID=%s''', parameters = (errormsg, timestamp, jobID))
 		self.log("Error: The %s job %d failed at some point:\n%s" % (suffix, jobID, errormsg))
-		self.notifyAdminOfError(jobID)
+		self.notifyAdminOfError(clusterjob)
 		
 	def run(self):
 		"""The main loop and job controller of the daemon."""
