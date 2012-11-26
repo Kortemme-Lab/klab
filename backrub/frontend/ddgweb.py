@@ -22,7 +22,7 @@ import retrospect
 from RosettaProtocols import WebserverProtocols
 import sys
 import common
-from ddglib import ddgfilters, protherm_api, ddgdbapi
+from ddglib import protherm_api, ddgdbapi # ddgfilters
 
 settings = None
 script_filename = None
@@ -385,7 +385,7 @@ def generateStatusPage(form):
 	chartfns = [fnname]
 	
 	ddGdb = ddgdbapi.ddGDatabase(passwd = settings["ddGPassword"])
-	results = ddGdb.execute('''SELECT PredictionSet, Status, COUNT(*) AS Count FROM Prediction WHERE PredictionSet <> "testrun" GROUP BY PredictionSet, Status;''')
+	results = ddGdb.execute('''SELECT PredictionSet, Status, COUNT(*) AS Count FROM Prediction WHERE PredictionSet <> "testrun" GROUP BY PredictionSet, Status''')
 	predictionSets =  {}
 	
 	statusOrder = ["done", "active", "queued", "failed"]
@@ -403,7 +403,6 @@ def generateStatusPage(form):
 			predictionSets[r["PredictionSet"]] = newtbl
 		assert(r["Status"] in statusColors.keys())
 		predictionSets[r["PredictionSet"]][r["Status"]] = r["Count"]
-	ddGdb.close()
 	
 	for predictionSet in predictionSets.keys(): 
 		if predictionSet.startswith("lin-"):

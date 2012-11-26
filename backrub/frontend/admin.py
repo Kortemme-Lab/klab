@@ -1075,7 +1075,7 @@ def generateITInventory():
 		"Dogpatch Network Centre"	: ("#66ff66", "#000000"),
 		"None"						: ("#cc9999", "#000000"),
 	}
-	
+
 	IPRanges = {
 		"Computational lab"			: "169.230.84.",
 		"Experimental lab"			: "169.230.86.",
@@ -1084,7 +1084,7 @@ def generateITInventory():
 	}
 	# Get all IP addresses  which either have no corresponding PC Inventory entry or which have one but the PC is unused 
 	machineNames = set([machine["Hostname"] for machine in inventory])
-	unusedMachineNames = set([machine["Hostname"] for machine in inventory if not(machine["InUse"])])
+	unusedMachineNames = set([machine["Hostname"] for machine in inventory if not(machine["Status"] == "In use" or machine["Status"] == "Free")])
 	unusedHostnames = list(set(hostToIP.keys()).difference(machineNames).union(set(hostToIP.keys()).intersection(unusedMachineNames)))
 	unusedIPAddresses = []
 	for h in unusedHostnames:
@@ -1119,7 +1119,7 @@ def generateITInventory():
 		("IP", [80], [""]),
 		("Hostname", [80], [""]),
 		("Location", [160], [""]),
-		("In use", [50], [""]),
+		("Status", [50], [""]),
 		("Primary user", [100], [""]),
 		("Model", [150], [""]),
 		("OS", [200], [""]),
@@ -1159,7 +1159,7 @@ def generateITInventory():
 		
 		colors = rowcols.get(machine["Location"], rowcols["None"])
 		
-		if not machine["InUse"]:
+		if not(machine["Status"] == "In use" or machine["Status"] == "Free"):
 			IPAddress = "None"
 			colors = rowcols["None"]
 		elif hostToIP.get(machine["Hostname"]):
@@ -1178,7 +1178,10 @@ def generateITInventory():
 		machinestring.append("<td>%s</td>" % IPAddress)
 		machinestring.append("<td>%(Hostname)s</td>" % machine)
 		machinestring.append("<td>%(Location)s</td>" % machine)
-		machinestring.append("<td>%(InUse)s</td>" % machine)
+		if machine["Status"] == "Free":
+			machinestring.append("<td style='color:white;background-color:#44cc44;'>%(Status)s</td>" % machine)
+		else:
+			machinestring.append("<td>%(Status)s</td>" % machine)
 		machinestring.append("<td>%s</td>" % (machine["FirstName"] or machine["PrimaryUse"]))
 		
 		if machine.get("Model"):
