@@ -272,4 +272,158 @@ def run(test):
     else:
     	print("Cannot find test '%s'." % test)
 
-run("1KI1analysis")
+import pickle
+import rosettadb
+import shutil
+import glob
+import subprocess
+from weblogolib import *
+from corebio.seq import unambiguous_protein_alphabet 
+
+def getResIDs(params, justification = 0):
+	design = []
+	for partner in params['Partners']:
+		if params['Designed'].get(partner):
+			pm = params['Designed'][partner]
+			for residue in pm:
+				design.append('%s%s' % (partner, str(residue).rjust(justification)))
+	return design
+
+def createSequenceMotif(infasta, annotations, outpng):
+	# create weblogo from the created fasta file
+	seqs = read_seq_data(open(infasta), alphabet=unambiguous_protein_alphabet)
+	logo_data = LogoData.from_seqs(seqs)	
+	logo_options = LogoOptions()
+	logo_options.title = "Sequence profile"
+	logo_options.number_interval = 1
+	logo_options.color_scheme = std_color_schemes["chemistry"]
+	logo_options.annotate = annotations
+	
+	# Change the logo size of the X-axis for readability
+	logo_options.number_fontsize = 3.5
+	
+	# Change the logo size of the Weblogo 'fineprint' - the default Weblogo text
+	logo_options.small_fontsize = 4
+	
+	# Move the Weblogo fineprint to the left hand side for readability
+	fineprinttabs = "\t" * (int(2.7 * float(len(annotations))))
+	logo_options.fineprint = "%s\t%s" % (logo_options.fineprint, fineprinttabs)
+
+	logo_format = LogoFormat(logo_data, logo_options)
+	png_print_formatter(logo_data, logo_format, open(outpng, 'w'))
+
+
+def reanalyze_seqtol_job(resultsdir, parameters):
+	# Run the analysis on the originating host
+	
+	print(resultsdir)
+	assert(os.path.exists(resultsdir))
+	
+	print("Analyzing results for job %d." % parameters["ID"])
+	# run Colin's analysis script: filtering and profiles/motifs
+	thresh_or_temp = parameters['kT']
+	
+	weights = parameters['Weights']
+	fitness_coef = 'c(%s' % weights[0]
+	for i in range(1, len(weights)):
+		fitness_coef += ', %s' % weights[i]
+	fitness_coef += ')'
+	
+	type_st = '\\"boltzmann\\"'
+	prefix  = '\\"tolerance\\"'
+	percentile = '.5'
+	
+	newpath = os.path.join('/backrub/reanalysis', str(parameters['ID']))
+	assert(os.path.exists('/backrub/reanalysis'))
+	if os.path.exists(newpath):
+		shutil.rmtree(newpath)
+	shutil.copytree(resultsdir, newpath)
+	
+	newseqtolpath = os.path.join(newpath, 'sequence_tolerance')
+	
+	# Create the standard output file where the R script expects it
+	firststdout = None
+	originalpdb = None
+	for file in glob.glob(os.path.join(newseqtolpath, "*.cmd.o*.1")):
+		firststdout = file
+		break
+	for file in glob.glob(os.path.join(newpath, parameters["pdb_filename"])):
+		originalpdb = file
+		break
+	if firststdout and originalpdb:
+		print("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
+		shutil.copy(firststdout, os.path.join(newpath, "seqtol_1_stdout.txt"))
+	else:
+		print("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
+	
+	specificityRScript = os.path.join('/backrub', "daemon", "specificity.R")
+
+	# Run the R script and pipe stderr and stdout to file 
+	cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
+			  | /bin/cat %s - \\
+			  | /usr/bin/R --vanilla''' % ( newpath, fitness_coef, thresh_or_temp, type_st, percentile, prefix, specificityRScript)				
+	
+	file_stdout = open(os.path.join(newpath, 'analysis_stdout.txt'), 'w')
+	file_stderr = open(os.path.join(newpath, 'analysis_stderr.txt'), 'w')
+	file_stdout.write("*********************** R output ***********************\n")
+	
+	subp = subprocess.Popen(cmd, stdout=file_stdout, stderr=file_stderr, cwd=newpath, shell=True, executable='/bin/bash')
+			
+	while True:
+		returncode = subp.poll()
+		if returncode != None:
+			if returncode != 0:
+				print("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+				raise Exception("An error occurred during the postprocessing script. The errorcode is %d." % returncode)
+			break;
+		time.sleep(2)
+	file_stdout.close()
+	file_stderr.close()
+	print("** stdout **")
+	print(readFile(os.path.join(newpath, 'analysis_stdout.txt')))
+	print("** stderr **")
+	print(readFile(os.path.join(newpath, 'analysis_stderr.txt')))
+	
+	Fpwm = open(os.path.join(newpath, "tolerance_pwm.txt"))
+	annotations = Fpwm.readline().split()
+	if len(set(annotations).difference(set(getResIDs(parameters)))) != 0:
+		print("Warning: There is a difference in the set of designed residues from getResIDs (%s) and from the pwm (%s)." % (str(getResIDs(parameters)), str(annotations)))
+	Fpwm.close()
+	success = True
+	try:
+		fasta_file = os.path.join(newpath, ("tolerance_sequences.fasta"))
+		createSequenceMotif(fasta_file, annotations, os.path.join(newpath, "tolerance_motif.png" ))
+	except Exception, e:
+		print("An error occurred creating the motifs.\n%s\n%s" % (str(e), traceback.format_exc()))
+		success = False
+	
+	outscript = ['#!/bin/bash']
+	shutil.copyfile(os.path.join(newpath, 'tolerance_boxplot.png'), os.path.join(resultsdir, 'tolerance_boxplot.png'))
+	shutil.copyfile(os.path.join(newpath, 'tolerance_boxplot.pdf'), os.path.join(resultsdir, 'tolerance_boxplot.pdf'))
+	shutil.copyfile(os.path.join(newpath, 'tolerance_seqrank.png'), os.path.join(resultsdir, 'tolerance_seqrank.png'))
+	shutil.copyfile(os.path.join(newpath, 'tolerance_seqrank.pdf'), os.path.join(resultsdir, 'tolerance_seqrank.pdf'))
+	shutil.copyfile(os.path.join(newpath, 'tolerance_sequences.fasta'), os.path.join(resultsdir, 'tolerance_sequences.fasta'))
+	shutil.copyfile(os.path.join(newpath, 'tolerance_pwm.txt'), os.path.join(resultsdir, 'tolerance_pwm.txt'))
+	shutil.copyfile(os.path.join(newpath, 'tolerance_motif.png'), os.path.join(resultsdir, 'tolerance_motif.png'))
+	
+	
+	for a in annotations:
+		shutil.copyfile(os.path.join(newpath, 'tolerance_boxplot_%s.png' % a), os.path.join(resultsdir, 'tolerance_boxplot_%s.png' % a))
+	writeFile('fix-%d.bash' % parameters['ID'], "\n".join(outscript))
+	print(annotations)
+	
+def reanalyze_seqtol_jobs():
+	DBConnection = rosettadb.RosettaDB(settings, numTries = 32)
+	
+	results = DBConnection.execQuery("SELECT ID, Mini, PDBComplexFile, cryptID, ProtocolParameters FROM backrub WHERE ID >= 4211 AND task='sequence_tolerance_SK' ORDER BY ID", cursorClass = rosettadb.DictCursor)
+	for r in results:
+		if 4324 > r['ID'] >= 4279:
+			print(r['ID'])
+			assert((r['Mini'] == 'seqtolP1') or (r['Mini'] == 'seqtolJMB'))
+			parameters = pickle.loads(r['ProtocolParameters'])
+			parameters['pdb_filename'] = r['PDBComplexFile']
+			parameters['ID'] = r['ID']
+			reanalyze_seqtol_job(os.path.join('/backrub/downloads', r['cryptID']), parameters)
+	
+#reanalyze_seqtol_jobs()
+#run("1KI1analysis")
