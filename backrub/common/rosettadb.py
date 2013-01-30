@@ -217,6 +217,7 @@ class DatabaseInterface(object):
 		if fields == None:
 			fields = sorted(d.keys())
 		values = None
+		SQL = None
 		try:
 			# Search for existing records
 			wherestr = []
