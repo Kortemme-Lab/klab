@@ -18,6 +18,15 @@ aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
        "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
        "TRP": "W", "TYR": "Y"}
 
+non_canonical_aa1 = {
+	'TPO' : 'T', # phosphothreonine
+	'MLY' : 'K', # dimethyl lysine
+	'CSO' : 'C', # s-hydroxycysteine
+	'CSU' : 'C', # ? some type of cysteine or a typo
+	'MSE' : 'M', # selenomethionine
+	'PTR' : 'Y', # phospotyrosine
+}
+
 residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS", 
             "HIE", "HIP", "ILE", "LYS", "LYN", "LEU", "MET", "ASN", "PRO", 
             "GLN", "ARG", "ARN", "SER", "THR", "VAL", "TRP", "TYR"]
@@ -177,6 +186,20 @@ class JRNL(object):
 		else:
 			self.d["DOI"] = None
 			
+class NonCanonicalResidueException(Exception):
+	pass
+
+COMPND_field_map = {
+	'MOL_ID' : 'MoleculeID',
+	'MOLECULE' : 'Name',
+	'CHAIN' : 'Chains',
+	'FRAGMENT' : 'Fragment',
+	'SYNONYM' : 'Synonym',
+	'EC' : 'EC',
+	'ENGINEERED' : 'Engineered',
+	'MUTATION' : 'Mutation',
+	'OTHER_DETAILS' : 'OtherDetails',
+}
 
 class PDB:
     """A class to store and manipulate PDB data"""
@@ -198,6 +221,150 @@ class PDB:
         elif type(pdb) == type(self):
             self.lines.extend(pdb.lines)
     
+    def getSEQRESSequences(self):
+        # Extract the SEQRES lines
+        SEQRES_lines = []
+        found_SEQRES_lines = False
+        for line in self.lines:
+            if not line.startswith("SEQRES"):
+                if not found_SEQRES_lines:
+                    continue
+                else:
+                    break
+            else:
+                found_SEQRES_lines = True
+                SEQRES_lines.append(line)
+        for x in range(0, len(SEQRES_lines)):
+            assert(SEQRES_lines[x][7:10].strip().isdigit())
+        
+        if not SEQRES_lines:
+            raise Exception("Do not raise this exception")
+            return None
+       
+       # If the COMPND lines exist, concatenate them together into one string
+        sequences = {}
+        chains_in_order = []
+        SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
+        for line in SEQRES_lines:
+            chainID = line[0]
+            if chainID not in chains_in_order:
+                chains_in_order.append(chainID)
+            sequences[chainID] = sequences.get(chainID, [])
+            residues = line[6:].strip().split(" ")
+            for r in residues:
+                if aa1.get(r):
+                    sequences[chainID].append(aa1[r])
+                else:
+                    if non_canonical_aa1.get(r):
+                        #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_aa1[r]))
+                        #print(SEQRES_lines)
+                        #print(line)
+                        sequences[chainID].append(non_canonical_aa1[r])
+                    else:
+                        #print(SEQRES_lines)
+                        #print(line)
+                        raise Exception("Unknown residue %s." % r)
+        for chainID, sequence in sequences.iteritems():
+            sequences[chainID] = "".join(sequence)
+        
+        return sequences, chains_in_order
+
+        
+    def getMoleculeInfo(self):
+        # Extract the COMPND lines
+        COMPND_lines = []
+        found_COMPND_lines = False
+        for line in self.lines:
+            if not line.startswith("COMPND"):
+                if not found_COMPND_lines:
+                    continue
+                else:
+                    break
+            else:
+                found_COMPND_lines = True
+                COMPND_lines.append(line)
+        for x in range(1, len(COMPND_lines)):
+            assert(int(COMPND_lines[x][7:10]) == x+1)
+        
+        if not COMPND_lines:
+            raise Exception("Do not raise this exception")
+            return None
+        
+        # If the COMPND lines exist, concatenate them together into one string
+        COMPND_lines = " ".join([line[10:].strip() for line in COMPND_lines])
+        COMPND_lines.replace("  ", " ")
+        
+        # Split the COMPND lines into seperate molecule entries
+        molecules = []
+        MOL_DATA = ["MOL_ID:%s".strip() % s for s in COMPND_lines.split('MOL_ID:') if s]
+        
+        # Parse the molecule entries
+        for MD in MOL_DATA:
+            MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
+            molecule = {}
+            for field in MOL_fields:
+                field = field.split(":")
+                field_name = COMPND_field_map[field[0].strip()]
+                field_data = field[1].strip()
+                molecule[field_name] = field_data
+            
+            # Normalize and type the fields 
+        
+            # Required (by us) fields
+            molecule['MoleculeID'] = int(molecule['MoleculeID'])
+            molecule['Chains'] = map(string.strip, molecule['Chains'].split(','))
+            for c in molecule['Chains']:
+                assert(len(c) == 1)
+            
+            # Optional fields
+            if not molecule.get('Engineered'):
+                molecule['Engineered'] = None
+            elif molecule.get('Engineered') == 'YES':
+                molecule['Engineered'] = True
+            elif molecule.get('Engineered') == 'NO':
+                molecule['Engineered'] = False
+            else:
+                raise Exception("Error parsing ENGINEERED field of COMPND lines: '%s'." % molecule)
+        
+            if molecule.get('Mutation'):
+                if molecule['Mutation'] != 'YES':
+                    raise Exception("Error parsing MUTATION field of COMPND lines. Expected 'YES', got '%s'." % molecule['Mutation'])
+                else:
+                    molecule['Mutation'] = True
+            else:
+                molecule['Mutation'] = None
+            
+            # Add missing fields
+            for k in COMPND_field_map.values():
+                if k not in molecule.keys():
+                    molecule[k] = None
+            
+            molecules.append(molecule)
+        print(molecules)
+        return molecules
+
+    def GetATOMSequences(self):
+        chain = None
+        sequences = {}
+        resid_set = set()
+        resid_list = []
+        for line in self.lines:
+            if line[0:4] == 'ATOM':
+                residue_longname = line[17:20] 
+                if residue_longname not in residues:
+                    raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
+                else:
+                    resid = line[21:26]
+                    if resid not in resid_set:
+                        resid_set.add(resid)
+                        resid_list.append(resid)
+                        chainID = line[21]
+                        sequences[chainID] = sequences.get(chainID, []) 
+                        sequences[chainID].append(aa1[residue_longname])
+        for chainID, sequence_list in sequences.iteritems():
+        	sequences[chainID] = "".join(sequence_list) 
+        return sequences
+
     def getJournal(self):
         if not self.journal:
             self.parseJRNL()
