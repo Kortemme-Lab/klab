@@ -37,7 +37,7 @@ import session
 from rosettahtml import RosettaHTML
 import rosettadb
 from rwebhelper import *
-from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory, writeFile
+from rosettahelper import WebsiteSettings, DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, make755Directory, writeFile, readBinaryFile
 from RosettaProtocols import *
 from rosettadatadir import RosettaDataDir
 
@@ -91,6 +91,9 @@ def getBenchmarksConnection():
 def getLabServicesConnection():
 	#return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "LabServices")
 	return rosettadb.RosettaDB(settings, host = "kortemmelab.ucsf.edu", db = "LabServices")
+
+def getGen9Connection():
+	return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Gen9Design")
 
 def fixFilename(filename):
 	
@@ -249,8 +252,8 @@ def ws():
 			allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
 			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
 			if not(settings["LiveWebserver"]):
-				allowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
-				subAllowedQueries.extend(["admin", "ddg", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+				allowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+				subAllowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
 			if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
@@ -269,7 +272,7 @@ def ws():
 		# send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
 		s.write(str(my_session.cookie) + '\n')
 		
-		if not(form.has_key("query")) or form["query"].value not in ["PDB", "benchmarkreport"]:
+		if not(form.has_key("query")) or form["query"].value not in ["PDB", "benchmarkreport", "Gen9File"]:
 			s.write("Content-type: text/html\n\n")
 		s.write(debug)
 		my_session.close()
@@ -532,6 +535,63 @@ def ws():
 			html_content = rosettaHTML.adminPage(quotas, usage, users, settings, form)
 			title = 'Admin'
 
+	elif query_type == "Gen9":
+		if not(settings["LiveWebserver"]):
+			html_content = rosettaHTML.gen9Page(settings, form, userid)
+			title = 'Gen9'
+
+	elif query_type == "Gen9File":
+		if not(settings["LiveWebserver"]):
+			if form.has_key('download'):
+				gen9db = getGen9Connection()
+				if form['download'].value == 'PDB':
+					if form.has_key('DesignID'):
+						results = gen9db.execute("SELECT FilePath FROM Design WHERE ID=%s", parameters = (form['DesignID'].value,))
+						if not results:
+							s.write("Content-type: text/html\n\n")
+							print("No files found for design ID %s." % form['DesignID'].value)
+						else:
+							assert(len(results) == 1)
+							filepath = results[0]['FilePath']
+							contents = readBinaryFile(filepath)
+							filename = os.path.split(filepath)[1]
+							
+							print 'Content-Type: application/x-gzip'
+							print 'Content-Disposition: attachment; filename="%s"' % (filename)
+							print "Content-Length: %d" % len(contents)
+							print
+							sys.stdout.write(contents)
+							sys.stdout.flush()
+					else:
+						s.write("Content-type: text/html\n\n")
+						print("Badly specified query.")
+
+
+				elif form['download'].value == 'PSE':
+					if form.has_key('DesignID') and form.has_key('RankingSchemeID'):
+						results = gen9db.execute("SELECT PyMOLSessionFile FROM RankedScore WHERE DesignID=%s AND RankingSchemeID=%s", parameters = (form['DesignID'].value, form['RankingSchemeID'].value))
+						if not results:
+							s.write("Content-type: text/html\n\n")
+							print("No files found for design ID %s." % form['DesignID'].value)
+						else:
+							assert(len(results) == 1)
+							filepath = results[0]['PyMOLSessionFile']
+							contents = readBinaryFile(filepath)
+							filename = os.path.split(filepath)[1]
+							
+							print 'Content-Type: application/octet-stream'
+							print 'Content-Disposition: attachment; filename="%s"' % (filename)
+							print "Content-Length: %d" % len(contents)
+							print
+							sys.stdout.write(contents)
+							sys.stdout.flush()
+					else:
+						s.write("Content-type: text/html\n\n")
+						print("Badly specified query.")
+			else:
+				print("No files found for design ID %s." % form['DesignID'].value)
+
+						
 	elif query_type == "ddg":
 		if not(settings["LiveWebserver"]):
 			html_content = rosettaHTML.ddgPage(settings, form)
@@ -749,7 +809,7 @@ def ws():
 	else:
 		html = "this is impossible" # should never happen since we only allow states from list above 
 
-	if query_type not in ["PDB", "benchmarkreport"]:
+	if query_type not in ["PDB", "benchmarkreport", "Gen9File"]:
 		s.write(rosettaHTML.main(html_content, title, query_type))
 	
 	s.close()

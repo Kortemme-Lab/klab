@@ -16,6 +16,7 @@ import pickle
 import gzip
 import Graph
 import admin
+import gen9
 import ddgweb
 import benchmarks
 import pdb
@@ -859,9 +860,13 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 ###############################################################################################
 
     def adminPage(self, quotas, usage, users, settings, form):
-    	html = admin.generateAdminPage(quotas, usage, users, settings, self, form)
+        html = admin.generateAdminPage(quotas, usage, users, settings, self, form)
         return join(html, "")
     
+    def gen9Page(self, settings, form, userid):
+        html = gen9.generateGen9Page(settings, self, form, userid)
+        return join(html, "")
+
     def ddgPage(self, settings, form):
         html = ddgweb.generateDDGPage(settings, self, form)
         return join(html, "")
@@ -2599,6 +2604,7 @@ var MaxMultiplePointMutations = %d;
         if self.server_shortname == 'albana':
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=ddg">&#916;&#916;G</A>&nbsp;]'''  % (self.script_filename)
+            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=Gen9">Gen9</A>&nbsp;]'''  % (self.script_filename)
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=benchmarks">Benchmarks</A>&nbsp;]''' % (self.script_filename)
             html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
 

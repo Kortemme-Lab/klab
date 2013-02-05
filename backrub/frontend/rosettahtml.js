@@ -10,6 +10,7 @@ function _updateResidues(strarray, n, residues)
 		residueString = []
 		for (j = 0; j < residues.length; j++)
 		{
+			// the forward slash references the model number
 			residueString.push(residues[j] + "/" + n + " ") // Eclipse 3.5.2 throws an "AST creation" error/wobbly with this line and some from updateJmol which necessitates moving these scripts into a separate file. 
 		}
 		strarray.push(residueString.join())
