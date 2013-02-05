@@ -340,27 +340,47 @@ class PDB:
                     molecule[k] = None
             
             molecules.append(molecule)
-        print(molecules)
+        
         return molecules
 
-    def GetATOMSequences(self):
+    def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False):
         chain = None
         sequences = {}
         resid_set = set()
         resid_list = []
+        
+        atoms_read = {}
         for line in self.lines:
-            if line[0:4] == 'ATOM':
-                residue_longname = line[17:20] 
-                if residue_longname not in residues:
+            if line[0:4] == 'ATOM' or (ConvertMSEToAtom and (line[0:6] == 'HETATM') and (line[17:20] == 'MSE')):
+                chainID = line[21]
+                residue_longname = line[17:20]
+                if residue_longname not in residues and not(ConvertMSEToAtom and residue_longname == 'MSE'):
                     raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
                     resid = line[21:26]
                     if resid not in resid_set:
+                        atoms_read[chainID] = set()
+                        atoms_read[chainID].add(line[12:15].strip())
                         resid_set.add(resid)
                         resid_list.append(resid)
                         chainID = line[21]
-                        sequences[chainID] = sequences.get(chainID, []) 
-                        sequences[chainID].append(aa1[residue_longname])
+                        sequences[chainID] = sequences.get(chainID, [])
+                        if residue_longname in non_canonical_aa1:
+                            sequences[chainID].append(non_canonical_aa1[residue_longname])
+                        else:
+                            sequences[chainID].append(aa1[residue_longname])
+                    else:
+                        #atoms_read[chainID] = atoms_read.get(chainID, set())
+                        atoms_read[chainID].add(line[12:15].strip())
+        
+        if RemoveIncompleteFinalResidues:
+            # These are (probably) necessary for Rosetta to keep the residue. Rosetta does throw away residues where only the N atom is present if that residue is at the end of a chain.
+            essential_atoms = set(['CA', 'C', 'N', 'O'])
+            for chainID, sequence_list in sequences.iteritems():
+                if essential_atoms.intersection(atoms_read[chainID]) != essential_atoms:
+                    print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms.difference(atoms_read[chainID])))
+                    sequences[chainID] = sequence_list[0:-1] 
+        
         for chainID, sequence_list in sequences.iteritems():
         	sequences[chainID] = "".join(sequence_list) 
         return sequences
