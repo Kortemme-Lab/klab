@@ -274,7 +274,7 @@ def webstatsJobsByProtocolCumulative(stats):
 		for i in range(len(seriesColors)):
 			html.append('''%d:{color: '%s'}, ''' % (i, seriesColors[i]))
 		html.append('''}
-		chart.draw(data, {width: 1200, height: 600, isStacked:true, series:seriesstyle});''')
+		chart.draw(data, {width: 1200, height: 600, isStacked:true, hAxis:{slantedText:true,slantedTextAngle:60}, series:seriesstyle});''')
 	html.append('''
 	}
 	</script>
@@ -1771,6 +1771,8 @@ def generateWebserverStatsSubpage():
 		k = "%d-%.2d" % (r[1], r[0])
 		if stats.get(k) != None:
 			stats[k]["Sequence Tolerance (Colin)"] = r[2]
+	
+	# Used to delete results to generate graphs of specific ranges del stats['2013-01']
 	
 	results = db.execQuery("SELECT * FROM Users ORDER BY ID", cursorClass = rosettadb.DictCursor)
 	fields = ["Address1", "Address2", "City", "State", "Zip", "Country"]
