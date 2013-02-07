@@ -863,8 +863,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         html = admin.generateAdminPage(quotas, usage, users, settings, self, form)
         return join(html, "")
     
-    def gen9Page(self, settings, form, userid):
-        html = gen9.generateGen9Page(settings, self, form, userid)
+    def gen9Page(self, settings, form, userid, Gen9Error = None):
+        html = gen9.generateGen9Page(settings, self, form, userid, Gen9Error)
         return join(html, "")
 
     def ddgPage(self, settings, form):
@@ -2564,7 +2564,7 @@ var MaxMultiplePointMutations = %d;
         """shows a little field with the username if logged in """
         html = []
         html.append('<td align="right">[&nbsp;Other Services: <A class="nav" style="color:green;" href="/alascan">Alanine Scanning</A>&nbsp;] ')
-        if self.username != '':
+        if self.username != '':# or self.isPrivateServer:
             html.append('<br><small>[ <font color=green>%s</font> | <a href="%s?query=logout"><small>Logout</small></a> ]</small></td>' % ( self.username, self.script_filename ))
         else:
             html.append('<br><small>[&nbsp;<font color=red>not logged in</font>&nbsp;]</small></td>') 
@@ -2599,14 +2599,14 @@ var MaxMultiplePointMutations = %d;
                     [&nbsp;<A class="nav" href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;] """ % (self.script_filename, self.script_filename)
-        
         #todo : Change this based on if not(settings["LiveWebserver"]) rather than albana
         if self.server_shortname == 'albana':
-            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
-            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=ddg">&#916;&#916;G</A>&nbsp;]'''  % (self.script_filename)
-            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=Gen9">Gen9</A>&nbsp;]'''  % (self.script_filename)
-            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=benchmarks">Benchmarks</A>&nbsp;]''' % (self.script_filename)
-            html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
+            if self.username and self.username != 'guest':
+                html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
+                html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=ddg">&#916;&#916;G</A>&nbsp;]'''  % (self.script_filename)
+                html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=Gen9">Gen9</A>&nbsp;]'''  % (self.script_filename)
+                html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=benchmarks">Benchmarks</A>&nbsp;]''' % (self.script_filename)
+                html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
 
         
         

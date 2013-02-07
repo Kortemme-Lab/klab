@@ -49,6 +49,15 @@ if (document.gen9form.Gen9Page.value != null)
 	showPage(document.gen9form.Gen9Page.value)
 }
 
+if (document.gen9form.gen9sort1.value == null || document.gen9form.gen9sort1.value == "")
+{
+	document.gen9form.gen9sort1.value = 'Complex';
+}
+if (document.gen9form.gen9sort2.value == null || document.gen9form.gen9sort2.value == "")
+{
+	document.gen9form.gen9sort2.value = 'ID';
+}
+
 if (document.gen9form.gen9sort1.value != null && document.gen9form.gen9sort1.value != "" )
 {
 	if (document.gen9form.gen9sort1.value == 'Complex')
@@ -102,6 +111,24 @@ function reopen_page_with_sorting()
 	var o2 = document.getElementById("ordering2");
 	var ordering2 = o2.options[o2.selectedIndex].value;
 	window.open("?query=Gen9&gen9sort1=" + ordering1 + "&gen9sort2=" + ordering2, "_self");
+}
+
+if (document.gen9form.DesignID.value != "")
+{
+	window.location.hash="" + document.gen9form.DesignID.value;
+}
+if (document.gen9form.Gen9Error.value != "")
+{
+	alert(document.gen9form.Gen9Error.value);
+}
+
+function copyPageFormValues(elem)
+{
+	design_form = elem.form;
+	design_form.Gen9Page.value = document.gen9form.Gen9Page.value;
+	design_form.query.value = "Gen9Comment"
+	design_form.gen9sort1.value = document.gen9form.gen9sort1.value;
+	design_form.gen9sort2.value = document.gen9form.gen9sort2.value;
 }
 
 /************************************

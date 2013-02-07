@@ -209,6 +209,7 @@ def ws():
 	my_session = session.Session(expires=settings["CookieExpiration"], cookie_path='/')
 	# get time of last visit
 	lastvisit = my_session.data.get('lastvisit')
+	
 	# set session ID
 	SID = my_session.cookie['sid'].value
 	# get present time as datetime object
@@ -221,8 +222,16 @@ def ws():
 	# my_session.close()
 	# s.close() 
 	# return
-
+	result = None
+	
 	if not (form.has_key("query") and form["query"].value == "datadir"):
+		sql = 'SELECT * FROM Sessions WHERE SessionID="%s"' % SID
+		results = DBConnection.execQuery(sql)
+		if not results:
+			lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
+			sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % (SID, lv_strftime, "login", "0")
+			result = DBConnection.execQuery(sql)
+			
 		if lastvisit == None:  # lastvisit == None means that the user doesn't have a cookie
 			# set the session object to the actual time and also write the time to the database
 			my_session.data['lastvisit'] = repr(time.time())
@@ -246,37 +255,44 @@ def ws():
 			
 			my_session.data['lastvisit'] = repr(time.time())
 			# get infos about session
-			sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID  # is the user logged in?
+			#sql = 'SELECT loggedin, UserName, KortemmeLabMember FROM Sessions INNER JOIN Users on UserID=Users.ID WHERE SessionID = "%s"' % SID  # is the user logged in?
+			sql = 'SELECT loggedin, UserName, KortemmeLabMember FROM Sessions INNER JOIN Users on UserID=Users.ID WHERE SessionID = "%s"' % SID  # is the user logged in?
 			result = DBConnection.execQuery(sql)
 			
-			allowedQueries = ["register", "login", "loggedin", "logout", "index", "jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"]
+			allowedQueries = ["register", "login", "loggedin", "logout", "index"]
 			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
+			if settings["LiveWebserver"]:
+				allowedQueries.extend(["jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"])
 			if not(settings["LiveWebserver"]):
-				allowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
-				subAllowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+				if result and result[0][1] == 'oconchus':
+					allowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+					subAllowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+				elif result and result[0][2] == 1:
+					allowedQueries.extend(["Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "benchmarkreport"])
+					subAllowedQueries.extend(["Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "benchmarkreport"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
-			if result[0][0] == 1 and form.has_key("query") and form['query'].value in allowedQueries:
-				query_type = form["query"].value
-
+			if result and result[0][0] == 1:
 				sql = "SELECT u.UserName,u.ID FROM Sessions s, Users u WHERE s.SessionID = \"%s\" AND u.ID=s.UserID" % SID
-				result = DBConnection.execQuery(sql)
-				if result[0][0] != () and result[0][0] != (): #todo
-					username = result[0][0]
-					userid = int(result[0][1])
+				userresult = DBConnection.execQuery(sql)
+				if userresult and userresult[0][0] != () and userresult[0][0] != (): #todo
+					username = userresult[0][0]
+					userid = int(userresult[0][1])
+			if  form.has_key("query") and form['query'].value in allowedQueries:
+				query_type = form["query"].value
 			elif form.has_key("query") and form['query'].value in subAllowedQueries:
 				query_type = form["query"].value
 			else:
 				query_type = "index" # fallback, shouldn't occur
-
 		# send cookie info to webbrowser. DO NOT DELETE OR COMMENT THIS LINE!
 		s.write(str(my_session.cookie) + '\n')
 		
 		if not(form.has_key("query")) or form["query"].value not in ["PDB", "benchmarkreport", "Gen9File"]:
 			s.write("Content-type: text/html\n\n")
+		
 		s.write(debug)
 		my_session.close()
-
+	
 	###############################
 	# HTML CODE GENERATION
 	###############################
@@ -539,7 +555,102 @@ def ws():
 		if not(settings["LiveWebserver"]):
 			html_content = rosettaHTML.gen9Page(settings, form, userid)
 			title = 'Gen9'
+	
+	elif query_type == "Gen9Comment":
+		if not(settings["LiveWebserver"]):
+			Gen9Error = None
+			success = True
+			try:
+				assert(form.has_key('Gen9Page'))
+				assert(form.has_key('gen9sort1'))
+				assert(form.has_key('gen9sort2'))
+			except:
+				success = False
+				print("Error: Could not find form values for Gen9 page settings.")
+			
+			DesignID = None
+			Gen9Username = None
+			try:
+				assert(form.has_key('DesignID'))
+				assert(form.has_key('Username'))
+				DesignID = int(form['DesignID'].value)
+				Gen9Username = form['Username'].value
+			except:
+				success = False
+				print("Error: Could not find form values for username and design ID.")
+			
+			if success:
+				gen9db = getGen9Connection()
+				
+				design_rating = None
+				if form.has_key('user-design-rating-%d' % DesignID):
+					if form['user-design-rating-%d' % DesignID].value != 'None':
+						design_rating = form['user-design-rating-%d' % DesignID].value
+				design_notes = None
+				if form.has_key('user-design-comments-%d' % DesignID):
+					if form['user-design-comments-%d' % DesignID].value != 'None':
+						design_notes = form['user-design-comments-%d' % DesignID].value
+					
+				scaffold_rating = None
+				if form.has_key('user-scaffold-rating-%d' % DesignID):
+					if form['user-scaffold-rating-%d' % DesignID].value != 'None':
+						scaffold_rating = form['user-scaffold-rating-%d' % DesignID].value
+				scaffold_notes = None
+				if form.has_key('user-scaffold-comments-%d' % DesignID):
+					if form['user-scaffold-comments-%d' % DesignID].value != 'None':
+						scaffold_notes = form['user-scaffold-comments-%d' % DesignID].value
+				
+				gres = gen9db.execute("SELECT * FROM UserDesignRating WHERE UserID=%s AND DesignID=%s", parameters=(Gen9Username, DesignID))
+				if gres:
+					assert(len(gres) == 1)
+					gen9db.execute("UPDATE UserDesignRating SET Rating=%s WHERE UserID=%s AND DesignID=%s", parameters=(design_rating, Gen9Username, DesignID))
+					gen9db.execute("UPDATE UserDesignRating SET RatingNotes=%s WHERE UserID=%s AND DesignID=%s", parameters=(design_notes, Gen9Username, DesignID))
+				elif design_rating and (not(design_notes) or (design_notes =="") or (design_notes == "None")):
+					Gen9Error = "You need to specify a design rating AND add notes."
+				elif design_notes and (not(design_rating) or (design_rating =="") or (design_rating == "None")):
+					Gen9Error = "You need to specify a design rating AND add notes."
+				elif design_rating and design_notes: 
+					details = {
+						'UserID'			: Gen9Username,
+						'DesignID'			: DesignID,
+						'Rating'			: design_rating,
+						'RatingNotes'		: design_notes,
+					}
+					gen9db.insertDict('UserDesignRating', details,)
 
+				ComplexID = gen9db.execute("SELECT ComplexID FROM Design INNER JOIN PDBBiologicalUnit ON Design.WildtypeScaffoldPDBFileID=PDBFileID AND Design.WildtypeScaffoldBiologicalUnit=BiologicalUnit WHERE ID=%s", parameters=(DesignID,))
+				assert(ComplexID)
+				assert(len(ComplexID) == 1)
+				ComplexID = ComplexID[0]['ComplexID']
+				
+				gres = gen9db.execute("SELECT * FROM UserScaffoldRating WHERE UserID=%s AND ComplexID=%s", parameters=(Gen9Username, ComplexID))
+				if gres:
+					assert(len(gres) == 1)
+					gen9db.execute("UPDATE UserScaffoldRating SET Rating=%s WHERE UserID=%s AND ComplexID=%s", parameters=(scaffold_rating, Gen9Username, ComplexID))
+					gen9db.execute("UPDATE UserScaffoldRating SET RatingNotes=%s WHERE UserID=%s AND ComplexID=%s", parameters=(scaffold_notes, Gen9Username, ComplexID))
+				elif scaffold_rating and (not(scaffold_notes) or (scaffold_notes =="") or (scaffold_notes == "None")):
+					Gen9Error = "You need to specify a scaffold rating AND add notes."
+				elif scaffold_notes and (not(scaffold_rating) or (scaffold_rating =="") or (scaffold_rating == "None")):
+					Gen9Error = "You need to specify a scaffold rating AND add notes."
+				elif scaffold_rating and scaffold_notes: 
+					details = {
+						'UserID'			: Gen9Username,
+						'ComplexID'			: ComplexID,
+						'Rating'			: scaffold_rating,
+						'RatingNotes'		: scaffold_notes,
+						'TerminiAreOkay'	: None,
+					}
+					gen9db.insertDict('UserScaffoldRating', details,)
+					
+			#form.has_key('Gen9Page').value
+			
+			html_content = rosettaHTML.gen9Page(settings, form, userid, Gen9Error)
+			title = 'Gen9'
+			
+			#html_content = rosettaHTML.gen9Page(settings, form, userid)
+			#title = 'Gen9'
+	
+	
 	elif query_type == "Gen9File":
 		if not(settings["LiveWebserver"]):
 			if form.has_key('download'):
@@ -843,17 +954,23 @@ def login(form, my_session, t):
 	SID = my_session.cookie['sid'].value
 	lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
 		
+	# Disable guest login to albana
+	if not(settings["LiveWebserver"]) and form.has_key('myUserName') and form["myUserName"].value == "guest":
+		return False
+	
 	## we first check if the user can login
 	if form.has_key('login') and form['login'].value == "login":
 		# this is for the guest user
+		
 		if not form.has_key('myUserName'):
 			return 'wrong_username'
-		elif form["myUserName"].value == "guest" and not form.has_key('myPassword'):
+		elif settings["LiveWebserver"] and (form["myUserName"].value == "guest" and not form.has_key('myPassword')):
 			password_entered = ''
 		elif not form.has_key('myPassword'):
 			return 'wrong_password'
 		else:
 			password_entered = form["myPassword"].value
+		
 		# check for userID and password
 		sql = 'SELECT ID,Password FROM Users WHERE UserName = "%s"' % form["myUserName"].value
 		result = DBConnection.execQuery(sql)
@@ -875,7 +992,7 @@ def login(form, my_session, t):
 	else: # need form
 		sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID
 		result = DBConnection.execQuery(sql)
-		if result[0][0] == 1:
+		if result and result[0][0] == 1:
 			return 'logged_in'
 
 		return False
@@ -2190,7 +2307,7 @@ try:
 		sys.stdout.close()		
 except Exception, e:
 	sys.stdout.write("Content-type: text/html\n\n")
-	if hostname in DEVELOPMENT_HOSTS:
+	if True or hostname in DEVELOPMENT_HOSTS:
 		cgitb.handler()
 		print("<br><pre>e = %s" % e)
 		print("\n")

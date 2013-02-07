@@ -56,7 +56,16 @@ def generateBrowsePage(form):
 	html = []
 	chartfns = []
 	html.append('''<center><div>''')
-	html.append('''<H1 align="center">update: [sorting is working, filtering will be added]</H1><br>''')
+	html.append('''<H1 align="center">To be done: <br>-fix residue numbering<br>-add filtering<br>-add motif images</H1><br>''')
+	html.append('''<H1 align="left" style='color:#005500;'>
+The scaffold column is colored depending on the scaffold rating which may differ from the design rating.
+<br>
+Colors are based on the *worst* user rating.
+<br>''')
+
+	html.append('''<H1 align="left" style='color:#550000;'>
+Mutation residue IDs use Rosetta numbering, not PDB numbering. HOWEVER, this is computed dumbly on the page<br> using sequences of strings ordered by chain ID. This is usually correct but when the PDB file contains chain B before<br> chain A, this numbering is incorrect e.g. see Design 131. This will be fixed by using Roland's script to extract the mutated<br>residues IDs and store them in the database explicitly.
+</H1><br>''')
 	html.append('''<H1 align="left">Designs</H1><br>''')
 	
 	if True:
@@ -120,14 +129,13 @@ def generateBrowsePage(form):
 	html.append('''</div>''')
 	
 	
-	html.append('''<FORM name="reportpageform" method="post" action="#">''')
 	html.append('''<table style="width:800px;">''')
 	html.append('''<tr><td>''')
-	html.append('''<table class="sortable" border=1 cellpadding=4 cellspacing=0  width="1100px" style="font-size:12px;text-align:left">''')
+	html.append('''<table   border=1 cellpadding=4 cellspacing=0  width="1100px" style="font-size:12px;text-align:left">''')
 	
 	html.append("<tr style='background-color:#dddddd'>")
 	#style='width:100px;'
-	html.append("<th>ID</th><th>Complex</th><th style='width:50px;'>Type</th><th style='width:50px;'>File</th><th>Target</th><th style='width:50px;'>Scaffold</th><th style='width:250px;'>List of best designs resp. best relaxed designs (enzdes weights)</th><th>User comments</th>")
+	html.append("<th>ID</th><th>Complex</th><th style='width:50px;'>Type</th><th style='width:50px;'>File</th><th>Target</th><th style='width:50px;'>Scaffold</th><th style='width:250px;'>List of best designs resp. best relaxed designs (enzdes weights)</th><th style='width:50px;'>Comments</th>")
 	html.append("</tr>")
 	
 	#benchmark_details['BenchmarkRuns'] = gen9db.execute("SELECT ID, BenchmarkID, RunLength, RosettaSVNRevision, RosettaDBSVNRevision, RunType, CommandLine, BenchmarkOptions, ClusterQueue, ClusterArchitecture, ClusterMemoryRequirementInGB, ClusterWalltimeLimitInMinutes, NotificationEmailAddress, EntryDate, StartDate, EndDate, Status, AdminCommand, Errors FROM BenchmarkRun ORDER BY ID")
@@ -161,11 +169,21 @@ def generateBrowsePage(form):
 	
 	designs = gen9db.execute("SELECT Design.ID AS DesignID, PDBBiologicalUnit.ComplexID, Design.*, SmallMolecule.Name AS SmallMoleculeName, SmallMolecule.ID AS SmallMoleculeID, SmallMoleculeMotif.Name AS TargetMotifName FROM Design INNER JOIN SmallMoleculeMotif ON TargetSmallMoleculeMotifID=SmallMoleculeMotif.ID INNER JOIN SmallMolecule ON SmallMoleculeID=SmallMolecule.ID INNER JOIN PDBBiologicalUnit ON PDBBiologicalUnit.PDBFileID=WildtypeScaffoldPDBFileID AND PDBBiologicalUnit.BiologicalUnit=WildtypeScaffoldBiologicalUnit ORDER BY %s" % sorting_criteria)
 	
+	UserScaffoldRatings = {}
+	UserScaffoldTerminiOkay = {}
+	results = gen9db.execute("SELECT UserScaffoldRating.*, User.FirstName FROM UserScaffoldRating INNER JOIN User ON UserID=User.ID")
+	for r in results:
+		key = r['ComplexID']
+		UserScaffoldRatings[key] = UserScaffoldRatings.get(key, {})
+		UserScaffoldRatings[key][r['UserID']] = r
+		if r['TerminiAreOkay']:
+			UserScaffoldTerminiOkay[key] = r['TerminiAreOkay']
+	
 	for design in designs:
 		UserDesignRatings = gen9db.execute("SELECT * FROM UserDesignRating INNER JOIN User ON UserID=User.ID WHERE DesignID=%s ORDER BY FirstName", parameters=(design['DesignID'],))
 		
-		# Determine row color based on ratings
-		benchmark_color = '#cccccc'
+		# Determine main row color based on ratings
+		design_color = '#cccccc'
 		bad_design = False
 		okay_design = False
 		good_design = False
@@ -177,17 +195,44 @@ def generateBrowsePage(form):
 			elif r['Rating'] == 'Maybe':
 				okay_design = True
 			else:
-				raise Exception("Bad user rating")
+				# if no rating is given, assume a good rating
+				good_design = True
 		if bad_design:
-			benchmark_color = '#FF4D4D'
+			design_color = '#FF4D4D'
 		elif okay_design:
-			benchmark_color = '#ffffaa'
+			design_color = '#FFCC00'
 		elif good_design:
-			benchmark_color = '#aaffaa'
+			design_color = '#00CC00'
 		
-		html.append("<tr style='background-color:%s'>" % benchmark_color)
+		# Determine scaffold color based on ratings
+		scaffold_color = '#cccccc'
+		bad_scaffold = False
+		okay_scaffold = False
+		good_scaffold = False
+		no_rating = False
+		if UserScaffoldRatings.get(design['ComplexID']):
+			for user_id, scaffold_rating in UserScaffoldRatings[design['ComplexID']].iteritems():
+				if scaffold_rating['Rating'] == 'Bad':
+					bad_scaffold = True
+				elif scaffold_rating['Rating'] == 'Good':
+					good_scaffold = True
+				elif scaffold_rating['Rating'] == 'Maybe':
+					okay_scaffold = True
+				elif user_id == 'huangy2':
+					no_rating = True
+				else:
+					# if no rating is given, assume a good rating
+					good_design = True
+			if bad_scaffold:
+				scaffold_color = '#FF4D4D'
+			elif okay_scaffold:
+				scaffold_color = '#FFCC00'
+			elif good_scaffold:
+				scaffold_color = '#00CC00'
+			
+		# Create an anchor to the row
+		html.append("<tr id='%d' style='background-color:%s'>" % (design['DesignID'], design_color))
 		
-		# ID
 		html.append("<td>%(DesignID)d</td>" % design)
 		html.append("<td>%(ComplexID)d</td>" % design)
 		html.append("<td>%(Type)s</td>" % design)
@@ -203,8 +248,9 @@ def generateBrowsePage(form):
 		design['motif_info'] = motif_info
 					
 		html.append("<td>%(SmallMoleculeName)s<br>%(SmallMoleculeID)s<br>%(TargetMotifName)s<br>%(motif_info)s</td>" % design)
-			
-		html.append("<td>%(WildtypeScaffoldPDBFileID)s<br>%(WildtypeScaffoldBiologicalUnit)s</td>" % design)
+		
+		html.append("<td style='background-color:%s'>" % scaffold_color)
+		html.append("%(WildtypeScaffoldPDBFileID)s<br>%(WildtypeScaffoldBiologicalUnit)s</td>" % design)
 		
 		# Scores
 		colors = ['#eeeeee', '#dddddd']
@@ -238,27 +284,29 @@ def generateBrowsePage(form):
 			
 		html.append("</table></td>")
 		
-		html.append("<td><div style='width:250px;'></div>")
+		html.append("<td style='vertical-align:top;'><b>Design comments</b><br><div style='width:20px;'></div>")
 		if UserDesignRatings:
 			html.append("<table style='border-collapse: collapse;'>")
 			for user_rating in UserDesignRatings:
-				html.append("<tr style='background-color:%s'>" % colors[1])
-				if user_rating['FirstName'] == 'Yao-ming':
-					html.append("<td style='width:65px;border: 1px solid black;'>Ming</td>")
-				else:
-					html.append("<td style='width:65px;border: 1px solid black;'>%s</td>" % user_rating['FirstName'])
-				html.append("<td style='border: 1px solid black;'>%s</td>" % user_rating['Rating'])
-				html.append("<td style='border: 1px solid black;'>%s</td>" % user_rating['RatingNotes'])
-				html.append("</tr>")
+				# Hide empty ratings
+				if user_rating['Rating'] or user_rating['RatingNotes']:
+					html.append("<tr style='background-color:%s'>" % colors[1])
+					if user_rating['FirstName'] == 'Yao-ming':
+						html.append("<td style='width:65px;border: 1px solid black;'>Ming</td>")
+					else:
+						html.append("<td style='width:65px;border: 1px solid black;'>%s</td>" % user_rating['FirstName'])
+					html.append("<td style='border: 1px solid black;'>%s</td>" % user_rating['Rating'])
+					html.append("<td style='border: 1px solid black;'>%s</td>" % user_rating['RatingNotes'])
+					html.append("</tr>")
 			html.append("</table>")
 		html.append("</td>")
 		
 		html.append("</tr>")
 		
-		html.append("<tr><td>%(DesignID)s</td>" % design)
+		html.append("<tr style='background-color:#CCE0F5'><td>%(DesignID)s</td>" % design)
 		html.append("<td>%(ComplexID)d</td>" % design)
 		html.append("<td COLSPAN='5'>")
-		html.append("<b>Scaffold sequences<br></b>")
+		html.append("<b>Scaffold sequences<br><br></b>")
 		
 		#if design['SequenceMatches'] == 'ATOM':
 		#	html.append('<b style="color:#885500">Note: The ATOM records of the PDB file are missing residues listed in the SEQRES records.</b><br><br>')
@@ -289,9 +337,11 @@ def generateBrowsePage(form):
 			assert(sp[1])
 			assert(sp[2])
 		
+		residue_offset = 0
 		for chainID, s_pair in sorted(sequence_pairs.iteritems()):
-			html.append('<b>Chain: %s</b><br>' % chainID)
-			html.append("<table>")
+			mutation_residueIDs = []
+			sub_html = []
+			sub_html.append("<table>")
 			if len(s_pair[0]) == len(s_pair[2]):
 				
 				wt_sequence = s_pair[0]
@@ -303,132 +353,154 @@ def generateBrowsePage(form):
 				counter = '1234567890' * (len(s_pair[0])/10) + ('1234567890')[0:len(s_pair[0])%10]
 				ncount = 0
 				for x in range(len(wt_subsequences)):
-					wt_sequence = wt_subsequences[x]
-					mutant_sequence = mutant_subsequences[x]
-					
-					html.append("<tr><td>        </td><td style='font-family:monospace;'>%s</td></tr>" % counter[ncount:ncount+n])
-						
-					html.append("<tr><td>Wildtype</td><td style='font-family:monospace;'>%s</td></tr>" % wt_sequence)
+					wt_subsequence = wt_subsequences[x]
+					mutant_subsequence = mutant_subsequences[x]
+					#html.append("<tr><td>        </td><td style='font-family:monospace;'>%s</td></tr>" % counter[ncount:ncount+n])
+					#html.append("<tr><td>Wildtype</td><td style='font-family:monospace;'>%s</td></tr>" % wt_subsequence)
+					seq1 = []
 					seq2 = []
-					for x in range(len(mutant_sequence)):
-						if wt_sequence[x] == mutant_sequence[x]:
-							seq2.append(mutant_sequence[x])
+					for x in range(len(mutant_subsequence)):
+						if wt_subsequence[x] == mutant_subsequence[x]:
+							seq1.append(wt_subsequence[x])
+							seq2.append(mutant_subsequence[x])
 						else:
-							seq2.append("<span style='background-color:#ffff00;'><font color='#990099'>%s</font></span>" % mutant_sequence[x])
-					html.append("<tr><td>Mutant</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(seq2))
+							mutation_residueIDs.append({'Chain' : chainID, 'ResidueID' : residue_offset + ncount + x + 1, 'WildTypeAA' : wt_subsequence[x], 'MutantAA' : mutant_subsequence[x]})
+							seq1.append("<span style='background-color:#00dd00;'><font color='#003300'>%s</font></span>" % wt_subsequence[x])
+							seq2.append("<span style='background-color:#ffff00;'><font color='#990099'>%s</font></span>" % mutant_subsequence[x])
+					sub_html.append("<tr><td>Wildtype</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(seq1))
+					sub_html.append("<tr><td>Mutant</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(seq2))
 					ncount += n
+				residue_offset += len(wt_sequence)
+			
 			else:
-				html.append("<tr><td>Mutant</td><td>Error: The length of the wildtype chain does not match what the database describes as the corresponding mutant chain.</td></tr>")
-			html.append("</table>")
+				sub_html.append("<tr><td>Mutant</td><td>Error: The length of the wildtype chain does not match what the database describes as the corresponding mutant chain.</td></tr>")
+			sub_html.append("</table>")
+
+			if mutation_residueIDs:
+				html.append('<b>Chain %s: Mutations %s (%d mutations in total)</b><br>' % (chainID, ", ".join(["%(WildTypeAA)s%(ResidueID)s%(MutantAA)s" % m for m in mutation_residueIDs]), len(mutation_residueIDs)))
+			else:
+				html.append('<b>Chain %s</b><br>' % chainID)
+			html.extend(sub_html)
 			
 		html.append("</td>")
 		html.append("<td style='vertical-align:top;' >")
 		html.append("<b>Scaffold comments<br></b>")
+		
+		key = design['ComplexID']
+		if UserScaffoldRatings.get(key) or UserScaffoldTerminiOkay.get(key):
+			html.append("<table style='border-collapse: collapse;'>")
+			for user, user_rating in sorted(UserScaffoldRatings[key].iteritems()):
+				if user_rating['Rating']:
+					html.append("<tr style='background-color:%s'>" % colors[1])
+					if user_rating['FirstName'] == 'Yao-ming':
+						html.append("<td style='width:65px;border: 1px solid black;'>Ming</td>")
+					else:
+						html.append("<td style='width:65px;border: 1px solid black;'>%s</td>" % user_rating['FirstName'])
+					html.append("<td style='border: 1px solid black;'>%s</td>" % user_rating['Rating'])
+					html.append("<td style='border: 1px solid black;'>%s</td>" % user_rating['RatingNotes'])
+					html.append("</tr>")
+			if UserScaffoldTerminiOkay.get(key):
+				html.append("<tr style='background-color:%s'><td style='width:65px;border: 1px solid black;'>TerminiOkay?</td><td style='border: 1px solid black;'>%s</td></tr>" % (colors[1], UserScaffoldTerminiOkay[key]))
+				
+			html.append("</table>")
+		
+		
 		html.append("</td>")
 		html.append("</tr>")
 		
-		html.append("<tr><td>%(DesignID)s</td>" % design)
-		html.append("<td>%(ComplexID)d</td>" % design)
-		username = 'rpache'
 		if username:
-			username = 'rpache'
+			html.append("<tr><td>%(DesignID)s</td>" % design)
+			html.append("<td>%(ComplexID)d</td>" % design)
 			html.append("<td COLSPAN='6'>")
+			html.append('''<FORM name="gen9form-%(DesignID)d" method="post">''' % design)
+			html.append('''<input type="hidden" NAME="DesignID" VALUE="%(DesignID)d">''' % design)
+			html.append('''<input type="hidden" NAME="Username" VALUE="%s">''' % username)
+			html.append('''<input type="hidden" NAME="Gen9Page" VALUE="">''')
+			html.append('''<input type="hidden" NAME="query" VALUE="">''')
+			html.append('''<input type="hidden" NAME="gen9sort1" VALUE="">''')
+			html.append('''<input type="hidden" NAME="gen9sort2" VALUE="">''')
+	
 			html.append("<table>")
-			html.append("<tr><td>User</td><td>%s</td></tr>" % username)
 			
-			user_comments = ""
-			user_rating = ""
+			user_design_comments = ""
+			user_design_rating = ""
+			user_scaffold_comments = "" 
+			user_scaffold_rating = ""
+			
 			for udr in UserDesignRatings:
 				if udr['UserID'] == username:
-					user_comments = udr['RatingNotes']
-					user_rating = udr['Rating']
-			html.append("<tr><td>Design rating:</td><td><select name='user-design-rating-%d'>" % design['DesignID'])
+					user_design_comments = udr['RatingNotes']
+					user_design_rating = udr['Rating']
 			
-			if user_rating == "":
+			key = design['ComplexID']
+			if UserScaffoldRatings.get(key):
+				if UserScaffoldRatings[key].get(username):
+					user_scaffold_comments = UserScaffoldRatings[key][username]['RatingNotes']
+					user_scaffold_rating = UserScaffoldRatings[key][username]['Rating']
+			
+			html.append("<tr><td>Design rating:</td><td><select name='user-design-rating-%d'>" % design['DesignID'])
+			if user_design_rating == "":
 				html.append("<option value='None' selected='selected'>[none]</option>")
 			else:
 				html.append("<option value='None'>[none]</option>")
 			
-			if user_rating == "Bad":
+			if user_design_rating == "Bad":
 				html.append("<option value='Bad' selected='selected'>Bad</option>")
 			else:
 				html.append("<option value='Bad'>Bad</option>")
 			
-			if user_rating == "Good":
+			if user_design_rating == "Good":
 				html.append("<option value='Good' selected='selected'>Good</option>")
 			else:
 				html.append("<option value='Good'>Good</option>")
 			
-			if user_rating == "Maybe":
+			if user_design_rating == "Maybe":
 				html.append("<option value='Maybe' selected='selected'>Maybe</option>")
 			else:
 				html.append("<option value='Maybe'>Maybe</option>")
 			html.append("</select></td></tr>")
-			html.append("""<tr><td>Comments on the design:</td><td><input type=text size=100 maxlength=300 name='user-design-comments-%d' value="%s"></td></tr>""" % (design['DesignID'], user_comments.replace('"',"'")))
-			html.append("<tr><td>Comments on the scaffold:</td><td><input type=text size=100 maxlength=300 name='user-scaffold-comments-%d' value=''></td></tr>" % design['DesignID'])
-			html.append("""<tr><td><button type='submit' name='user-comments-submit-%d' onClick='alert("does nothing at present"); return false;'>Submit comments</button></td></tr>""" % design['DesignID'])
+			if user_design_comments:
+				html.append("""<tr><td>Comments on the design:</td><td><input type=text size=100 maxlength=300 name='user-design-comments-%d' value="%s"></td></tr>""" % (design['DesignID'], user_design_comments.replace('"',"'")))
+			else:
+				html.append("""<tr><td>Comments on the design:</td><td><input type=text size=100 maxlength=300 name='user-design-comments-%d' value=""></td></tr>""" % (design['DesignID']))
+			
+			html.append("""<tr><td></td></tr>""")
+			##
+			
+			html.append("<tr><td>Scaffold rating:</td><td><select name='user-scaffold-rating-%d'>" % design['DesignID'])
+			if user_scaffold_rating == "":
+				html.append("<option value='None' selected='selected'>[none]</option>")
+			else:
+				html.append("<option value='None'>[none]</option>")
+			
+			if user_scaffold_rating == "Bad":
+				html.append("<option value='Bad' selected='selected'>Bad</option>")
+			else:
+				html.append("<option value='Bad'>Bad</option>")
+			
+			if user_scaffold_rating == "Good":
+				html.append("<option value='Good' selected='selected'>Good</option>")
+			else:
+				html.append("<option value='Good'>Good</option>")
+			
+			if user_scaffold_rating == "Maybe":
+				html.append("<option value='Maybe' selected='selected'>Maybe</option>")
+			else:
+				html.append("<option value='Maybe'>Maybe</option>")
+			html.append("</select></td></tr>")
+			
+			if user_scaffold_comments:
+				html.append("""<tr><td>Comments on the scaffold:</td><td><input type=text size=100 maxlength=300 name='user-scaffold-comments-%d' value="%s"></td></tr>""" % (design['DesignID'], user_scaffold_comments.replace('"',"'")))
+			else:
+				html.append("""<tr><td>Comments on the scaffold:</td><td><input type=text size=100 maxlength=300 name='user-scaffold-comments-%d' value=""></td></tr>""" % (design['DesignID']))
+			
+			
+			html.append("""<tr><td><button type='submit' name='user-comments-submit-%d' onClick='copyPageFormValues(this);'>Submit comments</button></td></tr>""" % design['DesignID'])
 			html.append("</table>")
+			html.append('''</FORM>''') 
 			html.append("</td>")
 			
-		html.append("</tr>")
-		
-		continue
-		html.append("<td>%(BenchmarkID)s</td>" % run)
-		html.append("<td>%(RunLength)s</td>" % run)
-		design['']
-		design['WildtypeScaffoldPDBFileID']
-		design['WildtypeScaffoldBiologicalUnit']
-		design['MutantComplexID']
-		design['SequenceMatches']
-		
-		
-		showprogressjavascript = '''window.location.href = 'https://kortemmelab.ucsf.edu/backrub/benchmarks/KIC/%d/progress.html';''' % run["ID"]
-		if run['Status'] == 'queued':
-			html.append("<td style='text-align:center; background-color:#ffffff'>%(Status)s</td>" % run)
-		elif run['Status'] == 'active':
-			html.append("<td style='text-align:center; background-color:#ffff00'>%(Status)s" % run)
-			html.append('''<br><span style='cursor:pointer;' onclick="%(showprogressjavascript)s"><img width="20" height="10" src='../images/progress-active82x30.png' alt='progress'></span></td>''' % vars())
-		elif run['Status'] == 'done':
-			html.append("<td style='text-align:center; text-align:center; background-color:#00aa00'>%(Status)s" % run)
-			html.append('''<br><span style='cursor:pointer;' onclick="%(showprogressjavascript)s"><img width="20" height="10" src='../images/progress-done82x30.png' alt='progress'></span></td>''' % vars())
-		elif run['Status'] == 'failed':
-			html.append("<td style='text-align:center; background-color:#aa0000'>%(Status)s" % run)
-			html.append('''<br><span style='cursor:pointer;' onclick="%(showprogressjavascript)s"><img width="20" height="10" src='../images/progress-failed82x30.png' alt='progress'></span></td>''' % vars())
-		html.append("<td>%(RosettaSVNRevision)s</td>" % run)
-		html.append("<td>%(RosettaDBSVNRevision)s</td>" % run)
-		
-		tooltip = "header=[Command line] body=[%(CommandLine)s] offsetx=[-90] offsety=[20] singleclickstop=[on] cssbody=[tooltipbenchmark] cssheader=[tthbenchmark] length=[600px] delay=[250]" % run
-		html.append("<td title='%s'>%s</td>" % (tooltip, run['RunType']))
-		
-		html.append("<td style='width:400px;'>")
-		html.append("</td>")
-		
-		if run["StartDate"] and run["EndDate"]:
-			tdelta = run["EndDate"] - run["StartDate"] 
-			dInMinutes = int(tdelta.seconds/60) 
-			dDays = ""
-			if tdelta.days:
-				dDays = "%dd " % tdelta.days
-			if dInMinutes >= 60:
-				dHours = int(dInMinutes / 60)
-				dMinutes = dInMinutes % 60
-				html.append("<td>%(dDays)s%(dHours)dh %(dMinutes)dm</td>" % vars())
-			else:
-				html.append("<td>%(dDays)s%(dInMinutes)dm</td>" % vars())
-		else:
-			html.append("<td></td>")
-			#html.append("<td>%(EntryDate)s</td>" % run)
-			
-		html.append("<td>None</td>" % run)
-		
-		if run["Status"] == "done":
-			html.append('''<td style='text-align:center; width:80px;'>
-				</td>''' % vars())
-		else:
-			html.append('''<td></td>''')
-		html.append("<td><input type='radio' name='benchmarkresults1' onchange='benchmarkWasSelected();' value='%(ID)d'></td>" % run)
-		html.append("<td><input type='radio' name='benchmarkresults2' onchange='benchmarkWasSelected();' value='%(ID)d'></td>" % run)
-		html.append("</tr>")
+			html.append("</tr>")
 		
 	html.append('''</table>''')
 	html.append('''</td></tr>''')
@@ -441,12 +513,12 @@ def generateBrowsePage(form):
 	html.append('''<input type="hidden" NAME="Benchmark2Name" VALUE="">''')
 	html.append('''<input type="hidden" NAME="Benchmark1ID" VALUE="">''')
 	html.append('''<input type="hidden" NAME="Benchmark2ID" VALUE="">''')
-	html.append('''</FORM></div></center>''')
+	html.append('''</div></center>''')
 	
 	return html, chartfns
 
 
-def generateGen9Page(settings_, rosettahtml, form, userid_):
+def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error):
 	global gen9db
 	gen9db = rosettadb.DatabaseInterface(settings_, host = "kortemmelab.ucsf.edu", db = "Gen9Design")
 	rosettaweb = rosettadb.DatabaseInterface(settings_, host = "localhost", db = "rosettaweb")
@@ -507,9 +579,18 @@ def generateGen9Page(settings_, rosettahtml, form, userid_):
 	html.append('''<input type="button" value="Refresh" onClick="document.gen9form.query.value='Gen9'; document.gen9form.submit();">''')
 	html.append('''<input type="hidden" NAME="Gen9Page" VALUE="%s">''' % Gen9Page)
 	html.append('''<input type="hidden" NAME="query" VALUE="">''')
-	html.append('''<input type="hidden" NAME="gen9SomeValue" VALUE="">''')
 	html.append('''<input type="hidden" NAME="gen9sort1" VALUE="%s">''' % gen9sort1)
 	html.append('''<input type="hidden" NAME="gen9sort2" VALUE="%s">''' % gen9sort2)
+	
+	if form.has_key('DesignID'):
+		html.append('''<input type="hidden" NAME="DesignID" VALUE="%d">''' % int(form['DesignID'].value))
+	else:
+		html.append('''<input type="hidden" NAME="DesignID" VALUE="">''')
+	if Gen9Error:			
+		html.append('''<input type="hidden" NAME="Gen9Error" VALUE="%s">''' % Gen9Error)
+	else:
+		html.append('''<input type="hidden" NAME="Gen9Error" VALUE="">''')
+			
 	html.append('''</FORM>''')
 	html.append("</td></tr><tr>")
 	
