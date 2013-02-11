@@ -15,6 +15,26 @@
 ER  - 
 TY  - JOUR
 C8  - 2012 Publications
+T1  - Prediction of Mutational Tolerance in HIV-1 Protease and Reverse Transcriptase Using Flexible Backbone Protein Design
+A1  - Humphris-Narayanan, Elisabeth L.
+A1  - Akiva, Eyal
+A1  - Varela, Rocco
+A1  - Ó Conchúir, Shane
+A1  - Kortemme, Tanja
+Y1  - 2012/08/23
+N2  - <title>Author Summary</title><p>Many related protein sequences can be consistent with the structure and function of a given protein, suggesting that proteins may be quite robust to mutations. This tolerance to mutations is frequently exploited by pathogens. In particular, pathogens can rapidly evolve mutated proteins that have a new function - resistance against a therapeutic inhibitor - without abandoning other functions essential for the pathogen. This principle may also hold more generally: Proteins tolerant to mutational changes can more easily acquire new functions while maintaining their existing properties. The ability to predict the tolerance of proteins to mutation could thus help both to analyze the emergence of resistance mutations in pathogens and to engineer proteins with new functions. Here we develop a computational model to predict protein mutational tolerance towards point mutations accessible by single nucleotide changes, and validate it using two important pathogenic proteins and therapeutic targets: the protease and reverse transcriptase from HIV-1. The model provides insights into how resistance emerges and makes testable predictions on mutations that have not been seen yet. Similar models of mutational tolerance should be useful for characterizing and reengineering the functions of other proteins for which a three-dimensional structure is available.</p>
+JF  - PLoS Computational Biology
+JA  - PLoS Computational Biology
+VL  - 8
+IS  - 8
+UR  - http://dx.doi.org/10.1371%2Fjournal.pcbi.1002639
+SP  - e1002639
+EP  -
+PB  - Public Library of Science
+M3  - doi: 10.1371/journal.pcbi.1002639
+ER  -
+TY  - JOUR
+C8  - 2012 Publications
 C7  - http://www.sciencemag.org/cgi/content/full/336/6083/911?ijkey=RAm8AM.4LYaJU&keytype=ref&siteid=sci 
 A1  - Eames, Matt
 A1  - Kortemme, Tanja
@@ -1783,6 +1803,47 @@ N2  - BACKGROUND:Recently, there has been much interest in relating domain-domai
 ER  - 
 TY  - JOUR
 C8  - LabMember
+T1  - Directed Evolution of the Quorum-Sensing Regulator EsaR for Increased Signal Sensitivity
+AU  - Shong, Jasmine
+AU  - Huang, Yao-ming
+AU  - Bystroff, Christopher
+AU  - Collins, Cynthia H.
+Y1  - 2013/01/30
+PY  - 2013
+N1  - doi: 10.1021/cb3006402
+DO  - doi: 10.1021/cb3006402
+T2  - ACS Chemical Biology
+JF  - ACS Chemical Biology
+JO  - ACS Chemical Biology
+PB  - American Chemical Society
+SN  - 1554-8929
+M3  - doi: 10.1021/cb3006402
+UR  - http://dx.doi.org/10.1021/cb3006402
+Y2  - 2013/02/11
+ER  - 
+TY  - CHAP
+C8  - LabMember
+AU  - Crone, D.E.
+AU  - Huang, Yao-ming
+AU  - Pitman, D.J.
+AU  - Schenkelberg, C.
+AU  - Fraser, K.
+AU  - Macari, S.
+AU  - Bystroff, Christopher
+AU  - Gronenborn, Angela M.
+A2  - Toonika Rinken
+T1  - GFP-based Biosensors
+T2  - State of the Art in Biosensors
+BT  - State of the Art in Biosensors
+VL  - 1
+SP  - 669
+EP  - 675
+SN  - 980-953-307-669-5
+PY  - 2012
+Y1  - 2013/01/01
+ER  -
+TY  - JOUR
+C8  - LabMember
 A1  - Huang, Yao-ming
 A1  - Nayak, Sasmita
 A1  - Bystroff, Christopher
@@ -1967,10 +2028,14 @@ A1  - Mosca, Roberto
 A1  - Pache, Roland A.
 A1  - Aloy, Patrick
 T1  - The role of structural disorder in the rewiring of protein interactions through evolution 
-Y1  - 2012/03/02 
+Y1  - 2012/07/01 
 JF  - Molecular & Cellular Proteomics 
 JO  - Molecular & Cellular Proteomics 
-N1  - doi: 10.1074/mcp.M111.014969 
+N1  - doi: 10.1074/mcp.M111.014969
+VL  - 11
+IS  - 7
+SP  - 1
+EP  - 8
 UR  - http://www.mcponline.org/content/early/2012/03/02/mcp.M111.014969.abstract 
 N2  - Structurally disordered regions play a key role in protein-protein interaction networks and the evolution of highly connected proteins, enabling the molecular mechanisms for multiple binding. However, the role of protein disorder in the evolution of interaction networks has been only investigated through the analysis of individual proteins, being impossible to distinguish its specific impact in the (re) shaping of their interaction environments. Now, the availability of large interactomes for several model organisms permits to explore the role of disorder in protein interaction networks not only at the level of the interacting proteins, but of the interactions themselves. By comparing the interactomes of human, fly and yeast, we discovered that, despite being much more abundant, disordered interactions are significantly less conserved than their ordered counterparts. Furthermore, our analyses provide evidence that this happens not only because disordered proteins are less conserved, but also because they display a higher capacity to rewire their interaction neighborhood through evolution. Overall, our results support the hypothesis that conservation of disorder gives a clear evolutionary advantage, facilitating the change of interaction partners during evolution. Moreover, this mechanism is not exclusive of a few anecdotal cases but a global feature present in the interactome networks of entire organisms. 
 ER  -
@@ -1980,11 +2045,15 @@ A1  - Pache, Roland A.
 A1  - Céol, Arnaud
 A1  - Aloy, Patrick
 T1  - NetAligner—a network alignment server to compare complexes, pathways and whole interactomes 
-Y1  - 2012/05/22 
+Y1  - 2012/07/01
 JF  - Nucleic Acids Research 
 JO  - Nucleic Acids Research 
+SP  - W157 
+EP  - W161 
 N1  - doi: 10.1093/nar/gks446 
-UR  - http://nar.oxfordjournals.org/content/early/2012/05/22/nar.gks446.abstract 
+VL  - 40 
+IS  - W1 
+UR  - http://nar.oxfordjournals.org/content/40/W1/W157.abstract 
 N2  - The many ongoing genome sequencing initiatives are delivering comprehensive lists of the individual molecular components present in an organism, but these reveal little about how they work together. Follow-up initiatives are revealing thousands of interrelationships between gene products that need to be analyzed with novel bioinformatics approaches able to capture their complex emerging properties. Recently, we developed NetAligner, a novel network alignment tool that allows the identification of conserved protein complexes and pathways across organisms, providing valuable hints as to how those interaction networks evolved. NetAligner includes the prediction of likely conserved interactions, based on evolutionary distances, to counter the high number of missing interactions in current interactome networks, and a fast assessment of the statistical significance of individual alignment solutions, which increases its performance with respect to existing tools. The web server implementation of the NetAligner algorithm presented here features complex, pathway and interactome to interactome alignments for seven model organisms, namely Homo sapiens, Mus musculus, Drosophila melanogaster, Caenorhabditis elegans, Arabidopsis thaliana, Saccharomyces cerevisiae and Escherichia coli. The user can query complexes and pathways of arbitrary topology against a target species interactome, or directly compare two complete interactomes to identify conserved complexes and subnetworks. Alignment solutions can be downloaded or directly visualized in the browser. The NetAligner web server is publicly available at http://netaligner.irbbarcelona.org/. 
 ER  -
 TY  - JOUR
@@ -2611,31 +2680,31 @@ TY  - JOUR
 C8  - LabMember
 N2  - The Bioconductor project is an initiative for the collaborative creation of extensible software for computational biology and bioinformatics. The goals of the project include: fostering collaborative development and widespread use of innovative software, reducing barriers to entry into interdisciplinary scientific research, and promoting the achievement of remote reproducibility of research results. We describe details of our aims and methods, identify current challenges, compare Bioconductor to other open bioinformatics projects, and provide working examples.
 AD  - Middlesex House, 34-42 Cleveland Street, London W1T 4LB, UK
-AU  - Gentleman, RC
-AU  - Carey, VJ
-AU  - Bates, DM
-AU  - Bolstad, B
-AU  - Dettling, M
-AU  - Dudoit, S
-AU  - Ellis, B
-AU  - Gautier, L
-AU  - Ge, YC
-AU  - Gentry, J
-AU  - Hornik, K
-AU  - Hothorn, T
-AU  - Huber, W
-AU  - Iacus, S
-AU  - Irizarry, R
-AU  - Leisch, F
-AU  - Li, C
-AU  - Maechler, M
-AU  - Rossini, AJ
-AU  - Sawitzki, G
+AU  - Gentleman, R. C.
+AU  - Carey, V. J.
+AU  - Bates, D. M.
+AU  - Bolstad, B.
+AU  - Dettling, M.
+AU  - Dudoit, S.
+AU  - Ellis, B.
+AU  - Gautier, L.
+AU  - Ge, Y. C.
+AU  - Gentry, J.
+AU  - Hornik, K.
+AU  - Hothorn, T.
+AU  - Huber, W.
+AU  - Iacus, S.
+AU  - Irizarry, R.
+AU  - Leisch, F.
+AU  - Li, C.
+AU  - Maechler, M.
+AU  - Rossini, A. J.
+AU  - Sawitzki, G.
 AU  - Smith, Colin A.
-AU  - Smyth, G
-AU  - Tierney, L
-AU  - Yang, JYH
-AU  - Zhang, JH
+AU  - Smyth, G.
+AU  - Tierney, L.
+AU  - Yang, J. Y. H.
+AU  - Zhang, J. H.
 JO  - Genome Biology
 PB  - BioMed Central Ltd.
 T1  - Bioconductor: open software development for computational biology and bioinformatics
@@ -2650,18 +2719,18 @@ Y1  - 2004/09/15
 ER  - 
 TY  - JOUR
 C8  - LabMember
-AU  - Titov, Denis V
+AU  - Titov, Denis V.
 AU  - Gilman, Benjamin
 AU  - He, Qing-Li
 AU  - Bhat, Shridhar
 AU  - Low, Woon-Kai
 AU  - Dang, Yongjun
 AU  - Smeaton, Michael B.
-AU  - Demain, Arnold L
+AU  - Demain, Arnold L.
 AU  - Miller, Paul S.
-AU  - Kugel, Jennifer F
-AU  - Goodrich, James A
-AU  - Liu, Jun O
+AU  - Kugel, Jennifer F.
+AU  - Goodrich, James A.
+AU  - Liu, Jun O.
 TI  - XPB, a subunit of TFIIH, is a target of the natural product triptolide
 JA  - Nature Chemical Biology
 PY  - 2011/03//print
@@ -2872,3 +2941,39 @@ KW  - Sublethal
 KW  - Behavior
 KW  - Electrophysiology
 ER  -
+TY  - JOUR
+C8  - LabMember
+AU  - Miller, Jeffrey C.
+AU  - Tan, Siyuan
+AU  - Qiao, Guijuan
+AU  - Barlow, Kyle A.
+AU  - Wang, Jianbin
+AU  - Xia, Danny F.
+AU  - Meng, Xiangdong
+AU  - Paschon, David E.
+AU  - Leung, Elo
+AU  - Hinkley, Sarah J.
+AU  - Dulay, Gladys P.
+AU  - Hua, Kevin L.
+AU  - Ankoudinova, Irina
+AU  - Cost, Gregory J.
+AU  - Urnov, Fyodor D.
+AU  - Zhang, H. Steve
+AU  - Holmes, Michael C.
+AU  - Zhang, Lei
+AU  - Gregory, Philip D.
+AU  - Rebar, Edward J.
+TI  - A TALE nuclease architecture for efficient genome editing
+JA  - Nature Biotechnology
+PY  - 2011/02/01/print
+VL  - 29
+IS  - 2
+SP  - 143
+EP  - 148
+PB  - Nature Publishing Group, a division of Macmillan Publishers Limited. All Rights Reserved.
+SN  - 1087-0156
+UR  - http://dx.doi.org/10.1038/nbt.1755
+M3  - doi: 10.1038/nbt.1755
+N1  - doi: 10.1038/nbt.1755
+L3  - http://www.nature.com/nbt/journal/v29/n2/abs/nbt.1755.html#supplementary-information
+ER  - 

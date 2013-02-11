@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+# -*- coding: latin-1 -*-
+
 import sys
 from string import join
 import re
@@ -76,6 +79,7 @@ taglist = [
 
 publication_abbreviations = {
 	#"Advances in Protein Chemistry"						: "Adv Protein Chem",
+	"ACS Chemical Biology"								: "ACS Chem Biol",
 	"Analytical Chemistry"								: "Analyt Chem",
 	"Aquatic Toxicology"								: "Aquatic Toxicol",
 	"Biochemical and Biophysical Research Communications": "Biochem Biophys Res Comms",
@@ -112,6 +116,7 @@ publication_abbreviations = {
 	"Molecular Cell"									: "Mol Cell",
 	"Molecular Systems Biology"							: "Mol Syst Biol",
 	"Nature"											: "Nature",
+	"Nature Biotechnology"								: "Nat Biotech",
 	"Nature Chemical Biology" 							: "Nat Chem Biol",
 	"Nature Methods" 									: "Nat Methods",
 	"Nature Structural & Molecular Biology" 			: "Nat Struct Mol Biol",
@@ -202,10 +207,14 @@ def parsePub(pub):
 	return d
 
 def pubpageID(pub_name):
+	if type(pub_name) == type([]):
+		pub_name = pub_name[0]
 	s = shortFormatAuthor(pub_name)
 	s = s.replace(" ", "")
 	s = s.replace(".", "")
 	s = s.replace(",", "")
+	s = s.replace("Ó", "O")
+	s = s.replace("ú", "u")
 	s = s.lower()
 	return s
 	
@@ -488,7 +497,7 @@ labmembers = [
 	("Babor, Mariana", None),
 	("Eames, Matt", None),
 	("Friedland, Gregory D.", "Greg"),
-	("Humphris, Elisabeth L.", None),
+	(['Humphris-Narayanan, Elisabeth L.', 'Humphris, Elisabeth L.'], None),
 	("Linares, Anthony J.", None),
 	("Lauck, Florian", None),
 	("Mandell, Daniel J.", "Dan"),
@@ -508,6 +517,9 @@ labmembers = [
 	("Smeaton, Michael B.", "Mike"),
 	("Kapp, Gregory T.", "Greg"),
 	("Liu, Sen", None),
+	("Barlow, Kyle A.", None),
+	("Ó Conchúir, Shane", None),
+	("Varela, Rocco", None),
 ]
 
 def getPublishedMembers():
@@ -538,17 +550,21 @@ def getHTML(page):
 	
 	# Lab members publications pages
 	for labmemberp in labmembers:
-		labmember = labmemberp[0]
+		labmember_names = labmemberp[0]
 		count = 0
-		sectionpubs = author_publications.get(labmember)
+		sectionpubs = []
+		if type(labmember_names) != type([]):
+			labmember_names = [labmember_names]
+		for labmember_name in labmember_names:
+			sectionpubs.extend(author_publications.get(labmember_name))
 		if sectionpubs:
 			html = [header]
-			firstname = labmemberp[1] or [n for n in re.split(r'[, ]', labmember) if n][1]
+			firstname = labmemberp[1] or [n for n in labmember_names[0].split(',')[1].split(' ') if n][0]
 			if firstname[-1] == "s":
 				sectiontitle = "%s's Publications" % firstname
 			else:
 				sectiontitle = "%s's Publications" % firstname
-			pagename = pubpageID(labmember)
+			pagename = pubpageID(labmemberp[0])
 			html.append(sectionheader % sectiontitle)
 			html.append('''                <ol class="style14" style="counter-reset:item %d;" start="%d">''' % (count, count +1))
 			for p in sectionpubs:

@@ -44,6 +44,6 @@ def main():
 	}
 	
 	for p, d in websitepages.iteritems():
-		makePage(p, d, debug = True)
+		makePage(p, d, debug = False)
 
 main()

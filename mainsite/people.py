@@ -1,3 +1,6 @@
+#!/usr/bin/python3
+# -*- coding: latin-1 -*-
+
 from string import join
 import publications
 
@@ -200,7 +203,7 @@ p_noah = {
 	"caption"	:	"I can't find my glasses!",
 	"mouseover"	:	"...or can I?",
 	"pub_name"	:	"Ollikainen, Noah",
-	"fellowship"	:	"NSF graduate fellow",
+	"fellowship":	"NSF graduate fellow",
 }
 
 p_laurens = {
@@ -217,7 +220,7 @@ p_laurens = {
 	"caption"	:	"I want to 3D print my thesis",
 	"mouseover"	:	"...or maybe IMAX",
 	"pub_name"	:	"Kraal, Laurens",
-	"fellowship"	:	"ARCS graduate fellow",
+	"fellowship":	"ARCS graduate fellow",
 }
 
 p_debbie = {
@@ -265,6 +268,35 @@ p_mike = {
 	"pub_name"	:	"Smeaton, Michael B.",
 }
 
+p_kyle = {
+	"name"		:	"Kyle Barlow",
+	"image"		:	"img/kyle.jpg",
+	"text"		:	"I am interested in taking a humid approach to protein design. I am working on integrating new algorithms into the Rosetta framework to assist in the design process. I hope to engineer proteins that are relevant for human health or biofuel synthesis.",
+	"degrees"	:	[
+		('Bachelor of Arts', 'Molecular and Cell Biology', 'UC Berkeley'),
+	],
+	"degree_w"	:	("width:110px;", "width:120px;", "width:160px;"),
+	"extratext"	:	"",
+	"caption"	:	"Coffee and tea are a grad student's best friend",
+	"mouseover"	:	"But beer is my significant other",
+	"pub_name"	:	"Barlow, Kyle A.",
+	"fellowship":	"ARCS graduate fellow",
+}
+
+p_kale = {
+	"name"		:	"Kale Kundert",
+	"image"		:	"img/kale.jpg",
+	"text"		:	'''I am interested in computationally engineering the extent to which different conformations of a protein are present at equilibrium.  This technology has many applications, but a prime example is the design of an artificial switch protein.  The activity of the switch could be tuned by changing the equilibrium between the "on" and "off" conformations.  Another good example is the modulation of binding between two partners that interact via conformational selection.  I am working both to develop algorithms that can predict protein conformational equilibria and to pursue the two example applications described above.''',
+	"degrees"	:	[
+		('Bachelor of Science', 'Chemical Biology', 'UC Berkeley'),
+	],
+	"degree_w"	:	("width:110px;", "width:120px;", "width:160px;"),
+	"extratext"	:	"",
+	"caption"	:	"",
+	"mouseover"	:	None,
+	"pub_name"	:	", ",
+}
+
 Todo='''
 p_ashley = {
 	"name"		:	"Ashley Custer",
@@ -301,23 +333,23 @@ p_bob = {
 # This list creates the sections for current members of the group
 peopleByGroup = [
 	('Principal Investigator', (p_tanja,)),
-	('Postdoctoral Scholars', (p_daniel, p_amelie, p_roland, p_ming, p_lin, p_mike)),
+	('Postdoctoral Scholars', (p_daniel, p_amelie, p_roland, p_ming, p_lin, )),
 	('Specialist', (p_cristina,)),
-	('Graduate Students', (p_ryan, p_noah, p_laurens)),
+	('Graduate Students', (p_ryan, p_noah, p_laurens, p_kyle, p_kale)),
 	('Staff Research Associate', (p_debbie,)),
 	('Software Engineer', (p_shane,)),
 	#('Lab admin', (p_ashley,))
 ]
 
 pastRotationStudents = [
-	{"name" : 'Kyle Barlow', "course" : 'BMI', "rotation" : 'Winter 2012',},
+	#{"name" : 'Kyle Barlow', "course" : 'BMI', "rotation" : 'Winter 2012',},
 	{"name" : 'Russell Goodman', "course" : 'Biophysics', "rotation" : 'Winter 2012',},
 	{"name" : 'Lawrence Uricchio', "course" : 'Bioengineering', "rotation" : 'Winter 2012',},
 	{"name" : 'Alec Nielsen', "course" : 'Biophysics', "rotation" : 'Winter 2011',},
 	{"name" : 'David Mavor', "course" : 'Biophysics', "rotation" : 'Summer 2011',},
 	{"name" : 'Joel Karpiak', "course" : 'CCB', "rotation" : 'Winter 2010',},
 	{"name" : 'Geoff Rollins', "course" : 'Biophysics', "rotation" : 'Winter 2009',},
-	{"name" : 'Rocco Varela', "course" : 'BMI', "rotation" : 'Winter 2009',},
+	{"name" : 'Rocco Varela', "course" : 'BMI', "rotation" : 'Winter 2009', "pub_name" : 'Varela, Rocco'},
 	{"name" : 'Ian Vaughn', "course" : 'Biophysics', "rotation" : 'Fall 2009',},
 	{"name" : 'Elaine Kirshke', "course" : 'Biophysics', "rotation" : 'Winter 2008',},
 	{"name" : 'Charles Kehoe', "course" : 'BMI', "rotation" : 'Winter 2008',},
@@ -345,7 +377,7 @@ labAlumni = [
 	{"name" : 'Michael Michalik', "qualification" : None, "period" : '2009-2010', "currentJob" : 'Graduate Program', "jobLocation" : 'University of Bonn, Germany',},
 	{"name" : 'Thomas Bliska', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'Williams College',},
 	{"name" : 'Aaron Nichols', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'UC Riverside',},
-	{"name" : 'Elisabeth Humphris', "qualification" : "PhD", "period" : '2005-2009', "currentJob" : 'Postdoc', "jobLocation" : 'Yale', "pub_name" : 'Humphris, Elisabeth L.',},
+	{"name" : 'Elisabeth Humphris', "qualification" : "PhD", "period" : '2005-2009', "currentJob" : 'Postdoc', "jobLocation" : 'Yale', "pub_name" : ['Humphris-Narayanan, Elisabeth L.', 'Humphris, Elisabeth L.'],},
 	{"name" : 'Matt Chroust', "qualification" : None, "period" : '2009', "currentJob" : 'Dentistry Graduate Program', "jobLocation" : 'UCSF',},
 	{"name" : 'Mariana Babor', "qualification" : "PhD", "period" : '2006-2009', "currentJob" : '', "jobLocation" : 'University of Toronto', "pub_name" : 'Babor, Mariana',},
 	{"name" : 'Greg Kapp', "qualification" : "PhD", "period" : '2004-2009', "currentJob" : 'Scientist', "jobLocation" : 'Omniox Inc.', "pub_name" : 'Kapp, Gregory T.',},
