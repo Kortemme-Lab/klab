@@ -375,7 +375,7 @@ class PDB:
         
         if RemoveIncompleteFinalResidues:
             # These are (probably) necessary for Rosetta to keep the residue. Rosetta does throw away residues where only the N atom is present if that residue is at the end of a chain.
-            essential_atoms = set(['CA', 'C', 'N', 'O'])
+            essential_atoms = set(['CA', 'C', 'N']) #, 'O'])
             for chainID, sequence_list in sequences.iteritems():
                 if essential_atoms.intersection(atoms_read[chainID]) != essential_atoms:
                     print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms.difference(atoms_read[chainID])))

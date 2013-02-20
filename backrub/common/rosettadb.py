@@ -128,7 +128,10 @@ class DatabaseInterface(object):
 		'''We are lock-happy here but SQL performance is not currently an issue daemon-side.''' 
 		return self.execute(sql, parameters, cursorClass, quiet, locked = True)
 	
-	def execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False, locked = False):
+	def execute_select(self, sql, parameters = None, cursorClass = DictCursor, quiet = False, locked = False):
+		self.execute(sql, parameters, cursorClass, quiet, locked, do_commit = False)
+			
+	def execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False, locked = False, do_commit = True):
 		"""Execute SQL query. This uses DictCursor by default."""
 		i = 0
 		errcode = 0
@@ -151,7 +154,7 @@ class DatabaseInterface(object):
 				else:
 					errcode = cursor.execute(sql)
 				self.lastrowid = int(cursor.lastrowid)
-				if self.isInnoDB:
+				if do_commit and self.isInnoDB:
 					self.connection.commit()
 				results = cursor.fetchall()
 				if locked:
@@ -280,7 +283,165 @@ class DatabaseInterface(object):
 			sys.stderr.flush()
 		raise MySQLdb.OperationalError(caughte)
 	
+class ReusableDatabaseInterface(DatabaseInterface):
+	def __init__(self, settings, isInnoDB = True, numTries = 1, host = None, db = None, user = None, passwd = None, port = None, unix_socket = None, passwdfile = None):
+		#super(ReusableDatabaseInterface, self).__init__(settings = settings, isInnoDB = isInnoDB, numTries = numTries, host = host, db = db, user = user, passwd = passwd, port = port, unix_socket = unix_socket, passwdfile = passwdfile)
+		
+		self.connection = None
+		self.isInnoDB = isInnoDB
+		self.host = host or settings["SQLHost"]
+		self.db = db or settings["SQLDatabase"]
+		self.user = user or settings["SQLUser"]
+		self.passwd = passwd or settings["SQLPassword"]
+		self.port = port or settings["SQLPort"]
+		self.unix_socket	= unix_socket or settings["SQLSocket"]
+		self.numTries = numTries
+		self.lastrowid = None
+		if (not self.passwd) and passwdfile:
+			if os.path.exists(passwdfile):
+				passwd = rosettahelper.readFile(passwdfile).strip()
+			else:
+				passwd = getpass.getpass("Enter password to connect to MySQL database:")
+				
+		self.locked = False
+		self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r.values()[0] for r in self.execute("SHOW TABLES")], ", ")
+		self.unlockstring = "UNLOCK TABLES"
+		
+		# Store a list of the table names  
+		self.TableNames = [r.values()[0] for r in self.execute("SHOW TABLES")]
+		
+		# Store a hierarchy of objects corresponding to the table names and their field names  
+		self.FieldNames = _FieldNames(None)
+		self.FlatFieldNames = _FieldNames(None)
+		tablenames = self.TableNames 
+		for tbl in tablenames:
+			setattr(self.FieldNames, tbl, _FieldNames(tbl))
+			fieldDescriptions = self.execute("SHOW COLUMNS FROM %s" % tbl)
+			for field in fieldDescriptions:
+				fieldname = field["Field"]
+				setattr(getattr(self.FieldNames, tbl), fieldname, fieldname)
+				setattr(self.FlatFieldNames, fieldname, fieldname)
+			getattr(self.FieldNames, tbl).makeReadOnly()
+		self.FieldNames.makeReadOnly()
+		self.FlatFieldNames.makeReadOnly()
+		
+		
+		
+	def close(self):
+		if self.connection and self.connection.open:
+			self.connection.close()
 
+	def checkIsClosed(self):
+		assert(not(self.connection) or not(self.connection.open))
+	
+	def _get_connection(self):
+		if not(self.connection and self.connection.open):
+			self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = DictCursor)
+	
+	def locked_execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False):
+		'''We are lock-happy here but SQL performance is not currently an issue daemon-side.''' 
+		return self.execute(sql, parameters = parameters, quiet = quiet, locked = True, do_commit = True)
+
+	def execute_select(self, sql, parameters = None, quiet = False, locked = False):
+		return self.execute(sql, parameters = parameters, quiet = quiet, locked = locked, do_commit = False)
+			
+	def execute(self, sql, parameters = None, quiet = False, locked = False, do_commit = True):
+		"""Execute SQL query. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		cursor = None
+		cursorClass = DictCursor
+		if sql.find(";") != -1 or sql.find("\\G") != -1:
+			# Catches some injections
+			raise Exception("The SQL command '%s' contains a semi-colon or \\G. This is a potential SQL injection." % sql)
+		while i < self.numTries:
+			i += 1
+			try:
+				self._get_connection()
+				#if not self.connection:
+				#	self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = cursorClass)
+				cursor = self.connection.cursor()
+				if locked:
+					cursor.execute(self.lockstring)
+					self.locked = True
+				if parameters:
+					errcode = cursor.execute(sql, parameters)
+				else:
+					errcode = cursor.execute(sql)
+				self.lastrowid = int(cursor.lastrowid)
+				if do_commit and self.isInnoDB:
+					self.connection.commit()
+				results = cursor.fetchall()
+				if locked:
+					cursor.execute(self.unlockstring)
+					self.locked = False
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				if cursor:
+					if self.locked:
+						cursor.execute(self.unlockstring)
+						self.locked = False
+					cursor.close()
+				caughte = str(e)
+				errcode = e[0]
+				continue
+			except Exception, e:
+				if cursor:
+					if self.locked:
+						cursor.execute(self.unlockstring)
+						self.locked = False
+					cursor.close()
+				caughte = str(e)
+				traceback.print_exc()
+				break
+			sleep(0.2)
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+	
+	
+	def callproc(self, procname, parameters = (), quiet = False):
+		"""Calls a MySQL stored procedure procname. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		
+		if not re.match("^\s*\w+\s*$", procname):
+			raise Exception("Expected a stored procedure name in callproc but received '%s'." % procname)
+		while i < self.numTries:
+			i += 1
+			try:
+				self._get_connection()
+				cursor = self.connection.cursor()
+				if type(parameters) != type(()):
+					parameters = (parameters,)
+				errcode = cursor.callproc(procname, parameters)
+				results = cursor.fetchall()
+				self.lastrowid = int(cursor.lastrowid)
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				self._close_connection()
+				errcode = e[0]
+				caughte = e
+				continue
+			except:
+				self._close_connection()
+				traceback.print_exc()
+				break
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error call stored procedure %s at %s:" % (procname, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+	
+	
 class RosettaDB:
 	
 	data = {}
