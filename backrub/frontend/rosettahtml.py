@@ -708,7 +708,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
               </form>                    
           </tr>                            
         </table></td>
-        """ % (error_html, username, disabled, firstname, lastname, institution, email, disabled, address, city, zip, state, self._printCountries(country), mode, self.script_filename)
+        """ % (error_html, username, disabled, firstname, lastname, email, disabled, institution, address, city, zip, state, self._printCountries(country), mode, self.script_filename)
     
         return html
     
@@ -863,8 +863,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
         html = admin.generateAdminPage(quotas, usage, users, settings, self, form)
         return join(html, "")
     
-    def gen9Page(self, settings, form, userid, Gen9Error = None):
-        html = gen9.generateGen9Page(settings, self, form, userid, Gen9Error)
+    def gen9Page(self, settings, form, userid, Gen9Error = None, filteredDesignIDs = None):
+        html = gen9.generateGen9Page(settings, self, form, userid, Gen9Error, filteredDesignIDs)
         return join(html, "")
 
     def ddgPage(self, settings, form):

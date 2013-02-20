@@ -126,7 +126,7 @@ class DatabaseInterface(object):
 	
 	def locked_execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False):
 		'''We are lock-happy here but SQL performance is not currently an issue daemon-side.''' 
-		return self.execute(sql, parameters, cursorClass, quiet, locked = True)
+		return self.execute(sql, parameters, cursorClass, quiet = quiet, locked = True)
 	
 	def execute_select(self, sql, parameters = None, cursorClass = DictCursor, quiet = False, locked = False):
 		self.execute(sql, parameters, cursorClass, quiet, locked, do_commit = False)
@@ -404,7 +404,6 @@ class ReusableDatabaseInterface(DatabaseInterface):
 			sys.stderr.flush()
 		raise MySQLdb.OperationalError(caughte)
 	
-	
 	def callproc(self, procname, parameters = (), quiet = False):
 		"""Calls a MySQL stored procedure procname. This uses DictCursor by default."""
 		i = 0
@@ -442,6 +441,7 @@ class ReusableDatabaseInterface(DatabaseInterface):
 		raise MySQLdb.OperationalError(caughte)
 	
 	
+
 class RosettaDB:
 	
 	data = {}

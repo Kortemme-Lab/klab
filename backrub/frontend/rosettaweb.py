@@ -95,6 +95,9 @@ def getLabServicesConnection():
 def getGen9Connection():
 	return rosettadb.DatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Gen9Design")
 
+def getGen9ResuableConnection():
+	return rosettadb.ReusableDatabaseInterface(settings, host = "kortemmelab.ucsf.edu", db = "Gen9Design")
+
 def fixFilename(filename):
 	
 	highestSeparator = filename.rfind('/')
@@ -206,7 +209,10 @@ def ws():
 	####################################### 
 
 	# create session object
-	my_session = session.Session(expires=settings["CookieExpiration"], cookie_path='/')
+	if not(settings["LiveWebserver"]):
+		my_session = session.Session(expires=3 * settings["CookieExpiration"], cookie_path='/')
+	else:
+		my_session = session.Session(expires=settings["CookieExpiration"], cookie_path='/')
 	# get time of last visit
 	lastvisit = my_session.data.get('lastvisit')
 	
@@ -231,7 +237,7 @@ def ws():
 			lv_strftime = t.strftime("%Y-%m-%d %H:%M:%S")
 			sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % (SID, lv_strftime, "login", "0")
 			result = DBConnection.execQuery(sql)
-			
+		
 		if lastvisit == None:  # lastvisit == None means that the user doesn't have a cookie
 			# set the session object to the actual time and also write the time to the database
 			my_session.data['lastvisit'] = repr(time.time())
@@ -258,18 +264,18 @@ def ws():
 			#sql = 'SELECT loggedin, UserName, KortemmeLabMember FROM Sessions INNER JOIN Users on UserID=Users.ID WHERE SessionID = "%s"' % SID  # is the user logged in?
 			sql = 'SELECT loggedin, UserName, KortemmeLabMember FROM Sessions INNER JOIN Users on UserID=Users.ID WHERE SessionID = "%s"' % SID  # is the user logged in?
 			result = DBConnection.execQuery(sql)
-			
-			allowedQueries = ["register", "login", "loggedin", "logout", "index"]
-			subAllowedQueries = ["register", "index", "login", "terms_of_service", "oops", "doc"]
+			allowedQueries = ["login", "loggedin", "logout", "index"] # "register"
+			subAllowedQueries = ["index", "login", "terms_of_service", "oops", "doc"] # "register"
 			if settings["LiveWebserver"]:
 				allowedQueries.extend(["jobinfo", "terms_of_service", "submit", "submitted", "queue", "update", "doc", "delete", "parsePDB", "sampleData"])
 			if not(settings["LiveWebserver"]):
+				# "register" is enabled for logged in users to allow updating passwords
 				if result and result[0][1] == 'oconchus':
-					allowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
-					subAllowedQueries.extend(["admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+					allowedQueries.extend(["register", "update", "admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+					subAllowedQueries.extend(["register", "admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
 				elif result and result[0][2] == 1:
-					allowedQueries.extend(["Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "benchmarkreport"])
-					subAllowedQueries.extend(["Gen9", "Gen9File", "Gen9Comment", "benchmarks", "PDB", "benchmarkreport"])
+					allowedQueries.extend(["register", "update", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "benchmarkreport"])
+					subAllowedQueries.extend(["register", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "benchmarkreport"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
 			if result and result[0][0] == 1:
@@ -289,7 +295,6 @@ def ws():
 		
 		if not(form.has_key("query")) or form["query"].value not in ["PDB", "benchmarkreport", "Gen9File"]:
 			s.write("Content-type: text/html\n\n")
-		
 		s.write(debug)
 		my_session.close()
 	
@@ -381,7 +386,6 @@ def ws():
 	for pv in propagatedValues:
 		if form.has_key(pv):
 			extraValues[pv] = form[pv].value
-
 	if query_type == "login" or query_type == "index":
 		login_return = login(form, my_session, t)
 		if login_return == True:
@@ -555,11 +559,40 @@ def ws():
 		if not(settings["LiveWebserver"]):
 			html_content = rosettaHTML.gen9Page(settings, form, userid)
 			title = 'Gen9'
-	
-	elif query_type == "Gen9Comment":
+
+	elif query_type == "Gen9Filter":
 		if not(settings["LiveWebserver"]):
+			from gen9 import generateFilterQuery
+			gen9db = getGen9ResuableConnection()
+			filteredDesignIDs = generateFilterQuery(gen9db, username, form)
+			gen9db.close()
+			html_content = rosettaHTML.gen9Page(settings, form, userid, filteredDesignIDs = filteredDesignIDs)
+			title = 'Gen9'
+			
+	elif query_type == "Gen9Switch":
+		if not(settings["LiveWebserver"]):
+			try:
+				gen9db = getGen9ResuableConnection()
+				assert(form.has_key('Username'))
+				Gen9Username = form['Username'].value
+				results = gen9db.execute_select("SELECT BrowserVersion FROM User WHERE ID=%s", parameters=(Gen9Username,))
+				newBrowserVersion = (results[0]['BrowserVersion'] % 2) + 1
+				gen9db.execute("UPDATE User SET BrowserVersion=%s WHERE ID=%s", parameters=(newBrowserVersion, Gen9Username))
+				gen9db.close()
+			except Exception, e:
+				print("Error: Could not switch view type<br>%s" % traceback.format_exc().replace("\n", "<br>"))
+			
+			Gen9Error = None
+			html_content = rosettaHTML.gen9Page(settings, form, userid, Gen9Error)
+			title = 'Gen9'
+			
+	elif query_type == "Gen9Comment":
+		#todo: add locked_execute here
+		if not(settings["LiveWebserver"]):
+			gen9db = getGen9ResuableConnection()
 			Gen9Error = None
 			success = True
+			
 			try:
 				assert(form.has_key('Gen9Page'))
 				assert(form.has_key('gen9sort1'))
@@ -580,76 +613,184 @@ def ws():
 				print("Error: Could not find form values for username and design ID.")
 			
 			if success:
-				gen9db = getGen9Connection()
-				
-				design_rating = None
-				if form.has_key('user-design-rating-%d' % DesignID):
-					if form['user-design-rating-%d' % DesignID].value != 'None':
-						design_rating = form['user-design-rating-%d' % DesignID].value
-				design_notes = None
-				if form.has_key('user-design-comments-%d' % DesignID):
-					if form['user-design-comments-%d' % DesignID].value != 'None':
-						design_notes = form['user-design-comments-%d' % DesignID].value
+				try:
+					current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 					
-				scaffold_rating = None
-				if form.has_key('user-scaffold-rating-%d' % DesignID):
-					if form['user-scaffold-rating-%d' % DesignID].value != 'None':
-						scaffold_rating = form['user-scaffold-rating-%d' % DesignID].value
-				scaffold_notes = None
-				if form.has_key('user-scaffold-comments-%d' % DesignID):
-					if form['user-scaffold-comments-%d' % DesignID].value != 'None':
-						scaffold_notes = form['user-scaffold-comments-%d' % DesignID].value
-				
-				gres = gen9db.execute("SELECT * FROM UserDesignRating WHERE UserID=%s AND DesignID=%s", parameters=(Gen9Username, DesignID))
-				if gres:
-					assert(len(gres) == 1)
-					gen9db.execute("UPDATE UserDesignRating SET Rating=%s WHERE UserID=%s AND DesignID=%s", parameters=(design_rating, Gen9Username, DesignID))
-					gen9db.execute("UPDATE UserDesignRating SET RatingNotes=%s WHERE UserID=%s AND DesignID=%s", parameters=(design_notes, Gen9Username, DesignID))
-				elif design_rating and (not(design_notes) or (design_notes =="") or (design_notes == "None")):
-					Gen9Error = "You need to specify a design rating AND add notes."
-				elif design_notes and (not(design_rating) or (design_rating =="") or (design_rating == "None")):
-					Gen9Error = "You need to specify a design rating AND add notes."
-				elif design_rating and design_notes: 
-					details = {
-						'UserID'			: Gen9Username,
-						'DesignID'			: DesignID,
-						'Rating'			: design_rating,
-						'RatingNotes'		: design_notes,
-					}
-					gen9db.insertDict('UserDesignRating', details,)
-
-				ComplexID = gen9db.execute("SELECT ComplexID FROM Design INNER JOIN PDBBiologicalUnit ON Design.WildtypeScaffoldPDBFileID=PDBFileID AND Design.WildtypeScaffoldBiologicalUnit=BiologicalUnit WHERE ID=%s", parameters=(DesignID,))
-				assert(ComplexID)
-				assert(len(ComplexID) == 1)
-				ComplexID = ComplexID[0]['ComplexID']
-				
-				gres = gen9db.execute("SELECT * FROM UserScaffoldRating WHERE UserID=%s AND ComplexID=%s", parameters=(Gen9Username, ComplexID))
-				if gres:
-					assert(len(gres) == 1)
-					gen9db.execute("UPDATE UserScaffoldRating SET Rating=%s WHERE UserID=%s AND ComplexID=%s", parameters=(scaffold_rating, Gen9Username, ComplexID))
-					gen9db.execute("UPDATE UserScaffoldRating SET RatingNotes=%s WHERE UserID=%s AND ComplexID=%s", parameters=(scaffold_notes, Gen9Username, ComplexID))
-				elif scaffold_rating and (not(scaffold_notes) or (scaffold_notes =="") or (scaffold_notes == "None")):
-					Gen9Error = "You need to specify a scaffold rating AND add notes."
-				elif scaffold_notes and (not(scaffold_rating) or (scaffold_rating =="") or (scaffold_rating == "None")):
-					Gen9Error = "You need to specify a scaffold rating AND add notes."
-				elif scaffold_rating and scaffold_notes: 
-					details = {
-						'UserID'			: Gen9Username,
-						'ComplexID'			: ComplexID,
-						'Rating'			: scaffold_rating,
-						'RatingNotes'		: scaffold_notes,
-						'TerminiAreOkay'	: None,
-					}
-					gen9db.insertDict('UserScaffoldRating', details,)
+					design_rating = None
+					if form.has_key('user-design-rating-%d' % DesignID):
+						if form['user-design-rating-%d' % DesignID].value != 'None':
+							design_rating = form['user-design-rating-%d' % DesignID].value
+					design_notes = None
+					if form.has_key('user-design-comments-%d' % DesignID):
+						if form['user-design-comments-%d' % DesignID].value != 'None':
+							design_notes = form['user-design-comments-%d' % DesignID].value
+						
+					scaffold_rating = None
+					if form.has_key('user-scaffold-rating-%d' % DesignID):
+						if form['user-scaffold-rating-%d' % DesignID].value != 'None':
+							scaffold_rating = form['user-scaffold-rating-%d' % DesignID].value
+					scaffold_notes = None
+					if form.has_key('user-scaffold-comments-%d' % DesignID):
+						if form['user-scaffold-comments-%d' % DesignID].value != 'None':
+							scaffold_notes = form['user-scaffold-comments-%d' % DesignID].value
 					
+					gres = gen9db.execute("SELECT * FROM UserDesignRating WHERE UserID=%s AND DesignID=%s", parameters=(Gen9Username, DesignID))
+					if gres and False:
+						assert(len(gres) == 1)
+						gen9db.execute("UPDATE UserDesignRating SET Rating=%s WHERE UserID=%s AND DesignID=%s", parameters=(design_rating, Gen9Username, DesignID))
+						gen9db.execute("UPDATE UserDesignRating SET RatingNotes=%s WHERE UserID=%s AND DesignID=%s", parameters=(design_notes, Gen9Username, DesignID))
+					elif design_rating and (not(design_notes) or (design_notes =="") or (design_notes == "None")):
+						Gen9Error = "You need to specify a design rating AND add notes."
+					elif design_notes and (not(design_rating) or (design_rating =="") or (design_rating == "None")):
+						Gen9Error = "You need to specify a design rating AND add notes."
+					else: 
+						details = {
+							'UserID'			: Gen9Username,
+							'DesignID'			: DesignID,
+							'Date'				: current_time,
+							'Rating'			: design_rating,
+							'RatingNotes'		: design_notes,
+						}
+						gen9db.insertDict('UserDesignRating', details,)
+	
+					ComplexID = gen9db.execute("SELECT ComplexID FROM Design INNER JOIN PDBBiologicalUnit ON Design.WildtypeScaffoldPDBFileID=PDBFileID AND Design.WildtypeScaffoldBiologicalUnit=BiologicalUnit WHERE ID=%s", parameters=(DesignID,))
+					assert(ComplexID)
+					assert(len(ComplexID) == 1)
+					ComplexID = ComplexID[0]['ComplexID']
+					
+					gres = gen9db.execute("SELECT * FROM UserScaffoldRating WHERE UserID=%s AND ComplexID=%s", parameters=(Gen9Username, ComplexID))
+					if gres and False:
+						assert(len(gres) == 1)
+						gen9db.execute("UPDATE UserScaffoldRating SET Rating=%s WHERE UserID=%s AND ComplexID=%s", parameters=(scaffold_rating, Gen9Username, ComplexID))
+						gen9db.execute("UPDATE UserScaffoldRating SET RatingNotes=%s WHERE UserID=%s AND ComplexID=%s", parameters=(scaffold_notes, Gen9Username, ComplexID))
+					elif scaffold_rating and (not(scaffold_notes) or (scaffold_notes =="") or (scaffold_notes == "None")):
+						Gen9Error = "You need to specify a scaffold rating AND add notes."
+					elif scaffold_notes and (not(scaffold_rating) or (scaffold_rating =="") or (scaffold_rating == "None")):
+						Gen9Error = "You need to specify a scaffold rating AND add notes."
+					else: 
+						details = {
+							'UserID'			: Gen9Username,
+							'ComplexID'			: ComplexID,
+							'Date'				: current_time,
+							'Rating'			: scaffold_rating,
+							'RatingNotes'		: scaffold_notes,
+							'TerminiAreOkay'	: None,
+						}
+						gen9db.insertDict('UserScaffoldRating', details,)
+				except Exception, e:
+					print("<font color='red'><b>An exception occurred: %s</b></font>" % e)
+					print(traceback.format_exc().replace("\n", "<br>"))
+				
 			#form.has_key('Gen9Page').value
 			
+			gen9db.close()
 			html_content = rosettaHTML.gen9Page(settings, form, userid, Gen9Error)
 			title = 'Gen9'
 			
 			#html_content = rosettaHTML.gen9Page(settings, form, userid)
 			#title = 'Gen9'
 	
+	elif query_type == "Gen9MeetingComment":
+		#todo: add locked_execute here
+		if not(settings["LiveWebserver"]):
+			gen9db = getGen9ResuableConnection()
+			Gen9Error = None
+			success = True
+			
+			try:
+				assert(form.has_key('Gen9Page'))
+				assert(form.has_key('gen9sort1'))
+				assert(form.has_key('gen9sort2'))
+			except:
+				success = False
+				print("Error: Could not find form values for Gen9 page settings.")
+			
+			DesignID = None
+			Gen9Username = None
+			Gen9MeetingDate = None
+			try:
+				assert(form.has_key('DesignID'))
+				assert(form.has_key('Username'))
+				DesignID = int(form['DesignID'].value)
+				Gen9Username = form['Username'].value
+				Gen9MeetingDate = date.today()
+			except:
+				success = False
+				print("Error: Could not find form values for username and design ID.")
+			
+			if success:
+				try:
+					current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+					
+					design_rating = None
+					if form.has_key('meeting-design-rating-%d' % DesignID):
+						if form['meeting-design-rating-%d' % DesignID].value != 'None':
+							design_rating = form['meeting-design-rating-%d' % DesignID].value
+					design_notes = None
+					if form.has_key('meeting-design-comments-%d' % DesignID):
+						if form['meeting-design-comments-%d' % DesignID].value != 'None':
+							design_notes = form['meeting-design-comments-%d' % DesignID].value
+						
+					scaffold_rating = None
+					if form.has_key('meeting-scaffold-rating-%d' % DesignID):
+						if form['meeting-scaffold-rating-%d' % DesignID].value != 'None':
+							scaffold_rating = form['meeting-scaffold-rating-%d' % DesignID].value
+					scaffold_notes = None
+					if form.has_key('meeting-scaffold-comments-%d' % DesignID):
+						if form['meeting-scaffold-comments-%d' % DesignID].value != 'None':
+							scaffold_notes = form['meeting-scaffold-comments-%d' % DesignID].value
+				
+					if design_rating == "None" and design_notes == "None":
+						pass
+					if design_rating and (not(design_notes) or (design_notes =="") or (design_notes == "None")):
+						Gen9Error = "You need to specify a design rating AND add notes."
+					elif design_notes and (not(design_rating) or (design_rating =="") or (design_rating == "None")):
+						Gen9Error = "You need to specify a design rating AND add notes."
+					else: 
+						details = {
+							'DesignID'			: DesignID,
+							'MeetingDate'		: Gen9MeetingDate,
+							'CommentDate'		: current_time,
+							'Approved'			: design_rating,
+							'ApprovalNotes'		: design_notes,
+							'UserID'			: Gen9Username,
+						}
+						gen9db.insertDict('MeetingDesignRating', details,)
+	
+					ComplexID = gen9db.execute("SELECT ComplexID FROM Design INNER JOIN PDBBiologicalUnit ON Design.WildtypeScaffoldPDBFileID=PDBFileID AND Design.WildtypeScaffoldBiologicalUnit=BiologicalUnit WHERE ID=%s", parameters=(DesignID,))
+					assert(ComplexID)
+					assert(len(ComplexID) == 1)
+					ComplexID = ComplexID[0]['ComplexID']
+					
+					if scaffold_rating == "None" and scaffold_notes == "None":
+						pass
+					if scaffold_rating and (not(scaffold_notes) or (scaffold_notes =="") or (scaffold_notes == "None")):
+						Gen9Error = "You need to specify a scaffold rating AND add notes."
+					elif scaffold_notes and (not(scaffold_rating) or (scaffold_rating =="") or (scaffold_rating == "None")):
+						Gen9Error = "You need to specify a scaffold rating AND add notes."
+					else: 
+						details = {
+							'ComplexID'			: ComplexID,
+							'MeetingDate'		: Gen9MeetingDate,
+							'CommentDate'		: current_time,
+							'Approved'			: scaffold_rating,
+							'ApprovalNotes'		: scaffold_notes,
+							'UserID'			: Gen9Username,
+							
+						}
+						gen9db.insertDict('MeetingScaffoldRating', details,)
+				except Exception, e:
+					print("<font color='red'><b>An exception occurred: %s</b></font>" % e)
+					print(traceback.format_exc().replace("\n", "<br>"))
+				
+			#form.has_key('Gen9Page').value
+			
+			gen9db.close()
+			html_content = rosettaHTML.gen9Page(settings, form, userid, Gen9Error)
+			title = 'Gen9'
+			
+			#html_content = rosettaHTML.gen9Page(settings, form, userid)
+			#title = 'Gen9'
 	
 	elif query_type == "Gen9File":
 		if not(settings["LiveWebserver"]):
@@ -692,6 +833,45 @@ def ws():
 							
 							print 'Content-Type: application/octet-stream'
 							print 'Content-Disposition: attachment; filename="%s"' % (filename)
+							print "Content-Length: %d" % len(contents)
+							print
+							sys.stdout.write(contents)
+							sys.stdout.flush()
+					else:
+						s.write("Content-type: text/html\n\n")
+						print("Badly specified query.")
+				elif form['download'].value == 'RefPDF':
+					if form.has_key('PublicationID'):
+						results = gen9db.execute("SELECT SchemeID, Scheme FROM Publication WHERE ID=%s", parameters = (form['PublicationID'].value))
+						if not results:
+							s.write("Content-type: text/html\n\n")
+							print("No files found for publication ID %s." % form['PublicationID'].value)
+						else:
+							assert(len(results) == 1)
+							filename = "%s.pdf" % results[0]['SchemeID']
+							filepath = os.path.join('/kortemmelab/shared/projects/Gen9/biosensor_design/publications', filename)
+							if not os.path.exists(filepath):
+								s.write("Content-type: text/html\n\n")
+								print("Could not find %s." % filepath)
+							else:
+								contents = readBinaryFile(filepath)
+								print 'Content-Type: application/pdf'
+								print 'Content-Disposition: inline; filename="%s"' % (filename)
+								print "Content-Length: %d" % len(contents)
+								print
+								sys.stdout.write(contents)
+								sys.stdout.flush()
+				elif form['download'].value == 'WebLogo':
+					if form.has_key('DesignID') and form.has_key('Chain'):
+						results = gen9db.execute("SELECT SequenceLogo FROM DesignMutatedChain WHERE DesignID=%s AND Chain=%s", parameters = (form['DesignID'].value, form['Chain'].value))
+						if not results:
+							s.write("Content-type: text/html\n\n")
+							print("No files found for design ID %s." % form['DesignID'].value)
+						else:
+							assert(len(results) == 1)
+							contents = results[0]['SequenceLogo']
+							print 'Content-Type: application/pdf'
+							print 'Content-Disposition: inline; filename="%s"' % ("%s-Chain%s.pdf" % (form['DesignID'].value, form['Chain'].value))
 							print "Content-Length: %d" % len(contents)
 							print
 							sys.stdout.write(contents)
@@ -922,7 +1102,6 @@ def ws():
 
 	if query_type not in ["PDB", "benchmarkreport", "Gen9File"]:
 		s.write(rosettaHTML.main(html_content, title, query_type))
-	
 	s.close()
 
 def logBrowser(sid, userid):

@@ -1,4 +1,4 @@
-subpages = ["browse"]
+subpages = ["browse", "rankmapping"]
 
 function showPage(page)
 {
@@ -58,6 +58,24 @@ if (document.gen9form.gen9sort2.value == null || document.gen9form.gen9sort2.val
 	document.gen9form.gen9sort2.value = 'ID';
 }
 
+function show_file_links_new(DesignID)
+{
+	var elemname = 'file-links-div-' + DesignID;
+	var rows = document.getElementsByClassName(elemname);
+	for (i = 0; i < rows.length; i++)
+	{
+		var row = rows[i];
+		if(row.getStyle('display') == 'none')
+		{
+			new Effect.Appear(row , { duration: 0.0 } );
+		}
+		else
+		{
+			new Effect.Fade( row, { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+		}
+	}
+}
+
 if (document.gen9form.gen9sort1.value != null && document.gen9form.gen9sort1.value != "" )
 {
 	if (document.gen9form.gen9sort1.value == 'Complex')
@@ -70,15 +88,20 @@ if (document.gen9form.gen9sort1.value != null && document.gen9form.gen9sort1.val
 		var order_selection = document.getElementById("ordering1");
 		order_selection.options[1].selected = true;
 	}
-	else if (document.gen9form.gen9sort1.value == 'Target')
+	else if (document.gen9form.gen9sort1.value == 'MutantComplex')
 	{
 		var order_selection = document.getElementById("ordering1");
 		order_selection.options[2].selected = true;
 	}
-	else if (document.gen9form.gen9sort1.value == 'Scaffold')
+	else if (document.gen9form.gen9sort1.value == 'Target')
 	{
 		var order_selection = document.getElementById("ordering1");
 		order_selection.options[3].selected = true;
+	}
+	else if (document.gen9form.gen9sort1.value == 'Scaffold')
+	{
+		var order_selection = document.getElementById("ordering1");
+		order_selection.options[4].selected = true;
 	}
 }
 if (document.gen9form.gen9sort2.value != null && document.gen9form.gen9sort2.value != "" )
@@ -93,17 +116,58 @@ if (document.gen9form.gen9sort2.value != null && document.gen9form.gen9sort2.val
 		var order_selection = document.getElementById("ordering2");
 		order_selection.options[1].selected = true;
 	}
-	else if (document.gen9form.gen9sort2.value == 'Target')
+	else if (document.gen9form.gen9sort2.value == 'MutantComplex')
 	{
 		var order_selection = document.getElementById("ordering2");
 		order_selection.options[2].selected = true;
 	}
-	else if (document.gen9form.gen9sort2.value == 'Scaffold')
+	else if (document.gen9form.gen9sort2.value == 'Target')
 	{
 		var order_selection = document.getElementById("ordering2");
 		order_selection.options[3].selected = true;
 	}
+	else if (document.gen9form.gen9sort2.value == 'Scaffold')
+	{
+		var order_selection = document.getElementById("ordering2");
+		order_selection.options[4].selected = true;
+	}
 }
+
+function enableMeetingComments(DesignID)
+{
+	new Effect.Appear("meeting-comments-" + DesignID, { duration: 0.0 } );
+	new Effect.Fade("meeting-comments-" + DesignID + "-header", { duration: 0.0, queue: { position: '0', scope: 'task' } } );	
+}
+
+function toggleNewDesigns(elem)
+{
+	var b;
+	if (elem.innerHTML == 'Only recent designs')
+	{
+		b = false;
+		elem.innerHTML = 'All designs';
+	}
+	else
+	{
+		b = true;
+		elem.innerHTML = 'Only recent designs';
+	}
+	
+	for (i = 1; i <= 169; i++)
+	{
+		var old_div = document.getElementById("d" + i);
+		if (b == false)
+		{
+			new Effect.Fade(old_div, { duration: 0.0 } );
+		}
+		else
+		{
+			new Effect.Appear(old_div, { duration: 0.0 } );
+				
+		}
+	}
+}
+
 function reopen_page_with_sorting()
 {
 	var o1 = document.getElementById("ordering1");
@@ -115,18 +179,84 @@ function reopen_page_with_sorting()
 
 if (document.gen9form.DesignID.value != "")
 {
-	window.location.hash="" + document.gen9form.DesignID.value;
+	window.location.hash="d" + document.gen9form.DesignID.value;
 }
 if (document.gen9form.Gen9Error.value != "")
 {
 	alert(document.gen9form.Gen9Error.value);
 }
 
+function goToDesign(txtbox, e)
+{
+	var keycode;
+	if (window.event)
+	{
+		keycode = window.event.keyCode;
+	}
+	else if (e)
+	{
+		keycode = e.which;
+	}
+	else return true;
+	
+	if (keycode == 13)
+	{
+		if(/^\d+$/.test(txtbox.value)) {
+			window.location.hash="#";
+			window.location.hash="d" + txtbox.value;
+		}
+		return false;
+	}
+	else
+		return true;
+}
+
+function jumpToDesign(designID)
+{
+	showPage("browse");
+	window.location.hash="#";
+	window.location.hash="d" + designID;
+}
+
+function showFilters()
+{
+	var tbl = document.getElementById('filter_table');
+	if(tbl.getStyle('display') == 'none')
+	{
+		new Effect.Appear("filter_table", { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade( "filter_table", { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+	}
+}
+function show_file_links(DesignID)
+{
+	var elemname = 'file-links-row-' + DesignID;
+	var row = document.getElementById(elemname );
+	if(row.getStyle('display') == 'none')
+	{
+		new Effect.Appear(elemname , { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade( elemname , { duration: 0.0, queue: { position: '0', scope: 'task' } } );
+	}	
+}
 function copyPageFormValues(elem)
 {
 	design_form = elem.form;
 	design_form.Gen9Page.value = document.gen9form.Gen9Page.value;
-	design_form.query.value = "Gen9Comment"
+	design_form.query.value = "Gen9Comment";
+	design_form.gen9sort1.value = document.gen9form.gen9sort1.value;
+	design_form.gen9sort2.value = document.gen9form.gen9sort2.value;
+}
+
+function copyPageFormValuesForMeeting(elem)
+{
+	design_form = elem.form;
+	design_form.Gen9Page.value = document.gen9form.Gen9Page.value;
+	design_form.query.value = "Gen9Comment";
 	design_form.gen9sort1.value = document.gen9form.gen9sort1.value;
 	design_form.gen9sort2.value = document.gen9form.gen9sort2.value;
 }
@@ -183,4 +313,48 @@ function updateJmol()
 		jmolScript("frame all; display " + displayString.join() + "; hide " + hideString.join())
 	}
 }
+
+function showDesigns()
+{
+	
+	var all_divs = document.getElementsByClassName('general-design-cl');
+	for (i = 0; i < all_divs.length; i++)
+	{
+		var particular_div = all_divs[i];
+		if(particular_div.getStyle('display') == 'none')
+		{
+			new Effect.Appear(particular_div, { duration: 0.0 } );
+		}
+	}
+}
+
+function toggleDesigns(t, elem, group_type)
+{
+	var b;
+	if (elem.innerHTML.substring(0, 4) == 'Hide')
+	{
+		b = false;
+		elem.innerHTML = 'Show' + elem.innerHTML.substring(4);
+	}
+	else
+	{
+		b = true;
+		elem.innerHTML = 'Hide' + elem.innerHTML.substring(4);
+	}
+	
+	var all_divs = document.getElementsByClassName(t + '_' + group_type + '-cl');
+	for (i = 0; i < all_divs.length; i++)
+	{
+		var particular_div = all_divs[i];
+		if(b == true)
+		{
+			new Effect.Appear(particular_div, { duration: 0.0 } );
+		}
+		else
+		{
+			new Effect.Fade(particular_div, { duration: 0.0 } );
+		}
+	}
+}
+
 
