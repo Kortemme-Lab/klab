@@ -349,10 +349,15 @@ class PDB:
         resid_set = set()
         resid_list = []
         
+        chains = []
+        self.RAW_ATOM_SEQUENCE = []
+        
         atoms_read = {}
         for line in self.lines:
             if line[0:4] == 'ATOM' or (ConvertMSEToAtom and (line[0:6] == 'HETATM') and (line[17:20] == 'MSE')):
                 chainID = line[21]
+                if chainID not in chains:
+                    chains.append(chainID)
                 residue_longname = line[17:20]
                 if residue_longname not in residues and not(ConvertMSEToAtom and residue_longname == 'MSE'):
                     raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
@@ -382,7 +387,12 @@ class PDB:
                     sequences[chainID] = sequence_list[0:-1] 
         
         for chainID, sequence_list in sequences.iteritems():
-        	sequences[chainID] = "".join(sequence_list) 
+            sequences[chainID] = "".join(sequence_list)
+
+        for chainID in chains:
+            for a_acid in sequences[chainID]:
+                self.RAW_ATOM_SEQUENCE.append((chainID, a_acid))
+ 
         return sequences
 
     def getJournal(self):
