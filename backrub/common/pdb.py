@@ -25,6 +25,10 @@ non_canonical_aa1 = {
 	'CSU' : 'C', # ? some type of cysteine or a typo
 	'MSE' : 'M', # selenomethionine
 	'PTR' : 'Y', # phospotyrosine
+	'CME' : 'C', # S,S-(2-Hydroxyethyl)Thiocysteine (DB04530)
+	'NEH' : 'X', # Ethanamine
+	'CSS' : 'C', # S-Mercaptocysteine (DB02761)
+	'MEN' : 'N', # N-methyl asparagine
 }
 
 residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS", 
@@ -300,6 +304,10 @@ class PDB:
         
         # Parse the molecule entries
         for MD in MOL_DATA:
+            # Hack for 2OMT
+            MD = MD.replace('EPITHELIAL-CADHERIN; E-CAD/CTF1', 'EPITHELIAL-CADHERIN: E-CAD/CTF1')
+            
+            print(1, MD)
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
             molecule = {}
             for field in MOL_fields:
@@ -343,7 +351,7 @@ class PDB:
         
         return molecules
 
-    def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False):
+    def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         chain = None
         sequences = {}
         resid_set = set()
@@ -351,8 +359,12 @@ class PDB:
         
         chains = []
         self.RAW_ATOM_SEQUENCE = []
-        
+        essential_atoms_1 = set(['CA', 'C', 'N'])#, 'O'])
+        essential_atoms_2 = set(['CA', 'C', 'N'])#, 'OG'])
+        current_atoms = set()
         atoms_read = {}
+        oldchainID = None
+        removed_residue = {}
         for line in self.lines:
             if line[0:4] == 'ATOM' or (ConvertMSEToAtom and (line[0:6] == 'HETATM') and (line[17:20] == 'MSE')):
                 chainID = line[21]
@@ -363,7 +375,29 @@ class PDB:
                     raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
                     resid = line[21:26]
+                    #print(chainID, residue_longname, resid)
+                    #print(line)
+                    #print(resid_list)
                     if resid not in resid_set:
+                    	removed_residue[chainID] = False
+                        add_residue = True
+                        if current_atoms:
+                            if RemoveIncompleteResidues and essential_atoms_1.intersection(current_atoms) != essential_atoms_1 and essential_atoms_2.intersection(current_atoms) != essential_atoms_2:
+                                oldChain = resid_list[-1][0]
+                                print("The last residue %s in chain %s is missing these atoms: %s." % (resid_list[-1], oldChain, essential_atoms_1.difference(current_atoms) or essential_atoms_2.difference(current_atoms)))
+                                resid_set.remove(resid_list[-1])
+                                #print("".join(resid_list))
+                                resid_list = resid_list[:-1]
+                                if oldchainID:
+                                    removed_residue[oldchainID] = True
+                                #print("".join(resid_list))
+                                #print(sequences[oldChain])
+                                if sequences.get(oldChain):
+                                    sequences[oldChain] = sequences[oldChain][:-1]
+                                #print(sequences[oldChain]
+                        else:
+                            assert(not(resid_set))
+                        current_atoms = set()
                         atoms_read[chainID] = set()
                         atoms_read[chainID].add(line[12:15].strip())
                         resid_set.add(resid)
@@ -374,25 +408,24 @@ class PDB:
                             sequences[chainID].append(non_canonical_aa1[residue_longname])
                         else:
                             sequences[chainID].append(aa1[residue_longname])
+                        oldchainID = chainID
                     else:
                         #atoms_read[chainID] = atoms_read.get(chainID, set())
                         atoms_read[chainID].add(line[12:15].strip())
-        
+                    current_atoms.add(line[12:15].strip())
         if RemoveIncompleteFinalResidues:
             # These are (probably) necessary for Rosetta to keep the residue. Rosetta does throw away residues where only the N atom is present if that residue is at the end of a chain.
-            essential_atoms = set(['CA', 'C', 'N']) #, 'O'])
             for chainID, sequence_list in sequences.iteritems():
-                if essential_atoms.intersection(atoms_read[chainID]) != essential_atoms:
-                    print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms.difference(atoms_read[chainID])))
-                    sequences[chainID] = sequence_list[0:-1] 
+                if not(removed_residue[chainID]):
+                    if essential_atoms_1.intersection(atoms_read[chainID]) != essential_atoms_1 and essential_atoms_2.intersection(atoms_read[chainID]) != essential_atoms_2:
+                        print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms_1.difference(atoms_read[chainID]) or essential_atoms_2.difference(atoms_read[chainID])))
+                        sequences[chainID] = sequence_list[0:-1] 
         
         for chainID, sequence_list in sequences.iteritems():
             sequences[chainID] = "".join(sequence_list)
-
         for chainID in chains:
             for a_acid in sequences[chainID]:
                 self.RAW_ATOM_SEQUENCE.append((chainID, a_acid))
- 
         return sequences
 
     def getJournal(self):
