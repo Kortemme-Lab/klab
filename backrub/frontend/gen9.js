@@ -328,6 +328,44 @@ function showDesigns()
 	}
 }
 
+function showScaffoldDetails(designID, show)
+{
+	var plus_span = document.getElementById('scaffold-details-' + designID + '-show');
+	var minus_span = document.getElementById('scaffold-details-' + designID + '-hide');
+	var details_div = document.getElementById('scaffold-details-' + designID + '-div');
+	if (show)
+	{
+		new Effect.Fade(plus_span, { duration: 0.0 } );
+		new Effect.Appear(minus_span, { duration: 0.0 } );
+		new Effect.Appear(details_div, { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade(minus_span, { duration: 0.0 } );
+		new Effect.Fade(details_div, { duration: 0.0 } );
+		new Effect.Appear(plus_span, { duration: 0.0 } );
+	}
+}
+
+function showUserComments(designID, show)
+{
+	var plus_span = document.getElementById('user-comments-' + designID + '-show');
+	var minus_span = document.getElementById('user-comments-' + designID + '-hide');
+	var details_div = document.getElementById('user-comments-' + designID + '-div');
+	if (show)
+	{
+		new Effect.Fade(plus_span, { duration: 0.0 } );
+		new Effect.Appear(minus_span, { duration: 0.0 } );
+		new Effect.Appear(details_div, { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade(minus_span, { duration: 0.0 } );
+		new Effect.Fade(details_div, { duration: 0.0 } );
+		new Effect.Appear(plus_span, { duration: 0.0 } );
+	}
+}
+
 function toggleDesigns(t, elem, group_type)
 {
 	var b;
