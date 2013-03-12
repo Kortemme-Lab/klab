@@ -530,6 +530,15 @@ class PDB:
             if line[21:22] == chain and resid == line[22:27]:
                 return line
         raise Exception("Could not find the ATOM/HETATM line corresponding to chain '%(chain)s' and residue '%(resid)s'." % vars())	
+
+    def getAtomLinesForResidueInRosettaStructure(self, resid):
+        '''We assume a Rosetta-generated structure where residues are uniquely identified by number.'''
+        lines = [line for line in self.lines if line[0:4] == "ATOM" and resid == int(line[22:27])]
+        if not lines:  
+            #print('Failed searching for residue %d.' % resid)
+            #print("".join([line for line in self.lines if line[0:4] == "ATOM"]))
+            raise Exception("Could not find the ATOM/HETATM line corresponding to residue '%(resid)s'." % vars())
+        return lines
     
     def remapMutations(self, mutations, pdbID = '?'):
         '''Takes in a list of (Chain, ResidueID, WildtypeAA, MutantAA) mutation tuples and returns the remapped
