@@ -1,4 +1,12 @@
-subpages = ["browse", "rankmapping"]
+var subpages;
+if (document.gen9form.Username.value == 'oconchus')
+{
+	subpages = ["browse", "rankmapping", "manualdesigns"]
+}
+else
+{
+	subpages = ["browse", "rankmapping", "manualdesigns"]
+}
 
 function showPage(page)
 {
@@ -43,7 +51,16 @@ function showPage(page)
 	}
 	alert("Cannot find div " + page)
 }
-
+if (document.gen9form.gen9mode.value != null && document.gen9form.gen9mode.value == 'top10')
+{
+	document.getElementsByName("Show_Top_10_Options")[0].checked = true;
+	/*if (document.gen9form.top10scheme.value != null)
+	{
+		
+	}*/	
+	toggleTop10Options();
+}
+	
 if (document.gen9form.Gen9Page.value != null)
 {
 	showPage(document.gen9form.Gen9Page.value)
@@ -177,6 +194,46 @@ function reopen_page_with_sorting()
 	window.open("?query=Gen9&gen9sort1=" + ordering1 + "&gen9sort2=" + ordering2, "_self");
 }
 
+function reopen_page_with_top10()
+{
+	if (document.getElementsByName("Show_Top_10_Options")[0].checked)
+	{
+		var o1 = document.getElementById("ordering1");
+		
+		var ordering1 = o1.options[o1.selectedIndex].value;
+		var o2 = document.getElementById("ordering2");
+		var ordering2 = o2.options[o2.selectedIndex].value;
+		
+		var t1 = document.getElementById("Top10SmallMolecules");
+		var molecule= t1.options[t1.selectedIndex].value;
+		if (molecule != '')
+		{
+			molecule = '&top10mol=' + molecule
+		}
+		
+		var t2 = document.getElementById("Top10RankingScheme");
+		var scheme= t2.options[t2.selectedIndex].value;
+		if (scheme != '')
+		{
+			scheme = '&top10scheme=' + scheme
+		}
+		
+		var t3 = document.getElementById("Top10DesignType");
+		var tttype= t3.options[t3.selectedIndex].value;
+		if (tttype != '')
+		{
+			tttype = '&top10type=' + tttype
+		}
+		window.open("?query=Gen9&gen9mode=top10" + molecule + scheme + tttype + "&gen9sort1=" + ordering1 + "&gen9sort2=" + ordering2, "_self");
+	}
+	else
+	{
+		reopen_page_with_sorting();
+	}
+}
+
+
+
 if (document.gen9form.DesignID.value != "")
 {
 	window.location.hash="d" + document.gen9form.DesignID.value;
@@ -186,6 +243,12 @@ if (document.gen9form.Gen9Error.value != "")
 	alert(document.gen9form.Gen9Error.value);
 }
 
+function goToSmallMolecule(SmallMoleculeID)
+{
+	window.location.hash="#";
+	window.location.hash="aSmallMolecule" + SmallMoleculeID;
+	return false;
+}
 function goToDesign(txtbox, e)
 {
 	var keycode;
@@ -243,22 +306,31 @@ function show_file_links(DesignID)
 		new Effect.Fade( elemname , { duration: 0.0, queue: { position: '0', scope: 'task' } } );
 	}	
 }
-function copyPageFormValues(elem)
+
+function copyGenericPageFormValues(elem)
 {
 	design_form = elem.form;
 	design_form.Gen9Page.value = document.gen9form.Gen9Page.value;
-	design_form.query.value = "Gen9Comment";
 	design_form.gen9sort1.value = document.gen9form.gen9sort1.value;
 	design_form.gen9sort2.value = document.gen9form.gen9sort2.value;
+	design_form.gen9mode.value = document.gen9form.gen9mode.value;
+	design_form.top10mol.value = document.gen9form.top10mol.value;
+	design_form.top10scheme.value = document.gen9form.top10scheme.value;
+	design_form.top10type.value = document.gen9form.top10type.value;
+}
+
+function copyPageFormValues(elem)
+{
+	design_form = elem.form;
+	design_form.query.value = "Gen9Comment";
+	copyGenericPageFormValues(elem);
 }
 
 function copyPageFormValuesForMeeting(elem)
 {
 	design_form = elem.form;
-	design_form.Gen9Page.value = document.gen9form.Gen9Page.value;
 	design_form.query.value = "Gen9Comment";
-	design_form.gen9sort1.value = document.gen9form.gen9sort1.value;
-	design_form.gen9sort2.value = document.gen9form.gen9sort2.value;
+	copyGenericPageFormValues(elem);
 }
 
 /************************************
@@ -363,6 +435,21 @@ function showUserComments(designID, show)
 		new Effect.Fade(minus_span, { duration: 0.0 } );
 		new Effect.Fade(details_div, { duration: 0.0 } );
 		new Effect.Appear(plus_span, { duration: 0.0 } );
+	}
+}
+
+function toggleTop10Options()
+{
+	var b = document.getElementsByName("Show_Top_10_Options")[0].checked;
+	var options_span = document.getElementById('Top10Options');
+	
+	if (b == true)
+	{
+		new Effect.Appear(options_span, { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade(options_span, { duration: 0.0 } );
 	}
 }
 
