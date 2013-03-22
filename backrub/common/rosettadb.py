@@ -345,6 +345,68 @@ class ReusableDatabaseInterface(DatabaseInterface):
 	def execute_select(self, sql, parameters = None, quiet = False, locked = False):
 		return self.execute(sql, parameters = parameters, quiet = quiet, locked = locked, do_commit = False)
 			
+	def execute_select_StdCursor(self, sql, parameters = None, quiet = False, locked = False):
+		return self.execute_StdCursor(sql, parameters = parameters, quiet = quiet, locked = locked, do_commit = False)
+	
+	def execute_StdCursor(self, sql, parameters = None, quiet = False, locked = False, do_commit = True):
+		"""Execute SQL query. This uses DictCursor by default."""
+		i = 0
+		errcode = 0
+		caughte = None
+		cursor = None
+		cursorClass = StdCursor
+		if sql.find(";") != -1 or sql.find("\\G") != -1:
+			# Catches some injections
+			raise Exception("The SQL command '%s' contains a semi-colon or \\G. This is a potential SQL injection." % sql)
+		while i < self.numTries:
+			i += 1
+			try:
+				self._get_connection()
+				#if not self.connection:
+				#	self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = cursorClass)
+				cursor = self.connection.cursor()
+				if locked:
+					cursor.execute(self.lockstring)
+					self.locked = True
+				if parameters:
+					errcode = cursor.execute(sql, parameters)
+				else:
+					errcode = cursor.execute(sql)
+				self.lastrowid = int(cursor.lastrowid)
+				if do_commit and self.isInnoDB:
+					self.connection.commit()
+				results = cursor.fetchall()
+				if locked:
+					cursor.execute(self.unlockstring)
+					self.locked = False
+				cursor.close()
+				return results
+			except MySQLdb.OperationalError, e:
+				if cursor:
+					if self.locked:
+						cursor.execute(self.unlockstring)
+						self.locked = False
+					cursor.close()
+				caughte = str(e)
+				errcode = e[0]
+				continue
+			except Exception, e:
+				if cursor:
+					if self.locked:
+						cursor.execute(self.unlockstring)
+						self.locked = False
+					cursor.close()
+				caughte = str(e)
+				traceback.print_exc()
+				break
+			sleep(0.2)
+		
+		if not quiet:
+			sys.stderr.write("\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+			sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+			sys.stderr.flush()
+		raise MySQLdb.OperationalError(caughte)
+	
 	def execute(self, sql, parameters = None, quiet = False, locked = False, do_commit = True):
 		"""Execute SQL query. This uses DictCursor by default."""
 		i = 0

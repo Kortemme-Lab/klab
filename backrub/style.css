@@ -324,6 +324,11 @@ span.new-genbrowser-header
 	color:#005;
 	font-weight: bold;
 }
+span.new-genbrowser-inline-header
+{
+	color:#005;
+	font-weight: bold;
+}
 span.new-genbrowser-short-header
 {
 	display: inline-block;
@@ -425,13 +430,22 @@ div.rankmapping_header span:nth-child(2)
 {
 	display: inline-block;
 	font-weight:bold;
+	width:120px;
+	text-align:left;
+	background: #b2cecf;
+	color:#5225d0;
+	margin:1px;
+}div.rankmapping_header span:nth-child(3)
+{
+	display: inline-block;
+	font-weight:bold;
 	width:140px;
 	text-align:left;
 	background: #b2cecf;
 	color:#5225d0;
 	margin:1px;
 }
-div.rankmapping_header span:nth-child(3)
+div.rankmapping_header span:nth-child(4)
 {
 	display: inline-block;
 	font-weight:bold;
@@ -455,13 +469,20 @@ div.rankmapping span:nth-child(1)
 div.rankmapping span:nth-child(2)
 {
 	display: inline-block;
+	width:120px;
+	text-align:left;
+	background:#c9d8d5;
+	margin:1px;
+}div.rankmapping span:nth-child(3)
+{
+	display: inline-block;
 	width:140px;
 	text-align:left;
 	background:#c9d8d5;
 	margin:1px;
 }
 
-div.rankmapping span:nth-child(3)
+div.rankmapping span:nth-child(4)
 {
 	display: inline-block;
 	width:130px;
@@ -475,6 +496,15 @@ span.new-genbrowser-sequence-chain
 	padding-left:30px;
 	display: inline-block;
 	width: 60px;
+	color:#005;
+	font-weight: bold;
+}
+span.new-genbrowser-scaffold-details
+{
+	padding-left:30px;
+	padding-top:5px;
+	padding-bottom:10px;
+	display: inline-block;
 	color:#005;
 	font-weight: bold;
 }
@@ -553,6 +583,56 @@ td.new-genbrowser-score-2
 	border: 0px;
 }
 th.new-genbrowser-score-2
+{
+	background: #b2cecf;
+	padding:0px;
+	text-align:left;
+	font-size: 10pt;
+	font-weight:bold;
+	color:#5225d0
+}
+
+
+td.gen9-RMSD-BadChi
+{
+	font-weight:bold;
+	color:#fff;
+	background:#d0101d;
+}
+tr.new-genbrowser-stats td:nth-child(-n+4)
+{
+	background: #c9d8d5;
+}
+tr.new-genbrowser-stats td:nth-child(n+4):nth-child(-n+7)
+{
+	background: #d9e8e5;
+}
+tr.new-genbrowser-stats td:nth-child(n+8):nth-child(-n+11)
+{
+	background: #c9d8d5;
+}
+tr.new-genbrowser-stats td:nth-child(n+12):nth-child(-n+15)
+{
+	background: #d9e8e5;
+}
+tr.new-genbrowser-manual-design-stats td:nth-child(-n+20)
+{
+	background: #c9d8d5;
+}
+tr.new-genbrowser-manual-design-stats td:nth-child(n+20):nth-child(-n+23)
+{
+	background: #d9e8e5;
+}
+tr.new-genbrowser-manual-design-stats td:nth-child(n+24):nth-child(-n+27)
+{
+	background: #c9d8d5;
+}
+tr.new-genbrowser-manual-design-stats td:nth-child(n+28):nth-child(-n+31)
+{
+	background: #d9e8e5;
+}
+
+td.new-genbrowser-score-2h
 {
 	background: #b2cecf;
 	padding:0px;
@@ -647,5 +727,49 @@ hr.new-genbrowser-hr
 	padding-bottom:0px;
 }
 
+.Top10SmallMolecule
+{
+	background: #40c06d;
+	margin-left:-60px;
+	margin-bottom:0px;
+}
+.Top10SmallMolecule:before,
+.Top10SmallMolecule:after { content: "\0000a0"; }
+.Top10RankingScheme
+{
+	background: #40c06d;
+	margin-left:-45px;
+	margin-top:0px;
+	margin-bottom:0px;
+}
+.Top10RankingScheme:before,
+.Top10RankingScheme:after { content: "\0000a0"; }
+.Top10DesignType
+{
+	background: #40c06d;
+	margin-left:-30px;
+	margin-top:0px;
+	margin-bottom:0px;
+}
+.Top10DesignType:before,
+.Top10DesignType:after { content: "\0000a0"; }
+.Top10DesignRank
+{
+	background: #40c06d;
+	margin-left:-15px;
+	margin-top:0px;
+}
+.Top10DesignRank:before,
+.Top10DesignRank:after { content: "\0000a0"; }
 
+a.top10header
+{
+	color: black;
+}
+span.gen9-scaffold-details
+{
+	padding-left:5px;
+	display: inline-block;
+	cursor: pointer;
+}
 
