@@ -265,6 +265,11 @@ def webstatsJobsByProtocolCumulative(stats):
 				cumulative[p] += v.get(p, 0)
 				html.append('''%d,''' % cumulative[p])
 			html.append('''],''')
+
+		total_number_of_jobs = 0
+		for p in protocols:
+			total_number_of_jobs += cumulative[p]
+			
 		html.append(''']);
 		
 		// Instantiate and draw our chart, passing in some options.
@@ -279,7 +284,10 @@ def webstatsJobsByProtocolCumulative(stats):
 	}
 	</script>
 	''')
-	html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span>''' % vars())
+	if total_number_of_jobs:
+		html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>Jobs by protocol (cumulative, %(total_number_of_jobs)d jobs to date)</span>''' % vars())
+	else:
+		html.append('''<span style="text-align:center; font-size:15pt"><A NAME="%(title)s"></A>%(title)s</span>''' % vars())
 	html.append('''<div id="webstatsJobsByProtocolCumulativeChart"></div>''')
 	
 	return title, html, chartsfns
@@ -1920,6 +1928,8 @@ def generateAdminPage(quotas, usage, users, settings_, rosettahtml, form):
 	# Set generate to False to hide pages for quicker testing
 	subpages = [
 		{"name" : "retrospect",	"desc" : "Backups",				"fn" : generateRetrospectLogPage,	"generate" :True,	"params" : []},
+	]
+	subpages = [
 		{"name" : "diskstats",	"desc" : "Disk stats",			"fn" : generateDiskStatsSubpage,	"generate" :True,	"params" : [quotas, usage, users]},
 		{"name" : "inventory",	"desc" : "IT inventory",		"fn" : generateITInventory,			"generate" :True,	"params" : []},
 		{"name" : "jobadmin",	"desc" : "Job administration",	"fn" : generateJobAdminSubpage,		"generate" :True,	"params" : []},

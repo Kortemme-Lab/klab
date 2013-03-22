@@ -1,11 +1,11 @@
 var subpages;
 if (document.gen9form.Username.value == 'oconchus')
 {
-	subpages = ["browse", "rankmapping", "manualdesigns"]
+	subpages = ["browse", "rankmapping"]
 }
 else
 {
-	subpages = ["browse", "rankmapping", "manualdesigns"]
+	subpages = ["browse", "rankmapping"]
 }
 
 function showPage(page)
@@ -156,6 +156,34 @@ function enableMeetingComments(DesignID)
 	new Effect.Fade("meeting-comments-" + DesignID + "-header", { duration: 0.0, queue: { position: '0', scope: 'task' } } );	
 }
 
+
+function toggleManualDesigns(elem)
+{
+	var b;
+	if (elem.innerHTML == 'Only manually designed')
+	{
+		b = false;
+		elem.innerHTML = 'All designs';
+	}
+	else
+	{
+		b = true;
+		elem.innerHTML = 'Only manually designed';
+	}
+	var all_divs = document.getElementsByClassName('no-manual-designs');
+	for (i = 0; i < all_divs.length; i++)
+	{
+		var particular_div = all_divs[i];
+		if(b == true)
+		{
+			new Effect.Appear(particular_div, { duration: 0.0 } );
+		}
+		else
+		{
+			new Effect.Fade(particular_div, { duration: 0.0 } );
+		}
+	}
+}
 function toggleNewDesigns(elem)
 {
 	var b;
@@ -405,6 +433,25 @@ function showScaffoldDetails(designID, show)
 	var plus_span = document.getElementById('scaffold-details-' + designID + '-show');
 	var minus_span = document.getElementById('scaffold-details-' + designID + '-hide');
 	var details_div = document.getElementById('scaffold-details-' + designID + '-div');
+	if (show)
+	{
+		new Effect.Fade(plus_span, { duration: 0.0 } );
+		new Effect.Appear(minus_span, { duration: 0.0 } );
+		new Effect.Appear(details_div, { duration: 0.0 } );
+	}
+	else
+	{
+		new Effect.Fade(minus_span, { duration: 0.0 } );
+		new Effect.Fade(details_div, { duration: 0.0 } );
+		new Effect.Appear(plus_span, { duration: 0.0 } );
+	}
+}
+
+function showManualDesignDetails(manualdesignID, show)
+{
+	var plus_span = document.getElementById('scaffold-details-Manual' + manualdesignID + '-show');
+	var minus_span = document.getElementById('scaffold-details-Manual' + manualdesignID + '-hide');
+	var details_div = document.getElementById('scaffold-details-Manual' + manualdesignID + '-div');
 	if (show)
 	{
 		new Effect.Fade(plus_span, { duration: 0.0 } );
