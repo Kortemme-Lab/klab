@@ -21,6 +21,7 @@ import cgi
 import cgitb
 cgitb.enable()
 import Cookie
+import gc
 
 # set Python egg dir MscOSX only
 if os.uname()[0] == 'Darwin':
@@ -171,6 +172,7 @@ protocolGroups = []
 protocols = []
 
 def ws():
+	start_time = time.time()
 	s = sys.stdout
 	if not(settings["LiveWebserver"]):
 		sys.stderr = s
@@ -271,10 +273,10 @@ def ws():
 			if not(settings["LiveWebserver"]):
 				# "register" is enabled for logged in users to allow updating passwords
 				if result and result[0][1] == 'oconchus':
-					allowedQueries.extend(["register", "update", "admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
-					subAllowedQueries.extend(["register", "admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+					allowedQueries.extend(["register", "update", "admin", "ddg", "Gen9DNA", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
+					subAllowedQueries.extend(["register", "admin", "ddg", "Gen9", "Gen9DNA", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "admincmd", "benchmarkreport"])
 				elif result and result[0][2] == 1:
-					allowedQueries.extend(["register", "update", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "benchmarkreport"])
+					allowedQueries.extend(["register", "update", "admin", "ddg", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "benchmarkreport"])
 					subAllowedQueries.extend(["register", "Gen9", "Gen9File", "Gen9Comment", "Gen9MeetingComment", "Gen9Switch", "Gen9Filter", "benchmarks", "PDB", "benchmarkreport"])
 
 			# if this session is active (i.e. the user is logged in) allow all modes. If not restrict access or send him to login.
@@ -556,10 +558,18 @@ def ws():
 			title = 'Admin'
 
 	elif query_type == "Gen9":
+		gc.disable()
 		if not(settings["LiveWebserver"]):
 			html_content = rosettaHTML.gen9Page(settings, form, userid)
 			title = 'Gen9'
-
+	
+	elif query_type == "Gen9DNA":
+		gc.disable()
+		if not(settings["LiveWebserver"]):
+			html_content = rosettaHTML.gen9DNAPage(settings, form, userid)
+			title = 'Gen9'
+	
+	
 	elif query_type == "Gen9Filter":
 		if not(settings["LiveWebserver"]):
 			from gen9 import generateFilterQuery
@@ -819,9 +829,33 @@ def ws():
 						print("Badly specified query.")
 
 
+				elif form['download'].value == 'ManualDesignsPSE':
+					if form.has_key('DesignID'):
+						results = gen9db.execute("SELECT ManualDesignsPyMOLSessionFile FROM Design WHERE ID=%s", parameters = (form['DesignID'].value,))
+						if not results:
+							s.write("Content-type: text/html\n\n")
+							print("No files found for design ID %s." % form['DesignID'].value)
+						else:
+							assert(len(results) == 1)
+							filepath = results[0]['ManualDesignsPyMOLSessionFile']
+							contents = readBinaryFile(filepath)
+							filename = os.path.split(filepath)[1]
+							
+							print 'Content-Type: application/octet-stream'
+							print 'Content-Disposition: attachment; filename="%s"' % (filename)
+							print "Content-Length: %d" % len(contents)
+							print
+							sys.stdout.write(contents)
+							sys.stdout.flush()
+					else:
+						s.write("Content-type: text/html\n\n")
+						print("Badly specified query.")				
 				elif form['download'].value == 'PSE':
-					if form.has_key('DesignID') and form.has_key('RankingSchemeID'):
-						results = gen9db.execute("SELECT PyMOLSessionFile FROM RankedScore WHERE DesignID=%s AND RankingSchemeID=%s", parameters = (form['DesignID'].value, form['RankingSchemeID'].value))
+					if form.has_key('DesignID'):
+						if form.has_key('RankingSchemeID'):
+							results = gen9db.execute("SELECT PyMOLSessionFile FROM RankedScore WHERE DesignID=%s AND RankingSchemeID=%s", parameters = (form['DesignID'].value, form['RankingSchemeID'].value))
+						else:
+							results = gen9db.execute("SELECT PyMOLSessionFile FROM Design WHERE ID=%s", parameters = (form['DesignID'].value,))
 						if not results:
 							s.write("Content-type: text/html\n\n")
 							print("No files found for design ID %s." % form['DesignID'].value)
@@ -862,7 +896,21 @@ def ws():
 								sys.stdout.write(contents)
 								sys.stdout.flush()
 				elif form['download'].value == 'WebLogo':
-					if form.has_key('DesignID') and form.has_key('Chain'):
+					if form.has_key('ScaffoldPDBID') and form.has_key('ScaffoldUnit') and form.has_key('Chain'):
+						results = gen9db.execute("SELECT SequenceLogo FROM PDBBiologicalUnitChain WHERE PDBFileID=%s AND BiologicalUnit=%s AND Chain=%s", parameters = (form['ScaffoldPDBID'].value, form['ScaffoldUnit'].value, form['Chain'].value))
+						if not results:
+							s.write("Content-type: text/html\n\n")
+							print("No files found for design ID %s." % form['DesignID'].value)
+						else:
+							assert(len(results) == 1)
+							contents = results[0]['SequenceLogo']
+							print 'Content-Type: application/pdf'
+							print 'Content-Disposition: inline; filename="%s"' % ("%s.%s.Chain%s.pdf" % (form['ScaffoldPDBID'].value, form['ScaffoldUnit'].value, form['Chain'].value))
+							print "Content-Length: %d" % len(contents)
+							print
+							sys.stdout.write(contents)
+							sys.stdout.flush()
+					elif form.has_key('DesignID') and form.has_key('Chain'):
 						results = gen9db.execute("SELECT SequenceLogo FROM DesignMutatedChain WHERE DesignID=%s AND Chain=%s", parameters = (form['DesignID'].value, form['Chain'].value))
 						if not results:
 							s.write("Content-type: text/html\n\n")
@@ -1101,7 +1149,16 @@ def ws():
 		html = "this is impossible" # should never happen since we only allow states from list above 
 
 	if query_type not in ["PDB", "benchmarkreport", "Gen9File"]:
-		s.write(rosettaHTML.main(html_content, title, query_type))
+		if query_type == "Gen9":
+			rosettaHTML.fast_main(s, html_content, title, query_type)
+			s.write('Page generation time: %0.2fs' % (time.time() - start_time))
+			gc.enable()
+		elif query_type == "Gen9DNA":
+			rosettaHTML.fast_main_jquery(s, html_content, title, query_type)
+			s.write('Page generation time: %0.2fs' % (time.time() - start_time))
+			gc.enable()
+		else:
+			s.write(rosettaHTML.main(html_content, title, query_type))
 	s.close()
 
 def logBrowser(sid, userid):

@@ -17,6 +17,7 @@ import gzip
 import Graph
 import admin
 import gen9
+import gen9dna
 import ddgweb
 import benchmarks
 import pdb
@@ -185,6 +186,161 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 
 
         return join(html, "")
+    
+    def fast_main(self, writestream, CONTENT=[], site='', query=''):
+		writestream.write("""
+			<!-- *********************************************************
+				 * RosettaBackrub										*
+				 * Kortemme Lab, University of California, San Francisco *
+				 * Tanja Kortemme, Florian Lauck, 2009-2010			  *
+				 ********************************************************* -->
+			<html>
+			<head>
+				<title>%s - %s</title>
+				<META name="description" content="RosettaBackrub a webserver for flexible backbone modeling">
+				<META name="keywords" content="RosettaBackrub RosettaFlexibleBackbone Rosetta Kortemme protein structure modeling prediction backrub flexible backbone design point mutation">
+				
+				<link rel="STYLESHEET" type="text/css" href="../style.css">
+				
+				<script src="/javascripts/prototype.js" type="text/javascript"></script>
+				<script src="/javascripts/sorttable.js" type="text/javascript"></script>
+				<script src="/javascripts/scriptaculous.js" type="text/javascript"></script>
+				<script src="/javascripts/niftycube.js" type="text/javascript"></script>
+				<script src="/javascripts/boxover.js" type="text/javascript"></script>
+				<script src="/jmol/Jmol.js" type="text/javascript"></script>
+				""" % (self.server_title, site))
+		
+		# Add the Javascript constants
+		self._setupJavascript()
+		writestream.write(join(self.JS,"\n"))
+					
+		writestream.write("""		<script src="/backrub/jscripts.js" type="text/javascript"></script>
+							   <script src="/backrub/frontend/rosettahtml.js" type="text/javascript"></script>
+			</head>
+
+			<body bgcolor="#ffffff" onload="startup( \'%s\' );">
+			<center>
+			<NOSCRIPT>
+			  <font style="color:red; font-weight:bold;">This page uses Javascript. Your browser either
+			  doesn't support Javascript or you have it turned off.
+			  To see this page as it is meant to appear please use
+			  a Javascript enabled browser.</font>
+			</NOSCRIPT>
+			<table border=0 width="1200" cellpadding=0 cellspacing=0>
+
+<!-- Header --> <tr> %s </tr>
+
+<!-- Warning --> <tr><td align="center" style="padding:10px;">%s</td></tr>
+
+<!-- Login Status --> <tr> %s </tr>
+
+<!-- Menu --> %s
+		<tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Content -->
+<tr>""" % ( query,
+							self._showHeader(),
+							self._showWarning(),
+							self._showLoginStatus(),
+							self._showMenu()))
+
+		chunk_size = len(CONTENT)
+		CONTENT_CHUNKS = [CONTENT[x:x+chunk_size] for x in xrange(0, len(CONTENT), chunk_size)]
+		for CHUNK in CONTENT_CHUNKS:
+			writestream.write("\n".join(CHUNK))
+		
+		#for LINE in CONTENT:
+		#	writestream.write("%s\n" % LINE)
+		
+		writestream.write("""
+</tr>
+		<tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Legal Info --> <tr> %s </tr>
+			<tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Footer --> <tr> %s </tr>
+
+		   </table>
+		   </center>
+		   </body>
+		   </html>\n""" % (self._showLegalInfo(),
+							self._showFooter() ))
+		
+    def fast_main_jquery(self, writestream, CONTENT=[], site='', query=''):
+        writestream.write("""
+            <!-- *********************************************************
+                 * RosettaBackrub                                        *
+                 * Kortemme Lab, University of California, San Francisco *
+                 * Tanja Kortemme, Florian Lauck, 2009-2010              *
+                 ********************************************************* -->
+            <html>
+            <head>
+                <title>%s - %s</title>
+                <META name="description" content="RosettaBackrub a webserver for flexible backbone modeling">
+                <META name="keywords" content="RosettaBackrub RosettaFlexibleBackbone Rosetta Kortemme protein structure modeling prediction backrub flexible backbone design point mutation">
+                
+                <link rel="STYLESHEET" type="text/css" href="../style.css">
+                
+                <script src="/javascripts/jquery-1.9.0.min.js" type="text/javascript"></script>
+                <script src="/javascripts/sorttable.js" type="text/javascript"></script>
+                <script src="/javascripts/niftycube.js" type="text/javascript"></script>
+                <script src="/javascripts/boxover.js" type="text/javascript"></script>
+                <script src="/jmol/Jmol.js" type="text/javascript"></script>
+                """ % (self.server_title, site))
+        
+        # Add the Javascript constants
+        self._setupJavascript()
+        writestream.write(join(self.JS,"\n"))
+                    
+        writestream.write("""        <script src="/backrub/jscripts.js" type="text/javascript"></script>
+                               <script src="/backrub/frontend/rosettahtml.js" type="text/javascript"></script>
+            </head>
+
+            <body bgcolor="#ffffff" onload="startup( \'%s\' );">
+            <center>
+            <NOSCRIPT>
+              <font style="color:red; font-weight:bold;">This page uses Javascript. Your browser either
+              doesn't support Javascript or you have it turned off.
+              To see this page as it is meant to appear please use
+              a Javascript enabled browser.</font>
+            </NOSCRIPT>
+            <table border=0 width="1200" cellpadding=0 cellspacing=0>
+
+<!-- Header --> <tr> %s </tr>
+
+<!-- Warning --> <tr><td align="center" style="padding:10px;">%s</td></tr>
+
+<!-- Login Status --> <tr> %s </tr>
+
+<!-- Menu --> %s
+        <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Content -->
+<tr>""" % ( query,
+                            self._showHeader(),
+                            self._showWarning(),
+                            self._showLoginStatus(),
+                            self._showMenu()))
+
+        chunk_size = len(CONTENT)
+        CONTENT_CHUNKS = [CONTENT[x:x+chunk_size] for x in xrange(0, len(CONTENT), chunk_size)]
+        for CHUNK in CONTENT_CHUNKS:
+            writestream.write("\n".join(CHUNK))
+        
+        #for LINE in CONTENT:
+        #    writestream.write("%s\n" % LINE)
+        
+        writestream.write("""
+</tr>
+        <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Legal Info --> <tr> %s </tr>
+            <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+<!-- Footer --> <tr> %s </tr>
+
+           </table>
+           </center>
+           </body>
+           </html>\n""" % (self._showLegalInfo(),
+                            self._showFooter() ))
+        
+       
 
 ##############################################
 # API functions follow below, one per section.
@@ -865,7 +1021,12 @@ This site has known issues under Internet Explorer. Until these issues are fixed
     
     def gen9Page(self, settings, form, userid, Gen9Error = None, filteredDesignIDs = None):
         html = gen9.generateGen9Page(settings, self, form, userid, Gen9Error, filteredDesignIDs)
-        return join(html, "")
+        return html
+
+    def gen9DNAPage(self, settings, form, userid, Gen9Error = None, filteredDesignIDs = None):
+        html = gen9dna.generateGen9DNAPage(settings, self, form, userid)
+        return html
+
 
     def ddgPage(self, settings, form):
         html = ddgweb.generateDDGPage(settings, self, form)
@@ -2588,13 +2749,21 @@ var MaxMultiplePointMutations = %d;
         s1 = ""
         s2 = ""
         if self.username != '':
-            s1 = """
+            if self.server_shortname == 'albana':
+                 s1 = ""
+            else:
+                 s1 = """
                     [&nbsp;<A class="nav" href="%s?query=submit">Submit</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="%s?query=queue">Queue</A>&nbsp;] &nbsp;&nbsp;&nbsp;""" % (self.script_filename,self.script_filename)
             if self.username != "guest":
                 s2 = """[&nbsp;<A class="nav" href="%s?query=update">My Account</A>&nbsp;]""" % (self.script_filename)
         
-        html = """
+        if self.server_shortname == 'albana':
+            html = """
+                <tr><td align=center>
+                    [&nbsp;<A class="nav" href="%s?query=register">Register</A>&nbsp;] """
+        else:
+            html = """
                 <tr><td align=center>
                     [&nbsp;<A class="nav" href="%s?query=index" >Home</A>&nbsp;] &nbsp;&nbsp;&nbsp;
                     [&nbsp;<A class="nav" href="https://kortemmelab.ucsf.edu/backrub/wiki/" target="_blank">Documentation</A>&nbsp;] &nbsp;&nbsp;&nbsp;
@@ -2605,6 +2774,7 @@ var MaxMultiplePointMutations = %d;
                 html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=admin">Admin</A>&nbsp;]''' % (self.script_filename)
                 html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=ddg">&#916;&#916;G</A>&nbsp;]'''  % (self.script_filename)
                 html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=Gen9">Gen9</A>&nbsp;]'''  % (self.script_filename)
+                html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=Gen9DNA">Gen9DNA</A>&nbsp;]'''  % (self.script_filename)
                 html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="%s?query=benchmarks">Benchmarks</A>&nbsp;]''' % (self.script_filename)
                 html += '''&nbsp;&nbsp;&nbsp;[&nbsp;<A class="nav" href="http://albana.ucsf.edu/backrub/philesight/philesight.cgi">philesight</A>&nbsp;]'''
 
