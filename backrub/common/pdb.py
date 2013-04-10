@@ -29,6 +29,9 @@ non_canonical_aa1 = {
 	'NEH' : 'X', # Ethanamine
 	'CSS' : 'C', # S-Mercaptocysteine (DB02761)
 	'MEN' : 'N', # N-methyl asparagine
+	'PCA' : 'E', # Pyroglutamic acid
+	'SEP' : 'S', # Phosphoserine
+	'GLZ' : 'G', # Amino-acetaldehyde
 }
 
 residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS", 
@@ -264,6 +267,8 @@ class PDB:
                         #print(SEQRES_lines)
                         #print(line)
                         sequences[chainID].append(non_canonical_aa1[r])
+                    elif r == 'UNK':
+                        continue
                     else:
                         #print(SEQRES_lines)
                         #print(line)
@@ -306,11 +311,14 @@ class PDB:
         for MD in MOL_DATA:
             # Hack for 2OMT
             MD = MD.replace('EPITHELIAL-CADHERIN; E-CAD/CTF1', 'EPITHELIAL-CADHERIN: E-CAD/CTF1')
+            # Hack for 1M2T
+            MD = MD.replace('SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN; MLA; ML-I A;', 'SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN, MLA, ML-I A,')
             
             print(1, MD)
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
             molecule = {}
             for field in MOL_fields:
+            	print(field)
                 field = field.split(":")
                 field_name = COMPND_field_map[field[0].strip()]
                 field_data = field[1].strip()
@@ -352,11 +360,13 @@ class PDB:
         return molecules
 
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
+        '''Note: This function ignores any DNA.'''
         chain = None
         sequences = {}
         resid_set = set()
         resid_list = []
         
+        DNA_residues = set([' DA', ' DC', ' DG', ' DT'])
         chains = []
         self.RAW_ATOM_SEQUENCE = []
         essential_atoms_1 = set(['CA', 'C', 'N'])#, 'O'])
@@ -371,6 +381,12 @@ class PDB:
                 if chainID not in chains:
                     chains.append(chainID)
                 residue_longname = line[17:20]
+                if residue_longname in DNA_residues: 
+                    # Skip DNA
+                    continue
+                if residue_longname == 'UNK':
+                    # Skip unknown residues
+                    continue
                 if residue_longname not in residues and not(ConvertMSEToAtom and residue_longname == 'MSE'):
                     raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
@@ -424,7 +440,7 @@ class PDB:
         for chainID, sequence_list in sequences.iteritems():
             sequences[chainID] = "".join(sequence_list)
         for chainID in chains:
-            for a_acid in sequences[chainID]:
+            for a_acid in sequences.get(chainID, ""):
                 self.RAW_ATOM_SEQUENCE.append((chainID, a_acid))
         return sequences
 
