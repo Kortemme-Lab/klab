@@ -32,6 +32,8 @@ non_canonical_aa1 = {
 	'PCA' : 'E', # Pyroglutamic acid
 	'SEP' : 'S', # Phosphoserine
 	'GLZ' : 'G', # Amino-acetaldehyde
+	'CSD' : 'C', # 3-sulfinoalanine
+	'HIC' : 'H', # 4-Methyl-Histidine
 }
 
 residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS", 
@@ -313,8 +315,11 @@ class PDB:
             MD = MD.replace('EPITHELIAL-CADHERIN; E-CAD/CTF1', 'EPITHELIAL-CADHERIN: E-CAD/CTF1')
             # Hack for 1M2T
             MD = MD.replace('SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN; MLA; ML-I A;', 'SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN, MLA, ML-I A,')
+            # Hack for 1IBR
+            MD = MD.replace('SYNONYM: RAN; TC4; RAN GTPASE; ANDROGEN RECEPTOR- ASSOCIATED PROTEIN 24;', 'SYNONYM: RAN TC4, RAN GTPASE, ANDROGEN RECEPTOR-ASSOCIATED PROTEIN 24;')
+            # Hack for 1IBR
+            MD = MD.replace('SYNONYM: KARYOPHERIN BETA-1 SUBUNIT; P95; NUCLEAR FACTOR P97; IMPORTIN 90', 'SYNONYM: KARYOPHERIN BETA-1 SUBUNIT, P95, NUCLEAR FACTOR P97, IMPORTIN 90')
             
-            print(1, MD)
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
             molecule = {}
             for field in MOL_fields:
