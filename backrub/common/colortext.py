@@ -27,6 +27,25 @@ colors = {
 	'white'			: (37, False),
 	'silver'		: (37, True),
 }
+
+colors_to_html = {
+	#'lightblue'		: (34, False),
+	#'blue'			: (34, True),
+	'lightgreen'	: '00ff00',
+	'green'			: '005f00',
+	'yellow'		: 'ffff00',
+	#'orange'		: (33, True),
+	'pink'			: 'ff0000',
+	#'red'			: (31, True),
+	'cyan'			:'00ffff',
+	#'aqua'			: (36, True),
+	'lightpurple'	: 'd75fff',
+	#'purple'		: (35, True),
+	#'grey'			: (30, False),
+	#'black'			: (30, True),
+	#'white'			: (37, False),
+	#'silver'		: (37, True),
+}
 rainbow_ = ['blue', 'green', 'yellow', 'orange', 'red', 'purple', 'lightblue']
 rasta_ = ['red', 'yellow', 'green']
 
