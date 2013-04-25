@@ -210,6 +210,14 @@ COMPND_field_map = {
 	'OTHER_DETAILS' : 'OtherDetails',
 }
 
+SOURCE_field_map = {
+	'MOL_ID' : 'MoleculeID',
+	'SYNTHETIC' : 'Synthetic',
+	'ORGANISM_SCIENTIFIC' : 'OrganismScientificName',
+	'ORGANISM_COMMON' : 'OrganismCommonName',
+	'ORGANISM_TAXID' : 'OrganismNCBITaxonomyID',
+}
+
 class PDB:
     """A class to store and manipulate PDB data"""
   
@@ -306,7 +314,7 @@ class PDB:
         COMPND_lines.replace("  ", " ")
         
         # Split the COMPND lines into seperate molecule entries
-        molecules = []
+        molecules = {}
         MOL_DATA = ["MOL_ID:%s".strip() % s for s in COMPND_lines.split('MOL_ID:') if s]
         
         # Parse the molecule entries
@@ -360,9 +368,71 @@ class PDB:
                 if k not in molecule.keys():
                     molecule[k] = None
             
-            molecules.append(molecule)
+            molecules[molecule['MoleculeID']] = molecule
         
-        return molecules
+        # Extract the SOURCE lines
+        SOURCE_lines = []
+        found_SOURCE_lines = False
+        for line in self.lines:
+            if not line.startswith("SOURCE"):
+                if not found_SOURCE_lines:
+                    continue
+                else:
+                    break
+            else:
+                found_SOURCE_lines = True
+                SOURCE_lines.append(line)
+        for x in range(1, len(SOURCE_lines)):
+            assert(int(SOURCE_lines[x][7:10]) == x+1)
+        
+        if not SOURCE_lines:
+            raise Exception("Do not raise this exception")
+            return None
+        
+        # If the SOURCE lines exist, concatenate them together into one string
+        SOURCE_lines = " ".join([line[10:].strip() for line in SOURCE_lines])
+        SOURCE_lines.replace("  ", " ")
+        
+        # Split the SOURCE lines into seperate molecule entries
+        MOL_DATA = ["MOL_ID:%s".strip() % s for s in SOURCE_lines.split('MOL_ID:') if s]
+        # Parse the molecule entries
+        for MD in MOL_DATA:
+            MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
+            new_molecule = {}
+            for field in MOL_fields:
+            	print(field)
+                field = field.split(":")
+                if SOURCE_field_map.get(field[0].strip()):
+                    field_name = SOURCE_field_map[field[0].strip()]
+                    field_data = field[1].strip()
+                    new_molecule[field_name] = field_data
+            
+            MoleculeID = int(new_molecule['MoleculeID'])
+            print(molecules.keys())
+            assert(MoleculeID in molecules)
+            molecule = molecules[MoleculeID]
+            
+            for field_name, field_data in new_molecule.iteritems():
+                if field_name != 'MoleculeID':
+                    molecule[field_name] = field_data 
+            
+            # Normalize and type the fields
+            
+            if not molecule.get('Synthetic'):
+                molecule['Synthetic'] = None
+            elif molecule.get('Synthetic') == 'YES':
+                molecule['Synthetic'] = True
+            elif molecule.get('Synthetic') == 'NO':
+                molecule['Synthetic'] = False
+            else:
+                raise Exception("Error parsing SYNTHETIC field of SOURCE lines: '%s'." % molecule)
+             
+            # Add missing fields
+            for k in SOURCE_field_map.values():
+                if k not in molecule.keys():
+                    molecule[k] = None
+
+        return [v for k, v in sorted(molecules.iteritems())]
 
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         '''Note: This function ignores any DNA.'''
