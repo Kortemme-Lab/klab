@@ -99,6 +99,16 @@ def computeMeanAndStandardDeviation(values):
     
     return mean, stddev, variance
 
+class Residue(object):
+    def __init__(self, Chain, ResidueID, ResidueAA):
+        assert(len(Chain) == 1)
+        assert(len(ResidueID) == 5)
+        assert(ResideAA in aa1.values())
+        
+        self.Chain = Chain
+        self.ResidueID = ResidueID
+        self.ResidueAA = ResidueAA
+
 class JRNL(object):
 	
 	def __init__(self, lines):
@@ -435,9 +445,14 @@ class PDB:
         return [v for k, v in sorted(molecules.iteritems())]
 
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
+        sequences, residue_map = self.GetRosettaResidueMap(ConvertMSEToAtom = ConvertMSEToAtom, RemoveIncompleteFinalResidues = RemoveIncompleteFinalResidues, RemoveIncompleteResidues = RemoveIncompleteResidues)
+        return sequences
+    
+    def GetRosettaResidueMap(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         '''Note: This function ignores any DNA.'''
         chain = None
         sequences = {}
+        residue_map = {}
         resid_set = set()
         resid_list = []
         
@@ -465,16 +480,17 @@ class PDB:
                 if residue_longname not in residues and not(ConvertMSEToAtom and residue_longname == 'MSE'):
                     raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
-                    resid = line[21:26]
+                    resid = line[21:27]
                     #print(chainID, residue_longname, resid)
                     #print(line)
                     #print(resid_list)
                     if resid not in resid_set:
-                    	removed_residue[chainID] = False
+                        removed_residue[chainID] = False
                         add_residue = True
                         if current_atoms:
                             if RemoveIncompleteResidues and essential_atoms_1.intersection(current_atoms) != essential_atoms_1 and essential_atoms_2.intersection(current_atoms) != essential_atoms_2:
                                 oldChain = resid_list[-1][0]
+                                oldResidueID = resid_list[-1][1:]
                                 print("The last residue %s in chain %s is missing these atoms: %s." % (resid_list[-1], oldChain, essential_atoms_1.difference(current_atoms) or essential_atoms_2.difference(current_atoms)))
                                 resid_set.remove(resid_list[-1])
                                 #print("".join(resid_list))
@@ -485,6 +501,15 @@ class PDB:
                                 #print(sequences[oldChain])
                                 if sequences.get(oldChain):
                                     sequences[oldChain] = sequences[oldChain][:-1]
+                                
+                                if residue_map.get(oldChain):
+                                    for x in range(len(residue_map[oldChain])):
+                                        p = residue_map[oldChain]
+                                        if p[0] == oldResidueID:
+                                            popped = residue_map[oldChain].pop(x) # we are mutating the list we are iterating through but we break
+                                            assert(x[0] == oldResidueID)
+                                            break
+
                                 #print(sequences[oldChain]
                         else:
                             assert(not(resid_set))
@@ -494,11 +519,19 @@ class PDB:
                         resid_set.add(resid)
                         resid_list.append(resid)
                         chainID = line[21]
+                        
                         sequences[chainID] = sequences.get(chainID, [])
                         if residue_longname in non_canonical_aa1:
                             sequences[chainID].append(non_canonical_aa1[residue_longname])
                         else:
                             sequences[chainID].append(aa1[residue_longname])
+                        
+                        residue_map[chainID] = residue_map.get(chainID, [])
+                        if residue_longname in non_canonical_aa1:
+                            residue_map[chainID].append((resid, non_canonical_aa1[residue_longname]))
+                        else:
+                            residue_map[chainID].append((resid, aa1[residue_longname]))
+                        
                         oldchainID = chainID
                     else:
                         #atoms_read[chainID] = atoms_read.get(chainID, set())
@@ -510,14 +543,29 @@ class PDB:
                 if not(removed_residue[chainID]):
                     if essential_atoms_1.intersection(atoms_read[chainID]) != essential_atoms_1 and essential_atoms_2.intersection(atoms_read[chainID]) != essential_atoms_2:
                         print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms_1.difference(atoms_read[chainID]) or essential_atoms_2.difference(atoms_read[chainID])))
-                        sequences[chainID] = sequence_list[0:-1] 
+                        oldResidueID = sequence_list[-1][1:]
+                        if residue_map.get(chainID, {}).get(oldResidueID):
+                            del residue_map[chainID][oldResidueID]
+                        sequences[chainID] = sequence_list[0:-1]
         
         for chainID, sequence_list in sequences.iteritems():
             sequences[chainID] = "".join(sequence_list)
+            assert(sequences[chainID] == "".join([res_details[1] for res_details in residue_map[chainID]]))
         for chainID in chains:
             for a_acid in sequences.get(chainID, ""):
                 self.RAW_ATOM_SEQUENCE.append((chainID, a_acid))
-        return sequences
+        
+        residue_objects = {}
+        for chainID in residue_map.keys():
+            residue_objects[chainID] = []
+        for chainID, residue_list in residue_map.iteritems():
+            for res_pair in residue_list:
+                resid = res_pair[0]
+                resaa = res_pair[1]
+                assert(resid[0] == chainID)
+                residue_objects[chainID].append((resid[1:].strip(), resaa))
+        
+        return sequences, residue_objects
 
     def getJournal(self):
         if not self.journal:
