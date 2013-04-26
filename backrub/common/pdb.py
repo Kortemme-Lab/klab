@@ -491,7 +491,7 @@ class PDB:
                             if RemoveIncompleteResidues and essential_atoms_1.intersection(current_atoms) != essential_atoms_1 and essential_atoms_2.intersection(current_atoms) != essential_atoms_2:
                                 oldChain = resid_list[-1][0]
                                 oldResidueID = resid_list[-1][1:]
-                                print("The last residue %s in chain %s is missing these atoms: %s." % (resid_list[-1], oldChain, essential_atoms_1.difference(current_atoms) or essential_atoms_2.difference(current_atoms)))
+                                print("The last residue '%s', %s, in chain %s is missing these atoms: %s." % (resid_list[-1], residue_longname, oldChain, essential_atoms_1.difference(current_atoms) or essential_atoms_2.difference(current_atoms)))
                                 resid_set.remove(resid_list[-1])
                                 #print("".join(resid_list))
                                 resid_list = resid_list[:-1]
@@ -503,13 +503,8 @@ class PDB:
                                     sequences[oldChain] = sequences[oldChain][:-1]
                                 
                                 if residue_map.get(oldChain):
-                                    for x in range(len(residue_map[oldChain])):
-                                        p = residue_map[oldChain]
-                                        if p[0] == oldResidueID:
-                                            popped = residue_map[oldChain].pop(x) # we are mutating the list we are iterating through but we break
-                                            assert(x[0] == oldResidueID)
-                                            break
-
+                                    residue_map[oldChain] = residue_map[oldChain][:-1]
+                                  
                                 #print(sequences[oldChain]
                         else:
                             assert(not(resid_set))
@@ -544,9 +539,9 @@ class PDB:
                     if essential_atoms_1.intersection(atoms_read[chainID]) != essential_atoms_1 and essential_atoms_2.intersection(atoms_read[chainID]) != essential_atoms_2:
                         print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms_1.difference(atoms_read[chainID]) or essential_atoms_2.difference(atoms_read[chainID])))
                         oldResidueID = sequence_list[-1][1:]
-                        if residue_map.get(chainID, {}).get(oldResidueID):
-                            del residue_map[chainID][oldResidueID]
+                        residue_map[chainID] = residue_map[chainID][0:-1] 
                         sequences[chainID] = sequence_list[0:-1]
+        
         
         for chainID, sequence_list in sequences.iteritems():
             sequences[chainID] = "".join(sequence_list)
