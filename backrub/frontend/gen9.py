@@ -19,7 +19,7 @@ from rosettahelper import DEVELOPMENT_HOSTS, DEVELOPER_USERNAMES, saturateHexCol
 import locale
 locale.setlocale(locale.LC_ALL, 'en_US')
 import sys
-import common
+#import common
 from rosettahelper import ggplotColorWheel
 
 settings = None
@@ -29,6 +29,8 @@ userid = None
 
 showprofile = False
 
+use_ajax_for_design_residues = True
+		
 class ProfileTimer(object):
 	def __init__(self):
 		self.stages = []
@@ -80,7 +82,7 @@ class ProfileTimer(object):
 		if len(stage_times) < 10:
 			top_time_cutoff = stage_times[-2]
 		else:
-			top_time_cutoff = stage_times[-(len(stage_times)/5)]
+			top_time_cutoff = stage_times[-(len(stage_times) / 5)]
 		
 		for stage in self.stages:
 			if self.stage_times[stage] == stage_times[-1]:
@@ -110,12 +112,8 @@ def initGoogleCharts(chartfnlist):
 				%s
 			}
 			</script>
-			""" % join(chartfnlist,"\n"))
+			""" % join(chartfnlist, "\n"))
 	return html
-
-def get_subsequence(sequence, n):
-	for i in xrange(0, len(sequence), n):
-		yield sequence[i:i + n]
 
 filter_types = ['Scaffold', 'Design']
 filter_entities = ['Meeting', 'Tanja', 'Roland', 'Kyle', 'Ming', 'Noah', 'Amelie']
@@ -155,7 +153,7 @@ def generateFilterQuery(gen9db, username, form):
 						allowed_ratings.append(rating_value)
 					
 			if allowed_ratings:
-				disjunction = " OR ".join(["Rating='%s'"% a_rating for a_rating in allowed_ratings])
+				disjunction = " OR ".join(["Rating='%s'" % a_rating for a_rating in allowed_ratings])
 				UserRatedDesignIDs = set([r['ID'] for r in gen9db.execute_select("SELECT Design.ID FROM Design INNER JOIN UserDesignRating ON UserDesignRating.DesignID=Design.ID WHERE UserID='%s' AND (Design.Type='Design' OR Design.Type='Relaxed design') AND %s" % (rating_entity_id, disjunction))])
 				if form['FilterType'].value == 'Intersection':
 					filteredIDs = filteredIDs.intersection(UserRatedDesignIDs)
@@ -183,7 +181,7 @@ def generateFilterQuery(gen9db, username, form):
 						allowed_ratings.append(rating_value)
 					
 			if allowed_ratings:
-				disjunction = " OR ".join(["Rating='%s'"% a_rating for a_rating in allowed_ratings])
+				disjunction = " OR ".join(["Rating='%s'" % a_rating for a_rating in allowed_ratings])
 				UserRatedScaffoldIDs = set([r['ID'] for r in gen9db.execute_select("SELECT Design.ID FROM Design INNER JOIN PDBBiologicalUnit ON PDBBiologicalUnit.PDBFileID=WildtypeScaffoldPDBFileID AND PDBBiologicalUnit.BiologicalUnit=WildtypeScaffoldBiologicalUnit INNER JOIN UserScaffoldRating ON UserScaffoldRating.ComplexID=PDBBiologicalUnit.ComplexID WHERE UserID='%s' AND (Design.Type='Design' OR Design.Type='Relaxed design') AND %s" % (rating_entity_id, disjunction))])
 				if form['FilterType'].value == 'Intersection':
 					filteredIDs = filteredIDs.intersection(UserRatedScaffoldIDs)
@@ -210,7 +208,7 @@ def generateFilterQuery(gen9db, username, form):
 					allowed_ratings.append(rating_value)
 					
 		if allowed_ratings:
-			disjunction = " OR ".join(["Approved='%s'"% filter_rating_map[a_rating] for a_rating in allowed_ratings])
+			disjunction = " OR ".join(["Approved='%s'" % filter_rating_map[a_rating] for a_rating in allowed_ratings])
 			MeetingRatedDesignIDs = set([r['ID'] for r in gen9db.execute_select("SELECT Design.ID FROM Design INNER JOIN MeetingDesignRating ON MeetingDesignRating.DesignID=Design.ID WHERE DATE(MeetingDate)='%s' AND (Design.Type='Design' OR Design.Type='Relaxed design') AND %s" % (form['FilterMeetingSelection'].value, disjunction))])
 			if form['FilterType'].value == 'Intersection':
 				filteredIDs = filteredIDs.intersection(MeetingRatedDesignIDs)
@@ -223,6 +221,7 @@ def generateFilterQuery(gen9db, username, form):
 def generateHidingCheckboxes():
 	html = []
 	html.append("<div style='text-align:left'>")
+	html.append('''<span class='gen9-hiding-button'><button style="width:155px" type='button' onClick="updateDesignCounter();">Count designs</button></span>''')
 	html.append('''<span class='gen9-hiding-button'><button style="width:155px" type='button' onClick="toggleNewDesigns(this);">Only recent designs</button></span>''')
 	html.append('''<span class='gen9-hiding-button'><button style="width:155px" type='button' onClick="toggleManualDesigns(this);">Only manually designed</button></span>''')
 	html.append("</div>")
@@ -253,6 +252,10 @@ def generateFilterCheckboxes(username):
 <input type="hidden" NAME="query" VALUE="">
 <input type="hidden" NAME="gen9sort1" VALUE="">
 <input type="hidden" NAME="gen9sort2" VALUE="">
+<input type="hidden" NAME="gen9mode" VALUE="">
+<input type="hidden" NAME="top10mol" VALUE="">
+<input type="hidden" NAME="top10scheme" VALUE="">
+<input type="hidden" NAME="top10type" VALUE="">
 ''' % username)
 	html.append('''
 <button type='button' onClick='showFilters()'>Show filters</button>
@@ -351,7 +354,7 @@ function Filter%(rating_type)s%(rating_entity)sAllHandler()
 </div><br>''' % vars())
 	return "%s%s" % ("\n".join(html), "\n".join(script_html))
 
-def debug_log(username, msg, br = True, color = None):
+def debug_log(username, msg, br=True, color=None):
 	if username == 'oconchus':
 		if br:
 			print("%s<br>" % msg)
@@ -362,7 +365,37 @@ def debug_log(username, msg, br = True, color = None):
 class DesignIterator(object):
 	'''This class does a slurp of data from the database and stores it. HTML for individual designs can then be extracted from it.''' 
 	
-	def __init__(self, filtered_DesignIDs = None):
+	residue_stats_headers = ['RSNL_', 'RSWL_', 'RANL_']
+	manual_design_score_components_of_interest = [  
+		'fa_dun',
+		'fa_atr',
+		'fa_rep',
+		'fa_sol',
+		'p_aa_pp',
+		'hbond_sr_bb',
+		'hbond_lr_bb',
+		'hbond_bb_sc',
+		'hbond_sc',
+		'hack_elec',
+		'rama',
+		'total',
+	]
+	bad_design_red = '#d0101d'
+	bad_scaffold_red = '#c0101d'
+	maybe_design_orange = '#e8c800'
+	maybe_scaffold_orange = '#e0c000'
+	meeting_rating_css_classes = {
+		'No'		: 'bad_design',
+		'Yes'		: 'good_design',
+		'Maybe'		: 'maybe_design',
+	}
+	meeting_scaffold_rating_css_classes = {
+		'No'		: 'bad_scaffold',
+		'Yes'		: 'good_scaffold',
+		'Maybe'		: 'maybe_scaffold',
+	}
+	
+	def __init__(self, filtered_DesignIDs=None):
 		self.html = []
 		self._initialize_css_members()
 		self._initialize_data()
@@ -372,35 +405,23 @@ class DesignIterator(object):
 		#self.darker_blue = '#b2cecf'
 		#self.lighter_blue = '#e3eae9'
 		#self.alt_lighter_blue = '#d3dad9'
-		
-		self.bad_design_red = '#d0101d'
-		self.bad_scaffold_red = '#c0101d'
-		self.maybe_design_orange = '#e8c800'
-		self.maybe_scaffold_orange = '#e0c000'
 		#self.good_design_green  = '#50f07d'
 		#self.good_scaffold_green  = '#40e06d'
 		#self.wildtype_mutation_green  = '#50d07d'
 		#self.title_bold_text = '#5225d0'
 		#self.YesNoMap = {0: 'No', 1: 'Yes'}
-		self.meeting_rating_css_classes = {
-			'No'		: 'bad_design',
-			'Yes'		: 'good_design',
-			'Maybe'		: 'maybe_design',
-		}
-		self.meeting_scaffold_rating_css_classes = {
-			'No'		: 'bad_scaffold',
-			'Yes'		: 'good_scaffold',
-			'Maybe'		: 'maybe_scaffold',
-		}
-		
+		self.group_colors = DesignIterator.getGroupColors()
+	
+	@staticmethod
+	def getGroupColors():
 		# group_colors
 		dbusers = ['Shane', 'Tanja', 'Roland', 'Kyle', 'Ming', 'Noah', 'Amelie', 'Meeting']
-		spaced_colors = ggplotColorWheel(len(dbusers), start = 15, saturation_adjustment = 0.5)
+		spaced_colors = ggplotColorWheel(len(dbusers), start=15, saturation_adjustment=0.5)
 		group_colors = {}
 		for x in range(len(dbusers)):
 			group_colors[dbusers[x]] = spaced_colors[x]
 		group_colors['TerminiOkay?'] = '#999'
-		self.group_colors = group_colors
+		return group_colors
 		
 	def _initialize_data(self):
 		profile_timer = ProfileTimer()
@@ -416,21 +437,8 @@ class DesignIterator(object):
 			'SR_LIGAND_burunsat_pm',
 			'nlr_totrms',
 		]
-		self.manual_design_score_components_of_interest = [  
-			'fa_dun',
-			'fa_atr',
-			'fa_rep',
-			'fa_sol',
-			'p_aa_pp',
-			'hbond_sr_bb',
-			'hbond_lr_bb',
-			'hbond_bb_sc',
-			'hbond_sc',
-			'hack_elec',
-			'rama',
-			'total',
-		]
-		self.residue_stats_headers = ['RSNL_', 'RSWL_', 'RANL_']
+		
+		DesignIDs = [r['ID'] for r in gen9db.execute_select("SELECT ID FROM Design ORDER BY ID ")]
 
 		# motif_residues
 		profile_timer.start('motif_residues')
@@ -506,6 +514,34 @@ class DesignIterator(object):
 			AllEffectiveWildtypeSequences[wkey].append(r)
 		self.AllEffectiveWildtypeSequences = AllEffectiveWildtypeSequences
 		
+		# AllWildtypeSequences
+		profile_timer.start('AllWildtypeSequences')
+		FastAllWildtypeSequences = {}
+		results = gen9db.execute_select('''
+	SELECT PDBBiologicalUnitChain.PDBFileID, PDBBiologicalUnitChain.BiologicalUnit, PDBBiologicalUnitChain.Chain AS Chain, ProteinChain.Sequence AS Sequence 
+	FROM PDBBiologicalUnitChain 
+	INNER JOIN PDBChain ON PDBBiologicalUnitChain.PDBFileID=PDBChain.PDBFileID AND PDBBiologicalUnitChain.Chain=PDBChain.Chain 
+	INNER JOIN ProteinChain ON PDBChain.ProteinChainID=ProteinChain.ID''')
+		for r in results:
+			wkey = '%s-%s' % (r['PDBFileID'], r['BiologicalUnit'])
+			FastAllWildtypeSequences[wkey] = FastAllWildtypeSequences.get(wkey, {})
+			FastAllWildtypeSequences[wkey][r['Chain']] = r['Sequence']
+		self.FastAllWildtypeSequences = FastAllWildtypeSequences
+		
+		# AllEffectiveWildtypeSequences
+		profile_timer.start('FastAllEffectiveWildtypeSequences')
+		FastAllEffectiveWildtypeSequences = {}
+		results = gen9db.execute_select('''
+	SELECT PDBBiologicalUnitChain.PDBFileID, PDBBiologicalUnitChain.BiologicalUnit, PDBBiologicalUnitChain.Chain AS Chain, ProteinChain.Sequence AS Sequence 
+	FROM PDBBiologicalUnitChain 
+	INNER JOIN PDBChain ON PDBBiologicalUnitChain.PDBFileID=PDBChain.PDBFileID AND PDBBiologicalUnitChain.Chain=PDBChain.Chain 
+	INNER JOIN ProteinChain ON PDBChain.EffectiveProteinChainID=ProteinChain.ID''')
+		for r in results:
+			wkey = '%s-%s' % (r['PDBFileID'], r['BiologicalUnit'])
+			FastAllEffectiveWildtypeSequences[wkey] = FastAllEffectiveWildtypeSequences.get(wkey, {})
+			FastAllEffectiveWildtypeSequences[wkey][r['Chain']] = r['Sequence']
+		self.FastAllEffectiveWildtypeSequences = FastAllEffectiveWildtypeSequences
+		
 		# rank_components
 		profile_timer.start('rank_components')
 		rank_components = {}
@@ -530,10 +566,10 @@ class DesignIterator(object):
 		# chain_molecule_info
 		profile_timer.start('chain_molecule_info')
 		chain_molecule_info = {}
-		results = gen9db.execute_select('SELECT PDBMolecule.PDBFileID, PDBMoleculeChain.Chain, PDBMolecule.Name, PDBMolecule.Synonym FROM PDBMoleculeChain INNER JOIN PDBMolecule ON PDBMoleculeChain.PDBFileID=PDBMolecule.PDBFileID AND PDBMoleculeChain.MoleculeID=PDBMolecule.MoleculeID')
+		results = gen9db.execute_select('SELECT PDBMolecule.PDBFileID, PDBMoleculeChain.Chain, PDBMolecule.Name, PDBMolecule.Organism, PDBMolecule.Synonym FROM PDBMoleculeChain INNER JOIN PDBMolecule ON PDBMoleculeChain.PDBFileID=PDBMolecule.PDBFileID AND PDBMoleculeChain.MoleculeID=PDBMolecule.MoleculeID')
 		for r in results:
 			chain_molecule_info[r['PDBFileID']] = chain_molecule_info.get(r['PDBFileID'], {})
-			chain_molecule_info[r['PDBFileID']][r['Chain']] = '<span title="%s">%s</span>' % (r['Synonym'], r['Name'])
+			chain_molecule_info[r['PDBFileID']][r['Chain']] = '<span title="%s">%s (%s)</span>' % (r['Synonym'], r['Name'], r['Organism'])
 		self.chain_molecule_info = chain_molecule_info
 		
 		# meeting_comments
@@ -614,7 +650,7 @@ class DesignIterator(object):
 		# SmallMoleculeReferences
 		profile_timer.start('SmallMoleculeReferences')
 		SmallMoleculeReferences = {} 
-		results = gen9db.execute_select("""SELECT * FROM SmallMoleculeReference INNER JOIN Publication ON PublicationID = Publication.ID ORDER BY PublicationDate""")
+		results = gen9db.execute_select("""SELECT * FROM SmallMoleculeReference INNER JOIN Publication ON PublicationID = Publication.ID WHERE SmallMoleculeReference.Type="Reference" ORDER BY PublicationDate""")
 		for r in results:
 			key = r['SmallMoleculeID']
 			SmallMoleculeReferences[key] = SmallMoleculeReferences.get(key, [])
@@ -698,24 +734,54 @@ ORDER BY DesignID, FirstName""")
 		self.ManualDesignToDesignMapping = ManualDesignToDesignMapping
 		
 		
-		# design_residue_data 
+		# has_design_residue_data 
+		has_design_residue_data = dict.fromkeys(DesignIDs, False)
+		for DesignID in [r['DesignID'] for r in gen9db.execute_select('''SELECT DISTINCT DesignID FROM DesignResidue''')]:
+			has_design_residue_data[DesignID] = True
+		self.has_design_residue_data = has_design_residue_data
+		
+		# design_residue_data
 		profile_timer.start('design_residue_data_SELECT_1')
 		design_residue_data = {}
-		results = gen9db.execute_select('''SELECT 
-			DesignID, Chain, OriginalAA, ResidueID, VariantAA, IsMotifResidue, IsMutation, PositionWithinChain,
-			fa_dun, fa_atr,	fa_rep,	fa_sol,	p_aa_pp, hbond_sr_bb, hbond_lr_bb, hbond_bb_sc, hbond_sc, hack_elec, rama, total,
-			RANL_SignificantChiChange, RANL_Chi1Delta, RANL_Chi2Delta, RANL_AllSideChainHeavyAtomsRMSD,
-			RSNL_SignificantChiChange, RSNL_Chi1Delta, RSNL_Chi2Delta, RSNL_AllSideChainHeavyAtomsRMSD,
-			RSWL_SignificantChiChange, RSWL_Chi1Delta, RSWL_Chi2Delta, RSWL_AllSideChainHeavyAtomsRMSD
-			FROM DesignResidue ORDER BY DesignID, Chain, ResidueID''')
 		
-		profile_timer.start('design_residue_data_LOOP')
-		for r in results:
-			design_residue_data[r['DesignID']] = design_residue_data.get(r['DesignID'], {})
-			design_residue_data[r['DesignID']][r['Chain']] = design_residue_data[r['DesignID']].get(r['Chain'], {})
-			design_residue_data[r['DesignID']][r['Chain']][r['ResidueID']] = r
+		if not use_ajax_for_design_residues:
+			results = gen9db.execute_select('''SELECT 
+				DesignID, Chain, OriginalAA, ResidueID, VariantAA, IsMotifResidue, IsMutation, PositionWithinChain,
+				fa_dun, fa_atr,	fa_rep,	fa_sol,	p_aa_pp, hbond_sr_bb, hbond_lr_bb, hbond_bb_sc, hbond_sc, hack_elec, rama, total,
+				RANL_SignificantChiChange, RANL_Chi1Delta, RANL_Chi2Delta, RANL_AllSideChainHeavyAtomsRMSD,
+				RSNL_SignificantChiChange, RSNL_Chi1Delta, RSNL_Chi2Delta, RSNL_AllSideChainHeavyAtomsRMSD,
+				RSWL_SignificantChiChange, RSWL_Chi1Delta, RSWL_Chi2Delta, RSWL_AllSideChainHeavyAtomsRMSD
+				FROM DesignResidue ORDER BY DesignID, Chain, ResidueID''')
+			
+			profile_timer.start('design_residue_data_LOOP')
+			for r in results:
+				design_residue_data[r['DesignID']] = design_residue_data.get(r['DesignID'], {})
+				design_residue_data[r['DesignID']][r['Chain']] = design_residue_data[r['DesignID']].get(r['Chain'], {})
+				design_residue_data[r['DesignID']][r['Chain']][r['ResidueID']] = r
 		self.design_residue_data = design_residue_data
 		
+		DesignMutations = {}
+		for DesignID in DesignIDs:
+			DesignMutations[DesignID] = {}
+		results = gen9db.execute_select('''SELECT DesignID, Chain, OriginalAA, ResidueID, VariantAA FROM DesignResidue WHERE IsMutation=1''')
+		for r in results:
+			DesignID = r['DesignID']
+			ChainID = r['Chain']
+			DesignMutations[DesignID][ChainID] = DesignMutations[DesignID].get(ChainID, [])
+			DesignMutations[DesignID][ChainID].append((r['OriginalAA'], r['ResidueID'], r['VariantAA']))
+		self.DesignMutations = DesignMutations
+
+		DesignsMotifResidues = {}
+		for DesignID in DesignIDs:
+			DesignsMotifResidues[DesignID] = {}
+		results = gen9db.execute_select('''SELECT DesignID, Chain, ResidueID, VariantAA, PositionWithinChain FROM DesignResidue WHERE IsMotifResidue=1''')
+		for r in results:
+			DesignID = r['DesignID']
+			ChainID = r['Chain']
+			DesignsMotifResidues[DesignID][ChainID] = DesignsMotifResidues[DesignID].get(ChainID, [])
+			DesignsMotifResidues[DesignID][ChainID].append((r['VariantAA'], r['ResidueID'], r['PositionWithinChain']))
+		self.DesignsMotifResidues = DesignsMotifResidues
+
 		# MutantSequences
 		profile_timer.start('MutantSequences')
 		MutantSequences = {}
@@ -726,92 +792,434 @@ ORDER BY DesignID, FirstName""")
 			MutantSequences[dID][r['Chain']] = MutantSequences[dID].get(r['Chain'], {})
 			MutantSequences[dID][r['Chain']] = r
 		self.MutantSequences = MutantSequences
-
+		
 		profile_timer.stop()
 		if showprofile:
 			debug_log(username, "** DesignIterator constructor **")
 			debug_log(username, profile_timer.getProfile())
 
+	def getSequenceAlignmentHTML(self, design, RelativeDesignsMotifResidues, DesignsMutations, ManualDesignsMutations, profile_timer):
+		profile_timer.start('FastSequences')
 
-	def get_Design_HTML(self, design, profile_timer):
-		'''design should be the result of a database query having:
-		   - all fields in Design;
-		   - PDBBiologicalUnit.ComplexID;
-		   - SmallMolecule.Name AS SmallMoleculeName;
-		   - SmallMolecule.ID AS SmallMoleculeID;
-		   - SmallMoleculeMotif.Name AS TargetMotifName.'''
+		DesignID = design['DesignID']
+		MutantSequences = self.MutantSequences
+		DesignMatchtypes = self.DesignMatchtypes
+		AllWildtypeSequences = self.FastAllWildtypeSequences
+		AllEffectiveWildtypeSequences = self.FastAllEffectiveWildtypeSequences
+		ManualDesignsPerDesign = self.ManualDesignsPerDesign
+		HasSequenceLogo = self.HasSequenceLogo
+		chain_molecule_info = self.chain_molecule_info
+		pdbID = design['WildtypeScaffoldPDBFileID']
+		html = []
 		
-		profile_timer.start('Design preamble')
+		sequences = {}
+		#mutant_sequences = gen9db.execute_select('SELECT Chain, ProteinChain.Sequence, WildTypeChain, FirstResidueID FROM DesignMutatedChain INNER JOIN ComplexChain ON DesignMutatedChain.ATOMComplexChainID=ComplexChain.ID INNER JOIN ProteinChain ON ComplexChain.ProteinChainID=ProteinChain.ID WHERE DesignID=%s', parameters=(design['DesignID'],))
+		
+		mutant_chain_to_wildtype_chain = {}
+				
+		seqres_wildtype_sequences = AllWildtypeSequences['%s-%s' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'])]
+		atom_wildtype_sequences = AllEffectiveWildtypeSequences['%s-%s' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'])]
+		
+		for chainID, ms in MutantSequences[DesignID].iteritems():
+			assert(chainID == ms['Chain'])
+			
+			WildtypeSequence = None
+			WildTypeChain = ms['WildTypeChain']
+			mutant_chain_to_wildtype_chain[chainID] = WildTypeChain
+			
+			match_type = DesignMatchtypes[DesignID][WildTypeChain]
+			if match_type == 'SEQRES':
+				WildtypeSequence = seqres_wildtype_sequences[WildTypeChain]
+			elif match_type == 'ATOM':
+				WildtypeSequence = atom_wildtype_sequences[WildTypeChain]
+			else:
+				assert(False)
+			sequences[chainID] = {
+				'WildtypeSequence'	: WildtypeSequence,
+				'MutantSequence'	: ms['Sequence'],
+				'FirstResidueID'	: ms['FirstResidueID']
+			}
+			
+		#if DesignID == 190:
+		#	print(DesignsMutations)
+		for chainID, sequence_data in sorted(sequences.iteritems()):
+			
+			# chainID is the Chain ID in the mutant 
+			
+			# Start counting from the correct number according to the order in the PDB file
+			first_residue_id = sequence_data['FirstResidueID']
+			if first_residue_id == None:
+				print("Warning: The FirstResidueID field is NULL for Design %d, chain %s." % (DesignID, chainID))
+				first_residue_id = 1
+			sub_html = []
+			sub_html.append("<table class='new-gen9browser-sequences'>")
+			
+			RelativeMotifPositions = set()
+			if RelativeDesignsMotifResidues.get(chainID):
+				RelativeMotifPositions = set([m[2] for m in RelativeDesignsMotifResidues.get(chainID)])
+			wildtype_sequence = sequence_data['WildtypeSequence']
+			mutant_sequence = sequence_data['MutantSequence']
+			
+			if len(wildtype_sequence) == len(mutant_sequence):
+				
+				wildtype_residues = list(wildtype_sequence)
+				mutant_residues = list(mutant_sequence)
+				
+				# The sanity_check_sequence reverts the mutated sequence based on the DesignResidue mutations to make sure that the DesignResidue mutations agree with the sequences
+				# DesignsMutations[ChainID] is a triple of OriginalAA, ResidueID, VariantAA
+				RelativeDesignedPositions = set() # these positions are relative to the sequence list i.e. they index the list (zero-based)
+				sanity_check_sequence = list(mutant_sequence)
+				if DesignsMutations and DesignsMutations.get(chainID):
+					for mutation in DesignsMutations[chainID]:
+						index_into_sequence = mutation[1] - first_residue_id
+						RelativeDesignedPositions.add(index_into_sequence)
+						sanity_check_sequence[index_into_sequence] = mutation[0]
+						assert(wildtype_residues[index_into_sequence] == mutation[0])
+						assert(mutant_residues[index_into_sequence] == mutation[2])
+				if not (sanity_check_sequence == wildtype_residues):
+					#print('Sanity check error with design %d on chain %s<br>' % (DesignID, chainID))
+					#print('%s<b>%s</b>%s<br>' % ("".join(sanity_check_sequence[0:101]), sanity_check_sequence[101], "".join(sanity_check_sequence[102:])))
+					#print('%s<b>%s</b>%s<br>' % ("".join(wildtype_residues[0:101]), wildtype_residues[101], "".join(wildtype_residues[102:])))
+					#print('%s<br>' % wildtype_residues)
+					assert(len(sanity_check_sequence) == len(wildtype_residues))
+					for x in range(len(sanity_check_sequence)):
+						if not sanity_check_sequence[x] == wildtype_residues[x]:
+							pass#print("MISMATCH AT INDEX %d. wt=%s, sanity_check=%s<BR>" % (x, sanity_check_sequence[x], wildtype_residues[x]))
+					
+				#assert(sanity_check_sequence == wildtype_residues)
+				
+				manual_sequences = []
+				manual_residues = []
+				for manual_design in ManualDesignsPerDesign.get(DesignID, []):
+					ManualDesignID = manual_design['ManualDesignID']
+					manual_RelativeDesignedPositions = set().union(RelativeDesignedPositions)
+					if ManualDesignsMutations.get(ManualDesignID) and ManualDesignsMutations[ManualDesignID].get(chainID):
+						for mutation in ManualDesignsMutations[ManualDesignID][chainID]:
+							index_into_sequence = mutation[1] - first_residue_id
+							manual_RelativeDesignedPositions.add(index_into_sequence)
+					manual_sequences.append((ManualDesignID, MutantSequences[ManualDesignID][chainID]['Sequence'], list('-' * len(wildtype_residues)) , manual_RelativeDesignedPositions))
+						
+				mutant_residues = list('-' * len(wildtype_residues)) 
+				for x in range(len(wildtype_residues)):
+					actual_residue_id = x + first_residue_id
+					wildtype_residue_aa = wildtype_residues[x]
+					mutant_residue_aa = mutant_sequence[x]
+					if not((x + 1) in RelativeMotifPositions) and not(x in RelativeDesignedPositions): 
+						wildtype_residues[x] = "<span title='%s %d'>%s</span>" % (ROSETTAWEB_SK_AAinv[wildtype_residue_aa], actual_residue_id, wildtype_residue_aa)
+					elif (x + 1) in RelativeMotifPositions and x in RelativeDesignedPositions: 
+						wildtype_residues[x] = "<span title='%s %d' class='new-genbrowser-sequence-wildtype-mutated'>%s</span>" % (ROSETTAWEB_SK_AAinv[wildtype_residue_aa], actual_residue_id, wildtype_residue_aa)
+						mutant_residues[x] = "<span title='%s %d' class='new-genbrowser-sequence-motif-residue'>%s</span>" % (ROSETTAWEB_SK_AAinv[mutant_residue_aa], actual_residue_id, mutant_residue_aa)
+					elif (x + 1) in RelativeMotifPositions:
+						wildtype_residues[x] = "<span title='%s %d'>%s</span>" % (ROSETTAWEB_SK_AAinv[wildtype_residue_aa], actual_residue_id, wildtype_residue_aa)
+						mutant_residues[x] = "<span title='%s %d' class='new-genbrowser-sequence-motif-residue'>%s</span>" % (ROSETTAWEB_SK_AAinv[mutant_residue_aa], actual_residue_id, mutant_residue_aa)	
+					else:
+						wildtype_residues[x] = "<span title='%s %d' class='new-genbrowser-sequence-wildtype-mutated'>%s</span>" % (ROSETTAWEB_SK_AAinv[wildtype_residue_aa], actual_residue_id, wildtype_residue_aa)
+						mutant_residues[x] = "<span title='%s %d' class='new-genbrowser-sequence-mutant-mutated'>%s</span>" % (ROSETTAWEB_SK_AAinv[mutant_residue_aa], actual_residue_id, mutant_residue_aa)
+					
+					for manual_sequence in manual_sequences:
+						if x in manual_sequence[3] and manual_sequence[1][x] != wildtype_residue_aa: # designed
+							manual_mutant_residue_aa = manual_sequence[1][x]
+							if (x + 1) in RelativeMotifPositions:
+								manual_sequence[2][x] = "<span title='%s %d' class='new-genbrowser-sequence-motif-residue'>%s</span>" % (ROSETTAWEB_SK_AAinv[manual_mutant_residue_aa], actual_residue_id, manual_mutant_residue_aa)
+							else:
+								manual_sequence[2][x] = "<span title='%s %d' class='new-genbrowser-sequence-mutant-mutated'>%s</span>" % (ROSETTAWEB_SK_AAinv[manual_mutant_residue_aa], actual_residue_id, manual_mutant_residue_aa)
+						
+				NUMBER_OF_RESIDUES_PER_LINE = 100
+				for x in range(0, len(wildtype_residues), NUMBER_OF_RESIDUES_PER_LINE):
+					sub_html.append("<tr><td>Wildtype</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(wildtype_residues[x:x+NUMBER_OF_RESIDUES_PER_LINE]))
+					
+					line_has_designed_residues = False
+					line_with_no_mutations = min(len(wildtype_residues) - x, NUMBER_OF_RESIDUES_PER_LINE) * '-'
+						
+					if "".join(mutant_residues[x:x+NUMBER_OF_RESIDUES_PER_LINE]) != line_with_no_mutations:
+						line_has_designed_residues = True
+					for manual_sequence in manual_sequences:
+						if "".join(manual_sequence[2][x:x+NUMBER_OF_RESIDUES_PER_LINE]) != line_with_no_mutations:
+							line_has_designed_residues = True
+					if line_has_designed_residues:
+						sub_html.append("<tr><td>Design</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(mutant_residues[x:x+NUMBER_OF_RESIDUES_PER_LINE]))
+						for manual_sequence in manual_sequences:
+							sub_html.append("<tr><td>Manual %d</td><td style='font-family:monospace;'>%s</td></tr>" % (manual_sequence[0], "".join(manual_sequence[2][x:x+NUMBER_OF_RESIDUES_PER_LINE])))
+			else:
+				sub_html.append("<tr><td>Design</td><td>Error: The length of the wildtype chain does not match what the database describes as the corresponding mutant chain.</td></tr>")
+			sub_html.append("</table>")
+			
+			html.append('''<div class='new-genbrowser-sequence-block'>''')
+			db_mutations = []
+			if DesignsMutations and DesignsMutations.get(chainID):
+				db_mutations = DesignsMutations[chainID]
+				
+				if HasSequenceLogo.get(DesignID) and chainID in HasSequenceLogo.get(DesignID):
+					first_cell = '''Chain %s <a class='gen9' target="_blank" href='?query=Gen9File&amp;DesignID=%d&amp;download=WebLogo&amp;Chain=%s'> <img width="42" height="18" src='../images/weblogo.png' alt='WebLogo'></a>:''' % (chainID, DesignID, chainID)
+				else:
+					first_cell = 'Chain %s:' % chainID
+				
+				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'>%s</span>''' % first_cell)
+				if chain_molecule_info.get(pdbID) and chain_molecule_info[pdbID].get(mutant_chain_to_wildtype_chain[chainID]):
+					html.append('''<span class="new-genbrowser-sequence-motif-residues">%s</span>''' % chain_molecule_info[pdbID][mutant_chain_to_wildtype_chain[chainID]])
+				else:
+					html.append('''<span class="new-genbrowser-sequence-motif-residues"></span>''')
+				if chainID != mutant_chain_to_wildtype_chain[chainID]:
+					html.append('''<span class="genbrowser-chain-difference-note">Note: The corresponding wildtype chain is %s</span>''' % mutant_chain_to_wildtype_chain[chainID])
+				html.append('''</div>''')
+				
+				if RelativeDesignsMotifResidues.get(chainID):
+					html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span class="new-genbrowser-sequence-motif-residues">Motif residues %s</span></div>''' % (", ".join(['''<span class='new-genbrowser-sequence-motif-residue'>%s</span>''' % "".join(map(str, m[0:2])) for m in RelativeDesignsMotifResidues.get(chainID)])))
+				#html.append('''<span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations %s (%d mutations in total)</span></div>''' % (", ".join(["".join(map(str,m[0:3])) for m in db_mutations]), len(db_mutations)))
+				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations ''')
+				mutation_string = ", ".join(['%s%d%s' % db_mutation for db_mutation in db_mutations])
+				html.append(''' (%d mutations in total) - %s</span></div>''' % (len(db_mutations), mutation_string))
+			else:
+				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'>Chain %s</span>''' % chainID)
+				if chain_molecule_info.get(pdbID) and chain_molecule_info[pdbID].get(mutant_chain_to_wildtype_chain[chainID]):
+					html.append('''<span class="new-genbrowser-sequence-motif-residues">%s</span>''' % chain_molecule_info[pdbID][mutant_chain_to_wildtype_chain[chainID]])
+				else:
+					html.append('''<span class="new-genbrowser-sequence-motif-residues"></span>''')
+				if chainID != mutant_chain_to_wildtype_chain[chainID]:
+					html.append('''<span class="genbrowser-chain-difference-note">Note: The corresponding wildtype chain is %s</span>''' % mutant_chain_to_wildtype_chain[chainID])
+				html.append('''</div>''')
+					
+				if RelativeDesignsMotifResidues.get(chainID):
+					html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span class="new-genbrowser-sequence-motif-residues">Motif residues %s</span></div>''' % (", ".join(['''<span class='new-genbrowser-sequence-motif-residue'>%s</span>''' % "".join(map(str, m[0:2])) for m in RelativeDesignsMotifResidues.get(chainID)])))
+				#html.append('''<span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations %s (%d mutations in total)</span></div>''' % (", ".join(["".join(map(str,m[0:3])) for m in db_mutations]), len(db_mutations)))
+				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations ''')
+				html.append(''' (%d mutations in total)</span></div>''' % len(db_mutations))
+				
+			html.extend(sub_html)
+			html.append('''</div>''')
+		return html
+	
+	@staticmethod
+	def get_Design_residue_table_HTML(design_residue_data):
+		''' Expects a table of type {ChainID -> {ResidueID -> ResidueDetail}} where ResidueDetail is a table containing fields from DesignResidue.'''
+		# &#x3B4; delta
+		# &#x3C3; sigma
+		
+		residue_stats_headers = DesignIterator.residue_stats_headers
 		
 		html = []
-		DesignID = design['DesignID']
-		if (self.filtered_DesignIDs != None) and (DesignID not in self.filtered_DesignIDs):
-			return html
+		html.append("<table style='padding-bottom:10px;' class='new-genbrowser-score-2'>")
+		html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><th COLSPAN='3'></th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, no ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, with ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack all, no ligand</th></tr>")
+		html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><td class='new-genbrowser-score-2h'>Chain</td><td class='new-genbrowser-score-2h'>Mutation</td><td class='new-genbrowser-score-2h'>fa_dun</td>")
+		for rowcount in range(3):
+			html.append("<td title='We consider significant changes to be anything greater than 20&#176;.' class='new-genbrowser-score-2h'>Large &#x394;(&#x3C7;)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;1)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;2)</td><td title='RMSD is based on all sidechain heavy atoms' class='new-genbrowser-score-2h'>RMSD (&#197;)</td>")
+		html.append("</tr>")
+		for dm_chain, residue_ids in sorted(design_residue_data.iteritems()):
+			for residue_id, residue_detail in sorted(residue_ids.iteritems()):
+				residue_detail['ResidueID'] = residue_id 
+				#html.append("<tr style='background-color:#c9d8d5'><td><b>%s</b></td>" % dm_chain)
+				html.append("<tr class='new-genbrowser-stats'><td><b>%s</b></td>" % dm_chain)
+				if residue_detail['IsMotifResidue']:
+					if residue_detail['IsMutation']:
+						html.append("<td style='background:#FFFF00'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
+					else:
+						html.append("<td style='background:#FFFF00'>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
+				elif residue_detail['IsMutation']:
+					html.append("<td style='background:#d07d50'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
+				else:
+					html.append("<td>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
+				if residue_detail.get('fa_dun') != None:
+					html.append("<td>%(fa_dun)f</td>" % residue_detail)
+				else:
+					html.append("<td></td>")
+				for prefix in residue_stats_headers:
+					if residue_detail.get('%sSignificantChiChange' % prefix) != None:
+						if residue_detail.get('%sSignificantChiChange' % prefix) == 0.0:
+							html.append("<td>No</td>")
+						elif residue_detail.get('%sSignificantChiChange' % prefix) < 1.0:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0d01d;'>Somewhat</td>")
+						elif residue_detail.get('%sSignificantChiChange' % prefix) == 1.0:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>Yes</td>")
+					else:
+						html.append("<td></td>")
+					Chi1Delta = residue_detail.get('%sChi1Delta' % prefix)
+					if Chi1Delta != None:
+						if Chi1Delta < 20:
+							html.append("<td>%0.2f&#176;</td>" % Chi1Delta)
+						else:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi1Delta)
+					else:
+						html.append("<td></td>")
+					Chi2Delta = residue_detail.get('%sChi2Delta' % prefix)
+					if Chi2Delta != None:
+						if Chi2Delta < 20:
+							html.append("<td>%0.2f&#176;</td>" % Chi2Delta)
+						else:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi2Delta)
+					else:
+						html.append("<td></td>")
+					if residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix):
+						html.append("<td>%0.3f</td>" % residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix))
+					else:
+						html.append("<td></td>")
+				html.append("</tr>")
+		html.append("</table>\n")
+		return html
+	
+	@staticmethod
+	def get_ManualDesign_residue_table_HTML(design_residue_data, set_of_motif_residues):
+		''' Expects a table of type {ChainID -> {ResidueID -> ResidueDetail}} where ResidueDetail is a table containing fields from DesignResidue.
+		    list_of_motif_residues is a list of ResidueIDs which are motif residues in the original design.'''
+		# &#x3B4; delta
+		# &#x3C3; sigma
 		
-		motif_residues = self.motif_residues
-		best_ranked = self.best_ranked
-		HasSequenceLogo = self.HasSequenceLogo
-		ScaffoldHasSequenceLogo = self.ScaffoldHasSequenceLogo
-		DesignMatchtypes = self.DesignMatchtypes
-		AllWildtypeSequences = self.AllWildtypeSequences
-		AllEffectiveWildtypeSequences = self.AllEffectiveWildtypeSequences
-		rank_components = self.rank_components
-		rank_component_scores =self.rank_component_scores
-		chain_molecule_info = self.chain_molecule_info
-		design_residue_data = self.design_residue_data
+		residue_stats_headers = DesignIterator.residue_stats_headers
+		manual_design_score_components_of_interest = DesignIterator.manual_design_score_components_of_interest
 		
-		DesignChains = sorted(design_residue_data.get(DesignID).keys())
+		html = []
+		html.append("<table style='padding-bottom:10px;' class='new-genbrowser-score-2'>")
+		html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><th COLSPAN='%d'></th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, no ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, with ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack all, no ligand</th></tr>" % (2 + len(manual_design_score_components_of_interest)))
+		html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><td class='new-genbrowser-score-2h'>Chain</td><td class='new-genbrowser-score-2h'>Mutation</td>")
+		for sc in manual_design_score_components_of_interest:
+			html.append("<td class='new-genbrowser-score-2h'>%s</td>" % sc)
+		for rowcount in range(3):
+			html.append("<td title='We consider significant changes to be anything greater than 20&#176;.' class='new-genbrowser-score-2h'>Large &#x394;(&#x3C7;)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;1)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;2)</td><td title='RMSD is based on all sidechain heavy atoms' class='new-genbrowser-score-2h'>RMSD (&#197;)</td>")
+		html.append("</tr>")
+		for dm_chain, residue_ids in sorted(design_residue_data.iteritems()):
+			for residue_id, residue_detail in sorted(residue_ids.iteritems()):
+				residue_detail['ResidueID'] = residue_id 
+				#html.append("<tr style='background-color:#c9d8d5'><td><b>%s</b></td>" % dm_chain)
+				html.append("<tr class='new-genbrowser-manual-design-stats'><td><b>%s</b></td>" % dm_chain)
+				if residue_id in set_of_motif_residues:
+					if residue_detail['IsMutation']:
+						html.append("<td style='background:#FFFF00'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
+					else:
+						html.append("<td style='background:#FFFF00'>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
+				elif residue_detail['IsMutation']:
+					html.append("<td style='background:#d07d50'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
+				else:
+					html.append("<td>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
+				for sc in manual_design_score_components_of_interest:
+					if residue_detail.get(sc) != None:
+						if residue_detail[sc] == 0:
+							html.append("<td>0</td>")
+						else:
+							html.append("<td>%0.2f</td>" % residue_detail[sc])
+					else:
+						html.append("<td></td>")
+				for prefix in residue_stats_headers:
+					if residue_detail.get('%sSignificantChiChange' % prefix) != None:
+						if residue_detail.get('%sSignificantChiChange' % prefix) == 0.0:
+							html.append("<td>No</td>")
+						elif residue_detail.get('%sSignificantChiChange' % prefix) < 1.0:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0d01d;'>Somewhat</td>")
+						elif residue_detail.get('%sSignificantChiChange' % prefix) == 1.0:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>Yes</td>")
+					else:
+						html.append("<td></td>")
+					Chi1Delta = residue_detail.get('%sChi1Delta' % prefix)
+					if Chi1Delta != None:
+						if Chi1Delta < 20:
+							html.append("<td>%0.2f&#176;</td>" % Chi1Delta)
+						else:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi1Delta)
+					else:
+						html.append("<td></td>")
+					Chi2Delta = residue_detail.get('%sChi2Delta' % prefix)
+					if Chi2Delta != None:
+						if Chi2Delta < 20:
+							html.append("<td>%0.2f&#176;</td>" % Chi2Delta)
+						else:
+							html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi2Delta)
+					else:
+						html.append("<td></td>")
+					if residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix):
+						html.append("<td>%0.3f</td>" % residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix))
+					else:
+						html.append("<td></td>")
+				html.append("</tr>")
+		html.append("</table>\n")	
+		return html
+	
+	@staticmethod
+	def getCommentsForDesign(DesignID, ComplexID, MeetingDesignRatings, UserDesignRatings, MeetingScaffoldRatings, UserScaffoldRatings, UserScaffoldTerminiOkay, group_colors = None):
+		
+		if not group_colors:
+			group_colors = DesignIterator.getGroupColors()
+	
+		html = []
+		comments = []
+		if MeetingDesignRatings.get(DesignID):
+			comments += [(comment['CommentDate'], 'Meeting', comment['Approved'], comment['ApprovalNotes']) for comment in MeetingDesignRatings[DesignID].values()]
+		if UserDesignRatings:
+			comments += [(comment['Date'], comment['FirstName'], comment['Rating'], comment['RatingNotes']) for comment in UserDesignRatings if comment['Rating'] or comment['RatingNotes']]
+		if comments:
+			html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Design comments</span><span></span></div>\n''' )
+			comments = sorted(comments, reverse=True)
+			html.append('''<div class='new-genbrowser-row'>''')
+			html.append('''<table class='new-genbrowser-comments'>''')
+			html.append('''<tr class='new-genbrowser-comments'><th class='new-genbrowser-comments'>Date</th><th class='new-genbrowser-comments'>User</th><th class='new-genbrowser-comments'>Rating</th><th class='new-genbrowser-comments'>Notes</th></tr>''')
+				
+			for comment in comments:
+				
+				#<span class='new-genbrowser-comment-header'></span>''')
+				name = comment[1]
+				if name == 'Yao-ming':
+					name = 'Ming'
+				html.append('''<tr style='background-color:%s' class='new-genbrowser-comments'>''' % group_colors[name])
+				html.append('''<td style='width:160px' class='new-genbrowser-comments'>%s</td>''' % comment[0])
+				html.append('''<td style='width:80px' class='new-genbrowser-comments'>%s</td>''' % name)
+				if comment[2] == 'Yes' or comment[2] == 'Good':
+					html.append('''<td style='text-align:center; width:50px; background:#19AC19' class='new-genbrowser-comments'>%s</td>''' % (comment[2]))
+				elif comment[2] == 'No' or comment[2] == 'Bad':
+					html.append('''<td style='text-align:center; width:50px; font-weight:bold; color:#fff; background:%s' class='new-genbrowser-comments'>%s</td>''' % (DesignIterator.bad_design_red, comment[2]))
+				else:
+					html.append('''<td style='text-align:center; width:50px; background:%s' class='new-genbrowser-comments'>%s</td>''' % (DesignIterator.maybe_design_orange, comment[2]))
+				html.append('''<td style='width:600px' class='new-genbrowser-comments'>%s</td>''' % comment[3])
+				html.append('''</tr>\n''')
+			html.append('''</table></div>''')
+		
+		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Scaffold comments</span><span></span></div>\n''')
+		comments = []#
+		key = ComplexID
+		if MeetingScaffoldRatings.get(key):
+			comments += [(comment['CommentDate'], 'Meeting', comment['Approved'], comment['ApprovalNotes']) for comment in MeetingScaffoldRatings[key].values()]
+		if UserScaffoldRatings.get(key):
+			comments += [(comment['Date'], comment['FirstName'], comment['Rating'], comment['RatingNotes']) for comment in UserScaffoldRatings[key].values() if comment['Rating']]
+					
+		if comments:
+			comments = sorted(comments, reverse=True)
+			
+			key = ComplexID
+			if UserScaffoldTerminiOkay.get(key):
+				comments.append((None, 'TerminiOkay?', UserScaffoldTerminiOkay[key], ''))
 
-		DesignsMutations = {}
-		for ChainID in DesignChains:
-			DesignsMutations[ChainID] = []
-			for residueID, residue_details in sorted(design_residue_data[DesignID][ChainID].iteritems()):
-				if residue_details['IsMutation'] == 1:
-					DesignsMutations[ChainID].append((residue_details['OriginalAA'], residue_details['ResidueID'], residue_details['VariantAA']))
-		
-		DesignsMotifResidues = {}
-		for ChainID in DesignChains:
-			DesignsMotifResidues[ChainID] = []
-			for residueID, residue_details in sorted(design_residue_data[DesignID][ChainID].iteritems()):
-				if residue_details['IsMotifResidue'] == 1:
-					DesignsMotifResidues[ChainID].append((residue_details['VariantAA'], residue_details['ResidueID'], residue_details['PositionWithinChain']))
-		
-		meeting_comments = self.meeting_comments
-		MeetingDesignRatings = self.MeetingDesignRatings
-		MeetingScaffoldRatings = self.MeetingScaffoldRatings
-		UserScaffoldRatings = self.UserScaffoldRatings
-		UserScaffoldTerminiOkay = self.UserScaffoldTerminiOkay
-		ScaffoldReferences = self.ScaffoldReferences
-		SmallMoleculeReferences = self.SmallMoleculeReferences
-		ReferenceAuthors = self.ReferenceAuthors
-		residue_stats_headers = self.residue_stats_headers
-		group_colors = self.group_colors 
-		ManualDesignsPerDesign = self.ManualDesignsPerDesign
-		AllManualDesignsPerDesign = self.AllManualDesignsPerDesign
-		manual_design_score_components_of_interest = self.manual_design_score_components_of_interest
-		ScoreComponentsOrder = self.ScoreComponentsOrder
-		
-		pdbID = design['WildtypeScaffoldPDBFileID']
-		ComplexID = design['ComplexID']
-		best_ranked_for_this_design = best_ranked.get(design['DesignID'], [])
-		
-		UserDesignRatings = self.UserDesignRatings.get(DesignID, [])
-		ScoreComponents = self.ScoreComponents
-		MutantSequences = self.MutantSequences
+			html.append('''<div class='new-genbrowser-row'>''')
+			html.append('''<table class='new-genbrowser-comments'>''')
+			html.append('''<tr class='new-genbrowser-comments'><th class='new-genbrowser-comments'>Date</th><th class='new-genbrowser-comments'>User</th><th class='new-genbrowser-comments'>Rating</th><th class='new-genbrowser-comments'>Notes</th></tr>''')
+				
+			for comment in comments:
+				#<span class='new-genbrowser-comment-header'></span>''')
+				name = comment[1]
+				if name == 'Yao-ming':
+					name = 'Ming'
+				html.append('''<tr style='background-color:%s' class='new-genbrowser-comments'>''' % group_colors[name])
+				html.append('''<td style='width:160px' class='new-genbrowser-comments'>%s</td>''' % comment[0])
+				html.append('''<td style='width:80px' class='new-genbrowser-comments'>%s</td>''' % name)
+				if comment[2] == 'Yes' or comment[2] == 'Good':
+					html.append('''<td style='text-align:center; width:50px; background:#40c06d' class='new-genbrowser-comments'>%s</td>''' % (comment[2]))
+				elif comment[2] == 'No' or comment[2] == 'Bad':
+					html.append('''<td style='text-align:center; width:50px; font-weight:bold; color:#fff; background:%s' class='new-genbrowser-comments'>%s</td>''' % (DesignIterator.bad_scaffold_red, comment[2]))
+				else:
+					html.append('''<td style='text-align:center; width:50px; background:%s' class='new-genbrowser-comments'>%s</td>''' % (DesignIterator.maybe_scaffold_orange, comment[2]))
 
-		profile_timer.start('Determine rating')
-		
-		# Determine main row color based on ratings
+				html.append('''<td style='width:600px' class='new-genbrowser-comments'>%s</td>''' % comment[3])
+				html.append('''</tr>\n''')
+			html.append('''</table></div>''')
+		return html
+	
+	@staticmethod
+	def getDesignsCSSClass(DesignID, UserDesignRatings, MeetingDesignRatings):
+		'''Determine design row color based on ratings.'''
 		design_tr_class = 'unrated_design'
-		scaffold_tr_class = 'unrated_scaffold'
 		
 		meeting_approval = None
 		if MeetingDesignRatings.get(DesignID):
 			# Latest meeting rating trumps all
-			meeting_approval = MeetingDesignRatings[DesignID][sorted(MeetingDesignRatings[DesignID].keys(), reverse = True)[0]]['Approved']
+			meeting_approval = MeetingDesignRatings[DesignID][sorted(MeetingDesignRatings[DesignID].keys(), reverse=True)[0]]['Approved']
 		
 		if meeting_approval:
-			design_tr_class = self.meeting_rating_css_classes[meeting_approval] 
+			design_tr_class = DesignIterator.meeting_rating_css_classes[meeting_approval] 
 		else:
 			num_bad_ratings = 0
 			num_good_ratings = 0
@@ -833,21 +1241,27 @@ ORDER BY DesignID, FirstName""")
 				design_tr_class = 'maybe_design'
 			elif num_good_ratings:
 				design_tr_class = 'good_design'
-
-		# Determine scaffold color based on ratings
+		return design_tr_class
+	
+	@staticmethod
+	def getScaffoldsCSSClass(ComplexID, UserScaffoldRatings, MeetingScaffoldRatings):
+		'''Determine scaffold row color based on ratings.'''
+		
+		scaffold_tr_class = 'unrated_scaffold'
+		
 		meeting_approval = None
 		if MeetingScaffoldRatings.get(ComplexID):
 			# Latest meeting rating trumps all
-			meeting_approval = MeetingScaffoldRatings[ComplexID][sorted(MeetingScaffoldRatings[ComplexID].keys(), reverse = True)[0]]['Approved']
+			meeting_approval = MeetingScaffoldRatings[ComplexID][sorted(MeetingScaffoldRatings[ComplexID].keys(), reverse=True)[0]]['Approved']
 		if meeting_approval:
-			scaffold_tr_class = self.meeting_scaffold_rating_css_classes[meeting_approval] 
+			scaffold_tr_class = DesignIterator.meeting_scaffold_rating_css_classes[meeting_approval] 
 		else:
 			num_bad_ratings = 0
 			num_good_ratings = 0
 			num_maybe_ratings = 0
 			
-			if UserScaffoldRatings.get(design['ComplexID']):
-				for user_id, scaffold_rating in UserScaffoldRatings[design['ComplexID']].iteritems():
+			if UserScaffoldRatings.get(ComplexID):
+				for user_id, scaffold_rating in UserScaffoldRatings[ComplexID].iteritems():
 					if scaffold_rating['Rating'] == 'Bad':
 						num_bad_ratings += 1
 					elif scaffold_rating['Rating'] == 'Good':
@@ -855,7 +1269,6 @@ ORDER BY DesignID, FirstName""")
 					elif scaffold_rating['Rating'] == 'Maybe':
 						num_maybe_ratings += 1
 					
-			
 			if num_bad_ratings:
 				if num_good_ratings or num_maybe_ratings:
 					# Mixed reviews
@@ -866,8 +1279,86 @@ ORDER BY DesignID, FirstName""")
 				scaffold_tr_class = 'maybe_scaffold'
 			elif num_good_ratings:
 				scaffold_tr_class = 'good_scaffold'
+		return scaffold_tr_class
+	
+	def get_Design_HTML(self, design, profile_timer):
+		'''design should be the result of a database query having:
+		   - all fields in Design;
+		   - PDBBiologicalUnit.ComplexID;
+		   - SmallMolecule.Name AS SmallMoleculeName;
+		   - SmallMolecule.ID AS SmallMoleculeID;
+		   - SmallMoleculeMotif.Name AS TargetMotifName.'''
 		
-			
+		profile_timer.start('Design preamble')
+		
+		html = []
+		DesignID = design['DesignID']
+		if (self.filtered_DesignIDs != None) and (DesignID not in self.filtered_DesignIDs):
+			return html
+		
+		motif_residues = self.motif_residues
+		best_ranked = self.best_ranked
+		ScaffoldHasSequenceLogo = self.ScaffoldHasSequenceLogo
+		rank_components = self.rank_components
+		rank_component_scores = self.rank_component_scores
+		
+		design_residue_data = self.design_residue_data
+
+		DesignChains = sorted(self.MutantSequences[DesignID].keys())
+		
+		DesignsMutations = self.DesignMutations[DesignID]
+		#for ChainID in DesignChains:
+		#	DesignsMutations[ChainID] = []
+		#	for residueID, residue_details in sorted(design_residue_data[DesignID][ChainID].iteritems()):
+		#		if residue_details['IsMutation'] == 1:
+		#			DesignsMutations[ChainID].append((residue_details['OriginalAA'], residue_details['ResidueID'], residue_details['VariantAA']))
+
+		ManualDesignsPerDesign = self.ManualDesignsPerDesign
+		
+		ManualDesignsMutations = {}
+		for manual_design in ManualDesignsPerDesign.get(DesignID, []):
+			ManualDesignID = manual_design['ManualDesignID']
+			ManualDesignsMutations[ManualDesignID] = self.DesignMutations[ManualDesignID]
+			#for ChainID in DesignChains:
+			#	ManualDesignsMutations[ManualDesignID][ChainID] = []
+			#	manual_design_residue_data = design_residue_data.get(ManualDesignID, {})
+			#	for residueID, residue_details in sorted(manual_design_residue_data.get(ChainID, {}).iteritems()):
+			#		if residue_details['IsMutation'] == 1:
+			#			ManualDesignsMutations[ManualDesignID][ChainID].append((residue_details['OriginalAA'], residue_details['ResidueID'], residue_details['VariantAA']))
+		
+		RelativeDesignsMotifResidues = self.DesignsMotifResidues[DesignID]
+		#RelativeDesignsMotifResidues = {}
+		#for ChainID in DesignChains:
+		#	RelativeDesignsMotifResidues[ChainID] = []
+		#	for residueID, residue_details in sorted(design_residue_data[DesignID][ChainID].iteritems()):
+		#		if residue_details['IsMotifResidue'] == 1:
+		#			RelativeDesignsMotifResidues[ChainID].append((residue_details['VariantAA'], residue_details['ResidueID'], residue_details['PositionWithinChain']))
+		
+		meeting_comments = self.meeting_comments
+		MeetingDesignRatings = self.MeetingDesignRatings
+		MeetingScaffoldRatings = self.MeetingScaffoldRatings
+		UserScaffoldRatings = self.UserScaffoldRatings
+		UserScaffoldTerminiOkay = self.UserScaffoldTerminiOkay
+		ScaffoldReferences = self.ScaffoldReferences
+		SmallMoleculeReferences = self.SmallMoleculeReferences
+		ReferenceAuthors = self.ReferenceAuthors
+		AllManualDesignsPerDesign = self.AllManualDesignsPerDesign
+		ScoreComponentsOrder = self.ScoreComponentsOrder
+		
+		ComplexID = design['ComplexID']
+		best_ranked_for_this_design = best_ranked.get(design['DesignID'], [])
+		
+		UserDesignRatings = self.UserDesignRatings.get(DesignID, [])
+		ScoreComponents = self.ScoreComponents
+		
+		profile_timer.start('Determine rating')
+		
+		# Color design/scaffold by rating
+		design_tr_class = DesignIterator.getDesignsCSSClass(DesignID, UserDesignRatings, MeetingDesignRatings)
+		scaffold_tr_class = DesignIterator.getScaffoldsCSSClass(ComplexID, UserScaffoldRatings, MeetingScaffoldRatings)
+		#print("%s, %s, %s" % (int(DesignID), design_tr_class.replace("_design", ""), scaffold_tr_class.replace("_scaffold", "")))
+		#print("<br>")
+		
 		# ROW 1
 			
 		# Create an anchor to the row
@@ -882,39 +1373,42 @@ ORDER BY DesignID, FirstName""")
 		if not has_manual_designs:
 			extra_class = " no-manual-designs "
 			
-		html.append('''<div id='d%d' class='%s-cl %s-cl %s general-design-cl'>''' % (design['DesignID'], design_tr_class, scaffold_tr_class, extra_class))
-		html.append('''<div class='new-genbrowser-row %s'>''' % design_tr_class)
+		html.append('''<div id='d%d' class='%s-cl %s-cl %s general-design-cl generic_design_class'>''' % (design['DesignID'], design_tr_class, scaffold_tr_class, extra_class))
+		html.append('''<div id='design-header-%d' class='new-genbrowser-row %s'>''' % (DesignID, design_tr_class))
 		html.append('''<span class='new-genbrowser-header'>%(Type)s</span><span><a class='gen9' href='#d%(DesignID)d'>#%(DesignID)d</a>''' % design)
 		if design['PyMOLSessionFile']:
-			html.append('''<span class='Gen9PyMOL-link'><a href='?query=Gen9File&amp;DesignID=%(DesignID)d&amp;download=PSE'><img width="18" height="18" src='../images/pse32o.png' alt='pdf'></a></span>''' % design)
+			html.append('''<span class='Gen9PyMOL-link'><a id='PSELink-%(DesignID)d' href=''><img width="18" height="18" src='../images/pse32o.png' alt='pdf'></a></span>''' % design)
 		if design['Description']:
 			html.append('''<span style='margin-left:20px;'>(%(Description)s)</span>''' % design)
+			
+		html.append('''<span style='margin-left:20px;'><img style='cursor:pointer;' width="18" height="18" src='../images/jsmol.png' onclick='LoadDesignModel(%(DesignID)d);'></span>''' % design)
+		
 		html.append('</span></div>\n')
 
-		html.append('''<div class='new-genbrowser-row %s'>''' % scaffold_tr_class)
+		html.append('''<div id='scaffold-header-%d' class='new-genbrowser-row %s'>''' % (DesignID, scaffold_tr_class))
 		
-		html.append('''<span class='new-genbrowser-header'>Wildtype scaffold</span><span style='display: inline-block; width: 50px;'>#%(ComplexID)d</span>'''  % design)
-		if len(pdbID) == 4:
-			html.append('''<span>(<a class='gen9' target='_new' href='http://www.rcsb.org/pdb/explore.do?structureId=%(WildtypeScaffoldPDBFileID)s'>%(WildtypeScaffoldPDBFileID)s</a>, %(WildtypeScaffoldBiologicalUnit)s)</span>'''  % design)
+		html.append('''<span class='new-genbrowser-header'>Wildtype scaffold</span><span style='display: inline-block; width: 50px;'>#%(ComplexID)d</span>''' % design)
+		if len(design['WildtypeScaffoldPDBFileID']) == 4:
+			html.append('''<span>(<a class='gen9' target='_blank' href='http://www.rcsb.org/pdb/explore.do?structureId=%(WildtypeScaffoldPDBFileID)s'>%(WildtypeScaffoldPDBFileID)s</a>, %(WildtypeScaffoldBiologicalUnit)s)</span>''' % design)
 			#html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Scaffold</span><span><a class='newgen9' href='http://www.rcsb.org/pdb/explore.do?structureId=%(WildtypeScaffoldPDBFileID)s'>%(WildtypeScaffoldPDBFileID)s</a>, %(WildtypeScaffoldBiologicalUnit)s</span></div>\n''' % design)
 		else:
-			html.append('''<span>(%(WildtypeScaffoldPDBFileID)s, %(WildtypeScaffoldBiologicalUnit)s)</span>'''  % design)
+			html.append('''<span>(%(WildtypeScaffoldPDBFileID)s, %(WildtypeScaffoldBiologicalUnit)s)</span>''' % design)
 		
 		sckey = '%s.%s' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'])	
 		if ScaffoldHasSequenceLogo.get(sckey):
 			for chainID in sorted(ScaffoldHasSequenceLogo[sckey]):
 				html.append('''<span style='display:inline-block; margin-left:20px;'>Chain %s''' % chainID)
-				html.append('''<a class='gen9' target="_new" href='?query=Gen9File&amp;ScaffoldPDBID=%s&amp;ScaffoldUnit=%s&amp;download=WebLogo&amp;Chain=%s'> <img width="42" height="18" src='../images/weblogo.png' alt='WebLogo'></a>''' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'], chainID))
+				html.append('''<a class='gen9' target="_blank" href='?query=Gen9File&amp;ScaffoldPDBID=%s&amp;ScaffoldUnit=%s&amp;download=WebLogo&amp;Chain=%s'> <img width="42" height="18" src='../images/weblogo.png' alt='WebLogo'></a>''' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'], chainID))
 		html.append('''</div>\n''')
 
 		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Mutant complex</span><span>#%(ATOMComplexID)d</span></div>\n''' % design)
 		
-		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Design PDB.gz</span><span><a class='newgen9' href='?query=Gen9File&amp;DesignID=%(DesignID)d&amp;download=PDB'>Download</a></span></div>\n'''  % design)
+		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Design PDB.gz</span><span><a class='newgen9' href='?query=Gen9File&amp;DesignID=%(DesignID)d&amp;download=PDB'>Download</a></span></div>\n''' % design)
 		
-		for mx in range(len(ManualDesignsPerDesign.get(DesignID, []))):
-			manual_design = ManualDesignsPerDesign[DesignID][mx]
+		for mx in range(len(AllManualDesignsPerDesign.get(DesignID, []))):
+			manual_design = AllManualDesignsPerDesign[DesignID][mx]
 			ManualDesignID = manual_design['ManualDesignID'] 
-			html.append('''<div class='new-genbrowser-row' id='manuald%(ManualDesignID)d'>''' % manual_design)
+			html.append('''<div class='new-genbrowser-row' id='manuald%(ManualDesignID)d'><span id='d%(ManualDesignID)d'></span>''' % manual_design)
 			if mx == 0:
 				html.append('''<span class='new-genbrowser-header'>Manual designs''')
 				if design['ManualDesignsPyMOLSessionFile']:
@@ -924,32 +1418,31 @@ ORDER BY DesignID, FirstName""")
 				html.append('''<span class='new-genbrowser-header'></span>''')
 			
 			html.append('''<span><a class='gen9' href='#manuald%(ManualDesignID)d'>#%(ManualDesignID)d</a></span>''' % manual_design)
-			html.append('''<span style='display:inline-block; margin-left:20px;'><a class='newgen9' href='?query=Gen9File&amp;DesignID=%(ManualDesignID)d&amp;download=PDB'>PDB</a></span>''' % manual_design)
+			
+			if manual_design['MutationDescription'] != 'AUTO Wildtype Sequence':
+				html.append('''<span style='display:inline-block; margin-left:20px;'><a class='newgen9' href='?query=Gen9File&amp;DesignID=%(ManualDesignID)d&amp;download=PDB'>PDB</a></span>''' % manual_design)
+			else:
+				html.append('''<span style='display:inline-block; margin-left:20px;'><font color='white'>PDB</font></span>''' % manual_design)
 				
-			ManualDesignsMutations = []
+			ManualDesignsMutationsString = []
 			num_manual_design_mutations = 0
 			description_join_str = ""
 			for ChainID in DesignChains:
-				ChainData = design_residue_data[ManualDesignID].get(ChainID)
-				if ChainData:
-					chainManualDesignsMutations = []
-					for residueID, residue_details in sorted(ChainData.iteritems()):
-						if residue_details['IsMutation'] == 1:
-							chainManualDesignsMutations.append("%s%s%s" % (residue_details['OriginalAA'], residue_details['ResidueID'], residue_details['VariantAA']))
-					if chainManualDesignsMutations:
-						num_manual_design_mutations += len(chainManualDesignsMutations) 
-						ManualDesignsMutations.append("Chain %s: %s\n" % (ChainID, " ".join(chainManualDesignsMutations)))
-			if ManualDesignsMutations:
-				ManualDesignsMutations = "".join(ManualDesignsMutations)
+				chainManualDesignsMutations = ["%s%s%s" % (t[0], t[1], t[2]) for t in self.DesignMutations.get(ManualDesignID, {}).get(ChainID, [])]
+				if chainManualDesignsMutations:
+					num_manual_design_mutations += len(chainManualDesignsMutations) 
+					ManualDesignsMutationsString.append("Chain %s: %s\n" % (ChainID, " ".join(chainManualDesignsMutations)))
+			if ManualDesignsMutationsString:
+				ManualDesignsMutationsString = "".join(ManualDesignsMutationsString)
 				description_join_str = ","
 			else:
-				ManualDesignsMutations = ""
+				ManualDesignsMutationsString = ""
 				
 			if manual_design['MutationDescription']:
 				html.append('''<span style='margin-left:10px;'>%s%s</span>''' % (manual_design['MutationDescription'], description_join_str))
 			
-			if ManualDesignsMutations:
-				html.append('''<span title='%s' style='background:#dddddd;'>%d mutations from design</span>''' % (ManualDesignsMutations, num_manual_design_mutations))
+			if ManualDesignsMutationsString:
+				html.append('''<span title='%s' style='background:#dddddd;'>%d mutations from design</span>''' % (ManualDesignsMutationsString, num_manual_design_mutations))
 				
 				
 			if manual_design.get('Description'):
@@ -964,12 +1457,12 @@ ORDER BY DesignID, FirstName""")
 			for manual_design in ManualDesignsPerDesign[DesignID]:
 				html.append('''<div class='new-genbrowser-row file-links-div-%(OriginalDesignID)d' style='display:none;'><span class='new-genbrowser-header'>Manual design %(ManualDesignID)d PDB</span><span class='gen9-betterfilelink'>%(FilePath)s</span></div>\n''' % manual_design)
 			html.append('''<div class='new-genbrowser-row file-links-div-%(DesignID)d' style='display:none;'><span class='new-genbrowser-header'>Manual designs PSE</span><span class='gen9-betterfilelink'>%(ManualDesignsPyMOLSessionFile)s</span></div>\n''' % design)
-		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'></span><span><button type='button' onClick='show_file_links_new(%(DesignID)d);'>Show paths</button></span></div>\n'''  % design)
+		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'></span><span><button type='button' onClick='show_file_links_new(%(DesignID)d);'>Show paths</button></span></div>\n''' % design)
 		
 		motif_info = motif_residues[design['TargetSmallMoleculeMotifID']]
-		split_point=motif_info[0].find('_')
+		split_point = motif_info[0].find('_')
 		if split_point != -1:
-			motif_info[0] = "%s (non-RCSB)" % motif_info[0][split_point+1:]
+			motif_info[0] = "%s (non-RCSB)" % motif_info[0][split_point + 1:]
 		motif_pdb_filename = motif_info[0]
 		motif_residue_list = "%s" % ",".join(motif_info[1])
 		
@@ -980,13 +1473,15 @@ ORDER BY DesignID, FirstName""")
 			for ref in SmallMoleculeReferences[design['SmallMoleculeID']]:
 				html.append('''<span class='genbrowser-smallmolecule-reference'>''')
 				publication_year = ref['PublicationYear']
-				authors = ReferenceAuthors[ref['PublicationID']]
+				authors = ReferenceAuthors.get(ref['PublicationID'])
+				if authors == None:
+					authors = ""
 				if len(authors) <= 2:
 					authors = " & ".join([author['Surname'] for author in authors])
 				else:
 					authors = "%s et al." % authors[0]['Surname']
 				
-				html.append('''<a class='gen9new' target="_new" href='?query=Gen9File&amp;PublicationID=%(PublicationID)d&amp;download=RefPDF'>''' % ref)
+				html.append('''<a class='gen9new' target="_blank" href='?query=Gen9File&amp;PublicationID=%(PublicationID)d&amp;download=RefPDF'>''' % ref)
 				html.append('''%s''' % authors)
 				if publication_year != None:
 					html.append(''', %d''' % publication_year)
@@ -1056,8 +1551,8 @@ ORDER BY DesignID, FirstName""")
 
 				rank = best_ranked_for_this_design[i]
 				next_rank = None
-				if i+1 < len(best_ranked_for_this_design):
-					next_rank = best_ranked_for_this_design[i+1] 
+				if i + 1 < len(best_ranked_for_this_design):
+					next_rank = best_ranked_for_this_design[i + 1] 
 				
 				html.append('''<span class='gen9-firstscore'>''')
 				html.append('''<span class='new-genbrowser-fake-button'>Scheme %(RankingSchemeID)s, ranked #%(Rank)d</span>''' % rank)
@@ -1137,311 +1632,33 @@ ORDER BY DesignID, FirstName""")
 		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-inline-header'>Scaffold sequences</span>''')
 		html.append('''</div>''')
 		
-		profile_timer.start('Sequences')
-		
-		sequence_pairs = {}
-		#mutant_sequences = gen9db.execute_select('SELECT Chain, ProteinChain.Sequence, WildTypeChain, FirstResidueID FROM DesignMutatedChain INNER JOIN ComplexChain ON DesignMutatedChain.ATOMComplexChainID=ComplexChain.ID INNER JOIN ProteinChain ON ComplexChain.ProteinChainID=ProteinChain.ID WHERE DesignID=%s', parameters=(design['DesignID'],))
-		
-		mutant_chain_to_wildtype_chain = {}
-		wildtype_chain_to_mutant_chain = {}
-
-		for ChainID, ms in MutantSequences[DesignID].iteritems():
-			sequence_pairs[ms['Chain']] = [None, None, ms['Sequence'], ms['FirstResidueID']]
-			matchtype = DesignMatchtypes[design['DesignID']][ms['WildTypeChain']]
-			sequence_pairs[ms['Chain']][1] = matchtype
-			mutant_chain_to_wildtype_chain[ms['Chain']] = ms['WildTypeChain']
-			wildtype_chain_to_mutant_chain[ms['WildTypeChain']] = ms['Chain'] 
-		
-		seqres_wildtype_sequences = AllWildtypeSequences['%s-%s' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'])]
-		atom_wildtype_sequences = AllEffectiveWildtypeSequences['%s-%s' % (design['WildtypeScaffoldPDBFileID'], design['WildtypeScaffoldBiologicalUnit'])]
-		
-		for wtsequence in seqres_wildtype_sequences:
-			if wildtype_chain_to_mutant_chain.get(wtsequence['Chain']):
-				mutant_chain = wildtype_chain_to_mutant_chain[wtsequence['Chain']]
-				if sequence_pairs.get(mutant_chain) and sequence_pairs[mutant_chain][1] == 'SEQRES':
-					sequence_pairs[mutant_chain][0] = wtsequence['Sequence']
-		for wtsequence in atom_wildtype_sequences:
-			if wildtype_chain_to_mutant_chain.get(wtsequence['Chain']):
-				mutant_chain = wildtype_chain_to_mutant_chain[wtsequence['Chain']]
-				if sequence_pairs.get(mutant_chain) and sequence_pairs[mutant_chain][1] == 'ATOM':
-					sequence_pairs[mutant_chain][0] = wtsequence['Sequence']
-		
-		for chainID, sp in sequence_pairs.iteritems():
-			assert(sp[0])
-			assert(sp[1])
-			assert(sp[2])
-		
-		residue_offset = 0
-		for chainID, s_pair in sorted(sequence_pairs.iteritems()):
-			# Start counting from the correct number according to the order in the PDB file
-			design_residue_id = s_pair[3]
-			if design_residue_id == None:
-				print("Warning: The FirstResidueID field is NULL for Design %d, chain %s." % (DesignID, chainID))
-				design_residue_id = 1
-			sub_html = []
-			sub_html.append("<table class='new-gen9browser-sequences'>")
-			
-			motif_positions = set()
-			if DesignsMotifResidues.get(chainID):
-				motif_positions = [m[2] for m in DesignsMotifResidues.get(chainID)]
-			if len(s_pair[0]) == len(s_pair[2]):
-				
-				n = 100
-				
-				wt_sequence = s_pair[0]
-				mutant_sequence = s_pair[2]
-				
-				manual_sequences = []
-				manual_subsequences = []
-				for manual_design in ManualDesignsPerDesign.get(DesignID, []):
-					ManualDesignID=manual_design['DesignID']
-					manual_sequence = MutantSequences[ManualDesignID][chainID]['Sequence']
-					manual_subsequences.append([s for s in get_subsequence(manual_sequence, n)])
-					
-				wt_subsequences = [s for s in get_subsequence(wt_sequence, n)]
-				mutant_subsequences = [s for s in get_subsequence(mutant_sequence, n)]
-				
-				counter = '1234567890' * (len(s_pair[0])/10) + ('1234567890')[0:len(s_pair[0])%10]
-				ncount = 0
-				for x in range(len(wt_subsequences)):
-					wt_subsequence = wt_subsequences[x]
-					mutant_subsequence = mutant_subsequences[x]
-					num_manual_sequences = len(ManualDesignsPerDesign.get(DesignID, []))
-					list_of_manual_subsequences = []
-					for xman in range(num_manual_sequences):
-						list_of_manual_subsequences.append(manual_subsequences[xman][x])
-					#html.append("<tr><td>        </td><td style='font-family:monospace;'>%s</td></tr>" % counter[ncount:ncount+n])
-					#html.append("<tr><td>Wildtype</td><td style='font-family:monospace;'>%s</td></tr>" % wt_subsequence)
-					seq1 = []
-					seq2 = []
-					manual_seqs = [[] for xman in range(num_manual_sequences)]
-					for x in range(len(mutant_subsequence)):
-						if wt_subsequence[x] == mutant_subsequence[x]:
-							seq1.append("<span title='%s %d'>%s</span>" % (ROSETTAWEB_SK_AAinv[wt_subsequence[x]], design_residue_id, wt_subsequence[x]))
-							if (ncount+x+1) in motif_positions:
-								seq2.append("<span title='%s %d' class='new-genbrowser-sequence-motif-residue'>%s</span>" % (ROSETTAWEB_SK_AAinv[mutant_subsequence[x]], design_residue_id, mutant_subsequence[x]))
-							else:
-								seq2.append("<span title='%s %d'>-</span>" % (ROSETTAWEB_SK_AAinv[mutant_subsequence[x]], design_residue_id))
-						else:
-							seq1.append("<span title='%s %d' class='new-genbrowser-sequence-wildtype-mutated'>%s</span>" % (ROSETTAWEB_SK_AAinv[wt_subsequence[x]], design_residue_id, wt_subsequence[x]))
-							if (ncount+x+1) in motif_positions:
-								seq2.append("<span title='%s %d' class='new-genbrowser-sequence-motif-residue'>%s</span>" % (ROSETTAWEB_SK_AAinv[mutant_subsequence[x]], design_residue_id, mutant_subsequence[x]))
-							else:
-								seq2.append("<span title='%s %d' class='new-genbrowser-sequence-mutant-mutated'>%s</span>" % (ROSETTAWEB_SK_AAinv[mutant_subsequence[x]], design_residue_id, mutant_subsequence[x]))
-						for xman in range(num_manual_sequences):
-							manual_subsequence = list_of_manual_subsequences[xman]
-							if wt_subsequence[x] == manual_subsequence[x]:
-								if (ncount+x+1) in motif_positions:
-									manual_seqs[xman].append("<span class='new-genbrowser-sequence-motif-residue'>-</span>")
-								else:
-									manual_seqs[xman].append("<span>-</span>")
-							else:
-								if (ncount+x+1) in motif_positions:
-									manual_seqs[xman].append("<span class='new-genbrowser-sequence-motif-residue'>%s</span>" % (manual_subsequence[x]))
-								else:
-									manual_seqs[xman].append("<span class='new-genbrowser-sequence-mutant-mutated'>%s</span>" % (manual_subsequence[x]))
-					
-							
-						design_residue_id += 1
-					sub_html.append("<tr><td>Wildtype</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(seq1))
-					sub_html.append("<tr><td>Design</td><td style='font-family:monospace;'>%s</td></tr>" % "".join(seq2))
-					for xman in range(num_manual_sequences):
-						manual_design = ManualDesignsPerDesign[DesignID][xman]
-						sub_html.append("<tr><td>Manual %d</td><td style='font-family:monospace;'>%s</td></tr>" % (manual_design['ManualDesignID'], "".join(manual_seqs[xman])))
-						
-					ncount += n
-				residue_offset += len(wt_sequence)
-			
-			else:
-				sub_html.append("<tr><td>Design</td><td>Error: The length of the wildtype chain does not match what the database describes as the corresponding mutant chain.</td></tr>")
-			sub_html.append("</table>")
-			
-			html.append('''<div class='new-genbrowser-sequence-block'>''')
-			db_mutations = []
-			if DesignsMutations and DesignsMutations.get(chainID):
-				db_mutations = DesignsMutations[chainID]
-				
-				if HasSequenceLogo.get(DesignID) and chainID in HasSequenceLogo.get(DesignID):
-					first_cell = '''Chain %s <a class='gen9' target="_new" href='?query=Gen9File&amp;DesignID=%d&amp;download=WebLogo&amp;Chain=%s'> <img width="42" height="18" src='../images/weblogo.png' alt='WebLogo'></a>:''' % (chainID, DesignID, chainID)
-				else:
-					first_cell = 'Chain %s:' % chainID
-				
-				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'>%s</span>''' % first_cell)
-				if chain_molecule_info.get(pdbID) and chain_molecule_info[pdbID].get(mutant_chain_to_wildtype_chain[chainID]):
-					html.append('''<span class="new-genbrowser-sequence-motif-residues">%s</span></div>''' % chain_molecule_info[pdbID][mutant_chain_to_wildtype_chain[chainID]])
-				else:
-					html.append('''<span class="new-genbrowser-sequence-motif-residues"></span></div>''')
-
-				if DesignsMotifResidues.get(chainID):
-					html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span class="new-genbrowser-sequence-motif-residues">Motif residues %s</span></div>''' % (", ".join(['''<span class='new-genbrowser-sequence-motif-residue'>%s</span>''' % "".join(map(str, m[0:2])) for m in DesignsMotifResidues.get(chainID)])))
-				#html.append('''<span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations %s (%d mutations in total)</span></div>''' % (", ".join(["".join(map(str,m[0:3])) for m in db_mutations]), len(db_mutations)))
-				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations ''')
-				html.append(''' (%d mutations in total)</span></div>''' % len(db_mutations))
-			else:
-				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'>Chain %s</span>''' % chainID)
-				if chain_molecule_info.get(pdbID) and chain_molecule_info[pdbID].get(mutant_chain_to_wildtype_chain[chainID]):
-					html.append('''<span class="new-genbrowser-sequence-motif-residues">%s</span></div>''' % chain_molecule_info[pdbID][mutant_chain_to_wildtype_chain[chainID]])
-				else:
-					html.append('''<span class="new-genbrowser-sequence-motif-residues"></span></div>''')
-				if DesignsMotifResidues.get(chainID):
-					html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span class="new-genbrowser-sequence-motif-residues">Motif residues %s</span></div>''' % (", ".join(['''<span class='new-genbrowser-sequence-motif-residue'>%s</span>''' % "".join(map(str, m[0:2])) for m in DesignsMotifResidues.get(chainID)])))
-				#html.append('''<span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations %s (%d mutations in total)</span></div>''' % (", ".join(["".join(map(str,m[0:3])) for m in db_mutations]), len(db_mutations)))
-				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-chain'></span><span title="%s" class="new-genbrowser-sequence-motif-residues">Mutations ''')
-				html.append(''' (%d mutations in total)</span></div>''' % len(db_mutations))
-				
-			html.extend(sub_html)
-			html.append('''</div>''')
-		
+		# Sequence alignment
+		html.extend(self.getSequenceAlignmentHTML(design, RelativeDesignsMotifResidues, DesignsMutations, ManualDesignsMutations, profile_timer))
+	
 		profile_timer.start('Dunbrack energies')
-		
-		if design_residue_data.get(DesignID):
+		has_design_residue_data = self.has_design_residue_data
+		if has_design_residue_data.get(DesignID):
 			html.append("<div style='padding-top:10px;padding-bottom:5px;' class='new-genbrowser-row'><span class='new-genbrowser-inline-header'>Dunbrack energies, &#x3C7; angle deviations, and side-chain RMSDs upon repacking after ligand removal</span></div>")
 			html.append("<div style='padding-top:5px;padding-bottom:5px;' class='new-genbrowser-row'><span style='margin-left:20px' class='new-genbrowser-inline-header'>Design:</span>")
 			html.append('''<span class='gen9-scaffold-details' onclick='showScaffoldDetails(%(DesignID)d, true);'  id='scaffold-details-%(DesignID)d-show'><img width="11" height="11" src='../images/plusbutton32.png' alt='pdf'></span>''' % design)
 			html.append('''<span class='gen9-scaffold-details' onclick='showScaffoldDetails(%(DesignID)d, false);' id='scaffold-details-%(DesignID)d-hide' style='display:none;'><img width="11" height="11" src='../images/minusbutton32.png' alt='pdf'></span>''' % design)
 			html.append("</div>")
 		html.append('''<div class='new-genbrowser-row' style='display:none;' id='scaffold-details-%(DesignID)d-div'>''' % design)
-		if design_residue_data.get(DesignID):
-			# &#x3B4; delta
-			# &#x3C3; sigma
-			
-			html.append("<table style='padding-bottom:10px;' class='new-genbrowser-score-2'>")
-			html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><th COLSPAN='3'></th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, no ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, with ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack all, no ligand</th></tr>")
-			html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><td class='new-genbrowser-score-2h'>Chain</td><td class='new-genbrowser-score-2h'>Mutation</td><td class='new-genbrowser-score-2h'>fa_dun</td>")
-			for rowcount in range(3):
-				html.append("<td title='We consider significant changes to be anything greater than 20&#176;.' class='new-genbrowser-score-2h'>Large &#x394;(&#x3C7;)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;1)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;2)</td><td title='RMSD is based on all sidechain heavy atoms' class='new-genbrowser-score-2h'>RMSD (&#197;)</td>")
-			html.append("</tr>")
-			for dm_chain, residue_ids in sorted(design_residue_data[DesignID].iteritems()):
-				for residue_id, residue_detail in sorted(residue_ids.iteritems()):
-					residue_detail['ResidueID'] = residue_id 
-					#html.append("<tr style='background-color:#c9d8d5'><td><b>%s</b></td>" % dm_chain)
-					html.append("<tr class='new-genbrowser-stats'><td><b>%s</b></td>" % dm_chain)
-					if residue_detail['IsMotifResidue']:
-						if residue_detail['IsMutation']:
-							html.append("<td style='background:#FFFF00'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
-						else:
-							html.append("<td style='background:#FFFF00'>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
-					elif residue_detail['IsMutation']:
-						html.append("<td style='background:#d07d50'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
-					else:
-						html.append("<td>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
-					if residue_detail.get('fa_dun') != None:
-						html.append("<td>%(fa_dun)f</td>" % residue_detail)
-					else:
-						html.append("<td></td>")
-					for prefix in residue_stats_headers:
-						if residue_detail.get('%sSignificantChiChange' % prefix) != None:
-							if residue_detail.get('%sSignificantChiChange' % prefix) == 0.0:
-								html.append("<td>No</td>")
-							elif residue_detail.get('%sSignificantChiChange' % prefix) < 1.0:
-								html.append("<td style='font-weight:bold;color:#fff;background:#d0d01d;'>Somewhat</td>")
-							elif residue_detail.get('%sSignificantChiChange' % prefix) == 1.0:
-								html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>Yes</td>")
-						else:
-							html.append("<td></td>")
-						Chi1Delta = residue_detail.get('%sChi1Delta' % prefix)
-						if Chi1Delta != None:
-							if Chi1Delta < 20:
-								html.append("<td>%0.2f&#176;</td>" % Chi1Delta)
-							else:
-								html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi1Delta)
-						else:
-							html.append("<td></td>")
-						Chi2Delta = residue_detail.get('%sChi2Delta' % prefix)
-						if Chi2Delta != None:
-							if Chi2Delta < 20:
-								html.append("<td>%0.2f&#176;</td>" % Chi2Delta)
-							else:
-								html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi2Delta)
-						else:
-							html.append("<td></td>")
-						if residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix):
-							html.append("<td>%0.3f</td>" % residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix))
-						else:
-							html.append("<td></td>")
-					html.append("</tr>")
-			html.append("</table>\n")
-		html.append("</div>")	
-		
+		html.append("</div>")
 		for manual_design in AllManualDesignsPerDesign.get(DesignID, []):
 			if manual_design['MutationDescription'].lower() == 'original design' or manual_design['MutationDescription'] == 'AUTO Wildtype Sequence':
 				continue
 			ManualDesignID = manual_design['ManualDesignID'] 
-			if design_residue_data.get(ManualDesignID):
+			if has_design_residue_data.get(ManualDesignID):
 				html.append("<div style='padding-top:5px;padding-bottom:5px;' class='new-genbrowser-row'><span style='margin-left:20px' class='new-genbrowser-inline-header'>Manual design #%d (%s):</span>" % (ManualDesignID, manual_design['MutationDescription']))
 
-				html.append('''<span class='gen9-scaffold-details' onclick='showManualDesignDetails(%(ManualDesignID)d, true);'  id='scaffold-details-Manual%(ManualDesignID)d-show'><img width="11" height="11" src='../images/plusbutton32.png' alt='pdf'></span>''' % manual_design)
-				html.append('''<span class='gen9-scaffold-details' onclick='showManualDesignDetails(%(ManualDesignID)d, false);' id='scaffold-details-Manual%(ManualDesignID)d-hide' style='display:none;'><img width="11" height="11" src='../images/minusbutton32.png' alt='pdf'></span>''' % manual_design)
+				html.append('''<span class='gen9-scaffold-details' onclick='showScaffoldDetails(%(ManualDesignID)d, true);'  id='scaffold-details-%(ManualDesignID)d-show'><img width="11" height="11" src='../images/plusbutton32.png' alt='pdf'></span>''' % manual_design)
+				html.append('''<span class='gen9-scaffold-details' onclick='showScaffoldDetails(%(ManualDesignID)d, false);' id='scaffold-details-%(ManualDesignID)d-hide' style='display:none;'><img width="11" height="11" src='../images/minusbutton32.png' alt='pdf'></span>''' % manual_design)
 				html.append("</div>")
-			html.append('''<div class='new-genbrowser-row' style='display:none;' id='scaffold-details-Manual%(ManualDesignID)d-div'>''' % manual_design)
-			#html.append('''<div class='new-genbrowser-row' id='scaffold-details-Manual%(ManualDesignID)d-div'>''' % manual_design)
-			if design_residue_data.get(ManualDesignID):
-				html.append("<table style='padding-bottom:10px;' class='new-genbrowser-score-2'>")
-				html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><th COLSPAN='%d'></th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, no ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack single, with ligand</th><th style='text-align:center' class='new-genbrowser-score-2' COLSPAN='4'>Repack all, no ligand</th></tr>" % (2+len(manual_design_score_components_of_interest)))
-				html.append("<tr style='text-align:center;' class='new-genbrowser-score-2'><td class='new-genbrowser-score-2h'>Chain</td><td class='new-genbrowser-score-2h'>Mutation</td>")
-				for sc in manual_design_score_components_of_interest:
-					html.append("<td class='new-genbrowser-score-2h'>%s</td>" % sc)
-				for rowcount in range(3):
-					html.append("<td title='We consider significant changes to be anything greater than 20&#176;.' class='new-genbrowser-score-2h'>Large &#x394;(&#x3C7;)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;1)</td><td class='new-genbrowser-score-2h'>&#x394;(&#x3C7;2)</td><td title='RMSD is based on all sidechain heavy atoms' class='new-genbrowser-score-2h'>RMSD (&#197;)</td>")
-				html.append("</tr>")
-				for dm_chain, residue_ids in sorted(design_residue_data[ManualDesignID].iteritems()):
-					for residue_id, residue_detail in sorted(residue_ids.iteritems()):
-						residue_detail['ResidueID'] = residue_id 
-						#html.append("<tr style='background-color:#c9d8d5'><td><b>%s</b></td>" % dm_chain)
-						html.append("<tr class='new-genbrowser-manual-design-stats'><td><b>%s</b></td>" % dm_chain)
-						if design_residue_data[DesignID][dm_chain].get(residue_id, {}).get('IsMotifResidue'):
-							if residue_detail['IsMutation']:
-								html.append("<td style='background:#FFFF00'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
-							else:
-								html.append("<td style='background:#FFFF00'>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
-						elif residue_detail['IsMutation']:
-							html.append("<td style='background:#d07d50'>%(OriginalAA)s%(ResidueID)d%(VariantAA)s</td>" % residue_detail)
-						else:
-							html.append("<td>%(VariantAA)s%(ResidueID)d</td>" % residue_detail)
-						for sc in manual_design_score_components_of_interest:
-							if residue_detail.get(sc) != None:
-								if residue_detail[sc] == 0:
-									html.append("<td>0</td>")
-								else:
-									html.append("<td>%0.2f</td>" % residue_detail[sc])
-							else:
-								html.append("<td></td>")
-						for prefix in residue_stats_headers:
-							if residue_detail.get('%sSignificantChiChange' % prefix) != None:
-								if residue_detail.get('%sSignificantChiChange' % prefix) == 0.0:
-									html.append("<td>No</td>")
-								elif residue_detail.get('%sSignificantChiChange' % prefix) < 1.0:
-									html.append("<td style='font-weight:bold;color:#fff;background:#d0d01d;'>Somewhat</td>")
-								elif residue_detail.get('%sSignificantChiChange' % prefix) == 1.0:
-									html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>Yes</td>")
-							else:
-								html.append("<td></td>")
-							Chi1Delta = residue_detail.get('%sChi1Delta' % prefix)
-							if Chi1Delta != None:
-								if Chi1Delta < 20:
-									html.append("<td>%0.2f&#176;</td>" % Chi1Delta)
-								else:
-									html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi1Delta)
-							else:
-								html.append("<td></td>")
-							Chi2Delta = residue_detail.get('%sChi2Delta' % prefix)
-							if Chi2Delta != None:
-								if Chi2Delta < 20:
-									html.append("<td>%0.2f&#176;</td>" % Chi2Delta)
-								else:
-									html.append("<td style='font-weight:bold;color:#fff;background:#d0101d;'>%0.2f&#176;</td>" % Chi2Delta)
-							else:
-								html.append("<td></td>")
-							if residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix):
-								html.append("<td>%0.3f</td>" % residue_detail.get('%sAllSideChainHeavyAtomsRMSD' % prefix))
-							else:
-								html.append("<td></td>")
-						html.append("</tr>")
-				html.append("</table>\n")	
-			html.append("</div>")		
-			
+			html.append('''<div class='new-genbrowser-row' style='display:none;' id='scaffold-details-%(ManualDesignID)d-div'>''' % manual_design)
+			html.append("</div>")
+
 		profile_timer.start('Scaffold references')
-		
 		if ScaffoldReferences.get(ComplexID):
 			html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Scaffold references</span></div>''')
 			for ref in ScaffoldReferences[ComplexID]:
@@ -1454,85 +1671,18 @@ ORDER BY DesignID, FirstName""")
 					authors = "%s et al." % authors[0]['Surname']
 				
 				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-sequence-reference'>
-<a class='gen9new' target="_new" href='?query=Gen9File&amp;PublicationID=%(PublicationID)d&amp;download=RefPDF'>''' % ref)
+<a class='gen9new' target="_blank" href='?query=Gen9File&amp;PublicationID=%(PublicationID)d&amp;download=RefPDF'>''' % ref)
 				html.append('''%s''' % authors)
 				if publication_year != None:
 					html.append(''', %d''' % publication_year)
 				html.append('''</a></span><span>%(Notes)s</span></div>''' % ref)
 		
-		comments = []
-		if MeetingDesignRatings.get(DesignID):
-			comments += [(comment['CommentDate'], 'Meeting', comment['Approved'], comment['ApprovalNotes']) for comment in MeetingDesignRatings[DesignID].values()]
-		if UserDesignRatings:
-			comments += [(comment['Date'], comment['FirstName'], comment['Rating'], comment['RatingNotes']) for comment in UserDesignRatings if comment['Rating'] or comment['RatingNotes']]
-		if comments:
-			html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Design comments</span><span></span></div>\n''' % design)
-			comments = sorted(comments, reverse=True)
-			html.append('''<div class='new-genbrowser-row'>''')
-			html.append('''<table class='new-genbrowser-comments'>''')
-			html.append('''<tr class='new-genbrowser-comments'><th class='new-genbrowser-comments'>Date</th><th class='new-genbrowser-comments'>User</th><th class='new-genbrowser-comments'>Rating</th><th class='new-genbrowser-comments'>Notes</th></tr>''')
-				
-			for comment in comments:
-				
-				#<span class='new-genbrowser-comment-header'></span>''')
-				name = comment[1]
-				if name == 'Yao-ming':
-					name = 'Ming'
-				html.append('''<tr style='background-color:%s' class='new-genbrowser-comments'>''' % group_colors[name])
-				html.append('''<td style='width:160px' class='new-genbrowser-comments'>%s</td>''' % comment[0])
-				html.append('''<td style='width:80px' class='new-genbrowser-comments'>%s</td>''' % name)
-				if comment[2] == 'Yes' or comment[2] == 'Good':
-					html.append('''<td style='text-align:center; width:50px; background:#19AC19' class='new-genbrowser-comments'>%s</td>''' % (comment[2]))
-				elif comment[2] == 'No' or comment[2] == 'Bad':
-					html.append('''<td style='text-align:center; width:50px; font-weight:bold; color:#fff; background:%s' class='new-genbrowser-comments'>%s</td>''' % (self.bad_design_red, comment[2]))
-				else:
-					html.append('''<td style='text-align:center; width:50px; background:%s' class='new-genbrowser-comments'>%s</td>''' % (self.maybe_design_orange, comment[2]))
-				html.append('''<td style='width:600px' class='new-genbrowser-comments'>%s</td>''' % comment[3])
-				html.append('''</tr>\n''')
-			html.append('''</table></div>''')
-				
-				#<span><a class='newgen9' href='?query=Gen9File&amp;DesignID=%(DesignID)d&amp;download=PDB'>Download</a></span></div>\n'''  % design)
-		
-		profile_timer.start('Scaffold comments')
-		
-		html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Scaffold comments</span><span></span></div>\n''' % design)
-		
-		comments = []#
-		key = design['ComplexID']
-		if MeetingScaffoldRatings.get(key):
-			comments += [(comment['CommentDate'], 'Meeting', comment['Approved'], comment['ApprovalNotes']) for comment in MeetingScaffoldRatings[key].values()]
-		if UserScaffoldRatings.get(key):
-			comments += [(comment['Date'], comment['FirstName'], comment['Rating'], comment['RatingNotes']) for comment in UserScaffoldRatings[key].values() if comment['Rating']]
-					
-		if comments:
-			comments = sorted(comments, reverse=True)
-			
-			key = design['ComplexID']
-			if UserScaffoldTerminiOkay.get(key):
-				comments.append((None, 'TerminiOkay?', UserScaffoldTerminiOkay[key], ''))
+		# Comments for the design/scaffold
+		profile_timer.start('Design comments')
+		html.append("<div id='comments-for-design-%(DesignID)d'>" % design)
+		html.extend(DesignIterator.getCommentsForDesign(DesignID, design['ComplexID'], MeetingDesignRatings, UserDesignRatings, MeetingScaffoldRatings, UserScaffoldRatings, UserScaffoldTerminiOkay, group_colors = self.group_colors))
+		html.append('</div>')
 
-			html.append('''<div class='new-genbrowser-row'>''')
-			html.append('''<table class='new-genbrowser-comments'>''')
-			html.append('''<tr class='new-genbrowser-comments'><th class='new-genbrowser-comments'>Date</th><th class='new-genbrowser-comments'>User</th><th class='new-genbrowser-comments'>Rating</th><th class='new-genbrowser-comments'>Notes</th></tr>''')
-				
-			for comment in comments:
-				#<span class='new-genbrowser-comment-header'></span>''')
-				name = comment[1]
-				if name == 'Yao-ming':
-					name = 'Ming'
-				html.append('''<tr style='background-color:%s' class='new-genbrowser-comments'>''' % group_colors[name])
-				html.append('''<td style='width:160px' class='new-genbrowser-comments'>%s</td>''' % comment[0])
-				html.append('''<td style='width:80px' class='new-genbrowser-comments'>%s</td>''' % name)
-				if comment[2] == 'Yes' or comment[2] == 'Good':
-					html.append('''<td style='text-align:center; width:50px; background:#40c06d' class='new-genbrowser-comments'>%s</td>''' % (comment[2]))
-				elif comment[2] == 'No' or comment[2] == 'Bad':
-					html.append('''<td style='text-align:center; width:50px; font-weight:bold; color:#fff; background:%s' class='new-genbrowser-comments'>%s</td>''' % (self.bad_scaffold_red, comment[2]))
-				else:
-					html.append('''<td style='text-align:center; width:50px; background:%s' class='new-genbrowser-comments'>%s</td>''' % (self.maybe_scaffold_orange, comment[2]))
-
-				html.append('''<td style='width:600px' class='new-genbrowser-comments'>%s</td>''' % comment[3])
-				html.append('''</tr>\n''')
-			html.append('''</table></div>''')
 		# ROW 4
 		profile_timer.start('User comments')
 		
@@ -1541,17 +1691,6 @@ ORDER BY DesignID, FirstName""")
 			html.append('''<span class='gen9-scaffold-details' onclick='showUserComments(%(DesignID)d, true);'  id='user-comments-%(DesignID)d-show'><img width="11" height="11" src='../images/plusbutton32.png' alt='pdf'></span>''' % design)
 			html.append('''<span class='gen9-scaffold-details' onclick='showUserComments(%(DesignID)d, false);' id='user-comments-%(DesignID)d-hide' style='display:none;'><img width="11" height="11" src='../images/minusbutton32.png' alt='pdf'></span>''' % design)
 			html.append('''</div>''')
-			
-			# START user-comments-div
-			html.append('''<div class='new-genbrowser-row' style='display:none;' id='user-comments-%(DesignID)d-div'>''' % design)
-		
-			html.append('''<FORM name="gen9form-new-%(DesignID)d" method="post" action="http://albana.ucsf.edu/backrub/cgi-bin/rosettaweb.py">''' % design)
-			html.append('''<input type="hidden" NAME="DesignID" VALUE="%(DesignID)d">''' % design)
-			html.append('''<input type="hidden" NAME="Username" VALUE="%s">''' % username)
-			html.append('''<input type="hidden" NAME="Gen9Page" VALUE="">''')
-			html.append('''<input type="hidden" NAME="query" VALUE="">''')
-			html.append('''<input type="hidden" NAME="gen9sort1" VALUE="">''')
-			html.append('''<input type="hidden" NAME="gen9sort2" VALUE="">''')
 			
 			# User design comments
 			user_design_comments = ""
@@ -1570,11 +1709,13 @@ ORDER BY DesignID, FirstName""")
 					user_scaffold_comments = UserScaffoldRatings[key][username]['RatingNotes']
 					user_scaffold_rating = UserScaffoldRatings[key][username]['Rating']
 			
-			# START new-genbrowser-comments-form-block
-			html.append('''<div class='new-genbrowser-comments-form-block'>''')
-			
+			# START user-comments-div
+			html.append('''<div class='new-genbrowser-row' style='display:none;' id='user-comments-%(DesignID)d-div'>''' % design)
+
 			# user design comments block
-			html.append("<div><span class='new-genbrowser-comments-header'>Design:</span><span class='new-genbrowser-comments-rating'><select name='user-design-rating-%d'>" % design['DesignID'])
+			html.append('''<div class='new-genbrowser-comments-form-block'>''')
+			html.append("""<div><span class='new-genbrowser-comments-header'>Design:</span><span class='new-genbrowser-comments-rating'>
+							<select name='ajax-user-design-rating-%d'>""" % design['DesignID'])
 			if user_design_rating == "":
 				html.append("<option value='None' selected='selected'>[none]</option>")
 			else:
@@ -1596,20 +1737,18 @@ ORDER BY DesignID, FirstName""")
 				html.append("<option value='Maybe'>Maybe</option>")
 			html.append("</select></span>")
 			if user_design_comments:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='user-design-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], user_design_comments.replace('"',"'")))
+				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-user-design-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], user_design_comments.replace('"', "'")))
 			else:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='user-design-comments-%d'></textarea></span></div>""" % (design['DesignID']))
-			
-			# END new-genbrowser-comments-form-block
+				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-user-design-comments-%d'></textarea></span></div>""" % (design['DesignID']))
+			html.append('''<div><span class='new-genbrowser-comments-header'></span><span class='new-genbrowser-comments-rating'></span>''')
+			#html.append('''<button type='button' onClick='addCommentToDatabase("Design", "User", %(DesignID)d);'>Submit</button></div>''' % design)
+			html.append("""</div>""")
 			html.append("""</div>""")
 			
-			# User scaffold comments
-			
-			# START new-genbrowser-comments-form-block
-			html.append('''<div class='new-genbrowser-comments-form-block'>''')
-			
 			# user scaffold comments block
-			html.append("<div><span class='new-genbrowser-comments-header'>Scaffold:</span><span class='new-genbrowser-comments-rating'><select name='user-scaffold-rating-%d'>" % design['DesignID'])
+			html.append('''<div class='new-genbrowser-comments-form-block'>''')
+			html.append("""<div><span class='new-genbrowser-comments-header'>Scaffold:</span><span class='new-genbrowser-comments-rating'>
+							<select name='ajax-user-scaffold-rating-%d'>""" % design['DesignID'])
 			if user_scaffold_rating == "":
 				html.append("<option value='None' selected='selected'>[none]</option>")
 			else:
@@ -1632,123 +1771,111 @@ ORDER BY DesignID, FirstName""")
 			html.append("</select></span>")
 			
 			if user_scaffold_comments:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='user-scaffold-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], user_scaffold_comments.replace('"',"'")))
+				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-user-scaffold-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], user_scaffold_comments.replace('"', "'")))
 			else:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='user-scaffold-comments-%d'></textarea></span></div>""" % (design['DesignID']))
-			
-			# END new-genbrowser-comments-form-block
+				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-user-scaffold-comments-%d'></textarea></span></div>""" % (design['DesignID']))
+			html.append('''<div><span class='new-genbrowser-comments-header'></span><span class='new-genbrowser-comments-rating'></span>''')
+			# Add both comments to the database
+			html.append('''<button type='button' onClick='addCommentToDatabase("Design", "User", %(DesignID)d); addCommentToDatabase("Scaffold", "User", %(DesignID)d);'>Submit</button></div>''' % design)
 			html.append("""</div>""")
 			
-			html.append("""<div class='new-genbrowser-comments-form-block'><span><button type='submit' name='user-comments-submit-%d' onClick='copyPageFormValues(this);'>Submit comments</button></span></div>""" % design['DesignID'])
-			html.append('''</FORM>''') 
-		
-		profile_timer.start('Meeting comments')
+			profile_timer.start('Meeting comments')
 			
-		if username and (username == 'oconchus' or username == 'kyleb' or username == 'rpache'):
-			
-			#html.append('''<div style='display:none;' id='meeting-comments-%(DesignID)d'>''')
-			html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Meeting comments</span></div>'''  % design)
-			
-			html.append('''<FORM name="gen9form-meeting-%(DesignID)d" method="post" action="http://albana.ucsf.edu/backrub/cgi-bin/rosettaweb.py">''' % design)
-			html.append('''<input type="hidden" NAME="DesignID" VALUE="%(DesignID)d">''' % design)
-			html.append('''<input type="hidden" NAME="Username" VALUE="%s">''' % username)
-			html.append('''<input type="hidden" NAME="Gen9Page" VALUE="">''')
-			html.append('''<input type="hidden" NAME="query" VALUE="">''')
-			html.append('''<input type="hidden" NAME="gen9sort1" VALUE="">''')
-			html.append('''<input type="hidden" NAME="gen9sort2" VALUE="">''')
-			
-			# Meeting design comments
-			meeting_design_comments = ""
-			meeting_design_rating = ""
-			meeting_scaffold_comments = "" 
-			meeting_scaffold_rating = ""
-			
-			for dt, mdr in MeetingDesignRatings.get(DesignID, {}).iteritems():
-				if dt == date.today():
-					meeting_design_comments = mdr['ApprovalNotes']
-					meeting_design_rating = mdr['Approved']
-			
-			key = design['ComplexID']
-			for dt, mdr in MeetingScaffoldRatings.get(key, {}).iteritems():
-				if dt == date.today():
-					meeting_scaffold_comments = mdr['ApprovalNotes']
-					meeting_scaffold_rating = mdr['Approved']
-			
-			
-			# START new-genbrowser-comments-form-block
-			html.append('''<div class='new-genbrowser-comments-form-block'>''')
-			
-			# meeting design comments block
-			html.append("<div><span class='new-genbrowser-comments-header'>Design:</span><span class='new-genbrowser-comments-rating'><select name='meeting-design-rating-%d'>" % design['DesignID'])
-			if meeting_design_rating == "":
-				html.append("<option value='None' selected='selected'>[none]</option>")
-			else:
-				html.append("<option value='None'>[none]</option>")
-			
-			if meeting_design_rating == "No":
-				html.append("<option value='No' selected='selected'>No</option>")
-			else:
-				html.append("<option value='No'>No</option>")
-			
-			if meeting_design_rating == "Yes":
-				html.append("<option value='Yes' selected='selected'>Yes</option>")
-			else:
-				html.append("<option value='Yes'>Yes</option>")
-			
-			if meeting_design_rating == "Maybe":
-				html.append("<option value='Maybe' selected='selected'>Maybe</option>")
-			else:
-				html.append("<option value='Maybe'>Maybe</option>")
-			html.append("</select></span>")
-			
-			if meeting_design_comments:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='meeting-design-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], meeting_design_comments.replace('"',"'")))
-			else:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='meeting-design-comments-%d'></textarea></span></div>""" % (design['DesignID']))
-			
-			# END new-genbrowser-comments-form-block
-			html.append("""</div>""")
-			
-			# Meeting scaffold comments
-			
-			# START new-genbrowser-comments-form-block
-			html.append('''<div class='new-genbrowser-comments-form-block'>''')
-			
-			# meeting scaffold comments block
-			html.append("<div><span class='new-genbrowser-comments-header'>Scaffold:</span><span class='new-genbrowser-comments-rating'><select name='meeting-scaffold-rating-%d'>" % design['DesignID'])
-			if meeting_scaffold_rating == "":
-				html.append("<option value='None' selected='selected'>[none]</option>")
-			else:
-				html.append("<option value='None'>[none]</option>")
-			
-			if meeting_scaffold_rating == "No":
-				html.append("<option value='No' selected='selected'>No</option>")
-			else:
-				html.append("<option value='No'>No</option>")
-			
-			if meeting_scaffold_rating == "Yes":
-				html.append("<option value='Yes' selected='selected'>Yes</option>")
-			else:
-				html.append("<option value='Yes'>Yes</option>")
-			
-			if meeting_scaffold_rating == "Maybe":
-				html.append("<option value='Maybe' selected='selected'>Maybe</option>")
-			else:
-				html.append("<option value='Maybe'>Maybe</option>")
-			html.append("</select></span>")
-			
-			if meeting_scaffold_comments:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='meeting-scaffold-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], meeting_scaffold_comments.replace('"',"'")))
-			else:
-				html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='meeting-scaffold-comments-%d'></textarea></span></div>""" % (design['DesignID']))
-			
-			# END new-genbrowser-comments-form-block
-			html.append("""</div>""")
+			if username == 'oconchus' or username == 'kyleb' or username == 'rpache':
 				
-			html.append("""<div class='new-genbrowser-comments-form-block'><span><button type='submit' name='meeting-comments-submit-%d' onClick='copyPageFormValues(this); this.form.query.value = "Gen9MeetingComment";'>Submit comments</button></span></div>""" % design['DesignID'])
-			html.append('''</FORM>''')
-		
-		if username:
+				# Meeting design comments
+				meeting_design_comments = ""
+				meeting_design_rating = ""
+				meeting_scaffold_comments = "" 
+				meeting_scaffold_rating = ""
+				
+				for dt, mdr in MeetingDesignRatings.get(DesignID, {}).iteritems():
+					if dt == date.today():
+						meeting_design_comments = mdr['ApprovalNotes']
+						meeting_design_rating = mdr['Approved']
+				
+				key = design['ComplexID']
+				for dt, mdr in MeetingScaffoldRatings.get(key, {}).iteritems():
+					if dt == date.today():
+						meeting_scaffold_comments = mdr['ApprovalNotes']
+						meeting_scaffold_rating = mdr['Approved']
+				
+				html.append('''<div class='new-genbrowser-row'><span class='new-genbrowser-header'>Meeting comments</span></div>''' % design)
+				
+				# START new-genbrowser-comments-form-block
+				html.append('''<div class='new-genbrowser-comments-form-block'>''')
+				
+				# meeting design comments block
+				html.append("""<div><span class='new-genbrowser-comments-header'>Design:</span><span class='new-genbrowser-comments-rating'>
+								<select name='ajax-meeting-design-rating-%d'>""" % design['DesignID'])
+				if meeting_design_rating == "":
+					html.append("<option value='None' selected='selected'>[none]</option>")
+				else:
+					html.append("<option value='None'>[none]</option>")
+				
+				if meeting_design_rating == "No":
+					html.append("<option value='No' selected='selected'>No</option>")
+				else:
+					html.append("<option value='No'>No</option>")
+				
+				if meeting_design_rating == "Yes":
+					html.append("<option value='Yes' selected='selected'>Yes</option>")
+				else:
+					html.append("<option value='Yes'>Yes</option>")
+				
+				if meeting_design_rating == "Maybe":
+					html.append("<option value='Maybe' selected='selected'>Maybe</option>")
+				else:
+					html.append("<option value='Maybe'>Maybe</option>")
+				html.append("</select></span>")
+				
+				if meeting_design_comments:
+					html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-meeting-design-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], meeting_design_comments.replace('"', "'")))
+				else:
+					html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-meeting-design-comments-%d'></textarea></span></div>""" % (design['DesignID']))
+				html.append('''<div><span class='new-genbrowser-comments-header'></span><span class='new-genbrowser-comments-rating'></span>''')
+				#html.append('''<button type='button' onClick='addCommentToDatabase("Design", "Meeting", %(DesignID)d);'>Submit</button></div>''' % design)
+				html.append("""</div>""")
+				html.append("""</div>""")
+				
+				# Meeting scaffold comments
+				
+				# START new-genbrowser-comments-form-block
+				html.append('''<div class='new-genbrowser-comments-form-block'>''')
+				
+				# meeting scaffold comments block
+				html.append("""<div><span class='new-genbrowser-comments-header'>Scaffold:</span><span class='new-genbrowser-comments-rating'>
+								<select name='ajax-meeting-scaffold-rating-%d'>""" % design['DesignID'])
+				if meeting_scaffold_rating == "":
+					html.append("<option value='None' selected='selected'>[none]</option>")
+				else:
+					html.append("<option value='None'>[none]</option>")
+				
+				if meeting_scaffold_rating == "No":
+					html.append("<option value='No' selected='selected'>No</option>")
+				else:
+					html.append("<option value='No'>No</option>")
+				
+				if meeting_scaffold_rating == "Yes":
+					html.append("<option value='Yes' selected='selected'>Yes</option>")
+				else:
+					html.append("<option value='Yes'>Yes</option>")
+				
+				if meeting_scaffold_rating == "Maybe":
+					html.append("<option value='Maybe' selected='selected'>Maybe</option>")
+				else:
+					html.append("<option value='Maybe'>Maybe</option>")
+				html.append("</select></span>")
+				
+				if meeting_scaffold_comments:
+					html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-meeting-scaffold-comments-%d'>%s</textarea></span></div>""" % (design['DesignID'], meeting_scaffold_comments.replace('"', "'")))
+				else:
+					html.append("""<span><textarea class='new-genbrowser-comments-textarea' name='ajax-meeting-scaffold-comments-%d'></textarea></span></div>""" % (design['DesignID']))
+				html.append('''<div><span class='new-genbrowser-comments-header'></span><span class='new-genbrowser-comments-rating'></span>''')
+				# Add both comments to the database
+				html.append('''<button type='button' onClick='addCommentToDatabase("Design", "Meeting", %(DesignID)d); addCommentToDatabase("Scaffold", "Meeting", %(DesignID)d);'>Submit</button></div>''' % design)
+				html.append("""</div>""")
+					
 			# END user-comments-div 
 			html.append('''</div>''') 
 				
@@ -1772,27 +1899,15 @@ ORDER BY DesignID, FirstName""")
 		
 		
 def getTablelessBrowsePageNotes():
-	html = []
-	html.append('''<H1 align="center">To be done: <br>
--add target molecule assay references and target motif references<br>
--improve filtering - store user's filters so they are reloaded on page reload<br>
-</H1><br>''')
-	html.append('''<H1 class="gen9-new-instructions">
-The scaffold column is colored depending on the scaffold rating which may differ from the design rating. Colors are based on consensus user rating - if opinions disagree then the column is colored as a maybe (orange). Ratings
-from meetings, if they exist, trump all other ratings with the more recent meetings taking priority.</H1>''')
-	html.append('''<H1 class="gen9-new-instructions">
-Mutation residue IDs use Rosetta numbering, not PDB numbering.
-</H1>''')
-	html.append('''<H1 class="gen9-new-instructions">
-All score components are shown. The components for the particular ranking scheme are shown in bold. The unused components for that scheme 
-have a darker, gray background. Cumulative probabilities, when available, are given in the final column.
-</H1>''')
-	html.append('''<H1 class="gen9-new-instructions">
-To jump to a particular design, enter the design ID number in the textfield on the bottom right.
-</H1>''')
-	html.append('''<H1 class="gen9-new-instructions">
-The show/hide buttons do not combine their filtering e.g. if you hide all bad designs and then show all bad scaffolds, all designs with bad scaffolds are shown, even the bad designs you just hid. 
-</H1>''')
+	html = ['''
+<div align="left"><button type='button' name='show_help_button' onclick='showHelp();'>Show help</button></div>
+<div id='help_text' style='display:none'>
+	<H1 class="gen9-new-instructions">The scaffold column is colored depending on the scaffold rating which may differ from the design rating. Colors are based on consensus user rating - if opinions disagree then the column is colored as a maybe (orange). Ratings	from meetings, if they exist, trump all other ratings with the more recent meetings taking priority.</H1>
+	<H1 class="gen9-new-instructions">Mutation residue IDs use Rosetta numbering, not PDB numbering.</H1>
+	<H1 class="gen9-new-instructions">All score components are shown. The components for the particular ranking scheme are shown in bold. The unused components for that scheme have a darker, gray background. Cumulative probabilities, when available, are given in the final column.</H1>
+	<H1 class="gen9-new-instructions">To jump to a particular design, enter the design ID number in the textfield on the bottom right.</H1>
+	<H1 class="gen9-new-instructions">The show/hide buttons do not combine their filtering e.g. if you hide all bad designs and then show all bad scaffolds, all designs with bad scaffolds are shown, even the bad designs you just hid.</H1>
+</div>''']
 	return html
 
 def determine_sorting_criteria(form):
@@ -1922,19 +2037,27 @@ def generateDesignBrowsePage(form, design_iterator, filtered_DesignIDs):
 			rough_count /= 4
 		if form.has_key('top10type'):
 			s = form['top10type'].value
-			assert(s.isalpha())
-			if s == 'RelaxedDesign':
+			print(s)
+			#assert(s.isalpha())
+			if s == 'Relaxed_design':
 				s = 'Relaxed design'
 			where_clauses.append("Design.Type=%s")
 			where_values.append(s)
 			rough_count /= 2
+		else:
+			if form.has_key('top10mol') and (form['top10mol'].value == 'ERG' or form['top10mol'].value == 'LAE'):
+				rough_count /= 2
+				
+
 		assert(len(where_clauses) == len(where_values))
 		if where_clauses:
 			where_clauses = ' WHERE %s' % " AND ".join(where_clauses)
 			top10_query += where_clauses 
 		top10_query += ' ORDER BY SmallMoleculeID, TopDesign.RankingSchemeID, Design.Type, Rank'
 		Top10Designs = gen9db.execute_select(top10_query, parameters=tuple(where_values))
-		assert(0.82 <= (float(rough_count)/float(len(Top10Designs))) <= 1.0)
+		#assert(0.82 <= (float(rough_count)/float(len(Top10Designs))) <= 1.0)
+		if not (0.81 <= (float(rough_count) / float(len(Top10Designs))) <= 1.0):
+			pass# print(float(rough_count)/float(len(Top10Designs)))
 		
 		SortedTop10Designs = {}
 		SortedTop10DesignsSet = set()
@@ -1960,10 +2083,10 @@ def generateDesignBrowsePage(form, design_iterator, filtered_DesignIDs):
 		html.append(generateFilterCheckboxes(username))
 	
 	if Top10Mode:
-		html.append('''<H1 align="left">Designs (%s)</H1><div align="right">
+		html.append('''<H1 id='DesignCounter' align="left">Designs (%s)</H1><div align="right">
 </div>''' % len([design for design in shown_designs if ((None == filtered_DesignIDs) or (filtered_DesignIDs and (design['DesignID'] in filtered_DesignIDs)))]))
 	else:
-		html.append('''<H1 align="left">Designs (%s)</H1><div align="right">
+		html.append('''<H1 id='DesignCounter' align="left">Designs (%s)</H1><div align="right">
 </div>''' % len([design for design in shown_designs if ((None == filtered_DesignIDs) or (filtered_DesignIDs and (design['DesignID'] in filtered_DesignIDs)))]))
 
 	#<table style="border-style:solid; border-width:1px;">
@@ -1987,6 +2110,25 @@ def generateDesignBrowsePage(form, design_iterator, filtered_DesignIDs):
 	else:
 		html.append('''<div class='gen9floater'>Jump to design:<input style='background:#e3eae9' onKeyPress="goToDesign(this, event)" type=text size=4 maxlength=4 name='floating-goto' value=""></div>''')
 	
+	html.append('''
+	<div id='design_jsmol_structure_panel' style='display:none' class='designfloater'>
+		<span id='design_jsmol_structure_div' style='display:inline-block; width:256px; height:256px'></span>
+		<span id='design_jsmol_structure_panel_controls' style='display:inline-block; vertical-align:top; align:right; margin-left:0px'>
+			<button type='button' class='close_jsmol'>x</button><br>
+			<button type='button' class='maximize_jsmol'>+</button><br>
+			<button type='button' class='minimize_jsmol'>-</button><br>
+		</span>
+	</div>
+	<div id='design_jsmol_structure_big_panel' style='display:none' class='bigdesignfloater'>
+		<span id='design_jsmol_structure_big_div' style='display:inline-block; width:712px; height:712px'></span>
+		<span id='design_jsmol_structure_panel_big_controls' style='display:inline-block; vertical-align:top; align:right; margin-left:0px'>
+			<button type='button' class='close_jsmol'>x</button><br>
+			<button type='button' class='maximize_jsmol'>+</button><br>
+			<button type='button' class='minimize_jsmol'>-</button><br>
+		</span>
+	</div>
+	''')
+	
 	profile_timer.start('For-loop start')
 	
 	html.append('''<div class='new-genbrowser'>''')
@@ -2009,13 +2151,11 @@ def generateDesignBrowsePage(form, design_iterator, filtered_DesignIDs):
 						html.append("<h1 class='Top10SmallMolecule'><a class='top10header' href='#aSmallMolecule%s'>%s</a></h1>" % (SmallMoleculeID, SmallMoleculeID))
 						html.append("<h1 class='Top10RankingScheme'><a class='top10header' href='#a%sRankingScheme%s'>Ranking scheme %s</a></h1>" % (SmallMoleculeID, RankingSchemeID, RankingSchemeID))
 						html.append("<h1 class='Top10DesignType'><a class='top10header' href='#a%s_%s_%s'>%ss</a></h1>" % (SmallMoleculeID, RankingSchemeID, TypeID, TypeID))
-						html.append("<p class ='Top10DesignRank'><b>#%d (ranked %d in the scheme)<b/></p>" % (count, Rank))
-						html.extend(design_iterator.get_Design_HTML(designs_table[DesignID]))
+						html.append("<p class ='Top10DesignRank'><b>#%d (ranked %d in the scheme)</b></p>" % (count, Rank))
+						html.extend(design_iterator.get_Design_HTML(designs_table[DesignID], profile_timer))
 						count += 1
 	else:		
 		for design in shown_designs:
-			#if username=='oconchus' and design['ID']!=100:
-			#	continue
 			html.extend(design_iterator.get_Design_HTML(design, profile_timer))
 	profile_timer.stop()
 	
@@ -2041,7 +2181,13 @@ def generateRankMappingPage(form):
 	html.append('''<div>''')
 	results = gen9db.execute("SELECT Design.ID AS DesignID, Design.Type AS Type, WildtypeScaffoldPDBFileID, WildtypeScaffoldBiologicalUnit, SmallMoleculeID, RankingSchemeID, Rank FROM Design INNER JOIN SmallMoleculeMotif ON Design.TargetSmallMoleculeMotifID=SmallMoleculeMotif.ID INNER JOIN RankedScore ON Design.ID=RankedScore.DesignID ORDER BY Design.ID")
 	if results:
-		html.append('''<div class="rankmapping_header"><span>Design ID#</span><span>Design Type</span><span>Ranking scheme ID</span><span>Wildtype scaffold</span></div>''')
+		html.append('''
+<div class="rankmapping_header">
+	<span>Design ID#</span>
+	<span>Design Type</span>
+	<span>Ranking scheme ID</span>
+	<span>Wildtype scaffold</span>
+</div>''')
 		for r in results: 
 			html.append('''<div class="rankmapping">''')
 			html.append('''<span onmouseover='style="cursor: pointer;"' onClick="jumpToDesign(%(DesignID)d)">%(DesignID)d</span>''' % r)
@@ -2068,8 +2214,8 @@ def generateGenericPage(form):
 	
 def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error, filtered_DesignIDs):
 	global gen9db
-	gen9db = rosettadb.ReusableDatabaseInterface(settings_, host = "kortemmelab.ucsf.edu", db = "Gen9Design")
-	rosettaweb = rosettadb.ReusableDatabaseInterface(settings_, host = "localhost", db = "rosettaweb")
+	gen9db = rosettadb.ReusableDatabaseInterface(settings_, host="kortemmelab.ucsf.edu", db="Gen9Design")
+	rosettaweb = rosettadb.ReusableDatabaseInterface(settings_, host="localhost", db="rosettaweb")
 
 	global settings
 	global protocols
@@ -2089,7 +2235,7 @@ def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error, filtered_
 			html.append('Guests do not have access to this page. Please log in.</tr>')
 			return html
 	if userid != '':
-		results = rosettaweb.execute_select('SELECT UserName FROM Users WHERE ID=%s', parameters= (userid_,))
+		results = rosettaweb.execute_select('SELECT UserName FROM Users WHERE ID=%s', parameters=(userid_,))
 		if len(results) == 1:
 			username = results[0]['UserName']
 		if username in ['oconchus', 'oconchus2', 'kortemme', 'rpache', 'kyleb', 'huangy2', 'noah', 'amelie']:
@@ -2101,7 +2247,7 @@ def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error, filtered_
 		return html
 	
 	BrowserVersion = 1
-	results = gen9db.execute("SELECT BrowserVersion FROM User WHERE ID=%s", parameters= (username,))
+	results = gen9db.execute("SELECT BrowserVersion FROM User WHERE ID=%s", parameters=(username,))
 	if len(results) == 1:
 		BrowserVersion = results[0]['BrowserVersion']
 	
@@ -2117,7 +2263,7 @@ def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error, filtered_
 	qs_top10type = ""
 	if form.has_key("top10type"):
 		qs_top10type = form["top10type"].value
-	
+
 	Gen9Page = ""
 	if form.has_key("Gen9Page"):
 		Gen9Page = form["Gen9Page"].value
@@ -2132,18 +2278,18 @@ def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error, filtered_
 	subpages = []
 	
 	global showprofile
-	if username=='oconchus':
+	if username == 'oconchus':
 		showprofile = False #True
 	
 	design_iterator = DesignIterator(filtered_DesignIDs)
 	
-	if username=='oconchus':
+	if username == 'oconchus':
 		#subpages.append({"name" : "browse",		"desc" : "Browse designs",	"fn" : generateGenericPage,	"generate" :True,	"params" : [form]})
-		subpages.append({"name" : "browse",		"desc" : "Browse designs",	"fn" : generateDesignBrowsePage,	"generate" :True,	"params" : [form, design_iterator, filtered_DesignIDs]})
+		subpages.append({"name" : "browse", 		"desc" : "Browse designs", 	"fn" : generateDesignBrowsePage, 	"generate" :True, 	"params" : [form, design_iterator, filtered_DesignIDs]})
 	else:
-		subpages.append({"name" : "browse",		"desc" : "Browse designs",	"fn" : generateDesignBrowsePage,	"generate" :True,	"params" : [form, design_iterator, filtered_DesignIDs]})
+		subpages.append({"name" : "browse", 		"desc" : "Browse designs", 	"fn" : generateDesignBrowsePage, 	"generate" :True, 	"params" : [form, design_iterator, filtered_DesignIDs]})
 
-	subpages.append({"name" : "rankmapping",		"desc" : "Rank/Design ID mapping",	"fn" : generateRankMappingPage,			"generate" :True,	"params" : [form]})
+	subpages.append({"name" : "rankmapping", 		"desc" : "Rank/Design ID mapping", 	"fn" : generateRankMappingPage, 			"generate" :True, 	"params" : [form]})
 	
 	
 	# Create menu
@@ -2156,7 +2302,6 @@ def generateGen9Page(settings_, rosettahtml, form, userid_, Gen9Error, filtered_
 			html.append('''<input type="button" value="%(desc)s" onClick="showPage('%(name)s');">''' % subpage)
 	
 	html.append('''<input type="button" value="Refresh" onClick="document.gen9form.query.value='Gen9'; document.gen9form.submit();">''')
-	html.append('''<input type="button" value="Switch view" onClick="document.gen9form.query.value='Gen9Switch'; document.gen9form.submit();">''')
 	html.append('''<input type="hidden" NAME="Gen9Page" VALUE="%s">''' % Gen9Page)
 	html.append('''<input type="hidden" NAME="query" VALUE="">''')
 	html.append('''<input type="hidden" NAME="gen9sort1" VALUE="%s">''' % gen9sort1)

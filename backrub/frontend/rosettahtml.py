@@ -199,7 +199,8 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 				<title>%s - %s</title>
 				<META name="description" content="RosettaBackrub a webserver for flexible backbone modeling">
 				<META name="keywords" content="RosettaBackrub RosettaFlexibleBackbone Rosetta Kortemme protein structure modeling prediction backrub flexible backbone design point mutation">
-				
+				<meta http-equiv="Content-Language" content="en" />
+
 				<link rel="STYLESHEET" type="text/css" href="../style.css">
 				
 				<script src="/javascripts/prototype.js" type="text/javascript"></script>
@@ -226,7 +227,7 @@ This site has known issues under Internet Explorer. Until these issues are fixed
 			  To see this page as it is meant to appear please use
 			  a Javascript enabled browser.</font>
 			</NOSCRIPT>
-			<table border=0 width="1200" cellpadding=0 cellspacing=0>
+			<table border=0 width="700" cellpadding=0 cellspacing=0>
 
 <!-- Header --> <tr> %s </tr>
 
@@ -276,14 +277,29 @@ This site has known issues under Internet Explorer. Until these issues are fixed
                 <title>%s - %s</title>
                 <META name="description" content="RosettaBackrub a webserver for flexible backbone modeling">
                 <META name="keywords" content="RosettaBackrub RosettaFlexibleBackbone Rosetta Kortemme protein structure modeling prediction backrub flexible backbone design point mutation">
-                
+                <meta http-equiv="Content-Language" content="en" />
+
                 <link rel="STYLESHEET" type="text/css" href="../style.css">
                 
                 <script src="/javascripts/jquery-1.9.0.min.js" type="text/javascript"></script>
+				<script src="/javascripts/jquery-ui-1.10.2.min.js" type="text/javascript"></script>
+				<link rel="stylesheet" href="http://code.jquery.com/ui/1.10.2/themes/redmond/jquery-ui.css" />
+				
+				<!--<script src="/jmol/Jmol.js" type="text/javascript"></script>-->
+				
+				<!-- <script type="text/javascript" src="/rosettaweb/jsmol/js/JSmoljQuery.js"></script>
+				<script type="text/javascript" src="/rosettaweb/jsmol/js/JSmolCore.js"></script>
+				<script type="text/javascript" src="/rosettaweb/jsmol/js/JSmolApplet.js"></script>
+				<script type="text/javascript" src="/rosettaweb/jsmol/js/JSmolApi.js"></script>
+				<script type="text/javascript" src="/rosettaweb/jsmol/js/j2sjmol.js"></script>
+				<script type="text/javascript" src="/rosettaweb/jsmol/js/JSmol.js"></script>-->
+
+				<script src="/rosettaweb/jsmol/JSmol.min.nojq.js" type="text/javascript"></script>
+
+				
                 <script src="/javascripts/sorttable.js" type="text/javascript"></script>
                 <script src="/javascripts/niftycube.js" type="text/javascript"></script>
                 <script src="/javascripts/boxover.js" type="text/javascript"></script>
-                <script src="/jmol/Jmol.js" type="text/javascript"></script>
                 """ % (self.server_title, site))
         
         # Add the Javascript constants
