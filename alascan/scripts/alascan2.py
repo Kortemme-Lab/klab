@@ -30,6 +30,8 @@ from cStringIO import StringIO
 from cgi import escape
 from rwebhelper import *
 
+UserID = None
+
 EMAIL_FROM = "lauck@cgl.ucsf.edu"
 
 parameter = read_config_file('/etc/rosettaweb/parameter.conf')
@@ -56,6 +58,7 @@ ROSETTAWEB_scriptname = os.environ['SCRIPT_NAME']
 ###############################################################################################
 
 def ws():
+  global UserID
   
   s = sys.stdout
   sys.stderr = s # should be removed later
@@ -91,11 +94,12 @@ def ws():
 
   if lastvisit:  # lastvisit != 0 means that this cookie wasn't just created. session should be known
     # get infos about session
-    sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID
+    sql = "SELECT loggedin, UserID FROM Sessions WHERE SessionID = \"%s\"" % SID
     result = execQuery( sql )
     
     #if user is logged in do everything he wants ;) ... as long as he's allowed to do that, if not send him to login
     if result[0][0] == 1 and form.has_key("query") and form['query'].value in ["register","logout","index","jobinfo","terms_of_service","submit","queue", "update","data_formats","faq","doc"]:
+      UserID = result[0][1]
       query_type = form["query"].value
     elif form.has_key("query") and form['query'].value in ["register","index","terms_of_service","oops","data_formats","faq","doc"]:
       query_type = form["query"].value
@@ -109,6 +113,9 @@ def ws():
     sql = "INSERT INTO Sessions (SessionID,Date,query,loggedin) VALUES (\"%s\",\"%s\",\"%s\",\"%s\") " % (SID, lv_strftime, "login", "0")
     result = execQuery( sql )
     
+    sql = "SELECT UserID FROM Sessions WHERE SessionID = \"%s\"" % SID
+    result = execQuery( sql )
+    UserID = result[0][1]
     #s.write(str(my_session.cookie)+'\n')
     #s.write("Content-type: text/html\n")
     s.write( "Location: http://%s/alascan/cgi-bin/%s\n\n" % (ROSETTAWEB_servername, ROSETTAWEB_scriptname) )
@@ -192,30 +199,34 @@ def login(form, my_session, t):
     try:
       UserID = result[0][0]
       PW     = result[0][1]
-      output.write( "<br>" )
-      if form["myPassword"].value == PW:
-        # all clear ... go!
-        sql = "UPDATE Sessions SET UserID = \"%s\", Date = \"%s\", loggedin = \"%s\" WHERE SessionID = \"%s\" " % ( UserID, lv_strftime, "1", SID)
-        result = execQuery(sql)
-        #output.write( sql )
-        output.write( "<br>" )
-        output.write(""" You have successfully logged in. <br> <br> \n 
-                        Proceed to <A href="alascan2.py?query=submit">Simulation Form</A>  or                               \n
-                                    <A href="alascan2.py?query=queue">Queue</A> . <br><br>                                   \n""")
+      if UserID not in [7, 84, 379, 380]:
+          output.write("""Server not publicly accessible.""")   
       else:
-        output.write(""" Wrong password. Please go <A href="alascan2.py?query=login">back</A> .                  \n""")   
+          output.write( "<br>" )
+          if form["myPassword"].value == PW:
+            # all clear ... go!
+            sql = "UPDATE Sessions SET UserID = \"%s\", Date = \"%s\", loggedin = \"%s\" WHERE SessionID = \"%s\" " % ( UserID, lv_strftime, "1", SID)
+            result = execQuery(sql)
+            #output.write( sql )
+            output.write( "<br>" )
+            output.write(""" You have successfully logged in. <br> <br> \n 
+                            Proceed to <A href="alascan2.py?query=submit">Simulation Form</A>  or                               \n
+                                        <A href="alascan2.py?query=queue">Queue</A> . <br><br>                                   \n""")
+          else:
+            output.write(""" Wrong password. Please go <A href="alascan2.py?query=login">back</A> .                  \n""")   
     except IndexError:
       output.write( "<br>" )
       output.write(""" Username not found. Please go <A href="alascan2.py?query=login">back</A> .                  \n""")
     
 
   else: # print login form
-    sql = "SELECT loggedin FROM Sessions WHERE SessionID = \"%s\"" % SID
+    sql = "SELECT loggedin, UserID FROM Sessions WHERE SessionID = \"%s\"" % SID
     result = execQuery( sql )
     message = ""
     disable = ""
     if result[0][0] == 1:
-      message = """<font color="FF0000">You are already logged in.</font><br>""" 
+      message = """<font color="FF0000">You are already logged in.</font><br>"""
+      UserID = result[0][1] 
       disable = "disabled"
     output.write("""<H1 class="title">Login</H1> %s\n
                     <P>If you do not have an account, please <A href="/backrub/cgi-bin/rosettaweb.py?query=register">register</A> .</P>        \n
@@ -974,7 +985,11 @@ def submit(form, SID):
 def queue(form, SID):
   
   output = StringIO()
-
+  if not UserID or UserID not in [7, 84, 379, 380]:
+      output.write("""Server not publicly accessible.""")   
+      html = output.getvalue()
+      output.close()
+      return html
   sql = "SELECT ID, Status, UserID, Date, Notes, Errors, Host FROM ALAScanQueue ORDER BY ALAScanQueue.ID DESC"
   result1 = execQuery(sql)
   
