@@ -25,8 +25,10 @@ footer = '''
       </td>'''
 
 news_items = [
+	('November 2012',		'''Our biosensor project wins first prize in <a href="http://gen9bio.com/news/2012-11-14/">Gen9's inaugural G-Prize contest</a>'''),
 	('July 2012',			'''Daniel's work on engineering molecular machines is funded by a grant from the UCSF Program for Breakthrough Biomedical Research'''),
 	('July 2012',			'''Matt's paper on cost / benefit tradeoffs in the lac operon is highlighted by Faculty of 1000'''),
+	('June 2012',			'''Kyle is awarded an ARCS graduate student fellowship'''),
 	('December 2011',		'''Rich graduates'''),
 	('September, 2011', 	'''Ryan’s work on engineering light-controlled cadherins is funded by a grant from the NSF'''),
 	('August, 2011', 		'''A new project on quantifying systems-level protein interaction specificity is funded by the NIH, in collaboration with Nevan Krogan’s group'''),
@@ -34,7 +36,7 @@ news_items = [
 	('July, 2011', 			'''Noah’s abstract is selected for a talk at the “Structural Bioinformatics and Computational Biophysics” ISMB meeting in Vienna'''),
 	('June, 2011', 			'''Laurens is awarded an ARCS graduate student fellowship'''),
 	('June, 2011', 			'''Amelie is awarded an EMBO postdoctoral fellowship'''),
-	('March, 2011', 			'''Dan's work on engineering small molecule biosensors is funded by a grant from the NIH'''),
+	('March, 2011', 		'''Dan's work on engineering small molecule biosensors is funded by a grant from the NIH'''),
 	('February, 2011', 		'''Daniel is awarded a postdoctoral fellowship from the German Research Foundation'''),
 	('September, 2010', 	'''Colin's paper on specificity prediction is highlighted by Faculty of 1000'''),
 	('September, 2010',		'''Ryan receives the Mel Jones Excellence in Graduate Student Research Award'''),

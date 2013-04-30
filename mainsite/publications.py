@@ -109,7 +109,7 @@ publication_abbreviations = {
 	"Journal of Chemical Information and Modeling"		: "J Chem Inf Model",
 	"Journal of Computational Biology"					: "J Comp Biol",
 	"Journal of the American Chemical Society"			: "J Am Chem Soc",
-	#"Methods in Enzymology"								: "Meth Enzym",
+	# This is a book series? If so, don't abbreviate. "Methods in Enzymology"								: "Meth Enzym",
 	"Journal of Molecular Biology"						: "J Mol Biol",
 	"Metabolomics"										: "Metabolomics",
 	"Molecular & Cellular Proteomics"					: "Mol Cell Proteomics",
@@ -336,6 +336,8 @@ def parsePublist(saveRis = True):
 		if pub:
 			d = parsePub(pub)
 			if not d:
+				colortext.error("Failed parsing publication:")
+				raise Exception("\n%s" % pub)
 				break
 			
 			# Get the section title from the custom field and populate the ordered lists
@@ -488,7 +490,6 @@ Yellow potentially indicates a duplicate name, cyan potentially indicates a miss
 	
 	for sectiontitle in sectionTitles:
 		publist.append((sectiontitle, pubsBySection[sectiontitle]))
-		
 	return publist, author_publications
 
 # List of lab members with publications. This is used to generate personal publications pages.
@@ -520,6 +521,9 @@ labmembers = [
 	("Barlow, Kyle A.", None),
 	("Ó Conchúir, Shane", None),
 	("Varela, Rocco", None),
+	("Shi, Catherine A.", None),
+	("Chroust, Matthew K.", None),
+	("Bliska, Thomas E.", None),
 ]
 
 def getPublishedMembers():

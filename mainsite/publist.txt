@@ -2,6 +2,7 @@
 # group (group order is determined by the order in which a group's first citation appears in this file) and then by the order in which the citation appears in this
 # file. 
 # There are a few changes needed to make the parsing work:
+#    - TY MUST be the first field in a record for the parser.
 #    - Add a C8 field indicating the group for the website. This will be stripped from the public RIS file.
 #    - Add a C7 field indicating the URL for the Science free download service when applicable. This will be stripped from the public RIS file.
 #    - If the DOI is present in an entry, prefix it with "doi: " if not already so. This helps parse the doi which appears in different fields from different sources. 
@@ -12,6 +13,118 @@
 # Any text before the first ER line is ignored for parsing and stripped from the public RIS file.
 #
 # If the publication is a book chapter (CHAP), use the T2 field for a subtitle when applicable.
+ER  - 
+TY  - JOUR
+C8  - 2013 Publications
+T1  - Serverification of molecular modeling applications: the Rosetta Online Server that Includes Everyone (ROSIE) [preprint, in press]
+JO  - PLoS ONE
+PY  - 2013
+AU  - Lyskov, Sergey
+AU  - Chou, Fang-Chieh
+AU  - Ó Conchúir, Shane
+AU  - Der, Brian S.
+AU  - Drew, Kevin
+AU  - Kuroda, Daisuké
+AU  - Xu, Jianqing
+AU  - Weitzner, Brian D.
+AU  - Renfew, P. Douglas
+AU  - Sripakdeevong, Parin
+AU  - Borgo, Benjamin
+AU  - Havranek, Jim J.
+AU  - Kuhlman, Brian
+AU  - Kortemme, Tanja
+AU  - Bonneau, Richard
+AU  - Gray, Jeffrey J.
+AU  - Das, Rhiju.
+UR  - http://arxiv.org/abs/1302.0029
+ER  - 
+TY  - JOUR
+C8  - 2013 Publications
+T1  - Design of a Phosphorylatable PDZ Domain with Peptide-Specific Affinity Changes
+JO  - Structure
+VL  - 21
+IS  - 1
+SP  - 54
+EP  - 64
+PY  - 2013/1/8/
+T2  - 
+AU  - Smith, Colin A.
+AU  - Shi, Catherine A.
+AU  - Chroust, Matthew K.
+AU  - Bliska, Thomas E.
+AU  - Kelly, Mark J. S.
+AU  - Jacobson, Matthew P.
+AU  - Kortemme, Tanja
+SN  - 0969-2126
+DO  - http://dx.doi.org/10.1016/j.str.2012.10.007
+M3  - doi: 10.1016/j.str.2012.10.007
+UR  - http://www.sciencedirect.com/science/article/pii/S0969212612003814
+ER  - 
+TY  - CHAP
+C8  - 2013 Publications
+AU  - Ollikainen, Noah
+AU  - Smith, Colin A.
+AU  - Fraser, James S.
+AU  - Kortemme, Tanja
+T1  - Chapter Four - Flexible Backbone Sampling Methods to Model and Design Protein Alternative Conformations
+A2  - Amy E. Keating
+BT  - Methods in Enzymology
+PB  - Academic Press
+PY  - 2013///
+VL  - Volume 523
+SP  - 61
+EP  - 85
+T2  - Methods in Protein Design
+SN  - 0076-6879
+DO  - http://dx.doi.org/10.1016/B978-0-12-394292-0.00004-7
+M3  - doi: 10.1016/B978-0-12-394292-0.00004-7
+UR  - http://www.sciencedirect.com/science/article/pii/B9780123942920000047
+KW  - Protein design
+KW  - Protein dynamics
+KW  - Conformational heterogeneity
+KW  - Conformational sampling
+KW  - Alternative conformations
+KW  - Rosetta
+KW  - Ringer
+KW  - Backrub
+ER  - 
+TY  - CHAP
+C8  - 2013 Publications
+AU  - Leaver-Fay, Andrew
+AU  - O'Meara, Matthew J.
+AU  - Tyka, Mike
+AU  - Jacak, Ron
+AU  - Song, Yifan
+AU  - Kellogg, Elizabeth H.
+AU  - Thompson, James
+AU  - Davis, Ian W.
+AU  - Pache, Roland A.
+AU  - Lyskov, Sergey
+AU  - Gray, Jeffrey J.
+AU  - Kortemme, Tanja
+AU  - Richardson, Jane S.
+AU  - Havranek, James J.
+AU  - Snoeyink, Jack
+AU  - Baker, David
+AU  - Kuhlman, Brian
+T1  - Chapter Six - Scientific Benchmarks for Guiding Macromolecular Energy Function Improvement
+A2  - Amy E. Keating
+BT  - Methods in Enzymology
+PB  - Academic Press
+PY  - 2013///
+VL  - Volume 523
+SP  - 109
+EP  - 143
+T2  - Methods in Protein Design
+SN  - 0076-6879
+DO  - http://dx.doi.org/10.1016/B978-0-12-394292-0.00006-0
+M3  - doi: 10.1016/B978-0-12-394292-0.00006-0
+UR  - http://www.sciencedirect.com/science/article/pii/B9780123942920000060
+KW  - Rosetta
+KW  - Energy function
+KW  - Scientific benchmarking
+KW  - Parameter estimation
+KW  - Decoy discrimination
 ER  - 
 TY  - JOUR
 C8  - 2012 Publications
@@ -1823,23 +1936,22 @@ Y2  - 2013/02/11
 ER  - 
 TY  - CHAP
 C8  - LabMember
-AU  - Crone, D.E.
+AU  - Crone, Donna E.
 AU  - Huang, Yao-ming
-AU  - Pitman, D.J.
-AU  - Schenkelberg, C.
-AU  - Fraser, K.
-AU  - Macari, S.
+AU  - Pitman, Derek J.
+AU  - Schenkelberg, Christian
+AU  - Fraser, Keith
+AU  - Macari, Stephen
 AU  - Bystroff, Christopher
-AU  - Gronenborn, Angela M.
 A2  - Toonika Rinken
 T1  - GFP-based Biosensors
-T2  - State of the Art in Biosensors
-BT  - State of the Art in Biosensors
+BT  - State of the Art in Biosensors - General Aspects
 VL  - 1
 SP  - 669
 EP  - 675
-SN  - 980-953-307-669-5
-PY  - 2012
+SN  - 978-953-51-1004-0
+M3  - doi: 10.5772/52250
+PY  - 2013
 Y1  - 2013/01/01
 ER  -
 TY  - JOUR

@@ -334,7 +334,7 @@ p_bob = {
 peopleByGroup = [
 	('Principal Investigator', (p_tanja,)),
 	('Postdoctoral Scholars', (p_daniel, p_amelie, p_roland, p_ming, p_lin, )),
-	('Specialist', (p_cristina,)),
+	('Specialist', ()), #p_cristina,)),
 	('Graduate Students', (p_ryan, p_noah, p_laurens, p_kyle, p_kale)),
 	('Staff Research Associate', (p_debbie,)),
 	('Software Engineer', (p_shane,)),
@@ -343,8 +343,11 @@ peopleByGroup = [
 
 pastRotationStudents = [
 	#{"name" : 'Kyle Barlow', "course" : 'BMI', "rotation" : 'Winter 2012',},
+	{"name" : 'Rebecca Davidson', "course" : 'Biophysics', "rotation" : 'Winter 2013',},
+	{"name" : 'Amanda Loshbaugh', "course" : 'Biophysics', "rotation" : 'Winter 2013',},
 	{"name" : 'Russell Goodman', "course" : 'Biophysics', "rotation" : 'Winter 2012',},
 	{"name" : 'Lawrence Uricchio', "course" : 'Bioengineering', "rotation" : 'Winter 2012',},
+	{"name" : 'Leo Gendelev', "course" : 'Biophysics', "rotation" : 'Summer 2012',},
 	{"name" : 'Alec Nielsen', "course" : 'Biophysics', "rotation" : 'Winter 2011',},
 	{"name" : 'David Mavor', "course" : 'Biophysics', "rotation" : 'Summer 2011',},
 	{"name" : 'Joel Karpiak', "course" : 'CCB', "rotation" : 'Winter 2010',},
@@ -367,22 +370,24 @@ pastRotationStudents = [
 ]
 
 labAlumni = [
+	{"name" : 'Cristina Melero', "qualification" : "MSc", "period" : '2004-2012', "currentJob" : 'Scientist', "jobLocation" : 'Intrexon Inc.', "pub_name" : "Melero, Cristina",},
 	{"name" : 'Eyal Akiva', "qualification" : "PhD", "period" : '2010-2011', "currentJob" : 'Postdoc', "jobLocation" : 'UCSF', "pub_name" : "Akiva, Eyal"},
 	{"name" : 'Rich Oberdorf', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : '', "jobLocation" : 'Ab Initio Software Corporation', "pub_name" : "Oberdorf, Richard"},
 	{"name" : 'Colin Smith', "qualification" : "PhD", "period" : '2006-2011', "currentJob" : 'Postdoc', "jobLocation" : 'Max Planck Institute Goettingen, Germany', "pub_name" : "Smith, Colin A."},
 	{"name" : 'Dan Mandell', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Postdoc', "jobLocation" : 'Harvard University', "pub_name" : 'Mandell, Daniel J.',},
-	{"name" : 'Matt Eames', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Patent Scientist', "jobLocation" : 'Davis Wright Tremaine', "pub_name" : 'Eames, Matt',},
+	#{"name" : 'Matt Eames', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Patent Scientist', "jobLocation" : 'Davis Wright Tremaine', "pub_name" : 'Eames, Matt',},
+	{"name" : 'Matt Eames', "qualification" : "PhD", "period" : '2005-2011', "currentJob" : 'Postdoc', "jobLocation" : 'NYU', "pub_name" : 'Eames, Matt',},
 	{"name" : 'Sen Liu', "qualification" : "PhD", "period" : '2008-2010', "currentJob" : 'Associate Professor', "jobLocation" : 'Three Gorges University, China', "pub_name" : 'Liu, Sen',},
 	{"name" : 'Florian Lauck', "qualification" : "MSc", "period" : '2008-2010', "currentJob" : 'Specialist', "jobLocation" : 'UCSF', "pub_name" : 'Lauck, Florian',},
 	{"name" : 'Michael Michalik', "qualification" : None, "period" : '2009-2010', "currentJob" : 'Graduate Program', "jobLocation" : 'University of Bonn, Germany',},
-	{"name" : 'Thomas Bliska', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'Williams College',},
+	{"name" : 'Thomas Bliska', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'Williams College', "pub_name" : 'Bliska, Thomas E.'},
 	{"name" : 'Aaron Nichols', "qualification" : None, "period" : '2010', "currentJob" : 'Undergraduate', "jobLocation" : 'UC Riverside',},
 	{"name" : 'Elisabeth Humphris', "qualification" : "PhD", "period" : '2005-2009', "currentJob" : 'Postdoc', "jobLocation" : 'Yale', "pub_name" : ['Humphris-Narayanan, Elisabeth L.', 'Humphris, Elisabeth L.'],},
-	{"name" : 'Matt Chroust', "qualification" : None, "period" : '2009', "currentJob" : 'Dentistry Graduate Program', "jobLocation" : 'UCSF',},
+	{"name" : 'Matt Chroust', "qualification" : None, "period" : '2009', "currentJob" : 'Dentistry Graduate Program', "jobLocation" : 'UCSF', "pub_name" : 'Chroust, Matthew K.'},
 	{"name" : 'Mariana Babor', "qualification" : "PhD", "period" : '2006-2009', "currentJob" : '', "jobLocation" : 'University of Toronto', "pub_name" : 'Babor, Mariana',},
 	{"name" : 'Greg Kapp', "qualification" : "PhD", "period" : '2004-2009', "currentJob" : 'Scientist', "jobLocation" : 'Omniox Inc.', "pub_name" : 'Kapp, Gregory T.',},
 	{"name" : 'Greg Friedland', "qualification" : "PhD", "period" : '2004-2008', "currentJob" : 'Postdoc', "jobLocation" : 'Joint Bioenergy Institute & UC Berkeley', "pub_name" : 'Friedland, Gregory D.',},
-	{"name" : 'Catherine Shi', "qualification" : None, "period" : '2008', "currentJob" : 'iPQB graduate program', "jobLocation" : 'UCSF',},
+	{"name" : 'Catherine Shi', "qualification" : None, "period" : '2008', "currentJob" : 'iPQB graduate program', "jobLocation" : 'UCSF', "pub_name" : 'Shi, Catherine A.'},
 	{"name" : 'Anthony Linares ', "qualification" : None, "period" : '2006-2007', "currentJob" : 'MD/PhD program', "jobLocation" : 'UCLA', "pub_name" : 'Linares, Anthony J.',},
 	{"name" : 'David Lomelin ', "qualification" : None, "period" : '2004-2006', "currentJob" : 'BMI graduate program', "jobLocation" : 'UCSF',},
 	{"name" : 'Loren Baugh', "qualification" : "PhD", "period" : '2004-2005', "currentJob" : 'Postdoc', "jobLocation" : 'University of Washington Seattle',},
@@ -403,6 +408,8 @@ def getPeopleHTML():
 	for pgroup in peopleByGroup:
 		groupname = pgroup[0]
 		people = pgroup[1]
+		if not people:
+			continue 
 		html.append(ruledSectionHeader(groupname))
 		#'''
         #        <span class="u_group_header">%(groupname)s</span>
