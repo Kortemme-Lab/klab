@@ -123,7 +123,7 @@ try:
 					
 					master_plate = 'plate10089' # may want to rethink whether we want this hardcoded in the future
 					
-					assembly_details = design_object.getSummaryInformationForAssembly([DNAPlates[0]])
+					assembly_details = design_object.getSummaryInformationForAssembly(master_plate)
 					if len(assembly_details) != 2:
 						assert(len(assembly_details) == 1)
 						errors.append("Can not assemble design %d. Information available for %s only." % (ManualDesignID, ", ".join([dca['DNAChain.CloningType'] for dca in assembly_details])))
@@ -136,51 +136,50 @@ try:
 					
 					translated_sequences = []
 					translations = {}
-					construct_map = design_object.getDNAConstructsFilteredByDNAPlate(["plate10089"])
-					F.write("\n*** construct_map ***\n")
-					F.write(str(construct_map))
-					F.write("\n*** /construct_map ***\n")
+					constructs = design_object.getDNAConstructsFilteredByDNAPlate(master_plate)
+					F.write("\n*** constructs ***\n")
+					F.write(str(constructs))
+					F.write("\n*** /constructs ***\n")
 					
-					for k, constructs in construct_map.iteritems():
-						for construct in constructs:
-							#html += construct.toHTML()
-							#html += "<br>"
+					for construct in constructs:
+						#html += construct.toHTML()
+						#html += "<br>"
+						
+						for DNAChain in design_object.DNAChains:
 							
-							for DNAChain in design_object.DNAChains:
+							chainIndex = construct.getChainIndex(DNAChain)
+							if chainIndex != None:
+								assert(translations.get(DNAChain.CloningType, None) == None)
+								translation = construct.translate(chainIndex + 1)
+								translations[DNAChain.CloningType] = translation
 								
-								chainIndex = construct.getChainIndex(DNAChain)
-								if chainIndex != None:
-									assert(translations.get(DNAChain.CloningType, None) == None)
-									translation = construct.translate(chainIndex + 1)
-									translations[DNAChain.CloningType] = translation
-									
-									design_object.FullComplexChains
-									
-									for chain_id, chain_details in design_object.Chains.iteritems():
-										if len(chain_details['Sequence']) > 30 and translation.find(chain_details['Sequence'][7:-7]) != -1:
-											assert(DNAChain.CloningType not in DNAChain_to_ProteinChain)
-											assert(DNAChain.CloningType not in DNAChain_to_WildTypeChain)
-											assert(DNAChain.CloningType not in DNAChain_to_Construct)
-											
-											DNAChain_to_ProteinChain[DNAChain.CloningType] = chain_id
-											DNAChain_to_WildTypeChain[DNAChain.CloningType] = chain_details['WildTypeChain']
-											DNAChain_to_Construct[DNAChain.CloningType] = construct
-										elif len(chain_details['Sequence']) > 15 and translation.find(chain_details['Sequence'][2:-2]) != -1:
-											assert(DNAChain.CloningType not in DNAChain_to_ProteinChain)
-											assert(DNAChain.CloningType not in DNAChain_to_WildTypeChain)
-											assert(DNAChain.CloningType not in DNAChain_to_Construct)
-											
-											DNAChain_to_ProteinChain[DNAChain.CloningType] = chain_id
-											DNAChain_to_WildTypeChain[DNAChain.CloningType] = chain_details['WildTypeChain']
-											DNAChain_to_Construct[DNAChain.CloningType] = construct
-										elif len(chain_details['Sequence']) > 15 and translation.find(chain_details['Sequence'][2:8]) != -1 and translation.find(chain_details['Sequence'][-8:-2]) != -1:
-											assert(DNAChain.CloningType not in DNAChain_to_ProteinChain)
-											assert(DNAChain.CloningType not in DNAChain_to_WildTypeChain)
-											assert(DNAChain.CloningType not in DNAChain_to_Construct)
-											
-											DNAChain_to_ProteinChain[DNAChain.CloningType] = chain_id
-											DNAChain_to_WildTypeChain[DNAChain.CloningType] = chain_details['WildTypeChain']
-											DNAChain_to_Construct[DNAChain.CloningType] = construct
+								design_object.FullComplexChains
+								
+								for chain_id, chain_details in design_object.Chains.iteritems():
+									if len(chain_details['Sequence']) > 30 and translation.find(chain_details['Sequence'][7:-7]) != -1:
+										assert(DNAChain.CloningType not in DNAChain_to_ProteinChain)
+										assert(DNAChain.CloningType not in DNAChain_to_WildTypeChain)
+										assert(DNAChain.CloningType not in DNAChain_to_Construct)
+										
+										DNAChain_to_ProteinChain[DNAChain.CloningType] = chain_id
+										DNAChain_to_WildTypeChain[DNAChain.CloningType] = chain_details['WildTypeChain']
+										DNAChain_to_Construct[DNAChain.CloningType] = construct
+									elif len(chain_details['Sequence']) > 15 and translation.find(chain_details['Sequence'][2:-2]) != -1:
+										assert(DNAChain.CloningType not in DNAChain_to_ProteinChain)
+										assert(DNAChain.CloningType not in DNAChain_to_WildTypeChain)
+										assert(DNAChain.CloningType not in DNAChain_to_Construct)
+										
+										DNAChain_to_ProteinChain[DNAChain.CloningType] = chain_id
+										DNAChain_to_WildTypeChain[DNAChain.CloningType] = chain_details['WildTypeChain']
+										DNAChain_to_Construct[DNAChain.CloningType] = construct
+									elif len(chain_details['Sequence']) > 15 and translation.find(chain_details['Sequence'][2:8]) != -1 and translation.find(chain_details['Sequence'][-8:-2]) != -1:
+										assert(DNAChain.CloningType not in DNAChain_to_ProteinChain)
+										assert(DNAChain.CloningType not in DNAChain_to_WildTypeChain)
+										assert(DNAChain.CloningType not in DNAChain_to_Construct)
+										
+										DNAChain_to_ProteinChain[DNAChain.CloningType] = chain_id
+										DNAChain_to_WildTypeChain[DNAChain.CloningType] = chain_details['WildTypeChain']
+										DNAChain_to_Construct[DNAChain.CloningType] = construct
 					
 					for chain_id, chain_details in design_object.Chains.iteritems():
 						DNAChain_to_ProteinChain[DNAChain.CloningType] = DNAChain_to_ProteinChain.get(DNAChain.CloningType, None)
@@ -208,7 +207,7 @@ try:
 					
 					#html.append(design_object.)
 					chain_html = {}
-					for chain_info in design_object.getSummaryInformationForAssembly([master_plate]):
+					for chain_info in design_object.getSummaryInformationForAssembly(master_plate):
 						sub_html = []
 						cloning_type = chain_info['DNAChain'].CloningType
 						assert(cloning_type == 'Chain1' or cloning_type == 'Chain2')
@@ -237,9 +236,10 @@ try:
 						substr = []
 						if construct:
 							bpcount = construct.getBasePairCount()
+							chainIDs = construct.getChainIDs()
 							for bp_chain_name, chain_bpcount in sorted(bpcount.iteritems()):
 								if bp_chain_name != 'Total':
-									substr.append("%d in %s" % (chain_bpcount, bp_chain_name))
+									substr.append("%d in %s (ID #%d)" % (chain_bpcount, bp_chain_name, chainIDs[bp_chain_name]))
 							sub_html.append("<div><b>DNA construct #%d, #base pairs = %d total: %s</b></div>" % (construct.ID, bpcount['Total'], ", ".join(substr)))
 						else:
 							sub_html.append("<div><b>DNA construct</b></div>")

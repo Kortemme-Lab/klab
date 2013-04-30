@@ -86,9 +86,7 @@ def generateChildPlatePage(form):
 	
 		plate_id = 'Child%d' % PlateChain 
 		
-		html.append("""<div id="dialog" title="Basic dialog">
-  <p>This is the default dialog which is useful for displaying information. The dialog window can be moved, resized and closed with the 'x' icon.</p>
-</div>""")
+		html.append("""<div id="dialog" title=""></div>""")
 		html.append("<div class='gen9well_container_title'>Child plate %d (Chain%d)</div>" % (PlateChain, PlateChain))
 		html.append("<div class='gen9well_container_header'>")
 		html.append("<div class='gen9well_container_row'>")
