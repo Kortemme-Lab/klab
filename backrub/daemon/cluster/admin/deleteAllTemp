@@ -1,7 +1,8 @@
 #!/bin/sh
-. /ccpr1/sge6/qb3/common/settings.sh
+. /usr/local/sge/qb3cell/common/settings.sh
 cd /netapp/home/klabqb3backrub
-rm -rf -- /netapp/home/klabqb3backrub/temp/
+#rm -rf -- /netapp/home/klabqb3backrub/temp/
+rm -rf /netapp/home/klabqb3backrub/temp/
 mkdir /netapp/home/klabqb3backrub/temp
 chmod 755 /netapp/home/klabqb3backrub/temp
 rm -rf /netapp/home/klabqb3backrub/benchmarks/KIC/temp/tmp*
