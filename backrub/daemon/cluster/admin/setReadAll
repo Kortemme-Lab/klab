@@ -1,5 +1,0 @@
-#!/bin/sh
-. /ccpr1/sge6/qb3/common/settings.sh
-cd /netapp/home/klabqb3backrub
-chmod a+rx ../klabqb3backrub
-

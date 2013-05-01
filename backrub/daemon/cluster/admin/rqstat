@@ -1,8 +1,0 @@
-#!/bin/sh
-#. /ccpr1/sge6/qb3/common/settings.sh
-. /usr/local/sge/qb3cell/common/settings.sh
-qstat -u "*"
-qstat -j 8000002
-
-#klabqb3backrub"
-

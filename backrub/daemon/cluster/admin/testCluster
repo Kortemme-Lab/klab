@@ -1,6 +1,0 @@
-#!/bin/sh
-. /ccpr1/sge6/qb3/common/settings.sh
-#mv /netapp/home/klabqb3backrub/r48255/rosetta_database /netapp/home/klabqb3backrub/r48255/rosetta_database.old
-#cp -R /var/binarybuilder/r45000-r49999/rosetta_database/ /netapp/home/klabqb3backrub/r48255/
-mv /netapp/home/klabqb3backrub/r48255/loopmodel_r48255_static /netapp/home/klabqb3backrub/r48255/loopmodel_r48255_static.static
-cp /netapp/home/shaneoconner/scratch/r48255/rosetta_source/bin/loopmodel.linuxgccrelease /netapp/home/klabqb3backrub/r48255/loopmodel_r48255_static
