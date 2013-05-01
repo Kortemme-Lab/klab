@@ -172,7 +172,18 @@ protocolGroups = []
 protocols = []
 
 def ws():
-	start_time = time.time()
+	if False:
+		# Domain-level blocking. In this case, to stop an idiot from spamming our server
+		if hostname.find('rau.am') != -1:
+			sys.stdout.write("Content-type: text/html\n\n")
+			return
+		elif hostname.find('ucom.am') != -1:
+			sys.stdout.write("Content-type: text/html\n\n")
+			return
+		elif hostname.endswith('.am'):
+			sys.stdout.write("Content-type: text/html\n\n")
+			return
+		
 	s = sys.stdout
 	if not(settings["LiveWebserver"]):
 		sys.stderr = s
@@ -2309,7 +2320,7 @@ class FrontendProtocols(WebserverProtocols):
 		rosettaHTML.protocolGroups = protocolGroups
 		rosettaDD.protocols = protocols
 		rosettaHTML.protocols = protocols
-		
+
 
 try:
 	# Change True to False here to display the maintenance page

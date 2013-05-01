@@ -356,7 +356,7 @@ class SequenceToleranceSKTask(ClusterTask):
 			'# Run sequence tolerance', '', 
 			join(seqtolCommand, " ")]		
 		
-		self.script = ct.createScript(backrubCommand + seqtolCommand, type="SequenceTolerance")
+		self.script = ct.createScript(['echo ""', 'date', 'echo ""'] + backrubCommand + ['echo ""', 'date', 'echo ""'] + seqtolCommand, type="SequenceTolerance")
 		
 	def _prepare_backrub( self ):
 		"""prepare data for a full backbone backrub run"""
@@ -1347,7 +1347,7 @@ class SequenceToleranceSKJob(RosettaClusterJob):
 		
 		# Create the standard output file where the R script expects it
 		firststdout = None
-		firstlowfile = None
+		originalpdb = None
 		for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance", "*.cmd.o*.1")):
 			firststdout = file
 			break
@@ -1355,11 +1355,11 @@ class SequenceToleranceSKJob(RosettaClusterJob):
 			originalpdb = file
 			break
 		if firststdout and originalpdb:
-			self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+			self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
 			shutil.copy(firststdout, self._targetdir_file_path("seqtol_1_stdout.txt"))
 			shutil.copy(originalpdb, self.targetdirectory)
 		else:
-			self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+			self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
 							
 		# Run the R script and pipe stderr and stdout to file 
 		cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
@@ -1385,7 +1385,7 @@ class SequenceToleranceSKJob(RosettaClusterJob):
 		Fpwm = open(self._targetdir_file_path("tolerance_pwm.txt"))
 		annotations = Fpwm.readline().split()
 		if len(set(annotations).difference(set(getResIDs(self.parameters)))) != 0:
-			self._status("Warning: There is a difference in the set of designed residues from the pwm (%s) and from getResIDs (%s)." % (str(getResIDs(self.parameters)), str(annotations)))
+			self._status("Warning: There is a difference in the set of designed residues from getResIDs (%s) and from the pwm (%s)." % (str(getResIDs(self.parameters)), str(annotations)))
 		Fpwm.close()
 		success = True
 		try:
@@ -1621,7 +1621,7 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
 			
 			# Create the standard output file where the R script expects it
 			firststdout = None
-			firstlowfile = None
+			originalpdb = None
 			for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*.cmd.o*.1")):
 				firststdout = file
 				break
@@ -1630,11 +1630,11 @@ class SequenceToleranceSKMultiJob(SequenceToleranceSKJob):
 				shutil.copy(originalpdb, self.targetdirectory)
 				break
 			if firststdout and originalpdb:
-				self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+				self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
 				shutil.copy(firststdout, self._taskresultsdir_file_path("sequence_tolerance%d" % i, "seqtol_1_stdout.txt"))
 				shutil.copy(originalpdb, targettaskdir)
 			else:
-				self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+				self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
 				
 			
 			cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\
@@ -1897,7 +1897,7 @@ class SequenceToleranceSKMultiJobFixBB(SequenceToleranceSKMultiJob):
 			
 			# Create the standard output file where the R script expects it
 			firststdout = None
-			firstlowfile = None
+			originalpdb = None
 			for file in glob.glob(self._taskresultsdir_file_path("sequence_tolerance%d" % i, "*.cmd.o*.1")):
 				firststdout = file
 				break
@@ -1906,11 +1906,11 @@ class SequenceToleranceSKMultiJobFixBB(SequenceToleranceSKMultiJob):
 				shutil.copy(originalpdb, self.targetdirectory)
 				break
 			if firststdout and originalpdb:
-				self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+				self._status("Copying stdout and original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
 				shutil.copy(firststdout, self._taskresultsdir_file_path("sequence_tolerance%d" % i, "seqtol_1_stdout.txt"))
 				shutil.copy(originalpdb, targettaskdir)
 			else:
-				self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, firstlowfile))
+				self._status("Could not find stdout or original PDB for R script boxplot names: (%s, %s)" % (firststdout, originalpdb))
 				
 			
 			cmd = '''/bin/echo "process_seqtol(\'%s\', %s, %s, %s, %s, %s);\" \\

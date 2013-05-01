@@ -42,6 +42,7 @@ class Rosetta_RDC:
         self.filename_stderr = "stderr_%s.dat" % str(self.ID)
         self.exit         = None # used to store the 'modus of exit' by is_done()
         self.errorcode    = None
+        self.task         = None
 
     
     def make_workingdir(self):

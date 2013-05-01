@@ -159,7 +159,10 @@ The Kortemme Lab Server Daemon
 			# check if a simulation is finished
 			
 			completedJobs = []
+			numEnsembleDesignTasks = 0
 			for rosetta_object in self.list_RosettaPP:
+				if rosetta_object.task == 'ensemble':
+					numEnsembleDesignTasks += 1
 				ID = rosetta_object.get_ID()
 				pid = rosetta_object.get_pid()
 				error = ""
@@ -208,9 +211,15 @@ The Kortemme Lab Server Daemon
 						continue
 					
 					for i in range(0,len(data)):
+						# Only allow one ensemble design job at once
+						if data[i][3] == 'ensemble' and numEnsembleDesignTasks > 0:
+							continue
+
 						#start the job, change status and write starttime to DB
 						ID = data[i][0]
 						pid = self.start_job(ID, data[i][4],data[i][5],data[i][6],data[i][7],data[i][3],data[i][8])
+						if data[i][3] == 'ensemble' and numEnsembleDesignTasks > 0:
+							numEnsembleDesignTasks += 1
 						if pid:
 							self.runSQL("UPDATE %s SET Status=1, StartDate=NOW(), pid=%s WHERE ID=%s" % ( self.db_table, pid, ID ))
 							break
@@ -783,6 +792,7 @@ The Kortemme Lab Server Daemon
 		executable = os.path.join(self.binDir, binary["backrub"])
 		databaseDir = os.path.join(self.dataDir, binary["database"])
 		object_rosetta = rosettaplusplus.RosettaPlusPlus( ID, executable, databaseDir, self.rosetta_tmp, mini = usingMini)
+		object_rosetta.task = params['task']
 		
 		# store Rosetta object to list; this is not a copy since Python uses references
 		self.list_RosettaPP.append(object_rosetta)
@@ -1028,6 +1038,7 @@ The Kortemme Lab Server Daemon
 		ENS_obj = rosetta_rdc.Rosetta_RDC( ID=ID, tempdir = self.rosetta_ens_tmp )
 		ENS_obj.make_workingdir()
 		ENS_obj.set_pdb(pdb_filename, pdb_info)
+		ENS_obj.task = params['task']
 		
 		# Parameters
 		ENS_segment_length = params["SegmentLength"]
@@ -1258,6 +1269,8 @@ class ClusterDaemon(RosettaDaemon):
 						if newclusterjob:
 							#change status and write start time to DB
 							self.runningJobs.append(newclusterjob)
+							self.log("Updating Status to 1")
+							self.log("UPDATE %s SET Status=1, StartDate=NOW() WHERE ID=%s" % ( self.db_table, jobID ))
 							self.runSQL("UPDATE %s SET Status=1, StartDate=NOW() WHERE ID=%s" % ( self.db_table, jobID ))
 															
 						if len(self.runningJobs) >= self.MaxClusterJobs:

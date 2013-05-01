@@ -271,7 +271,7 @@ class WebserverProtocols(object):
         
         proto = RosettaProtocol("Generalized Protocol<br>(Fold / Interface)<br>Sequence Tolerance", "sequence_tolerance_SK")
         proto.setBinaries("seqtolJMB", "seqtolP1") 
-        proto.setNumStructures(10,20,100)
+        proto.setNumStructures(20,50,150)
         protocolGroups[2].add(proto)
         
         # Private protocols for the lab go here
