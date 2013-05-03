@@ -284,10 +284,11 @@ class DatabaseInterface(object):
 		raise MySQLdb.OperationalError(caughte)
 	
 class ReusableDatabaseInterface(DatabaseInterface):
-	def __init__(self, settings, isInnoDB = True, numTries = 1, host = None, db = None, user = None, passwd = None, port = None, unix_socket = None, passwdfile = None):
+	def __init__(self, settings, isInnoDB = True, numTries = 1, host = None, db = None, user = None, passwd = None, port = None, unix_socket = None, passwdfile = None, use_utf = False):
 		#super(ReusableDatabaseInterface, self).__init__(settings = settings, isInnoDB = isInnoDB, numTries = numTries, host = host, db = db, user = user, passwd = passwd, port = port, unix_socket = unix_socket, passwdfile = passwdfile)
 		
 		self.connection = None
+		self.use_utf = use_utf 
 		self.isInnoDB = isInnoDB
 		self.host = host or settings["SQLHost"]
 		self.db = db or settings["SQLDatabase"]
@@ -336,8 +337,11 @@ class ReusableDatabaseInterface(DatabaseInterface):
 	
 	def _get_connection(self):
 		if not(self.connection and self.connection.open):
-			self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = DictCursor)
-	
+			if self.use_utf:
+				self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = DictCursor, charset='utf8', use_unicode=True)
+			else:
+				self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = DictCursor)
+
 	def locked_execute(self, sql, parameters = None, cursorClass = DictCursor, quiet = False):
 		'''We are lock-happy here but SQL performance is not currently an issue daemon-side.''' 
 		return self.execute(sql, parameters = parameters, quiet = quiet, locked = True, do_commit = True)
