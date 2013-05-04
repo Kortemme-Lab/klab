@@ -26,24 +26,6 @@ from string import join
 DictCursor = MySQLdb.cursors.DictCursor
 StdCursor = MySQLdb.cursors.Cursor
 
-def _lowercaseToStr(x):
-	return str.lower(str(x))   
-	
-def _getSortedString(o):
-	"""
-	Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
-	"""
-	# todo: replace this with something like pprint on Python upgrade 
-	# We assume here that any container type is either list or tuple which may not always hold 
-	if isinstance(o, (dict)):
-		pkeys = sorted(o.keys(), key=_lowercaseToStr)
-		l = []
-		for k in pkeys:
-			l.append(str(k) + ":" + _getSortedString(o[k]))
-		return "{" + join(l, ",") + "}"	
-	else:
-		return str(o)
-
 import getpass
 import rosettahelper
 
@@ -507,6 +489,30 @@ class ReusableDatabaseInterface(DatabaseInterface):
 		raise MySQLdb.OperationalError(caughte)
 	
 	
+
+
+
+####
+#Website classes and functions
+####
+
+def _lowercaseToStr(x):
+	return str.lower(str(x))
+
+def _getSortedString(o):
+	"""
+	Returns a string describing o, sorting the contents (case-insensitive on keys) if o is a dict.
+	"""
+	# todo: replace this with something like pprint on Python upgrade
+	# We assume here that any container type is either list or tuple which may not always hold
+	if isinstance(o, (dict)):
+		pkeys = sorted(o.keys(), key=_lowercaseToStr)
+		l = []
+		for k in pkeys:
+			l.append(str(k) + ":" + _getSortedString(o[k]))
+		return "{" + join(l, ",") + "}"
+	else:
+		return str(o)
 
 class RosettaDB:
 	
