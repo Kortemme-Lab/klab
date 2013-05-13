@@ -16,6 +16,8 @@ import getpass
 import time
 import pwd
 import sys
+import tarfile
+import shutil
 
 # Constants
 report_interval=1.0
@@ -30,10 +32,10 @@ class Reporter:
         print 'Starting '+task
     def report(self,a,b=0):
         t=time.time()
+        self.a=a
+        self.b=b
         if self.lastreport<(t-report_interval):
             self.lastreport=t
-            self.a=a
-            self.b=b
             self.output_report()
     def output_report(self):
         if self.b==0:
@@ -99,6 +101,48 @@ def delete_files(files):
         r.report(c)
     r.done()
 
+def tar_files(tar_file,input_dir,files):
+    # Ensure correct file extension
+    if (not tar_file.endswith('.tgz')) and (not tar_file.endswith('.gz')):
+        if tar_file.endswith('.tar'):
+            tar_file+='.gz'
+        else:
+            tar_file+='.tar.gz'
+
+    r = Reporter('taring and zipping files')
+    c=0
+
+    with tarfile.open(tar_file,'w:gz') as tar:
+        for f in files:
+            relpath=os.path.relpath(f,input_dir)
+            tar.add(f,arcname=relpath)
+            c+=1
+            r.report(c)
+
+    r.done()
+
+def move_files(move_dir,input_dir,files,copy=False):
+    if copy:
+        r = Reporter('copying files')
+    else:
+        r = Reporter('moving files')
+    c=0
+
+    for f in files:
+        relpath=os.path.relpath(f,input_dir)
+        new_dir=os.path.join(move_dir,os.path.dirname(relpath))
+        new_file=os.path.join(new_dir,os.path.basename(f))
+        if not os.path.isdir(new_dir):
+            os.makedirs(new_dir)
+        if copy:
+            shutil.copy(f,new_file)
+        else:
+            shutil.move(f,new_file)
+        c+=1
+        r.report(c)
+
+    r.done()
+
 def main():
     parser = optparse.OptionParser(description=program_description,
                                    version=script_version,
@@ -112,7 +156,7 @@ def main():
                       help="Delete files after other tasks complete")
     parser.add_option('-m','--move_dir',
                       default=None,
-                      help="Specify root directory to move files to")
+                      help="Specify root directory to copy files to. Will perform a move instead of a copy if --delete is also enabled.")
     parser.add_option('-t','--tar_file',
                       default=None,
                       help="Specify new tar.gz file to save files in")
@@ -145,8 +189,24 @@ def main():
 
     files=find_files(input_dir,user)
 
-    if args.delete and delete_files_prompt(len(files)):
-        delete_files(files)
+    if args.tar_file!=None:
+        tar_files(args.tar_file,input_dir,files)
+
+    if args.move_dir!=None:
+        if args.delete:
+            move_files(args.move_dir,input_dir,files,copy=False)
+        else:
+            move_files(args.move_dir,input_dir,files,copy=True)
+
+    # Delete files if they haven't already been moved
+    if args.delete and args.move_dir==None:
+        # Ask for confirmation if files haven't been tared
+        if args.tar_file==None:
+            if delete_files_prompt(len(files)):
+                delete_files(files)
+        else:
+            # Files have already been tared, ok to delete without confirmation
+            delete_files(files)
 
 if __name__ == "__main__":
     main()
