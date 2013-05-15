@@ -95,11 +95,16 @@ def find_files(input_dir,user):
 def delete_files(files):
     r = Reporter('deleting files')
     c=0
+    failures=0
     for f in files:
-        os.remove(f)
+        try:
+            os.remove(f)
+        except Exception:
+            failures+=1
         c+=1
         r.report(c)
     r.done()
+    print '%d deletion failures\n'%(failures)
 
 def tar_files(tar_file,input_dir,files):
     # Ensure correct file extension
@@ -112,13 +117,14 @@ def tar_files(tar_file,input_dir,files):
     r = Reporter('taring and zipping files')
     c=0
 
-    with tarfile.open(tar_file,'w:gz') as tar:
-        for f in files:
-            relpath=os.path.relpath(f,input_dir)
-            tar.add(f,arcname=relpath)
-            c+=1
-            r.report(c)
+    tar=tarfile.open(tar_file,'w:gz')
+    for f in files:
+        relpath=os.path.relpath(f,input_dir)
+        tar.add(f,arcname=relpath)
+        c+=1
+        r.report(c)
 
+    tar.close()
     r.done()
 
 def move_files(move_dir,input_dir,files,copy=False):
@@ -142,6 +148,9 @@ def move_files(move_dir,input_dir,files,copy=False):
         r.report(c)
 
     r.done()
+
+def own_files():
+    pass
 
 def main():
     parser = optparse.OptionParser(description=program_description,
