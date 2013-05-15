@@ -17,9 +17,12 @@ DictCursor = MySQLdb.cursors.DictCursor
 StdCursor = MySQLdb.cursors.Cursor
 
 class DatabaseInterface(object):
+
     def __init__(self, settings, isInnoDB=True, numTries=1, host=None, db=None, user=None, passwd=None, port=None,
                  unix_socket=None, passwdfile=None, use_utf=False):
         self.connection = None
+        self.queries_run = 0
+        self.procedures_run = 0
         self.use_utf = use_utf
         self.isInnoDB = isInnoDB
         self.host = host or settings["SQLHost"]
@@ -109,6 +112,7 @@ class DatabaseInterface(object):
 
     def execute_StdCursor(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
         """Execute SQL query. This uses DictCursor by default."""
+        self.queries_run += 1
         i = 0
         errcode = 0
         caughte = None
@@ -170,6 +174,7 @@ class DatabaseInterface(object):
 
     def execute(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
         """Execute SQL query. This uses DictCursor by default."""
+        self.queries_run += 1
         i = 0
         errcode = 0
         caughte = None
@@ -231,6 +236,7 @@ class DatabaseInterface(object):
 
     def callproc(self, procname, parameters=(), quiet=False):
         """Calls a MySQL stored procedure procname. This uses DictCursor by default."""
+        self.procedures_run += 1
         i = 0
         errcode = 0
         caughte = None
@@ -270,6 +276,7 @@ class DatabaseInterface(object):
     def insertDict(self, tblname, d, fields=None):
         '''Simple function for inserting a dictionary whose keys match the fieldnames of tblname.'''
 
+        self.queries_run += 1
         if fields == None:
             fields = sorted(d.keys())
         values = None
@@ -293,6 +300,7 @@ class DatabaseInterface(object):
             (False, the dictionary of existing primary keys) is returned. Otherwise, the record is inserted into the database and (True, d)
             is returned.'''
 
+        self.queries_run += 1
         if type(PKfields) == type(""):
             PKfields = [PKfields]
 
