@@ -10,7 +10,6 @@ import UserDict
 import spatialhash
 import chainsequence
 import math
-from Bio.PDB import PDBParser
         
 #todo: replace with ROSETTAWEB_SK_AA
 aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
@@ -694,7 +693,8 @@ class PDB:
            Unoccupied ATOM lines are discarded.
            This function also builds maps from PDB numbering to Rosetta numbering and vice versa.
            '''
-        resmap = {}
+	from Bio.PDB import PDBParser
+	resmap = {}
         iresmap = {}
         newlines = []
         residx = 0
