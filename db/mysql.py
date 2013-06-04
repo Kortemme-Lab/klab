@@ -17,9 +17,13 @@ DictCursor = MySQLdb.cursors.DictCursor
 StdCursor = MySQLdb.cursors.Cursor
 
 class DatabaseInterface(object):
+
     def __init__(self, settings, isInnoDB=True, numTries=1, host=None, db=None, user=None, passwd=None, port=None,
                  unix_socket=None, passwdfile=None, use_utf=False):
         self.connection = None
+        self.StdCursor_connection = None
+        self.queries_run = 0
+        self.procedures_run = 0
         self.use_utf = use_utf
         self.isInnoDB = isInnoDB
         self.host = host or settings["SQLHost"]
@@ -63,15 +67,19 @@ class DatabaseInterface(object):
     def __del__(self):
         if self.connection and self.connection.open:
             self.connection.close()
+        if self.StdCursor_connection and self.StdCursor_connection.open:
+            self.StdCursor_connection.close()
 
 
     def close(self):
         if self.connection and self.connection.open:
             self.connection.close()
+        if self.StdCursor_connection and self.StdCursor_connection.open:
+            self.StdCursor_connection.close()
 
 
     def checkIsClosed(self):
-        assert (not (self.connection) or not (self.connection.open))
+        assert ((not (self.connection) or not (self.connection.open)) and (not (self.StdCursor_connection) or not (self.StdCursor_connection.open)))
 
 
     def _get_connection(self):
@@ -84,10 +92,18 @@ class DatabaseInterface(object):
                 self.connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
                                                   port=self.port, unix_socket=self.unix_socket, cursorclass=DictCursor)
 
+    def _get_StdCursor_connection(self):
+        if not (self.StdCursor_connection and self.StdCursor_connection.open):
+            if self.use_utf:
+                self.StdCursor_connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
+                                                  port=self.port, unix_socket=self.unix_socket, cursorclass=StdCursor,
+                                                  charset='utf8', use_unicode=True)
+            else:
+                self.StdCursor_connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
+                                                  port=self.port, unix_socket=self.unix_socket, cursorclass=StdCursor)
 
     def _close_connection(self):
-        if self.connection and self.connection.open:
-            self.connection.close()
+        self.close()
 
 
     def getLastRowID(self):
@@ -109,6 +125,7 @@ class DatabaseInterface(object):
 
     def execute_StdCursor(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
         """Execute SQL query. This uses DictCursor by default."""
+        self.queries_run += 1
         i = 0
         errcode = 0
         caughte = None
@@ -120,10 +137,8 @@ class DatabaseInterface(object):
         while i < self.numTries:
             i += 1
             try:
-                self._get_connection()
-                #if not self.connection:
-                #	self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = cursorClass)
-                cursor = self.connection.cursor()
+                self._get_StdCursor_connection()
+                cursor = self.StdCursor_connection.cursor()
                 if locked:
                     cursor.execute(self.lockstring)
                     self.locked = True
@@ -133,7 +148,7 @@ class DatabaseInterface(object):
                     errcode = cursor.execute(sql)
                 self.lastrowid = int(cursor.lastrowid)
                 if do_commit and self.isInnoDB:
-                    self.connection.commit()
+                    self.StdCursor_connection.commit()
                 results = cursor.fetchall()
                 if locked:
                     cursor.execute(self.unlockstring)
@@ -170,6 +185,9 @@ class DatabaseInterface(object):
 
     def execute(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
         """Execute SQL query. This uses DictCursor by default."""
+        if do_commit:
+            pass#print('s')
+            self.queries_run += 1
         i = 0
         errcode = 0
         caughte = None
@@ -182,8 +200,6 @@ class DatabaseInterface(object):
             i += 1
             try:
                 self._get_connection()
-                #if not self.connection:
-                #	self.connection = MySQLdb.connect(host = self.host, db = self.db, user = self.user, passwd = self.passwd, port = self.port, unix_socket = self.unix_socket, cursorclass = cursorClass)
                 cursor = self.connection.cursor()
                 if locked:
                     cursor.execute(self.lockstring)
@@ -231,6 +247,7 @@ class DatabaseInterface(object):
 
     def callproc(self, procname, parameters=(), quiet=False):
         """Calls a MySQL stored procedure procname. This uses DictCursor by default."""
+        self.procedures_run += 1
         i = 0
         errcode = 0
         caughte = None
@@ -270,6 +287,7 @@ class DatabaseInterface(object):
     def insertDict(self, tblname, d, fields=None):
         '''Simple function for inserting a dictionary whose keys match the fieldnames of tblname.'''
 
+        self.queries_run += 1
         if fields == None:
             fields = sorted(d.keys())
         values = None
@@ -293,6 +311,7 @@ class DatabaseInterface(object):
             (False, the dictionary of existing primary keys) is returned. Otherwise, the record is inserted into the database and (True, d)
             is returned.'''
 
+        self.queries_run += 1
         if type(PKfields) == type(""):
             PKfields = [PKfields]
 
