@@ -1,6 +1,16 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+rcsb.py
+For functions relating to getting data from the RCSB.
+This is a pretty haphazard collection of functions that could do with some APIing up.
+
+Created by Shane O'Connor 2011/2012
+"""
+
 from string import join
 from httplib import HTTPConnection
-import colortext
+from tools import colortext
 
 visible_colors = [
 	'lightblue'		,
@@ -18,8 +28,9 @@ visible_colors = [
 	'silver'		,
 	]
 
-def getPDB(pdbID):
-	colortext.printf("Retrieving PDB file", color = "aqua")
+def getPDB(pdbID, silent = True):
+	if not silent:
+		colortext.printf("Retrieving %s.pdb from RCSB" % pdbID, color = "aqua")
 	c = HTTPConnection("www.rcsb.org")
 	c.request("GET", "/pdb/files/%s.pdb" % pdbID)
 	response = c.getresponse()
