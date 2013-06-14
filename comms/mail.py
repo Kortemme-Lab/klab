@@ -3,6 +3,8 @@
 """
 mail.py
 For email functions
+
+Created by Shane O'Connor 2013
 """
 
 from string import join

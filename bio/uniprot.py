@@ -22,6 +22,9 @@ from tools.hash import CRC64
 from tools.fs.io import read_file, write_file
 from tools.bio.uniprot_patches import * # UniParcMergedSubmittedNamesRemap, UniParcMergedRecommendedNamesRemap, clashing_subsections_for_removal, subsections_for_addition, AC_entries_where_we_ignore_the_subsections, overlapping_subsections_for_removal, PDBs_marked_as_XRay_with_no_resolution
 
+class ProteinSubsectionOverlapException(colortext.Exception): pass
+class UniParcEntryStandardizationException(colortext.Exception): pass
+
 def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None):
     '''Maps from one ID scheme to another using the UniProt service.
         list_of_ids should be a list of strings.
@@ -140,7 +143,6 @@ def pdb_to_uniparc(pdb_ids, silent = True):
                 colortext.write(".", "green")
         if not silent:
             print("")
-
     return m
 
 class ProteinSubsection(object):
@@ -170,9 +172,6 @@ class ProteinSubsection(object):
 
     def __eq__(self, other):
         return self.att_type == other.att_type and self.description == other.description and self.begin_position == other.begin_position and self.end_position == other.end_position
-
-class ProteinSubsectionOverlapException(colortext.Exception): pass
-class UniParcEntryStandardizationException(colortext.Exception): pass
 
 class ProteinSubsectionHolder(object):
     def __init__(self, _length):
@@ -204,8 +203,8 @@ class ProteinSubsectionHolder(object):
             elif (s_pair[0].begin_position <= s_pair[1].end_position <= s_pair[0].end_position) and (s_pair[1].begin_position < s_pair[0].begin_position):
                 overlap = True
             if overlap:
-                colortext.error("\n1: Overlap in protein sections.\nExisting sections:\n%s\nNew section:\n%s" % (s_pair[0], s_pair[1]))
-                #raise ProteinSubsectionOverlapException("\n1: Overlap in protein sections.\nExisting sections:\n%s\nNew section:\n%s" % (s_pair[0], s_pair[1]))
+                #colortext.error("\n1: Overlap in protein sections.\nExisting sections:\n%s\nNew section:\n%s" % (s_pair[0], s_pair[1]))
+                raise ProteinSubsectionOverlapException("\n1: Overlap in protein sections.\nExisting sections:\n%s\nNew section:\n%s" % (s_pair[0], s_pair[1]))
         self.sections.append(new_section)
         self.sections = sorted(self.sections, key=lambda x:(x.begin_position, -x.end_position))
 
@@ -223,8 +222,8 @@ class ProteinSubsectionHolder(object):
                         if o.description != s.description:
                             # Ignore case differences for equality but favor the case where the first letter is capitalized
                             if o.description.upper() != s.description.upper():
-                                pass
-                                #raise ProteinSubsectionOverlapException("\nSubsection descriptions do not match.\nFirst description: '%s'\nSecond description: '%s'\n" % (o.description, s.description))
+                                #colortext.error("\nSubsection descriptions do not match for '%s', range %d-%d.\nFirst description: '%s'\nSecond description: '%s'\n" % (s.att_type, s.begin_position, s.end_position, o.description, s.description))
+                                raise ProteinSubsectionOverlapException("\nSubsection descriptions do not match for '%s', range %d-%d.\nFirst description: '%s'\nSecond description: '%s'\n" % (s.att_type, s.begin_position, s.end_position, o.description, s.description))
                             elif o.description[0].upper() == o.description[0]:
                                 s.description = o.description
                             else:
@@ -321,7 +320,7 @@ class UniProtACEntry(object):
             if db_type == 'PDB':
                 pdb_id = t.getAttribute('id')
                 assert(len(pdb_id) == 4)
-                print(pdb_id)
+                #print(pdb_id)
                 method = None
                 resolution = None
                 chains = []
@@ -393,10 +392,11 @@ class UniProtACEntry(object):
                             assert(chain[0]not in mapping[pdb_id]['chains'])
                             mapping[pdb_id]['chains'][chain[0]] = (chain[1], chain[2])
 
-        for pdb_id, details in sorted(mapping.iteritems()):
-            colortext.message("%s, %s, %sA" % (str(pdb_id), str(details['method']), str(details['resolution'])))
-            for chain, indices in sorted(details['chains'].iteritems()):
-                colortext.warning(" Chain %s: %s-%s" % (chain, str(indices[0]).rjust(5), str(indices[1]).ljust(5)))
+        if False:
+            for pdb_id, details in sorted(mapping.iteritems()):
+                colortext.message("%s, %s, %sA" % (str(pdb_id), str(details['method']), str(details['resolution'])))
+                for chain, indices in sorted(details['chains'].iteritems()):
+                    colortext.warning(" Chain %s: %s-%s" % (chain, str(indices[0]).rjust(5), str(indices[1]).ljust(5)))
 
 
     def _parse_evidence_tag(self):
@@ -404,6 +404,7 @@ class UniProtACEntry(object):
         protein_Existence_tags = entry_tag.getElementsByTagName("proteinExistence")
         assert(len(protein_Existence_tags) == 1)
         self.existence_type = protein_Existence_tags[0].getAttribute('type')
+        print(self.existence_type)
 
     def _parse_subsections(self):
         molecule_processing_subsections = UniProtACEntry.molecule_processing_subsections
@@ -426,36 +427,36 @@ class UniProtACEntry(object):
                         assert(len(locations) == 1)
 
                         subsection_for_addition = None
-
+                        begin_position = None
+                        end_position = None
                         position_tag = locations[0].getElementsByTagName("position")
                         if position_tag:
                             assert(len(position_tag) == 1)
                             position_tag = locations[0].getElementsByTagName("position")
-                            position = None
                             if position_tag[0].hasAttribute('position'):
-                                position = int(position_tag[0].getAttribute('position'))
-                            if position:
-                                #print(att_type, description, position)
-                                subsection_for_addition = (att_type, description, position, position)
-                                #subsections.add(att_type, description, position, position)
+                                begin_position = int(position_tag[0].getAttribute('position'))
+                                end_position = begin_position
                         else:
                             begin_pos = locations[0].getElementsByTagName("begin")
                             end_pos = locations[0].getElementsByTagName("end")
                             assert(len(begin_pos) == 1 and len(end_pos) == 1)
-                            begin_position = None
-                            end_position = None
+
                             if begin_pos[0].hasAttribute('position'):
                                 begin_position = int(begin_pos[0].getAttribute('position'))
                             if end_pos[0].hasAttribute('position'):
                                 end_position = int(end_pos[0].getAttribute('position'))
-                            if begin_position and end_position:
-                                #print(att_type, description, begin_position, end_position)
-                                subsection_for_addition = (att_type, description, begin_position, end_position)
-                                #subsections.add(att_type, description, begin_position, end_position)
 
-                        if subsection_for_addition:
+                        if (begin_position, end_position) in differing_subsection_name_patch.get(self.UniProtAC, {}):
+                            description_pair = differing_subsection_name_patch[self.UniProtAC][(begin_position, end_position)]
+                            if description_pair[0] == description:
+                                colortext.warning("Changing subsection name from '%s' to '%s'." % description_pair)
+                                description = description_pair[1]
+
+                        if begin_position and end_position:
+                            subsection_for_addition = (att_type, description, begin_position, end_position)
                             if subsection_for_addition not in clashing_subsections_for_removal.get(self.UniProtAC, []):
                                 if subsection_for_addition not in overlapping_subsections_for_removal.get(self.UniProtAC, []): # This may be overkill
+                                    colortext.message("Adding subsection %s." % str(subsection_for_addition))
                                     subsections.add(subsection_for_addition[0], subsection_for_addition[1], subsection_for_addition[2], subsection_for_addition[3])
                                 else:
                                     colortext.warning("Skipping overlapping subsection %s." % str(subsection_for_addition))
