@@ -18,26 +18,49 @@ aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
        "TRP": "W", "TYR": "Y"}
 
 non_canonical_aa1 = {
-	'TPO' : 'T', # phosphothreonine
-	'MLY' : 'K', # dimethyl lysine
-	'CSO' : 'C', # s-hydroxycysteine
-	'CSU' : 'C', # ? some type of cysteine or a typo
-	'MSE' : 'M', # selenomethionine
-	'PTR' : 'Y', # phospotyrosine
-	'CME' : 'C', # S,S-(2-Hydroxyethyl)Thiocysteine (DB04530)
-	'NEH' : 'X', # Ethanamine
-	'CSS' : 'C', # S-Mercaptocysteine (DB02761)
-	'MEN' : 'N', # N-methyl asparagine
-	'PCA' : 'E', # Pyroglutamic acid
-	'SEP' : 'S', # Phosphoserine
-	'GLZ' : 'G', # Amino-acetaldehyde
+	'ABA' : 'A', # Alpha-aminobutyric acid
+    'CCS' : 'C', # Carboxymethylated cysteine
+    'CME' : 'C', # S,S-(2-Hydroxyethyl)Thiocysteine (DB04530)
 	'CSD' : 'C', # 3-sulfinoalanine
+	'CSO' : 'C', # s-hydroxycysteine
+	'CSS' : 'C', # S-Mercaptocysteine (DB02761)
+	'CSU' : 'C', # ? some type of cysteine or a typo
+	'CSW' : 'C', # Cysteine-S-dioxide
+    'CSX' : 'C', # Modified cysteine residue
+    'SCH' : 'C', # S-Methyl-Thio-Cysteine
+    'SMC' : 'C', # S-methylcysteine
+    'PCA' : 'E', # Pyroglutamic acid
+	'GLZ' : 'G', # Amino-acetaldehyde
 	'HIC' : 'H', # 4-Methyl-Histidine
+    'M3L' : 'K', # N-Trimethyllysine
+	'MLY' : 'K', # dimethyl lysine
+    'MSE' : 'M', # selenomethionine
+	'MEN' : 'N', # N-methyl asparagine
+	'SEP' : 'S', # Phosphoserine
+	'SVA' : 'S', # Serine vanadate
+	'TPO' : 'T', # phosphothreonine
+    'TRN' : 'W', # Nz2-Tryptophan
+	'NEH' : 'X', # Ethanamine
+	'MPT' : 'X', # Beta-Mercaptopropionic acid
+	'NH2' : 'X', # Amino group
+	'PTR' : 'Y', # phospotyrosine
+    'BHD' : 'D', # (3S)-3-HYDROXY-L-ASPARTIC ACID
+    #
+    'ASX' : 'B', # ??? N in UniProt entry P0A786 for 2ATC, chain A
+    'GLX' : 'Q', # ??? Q in UniProt entry P01075 for 4CPA, chain I
 }
+
+known_chimeras = set([
+    ('1M7T', 'A'), # chimera of UniProtKB ACs P0AA25 (previously P00274) and P10599
+    ])
+
+maps_to_multiple_uniprot_ACs = set([('1Z1I', 'A'), ])
 
 residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS", 
             "HIE", "HIP", "ILE", "LYS", "LYN", "LEU", "MET", "ASN", "PRO", 
             "GLN", "ARG", "ARN", "SER", "THR", "VAL", "TRP", "TYR"]
+
+cases_with_ACE_residues_we_can_ignore = set(['1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD'])
 
 # todo: replace residues with this and move to rwebhelper.py
 allowedResidues = {}
@@ -45,8 +68,14 @@ for r in residues:
     allowedResidues[r] = True
 
 nucleotides_dna = ["DT","DA","DC","DG"]
+nucleotides_dna_to_shorthand = {
+    'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T'
+}
+non_canonical_dna = {
+    '5IU' : 'U', # 5-Iodo-2'-Deoxyuridine-5'-Monophosphate
+}
 nucleotides_rna = ["U","C","G","A"]
-
+set_of_nucleotides_dna = set(nucleotides_dna)
           
 records = ["HEADER","OBSLTE","TITLE","SPLIT","CAVEAT","COMPND","SOURCE","KEYWDS",
            "EXPDTA","NUMMDL","MDLTYP","AUTHOR","REVDAT","SPRSDE","JRNL","REMARK",
@@ -251,7 +280,11 @@ class PDB:
         # Extract the SEQRES lines
         SEQRES_lines = []
         found_SEQRES_lines = False
+
+        pdb_id = None
         for line in self.lines:
+            if line.startswith("HEADER"):
+                pdb_id = line[62:66]
             if not line.startswith("SEQRES"):
                 if not found_SEQRES_lines:
                     continue
@@ -266,38 +299,115 @@ class PDB:
         if not SEQRES_lines:
             raise Exception("Do not raise this exception")
             return None
-       
-       # If the COMPND lines exist, concatenate them together into one string
+
+        # If the COMPND lines exist, concatenate them together into one string
         sequences = {}
         chains_in_order = []
         SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
+
+        # Collect all residues for all chains
+        chain_tokens = {}
         for line in SEQRES_lines:
             chainID = line[0]
             if chainID not in chains_in_order:
                 chains_in_order.append(chainID)
-            sequences[chainID] = sequences.get(chainID, [])
-            residues = line[6:].strip().split(" ")
-            for r in residues:
-                if aa1.get(r):
-                    sequences[chainID].append(aa1[r])
-                else:
-                    if non_canonical_aa1.get(r):
-                        #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_aa1[r]))
-                        #print(SEQRES_lines)
-                        #print(line)
-                        sequences[chainID].append(non_canonical_aa1[r])
-                    elif r == 'UNK':
-                        continue
+            chain_tokens[chainID] = chain_tokens.get(chainID, [])
+            residues = line[6:].strip().split()
+            chain_tokens[chainID].extend(residues)
+
+        self.chain_types = {}
+        for chain_id, tokens in chain_tokens.iteritems():
+            # Determine whether chains are DNA or proteins
+            chain_type = None
+            set_of_tokens = set(tokens)
+            if (set(tokens).union(set_of_nucleotides_dna) == set_of_nucleotides_dna) or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(set_of_nucleotides_dna)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+                chain_type = 'DNA'
+            else:
+                chain_type = 'Protein'
+            self.chain_types[chain_id] = chain_type
+
+            sequence = []
+            if chain_type == 'DNA':
+                for r in tokens:
+                    if nucleotides_dna_to_shorthand.get(r):
+                        sequence.append(nucleotides_dna_to_shorthand[r])
                     else:
-                        #print(SEQRES_lines)
-                        #print(line)
-                        raise Exception("Unknown residue %s." % r)
-        for chainID, sequence in sequences.iteritems():
-            sequences[chainID] = "".join(sequence)
-        
+                        if non_canonical_dna.get(r):
+                            sequence.append(non_canonical_dna[r])
+                        else:
+                            raise Exception("Unknown DNA residue %s." % r)
+            else:
+                for r in tokens:
+                    if aa1.get(r):
+                        sequence.append(aa1[r])
+                    else:
+                        if non_canonical_aa1.get(r):
+                            #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_aa1[r]))
+                            #print(SEQRES_lines)
+                            #print(line)
+                            sequence.append(non_canonical_aa1[r])
+                        elif r == 'UNK':
+                            continue
+                        # Skip these residues
+                        elif r == 'ACE' and pdb_id in cases_with_ACE_residues_we_can_ignore:
+                            continue
+                        # End of skipped residues
+                        else:
+                            #print(SEQRES_lines)
+                            #print(line)
+                            raise Exception("Unknown protein residue %s." % r)
+            sequences[chain_id] = "".join(sequence)
+
         return sequences, chains_in_order
 
-        
+    def getDBRef(self):
+        ''' "The DBREF record provides cross-reference links between PDB sequences (what appears in SEQRES record) and
+                a corresponding database sequence." - http://www.wwpdb.org/documentation/format33/sect3.html#DBREF
+
+        '''
+
+        _database_names = {
+            'GB'    :  'GenBank',
+            'PDB'   :  'Protein Data Bank',
+            'UNP'   :  'UNIPROT',
+            'NORINE':  'Norine',
+            'TREMBL': 'UNIPROT',
+        }
+
+        DBREF_lines = [l for l in self.lines if l.startswith('DBREF')]
+        DBref = {}
+        for l in DBREF_lines:
+            pdb_id = l[7:11]
+            chain_id = l[12]
+            seqBegin = int(l[14:18])
+            insertBegin = l[18]
+            seqEnd = int(l[20:24])
+            insertEnd = l[24]
+            database = _database_names[l[26:32].strip()]
+            dbAccession = l[33:41].strip()
+            dbIdCode = l[42:54].strip()
+            dbseqBegin = int(l[55:60])
+            idbnsBeg = l[60]
+            dbseqEnd = int(l[62:67])
+            dbinsEnd = l[67]
+
+            DBref[pdb_id] = DBref.get(pdb_id, {})
+            DBref[pdb_id][database] = DBref[pdb_id].get(database, {})
+            if (pdb_id, chain_id) not in known_chimeras:
+                assert(chain_id not in DBref[pdb_id][database] or
+                       (DBref[pdb_id][database][chain_id]['dbAccession'] == dbAccession and
+                        DBref[pdb_id][database][chain_id]['dbIdCode'] == dbIdCode)
+                )
+            else:
+                pass # todo: dbIdCode should really be a list to handle chimera cases
+            DBref[pdb_id][database][chain_id] = {
+                'dbAccession'   :   dbAccession,
+                'dbIdCode'      :   dbIdCode,
+                'PDBRange'      :   ("%d%s" % (seqBegin,  insertBegin), "%d%s" % (seqEnd,  insertEnd)),
+                'dbRange'       :   ("%d%s" % (dbseqBegin, idbnsBeg), "%d%s" % (dbseqEnd, dbinsEnd)),
+            }
+        return DBref
+
     def getMoleculeInfo(self):
         # Extract the COMPND lines
         COMPND_lines = []

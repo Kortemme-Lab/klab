@@ -36,7 +36,7 @@ if use_patches:
         'UPI0000111CC2' : {'Name' : 'Lambda prophage-derived head-to-tail joining protein W', 'EC numbers' : [], 'Short names' : ['gpW']},
         'UPI0000111D34' : {'Name' : 'Superoxide dismutase', 'EC numbers' : ['1.15.1.1'], 'Short names' : []},
         'UPI000011287C' : {'Name' : 'Peptidyl-prolyl cis-trans isomerase', 'EC numbers' : ['5.2.1.8'], 'Short names' : []},
-        'UPI0000112C08' : {'Name' : 'Ribonuclease H', 'EC numbers' : ['3.1.26.4'], 'Short names' : ['RNase H']},
+        'UPI0000112C08' : {'Name' : 'Ribonuclease HI', 'EC numbers' : ['3.1.26.4'], 'Short names' : ['RNase HI']},
         'UPI000012813D' : {'Name' : 'Cytochrome c oxidase subunit 6A, mitochondrial', 'EC numbers' : [], 'Short names' : []},
         'UPI00001292ED' : {'Name' : 'Glutamate dehydrogenase', 'EC numbers' : ['1.4.1.3'], 'Short names' : ['GDH']},
         'UPI000012EBF8' : {'Name' : 'Silenced mating-type protein ALPHA2', 'EC numbers' : [], 'Short names' : ['MATalpha2 protein']},
@@ -288,7 +288,7 @@ if use_patches:
         ],
     }
 
-    AC_entries_where_we_ignore_the_subsections = [
+    AC_entries_where_we_ignore_the_subsections = set([
         # UPI000018DB89. Complicated. A7J8L3, P0C6U8, and D3KDM4 agree and A7J8L3 and P0C6U8 have 'Evidence at protein level' but the subsection names differ. I chose P0C6U8 out of these.
         'A7J8L3', 'D3KDM4', # agrees with P0C6U8 but with different names
         'Q6RCX7', 'Q6RCY8', 'Q6RCZ9', 'Q6RD10', 'Q6RD43', 'Q6RD65', # agree with each other but disagree with P0C6U8
@@ -297,8 +297,15 @@ if use_patches:
         'A7J8L2', 'D3KDM3', # nearly agree with each other and P0C6X7
         'Q6RCY9', 'Q6RD00', 'Q6RD11', 'Q6RD44', 'Q6RD66', # agree with each other but disagree with P0C6X7
         'Q6VA91', 'Q6VAA2', # agree with each other but disagree with P0C6X7
-
-    ]
+        # UPI0000000ED4.
+        'A1AJ51', 'A7ZV12', 'A8A7N9', 'B1ITQ5', 'B1LQG4', 'B1XDP7', 'B2TY18', # Do not specify the name of position 1 (initiator methionine) whereas entries like P10149 do
+        'B5Z2F2', 'B6I615', 'B7LC02', 'B7M8Q4', 'B7MKU8', 'B7MSV9', 'B7NG81',
+        'B7NTK2', 'B7UPW3', 'C5A1D5', 'Q0SXD6', 'Q31T78', 'Q328C4', 'Q3YUJ7',
+        'Q1R3B6', # This has Evidence at protein level but also omits the name of position 1
+        # UPI000000E853
+        'A1AGM6', 'A7ZSL4', 'A8A5E6', 'B1IPW0', # Do not specify the name of position 1 (initiator methionine) whereas entries like P0CE47 do
+        'Q0TCC0', 'Q1R5Y2', 'Q31VV0', 'Q32B27', 'Q3YWT3'
+    ])
 
     # These subsections overlap with those of UniProt AC entries relating to the same protein. We may want to keep this information instead of discarding it.
     overlapping_subsections_for_removal = {
@@ -308,9 +315,9 @@ if use_patches:
         ],
     }
 
-    PDBs_marked_as_XRay_with_no_resolution = [
+    PDBs_marked_as_XRay_with_no_resolution = set([
         '2A6U', # Solved with POWDER DIFFRACTION
-    ]
+    ])
 
     # These entries seem wrong in UniProt
     fixed_mapping_for_AC_PDB_chains = {
@@ -343,8 +350,58 @@ if use_patches:
         },
         'P07320' : {'2KLJ' : ['NMR', 'Solution scattering']},
         'P00760' : {'3OTJ' : ['X-ray', 'Neutron']},
-
-
+    }
+    differing_subsection_name_patch = {
+        # UPI00000000C3 - P01899 has Evidence at protein level, Q792Z7 has Evidence at transcript level
+        'Q792Z7' : {(25, 362) : ('D(b) glycoprotein', 'H-2 class I histocompatibility antigen, D-B alpha chain')},
+        # UPI00000000E4 - A7Z0C2, P62593, P62594 use the second name. P62593 has Evidence at protein level, Q6A253 is Predicted
+        'Q6A253' : {(24, 286) : ('beta-lactamase', 'Beta-lactamase TEM')},
+        # UPI0000000440 - P69178, P69179, and Q7BQ98 have Evidence at protein level. P69178, P69179 agree so I took their description
+        'Q1ELX8' : {(21, 89) : ('shiga toxin I subunit B', 'Shiga-like toxin 1 subunit B')},
+        'Q32GM0' : {(21, 89) : ('Shiga toxin subunit B', 'Shiga-like toxin 1 subunit B')},
+        'Q6LDT3' : {(21, 89) : ('Shiga toxin-like subunit B', 'Shiga-like toxin 1 subunit B')},
+        'Q779K3' : {(21, 89) : ('Shiga toxin subunit B', 'Shiga-like toxin 1 subunit B')},
+        'Q7BQ98' : {(21, 89) : ('Shiga toxin subunit B', 'Shiga-like toxin 1 subunit B')},
+        'Q8X4M7' : {(21, 89) : ('Shiga-like toxin type-I beta subunit', 'Shiga-like toxin 1 subunit B')},
+        # UPI0000000586 - more entries with Evidence at protein level used Histone H3.2 rather than Histone H3
+        'P02299' : {(2, 136) : ('Histone H3', 'Histone H3.2')},
+        'P84235' : {(2, 136) : ('Histone H3', 'Histone H3.2')},
+        'P84236' : {(2, 136) : ('Histone H3', 'Histone H3.2')},
+        'P84237' : {(2, 136) : ('Histone H3', 'Histone H3.2')},
+        'P84238' : {(2, 136) : ('Histone H3', 'Histone H3.2')},
+        'P84239' : {(2, 136) : ('Histone H3', 'Histone H3.2')},
+        # UPI0000000DA9 - This may not be the best name but the Evidence at protein level entry uses it
+        'P10149' : {(23, 315) : ('Shiga-like toxin 1 subunit A', 'Shiga toxin subunit A')},
+        # UPI00000010A1 - I took the majority case here.
+        'P62147' : {(2, 149) : ('Calmodulin-1', 'Calmodulin')},
+        'P62148' : {(2, 149) : ('Calmodulin-1', 'Calmodulin')},
+        'P62153' : {(2, 149) : ('Calmodulin-A', 'Calmodulin')},
+        # UPI00000017E7 - Taking the Evidence at protein level entry Q08012
+        'Q6YKA8' : {(1, 211) : ('Protein E(sev)2B', 'Protein enhancer of sevenless 2B')},
+        # UPI000000E853 -
+        'Q83JC4' : {(2, 394) : ('Elongation factor Tu', 'Elongation factor Tu 1')},
+        # UPI0000111CC2 -
+        'P68659' : {(1, 68) : ('Lambda prophage-derived head-to-tail joining protein W', 'Head-to-tail joining protein W')},
+        # UPI0000112C08 -
+        'A7ZHV1' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B1IPU4' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B1LHM3' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B1XD78' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B2U352' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B5Z0I8' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B6HZS7' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B7LW89' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B7M213' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B7MBJ0' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B7MQ23' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B7N876' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'B7NKW4' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'C4ZRV1' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'Q325T2' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'Q32JP9' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        'Q3Z5E9' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
+        # UPI000012EBF8 - I took the entry P0CY08 with Evidence at protein level
+        'P0CY09' : {(1, 210) : ('Silenced mating-type protein ALPHA2', 'Mating-type protein ALPHA2')},
     }
 
 else:
@@ -352,10 +409,11 @@ else:
     UniParcMergedRecommendedNamesRemap = {}
     clashing_subsections_for_removal = {}
     subsections_for_addition = {}
-    AC_entries_where_we_ignore_the_subsections = []
+    AC_entries_where_we_ignore_the_subsections = set([])
     overlapping_subsections_for_removal = {}
-    PDBs_marked_as_XRay_with_no_resolution = []
+    PDBs_marked_as_XRay_with_no_resolution = set([])
     fixed_mapping_for_AC_PDB_chains = {}
     broken_mapping_for_AC_PDB_chains = {}
     missing_mapping_for_AC_PDB_chains = {}
     missing_AC_PDB_methods = {}
+    differing_subsection_name_patch = {}
