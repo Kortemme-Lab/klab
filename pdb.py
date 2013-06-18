@@ -60,7 +60,7 @@ residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS",
             "HIE", "HIP", "ILE", "LYS", "LYN", "LEU", "MET", "ASN", "PRO", 
             "GLN", "ARG", "ARN", "SER", "THR", "VAL", "TRP", "TYR"]
 
-cases_with_ACE_residues_we_can_ignore = set(['1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD'])
+cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD'])
 
 # todo: replace residues with this and move to rwebhelper.py
 allowedResidues = {}
@@ -263,12 +263,13 @@ class PDB:
   # takes either a pdb file, a list of strings = lines of a pdb file, or another object
   # 
   # 
-    def __init__(self, pdb = None):
+    def __init__(self, pdb = None, pdb_id = None):
     
         self.ddGresmap = None
         self.ddGiresmap = None
         self.lines = []
         self.journal = None
+        self.pdb_id = pdb_id
         if type(pdb) == types.StringType:
             self.read(pdb)
         elif type(pdb) == types.ListType:
@@ -280,11 +281,11 @@ class PDB:
         # Extract the SEQRES lines
         SEQRES_lines = []
         found_SEQRES_lines = False
-
-        pdb_id = None
+        pdb_id = self.pdb_id
         for line in self.lines:
             if line.startswith("HEADER"):
-                pdb_id = line[62:66]
+                if not pdb_id:
+                    pdb_id = line[62:66]
             if not line.startswith("SEQRES"):
                 if not found_SEQRES_lines:
                     continue
@@ -446,7 +447,10 @@ class PDB:
             MD = MD.replace('SYNONYM: RAN; TC4; RAN GTPASE; ANDROGEN RECEPTOR- ASSOCIATED PROTEIN 24;', 'SYNONYM: RAN TC4, RAN GTPASE, ANDROGEN RECEPTOR-ASSOCIATED PROTEIN 24;')
             # Hack for 1IBR
             MD = MD.replace('SYNONYM: KARYOPHERIN BETA-1 SUBUNIT; P95; NUCLEAR FACTOR P97; IMPORTIN 90', 'SYNONYM: KARYOPHERIN BETA-1 SUBUNIT, P95, NUCLEAR FACTOR P97, IMPORTIN 90')
-            
+            # Hack for 1NKH
+            MD = MD.replace('SYNONYM: B4GAL-T1; BETA4GAL-T1; BETA-1,4-GALTASE 1; BETA-1, 4-GALACTOSYLTRANSFERASE 1;  UDP-GALACTOSE:BETA-N- ACETYLGLUCOSAMINE BETA-1,4-GALACTOSYLTRANSFERASE 1; EC: 2.4.1.22, 2.4.1.90, 2.4.1.38; ENGINEERED: YES; OTHER_DETAILS: CHAINS A AND B FORM FIRST, C AND D SECOND LACTOSE SYNTHASE COMPLEX',
+                            'SYNONYM: B4GAL-T1, BETA4GAL-T1, BETA-1,4-GALTASE 1, BETA-1, 4-GALACTOSYLTRANSFERASE 1,  UDP-GALACTOSE:BETA-N- ACETYLGLUCOSAMINE BETA-1,4-GALACTOSYLTRANSFERASE 1, EC: 2.4.1.22, 2.4.1.90, 2.4.1.38, ENGINEERED: YES, OTHER_DETAILS: CHAINS A AND B FORM FIRST, C AND D SECOND LACTOSE SYNTHASE COMPLEX')
+
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
             molecule = {}
             for field in MOL_fields:
