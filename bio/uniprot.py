@@ -154,7 +154,15 @@ class ProteinSubsection(object):
         assert(type(end_position) == type(1))
         self.begin_position = begin_position
         self.end_position = end_position
-        self.parent = None
+        #self.parent = None - Unused at present
+
+    def to_db(self):
+        return {
+            'StartResidue'  :   self.begin_position,
+            'EndResidue'    :   self.end_position,
+            'Type'          :   self.att_type,
+            'Description'   :   self.description,
+        }
 
     def __repr__(self):
         s = []
@@ -249,6 +257,8 @@ class ProteinSubsectionHolder(object):
 
 class UniProtACEntry(object):
 
+    organism_name_types = set(['common', 'full', 'scientific', 'synonym', 'abbreviation'])
+
     molecule_processing_subsections = set([
         "signal peptide",
         "chain",
@@ -306,6 +316,7 @@ class UniProtACEntry(object):
         self._parse_evidence_tag()
         self._parse_sequence_tag()
         self._parse_protein_tag()
+        self._parse_organism_tag()
         self._parse_subsections()
         self._parse_PDB_mapping()
 
@@ -404,7 +415,7 @@ class UniProtACEntry(object):
         protein_Existence_tags = entry_tag.getElementsByTagName("proteinExistence")
         assert(len(protein_Existence_tags) == 1)
         self.existence_type = protein_Existence_tags[0].getAttribute('type')
-        print(self.existence_type)
+        #print(self.existence_type)
 
     def _parse_subsections(self):
         molecule_processing_subsections = UniProtACEntry.molecule_processing_subsections
@@ -456,7 +467,7 @@ class UniProtACEntry(object):
                             subsection_for_addition = (att_type, description, begin_position, end_position)
                             if subsection_for_addition not in clashing_subsections_for_removal.get(self.UniProtAC, []):
                                 if subsection_for_addition not in overlapping_subsections_for_removal.get(self.UniProtAC, []): # This may be overkill
-                                    colortext.message("Adding subsection %s." % str(subsection_for_addition))
+                                    #colortext.message("Adding subsection %s." % str(subsection_for_addition))
                                     subsections.add(subsection_for_addition[0], subsection_for_addition[1], subsection_for_addition[2], subsection_for_addition[3])
                                 else:
                                     colortext.warning("Skipping overlapping subsection %s." % str(subsection_for_addition))
@@ -485,6 +496,21 @@ class UniProtACEntry(object):
         self.sequence_length = int(sequence_tag.getAttribute("length"))
         self.CRC64Digest = sequence_tag.getAttribute("checksum")
 
+    def _parse_organism_tag(self):
+        '''Parses the protein tag to get the names and EC numbers.'''
+        organism_name_types = UniProtACEntry.organism_name_types
+        self.organisms = []
+        organism_tags = [child for child in self.entry_tag.childNodes if child.nodeType == child.ELEMENT_NODE and child.tagName == 'organism']
+        assert(len(organism_tags) == 1)
+        for organism_tag in organism_tags:
+            names = dict.fromkeys(organism_name_types, None)
+            for name_tag in [child for child in organism_tag.childNodes if child.nodeType == child.ELEMENT_NODE and child.tagName == 'name']:
+                name_type = name_tag.getAttribute("type")
+                assert(name_type in organism_name_types)
+                names[name_type] = name_tag.firstChild.nodeValue.strip()
+            assert(names.get('scientific'))
+            self.organisms.append(names)
+            
     def _parse_protein_tag(self):
         '''Parses the protein tag to get the names and EC numbers.'''
 
@@ -549,11 +575,76 @@ class UniProtACEntry(object):
 
 class UniParcEntry(object):
 
-    def __init__(self, UniParcID, UniProtACs = None, UniProtKBs = None, cache_dir = None):
+    def _get_XML(self):
+        uparc_xml = None
+        cached_filepath = None
+        if self.cache_dir:
+            cached_filepath = os.path.join(self.cache_dir, '%s.xml' % self.UniParcID)
+        if cached_filepath and os.path.exists(cached_filepath):
+            uparc_xml = read_file(cached_filepath)
+        else:
+            colortext.write("Retrieving %s\n" % self.UniParcID, "cyan")
+            url = 'http://www.uniprot.org/uniparc/%s.xml' % self.UniParcID
+            uparc_xml = http_get(url)
+            if cached_filepath:
+                write_file(cached_filepath, uparc_xml)
+        self.XML = uparc_xml
+
+        # Get DOM
+        self._dom = parseString(uparc_xml)
+        main_tags = self._dom.getElementsByTagName("uniparc")
+        assert(len(main_tags) == 1)
+        entry_tags = main_tags[0].getElementsByTagName("entry")
+        assert(len(entry_tags) == 1)
+        self.entry_tag = entry_tags[0]
+
+    def _get_active_ACCs(self):
+        entry_tag = self.entry_tag
+        db_reference_tags = [child for child in entry_tag.childNodes if child.nodeType == child.ELEMENT_NODE and child.tagName == 'dbReference']
+        ACCs = []
+        for db_reference_tag in db_reference_tags:
+            assert(db_reference_tag.hasAttribute('type') and db_reference_tag.hasAttribute('active') and db_reference_tag.hasAttribute('id'))
+            att_type = db_reference_tag.getAttribute('type')
+            is_active = db_reference_tag.getAttribute('active')
+            dbref_id = db_reference_tag.getAttribute('id')
+            assert(is_active == 'Y' or is_active == 'N')
+            is_active = (is_active == 'Y')
+            if att_type == 'UniProtKB/Swiss-Prot' or att_type == 'UniProtKB/TrEMBL':
+                if is_active:
+                    #colortext.message(att_type + dbref_id)
+                    ACCs.append(dbref_id)
+                else:
+                    pass#colortext.warning(att_type + dbref_id)
+        return ACCs
+
+    def get_organisms(self):
+        self.organisms = {}
+        self._get_XML()
+        ACCs = self._get_active_ACCs()
+        #print(ACCs)
+        name_count = {}
+        for UniProtAC in ACCs:
+            #print(UniProtAC)
+            if UniProtAC in self.AC_entries:
+                AC_entry = self.AC_entries[UniProtAC]
+            else:
+                if UniProtAC in ['N2XE95', 'N1E9H6', 'N2JUB3', 'N2Z3Z2']: # hack for bad XML documents at time of writing
+                    continue
+                colortext.warning("Retrieving %s" % UniProtAC)
+                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir)
+            for o in AC_entry.organisms:
+                name_count[o['scientific']] = name_count.get(o['scientific'], 0)
+                name_count[o['scientific']] += 1
+            assert(len(AC_entry.organisms) == 1)
+            self.organisms[UniProtAC] = AC_entry.organisms[0]
+
+
+    def __init__(self, UniParcID, UniProtACs = None, UniProtIDs = None, cache_dir = None):
         if cache_dir and not(os.path.exists(os.path.abspath(cache_dir))):
             raise Exception("The cache directory %s does not exist." % os.path.abspath(cache_dir))
         self.UniParcID = UniParcID
         self.cache_dir = cache_dir
+        self.recommended_name = None
 
         # Get AC mapping
         if not UniProtACs:
@@ -563,11 +654,11 @@ class UniParcEntry(object):
             self.UniProtACs = UniProtACs
 
         # Get ID mapping
-        if not UniProtKBs:
+        if not UniProtIDs:
             mapping = uniprot_map('UPARC', 'ID', [UniParcID], cache_dir = cache_dir)[UniParcID]
-            self.UniProtKBs = mapping
+            self.UniProtIDs = mapping
         else:
-            self.UniProtKBs = UniProtKBs
+            self.UniProtIDs = UniProtIDs
 
         # Get FASTA
         cached_filepath = None
@@ -597,10 +688,12 @@ class UniParcEntry(object):
         alternative_names = []
         submitted_names = []
 
+        self.AC_entries = {}
         subsections = ProteinSubsectionHolder(len(sequence))
         for UniProtAC in self.UniProtACs:
-            colortext.write("%s\n" % UniProtAC, 'cyan')
+            #colortext.write("%s\n" % UniProtAC, 'cyan')
             AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir)
+            self.AC_entries[UniProtAC] = AC_entry
 
             # Mass sanity check
             if self.atomic_mass != None:
@@ -646,15 +739,16 @@ class UniParcEntry(object):
                     submitted_names.append([submitted_name, 1])
 
             subsections += AC_entry.subsections
+        self.subsections = subsections
 
         assert(len(set(UniParcMergedRecommendedNamesRemap.keys()).intersection(set(UniParcMergedSubmittedNamesRemap.keys()))) == 0)
         if UniParcID in UniParcMergedRecommendedNamesRemap:
-            recommended_names = [UniParcMergedRecommendedNamesRemap[UniParcID]]
+            recommended_names = [[UniParcMergedRecommendedNamesRemap[UniParcID], 1]]
         elif UniParcID in UniParcMergedSubmittedNamesRemap:
-            recommended_names = [UniParcMergedSubmittedNamesRemap[UniParcID]]
+            recommended_names = [[UniParcMergedSubmittedNamesRemap[UniParcID], 1]]
 
         colortext.write('Subsections\n', 'orange')
-        print(subsections)
+        #print(subsections)
 
         if len(recommended_names) == 0 and len(alternative_names) == 0 and len(submitted_names) == 0:
             raise UniParcEntryStandardizationException("UniParcID %s has no recommended names." % UniParcID)
@@ -687,11 +781,16 @@ class UniParcEntry(object):
                     s.append(" (EC numbers: %s)" % ",".join(tpl[0]['EC numbers']))
             raise UniParcEntryStandardizationException("".join(s))
 
+        assert(len(recommended_names) == 1)
+        #print(recommended_names)
+        self.recommended_name = recommended_names[0][0]
+        self.get_organisms()
+
     def to_dict(self):
         return {
             'UniParcID' : self.UniParcID,
             'UniProtAC' : self.UniProtACs,
-            'UniProtKB' : self.UniProtKBs,
+            'UniProtKB' : self.UniProtIDs,
             'sequence'  : self.sequence,
             'atomic_mass'  : self.atomic_mass,
             'CRC64Digest'  : self.CRC64Digest,
