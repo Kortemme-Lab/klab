@@ -120,71 +120,87 @@ tag_map = {
 #def __init__(self, publication_type, authors, title, journal, entry, year, doi, URL, ReferralURL, subtitle):
 
 publication_abbreviations = {
-    #"Advances in Protein Chemistry"						: "Adv Protein Chem",
-    "ACS Chemical Biology"								: "ACS Chem Biol",
-    "Analytical Chemistry"								: "Analyt Chem",
-    "Aquatic Toxicology"								: "Aquatic Toxicol",
-    "Biochemical and Biophysical Research Communications": "Biochem Biophys Res Comms",
-    "Biochemistry"										: "Biochemistry",
-    "Bioconjugate Chemistry"							: "Bioconjugate Chem",
-    "Bioinformatics"									: "Bioinformatics",
-    "Bioorganic & Medicinal Chemistry"					: "Bioorg Med Chem",
-    "Biophysical Journal"								: "Biophys Journal",
-    "BMC Evolutionary Biology"							: "BMC Evol Biol",
-    "BMC Systems Biology"								: "BMC Sys Biol",
-    "Cell"												: "Cell",
-    "Chemistry & Biology"								: "Chem Biol",
-    "Chemical Research in Toxicology"					: "Chem Res Toxicol",
-    "Comprehensive Biophysics"							: "Comprehensive Biophysics",
-    "Current Opinion in Chemical Biology"				: "Curr Opin Chem Biol",
-    "Current Opinion in Structural Biology"				: "Curr Opin Struct Biol",
-    "Current Opinion in Biotechnology"					: "Curr Opin Biotechnol",
-    "EMBO Reports"										: "EMBO Rep",
-    "Environmental and Molecular Mutagenesis"			: "Environ Mol Mutagen",
-    "FEBS Journal"										: "FEBS Journal",
-    "FEBS Letters"										: "FEBS Letters",
-    "Genome Biology"									: "Genome Biology",
-    "Genome Research"									: "Genome Research",
-    "Integrative and Comparative Biology"				: "Integr and Comparative Biol",
-    "Journal of Biological Chemistry"					: "J Biol Chem",
-    "Journal of Biomedical & Laboratory Sciences"		: "J Biomed Lab Sci",
-    "Journal of Chemical Information and Modeling"		: "J Chem Inf Model",
-    "Journal of Computational Biology"					: "J Comp Biol",
-    "Journal of the American Chemical Society"			: "J Am Chem Soc",
-    # This is a book series? If so, don't abbreviate. "Methods in Enzymology"								: "Meth Enzym",
-    "Journal of Molecular Biology"						: "J Mol Biol",
-    "Metabolomics"										: "Metabolomics",
-    "Molecular & Cellular Proteomics"					: "Mol Cell Proteomics",
-    "Molecular Cell"									: "Mol Cell",
-    "Molecular Systems Biology"							: "Mol Syst Biol",
-    "Nature"											: "Nature",
-    "Nature Biotechnology"								: "Nat Biotech",
-    "Nature Chemical Biology" 							: "Nat Chem Biol",
-    "Nature Methods" 									: "Nat Methods",
-    "Nature Structural & Molecular Biology" 			: "Nat Struct Mol Biol",
-    "Nucleic Acids Research"							: "Nucleic Acids Res",
-    "NeuroToxicology"									: "NeuroToxicol",
-    "Physical Review E"									: "Phys Rev E",
-    "Physical Chemistry Chemical Physics"				: "Phys Chem Chem Phys",
-    "PLoS Biology" 										: "PLoS Biol",
-    "PLoS Computational Biology" 						: "PLoS Comput Biol",
-    "PLoS ONE"											: "PLoS ONE",
+    #"Advances in Protein Chemistry"                      : "Adv Protein Chem",
+    "ACS Chemical Biology"                                      : "ACS Chem Biol",
+    "Analytical Chemistry"                                      : "Analyt Chem",
+    "Aquatic Toxicology"                                        : "Aquatic Toxicol",
+    "Biochemical and Biophysical Research Communications"       : "Biochem Biophys Res Comms",
+    "Biochemical Journal"                                       : "Biochem J", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
+    "Biochemistry"                                              : "Biochemistry",
+    "Biochimica et Biophysica Acta (BBA) - Protein Structure"   : "BBA-Protein Struct M", # this was incorporated into the journal below
+    "Biochimica et Biophysica Acta (BBA) - Protein Structure and Molecular Enzymology" : "BBA-Protein Struct M",
+    "Bioconjugate Chemistry"                                    : "Bioconjugate Chem",
+    "Bioinformatics"                                            : "Bioinformatics",
+    "Biological Chemistry"                                      : "Biol Chem", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
+    "Bioorganic & Medicinal Chemistry"                          : "Bioorg Med Chem",
+    "Biophysical Chemistry"                                     : "Biophys Chem", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
+    "Biophysical Journal"                                       : "Biophys Journal",
+    "Biopolymers"                                       : "Biopolymers", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
+    "BMC Evolutionary Biology"                            : "BMC Evol Biol",
+    "BMC Systems Biology"                                : "BMC Sys Biol",
+    "Cell"                                                : "Cell",
+    "Chemistry & Biology"                                : "Chem Biol",
+    "Chemical Research in Toxicology"                    : "Chem Res Toxicol",
+    "Comprehensive Biophysics"                            : "Comprehensive Biophysics",
+    "Current Opinion in Chemical Biology"                : "Curr Opin Chem Biol",
+    "Current Opinion in Structural Biology"                : "Curr Opin Struct Biol",
+    "Current Opinion in Biotechnology"                    : "Curr Opin Biotechnol",
+    "EMBO Reports"                                        : "EMBO Rep",
+    "Environmental and Molecular Mutagenesis"            : "Environ Mol Mutagen",
+    "European Journal of Biochemistry" : "Eur J Biochem", # site:www.efm.leeds.ac.uk "European Journal of Biochemistry"
+    "FEBS Journal"                                        : "FEBS Journal",
+    "FEBS Letters"                                        : "FEBS Letters",
+    "Folding and Design"                             : "Folding and Design", # I am unsure what the abbreviation is
+    "Genome Biology"                                    : "Genome Biology",
+    "Genome Research"                                    : "Genome Research",
+    "Integrative and Comparative Biology"                : "Integr and Comparative Biol",
+    "International Journal of Biological Macromolecules" : "Int J Biol Macromol", #http://www.efm.leeds.ac.uk/~mark/ISIabbr/I_abrvjt.html
+    "Journal of Biochemistry"                           : 'J Biochem',
+    "Journal of Biological Chemistry"                    : "J Biol Chem",
+    "Journal of Biomedical & Laboratory Sciences"        : "J Biomed Lab Sci",
+    "Journal of Biotechnology"                          : "J Biotechnol", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/J_abrvjt.html
+    "Journal of Chemical Information and Modeling"        : "J Chem Inf Model",
+    "Journal of Computational Biology"                    : "J Comp Biol",
+    # This is a book series? If so, don't abbreviate. "Methods in Enzymology"                                : "Meth Enzym",
+    "Journal of Molecular Biology"                        : "J Mol Biol",
+    "Journal of Protein Chemistry"                           : "J Protein Chem", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/J_abrvjt.html
+    "Journal of the American Chemical Society"            : "J Am Chem Soc", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/J_abrvjt.html
+    "Metabolomics"                                        : "Metabolomics",
+    "Molecular & Cellular Proteomics"                    : "Mol Cell Proteomics",
+    "Molecular Cell"                                    : "Mol Cell",
+    "Molecular Systems Biology"                            : "Mol Syst Biol",
+    "Nature"                                            : "Nature",
+    "Nature Biotechnology"                                : "Nat Biotech",
+    "Nature Chemical Biology"                             : "Nat Chem Biol",
+    "Nature Methods"                                     : "Nat Methods",
+    "Nature Structural & Molecular Biology"             : "Nat Struct Mol Biol",
+    "Nucleic Acids Research"                            : "Nucleic Acids Res",
+    "NeuroToxicology"                                    : "NeuroToxicol",
+    "Physical Review E"                                    : "Phys Rev E",
+    "Physical Chemistry Chemical Physics"                : "Phys Chem Chem Phys",
+    "PLoS Biology"                                         : "PLoS Biol",
+    "PLoS Computational Biology"                         : "PLoS Comput Biol",
+    "PLoS ONE"                                            : "PLoS ONE",
     "Proceedings of the 9th International Congress of Therapeutic Drug Monitoring & Clinical Toxicology" : "Ther Drug Mon",
-    "Proceedings of the National Academy of Sciences"	: "Proc Natl Acad Sci U S A",
-    "Protein Science"									: "Protein Sci",
-    "Proteins: Structure, Function, and Bioinformatics"	: "Proteins",
-    "Proteomics"										: "Proteomics",
-    "Science's STKE : signal transduction knowledge environment"		: "Sci STKE",
-    "Science"											: "Science",
-    "Spectroscopy: An International Journal"			: "Spectr Int J",
-    "Structure"											: "Structure",
-    "The Journal of Physical Chemistry B" 				: "J Phys Chem B",
-    "The Journal of Cell Biology"						: "J Cell Biol",
-    "The Journal of Immunology"							: "J Immunol",
-    "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)"	: "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)",
+    "Proceedings of the National Academy of Sciences"    : "Proc Natl Acad Sci U S A",
+    'Protein Engineering' : 'Protein Eng', # Renamed to PEDS (below) in 2004
+    'Protein Engineering, Design and Selection' : 'Protein Eng Des Sel', # http://www.bioxbio.com/if/html/PROTEIN-ENG-DES-SEL.html
+    "Protein and Peptide Letters" : "Protein Pept Lett", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/P_abrvjt.html
+    "Protein Science"                                    : "Protein Sci",
+    "Proteins: Structure, Function, and Bioinformatics"    : "Proteins",
+    "Proteomics"                                        : "Proteomics",
+    "Science's STKE : signal transduction knowledge environment"        : "Sci STKE",
+    "Science"                                            : "Science",
+    "Spectroscopy: An International Journal"            : "Spectr Int J",
+    "Structure"                                            : "Structure",
+    "The EMBO Journal"                                   : "EMBO J",
+    "The Journal of Physical Chemistry B"                 : "J Phys Chem B",
+    "The Journal of Cell Biology"                        : "J Cell Biol",
+    "The Journal of Immunology"                            : "J Immunol",
+    "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)"    : "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)",
 }
 
-class RIS(object):
+class RISEntry(object):
 
     def __init__(self, RIS, quiet = True):
         if type(RIS) != unicode_type:
@@ -195,7 +211,7 @@ class RIS(object):
 
         # Setting member elements explicitly here so that developers can see which variable are expected to be set after parsing
         self.publication_type = None
-        self.authors = None
+        self.authors = []
         self.ReferralURL = None
         self.title = None
         self.subtitle = None
@@ -211,18 +227,21 @@ class RIS(object):
         self.errors, self.warnings = self.parse()
 
     @staticmethod
+    def _normalize_journal_name(j):
+        return j.strip().replace(".", "").replace(",", "").replace("  ", "").lower()
+
+    @staticmethod
     def get_author_name_in_short_format(author):
         initials = []
         if author['FirstName']: # counterexample: Arvind :-)
             initials.append(author['FirstName'][0])
-        if author['MiddleNames'] and author['FirstName'] == 'Manuela':
-            initials += [mn[0] for mn in author['MiddleNames']]
+        initials += [mn[0] for mn in author['MiddleNames']]
         return "%s, %s" % (author['Surname'], "".join(initials))
 
     def get_author_names_in_short_format(self):
         short = []
         for author in self.authors:
-            short.append(RIS.get_author_name_in_short_format(author))
+            short.append(RISEntry.get_author_name_in_short_format(author))
         return short
 
     def get_page_range_in_abbreviated_format(self):
@@ -286,9 +305,11 @@ class RIS(object):
 
         for k, v in d.iteritems():
             # Remove
-            if len(v) == 1:
+            if len(v) == 0:
+                d[k] = None
+            elif len(v) == 1 and k != 'authors':
                 d[k] = v[0]
-            elif len(set(v)) == 1:
+            elif len(set(v)) == 1 and k != 'authors':
                 d[k] = v[0]
             elif len(v) > 1:
                 if k == 'journal':
@@ -302,6 +323,7 @@ class RIS(object):
                     assert(found)
                 else:
                     assert(k in ['authors'])
+        assert(type(d['authors'] == lsttype))
 
         d['year'] = None
         if not d['date']:
@@ -329,13 +351,13 @@ class RIS(object):
         if not d['year']:
             errors.append("The year of publication could not be determined.")
 
-        author_order = 1
+        author_order = 0
         authors = []
         for author in d['authors']:
             surname = author.split(",")[0].strip()
             firstnames = author.split(",")[1].strip().split()
             firstname = firstnames[0]
-            middlenames = None
+            middlenames = []
             if len(firstnames) > 1:
                 middlenames = firstnames[1:]
 
@@ -403,7 +425,17 @@ class RIS(object):
             errors.append("Missing crucial information (author, title, journal, or year) - skipping entry.")
         else:
             if self.publication_type != "CHAP" and not(publication_abbreviations.get(self.journal)):
-                errors.append("Missing abbreviation for journal '%s'." % self.journal)
+                matched = False
+                normalized_journal_name = RISEntry._normalize_journal_name(self.journal)
+                for k, v in publication_abbreviations.iteritems():
+                    if RISEntry._normalize_journal_name(k) == normalized_journal_name or RISEntry._normalize_journal_name(v) == normalized_journal_name:
+                        self.journal = k
+                        matched = True
+                        break
+                if not matched:
+                    errors.append("Missing abbreviation for journal '%s'." % self.journal)
+                else:
+                    assert(publication_abbreviations.get(self.journal))
 
         return errors, warnings
 
@@ -487,6 +519,6 @@ if __name__ == '__main__':
     big_ris = "\n".join([l.strip() for l in test_ris.split("\n") if l.strip() and l[0] != '#'])
     list_o_ris = [l.strip() for l in big_ris.split("ER  -")[1:] if l.strip()]
     for pub in list_o_ris:
-        r = RIS(pub + "\nER  - ")
+        r = RISEntry(pub + "\nER  - ")
         f = r.format(html = False)
     colortext.message("Test passed.")
