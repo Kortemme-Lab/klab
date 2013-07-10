@@ -4,6 +4,8 @@
 io.py
 For common file I/O functions
 """
+import os
+import tempfile
 
 def read_file(filepath, binary = False):
     if binary:
@@ -23,7 +25,7 @@ def write_file(filepath, contents):
     output_handle.close()
 
 def open_temp_file(path):
-    F, fname = mkstemp(dir = path)
+    F, fname = tempfile.mkstemp(dir = path)
     output_handle = os.fdopen(F, "w")
     return output_handle, fname
 

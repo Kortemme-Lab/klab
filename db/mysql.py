@@ -182,8 +182,32 @@ class DatabaseInterface(object):
             sys.stderr.flush()
         raise MySQLdb.OperationalError(caughte)
 
+    def list_stored_procedures(self):
+        return [r['Name'] for r in self.execute("SHOW PROCEDURE STATUS")]
 
-    def execute(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
+    def run_transaction(self, command_list, do_commit=True):
+        '''This can be used to stage multiple commands and roll back the transaction if an error occurs. This is useful
+            if you want to remove multiple records in multiple tables for one entity but do not want the deletion to occur
+            if the entity is tied to table not specified in the list of commands. Performing this as a transaction avoids
+            the situation where the records are partially removed. If do_commit is false, the entire transaction is cancelled.'''
+
+        pass
+        # I decided against creating this for now.
+        # It may be more useful to create a stored procedure like in e.g. _create_protein_deletion_stored_procedure
+        # in the DDGadmin project and then use callproc
+
+        for c in command_list:
+            if c.find(";") != -1 or c.find("\\G") != -1:
+                # Catches *some* injections
+                raise Exception("The SQL command '%s' contains a semi-colon or \\G. This is a potential SQL injection." % c)
+        if do_commit:
+            sql = "START TRANSACTION;\n%s;\nCOMMIT" % "\n".join(command_list)
+        else:
+            sql = "START TRANSACTION;\n%s;" % "\n".join(command_list)
+        #print(sql)
+        return
+
+    def execute(self, sql, parameters=None, quiet=False, locked=False, do_commit=True, allow_unsafe_query=False):
         """Execute SQL query. This uses DictCursor by default."""
         if do_commit:
             pass#print('s')
@@ -193,7 +217,7 @@ class DatabaseInterface(object):
         caughte = None
         cursor = None
         cursorClass = DictCursor
-        if sql.find(";") != -1 or sql.find("\\G") != -1:
+        if not(allow_unsafe_query) and (sql.find(";") != -1 or sql.find("\\G") != -1):
             # Catches some injections
             raise Exception("The SQL command '%s' contains a semi-colon or \\G. This is a potential SQL injection." % sql)
         while i < self.numTries:
@@ -245,13 +269,24 @@ class DatabaseInterface(object):
         raise MySQLdb.OperationalError(caughte)
 
 
-    def callproc(self, procname, parameters=(), quiet=False):
-        """Calls a MySQL stored procedure procname. This uses DictCursor by default."""
+    def callproc(self, procname, parameters=(), quiet=False, expect_return_value=False):
+        """Calls a MySQL stored procedure procname. This uses DictCursor by default.
+            To get return values back out of a stored procedure, prefix the parameter with a @ character.
+        """
         self.procedures_run += 1
         i = 0
         errcode = 0
         caughte = None
 
+        out_param_indices = []
+        for j in range(len(parameters)):
+            p = parameters[j]
+            if type(p) == type('') and p[0] == '@':
+                assert(p.find(' ') == -1)
+                out_param_indices.append(j)
+
+        if procname not in self.list_stored_procedures():
+            raise Exception("The stored procedure '%s' does not exist." % procname)
         if not re.match("^\s*\w+\s*$", procname):
             raise Exception("Expected a stored procedure name in callproc but received '%s'." % procname)
         while i < self.numTries:
@@ -262,10 +297,15 @@ class DatabaseInterface(object):
                 if type(parameters) != type(()):
                     parameters = (parameters,)
                 errcode = cursor.callproc(procname, parameters)
-                results = cursor.fetchall()
                 self.lastrowid = int(cursor.lastrowid)
                 cursor.close()
-                return results
+
+                # Get the out parameters
+                out_param_results = []
+                if out_param_indices:
+                    out_param_results = self.execute('SELECT %s' % ", ".join(['@_%s_%d AS %s' % (procname, pindex, parameters[pindex][1:]) for pindex in out_param_indices]))
+
+                return out_param_results
             except MySQLdb.OperationalError, e:
                 self._close_connection()
                 errcode = e[0]

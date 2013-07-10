@@ -97,22 +97,3 @@ class ProfileTimer(object):
 			return self._getProfileForWeb()
 		else:
 			return self._getProfileForTerminal()
-
-		if not self.stopped:
-			return False
-		s = ['<b>Total time: %fs</b>' % self.getTotalTime()]
-
-		stage_times = sorted([self.stage_times[stage] for stage in self.stages])
-		if len(stage_times) < 10:
-			top_time_cutoff = stage_times[-2]
-		else:
-			top_time_cutoff = stage_times[-(len(stage_times) / 5)]
-
-		for stage in self.stages:
-			if self.stage_times[stage] == stage_times[-1]:
-				s.append("<b><font color='#550000'>%s: %fs</font></b>" % (stage, self.stage_times[stage]))
-			elif self.stage_times[stage] >= top_time_cutoff:
-				s.append("<b><font color='red'>%s: %fs</font></b>" % (stage, self.stage_times[stage]))
-			else:
-				s.append("%s: %fs" % (stage, self.stage_times[stage]))
-		return "<br>".join(s)
