@@ -268,9 +268,47 @@ class DatabaseInterface(object):
             sys.stderr.flush()
         raise MySQLdb.OperationalError(caughte)
 
+    def call_select_proc(self, procname, parameters=(), quiet=False):
+        """Calls a MySQL stored procedure procname and returns the set of results."""
+        self.procedures_run += 1
+        i = 0
+        errcode = 0
+        caughte = None
+
+        if not re.match("^\s*\w+\s*$", procname):
+            raise Exception("Expected a stored procedure name in callproc but received '%s'." % procname)
+        while i < self.numTries:
+            i += 1
+            try:
+                self._get_connection()
+                cursor = self.connection.cursor()
+                if type(parameters) != type(()):
+                    parameters = (parameters,)
+                errcode = cursor.callproc(procname, parameters)
+                results = cursor.fetchall()
+                self.lastrowid = int(cursor.lastrowid)
+                cursor.close()
+                return results
+            except MySQLdb.OperationalError, e:
+                self._close_connection()
+                errcode = e[0]
+                caughte = e
+                continue
+            except:
+                self._close_connection()
+                traceback.print_exc()
+                break
+
+        if not quiet:
+            sys.stderr.write("\nSQL execution error call stored procedure %s at %s:" % (
+            procname, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+            sys.stderr.flush()
+        raise MySQLdb.OperationalError(caughte)
+
 
     def callproc(self, procname, parameters=(), quiet=False, expect_return_value=False):
-        """Calls a MySQL stored procedure procname. This uses DictCursor by default.
+        """Calls a MySQL stored procedure procname and returns the return values. This uses DictCursor.
             To get return values back out of a stored procedure, prefix the parameter with a @ character.
         """
         self.procedures_run += 1
