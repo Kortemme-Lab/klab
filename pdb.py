@@ -103,6 +103,18 @@ def ResidueID2String(residueID):
         return "%s" % (residueID.rjust(5))
 
 def checkPDBAgainstMutations(pdbID, pdb, mutations):
+    #Chain, ResidueID, WildTypeAA, MutantAA
+    resID2AA = pdb.ProperResidueIDToAAMap()
+    badmutations = []
+    for m in mutations:
+        wildtype = resID2AA.get(ChainResidueID2String(m['Chain'], m['ResidueID']), "")
+        if m['WildTypeAA'] != wildtype:
+            badmutations.append("%s%s:%s->%s" % (m['Chain'], m['ResidueID'], m['WildTypeAA'], m['MutantAA']))
+    if badmutations:
+        raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (string.join(badmutations, ", "), pdbID))
+
+def checkPDBAgainstMutationsTuple(pdbID, pdb, mutations):
+    #Chain, ResidueID, WildTypeAA, MutantAA
     resID2AA = pdb.ProperResidueIDToAAMap()
     badmutations = []
     for m in mutations:
@@ -934,16 +946,16 @@ class PDB:
         return lines
 
     def remapMutations(self, mutations, pdbID = '?'):
-        '''Takes in a list of (Chain, ResidueID, WildtypeAA, MutantAA) mutation tuples and returns the remapped
+        '''Takes in a list of (Chain, ResidueID, WildTypeAA, MutantAA) mutation tuples and returns the remapped
            mutations based on the ddGResmap (which must be previously instantiated).
            This function checks that the mutated positions exist and that the wild-type matches the PDB.
         '''
         remappedMutations = []
         ddGResmap = self.get_ddGResmap()
         for m in mutations:
-            ns = (ChainResidueID2String(m[0], str(ddGResmap['ATOM-%s' % ChainResidueID2String(m[0], m[1])])))
-            remappedMutations.append((ns[0], ns[1:].strip(), m[2], m[3])) 
-        checkPDBAgainstMutations(pdbID, self, remappedMutations)
+            ns = (ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % ChainResidueID2String(m['Chain'], m['ResidueID'])])))
+            remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
+        checkPDBAgainstMutationsTuple(pdbID, self, remappedMutations)
         return remappedMutations
 
     def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
