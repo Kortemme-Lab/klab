@@ -82,8 +82,8 @@ class DatabaseInterface(object):
         assert ((not (self.connection) or not (self.connection.open)) and (not (self.StdCursor_connection) or not (self.StdCursor_connection.open)))
 
 
-    def _get_connection(self):
-        if not (self.connection and self.connection.open):
+    def _get_connection(self, force = False):
+        if force or not (self.connection and self.connection.open):
             if self.use_utf:
                 self.connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
                                                   port=self.port, unix_socket=self.unix_socket, cursorclass=DictCursor,
@@ -209,6 +209,7 @@ class DatabaseInterface(object):
 
     def execute(self, sql, parameters=None, quiet=False, locked=False, do_commit=True, allow_unsafe_query=False):
         """Execute SQL query. This uses DictCursor by default."""
+
         if do_commit:
             pass#print('s')
             self.queries_run += 1
@@ -223,7 +224,7 @@ class DatabaseInterface(object):
         while i < self.numTries:
             i += 1
             try:
-                self._get_connection()
+                self._get_connection(force = i > 1)
                 cursor = self.connection.cursor()
                 if locked:
                     cursor.execute(self.lockstring)
@@ -242,6 +243,8 @@ class DatabaseInterface(object):
                 cursor.close()
                 return results
             except MySQLdb.OperationalError, e:
+                if not quiet:
+                    print(i, "MySQLdb.OperationalError", str(e))
                 if cursor:
                     if self.locked:
                         cursor.execute(self.unlockstring)
@@ -251,6 +254,8 @@ class DatabaseInterface(object):
                 errcode = e[0]
                 continue
             except Exception, e:
+                if not quiet:
+                    print(i, "Exception", str(e))
                 if cursor:
                     if self.locked:
                         cursor.execute(self.unlockstring)
@@ -263,7 +268,7 @@ class DatabaseInterface(object):
 
         if not quiet:
             sys.stderr.write(
-                "\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                "\nSQL execution error in query '%s' at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
             sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
             sys.stderr.flush()
         raise MySQLdb.OperationalError(caughte)
