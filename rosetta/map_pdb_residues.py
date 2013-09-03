@@ -5,7 +5,7 @@ import commands
 import traceback
 import sqlite3
 from optparse import OptionParser # deprecated since Python 2.7
-
+from tools.fs.io import write_temp_file
 # Python functions to map PDB residue IDs to Rosetta/pose IDs by using the features database.
 # Direct complaints to shane.oconnor@ucsf.edu
 # Warning: The inputs to the commands.getstatusoutput (one of these is an executable) are unsanitized. Only use these functions if you trust the caller.
@@ -27,7 +27,15 @@ script = '''<ROSETTASCRIPTS>
   </PROTOCOLS>
 </ROSETTASCRIPTS>'''
 
-def get_pdb_to_post_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path):
+def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path):
+    '''Takes a string containing a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
+       On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
+    filename = write_temp_file("/tmp", pdb_file_contents)
+    success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path)
+    os.path.remove(filename)
+    return success, mapping
+
+def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path):
     '''Takes a path to a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
     mapping = {}
@@ -93,7 +101,7 @@ def get_stripped_pdb_to_post_residue_map(input_pdb_path, rosetta_scripts_path, r
     success, result = strip_pdb(input_pdb_path, chains = chains, strip_hetatms = strip_hetatms)
     if success:
         assert(os.path.exists(result))
-        success, mapping = get_pdb_to_post_residue_map(result, rosetta_scripts_path, rosetta_database_path)
+        success, mapping = get_pdb_to_pose_residue_map(result, rosetta_scripts_path, rosetta_database_path)
         os.remove(result)
         if success:
             return True, mapping
@@ -102,6 +110,7 @@ def get_stripped_pdb_to_post_residue_map(input_pdb_path, rosetta_scripts_path, r
     return False, result
 
 if __name__ == '__main__':
+    sys.path.insert(0, "../..")
     chains = []
     
     parser = OptionParser()
