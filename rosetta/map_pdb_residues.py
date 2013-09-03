@@ -5,7 +5,12 @@ import commands
 import traceback
 import sqlite3
 from optparse import OptionParser # deprecated since Python 2.7
+
+if __name__ == '__main__':
+    sys.path.insert(0, "../..")
+
 from tools.fs.io import write_temp_file
+
 # Python functions to map PDB residue IDs to Rosetta/pose IDs by using the features database.
 # Direct complaints to shane.oconnor@ucsf.edu
 # Warning: The inputs to the commands.getstatusoutput (one of these is an executable) are unsanitized. Only use these functions if you trust the caller.
@@ -82,9 +87,15 @@ def strip_pdb(pdb_path, chains = [], strip_hetatms = False):
     chains = set(chains)
     contents = open(pdb_path).read().split("\n") # file handle should get garbage collected
     if strip_hetatms:
-        atom_lines = [l for l in contents if l.startswith("ATOM  ") and l[21] in chains]
+        if chains:
+            atom_lines = [l for l in contents if l.startswith("ATOM  ") and l[21] in chains]
+        else:
+            atom_lines = [l for l in contents if l.startswith("ATOM  ")]
     else:
-        atom_lines = [l for l in contents if (l.startswith("ATOM  ") or l.startswith("HETATM")) and l[21] in chains]
+        if chains:
+            atom_lines = [l for l in contents if (l.startswith("ATOM  ") or l.startswith("HETATM")) and l[21] in chains]
+        else:
+            atom_lines = [l for l in contents if (l.startswith("ATOM  ") or l.startswith("HETATM"))]
     existing_chains = set([l[21] for l in atom_lines])
     if chains.difference(existing_chains):
         return False, ["Error: The following chains do not exist in the PDB file - %s" % ", ".join(list(chains.difference(existing_chains)))]
@@ -95,7 +106,7 @@ def strip_pdb(pdb_path, chains = [], strip_hetatms = False):
     temp_pdb_handle.close()
     return True, temp_pdb_path
 
-def get_stripped_pdb_to_post_residue_map(input_pdb_path, rosetta_scripts_path, rosetta_database_path, chains = [], strip_hetatms = False):
+def get_stripped_pdb_to_pose_residue_map(input_pdb_path, rosetta_scripts_path, rosetta_database_path, chains = [], strip_hetatms = False):
     '''Takes a path to an input PDB file, the path to the RosettaScripts executable and Rosetta database, an optional list of chains to strip the PDB down to, and an optional flag specifying whether HETATM lines should be stripped from the PDB.
        On success, a pair (True, mapping between PDB and pose residues) is returned. On failure, a pair (False, a list of errors) is returned.'''
     success, result = strip_pdb(input_pdb_path, chains = chains, strip_hetatms = strip_hetatms)
@@ -110,7 +121,6 @@ def get_stripped_pdb_to_post_residue_map(input_pdb_path, rosetta_scripts_path, r
     return False, result
 
 if __name__ == '__main__':
-    sys.path.insert(0, "../..")
     chains = []
     
     parser = OptionParser()
@@ -159,7 +169,7 @@ if __name__ == '__main__':
                 print("\nError: Chain ID '%s' is invalid. PDB chain identifiers are one character in length.\n" % c)
                 sys.exit(1)
 
-    success, result = get_stripped_pdb_to_post_residue_map(filename, rosetta_scripts_path, rosetta_database_path, chains = chains, strip_hetatms = strip_hetatms)
+    success, result = get_stripped_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path, chains = chains, strip_hetatms = strip_hetatms)
     if success:
         print("{")
         for k, v in sorted(result.iteritems()):
