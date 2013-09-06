@@ -11,7 +11,10 @@ import sys
 import os
 import string
 import urllib,urllib2
-import simplejson
+try:
+    import json as simplejson
+except:
+    import simplejson
 from xml.dom.minidom import parse, parseString
 
 if __name__ == '__main__':
@@ -794,7 +797,18 @@ class UniParcEntry(object):
             'sequence'  : self.sequence,
             'atomic_mass'  : self.atomic_mass,
             'CRC64Digest'  : self.CRC64Digest,
+            'Subsections' : self.subsections,
+            'Recommended Name' : self.recommended_name,
         }
 
     def __repr__(self):
-        return simplejson.dumps(self.to_dict())
+        a = []
+        for k, v in sorted(self.to_dict().iteritems()):
+            if k == 'Subsections':
+                a.append(colortext.make("Subsections\n", 'green'))
+                a.append("%s\n" % str(v))
+            else:
+                a.append(colortext.make(k.ljust(20), 'green'))
+                a.append(colortext.make("%s\n" % str(v), 'silver'))
+        return "".join(a)
+        #, '        return simplejson.dumps(self.to_dict())
