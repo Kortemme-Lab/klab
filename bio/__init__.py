@@ -1,0 +1,1 @@
+'''A package containing Python code for bioinformatics.'''
