@@ -1,7 +1,7 @@
 import os
 from string import join
 import process
-import rosettahelper
+import deprecated.rosettahelper as rosettahelper
 
 def breakCommandLine(commandLine, length = 80):
 	commandLine = commandLine.replace("%(", "[").replace(")s", "]").replace(")d", "]").replace('{', '(').replace('}', ')')
@@ -39,7 +39,7 @@ class LaTeXDocument(object):
   {\\normalfont\\normalsize\\bfseries}}
 \\makeatother
 
-\\usepackage{a4wide}
+%%\\usepackage{a4wide} - a4wide is a deprecated package
 \\usepackage[utf8]{inputenc}
 \\usepackage[small,bf]{caption}
 \\usepackage{times}
@@ -265,3 +265,96 @@ class LaTeXDocument(object):
 \\end{tabular}
 }\\end{figure}''')
 
+
+class LaTeXCodePrinter(LaTeXDocument):
+	'''Useful to create PDFs for printing source code since Linux generally sucks at this. Example of usage:
+
+    code = """
+// blah blah blah
+"""
+    codeprinter = latex.LaTeXCodePrinter('my\_stuff', code)
+    codeprinter.compile_pdf("codetest.pdf")
+
+    '''
+
+	header = '''
+\\documentclass[a4paper,10pt]{article}
+
+\usepackage[margin=0.5in]{geometry}
+\\usepackage{color}
+\\usepackage{xcolor,listings}
+\\lstset{ %
+language=C++,                % choose the language of the code
+basicstyle=\\footnotesize,       % the size of the fonts that are used for the code
+numbers=left,                   % where to put the line-numbers
+numberstyle=\\footnotesize,      % the size of the fonts that are used for the line-numbers
+stepnumber=1,                   % the step between two line-numbers. If it is 1 each line will be numbered
+numbersep=5pt,                  % how far the line-numbers are from the code
+backgroundcolor=\\color{white},  % choose the background color. You must add \\usepackage{color}
+showspaces=false,               % show spaces adding particular underscores
+showstringspaces=false,         % underline spaces within strings
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=none,           % adds a frame around the code. Some valid values are 'single', 'none'
+tabsize=2,          % sets default tabsize to 2 spaces
+captionpos=b,           % sets the caption-position to bottom
+breaklines=true,        % sets automatic line breaking
+breakatwhitespace=false,    % sets if automatic breaks should only happen at whitespace
+keywordstyle=\\color{blue}\\bfseries,
+commentstyle=\\color{green},
+stringstyle=\\ttfamily\color{red!50!brown},
+escapeinside={\\%*}{*)}          % if you want to add a comment within your code
+}
+
+\\begin{document}
+
+\\setcounter{page}{1}
+\\setcounter{footnote}{0}
+\\renewcommand{\\thefootnote}{\\arabic{footnote}}
+'''
+	title = '''
+\\begin{center}
+{\\huge %(document_title)s}\\\\[0.5cm]
+\\today
+\\end{center}
+
+\\begin{lstlisting}
+'''
+
+	footer = '''
+\\end{lstlisting}
+\\end{document}
+'''
+
+	def __init__(self, document_title, code, pdf_title = None):
+		if not pdf_title:
+			pdf_title = document_title
+		self.quiet = False
+		self.outdir = "."
+		self.code = code
+		self.document_title = document_title
+
+	def getLaTeXCode(self):
+		return LaTeXCodePrinter.header + (LaTeXCodePrinter.title % self.__dict__) + self.code + LaTeXCodePrinter.footer
+
+	def compile_pdf(self, report_filename):
+		prefix = os.path.splitext(report_filename)[0]
+
+		latex_filename = "%s.tex" % prefix
+		pdf_filename = "%s.pdf" % prefix
+		out_filename = "%s.out" % prefix
+		aux_filename = "%s.aux" % prefix
+		log_filename = "%s.log" % prefix
+
+		rosettahelper.writeFile(latex_filename, self.getLaTeXCode())
+
+		for i in range(3):
+			self.popen(['pdflatex', '-output-directory', self.outdir, latex_filename], logstdout = False, logstderr = False)
+			self.checkFileExists(pdf_filename)
+		os.remove(latex_filename)
+
+		self.PDFReport = rosettahelper.readFile(report_filename)
+		self.log('Report saved as %s.' % report_filename)
+
+		os.remove(out_filename)
+		os.remove(aux_filename)
+		os.remove(log_filename)
