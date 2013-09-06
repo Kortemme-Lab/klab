@@ -427,7 +427,7 @@ class DatabaseInterface(object):
                 SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
             sys.stderr.write("\nError: '%s'.\n" % (str(e)))
             sys.stderr.flush()
-            raise Exception("Error occurred during database insertion: '%s'." % str(e))
+            raise Exception("Error occurred during database insertion: '%s'. %s" % (str(e), traceback.format_exc()))
 
 
 class _FieldNames(object):
