@@ -6,53 +6,22 @@ import sys
 import os
 import types
 import string
-import UserDict
-import spatialhash
-import chainsequence
 import math
 
-#todo: replace with ROSETTAWEB_SK_AA
-aa1 = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", "GLY": "G",
-       "HIS": "H", "ILE": "I", "LYS": "K", "LEU": "L", "MET": "M", "ASN": "N",
-       "PRO": "P", "GLN": "Q", "ARG": "R", "SER": "S", "THR": "T", "VAL": "V",
-       "TRP": "W", "TYR": "Y"}
+from tools.pymath.stats import get_mean_and_standard_deviation
+from tools.pymath.cartesian import spatialhash
+from basics import residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
+from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna
 
-amino_acid_codes = aa1.values()
-relaxed_amino_acid_codes = amino_acid_codes + ['X']
+# todo: related packages
+# computeMeanAndStandardDeviation was renamed to get_mean_and_standard_deviation
 
-non_canonical_aa1 = {
-    'ABA' : 'A', # Alpha-aminobutyric acid
-    'CCS' : 'C', # Carboxymethylated cysteine
-    'CME' : 'C', # S,S-(2-Hydroxyethyl)Thiocysteine (DB04530)
-    'CSD' : 'C', # 3-sulfinoalanine
-    'CSO' : 'C', # s-hydroxycysteine
-    'CSS' : 'C', # S-Mercaptocysteine (DB02761)
-    'CSU' : 'C', # ? some type of cysteine or a typo
-    'CSW' : 'C', # Cysteine-S-dioxide
-    'CSX' : 'C', # Modified cysteine residue
-    'SCH' : 'C', # S-Methyl-Thio-Cysteine
-    'SMC' : 'C', # S-methylcysteine
-    'PCA' : 'E', # Pyroglutamic acid
-    'GLZ' : 'G', # Amino-acetaldehyde
-    'HIC' : 'H', # 4-Methyl-Histidine
-    'M3L' : 'K', # N-Trimethyllysine
-    'MLY' : 'K', # dimethyl lysine
-    'FME' : 'M', # N-Formylmethionine
-    'MSE' : 'M', # selenomethionine
-    'MEN' : 'N', # N-methyl asparagine
-    'SEP' : 'S', # Phosphoserine
-    'SVA' : 'S', # Serine vanadate
-    'TPO' : 'T', # phosphothreonine
-    'TRN' : 'W', # Nz2-Tryptophan
-    'NEH' : 'X', # Ethanamine
-    'MPT' : 'X', # Beta-Mercaptopropionic acid
-    'NH2' : 'X', # Amino group
-    'PTR' : 'Y', # phospotyrosine
-    'BHD' : 'D', # (3S)-3-HYDROXY-L-ASPARTIC ACID
-    #
-    'ASX' : 'B', # ??? N in UniProt entry P0A786 for 2ATC, chain A
-    'GLX' : 'Q', # ??? Q in UniProt entry P01075 for 4CPA, chain I
-}
+### Residue types
+
+allowed_PDB_residues_types = protonated_residues_types_3.union(residue_types_3)
+allowed_PDB_residues_and_nucleotides = allowed_PDB_residues_types.union(dna_nucleotides).union(rna_nucleotides)
+
+### UniProt-related variables
 
 known_chimeras = set([
     ('1M7T', 'A'), # chimera of UniProtKB ACs P0AA25 (previously P00274) and P10599
@@ -60,98 +29,112 @@ known_chimeras = set([
 
 maps_to_multiple_uniprot_ACs = set([('1Z1I', 'A'), ])
 
-residues = ["ALA", "CYS", "ASP", "ASH", "GLU", "GLH", "PHE", "GLY", "HIS", 
-            "HIE", "HIP", "ILE", "LYS", "LYN", "LEU", "MET", "ASN", "PRO", 
-            "GLN", "ARG", "ARN", "SER", "THR", "VAL", "TRP", "TYR"]
+### Whitelist for PDB files with ACE residues (we could allow all to pass but it may be good to manually look at each case)
 
 cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD'])
 
-# todo: replace residues with this and move to rwebhelper.py
-allowedResidues = {}
-for r in residues:
-    allowedResidues[r] = True
+### Parsing-related variables
 
-nucleotides_dna = ['DT', 'DA', 'DC', 'DG']
-nucleotides_dna_to_shorthand = {
-    'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T'
+COMPND_field_map = {
+    'MOL_ID' : 'MoleculeID',
+    'MOLECULE' : 'Name',
+    'CHAIN' : 'Chains',
+    'FRAGMENT' : 'Fragment',
+    'SYNONYM' : 'Synonym',
+    'EC' : 'EC',
+    'ENGINEERED' : 'Engineered',
+    'MUTATION' : 'Mutation',
+    'OTHER_DETAILS' : 'OtherDetails',
 }
-non_canonical_dna = {
-    '5IU' : 'U', # 5-Iodo-2'-Deoxyuridine-5'-Monophosphate
+
+SOURCE_field_map = {
+    'MOL_ID' : 'MoleculeID',
+    'SYNTHETIC' : 'Synthetic',
+    'ORGANISM_SCIENTIFIC' : 'OrganismScientificName',
+    'ORGANISM_COMMON' : 'OrganismCommonName',
+    'ORGANISM_TAXID' : 'OrganismNCBITaxonomyID',
 }
-nucleotides_rna = ["U","C","G","A"]
-set_of_nucleotides_dna = set(nucleotides_dna)
 
-records = ["HEADER","OBSLTE","TITLE","SPLIT","CAVEAT","COMPND","SOURCE","KEYWDS",
-           "EXPDTA","NUMMDL","MDLTYP","AUTHOR","REVDAT","SPRSDE","JRNL","REMARK",
-           "DBREF","DBREF1","DBREF2","DBREF1/DBREF2","SEQADV","SEQRES","MODRES",
-           "HET","HETNAM","HETSYN","FORMUL","HELIX","SHEET","SSBOND","LINK","CISPEP",
-           "SITE","CRYST1","ORIGX1","ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3",
-           "MTRIX1","MTRIX2","MTRIX3","MODEL","ATOM","ANISOU","TER","HETATM",
-           "ENDMDL","CONECT","MASTER","END"]
+### Record types
 
-def ChainResidueID2String(chain, residueID):
-    '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier
-       spaced as in the PDB format.'''
-    return "%s%s" % (chain, ResidueID2String(residueID))
+# It looks like (Florian/Colin?) got this list from the Order of Records section, probably in an older version of the standard.
+order_of_records = [
+    "HEADER","OBSLTE","TITLE","SPLIT","CAVEAT","COMPND","SOURCE","KEYWDS",
+    "EXPDTA","NUMMDL","MDLTYP","AUTHOR","REVDAT","SPRSDE","JRNL","REMARK",
+    "DBREF","DBREF1","DBREF2","DBREF1/DBREF2","SEQADV","SEQRES","MODRES",
+    "HET","HETNAM","HETSYN","FORMUL","HELIX","SHEET","SSBOND","LINK","CISPEP",
+    "SITE","CRYST1","ORIGX1","ORIGX2","ORIGX3","SCALE1","SCALE2","SCALE3",
+    "MTRIX1","MTRIX2","MTRIX3","MODEL","ATOM","ANISOU","TER","HETATM",
+    "ENDMDL","CONECT","MASTER","END"
+]
 
-def ResidueID2String(residueID):
-    '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier
-       spaced as in the PDB format.'''
-    if residueID.isdigit():
-        return "%s " % (residueID.rjust(4))
-    else:
-        return "%s" % (residueID.rjust(5))
+# I added allowed_record_types from the Types of Records section of the PDB format documentation at http://www.wwpdb.org/documentation/format33/sect1.html
+# It is missing the following set ['DBREF1', 'DBREF1/DBREF2', 'DBREF2', 'ORIGX1', 'ORIGX2', 'ORIGX3', 'SCALE1', 'SCALE2', 'SCALE3', 'MTRIX1', 'MTRIX2', 'MTRIX3']
+# that order_of_records has. ORIGX1, SCALE1, MTRIX1 etc. have probably been replaced by the Coordinate Transformation Operator record types ['MTRIXn', 'SCALEn', 'ORIGXn']
+# which allowed_record_types has but order_of_records does not.
 
-def checkPDBAgainstMutations(pdbID, pdb, mutations):
-    #Chain, ResidueID, WildTypeAA, MutantAA
-    resID2AA = pdb.ProperResidueIDToAAMap()
-    badmutations = []
-    for m in mutations:
-        wildtype = resID2AA.get(ChainResidueID2String(m['Chain'], m['ResidueID']), "")
-        if m['WildTypeAA'] != wildtype:
-            badmutations.append("%s%s:%s->%s" % (m['Chain'], m['ResidueID'], m['WildTypeAA'], m['MutantAA']))
-    if badmutations:
-        raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (string.join(badmutations, ", "), pdbID))
+allowed_record_types = set([
+# One time, single line:
+'CRYST1', #     Unit cell parameters, space group, and Z.
+'END   ', #     Last record in the file.
+'HEADER', #     First line of the entry, contains PDB ID code, classification, and date of deposition.
+'NUMMDL', #     Number of models.
+'MASTER', #     Control record for bookkeeping.
+'ORIGXn', #     Transformation from orthogonal  coordinates to the submitted coordinates (n = 1, 2, or 3).
+'SCALEn', #     Transformation from orthogonal coordinates to fractional crystallographic coordinates  (n = 1, 2, or 3).
+# One time, multiple lines:
+'AUTHOR', #     List of contributors.
+'CAVEAT', #     Severe error indicator.
+'COMPND', #     Description of macromolecular contents of the entry.
+'EXPDTA', #     Experimental technique used for the structure determination.
+'MDLTYP', #     Contains additional annotation  pertinent to the coordinates presented  in the entry.
+'KEYWDS', #     List of keywords describing the macromolecule.
+'OBSLTE', #     Statement that the entry has been removed from distribution and list of the ID code(s) which replaced it.
+'SOURCE', #     Biological source of macromolecules in the entry.
+'SPLIT ', #     List of PDB entries that compose a larger  macromolecular complexes.
+'SPRSDE', #     List of entries obsoleted from public release and replaced by current entry.
+'TITLE ', #     Description of the experiment represented in the entry.
+# Multiple times, one line:
+'ANISOU', #     Anisotropic temperature factors.
+'ATOM  ', #     Atomic coordinate records for  standard groups.
+'CISPEP', #     Identification of peptide residues in cis conformation.
+'CONECT', #     Connectivity records.
+'DBREF ', #     Reference  to the entry in the sequence database(s).
+'HELIX ', #     Identification of helical substructures.
+'HET   ', #     Identification of non-standard groups heterogens).
+'HETATM', #     Atomic coordinate records for heterogens.
+'LINK  ', #     Identification of inter-residue bonds.
+'MODRES', #     Identification of modifications to standard residues.
+'MTRIXn', #     Transformations expressing non-crystallographic symmetry (n = 1, 2, or 3). There may be multiple sets of these records.
+'REVDAT', #     Revision date and related information.
+'SEQADV', #     Identification of conflicts between PDB and the named sequence database.
+'SHEET ', #     Identification of sheet substructures.
+'SSBOND', #     Identification of disulfide bonds.
+# Multiple times, multiple lines:
+'FORMUL', #     Chemical formula of non-standard groups.
+'HETNAM', #     Compound name of the heterogens.
+'HETSYN', #     Synonymous compound names for heterogens.
+'SEQRES', #     Primary sequence of backbone residues.
+'SITE  ', #     Identification of groups comprising important entity sites.
+# Grouping:
+'ENDMDL', #     End-of-model record for multiple structures in a single coordinate entry.
+'MODEL ', #     Specification of model number for multiple structures in a single coordinate entry.
+'TER   ', #     Chain terminator.
+# Other:
+'JRNL  ', #     Literature citation that defines the coordinate set.
+'REMARK', #     General remarks; they can be structured or free form.
+])
 
-def checkPDBAgainstMutationsTuple(pdbID, pdb, mutations):
-    #Chain, ResidueID, WildTypeAA, MutantAA
-    resID2AA = pdb.ProperResidueIDToAAMap()
-    badmutations = []
-    for m in mutations:
-        wildtype = resID2AA.get(ChainResidueID2String(m[0], m[1]), "")
-        if m[2] != wildtype:
-            badmutations.append("%s%s:%s->%s" % (m[0], m[1], m[2], m[3]))
-    if badmutations:
-        raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (string.join(badmutations, ", "), pdbID))
+# This set is probably safer to use to allow backwards compatibility
+all_record_types = allowed_record_types.union(set(order_of_records))
 
-def computeMeanAndStandardDeviation(values):
-    sum = 0
-    n = len(values)
+### Deprecated
+def checkPDBAgainstMutations(pdbID, pdb, mutations): raise Exception("This function has been moved inside the class")
+def checkPDBAgainstMutationsTuple(pdbID, pdb, mutations): raise Exception("This function has been moved inside the class as validate_mutations")
 
-    for v in values:
-        sum += v
-
-    mean = sum / n
-    sumsqdiff = 0
-
-    for v in values:
-        t = (v - mean)
-        sumsqdiff += t * t
-
-    variance = sumsqdiff / n
-    stddev = math.sqrt(variance)
-
-    return mean, stddev, variance
-
-class Residue(object):
-    def __init__(self, Chain, ResidueID, ResidueAA):
-        assert(len(Chain) == 1)
-        assert(len(ResidueID) == 5)
-        assert(ResidueAA in aa1.values())
-
-        self.Chain = Chain
-        self.ResidueID = ResidueID
-        self.ResidueAA = ResidueAA
+### Exception classes
+class PDBParsingException(Exception): pass
+class NonCanonicalResidueException(Exception): pass
 
 class JRNL(object):
 
@@ -249,85 +232,6 @@ class JRNL(object):
         else:
             self.d["DOI"] = None
 
-class NonCanonicalResidueException(Exception):
-    pass
-
-COMPND_field_map = {
-    'MOL_ID' : 'MoleculeID',
-    'MOLECULE' : 'Name',
-    'CHAIN' : 'Chains',
-    'FRAGMENT' : 'Fragment',
-    'SYNONYM' : 'Synonym',
-    'EC' : 'EC',
-    'ENGINEERED' : 'Engineered',
-    'MUTATION' : 'Mutation',
-    'OTHER_DETAILS' : 'OtherDetails',
-}
-
-SOURCE_field_map = {
-    'MOL_ID' : 'MoleculeID',
-    'SYNTHETIC' : 'Synthetic',
-    'ORGANISM_SCIENTIFIC' : 'OrganismScientificName',
-    'ORGANISM_COMMON' : 'OrganismCommonName',
-    'ORGANISM_TAXID' : 'OrganismNCBITaxonomyID',
-}
-
-#From the PDB format documentation at http://www.wwpdb.org/documentation/format33/sect1.html
-
-allowed_record_types = set([
-# One time, single line:
-'CRYST1', #     Unit cell parameters, space group, and Z.
-'END   ', #     Last record in the file.
-'HEADER', #     First line of the entry, contains PDB ID code, classification, and date of deposition.
-'NUMMDL', #     Number of models.
-'MASTER', #     Control record for bookkeeping.
-'ORIGXn', #     Transformation from orthogonal  coordinates to the submitted coordinates (n = 1, 2, or 3).
-'SCALEn', #     Transformation from orthogonal coordinates to fractional crystallographic coordinates  (n = 1, 2, or 3).
-# One time, multiple lines:
-'AUTHOR', #     List of contributors.
-'CAVEAT', #     Severe error indicator.
-'COMPND', #     Description of macromolecular contents of the entry.
-'EXPDTA', #     Experimental technique used for the structure determination.
-'MDLTYP', #     Contains additional annotation  pertinent to the coordinates presented  in the entry.
-'KEYWDS', #     List of keywords describing the macromolecule.
-'OBSLTE', #     Statement that the entry has been removed from distribution and list of the ID code(s) which replaced it.
-'SOURCE', #     Biological source of macromolecules in the entry.
-'SPLIT ', #     List of PDB entries that compose a larger  macromolecular complexes.
-'SPRSDE', #     List of entries obsoleted from public release and replaced by current entry.
-'TITLE ', #     Description of the experiment represented in the entry.
-# Multiple times, one line:
-'ANISOU', #     Anisotropic temperature factors.
-'ATOM  ', #     Atomic coordinate records for  standard groups.
-'CISPEP', #     Identification of peptide residues in cis conformation.
-'CONECT', #     Connectivity records.
-'DBREF ', #     Reference  to the entry in the sequence database(s).
-'HELIX ', #     Identification of helical substructures.
-'HET   ', #     Identification of non-standard groups heterogens).
-'HETATM', #     Atomic coordinate records for heterogens.
-'LINK  ', #     Identification of inter-residue bonds.
-'MODRES', #     Identification of modifications to standard residues.
-'MTRIXn', #     Transformations expressing non-crystallographic symmetry (n = 1, 2, or 3). There may be multiple sets of these records.
-'REVDAT', #     Revision date and related information.
-'SEQADV', #     Identification of conflicts between PDB and the named sequence database.
-'SHEET ', #     Identification of sheet substructures.
-'SSBOND', #     Identification of disulfide bonds.
-# Multiple times, multiple lines:
-'FORMUL', #     Chemical formula of non-standard groups.
-'HETNAM', #     Compound name of the heterogens.
-'HETSYN', #     Synonymous compound names for heterogens.
-'SEQRES', #     Primary sequence of backbone residues.
-'SITE  ', #     Identification of groups comprising important entity sites.
-# Grouping:
-'ENDMDL', #     End-of-model record for multiple structures in a single coordinate entry.
-'MODEL ', #     Specification of model number for multiple structures in a single coordinate entry.
-'TER   ', #     Chain terminator.
-# Other:
-'JRNL  ', #     Literature citation that defines the coordinate set.
-'REMARK', #     General remarks; they can be structured or free form.
-])
-
-class PDBParsingException(Exception): pass
-
 class PDB:
     """A class to store and manipulate PDB data"""
 
@@ -350,24 +254,38 @@ class PDB:
             self.lines.extend(pdb)
         elif type(pdb) == type(self):
             self.lines.extend(pdb.lines)
-        self.split_lines()
+        self._split_lines()
 
-    def split_lines(self):
+    ### Private functions ###
+    def _split_lines(self):
+        structure_lines = []
         parsed_lines = {}
-        for rt in allowed_record_types:
+        for rt in all_record_types:
             parsed_lines[rt] = []
         parsed_lines[0] = []
 
         for line in self.lines:
             linetype = line[0:6]
-            if linetype in allowed_record_types:
+            if linetype in all_record_types:
                 parsed_lines[linetype].append(line)
                 if linetype == 'ATOM' or linetype == 'HETATM':
-                    self.structure_lines.append(line)
+                    structure_lines.append(line)
             else:
                 parsed_lines[0].append(line)
 
         self.parsed_lines = parsed_lines
+        self.structure_lines = structure_lines
+
+    def _update_structure_lines(self):
+        '''ATOM and HETATM lines may be altered by function calls. When this happens, this function should be called to keep self.structure_lines up to date.'''
+        structure_lines = []
+        for line in self.lines:
+            linetype = line[0:6]
+            if linetype == 'ATOM' or linetype == 'HETATM':
+                structure_lines.append(line)
+        self.structure_lines = structure_lines
+
+    ### PDB FILE PARSING FUNCTIONS ###
 
     def get_resolution(self):
         resolution = None
@@ -520,7 +438,7 @@ class PDB:
             # Determine whether chains are DNA or proteins
             chain_type = None
             set_of_tokens = set(tokens)
-            if (set(tokens).union(set_of_nucleotides_dna) == set_of_nucleotides_dna) or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(set_of_nucleotides_dna)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+            if (set(tokens).union(dna_nucleotides) == dna_nucleotides) or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
                 chain_type = 'DNA'
             else:
                 chain_type = 'Protein'
@@ -529,8 +447,8 @@ class PDB:
             sequence = []
             if chain_type == 'DNA':
                 for r in tokens:
-                    if nucleotides_dna_to_shorthand.get(r):
-                        sequence.append(nucleotides_dna_to_shorthand[r])
+                    if dna_nucleotides_2to1_map.get(r):
+                        sequence.append(dna_nucleotides_2to1_map[r])
                     else:
                         if non_canonical_dna.get(r):
                             sequence.append(non_canonical_dna[r])
@@ -538,14 +456,14 @@ class PDB:
                             raise Exception("Unknown DNA residue %s." % r)
             else:
                 for r in tokens:
-                    if aa1.get(r):
-                        sequence.append(aa1[r])
+                    if residue_type_3to1_map.get(r):
+                        sequence.append(residue_type_3to1_map[r])
                     else:
-                        if non_canonical_aa1.get(r):
-                            #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_aa1[r]))
+                        if non_canonical_amino_acids.get(r):
+                            #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_amino_acids[r]))
                             #print(SEQRES_lines)
                             #print(line)
-                            sequence.append(non_canonical_aa1[r])
+                            sequence.append(non_canonical_amino_acids[r])
                         elif r == 'UNK':
                             continue
                         # Skip these residues
@@ -559,8 +477,6 @@ class PDB:
             sequences[chain_id] = "".join(sequence)
 
         return sequences, chains_in_order
-
-
 
     def getMoleculeInfo(self):
         # Extract the COMPND lines
@@ -715,6 +631,32 @@ class PDB:
 
         return [v for k, v in sorted(molecules.iteritems())]
 
+    @staticmethod
+    def ChainResidueID2String(chain, residueID):
+        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        return "%s%s" % (chain, PDB.ResidueID2String(residueID))
+
+    @staticmethod
+    def ResidueID2String(residueID):
+        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        if residueID.isdigit():
+            return "%s " % (residueID.rjust(4))
+        else:
+            return "%s" % (residueID.rjust(5))
+
+    def validate_mutations(self, mutations):
+        '''This function has been refactored to use the SimpleMutation class.'''
+        # Chain, ResidueID, WildTypeAA, MutantAA
+        resID2AA = self.ProperResidueIDToAAMap()
+        badmutations = []
+        for m in mutations:
+            wildtype = resID2AA.get(PDB.ChainResidueID2String(m.Chain, m.ResidueID), "")
+            if m.WildTypeAA != wildtype:
+                badmutations.append(m)
+        if badmutations:
+            raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (", ".join(map(str, badmutations)), self.pdb_id))
+
+    ###
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         sequences, residue_map = self.GetRosettaResidueMap(ConvertMSEToAtom = ConvertMSEToAtom, RemoveIncompleteFinalResidues = RemoveIncompleteFinalResidues, RemoveIncompleteResidues = RemoveIncompleteResidues)
         return sequences
@@ -748,7 +690,7 @@ class PDB:
                 if residue_longname == 'UNK':
                     # Skip unknown residues
                     continue
-                if residue_longname not in residues and not(ConvertMSEToAtom and residue_longname == 'MSE'):
+                if residue_longname not in allowed_PDB_residues_types and not(ConvertMSEToAtom and residue_longname == 'MSE'):
                     raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
                     resid = line[21:27]
@@ -787,16 +729,16 @@ class PDB:
                         chainID = line[21]
 
                         sequences[chainID] = sequences.get(chainID, [])
-                        if residue_longname in non_canonical_aa1:
-                            sequences[chainID].append(non_canonical_aa1[residue_longname])
+                        if residue_longname in non_canonical_amino_acids:
+                            sequences[chainID].append(non_canonical_amino_acids[residue_longname])
                         else:
-                            sequences[chainID].append(aa1[residue_longname])
+                            sequences[chainID].append(residue_type_3to1_map[residue_longname])
 
                         residue_map[chainID] = residue_map.get(chainID, [])
-                        if residue_longname in non_canonical_aa1:
-                            residue_map[chainID].append((resid, non_canonical_aa1[residue_longname]))
+                        if residue_longname in non_canonical_amino_acids:
+                            residue_map[chainID].append((resid, non_canonical_amino_acids[residue_longname]))
                         else:
-                            residue_map[chainID].append((resid, aa1[residue_longname]))
+                            residue_map[chainID].append((resid, residue_type_3to1_map[residue_longname]))
 
                         oldchainID = chainID
                     else:
@@ -911,7 +853,6 @@ class PDB:
             if line.startswith("ATOM") and line[21] == ' ':
                 self.lines[i] = line[:21] + 'A' + line[22:]
 
-
     def remove_hetatm(self):
 
         self.lines = [line for line in self.lines if not line.startswith("HETATM")]
@@ -953,7 +894,7 @@ class PDB:
         remappedMutations = []
         ddGResmap = self.get_ddGResmap()
         for m in mutations:
-            ns = (ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % ChainResidueID2String(m['Chain'], m['ResidueID'])])))
+            ns = (PDB.ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % PDB.ChainResidueID2String(m['Chain'], m['ResidueID'])])))
             remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
         checkPDBAgainstMutationsTuple(pdbID, self, remappedMutations)
         return remappedMutations
@@ -1034,13 +975,12 @@ class PDB:
             return res
         return None
 
-
     def aa_resids(self, only_res=None):
 
         if only_res:
-          atomlines = [line for line in self.lines if line[0:4] == "ATOM" and line[17:20] in residues and line[26] == ' ']
+          atomlines = [line for line in self.lines if line[0:4] == "ATOM" and line[17:20] in allowed_PDB_residues_types and line[26] == ' ']
         else:  
-          atomlines = [line for line in self.lines if line[0:4] == "ATOM" and (line[17:20] in residues or line[18:20] in nucleotides_dna or line[19:20] in nucleotides_rna ) and line[26] == ' ']
+          atomlines = [line for line in self.lines if line[0:4] == "ATOM" and (line[17:20].strip() in allowed_PDB_residues_and_nucleotides) and line[26] == ' ']
 
         resid_set = set()
         resid_list = []
@@ -1077,10 +1017,10 @@ class PDB:
         BFPerResidue = {}
         MeanPerResidue = []
         for residueID, bfactorlist in bfactors.iteritems():
-            mean, stddev, variance = computeMeanAndStandardDeviation(bfactorlist)
+            mean, stddev, variance = get_mean_and_standard_deviation(bfactorlist)
             BFPerResidue[residueID] = (mean, stddev)
             MeanPerResidue.append(mean)
-        TotalAverage, TotalStandardDeviation, variance = computeMeanAndStandardDeviation(MeanPerResidue)
+        TotalAverage, TotalStandardDeviation, variance = get_mean_and_standard_deviation(MeanPerResidue)
 
         return {"_description" : "First tuple element is average, second is standard deviation",
                 "Total"        : (TotalAverage, TotalStandardDeviation),
@@ -1109,10 +1049,9 @@ class PDB:
         resid2type = {}
         for line in self.lines:
             resname = line[17:20]
-            if line[0:4] == "ATOM" and resname in residues and line[13:16] == 'CA ':
-                resid2type[line[21:27]] = aa1[resname]
-        return resid2type 
-
+            if line[0:4] == "ATOM" and resname in allowed_PDB_residues_types and line[13:16] == 'CA ':
+                resid2type[line[21:27]] = residue_type_3to1_map[resname]
+        return resid2type
 
     def aa_resid2type(self):
         '''this creates a dictionary where the resid "A 123" is mapped to the one-letter aa type'''
@@ -1121,8 +1060,8 @@ class PDB:
 
         for line in self.lines:
             resname = line[17:20]
-            if line[0:4] == "ATOM" and resname in residues and line[26] == ' ' and line[13:16] == 'CA ':
-                resid2type[line[21:26]] = aa1[resname]
+            if line[0:4] == "ATOM" and resname in allowed_PDB_residues_types and line[26] == ' ' and line[13:16] == 'CA ':
+                resid2type[line[21:26]] = residue_type_3to1_map[resname]
 
         return resid2type # format: "A 123" or: '%s%4.i' % (chain,resid)    
 
@@ -1132,7 +1071,7 @@ class PDB:
             templines = []
             for line in self.lines:
                 shortRecordName = line[0:4]
-                if shortRecordName == "ATOM" and line[17:20] in residues and line[26] == ' ':
+                if shortRecordName == "ATOM" and line[17:20] in allowed_PDB_residues_types and line[26] == ' ':
                     chain = line[21:22]
                     if chain in chainsChosen:
                         # Only keep ATOM lines for chosen chains
@@ -1151,7 +1090,7 @@ class PDB:
         chain_ids = set()
         chainlist = []
         for line in self.lines:
-            if line[0:4] == "ATOM" and line[17:20] in residues and line[26] == ' ':
+            if line[0:4] == "ATOM" and line[17:20] in allowed_PDB_residues_types and line[26] == ' ':
                 chain = line[21:22]
                 if chain not in chain_ids:
                     chain_ids.add(chain)
@@ -1161,7 +1100,6 @@ class PDB:
 
     def number_of_models(self):
         return len( [line for line in self.lines if line[0:4] == 'MODEL'] )
-
 
     def fix_residue_numbering(self):
         """this function renumbers the res ids in order to avoid strange behaviour of Rosetta"""
@@ -1196,7 +1134,6 @@ class PDB:
         self.lines = atomlines
         return map_res_id
 
-
     def get_residue_mapping(self):
         """this function maps the chain and res ids "A 234" to values from [1-N]"""
 
@@ -1224,7 +1161,6 @@ class PDB:
         resid_set = set(resid_list)
 
         return [line for line in self.lines if line[0:4] == "ATOM" and line[21:26] in resid_set and line[26] == ' ' ]
-
 
     def neighbors(self, distance, residue, atom = None, resid_list = None): #atom = " CA "
 
@@ -1256,7 +1192,6 @@ class PDB:
                 neighbor_list.sort()
         return neighbor_list
 
-
     #todo 29: Optimise all callers of this function by using fastneighbors2 instead
     def neighbors2(self, distance, chain_residue, atom = None, resid_list = None):  
 
@@ -1264,9 +1199,9 @@ class PDB:
         '''this one is more precise since it uses the chain identifier also'''
 
         if atom == None:     # consider all atoms
-            lines = [line for line in self.atomlines(resid_list) if line[17:20] in residues]
+            lines = [line for line in self.atomlines(resid_list) if line[17:20] in allowed_PDB_residues_types]
         else:                # consider only given atoms
-            lines = [line for line in self.atomlines(resid_list) if line[17:20] in residues and line[12:16] == atom]
+            lines = [line for line in self.atomlines(resid_list) if line[17:20] in allowed_PDB_residues_types and line[12:16] == atom]
 
         shash = spatialhash.SpatialHash(distance)
 
@@ -1300,7 +1235,7 @@ class PDB:
         # This could be made fast by inlining atomlines and avoiding creating line[21:26] twice and by reusing resids rather than recomputing them
         # However, the speedup may not be too great and would need profiling
         for line in self.atomlines(resid_list):
-            if line[17:20] in residues:
+            if line[17:20] in allowed_PDB_residues_types:
                 if atom == None or line[12:16] == atom:                    
                     resid = line[21:26]
                     pos = (float(line[30:38]), float(line[38:46]), float(line[46:54]))
@@ -1347,7 +1282,6 @@ class PDB:
                       neighbor_list.append(data[1])
               neighbor_list.sort()
       return neighbor_list
-
 
     def get_stats(self):
       counts = {}
@@ -1439,7 +1373,7 @@ class PDB:
 
                 occupancy = PDB.getOccupancy(line)
 
-                if usingClassic and (not allowedResidues.get(residue)):
+                if usingClassic and (residue not in allowed_PDB_residues_types):
                     # Check for residues outside the list classic can handle
                     classicErrors.append("Residue %s on line %d is not recognized by classic." % (residue, lineidx))
                 elif (oldChain != None) and (currentChain == oldChain):
@@ -1587,7 +1521,7 @@ class PDB:
             elif '\t' in line:
                 errors.append("The file contains tabs on line %d." % lineidx)
             # check whether the records in the file are conform with the PDB format
-            elif not line[0:6].rstrip() in records:
+            elif not line[0:6].rstrip() in all_record_types:
                 if not self.check_custom_format(line, lineidx):
                     errors.append("Unknown record (%s) on line %d." % (line[0:6], lineidx))
                 else:
