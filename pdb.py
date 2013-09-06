@@ -71,7 +71,7 @@ allowedResidues = {}
 for r in residues:
     allowedResidues[r] = True
 
-nucleotides_dna = ["DT","DA","DC","DG"]
+nucleotides_dna = ['DT', 'DA', 'DC', 'DG']
 nucleotides_dna_to_shorthand = {
     'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T'
 }
