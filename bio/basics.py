@@ -91,16 +91,25 @@ non_canonical_amino_acids = {
 # I am unsure whether this is all correct. The code I inherited seems to leave out DI and DU for DNA and T and I for RNA which seems wrong.
 ###
 
-dna_nucleotides = set(['DA', 'DC', 'DG', 'DT']) # Add DI and DU? # deoxyribonucleic acids
-rna_nucleotides = set(['A', 'C', 'G', 'U']) # Add T and I? # ribonucleic acids
+dna_nucleotides = set(['DA', 'DC', 'DG', 'DT', 'DU', 'DI']) # deoxyribonucleic acids
+rna_nucleotides = set(['A', 'C', 'G', 'U', 'I']) # ribonucleic acids
 
 dna_nucleotides_2to1_map = {
     # Used to map PDB SEQRES DNA sequences to single letter sequences
-    'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T'
+    'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T', 'DU' : 'U', 'DI' : 'I',
 }
+
 non_canonical_dna = {
     '5IU' : 'U', # 5-Iodo-2'-Deoxyuridine-5'-Monophosphate
 }
+
+non_canonical_rna = {
+    'U33' : 'U', # 5-bromo-2'-deoxy-uridine
+}
+
+all_recognized_dna = dna_nucleotides.union(set(non_canonical_dna.keys()))
+all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
+
 
 ###
 # Mutations
