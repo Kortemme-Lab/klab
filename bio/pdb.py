@@ -27,6 +27,7 @@ from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, n
 # - computeMeanAndStandardDeviation was renamed to get_mean_and_standard_deviation
 # - checkPDBAgainstMutations and checkPDBAgainstMutationsTuple have now been made into object functions
 # - getSEQRESSequences is now get_SEQRES_sequences and handles RNA properly.
+# - getMoleculeInfo is now get_molecules_and_source
 
 ### Residue types
 
@@ -147,6 +148,7 @@ def checkPDBAgainstMutationsTuple(pdbID, pdb, mutations): raise Exception("This 
 
 ### Exception classes
 class PDBParsingException(Exception): pass
+class MissingRecordsException(Exception): pass
 class NonCanonicalResidueException(Exception): pass
 
 class JRNL(object):
@@ -248,11 +250,10 @@ class JRNL(object):
 class PDB:
     """A class to store and manipulate PDB data"""
 
-    ## Constructor:
-  # takes either a pdb file, a list of strings = lines of a pdb file, or another object
-  # 
-  # 
+    ### Constructor ###
+
     def __init__(self, pdb = None, pdb_id = None):
+        '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
         self.parsed_lines = {}
         self.structure_lines = [] # For ATOM and HETATM records
@@ -273,6 +274,7 @@ class PDB:
         self._split_lines()
 
     ### Private functions ###
+
     def _split_lines(self):
         '''Creates the parsed_lines dict which keeps all record data in document order indexed by the record type.'''
         parsed_lines = {}
@@ -305,6 +307,22 @@ class PDB:
                     
         self.structure_lines = structure_lines
         self.chains_in_document_order = chains_in_document_order
+
+    ### Basic functions ###
+
+    def get_pdb_id(self):
+        if self.pdb_id:
+            return self.pdb_id
+        else:
+            header = self.parsed_lines["HEADER"]
+            assert(len(header) <= 1)
+            if header:
+                return header[0][62:66]
+        return None
+
+    def get_ATOM_and_HETATM_chains(self):
+        '''todo: remove this function as it now just returns a member element'''
+        return self.chains_in_document_order
 
     ### PDB FILE PARSING FUNCTIONS ###
 
@@ -359,10 +377,6 @@ class PDB:
             raise PDBParsingException("Could not determine techniques used.")
         return techniques
 
-    def get_ATOM_and_HETATM_chains(self):
-        '''todo: remove this function as it now just returns a member element'''
-        return self.chains_in_document_order
-
     def get_DB_references(self):
         ''' "The DBREF record provides cross-reference links between PDB sequences (what appears in SEQRES record) and
                 a corresponding database sequence." - http://www.wwpdb.org/documentation/format33/sect3.html#DBREF
@@ -407,100 +421,148 @@ class PDB:
             )
         return DBref
 
-    def getSEQRESSequences(self):
-        '''Deprecated. Use get_SEQRES_sequences.
-           Extract the SEQRES lines.'''
-        SEQRES_lines = []
-        found_SEQRES_lines = False
-        pdb_id = self.pdb_id
-        for line in self.lines:
-            if line.startswith("HEADER"):
-                if not pdb_id:
-                    pdb_id = line[62:66]
-            if not line.startswith("SEQRES"):
-                if not found_SEQRES_lines:
-                    continue
+    def get_molecules_and_source(self):
+        # Check the COMPND lines
+        COMPND_lines = self.parsed_lines["COMPND"]
+        for x in range(1, len(COMPND_lines)):
+            assert(int(COMPND_lines[x][7:10]) == x+1)
+        if not COMPND_lines:
+            raise MissingRecordsException("No COMPND records were found. Handle this gracefully.")
+
+        # Concatenate the COMPND lines into one string, removing double spaces
+        COMPND_lines = " ".join([line[10:].strip() for line in COMPND_lines])
+        COMPND_lines.replace("  ", " ")
+
+        # Split the COMPND lines into separate molecule entries
+        molecules = {}
+        MOL_DATA = ["MOL_ID:%s".strip() % s for s in COMPND_lines.split('MOL_ID:') if s]
+
+        # Parse the molecule entries
+        # The hacks below are due to some PDBs breaking the grammar by not following the standard which states:
+        #   Specification: A String composed of a token and its associated value separated by a colon.
+        #   Specification List: A sequence of Specifications, separated by semi-colons.
+        # COMPND records are a specification list so semi-colons should not appear inside entries.
+        # The hacks below could probably be removed if I assumed that the standard was not followed (valid) by
+        #   e.g. splitting the COMPND data by allowed tokens (the keys of COMPND_field_map)
+        # but I would want lots of tests in place first.
+        for MD in MOL_DATA:
+            # Hack for 2OMT
+            MD = MD.replace('EPITHELIAL-CADHERIN; E-CAD/CTF1', 'EPITHELIAL-CADHERIN: E-CAD/CTF1')
+            # Hack for 1M2T
+            MD = MD.replace('SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN; MLA; ML-I A;', 'SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN, MLA, ML-I A,')
+            # Hack for 1IBR
+            MD = MD.replace('SYNONYM: RAN; TC4; RAN GTPASE; ANDROGEN RECEPTOR- ASSOCIATED PROTEIN 24;', 'SYNONYM: RAN TC4, RAN GTPASE, ANDROGEN RECEPTOR-ASSOCIATED PROTEIN 24;')
+            # Hack for 1IBR
+            MD = MD.replace('SYNONYM: KARYOPHERIN BETA-1 SUBUNIT; P95; NUCLEAR FACTOR P97; IMPORTIN 90', 'SYNONYM: KARYOPHERIN BETA-1 SUBUNIT, P95, NUCLEAR FACTOR P97, IMPORTIN 90')
+            # Hack for 1NKH
+            MD = MD.replace('SYNONYM: B4GAL-T1; BETA4GAL-T1; BETA-1,4-GALTASE 1; BETA-1, 4-GALACTOSYLTRANSFERASE 1;  UDP-GALACTOSE:BETA-N- ACETYLGLUCOSAMINE BETA-1,4-GALACTOSYLTRANSFERASE 1; EC: 2.4.1.22, 2.4.1.90, 2.4.1.38; ENGINEERED: YES; OTHER_DETAILS: CHAINS A AND B FORM FIRST, C AND D SECOND LACTOSE SYNTHASE COMPLEX',
+                            'SYNONYM: B4GAL-T1, BETA4GAL-T1, BETA-1,4-GALTASE 1, BETA-1, 4-GALACTOSYLTRANSFERASE 1,  UDP-GALACTOSE:BETA-N- ACETYLGLUCOSAMINE BETA-1,4-GALACTOSYLTRANSFERASE 1, EC: 2.4.1.22, 2.4.1.90, 2.4.1.38, ENGINEERED: YES, OTHER_DETAILS: CHAINS A AND B FORM FIRST, C AND D SECOND LACTOSE SYNTHASE COMPLEX')
+            # Hacks for 2PMI
+            MD = MD.replace('SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85; NEGATIVE REGULATOR OF THE PHO SYSTEM;',
+                            'SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85, NEGATIVE REGULATOR OF THE PHO SYSTEM;')
+            MD = MD.replace('SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80; AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;',
+                            'SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80, AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;')
+
+            MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
+
+            molecule = {}
+            for field in MOL_fields:
+                field = field.split(":")
+                field_name = COMPND_field_map[field[0].strip()]
+                field_data = field[1].strip()
+                molecule[field_name] = field_data
+
+            ### Normalize and type the fields ###
+
+            # Required (by us) fields
+            molecule['MoleculeID'] = int(molecule['MoleculeID'])
+            molecule['Chains'] = map(string.strip, molecule['Chains'].split(','))
+            for c in molecule['Chains']:
+                assert(len(c) == 1)
+
+            # Optional fields
+            if not molecule.get('Engineered'):
+                molecule['Engineered'] = None
+            elif molecule.get('Engineered') == 'YES':
+                molecule['Engineered'] = True
+            elif molecule.get('Engineered') == 'NO':
+                molecule['Engineered'] = False
+            else:
+                raise PDBParsingException("Error parsing ENGINEERED field of COMPND lines. Expected 'YES' or 'NO', got '%s'." % molecule['Engineered'])
+
+            if molecule.get('Mutation'):
+                if molecule['Mutation'] != 'YES':
+                    raise PDBParsingException("Error parsing MUTATION field of COMPND lines. Expected 'YES', got '%s'." % molecule['Mutation'])
                 else:
-                    break
+                    molecule['Mutation'] = True
             else:
-                found_SEQRES_lines = True
-                SEQRES_lines.append(line)
-        for x in range(0, len(SEQRES_lines)):
-            assert(SEQRES_lines[x][7:10].strip().isdigit())
+                molecule['Mutation'] = None
 
-        if not SEQRES_lines:
-            raise Exception("Do not raise this exception")
-            return None
+            # Add missing fields
+            for k in COMPND_field_map.values():
+                if k not in molecule.keys():
+                    molecule[k] = None
 
-        # If the COMPND lines exist, concatenate them together into one string
-        sequences = {}
-        chains_in_order = []
-        SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
+            molecules[molecule['MoleculeID']] = molecule
 
-        # Collect all residues for all chains
-        chain_tokens = {}
-        for line in SEQRES_lines:
-            chainID = line[0]
-            if chainID not in chains_in_order:
-                chains_in_order.append(chainID)
-            chain_tokens[chainID] = chain_tokens.get(chainID, [])
-            residues = line[6:].strip().split()
-            chain_tokens[chainID].extend(residues)
 
-        self.chain_types = {}
-        for chain_id, tokens in chain_tokens.iteritems():
-            # Determine whether chains are DNA or proteins
-            chain_type = None
-            set_of_tokens = set(tokens)
-            if (set(tokens).union(dna_nucleotides) == dna_nucleotides) or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
-                chain_type = 'DNA'
+        COMPND_lines = self.parsed_lines["COMPND"]
+        for x in range(1, len(COMPND_lines)):
+            assert(int(COMPND_lines[x][7:10]) == x+1)
+        if not COMPND_lines:
+            raise MissingRecordsException("No COMPND records were found. Handle this gracefully.")
+
+        # Extract the SOURCE lines
+        SOURCE_lines = self.parsed_lines["SOURCE"]
+        for x in range(1, len(SOURCE_lines)):
+            assert(int(SOURCE_lines[x][7:10]) == x+1)
+        if not SOURCE_lines:
+            raise MissingRecordsException("No SOURCE records were found. Handle this gracefully.")
+
+        # Concatenate the SOURCE lines into one string, removing double spaces
+        SOURCE_lines = " ".join([line[10:].strip() for line in SOURCE_lines])
+        SOURCE_lines.replace("  ", " ")
+
+        # Split the SOURCE lines into separate molecule entries
+        MOL_DATA = ["MOL_ID:%s".strip() % s for s in SOURCE_lines.split('MOL_ID:') if s]
+        # Parse the molecule entries
+        for MD in MOL_DATA:
+            MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
+            new_molecule = {}
+            for field in MOL_fields:
+                field = field.split(":")
+                if SOURCE_field_map.get(field[0].strip()):
+                    field_name = SOURCE_field_map[field[0].strip()]
+                    field_data = field[1].strip()
+                    new_molecule[field_name] = field_data
+
+            MoleculeID = int(new_molecule['MoleculeID'])
+            assert(MoleculeID in molecules)
+            molecule = molecules[MoleculeID]
+
+            for field_name, field_data in new_molecule.iteritems():
+                if field_name != 'MoleculeID':
+                    molecule[field_name] = field_data
+
+            # Normalize and type the fields
+
+            if not molecule.get('Synthetic'):
+                molecule['Synthetic'] = None
+            elif molecule.get('Synthetic') == 'YES':
+                molecule['Synthetic'] = True
+            elif molecule.get('Synthetic') == 'NO':
+                molecule['Synthetic'] = False
             else:
-                chain_type = 'Protein'
-            self.chain_types[chain_id] = chain_type
+                raise PDBParsingException("Error parsing SYNTHETIC field of SOURCE lines. Expected 'YES' or 'NO', got '%s'." % molecule['Synthetic'])
 
-            sequence = []
-            if chain_type == 'DNA':
-                for r in tokens:
-                    if dna_nucleotides_2to1_map.get(r):
-                        sequence.append(dna_nucleotides_2to1_map[r])
-                    else:
-                        if non_canonical_dna.get(r):
-                            sequence.append(non_canonical_dna[r])
-                        else:
-                            raise Exception("Unknown DNA residue %s." % r)
-            else:
-                for r in tokens:
-                    if residue_type_3to1_map.get(r):
-                        sequence.append(residue_type_3to1_map[r])
-                    else:
-                        if non_canonical_amino_acids.get(r):
-                            #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_amino_acids[r]))
-                            #print(SEQRES_lines)
-                            #print(line)
-                            sequence.append(non_canonical_amino_acids[r])
-                        elif r == 'UNK':
-                            continue
-                        # Skip these residues
-                        elif r == 'ACE' and pdb_id in cases_with_ACE_residues_we_can_ignore:
-                            continue
-                        # End of skipped residues
-                        else:
-                            #print(SEQRES_lines)
-                            #print(line)
-                            raise Exception("Unknown protein residue %s." % r)
-            sequences[chain_id] = "".join(sequence)
+            # Add missing fields
+            for k in SOURCE_field_map.values():
+                if k not in molecule.keys():
+                    molecule[k] = None
 
-        return sequences, chains_in_order
+        return [v for k, v in sorted(molecules.iteritems())]
 
-    def get_pdb_id(self):
-        if self.pdb_id:
-            return self.pdb_id
-        else:
-            header = self.parsed_lines["HEADER"]
-            assert(len(header) <= 1)
-            if header:
-                return header[0][62:66]
-        return None
+    ### Sequence-related functions ###
 
     def get_SEQRES_sequences(self):
 
@@ -511,7 +573,7 @@ class PDB:
             assert(SEQRES_lines[x][7:10].strip().isdigit())
 
         if not SEQRES_lines:
-            raise Exception("No SEQRES records were found. Handle this gracefully.") # return None
+            raise MissingRecordsException("No SEQRES records were found. Handle this gracefully.") # return None
 
         chains_in_order = []
         SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
@@ -592,158 +654,7 @@ class PDB:
 
         return sequences, chains_in_order
 
-    def getMoleculeInfo(self):
-        # Extract the COMPND lines
-        COMPND_lines = []
-        found_COMPND_lines = False
-        for line in self.lines:
-            if not line.startswith("COMPND"):
-                if not found_COMPND_lines:
-                    continue
-                else:
-                    break
-            else:
-                found_COMPND_lines = True
-                COMPND_lines.append(line)
-        for x in range(1, len(COMPND_lines)):
-            assert(int(COMPND_lines[x][7:10]) == x+1)
 
-        if not COMPND_lines:
-            raise Exception("Do not raise this exception")
-            return None
-
-        # If the COMPND lines exist, concatenate them together into one string
-        COMPND_lines = " ".join([line[10:].strip() for line in COMPND_lines])
-        COMPND_lines.replace("  ", " ")
-
-        # Split the COMPND lines into seperate molecule entries
-        molecules = {}
-        MOL_DATA = ["MOL_ID:%s".strip() % s for s in COMPND_lines.split('MOL_ID:') if s]
-
-        # Parse the molecule entries
-        for MD in MOL_DATA:
-            # Hack for 2OMT
-            MD = MD.replace('EPITHELIAL-CADHERIN; E-CAD/CTF1', 'EPITHELIAL-CADHERIN: E-CAD/CTF1')
-            # Hack for 1M2T
-            MD = MD.replace('SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN; MLA; ML-I A;', 'SYNONYM: BETA-GALACTOSIDE SPECIFIC LECTIN I A CHAIN, MLA, ML-I A,')
-            # Hack for 1IBR
-            MD = MD.replace('SYNONYM: RAN; TC4; RAN GTPASE; ANDROGEN RECEPTOR- ASSOCIATED PROTEIN 24;', 'SYNONYM: RAN TC4, RAN GTPASE, ANDROGEN RECEPTOR-ASSOCIATED PROTEIN 24;')
-            # Hack for 1IBR
-            MD = MD.replace('SYNONYM: KARYOPHERIN BETA-1 SUBUNIT; P95; NUCLEAR FACTOR P97; IMPORTIN 90', 'SYNONYM: KARYOPHERIN BETA-1 SUBUNIT, P95, NUCLEAR FACTOR P97, IMPORTIN 90')
-            # Hack for 1NKH
-            MD = MD.replace('SYNONYM: B4GAL-T1; BETA4GAL-T1; BETA-1,4-GALTASE 1; BETA-1, 4-GALACTOSYLTRANSFERASE 1;  UDP-GALACTOSE:BETA-N- ACETYLGLUCOSAMINE BETA-1,4-GALACTOSYLTRANSFERASE 1; EC: 2.4.1.22, 2.4.1.90, 2.4.1.38; ENGINEERED: YES; OTHER_DETAILS: CHAINS A AND B FORM FIRST, C AND D SECOND LACTOSE SYNTHASE COMPLEX',
-                            'SYNONYM: B4GAL-T1, BETA4GAL-T1, BETA-1,4-GALTASE 1, BETA-1, 4-GALACTOSYLTRANSFERASE 1,  UDP-GALACTOSE:BETA-N- ACETYLGLUCOSAMINE BETA-1,4-GALACTOSYLTRANSFERASE 1, EC: 2.4.1.22, 2.4.1.90, 2.4.1.38, ENGINEERED: YES, OTHER_DETAILS: CHAINS A AND B FORM FIRST, C AND D SECOND LACTOSE SYNTHASE COMPLEX')
-            # Hacks for 2PMI
-            MD = MD.replace('SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85; NEGATIVE REGULATOR OF THE PHO SYSTEM;',
-                            'SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85, NEGATIVE REGULATOR OF THE PHO SYSTEM;')
-            MD = MD.replace('SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80; AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;',
-                            'SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80, AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;')
-
-            MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
-            molecule = {}
-            for field in MOL_fields:
-                print(field)
-                field = field.split(":")
-                field_name = COMPND_field_map[field[0].strip()]
-                field_data = field[1].strip()
-                molecule[field_name] = field_data
-
-            # Normalize and type the fields 
-
-            # Required (by us) fields
-            molecule['MoleculeID'] = int(molecule['MoleculeID'])
-            molecule['Chains'] = map(string.strip, molecule['Chains'].split(','))
-            for c in molecule['Chains']:
-                assert(len(c) == 1)
-
-            # Optional fields
-            if not molecule.get('Engineered'):
-                molecule['Engineered'] = None
-            elif molecule.get('Engineered') == 'YES':
-                molecule['Engineered'] = True
-            elif molecule.get('Engineered') == 'NO':
-                molecule['Engineered'] = False
-            else:
-                raise Exception("Error parsing ENGINEERED field of COMPND lines: '%s'." % molecule)
-
-            if molecule.get('Mutation'):
-                if molecule['Mutation'] != 'YES':
-                    raise Exception("Error parsing MUTATION field of COMPND lines. Expected 'YES', got '%s'." % molecule['Mutation'])
-                else:
-                    molecule['Mutation'] = True
-            else:
-                molecule['Mutation'] = None
-
-            # Add missing fields
-            for k in COMPND_field_map.values():
-                if k not in molecule.keys():
-                    molecule[k] = None
-
-            molecules[molecule['MoleculeID']] = molecule
-
-        # Extract the SOURCE lines
-        SOURCE_lines = []
-        found_SOURCE_lines = False
-        for line in self.lines:
-            if not line.startswith("SOURCE"):
-                if not found_SOURCE_lines:
-                    continue
-                else:
-                    break
-            else:
-                found_SOURCE_lines = True
-                SOURCE_lines.append(line)
-        for x in range(1, len(SOURCE_lines)):
-            assert(int(SOURCE_lines[x][7:10]) == x+1)
-
-        if not SOURCE_lines:
-            raise Exception("Do not raise this exception")
-            return None
-
-        # If the SOURCE lines exist, concatenate them together into one string
-        SOURCE_lines = " ".join([line[10:].strip() for line in SOURCE_lines])
-        SOURCE_lines.replace("  ", " ")
-
-        # Split the SOURCE lines into seperate molecule entries
-        MOL_DATA = ["MOL_ID:%s".strip() % s for s in SOURCE_lines.split('MOL_ID:') if s]
-        # Parse the molecule entries
-        for MD in MOL_DATA:
-            MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
-            new_molecule = {}
-            for field in MOL_fields:
-                print(field)
-                field = field.split(":")
-                if SOURCE_field_map.get(field[0].strip()):
-                    field_name = SOURCE_field_map[field[0].strip()]
-                    field_data = field[1].strip()
-                    new_molecule[field_name] = field_data
-
-            MoleculeID = int(new_molecule['MoleculeID'])
-            print(molecules.keys())
-            assert(MoleculeID in molecules)
-            molecule = molecules[MoleculeID]
-
-            for field_name, field_data in new_molecule.iteritems():
-                if field_name != 'MoleculeID':
-                    molecule[field_name] = field_data 
-
-            # Normalize and type the fields
-
-            if not molecule.get('Synthetic'):
-                molecule['Synthetic'] = None
-            elif molecule.get('Synthetic') == 'YES':
-                molecule['Synthetic'] = True
-            elif molecule.get('Synthetic') == 'NO':
-                molecule['Synthetic'] = False
-            else:
-                raise Exception("Error parsing SYNTHETIC field of SOURCE lines: '%s'." % molecule)
-
-            # Add missing fields
-            for k in SOURCE_field_map.values():
-                if k not in molecule.keys():
-                    molecule[k] = None
-
-        return [v for k, v in sorted(molecules.iteritems())]
 
     @staticmethod
     def ChainResidueID2String(chain, residueID):
