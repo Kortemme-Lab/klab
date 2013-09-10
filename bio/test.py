@@ -3,11 +3,11 @@ sys.path.insert(0, "../..")
 from tools.bio.pdb import PDB
 from tools import colortext
 
-#p = PDB('/home/oconchus/Downloads/1J1M.pdb')
 p = PDB('../.testdata/1H38.pdb')
 p = PDB('../.testdata/1ZC8.pdb')
 p = PDB('../.testdata/4IHY.pdb')
 #p = PDB('../.testdata/2GRB.pdb')
+p = PDB('/home/oconchus/Downloads/1J1M.pdb')
 
 #print(p.structure_lines)
 
@@ -35,6 +35,30 @@ for pdb_id, details in sorted(refs.iteritems()):
                 else:
                     print("      %s: %s" % (k, v))
 
+
+colortext.message("Molecule information")
+molecules = p.get_molecules_and_source()
+for m in molecules:
+    colortext.warning("Molecule %d" % m['MoleculeID'])
+    for k, v in m.iteritems():
+        if k != 'MoleculeID':
+            print("  %s: %s" % (k,v))
+
+colortext.message("Journal information")
+for k,v in p.get_journal().iteritems():
+    print("%s : %s" % (k.ljust(20), v))
+
+colortext.message("GetRosettaResidueMap")
+print(p.GetRosettaResidueMap())
+
+colortext.message("get_all_sequences")
+print(p.get_all_sequences('/guybrushhome/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease', '/guybrushhome/Rosetta3.5/rosetta_database/', False))
+
+#print(p.get_pdb_to_rosetta_residue_map('/guybrushhome/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease', '/guybrushhome/Rosetta3.5/rosetta_database/', False))
+
+
+sys.exit(0)
+
 colortext.message("Chains")
 print(",".join(p.get_ATOM_and_HETATM_chains()))
 
@@ -43,6 +67,8 @@ sequences, chains_in_order = p.get_SEQRES_sequences()
 for chain_id in chains_in_order:
     colortext.warning("%s (%s)" % (chain_id, p.chain_types[chain_id]))
     print(sequences[chain_id])
+
+sys.exit(0)
 
 for testpdb in ['2GRB', '4IHY', '1ZC8', '1H38']:
     p = PDB('../.testdata/%s.pdb' % testpdb)
