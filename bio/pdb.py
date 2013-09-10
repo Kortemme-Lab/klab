@@ -28,6 +28,7 @@ from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, n
 # - checkPDBAgainstMutations and checkPDBAgainstMutationsTuple have now been made into object functions
 # - getSEQRESSequences is now get_SEQRES_sequences and handles RNA properly.
 # - getMoleculeInfo is now get_molecules_and_source
+# - ProperResidueIDToAAMap is now get_residue_type_map. The buggy aa_resid2type function has been deleted.
 
 ### Residue types
 
@@ -1065,29 +1066,22 @@ class PDB:
 
         return foundRes.keys()
 
-    def ProperResidueIDToAAMap(self):
+    def get_residue_type_map(self):
         '''This fixes the odd behaviour of aa_resid2type by including the insertion code.
-           Returns a dictionary mapping residue IDs (Chain, residue number, insertion code) to the
-           corresponding one-letter amino acid.'''
+           Returns a dictionary mapping residue IDs (Chain, residue number, insertion code e.g. "A 123B) to the
+           corresponding one-letter amino acid.
+
+           Caveat: This function ignores occupancy - this function should be called once occupancy has been dealt with appropriately.'''
 
         resid2type = {}
-        for line in self.lines:
+        atomlines = self.parsed_lines['ATOM']
+        for line in atomlines:
             resname = line[17:20]
-            if line[0:4] == "ATOM" and resname in allowed_PDB_residues_types and line[13:16] == 'CA ':
-                resid2type[line[21:27]] = residue_type_3to1_map[resname]
+            if resname in allowed_PDB_residues_types and line[13:16] == 'CA ':
+                resid2type[line[21:27]] = residue_type_3to1_map.get(resname) or protonated_residue_type_3to1_map.get(resname)
         return resid2type
 
-    def aa_resid2type(self):
-        '''this creates a dictionary where the resid "A 123" is mapped to the one-letter aa type'''
 
-        resid2type = {}
-
-        for line in self.lines:
-            resname = line[17:20]
-            if line[0:4] == "ATOM" and resname in allowed_PDB_residues_types and line[26] == ' ' and line[13:16] == 'CA ':
-                resid2type[line[21:26]] = residue_type_3to1_map[resname]
-
-        return resid2type # format: "A 123" or: '%s%4.i' % (chain,resid)    
 
     def pruneChains(self, chainsChosen):
         # If chainsChosen is non-empty then removes any ATOM lines of chains not in chainsChosen
