@@ -50,7 +50,20 @@ residue_types_3 = set(residue_type_3to1_map.keys())
 residue_types_1 = set(residue_type_3to1_map.values()) # formally a list called amino_acid_codes
 relaxed_residue_types_1 = residue_types_1.union(set(['X']))
 
-protonated_residues_types_3 = set(['ARN', 'ASH', 'GLH', 'LYN', 'HIE', 'HIP'])
+protonated_residue_type_3to1_map = {
+    'ARN': 'R', # neutral arginine
+    'ASH': 'D', # protonated aspartic acid
+    'GLH': 'E', # protonated glutamic acid
+    'LYN': 'K', # neutral lysine
+    'HIE': 'H', # epsilon-protonated histidine
+    'HIP': 'H', # epsilon- and delta-protonated histidine
+    'HIS': 'H', # delta-protonated histidine
+    'CYM': 'C', # deprotonated or bonded to metal atom
+    'CYT': 'C', # deprotonated negative cysteine
+    'CYX': 'C', # involved in disulphide bridge and other bonds / neutral cysteine
+}
+protonated_residues_types_3 = set(protonated_residue_type_3to1_map.keys())
+protonated_residues_types_1 = set(protonated_residue_type_3to1_map.values())
 
 non_canonical_amino_acids = {
     'ABA' : 'A', # Alpha-aminobutyric acid
@@ -115,15 +128,37 @@ all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
 # Mutations
 #
 
-class PDBResidue(object):
-    def __init__(self, Chain, ResidueID, ResidueAA):
-        assert(len(Chain) == 1)
-        assert(len(ResidueID) == 5)
-        assert(ResidueAA in residue_types_1)
+class Sequence(object):
+    '''A class to hold a list of Residues in the same chain. The order of the sequence is the order of addition.'''
+    def __init__(self):
+        self.sequence = []
 
+    def add(self, r):
+        if self.sequence:
+            assert(r.Chain == self.sequence[-1].Chain)
+        self.sequence.append(r)
+
+    def __repr__(self):
+        return "".join([r.ResidueAA for r in self.sequence])
+
+
+class Residue(object):
+    def __init__(self, Chain, ResidueID, ResidueAA):
+        assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1))
         self.Chain = Chain
         self.ResidueID = ResidueID
         self.ResidueAA = ResidueAA
+
+    def __repr__(self):
+        return "%s:%s %s" % (self.Chain, self.ResidueID.strip(), self.ResidueAA)
+
+
+class PDBResidue(Residue):
+    def __init__(self, Chain, ResidueID, ResidueAA):
+        assert(len(Chain) == 1)
+        assert(len(ResidueID) == 5)
+        super(PDBResidue, self).__init__(Chain, ResidueID, ResidueAA)
+
 
 ###
 # Mutations
