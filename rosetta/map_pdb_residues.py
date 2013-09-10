@@ -37,7 +37,7 @@ def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
     filename = write_temp_file("/tmp", pdb_file_contents)
     success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path)
-    os.path.remove(filename)
+    os.remove(filename)
     return success, mapping
 
 def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path):
