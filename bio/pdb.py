@@ -654,34 +654,6 @@ class PDB:
 
         return sequences, chains_in_order
 
-
-
-    @staticmethod
-    def ChainResidueID2String(chain, residueID):
-        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
-        return "%s%s" % (chain, PDB.ResidueID2String(residueID))
-
-    @staticmethod
-    def ResidueID2String(residueID):
-        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
-        if residueID.isdigit():
-            return "%s " % (residueID.rjust(4))
-        else:
-            return "%s" % (residueID.rjust(5))
-
-    def validate_mutations(self, mutations):
-        '''This function has been refactored to use the SimpleMutation class.'''
-        # Chain, ResidueID, WildTypeAA, MutantAA
-        resID2AA = self.ProperResidueIDToAAMap()
-        badmutations = []
-        for m in mutations:
-            wildtype = resID2AA.get(PDB.ChainResidueID2String(m.Chain, m.ResidueID), "")
-            if m.WildTypeAA != wildtype:
-                badmutations.append(m)
-        if badmutations:
-            raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (", ".join(map(str, badmutations)), self.pdb_id))
-
-    ###
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         sequences, residue_map = self.GetRosettaResidueMap(ConvertMSEToAtom = ConvertMSEToAtom, RemoveIncompleteFinalResidues = RemoveIncompleteFinalResidues, RemoveIncompleteResidues = RemoveIncompleteResidues)
         return sequences
@@ -709,7 +681,7 @@ class PDB:
                 if chainID not in chains:
                     chains.append(chainID)
                 residue_longname = line[17:20]
-                if residue_longname in DNA_residues: 
+                if residue_longname in DNA_residues:
                     # Skip DNA
                     continue
                 if residue_longname == 'UNK':
@@ -777,7 +749,7 @@ class PDB:
                     if essential_atoms_1.intersection(atoms_read[chainID]) != essential_atoms_1 and essential_atoms_2.intersection(atoms_read[chainID]) != essential_atoms_2:
                         print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms_1.difference(atoms_read[chainID]) or essential_atoms_2.difference(atoms_read[chainID])))
                         oldResidueID = sequence_list[-1][1:]
-                        residue_map[chainID] = residue_map[chainID][0:-1] 
+                        residue_map[chainID] = residue_map[chainID][0:-1]
                         sequences[chainID] = sequence_list[0:-1]
 
 
@@ -799,6 +771,33 @@ class PDB:
                 residue_objects[chainID].append((resid[1:].strip(), resaa))
 
         return sequences, residue_objects
+
+    @staticmethod
+    def ChainResidueID2String(chain, residueID):
+        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        return "%s%s" % (chain, PDB.ResidueID2String(residueID))
+
+    @staticmethod
+    def ResidueID2String(residueID):
+        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        if residueID.isdigit():
+            return "%s " % (residueID.rjust(4))
+        else:
+            return "%s" % (residueID.rjust(5))
+
+    def validate_mutations(self, mutations):
+        '''This function has been refactored to use the SimpleMutation class.'''
+        # Chain, ResidueID, WildTypeAA, MutantAA
+        resID2AA = self.ProperResidueIDToAAMap()
+        badmutations = []
+        for m in mutations:
+            wildtype = resID2AA.get(PDB.ChainResidueID2String(m.Chain, m.ResidueID), "")
+            if m.WildTypeAA != wildtype:
+                badmutations.append(m)
+        if badmutations:
+            raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (", ".join(map(str, badmutations)), self.pdb_id))
+
+
 
     def getJournal(self):
         if not self.journal:
