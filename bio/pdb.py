@@ -11,10 +11,22 @@ import math
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
 from basics import residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
-from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna
+from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 
-# todo: related packages
-# computeMeanAndStandardDeviation was renamed to get_mean_and_standard_deviation
+# todo: related packages will need to be fixed since my refactoring
+# - replace aa1 with basics.residue_type_3to1_map
+# - replace relaxed_amino_acid_codes (a list) with basics.relaxed_residue_types_1 (a set)
+# - replace amino_acid_codes (a list) with basics.residue_types_1 (a set)
+# - replace non_canonical_aa1 with basics.non_canonical_amino_acids
+# - replace residues with pdb.allowed_PDB_residues_types
+# - replace nucleotides_dna_to_shorthand with basics.dna_nucleotides_2to1_map
+# - replace nucleotides_dna and nucleotides_rna with basics.dna_nucleotides and rna_nucleotides respectively
+# - The Residue class is now located in basics.py and renamed to PDBResidue (since we assert that the chain is 1 character long).
+# - The Mutation class is now located in basics.py. ChainMutation was called something else.
+# - computeMeanAndStandardDeviation was renamed to pymath.stats.get_mean_and_standard_deviation
+# - computeMeanAndStandardDeviation was renamed to get_mean_and_standard_deviation
+# - checkPDBAgainstMutations and checkPDBAgainstMutationsTuple have now been made into object functions
+# - getSEQRESSequences is now get_SEQRES_sequences and handles RNA properly.
 
 ### Residue types
 
@@ -67,6 +79,7 @@ order_of_records = [
     "MTRIX1","MTRIX2","MTRIX3","MODEL","ATOM","ANISOU","TER","HETATM",
     "ENDMDL","CONECT","MASTER","END"
 ]
+order_of_records = [x.ljust(6) for x in order_of_records]
 
 # I added allowed_record_types from the Types of Records section of the PDB format documentation at http://www.wwpdb.org/documentation/format33/sect1.html
 # It is missing the following set ['DBREF1', 'DBREF1/DBREF2', 'DBREF2', 'ORIGX1', 'ORIGX2', 'ORIGX3', 'SCALE1', 'SCALE2', 'SCALE3', 'MTRIX1', 'MTRIX2', 'MTRIX3']
@@ -243,10 +256,13 @@ class PDB:
 
         self.parsed_lines = {}
         self.structure_lines = [] # For ATOM and HETATM records
+        self.chains_in_document_order = []
         self.ddGresmap = None
         self.ddGiresmap = None
         self.lines = []
         self.journal = None
+        self.chain_types = {}
+
         self.pdb_id = pdb_id
         if type(pdb) == types.StringType:
             self.read(pdb)
@@ -258,7 +274,7 @@ class PDB:
 
     ### Private functions ###
     def _split_lines(self):
-        structure_lines = []
+        '''Creates the parsed_lines dict which keeps all record data in document order indexed by the record type.'''
         parsed_lines = {}
         for rt in all_record_types:
             parsed_lines[rt] = []
@@ -268,22 +284,27 @@ class PDB:
             linetype = line[0:6]
             if linetype in all_record_types:
                 parsed_lines[linetype].append(line)
-                if linetype == 'ATOM' or linetype == 'HETATM':
-                    structure_lines.append(line)
             else:
                 parsed_lines[0].append(line)
 
         self.parsed_lines = parsed_lines
-        self.structure_lines = structure_lines
+        self._update_structure_lines() # This does a second loop through the lines. We could do this logic above but I prefer a little performance hit for the cleaner code
 
     def _update_structure_lines(self):
         '''ATOM and HETATM lines may be altered by function calls. When this happens, this function should be called to keep self.structure_lines up to date.'''
         structure_lines = []
+        chains_in_document_order = []
+
         for line in self.lines:
             linetype = line[0:6]
-            if linetype == 'ATOM' or linetype == 'HETATM':
+            if linetype == 'ATOM  ' or linetype == 'HETATM' or linetype == 'TER   ':
                 structure_lines.append(line)
+                chainID = line[21]
+                if chainID not in chains_in_document_order:
+                    chains_in_document_order.append(chainID)
+                    
         self.structure_lines = structure_lines
+        self.chains_in_document_order = chains_in_document_order
 
     ### PDB FILE PARSING FUNCTIONS ###
 
@@ -339,18 +360,12 @@ class PDB:
         return techniques
 
     def get_ATOM_and_HETATM_chains(self):
-        '''Returns the chains of the PDB in the order in which they appear in the file.'''
-        chains = []
-        for line in self.structure_lines:
-            chainID = line[21]
-            if chainID not in chains:
-                chains.append(chainID)
-        return chains
+        '''todo: remove this function as it now just returns a member element'''
+        return self.chains_in_document_order
 
     def get_DB_references(self):
         ''' "The DBREF record provides cross-reference links between PDB sequences (what appears in SEQRES record) and
                 a corresponding database sequence." - http://www.wwpdb.org/documentation/format33/sect3.html#DBREF
-
         '''
 
         _database_names = {
@@ -361,9 +376,8 @@ class PDB:
             'TREMBL': 'UNIPROT',
         }
 
-        DBREF_lines = [l for l in self.lines if l.startswith('DBREF')]
         DBref = {}
-        for l in DBREF_lines:
+        for l in self.parsed_lines["DBREF "]: # [l for l in self.lines if l.startswith('DBREF')]
             pdb_id = l[7:11]
             chain_id = l[12]
             seqBegin = int(l[14:18])
@@ -380,7 +394,6 @@ class PDB:
 
             DBref[pdb_id] = DBref.get(pdb_id, {})
             DBref[pdb_id][database] = DBref[pdb_id].get(database, {})
-            print((pdb_id, chain_id), known_chimeras)
             if DBref[pdb_id][database].get(chain_id):
                 if not(DBref[pdb_id][database][chain_id]['dbAccession'] == dbAccession and DBref[pdb_id][database][chain_id]['dbIdCode'] == dbIdCode):
                     raise PDBParsingException('This code needs to be generalized. dbIdCode should really be a list to handle chimera cases.')
@@ -395,7 +408,8 @@ class PDB:
         return DBref
 
     def getSEQRESSequences(self):
-        # Extract the SEQRES lines
+        '''Deprecated. Use get_SEQRES_sequences.
+           Extract the SEQRES lines.'''
         SEQRES_lines = []
         found_SEQRES_lines = False
         pdb_id = self.pdb_id
@@ -454,6 +468,106 @@ class PDB:
                             sequence.append(non_canonical_dna[r])
                         else:
                             raise Exception("Unknown DNA residue %s." % r)
+            else:
+                for r in tokens:
+                    if residue_type_3to1_map.get(r):
+                        sequence.append(residue_type_3to1_map[r])
+                    else:
+                        if non_canonical_amino_acids.get(r):
+                            #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_amino_acids[r]))
+                            #print(SEQRES_lines)
+                            #print(line)
+                            sequence.append(non_canonical_amino_acids[r])
+                        elif r == 'UNK':
+                            continue
+                        # Skip these residues
+                        elif r == 'ACE' and pdb_id in cases_with_ACE_residues_we_can_ignore:
+                            continue
+                        # End of skipped residues
+                        else:
+                            #print(SEQRES_lines)
+                            #print(line)
+                            raise Exception("Unknown protein residue %s." % r)
+            sequences[chain_id] = "".join(sequence)
+
+        return sequences, chains_in_order
+
+    def get_pdb_id(self):
+        if self.pdb_id:
+            return self.pdb_id
+        else:
+            header = self.parsed_lines["HEADER"]
+            assert(len(header) <= 1)
+            if header:
+                return header[0][62:66]
+        return None
+
+    def get_SEQRES_sequences(self):
+
+        pdb_id = self.get_pdb_id()
+        SEQRES_lines = self.parsed_lines["SEQRES"]
+
+        for x in range(0, len(SEQRES_lines)):
+            assert(SEQRES_lines[x][7:10].strip().isdigit())
+
+        if not SEQRES_lines:
+            raise Exception("No SEQRES records were found. Handle this gracefully.") # return None
+
+        chains_in_order = []
+        SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
+
+        # Collect all residues for all chains, remembering the chain order
+        chain_tokens = {}
+        for line in SEQRES_lines:
+            chainID = line[0]
+            if chainID not in chains_in_order:
+                chains_in_order.append(chainID)
+            chain_tokens[chainID] = chain_tokens.get(chainID, [])
+            chain_tokens[chainID].extend(line[6:].strip().split())
+
+        sequences = {}
+        self.chain_types = {}
+        for chain_id, tokens in chain_tokens.iteritems():
+
+            # Determine whether the chain is DNA, RNA, or a protein chain
+            # 1H38 is a good test for this - it contains DNA (chains E and G and repeated by H, K, N, J, M, P), RNA (chain F, repeated by I, L, O) and protein (chain D, repeated by A,B,C) sequences
+            # 1ZC8 is similar but also has examples of DU
+            # 4IHY has examples of DI (I is inosine)
+            # 2GRB has RNA examples of I and U
+            # This will throw an exception when a non-canonical is found which is not listed in basics.py. In that case, the list in basics.py should be updated.
+
+            chain_type = None
+            set_of_tokens = set(tokens)
+            if (set(tokens).union(all_recognized_dna) == all_recognized_dna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+                chain_type = 'DNA'
+            elif (set(tokens).union(all_recognized_rna) == all_recognized_rna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+                chain_type = 'RNA'
+            else:
+                assert(len(set(tokens).intersection(dna_nucleotides)) == 0)
+                assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
+                chain_type = 'Protein'
+
+            # Get the sequence, mapping non-canonicals to the appropriate letter
+            self.chain_types[chain_id] = chain_type
+            sequence = []
+            if chain_type == 'DNA':
+                for r in tokens:
+                    if dna_nucleotides_2to1_map.get(r):
+                        sequence.append(dna_nucleotides_2to1_map[r])
+                    else:
+                        if non_canonical_dna.get(r):
+                            sequence.append(non_canonical_dna[r])
+                        else:
+                            raise Exception("Unknown DNA residue %s." % r)
+            elif chain_type == 'RNA':
+                for r in tokens:
+                    if r in rna_nucleotides:
+                        sequence.append(r)
+                    else:
+                        if non_canonical_rna.get(r):
+                            sequence.append(non_canonical_rna[r])
+                        else:
+                            raise Exception("Unknown RNA residue %s." % r)
             else:
                 for r in tokens:
                     if residue_type_3to1_map.get(r):
