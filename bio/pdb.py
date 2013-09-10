@@ -10,8 +10,9 @@ import math
 
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
-from basics import residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
+from basics import PDBResidue, Sequence, residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
 
 # todo: related packages will need to be fixed since my refactoring
 # - replace aa1 with basics.residue_type_3to1_map
@@ -28,7 +29,9 @@ from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, n
 # - checkPDBAgainstMutations and checkPDBAgainstMutationsTuple have now been made into object functions
 # - getSEQRESSequences is now get_SEQRES_sequences and handles RNA properly.
 # - getMoleculeInfo is now get_molecules_and_source
-# - ProperResidueIDToAAMap is now get_residue_type_map. The buggy aa_resid2type function has been deleted.
+# - ProperResidueIDToAAMap is now get_residue_id_to_type_map. The buggy aa_resid2type function has been deleted.
+# - getJournal is now get_journal.  parseJRNL has been removed.
+# - Calls to get_ATOM_and_HETATM_chains should be removed
 
 ### Residue types
 
@@ -151,6 +154,7 @@ def checkPDBAgainstMutationsTuple(pdbID, pdb, mutations): raise Exception("This 
 class PDBParsingException(Exception): pass
 class MissingRecordsException(Exception): pass
 class NonCanonicalResidueException(Exception): pass
+class PDBValidationException(Exception): pass
 
 class JRNL(object):
 
@@ -163,7 +167,7 @@ class JRNL(object):
         self.parse_REFN()
         self.parse_DOI()
 
-    def getInfo(self):
+    def get_info(self):
         return self.d
 
     def parse_REF(self):
@@ -265,13 +269,17 @@ class PDB:
         self.journal = None
         self.chain_types = {}
 
+        # todo: This legacy logic is kind of terrible. pdb should be replace with lines (a list of PDB file lines) or content (the entire PDB file read as a string).
+        # todo: For calls to this function passing a filename string, we should have a static function of the PDB class which reads the file and passes the contents to this constructor.
+        # todo: For calls to this function passing a PDB object, we should instead have a clone method which seems to have been the intention.
         self.pdb_id = pdb_id
         if type(pdb) == types.StringType:
             self.read(pdb)
         elif type(pdb) == types.ListType:
-            self.lines.extend(pdb)
+            self.lines = pdb
         elif type(pdb) == type(self):
-            self.lines.extend(pdb.lines)
+            self.lines = pdb.lines
+
         self._split_lines()
 
     ### Private functions ###
@@ -312,6 +320,9 @@ class PDB:
     ### Basic functions ###
 
     def get_pdb_id(self):
+        '''Return the PDB ID. If one was passed in to the constructor, this takes precedence, otherwise the header is
+           parsed to try to find an ID. The header does not always contain a PDB ID in regular PDB files and appears to
+           always have an ID of 'XXXX' in biological units so the constructor override is useful.'''
         if self.pdb_id:
             return self.pdb_id
         else:
@@ -506,13 +517,6 @@ class PDB:
 
             molecules[molecule['MoleculeID']] = molecule
 
-
-        COMPND_lines = self.parsed_lines["COMPND"]
-        for x in range(1, len(COMPND_lines)):
-            assert(int(COMPND_lines[x][7:10]) == x+1)
-        if not COMPND_lines:
-            raise MissingRecordsException("No COMPND records were found. Handle this gracefully.")
-
         # Extract the SOURCE lines
         SOURCE_lines = self.parsed_lines["SOURCE"]
         for x in range(1, len(SOURCE_lines)):
@@ -563,9 +567,18 @@ class PDB:
 
         return [v for k, v in sorted(molecules.iteritems())]
 
+    def get_journal(self):
+        if not self.journal:
+            self.journal = JRNL(self.parsed_lines["JRNL  "])
+        return self.journal.get_info()
+
     ### Sequence-related functions ###
 
     def get_SEQRES_sequences(self):
+        '''Returns the SEQRES sequences and the chains in order of their appearance in the SEQRES records. This second
+           return value should be removed since it does not always agree with the order in the ATOM records which seems
+           the more important value.'''
+         # todo: remove the second return value
 
         pdb_id = self.get_pdb_id()
         SEQRES_lines = self.parsed_lines["SEQRES"]
@@ -654,6 +667,46 @@ class PDB:
             sequences[chain_id] = "".join(sequence)
 
         return sequences, chains_in_order
+
+    ### END OF REFACTORED CODE
+
+    def get_atom_sequences(self):
+        pass
+
+    def get_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
+        if ignore_HETATMs:
+            pdb_file_contents = "\n".join([l for l in self.structure_lines if not(l.startswith('HETATM'))])
+        else:
+            pdb_file_contents = "\n".join(self.structure_lines)
+        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path)
+        if not success:
+            raise Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.")
+        print(a,b)
+        pass
+
+    def get_all_sequences(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
+
+        seqres_sequences, chains_in_order = self.get_SEQRES_sequences()
+
+        # Get a list of all residues with ATOM or HETATM records
+        atom_sequences = {}
+        structural_residue_IDs_set = set() # use a set for a quicker lookup
+        for l in self.structure_lines:
+            if (not(ignore_HETATMs)) or (not(l.startswith("HETATM"))):
+                residue_id = l[21:27]
+                if residue_id not in structural_residue_IDs_set:
+                    chain_id = l[21]
+                    atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence())
+                    residue_type = l[17:20]
+                    short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
+                    #structural_residue_IDs.append((residue_id, short_residue_type))
+                    atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type))
+                    structural_residue_IDs_set.add(residue_id)
+
+        #self.get_pdb_to_rosetta_residue_map(rosetta_scripts_path, rosetta_database_path, ignore_HETATMs)
+
+
+        #ATOM_list =
 
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         sequences, residue_map = self.GetRosettaResidueMap(ConvertMSEToAtom = ConvertMSEToAtom, RemoveIncompleteFinalResidues = RemoveIncompleteFinalResidues, RemoveIncompleteResidues = RemoveIncompleteResidues)
@@ -787,35 +840,19 @@ class PDB:
             return "%s" % (residueID.rjust(5))
 
     def validate_mutations(self, mutations):
-        '''This function has been refactored to use the SimpleMutation class.'''
+        '''This function has been refactored to use the SimpleMutation class.
+           The parameter is a list of Mutation objects. The function has no return value but raises a PDBValidationException
+           if the wildtype in the Mutation m does not match the residue type corresponding to residue m.ResidueID in the PDB file.
+        '''
         # Chain, ResidueID, WildTypeAA, MutantAA
-        resID2AA = self.ProperResidueIDToAAMap()
+        resID2AA = self.get_residue_id_to_type_map()
         badmutations = []
         for m in mutations:
             wildtype = resID2AA.get(PDB.ChainResidueID2String(m.Chain, m.ResidueID), "")
             if m.WildTypeAA != wildtype:
                 badmutations.append(m)
         if badmutations:
-            raise Exception("The mutation(s) %s could not be matched against the PDB %s." % (", ".join(map(str, badmutations)), self.pdb_id))
-
-
-
-    def getJournal(self):
-        if not self.journal:
-            self.parseJRNL()
-        return self.journal.getInfo()
-
-    def parseJRNL(self):
-        journal = []
-        startedToRead = False 
-        for line in self.lines:
-            if line.startswith("JRNL  "):
-                journal.append(line)
-                startedToRead = True
-            else:
-                if startedToRead:
-                    break	# early out
-        self.journal = JRNL(journal)
+            raise PDBValidationException("The mutation(s) %s could not be matched against the PDB %s." % (", ".join(map(str, badmutations)), self.pdb_id))
 
     def read(self, pdbpath):
 
@@ -1066,9 +1103,8 @@ class PDB:
 
         return foundRes.keys()
 
-    def get_residue_type_map(self):
-        '''This fixes the odd behaviour of aa_resid2type by including the insertion code.
-           Returns a dictionary mapping residue IDs (Chain, residue number, insertion code e.g. "A 123B) to the
+    def get_residue_id_to_type_map(self):
+        '''Returns a dictionary mapping 6-character residue IDs (Chain, residue number, insertion code e.g. "A 123B") to the
            corresponding one-letter amino acid.
 
            Caveat: This function ignores occupancy - this function should be called once occupancy has been dealt with appropriately.'''
