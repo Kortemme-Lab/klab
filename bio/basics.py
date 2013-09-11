@@ -123,6 +123,7 @@ non_canonical_rna = {
 all_recognized_dna = dna_nucleotides.union(set(non_canonical_dna.keys()))
 all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
 
+nucleotide_types_1 = set(dna_nucleotides_2to1_map.values()) # for use in SEQRES sequences
 
 ###
 # Mutations
@@ -130,35 +131,104 @@ all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
 
 class Sequence(object):
     '''A class to hold a list of Residues in the same chain. The order of the sequence is the order of addition.'''
-    def __init__(self):
+    def __init__(self, sequence_type = None):
         self.sequence = []
+        if sequence_type:
+            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA')
+        self.sequence_type = sequence_type
 
     def add(self, r):
         if self.sequence:
             assert(r.Chain == self.sequence[-1].Chain)
+            assert(r.residue_type == self.sequence[-1].residue_type)
         self.sequence.append(r)
+
+    def set_type(self, sequence_type):
+        '''Set the type of a Sequence if it has not been set.'''
+        if not(self.sequence_type):
+            for r in self.sequence:
+                r.sequence_type = sequence_type
+            self.sequence_type = sequence_type
 
     def __repr__(self):
         return "".join([r.ResidueAA for r in self.sequence])
 
+    @staticmethod
+    def from_sequence(chain, list_of_residues, sequence_type = None):
+        '''Takes in a chain identifier and protein sequence and returns a Sequence object of Residues, indexed from 1.'''
+        s = Sequence(sequence_type)
+        count = 1
+        for ResidueAA in list_of_residues:
+            if sequence_type:
+                s.add(Residue(chain, count, ResidueAA, sequence_type))
+            else:
+                s.add(Residue(chain, count, ResidueAA, sequence_type))
+            count += 1
+        return s
+
 
 class Residue(object):
-    def __init__(self, Chain, ResidueID, ResidueAA):
-        assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1))
+    def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
+        if residue_type:
+            if residue_type == 'Protein':
+                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1))
+            else:
+                assert(ResidueAA in nucleotide_types_1)
         self.Chain = Chain
         self.ResidueID = ResidueID
         self.ResidueAA = ResidueAA
+        self.residue_type = residue_type
 
     def __repr__(self):
         return "%s:%s %s" % (self.Chain, self.ResidueID.strip(), self.ResidueAA)
 
+    def __eq__(self, other):
+        '''Basic form of equality, just checking the amino acid types. This lets us check equality over different chains with different residue IDs.'''
+        return (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
 
 class PDBResidue(Residue):
-    def __init__(self, Chain, ResidueID, ResidueAA):
+    def __init__(self, Chain, ResidueID, ResidueAA, residue_type, Residue3AA = None):
+        '''Residue3AA has to be used when matching non-canonical residues/HETATMs to the SEQRES record e.g. 34H in 1A2C.'''
         assert(len(Chain) == 1)
         assert(len(ResidueID) == 5)
-        super(PDBResidue, self).__init__(Chain, ResidueID, ResidueAA)
+        super(PDBResidue, self).__init__(Chain, ResidueID, ResidueAA, residue_type)
+        self.Residue3AA = Residue3AA
 
+    def add_position(self, x, y, z):
+        self.x, self.y, self.z = x, y, z
+
+    def __repr__(self):
+        return "%s%s" % (self.Chain, self.ResidueID)
+
+class IdentifyingPDBResidue(PDBResidue):
+    '''A sortable subclass.'''
+
+    def __eq__(self, other):
+        return (self.Chain == other.Chain) and (self.ResidueID == other.ResidueID) and (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
+
+    def __cmp__(self, other):
+        '''Only checks chains and residue IDs.'''
+        if self.Chain != other.Chain:
+            if ord(self.Chain) < ord(other.Chain):
+                return -1
+            else:
+                return 1
+        selfResidueID = self.ResidueID
+        otherResidueID = other.ResidueID
+        if selfResidueID != otherResidueID:
+            if not selfResidueID.isdigit():
+                spair = (int(selfResidueID[:-1]), ord(selfResidueID[-1]))
+            else:
+                spair = (int(selfResidueID), 0)
+            if not otherResidueID.isdigit():
+                opair = (int(otherResidueID[:-1]), ord(otherResidueID[-1]))
+            else:
+                opair = (int(otherResidueID), 0)
+            if spair < opair:
+                return -1
+            else:
+                return 1
+        return 0
 
 ###
 # Mutations
