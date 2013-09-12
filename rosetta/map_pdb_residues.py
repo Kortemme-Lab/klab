@@ -69,13 +69,13 @@ FROM residue_pdb_identification
 INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id AND residue_pdb_identification.residue_number=residues.resNum
 ''')
                 # Create the mapping from PDB residues to Rosetta residues
-                rosetta_residue_ids = set()
+                rosetta_residue_ids = []
                 for r in results:
                     mapping["%s%s%s" % (r[0], str(r[1]).rjust(4), r[2])] = {'pose_residue_id' : r[4], 'name3' : r[5], 'res_type' : r[6]}
-                    rosetta_residue_ids.add(r[4])
+                    rosetta_residue_ids.append(r[4])
 
                 raw_residue_list = [r for r in conn.cursor().execute('''SELECT resNum, name3 FROM residues ORDER BY resNum''')]
-                assert(set([r[0] for r in raw_residue_list]) == rosetta_residue_ids)
+                assert(sorted([r[0] for r in raw_residue_list]) == sorted(rosetta_residue_ids))
 
             except Exception, e:
                 errors.append(str(e))
