@@ -7,12 +7,12 @@ import os
 import types
 import string
 import math
+import tools.colortext as colortext
 
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
-from basics import PDBResidue, Sequence, residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
+from basics import PDBResidue, Sequence, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
-from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
 
 # todo: related packages will need to be fixed since my refactoring
 # - replace aa1 with basics.residue_type_3to1_map
@@ -70,6 +70,14 @@ SOURCE_field_map = {
     'ORGANISM_SCIENTIFIC' : 'OrganismScientificName',
     'ORGANISM_COMMON' : 'OrganismCommonName',
     'ORGANISM_TAXID' : 'OrganismNCBITaxonomyID',
+}
+
+modified_residues_patch = {
+    '1A2C' : {
+        '34H' : 'UNK',
+#        'NA'  : 'UNK',
+#        'HOH' : 'UNK',
+    },
 }
 
 ### Record types
@@ -268,6 +276,9 @@ class PDB:
         self.lines = []
         self.journal = None
         self.chain_types = {}
+        self.format_version = None
+        self.modified_residues = None
+        self.modified_residue_mapping_3 = {}
 
         # todo: This legacy logic is kind of terrible. pdb should be replace with lines (a list of PDB file lines) or content (the entire PDB file read as a string).
         # todo: For calls to this function passing a filename string, we should have a static function of the PDB class which reads the file and passes the contents to this constructor.
@@ -281,6 +292,10 @@ class PDB:
             self.lines = pdb.lines
 
         self._split_lines()
+
+        self.pdb_id = self.get_pdb_id()     # parse the PDB ID if it is not passed in
+        self._get_pdb_format_version()
+        self._get_modified_residues()
 
     ### Private functions ###
 
@@ -329,14 +344,48 @@ class PDB:
             header = self.parsed_lines["HEADER"]
             assert(len(header) <= 1)
             if header:
-                return header[0][62:66]
+                self.pdb_id = header[0][62:66]
+                return self.pdb_id
         return None
 
     def get_ATOM_and_HETATM_chains(self):
         '''todo: remove this function as it now just returns a member element'''
         return self.chains_in_document_order
 
+    def _get_modified_residues(self):
+        if not self.modified_residues:
+            modified_residues = {}
+            modified_residue_mapping_3 = {}
+
+            # Add in the patch
+            for k, v in modified_residues_patch.get(self.pdb_id, {}).iteritems():
+                modified_residue_mapping_3[k] = v
+
+            for line in self.parsed_lines["MODRES"]:
+                modified_residues["%s%s" % (line[16], line[18:23])] = {'modified_residue' : line[12:15], 'original_residue_3' : line[24:27], 'original_residue_1' : residue_type_3to1_map[line[24:27]]}
+                modified_residue_mapping_3[line[12:15]] = line[24:27]
+
+            self.modified_residue_mapping_3 = modified_residue_mapping_3
+            self.modified_residues = modified_residues
+
     ### PDB FILE PARSING FUNCTIONS ###
+
+    def _get_pdb_format_version(self):
+        '''Remark 4 indicates the version of the PDB File Format used to generate the file.'''
+        if not self.format_version:
+            version = None
+            version_lines = [line for line in self.parsed_lines['REMARK'] if int(line[7:10]) == 4 and line[10:].strip()]
+            if version_lines:
+                assert(len(version_lines) == 1)
+                version_line = version_lines[0]
+                version_regex = re.compile('.*?FORMAT V.(.*),')
+                mtch = version_regex.match(version_line)
+                if mtch and mtch.groups(0):
+                    try:
+                        version = float(mtch.groups(0)[0])
+                    except:
+                        pass
+            self.format_version = version
 
     def get_resolution(self):
         resolution = None
@@ -583,6 +632,11 @@ class PDB:
         pdb_id = self.get_pdb_id()
         SEQRES_lines = self.parsed_lines["SEQRES"]
 
+        modified_residue_mapping_3 = self.modified_residue_mapping_3
+        #for k, v in self.modified_residues.iteritems():
+        #    assert(v['modified_residue'] not in modified_residues)
+        #    modified_residues[v['modified_residue']] = v['original_residue_3']
+
         for x in range(0, len(SEQRES_lines)):
             assert(SEQRES_lines[x][7:10].strip().isdigit())
 
@@ -661,9 +715,15 @@ class PDB:
                             continue
                         # End of skipped residues
                         else:
-                            #print(SEQRES_lines)
-                            #print(line)
-                            raise Exception("Unknown protein residue %s." % r)
+                            #print(modified_residue_mapping_3)
+                            if modified_residue_mapping_3.get(r):
+                                if modified_residue_mapping_3[r] == 'UNK':
+                                    sequence.append('X')
+                                else:
+                                    assert(modified_residue_mapping_3[r] in residue_types_3)
+                                    sequence.append(residue_type_3to1_map[modified_residue_mapping_3[r]])
+                            else:
+                                raise Exception("Unknown protein residue %s in chain %s." % (r, chain_id))
             sequences[chain_id] = "".join(sequence)
 
         return sequences, chains_in_order
@@ -674,37 +734,70 @@ class PDB:
         pass
 
     def get_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
+        from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
         if ignore_HETATMs:
             pdb_file_contents = "\n".join([l for l in self.structure_lines if not(l.startswith('HETATM'))])
         else:
             pdb_file_contents = "\n".join(self.structure_lines)
         success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path)
         if not success:
-            raise Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.")
-        print(a,b)
-        pass
+            raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
+        self.pdb_residue_to_rosetta_residue_map = mapping
+        self.rosetta_residues = [v['pose_residue_id'] for k, v in self.pdb_residue_to_rosetta_residue_map.iteritems()]
 
     def get_all_sequences(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
 
         seqres_sequences, chains_in_order = self.get_SEQRES_sequences()
 
+        colortext.warning('seqres')
+        for chain_id, s in seqres_sequences.iteritems():
+            colortext.warning(chain_id)
+            sequence = Sequence.from_sequence(chain_id, s, self.chain_types[chain_id])
+            print(sequence.sequence_type)
+            print(sequence)
+            print('***')
+
+
+        self.get_pdb_to_rosetta_residue_map(rosetta_scripts_path, rosetta_database_path, ignore_HETATMs)
+        pdb_to_rosetta_map = self.pdb_residue_to_rosetta_residue_map
+        rosetta_residues = self.rosetta_residues
+        print('here')
+        print(rosetta_residues)
+
         # Get a list of all residues with ATOM or HETATM records
         atom_sequences = {}
         structural_residue_IDs_set = set() # use a set for a quicker lookup
+        ignore_HETATMs = True
         for l in self.structure_lines:
             if (not(ignore_HETATMs)) or (not(l.startswith("HETATM"))):
                 residue_id = l[21:27]
                 if residue_id not in structural_residue_IDs_set:
                     chain_id = l[21]
-                    atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence())
-                    residue_type = l[17:20]
-                    short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
+                    chain_type = self.chain_types[chain_id]
+                    atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
+                    residue_type = l[17:20].strip()
+
+                    residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
+                    print(1,residue_type)
+                    if residue_type == 'UNK':
+                        short_residue_type = 'X'
+                    elif chain_type == 'Protein':
+                        short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
+                    elif chain_type == 'DNA':
+                        short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
+                    elif chain_type == 'RNA':
+                        short_residue_type = non_canonical_rna.get(residue_type) or residue_type
+
+                    assert(short_residue_type)
+
                     #structural_residue_IDs.append((residue_id, short_residue_type))
-                    atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type))
+                    atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
                     structural_residue_IDs_set.add(residue_id)
 
-        #self.get_pdb_to_rosetta_residue_map(rosetta_scripts_path, rosetta_database_path, ignore_HETATMs)
+        print(atom_sequences)
 
+
+        print(pdb_to_rosetta_map)
 
         #ATOM_list =
 
