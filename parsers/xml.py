@@ -2,10 +2,14 @@
 # encoding: utf-8
 """
 xml.py
-Basic objects for bioinformatics.
+XML helper functions.
 
 Created by Shane O'Connor 2013
 """
+
+### Single value parsers
+#  Parse the sole value from an XML tag. Assert that only one value exists and that it has the expected type.
+###
 
 def parse_singular_float(t, tag_name):
     '''Parses the sole floating point value with name tag_name in tag t. Heavy-handed with the asserts.'''
@@ -25,7 +29,7 @@ def parse_singular_int(t, tag_name):
     assert(v.isdigit()) # no floats allowed
     return int(v)
 
-def parse_singular_character(t, tag_name):
+def parse_singular_alphabetic_character(t, tag_name):
     '''Parses the sole alphabetic character value with name tag_name in tag t. Heavy-handed with the asserts.'''
     pos = t.getElementsByTagName(tag_name)
     assert(len(pos) == 1)
