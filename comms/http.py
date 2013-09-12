@@ -8,9 +8,19 @@ def get(url):
 
     root = url[:idx]
     resource = url[idx:]
-    c = HTTPConnection(root )
+    c = HTTPConnection(root)
     c.request("GET", resource)
     response = c.getresponse()
     contents = response.read()
     c.close()
+    return contents
+
+def get_resource(url, resource):
+    c = HTTPConnection(url)
+    c.request("GET", resource)
+    response = c.getresponse()
+    contents = response.read()
+    c.close()
+    if contents[0:6] == "<html>":
+        raise Exception("Error retrieving %s." % os.path.split(url)[1])
     return contents
