@@ -1,14 +1,21 @@
 import sys
 sys.path.insert(0, "../..")
 from tools.bio.pdb import PDB
+from tools.fs.io import read_file
 from tools import colortext
+
+from pdbml import PDBML
+
+px = PDBML(read_file('../.testdata/1A2C.xml'), read_file('../.testdata/1A2C.pdb'))
+print(px.xml_version)
+sys.exit(0)
 
 p = PDB('../.testdata/1H38.pdb')
 p = PDB('../.testdata/1ZC8.pdb')
 p = PDB('../.testdata/4IHY.pdb')
 #p = PDB('../.testdata/2GRB.pdb')
-p = PDB('/home/oconchus/Downloads/1J1M.pdb')
-
+p = PDB('../.testdata/1J1M.pdb')
+p = PDB('../.testdata/1H38.pdb')
 #print(p.structure_lines)
 
 colortext.message("Resolution")
@@ -48,25 +55,32 @@ colortext.message("Journal information")
 for k,v in p.get_journal().iteritems():
     print("%s : %s" % (k.ljust(20), v))
 
-colortext.message("GetRosettaResidueMap")
-print(p.GetRosettaResidueMap())
-
-colortext.message("get_all_sequences")
-print(p.get_all_sequences('/guybrushhome/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease', '/guybrushhome/Rosetta3.5/rosetta_database/', False))
-
-#print(p.get_pdb_to_rosetta_residue_map('/guybrushhome/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease', '/guybrushhome/Rosetta3.5/rosetta_database/', False))
-
+colortext.message("PDB format version")
+print(p.format_version)
 
 sys.exit(0)
-
-colortext.message("Chains")
-print(",".join(p.get_ATOM_and_HETATM_chains()))
 
 colortext.message("SEQRES sequences")
 sequences, chains_in_order = p.get_SEQRES_sequences()
 for chain_id in chains_in_order:
     colortext.warning("%s (%s)" % (chain_id, p.chain_types[chain_id]))
     print(sequences[chain_id])
+
+colortext.message("get_all_sequences")
+print(p.get_all_sequences('~/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease', '~/Rosetta3.5/rosetta_database/', False))
+
+#print(p.get_pdb_to_rosetta_residue_map('/guybrushhome/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease', '/guybrushhome/Rosetta3.5/rosetta_database/', False))
+
+
+sys.exit(0)
+
+colortext.message("GetRosettaResidueMap")
+print(p.GetRosettaResidueMap())
+
+
+colortext.message("Chains")
+print(",".join(p.get_ATOM_and_HETATM_chains()))
+
 
 sys.exit(0)
 
