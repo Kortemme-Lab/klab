@@ -84,18 +84,16 @@ class PDBML(object):
         residue_b = parse_singular_string(t, 'PDBx:label_comp_id')
         assert(residue_a == residue_b)
         residue_3_letter = residue_a
-        print(residue_3_letter)
+
         residue_1_letter = residue_type_3to1_map.get(residue_3_letter) or protonated_residue_type_3to1_map.get(residue_3_letter) or non_canonical_amino_acids.get(residue_3_letter)
         if not residue_1_letter:
             residue_identifier = '%s%s%s' % (PDB_chain_id, str(ATOM_residue_id).rjust(4), PDB_insertion_code)
-            print(residue_identifier, modified_residues.get(residue_identifier))
             if modified_residues.get(residue_identifier):
                 residue_1_letter = modified_residues[residue_identifier]['original_residue_1']
         if not residue_1_letter:
             '''Too many cases to worry about... we will have to use residue_3_letter to sort those out.'''
             residue_1_letter = 'X'
 
-        print(PDB_chain_id, ("%d%s" % (ATOM_residue_id, PDB_insertion_code)).rjust(5), residue_1_letter, None, residue_3_letter)
         r = IdentifyingPDBResidue(PDB_chain_id, ("%d%s" % (ATOM_residue_id, PDB_insertion_code)).rjust(5), residue_1_letter, None, residue_3_letter)
         r.add_position(x, y, z)
 
