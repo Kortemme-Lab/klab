@@ -36,22 +36,20 @@ script = '''<ROSETTASCRIPTS>
 
 def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path):
     '''Takes a string containing a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
-       On success, (True, the residue mapping, the sequences of Rosetta residues) is returned. On failure, (False, a list of errors, None) is returned.'''
+       On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
     filename = write_temp_file("/tmp", pdb_file_contents)
     success, mapping, sequence_list = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path)
     os.remove(filename)
-    return success, mapping#, sequence_list
+    return success, mapping
 
 def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path):
     '''Takes a path to a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
-       On success, (True, the residue mapping, the sequences of Rosetta residues) is returned. On failure, (False, a list of errors, None) is returned.'''
+       On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
     mapping = {}
     errors = []
     exit_code = 0
     F, script_path = tempfile.mkstemp(dir=".")
     script_handle = os.fdopen(F, "w")
-    #sequence_list = None
-    #rosetta_output_file = None
 
     try:
         db_path = script_path + ".db3"
@@ -70,58 +68,15 @@ SELECT chain_id, pdb_residue_number, insertion_code, residues.struct_id, residue
 FROM residue_pdb_identification
 INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id AND residue_pdb_identification.residue_number=residues.resNum
 ''')
-                #residue_to_chain_map = {}
-
                 # Create the mapping from PDB residues to Rosetta residues
                 rosetta_residue_ids = set()
                 for r in results:
-                    #print(r)
                     mapping["%s%s%s" % (r[0], str(r[1]).rjust(4), r[2])] = {'pose_residue_id' : r[4], 'name3' : r[5], 'res_type' : r[6]}
                     rosetta_residue_ids.add(r[4])
-                    #assert(not(residue_to_chain_map.get(r[4])))
-                    #residue_to_chain_map[r[4]] = r[0]
-                #print(residue_to_chain_map)
-
-                #sequence_list = {}
-                #s = Sequence()
 
                 raw_residue_list = [r for r in conn.cursor().execute('''SELECT resNum, name3 FROM residues ORDER BY resNum''')]
-                #chain_residues = {}
-                # Make sure that the mapping is surjective
                 for r in raw_residue_list:
                     assert(r[0] in rosetta_residue_ids)
-                    #rosetta_residue_id = r[0]
-                    #chain_id = residue_to_chain_map[rosetta_residue_id]
-                    #chain_residues[chain_id] = chain_residues.get(chain_id, set())
-                    #chain_residues[chain_id].add(r[1].strip())
-
-                #print(chain_residues['E'])
-                #chain_types = {}
-                #for chain_id, residue_types in chain_residues.iteritems():
-                #    print(chain_id, residue_types)
-                #    if residue_types.intersection(dna_nucleotides):
-                #        assert(not(residue_types.intersection(rna_nucleotides)))
-                #        assert(not(residue_types.intersection(residue_types_3)))
-                #        print('DNA')
-                #        chain_types[chain_id] = 'DNA'
-                #    elif residue_types.intersection(rna_nucleotides):
-                #        assert(not(residue_types.intersection(residue_types_3)))
-                #        print('RNA')
-                #        chain_types[chain_id] = 'RNA'
-                #    else:
-                #        assert(residue_types.intersection(residue_types_3))
-                #        print('Protein')
-                #        chain_types[chain_id] = 'Protein'
-                # E - DNA - DG, DA,
-                # F - RNA - G, C,
-                #sys.exit()
-
-                #for r in raw_residue_list:
-                #    rosetta_residue_id = r[0]
-                #    chain_id = residue_to_chain_map[rosetta_residue_id]
-                #    sequence_list[chain_id] = sequence_list.get(chain_id, Sequence())
-                #    sequence_list[chain_id].add(Residue(chain_id, rosetta_residue_id, residue_type_3to1_map[r[1]], residue_type = None))
-                #print(sequence_list)
 
             except Exception, e:
                 print(e)
@@ -136,12 +91,10 @@ INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id A
         os.remove(script_path)
     if os.path.exists(db_path):
         os.remove(db_path)
-    #if os.path.exists(rosetta_output_file):
-    #    os.remove(rosetta_output_file)
     if exit_code or errors:
-        return False, errors#, None
+        return False, errors
 
-    return True, mapping#, sequence_list
+    return True, mapping
 
 def strip_pdb(pdb_path, chains = [], strip_hetatms = False):
     '''Takes a PDB file and strips all lines except ATOM and HETATM records. If chains is specified, only those chains are kept. If strip_hetatms is True then HETATM lines are also stripped.
