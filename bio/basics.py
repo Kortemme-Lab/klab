@@ -171,7 +171,7 @@ class Residue(object):
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
         if residue_type:
             if residue_type == 'Protein':
-                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1))
+                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X'))
             else:
                 assert(ResidueAA in nucleotide_types_1)
         self.Chain = Chain
