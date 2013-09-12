@@ -1,9 +1,18 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+pdbml.py
+Basic parsing for the PDBML format. This is currently used to map PDB ATOM residues to indices within the SEQRES sequence.
+
+Created by Shane O'Connor 2013
+"""
+
 import os
 from xml.dom.minidom import parse, parseString
 
 from basics import IdentifyingPDBResidue, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
 from pdb import PDB
-from tools.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_character, parse_singular_string
+from tools.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_alphabetic_character, parse_singular_string
 
 xsd_versions = {
     'pdbx-v40.xsd' : 4.0,
@@ -72,11 +81,11 @@ class PDBML(object):
 
         x, y, z = parse_singular_float(t, "PDBx:Cartn_x"), parse_singular_float(t, "PDBx:Cartn_y"), parse_singular_float(t, "PDBx:Cartn_z")
 
-        PDB_chain_id = parse_singular_character(t, 'PDBx:auth_asym_id')
+        PDB_chain_id = parse_singular_alphabetic_character(t, 'PDBx:auth_asym_id')
         ATOM_residue_id = parse_singular_int(t, 'PDBx:auth_seq_id')
         PDB_insertion_code = " "
         if t.getElementsByTagName('PDBx:pdbx_PDB_ins_code'):
-            PDB_insertion_code = parse_singular_character(t, 'PDBx:pdbx_PDB_ins_code')
+            PDB_insertion_code = parse_singular_alphabetic_character(t, 'PDBx:pdbx_PDB_ins_code')
 
         SEQRES_index = parse_singular_int(t, 'PDBx:label_seq_id')
 
