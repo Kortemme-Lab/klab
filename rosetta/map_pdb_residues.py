@@ -78,8 +78,8 @@ INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id A
                 assert(set([r[0] for r in raw_residue_list]) == rosetta_residue_ids)
 
             except Exception, e:
-                print(e)
-                print(traceback.format_exc())
+                errors.append(str(e))
+                errors.append(traceback.format_exc())
                 errors.append("The features database does not seem to have been correctly created. Check to see if the command '%s' is correct." % command_line)
     except Exception, e:
         errors.append(str(e))
@@ -126,7 +126,7 @@ def get_stripped_pdb_to_pose_residue_map(input_pdb_path, rosetta_scripts_path, r
     success, result = strip_pdb(input_pdb_path, chains = chains, strip_hetatms = strip_hetatms)
     if success:
         assert(os.path.exists(result))
-        success, mapping, residue_list = get_pdb_to_pose_residue_map(result, rosetta_scripts_path, rosetta_database_path)
+        success, mapping = get_pdb_to_pose_residue_map(result, rosetta_scripts_path, rosetta_database_path)
         os.remove(result)
         if success:
             return True, mapping
