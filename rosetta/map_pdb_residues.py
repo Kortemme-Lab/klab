@@ -38,7 +38,7 @@ def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path
     '''Takes a string containing a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
     filename = write_temp_file("/tmp", pdb_file_contents)
-    success, mapping, sequence_list = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path)
+    success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path)
     os.remove(filename)
     return success, mapping
 
@@ -75,8 +75,7 @@ INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id A
                     rosetta_residue_ids.add(r[4])
 
                 raw_residue_list = [r for r in conn.cursor().execute('''SELECT resNum, name3 FROM residues ORDER BY resNum''')]
-                for r in raw_residue_list:
-                    assert(r[0] in rosetta_residue_ids)
+                assert(set([r[0] for r in raw_residue_list]) == rosetta_residue_ids)
 
             except Exception, e:
                 print(e)
