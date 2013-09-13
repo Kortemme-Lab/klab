@@ -25,6 +25,9 @@ def retrieve_pdb(pdb_id, silent = True):
 def retrieve_fasta(pdb_id, silent = True):
     return retrieve_file_from_RCSB("/pdb/files/fasta.txt?structureIdList=%s" % pdb_id, silent)
 
+def retrieve_xml(pdb_id, silent = True):
+    return retrieve_file_from_RCSB("/pdb/files/%s.xml" % pdb_id, silent)
+
 def retrieve_fasta_from_database(pdbID, database_ref = None, database_table = None, database_field = None, database_IDfield = None, silent = True):
     if database_ref and database_table and database_field and database_IDfield:
         results = database_ref.execute(("SELECT %s FROM %s WHERE %s=" % (database_field, database_table, database_IDfield)) + "%s", parameters = (pdbID,))

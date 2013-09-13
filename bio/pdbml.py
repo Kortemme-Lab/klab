@@ -12,6 +12,8 @@ from xml.dom.minidom import parse, parseString
 
 from basics import IdentifyingPDBResidue, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
 from pdb import PDB
+import rcsb
+from tools.fs.io import read_file, write_file
 from tools.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_alphabetic_character, parse_singular_string
 
 xsd_versions = {
@@ -31,11 +33,44 @@ class PDBML(object):
         self._dom = parseString(xml_contents)
         self.residue_map = {}
 
-        self.modified_residues = PDB(pdb_contents.split("\n")).modified_residues
+        self.modified_residues = PDB(pdb_contents).modified_residues
 
         self.main_tag = None
         self.parse_header()
         self.parse_atoms()
+
+    @staticmethod
+    def retrieve(pdb_id, cache_dir = None):
+        '''Creates a PDBML object by using a cached copy of the files if they exists or by retrieving the files from the RCSB.'''
+
+        pdb_contents = None
+        xml_contents = None
+        pdb_id = pdb_id.upper()
+
+        if cache_dir:
+            # Check to see whether we have a cached copy of the PDB file
+            filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
+            if os.path.exists(filename):
+                pdb_contents = read_file(filename)
+
+            # Check to see whether we have a cached copy of the XML file
+            filename = os.path.join(cache_dir, "%s.xml" % pdb_id)
+            if os.path.exists(filename):
+                xml_contents = read_file(filename)
+
+        # Get any missing files from the RCSB and create cached copies if appropriate
+        if not pdb_contents:
+            pdb_contents = rcsb.retrieve_pdb(pdb_id)
+            if cache_dir:
+                write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), pdb_contents)
+
+        if not xml_contents:
+            xml_contents = rcsb.retrieve_xml(pdb_id)
+            if cache_dir:
+                write_file(os.path.join(cache_dir, "%s.xml" % pdb_id), xml_contents)
+
+        # Return the object
+        return PDBML(xml_contents, pdb_contents)
 
     def parse_header(self):
         main_tags = self._dom.getElementsByTagName("PDBx:datablock")

@@ -24,9 +24,6 @@ from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, n
 #       from_lines (use the list of PDB file lines to create a PDB object)
 #       retrieve (new: read a PDB file from the RCSB or a cached copy and create a PDB object)
 #
-# Removed PDB.read function
-# Used existing code to neaten the PDB.write function
-
 # - replace aa1 with basics.residue_type_3to1_map
 # - replace relaxed_amino_acid_codes (a list) with basics.relaxed_residue_types_1 (a set)
 # - replace amino_acid_codes (a list) with basics.residue_types_1 (a set)
