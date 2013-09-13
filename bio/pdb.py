@@ -6,15 +6,27 @@ import sys
 import os
 import types
 import string
-import math
-import tools.colortext as colortext
+import types
 
+import tools.colortext as colortext
+from tools.fs.io import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
 from basics import PDBResidue, Sequence, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 
 # todo: related packages will need to be fixed since my refactoring
+# The PDB constructor has now changed
+#   it now only accepts the content of a PDB file
+#   calling functions should use one of:
+#       clone (copy lines from an existing object)
+#       from_filepath (read a file from the disk and create a PDB object)
+#       from_lines (use the list of PDB file lines to create a PDB object)
+#       retrieve (new: read a PDB file from the RCSB or a cached copy and create a PDB object)
+#
+# Removed PDB.read function
+# Used existing code to neaten the PDB.write function
+
 # - replace aa1 with basics.residue_type_3to1_map
 # - replace relaxed_amino_acid_codes (a list) with basics.relaxed_residue_types_1 (a set)
 # - replace amino_acid_codes (a list) with basics.residue_types_1 (a set)
@@ -32,6 +44,7 @@ from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, n
 # - ProperResidueIDToAAMap is now get_residue_id_to_type_map. The buggy aa_resid2type function has been deleted.
 # - getJournal is now get_journal.  parseJRNL has been removed.
 # - Calls to get_ATOM_and_HETATM_chains should be removed
+# - the read function has been removed
 
 ### Residue types
 
@@ -260,14 +273,16 @@ class JRNL(object):
         else:
             self.d["DOI"] = None
 
+
 class PDB:
     """A class to store and manipulate PDB data"""
 
     ### Constructor ###
 
-    def __init__(self, pdb = None, pdb_id = None):
+    def __init__(self, pdb_content, pdb_id = None):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
+        assert(type(pdb_content) is types.StringType)
         self.parsed_lines = {}
         self.structure_lines = [] # For ATOM and HETATM records
         self.chains_in_document_order = []
@@ -280,22 +295,45 @@ class PDB:
         self.modified_residues = None
         self.modified_residue_mapping_3 = {}
 
-        # todo: This legacy logic is kind of terrible. pdb should be replace with lines (a list of PDB file lines) or content (the entire PDB file read as a string).
-        # todo: For calls to this function passing a filename string, we should have a static function of the PDB class which reads the file and passes the contents to this constructor.
-        # todo: For calls to this function passing a PDB object, we should instead have a clone method which seems to have been the intention.
-        self.pdb_id = pdb_id
-        if type(pdb) == types.StringType:
-            self.read(pdb)
-        elif type(pdb) == types.ListType:
-            self.lines = pdb
-        elif type(pdb) == type(self):
-            self.lines = pdb.lines
-
+        self.lines = pdb_content.split("\n")
         self._split_lines()
-
+        self.pdb_id = pdb_id
         self.pdb_id = self.get_pdb_id()     # parse the PDB ID if it is not passed in
         self._get_pdb_format_version()
         self._get_modified_residues()
+
+    ### Class functions ###
+
+    @staticmethod
+    def from_filepath(filepath):
+        '''A function to replace the old constructor call where a filename was passed in.'''
+        return PDB(read_file(filepath))
+
+    @staticmethod
+    def from_lines(pdb_file_lines):
+        '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
+        return PDB("\n".join(pdb_file_lines))
+
+    @staticmethod
+    def retrieve(pdb_id, cache_dir = None):
+        '''Creates a PDB object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
+
+        # Check to see whether we have a cached copy
+        pdb_id = pdb_id.upper()
+        if cache_dir:
+            filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
+            if os.path.exists(filename):
+                return PDB(read_file(filename))
+
+        # Get a copy from the RCSB
+        contents = rcsb.retrieve_pdb(pdb_id)
+
+        # Create a cached copy if appropriate
+        if cache_dir:
+            write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), contents)
+
+        # Return the object
+        return PDB(contents)
 
     ### Private functions ###
 
@@ -333,6 +371,13 @@ class PDB:
         self.chains_in_document_order = chains_in_document_order
 
     ### Basic functions ###
+
+    def clone(self):
+        '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
+        return PDB("\n".join(self.lines))
+
+    def write(self, pdbpath, separator = '\n'):
+        write_file(pdbpath, separator.join(self.lines))
 
     def get_pdb_id(self):
         '''Return the PDB ID. If one was passed in to the constructor, this takes precedence, otherwise the header is
@@ -946,18 +991,6 @@ class PDB:
                 badmutations.append(m)
         if badmutations:
             raise PDBValidationException("The mutation(s) %s could not be matched against the PDB %s." % (", ".join(map(str, badmutations)), self.pdb_id))
-
-    def read(self, pdbpath):
-
-        pdbhandle = open(pdbpath)
-        self.lines = pdbhandle.readlines()
-        pdbhandle.close()
-
-    def write(self, pdbpath, separator = '\n'):
-        pdbhandle = open(pdbpath, "w")
-        text = string.join(self.lines, separator)
-        pdbhandle.write(text)
-        pdbhandle.close()
 
     def remove_nonbackbone_atoms(self, resid_list):
 
