@@ -95,13 +95,15 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None):
         write_file(cached_mapping_file, simplejson.dumps(full_mapping))
     return requested_mapping
 
-def pdb_to_uniparc(pdb_ids, silent = True):
-    '''Returns a mapping {PDB ID -> List(UniParcEntry)}'''
+def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None):
+    ''' Returns a mapping {PDB ID -> List(UniParcEntry)}
+        The UniParcEntry objects have a to_dict() method which may be useful.
+    '''
 
     # Map PDB IDs to UniProtKB AC
     if not silent:
         colortext.write("Retrieving PDB to UniProtKB AC mapping: ", 'cyan')
-    pdb_ac_mapping = uniprot_map('PDB_ID', 'ACC', pdb_ids)
+    pdb_ac_mapping = uniprot_map('PDB_ID', 'ACC', pdb_ids, cache_dir = cache_dir)
     if not silent:
         colortext.write("done\n", 'green')
 
@@ -118,7 +120,7 @@ def pdb_to_uniparc(pdb_ids, silent = True):
     # Map UniProtKB ACs to UniParc IDs
     if not silent:
         colortext.write("Retrieving UniProtKB AC to UniParc ID mapping: ", 'cyan')
-    ac_uniparc_mapping = uniprot_map('ACC', 'UPARC', AC_IDs)
+    ac_uniparc_mapping = uniprot_map('ACC', 'UPARC', AC_IDs, cache_dir = cache_dir)
     for k, v in ac_uniparc_mapping.iteritems():
         assert(len(v) == 1)
         ac_uniparc_mapping[k] = v[0]
@@ -126,7 +128,7 @@ def pdb_to_uniparc(pdb_ids, silent = True):
         colortext.write("done\n", 'green')
 
     # Map UniProtKB ACs to UniProtKB IDs
-    ac_id_mapping = uniprot_map('ACC', 'ID', AC_IDs)
+    ac_id_mapping = uniprot_map('ACC', 'ID', AC_IDs, cache_dir = cache_dir)
     for k, v in ac_id_mapping.iteritems():
         assert(len(v) == 1)
         ac_id_mapping[k] = v[0]
@@ -140,8 +142,8 @@ def pdb_to_uniparc(pdb_ids, silent = True):
             colortext.write("%s: " % pdb_id, "orange")
         m[pdb_id] = []
         for AC in ACs:
-            entry = UniParcEntry(ac_uniparc_mapping[AC], [AC], [ac_id_mapping[AC]])
-            m[pdb_id].append(entry.to_dict())
+            entry = UniParcEntry(ac_uniparc_mapping[AC], [AC], [ac_id_mapping[AC]], cache_dir = cache_dir)
+            m[pdb_id].append(entry)
             if not silent:
                 colortext.write(".", "green")
         if not silent:
@@ -578,70 +580,6 @@ class UniProtACEntry(object):
 
 class UniParcEntry(object):
 
-    def _get_XML(self):
-        uparc_xml = None
-        cached_filepath = None
-        if self.cache_dir:
-            cached_filepath = os.path.join(self.cache_dir, '%s.xml' % self.UniParcID)
-        if cached_filepath and os.path.exists(cached_filepath):
-            uparc_xml = read_file(cached_filepath)
-        else:
-            colortext.write("Retrieving %s\n" % self.UniParcID, "cyan")
-            url = 'http://www.uniprot.org/uniparc/%s.xml' % self.UniParcID
-            uparc_xml = http_get(url)
-            if cached_filepath:
-                write_file(cached_filepath, uparc_xml)
-        self.XML = uparc_xml
-
-        # Get DOM
-        self._dom = parseString(uparc_xml)
-        main_tags = self._dom.getElementsByTagName("uniparc")
-        assert(len(main_tags) == 1)
-        entry_tags = main_tags[0].getElementsByTagName("entry")
-        assert(len(entry_tags) == 1)
-        self.entry_tag = entry_tags[0]
-
-    def _get_active_ACCs(self):
-        entry_tag = self.entry_tag
-        db_reference_tags = [child for child in entry_tag.childNodes if child.nodeType == child.ELEMENT_NODE and child.tagName == 'dbReference']
-        ACCs = []
-        for db_reference_tag in db_reference_tags:
-            assert(db_reference_tag.hasAttribute('type') and db_reference_tag.hasAttribute('active') and db_reference_tag.hasAttribute('id'))
-            att_type = db_reference_tag.getAttribute('type')
-            is_active = db_reference_tag.getAttribute('active')
-            dbref_id = db_reference_tag.getAttribute('id')
-            assert(is_active == 'Y' or is_active == 'N')
-            is_active = (is_active == 'Y')
-            if att_type == 'UniProtKB/Swiss-Prot' or att_type == 'UniProtKB/TrEMBL':
-                if is_active:
-                    #colortext.message(att_type + dbref_id)
-                    ACCs.append(dbref_id)
-                else:
-                    pass#colortext.warning(att_type + dbref_id)
-        return ACCs
-
-    def get_organisms(self):
-        self.organisms = {}
-        self._get_XML()
-        ACCs = self._get_active_ACCs()
-        #print(ACCs)
-        name_count = {}
-        for UniProtAC in ACCs:
-            #print(UniProtAC)
-            if UniProtAC in self.AC_entries:
-                AC_entry = self.AC_entries[UniProtAC]
-            else:
-                if UniProtAC in ['N2XE95', 'N1E9H6', 'N2JUB3', 'N2Z3Z2']: # hack for bad XML documents at time of writing
-                    continue
-                colortext.warning("Retrieving %s" % UniProtAC)
-                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir)
-            for o in AC_entry.organisms:
-                name_count[o['scientific']] = name_count.get(o['scientific'], 0)
-                name_count[o['scientific']] += 1
-            assert(len(AC_entry.organisms) == 1)
-            self.organisms[UniProtAC] = AC_entry.organisms[0]
-
-
     def __init__(self, UniParcID, UniProtACs = None, UniProtIDs = None, cache_dir = None):
         if cache_dir and not(os.path.exists(os.path.abspath(cache_dir))):
             raise Exception("The cache directory %s does not exist." % os.path.abspath(cache_dir))
@@ -788,6 +726,69 @@ class UniParcEntry(object):
         #print(recommended_names)
         self.recommended_name = recommended_names[0][0]
         self.get_organisms()
+
+    def _get_XML(self):
+        uparc_xml = None
+        cached_filepath = None
+        if self.cache_dir:
+            cached_filepath = os.path.join(self.cache_dir, '%s.xml' % self.UniParcID)
+        if cached_filepath and os.path.exists(cached_filepath):
+            uparc_xml = read_file(cached_filepath)
+        else:
+            colortext.write("Retrieving %s\n" % self.UniParcID, "cyan")
+            url = 'http://www.uniprot.org/uniparc/%s.xml' % self.UniParcID
+            uparc_xml = http_get(url)
+            if cached_filepath:
+                write_file(cached_filepath, uparc_xml)
+        self.XML = uparc_xml
+
+        # Get DOM
+        self._dom = parseString(uparc_xml)
+        main_tags = self._dom.getElementsByTagName("uniparc")
+        assert(len(main_tags) == 1)
+        entry_tags = main_tags[0].getElementsByTagName("entry")
+        assert(len(entry_tags) == 1)
+        self.entry_tag = entry_tags[0]
+
+    def _get_active_ACCs(self):
+        entry_tag = self.entry_tag
+        db_reference_tags = [child for child in entry_tag.childNodes if child.nodeType == child.ELEMENT_NODE and child.tagName == 'dbReference']
+        ACCs = []
+        for db_reference_tag in db_reference_tags:
+            assert(db_reference_tag.hasAttribute('type') and db_reference_tag.hasAttribute('active') and db_reference_tag.hasAttribute('id'))
+            att_type = db_reference_tag.getAttribute('type')
+            is_active = db_reference_tag.getAttribute('active')
+            dbref_id = db_reference_tag.getAttribute('id')
+            assert(is_active == 'Y' or is_active == 'N')
+            is_active = (is_active == 'Y')
+            if att_type == 'UniProtKB/Swiss-Prot' or att_type == 'UniProtKB/TrEMBL':
+                if is_active:
+                    #colortext.message(att_type + dbref_id)
+                    ACCs.append(dbref_id)
+                else:
+                    pass#colortext.warning(att_type + dbref_id)
+        return ACCs
+
+    def get_organisms(self):
+        self.organisms = {}
+        self._get_XML()
+        ACCs = self._get_active_ACCs()
+        #print(ACCs)
+        name_count = {}
+        for UniProtAC in ACCs:
+            #print(UniProtAC)
+            if UniProtAC in self.AC_entries:
+                AC_entry = self.AC_entries[UniProtAC]
+            else:
+                if UniProtAC in ['N2XE95', 'N1E9H6', 'N2JUB3', 'N2Z3Z2']: # hack for bad XML documents at time of writing
+                    continue
+                colortext.warning("Retrieving %s" % UniProtAC)
+                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir)
+            for o in AC_entry.organisms:
+                name_count[o['scientific']] = name_count.get(o['scientific'], 0)
+                name_count[o['scientific']] += 1
+            assert(len(AC_entry.organisms) == 1)
+            self.organisms[UniProtAC] = AC_entry.organisms[0]
 
     def to_dict(self):
         return {
