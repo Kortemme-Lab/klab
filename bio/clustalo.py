@@ -108,20 +108,16 @@ class SequenceAligner(object):
         clustal_output_handle, clustal_filename = open_temp_file('/tmp')
         stats_output_handle, stats_filename = open_temp_file('/tmp')
         tempfiles = [fasta_filename, clustal_filename, stats_filename]
-        print(fasta_filename, clustal_filename)
 
         # Create FASTA file
         fasta_handle.write("\n".join(records))
         fasta_handle.close()
 
         try:
-            colortext.message("Calling clustalo to align sequences:")
-            print(shlex.split('clustalo --infile %(fasta_filename)s --verbose --outfmt clustal --outfile %(clustal_filename)s' % vars()))
             p = _Popen('.', shlex.split('clustalo --infile %(fasta_filename)s --verbose --outfmt clustal --outfile %(clustal_filename)s --force' % vars()))
             if p.errorcode:
                 raise Exception('An error occurred while calling clustalo to align sequences:\n%s' % p.stderr)
 
-            colortext.message("Calling clustalw to generate Percent Identity Matrix:")
             p = _Popen('.', shlex.split('clustalw -INFILE=%(clustal_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -OUTFILE=/dev/null' % vars()))
             if p.errorcode:
                 raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
@@ -194,11 +190,22 @@ class SequenceAligner(object):
         return named_matrix
 
 
+class MultipleAlignmentException(Exception):
+    '''This exception gets thrown when there are more alignments found than expected.'''
+    def __init__(self, chain_id, max_expected_matches_per_chain, num_actual_matches, match_list):
+        super(MultipleAlignmentException, self).__init__("Each chain was expected to match at most %d other sequences but chain %s matched %d chains: %s." % (max_expected_matches_per_chain, chain_id, num_actual_matches, ", ".join(match_list)))
+
+
 class PDBUniParcSequenceAligner(object):
 
-    def __init__(self, pdb_id, cache_dir = None):
+    ### Constructor methods ###
 
+    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0):
+        ''' The sequences are matched up to a percentage identity specified by cut_off (0.0 - 100.0).
+        '''
         self.pdb_id = pdb_id
+        self.cut_off = cut_off
+        assert(0.0 <= cut_off <= 100.0)
 
         # Retrieve the FASTA record
         f = FASTA.retrieve(pdb_id, cache_dir = cache_dir)[pdb_id]
@@ -209,20 +216,37 @@ class PDBUniParcSequenceAligner(object):
 
         # Retrieve the related UniParc sequences
         uniparc_sequences = {}
+        uniparc_objects = {}
         pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir)
         for upe in pdb_uniparc_mapping[pdb_id]:
             uniparc_sequences[upe.UniParcID] = upe.sequence
+            uniparc_objects[upe.UniParcID] = upe
         self.uniparc_sequences = uniparc_sequences
+        self.uniparc_objects = uniparc_objects
 
         # Run the alignment with clustal
         self._align_with_clustal()
         self._align_with_substrings()
-        self.check_alignments()
-        print(self.clustal_matches)
-        print(self.substring_matches)
+        self._check_alignments()
+
+    ### Object methods ###
 
     def __getitem__(self, chain):
         return self.alignment.get(chain)
+
+    def __repr__(self):
+        s = []
+        for c in sorted(self.chains):
+            if self.clustal_matches[c]:
+                match_string = ['%s (%.2f%%)' % (k, v) for k, v in sorted(self.clustal_matches[c].iteritems(), key = lambda x: x[1])] # this list should have be at most one element unless the matching did not go as expected
+                s.append("%c -> %s" % (c, ", ".join(match_string)))
+            elif self.alignment[c]:
+                s.append("%c -> %s" % (c, self.alignment[c]))
+            else:
+                s.append("%c -> ?")
+        return "\n".join(s)
+
+    ### API methods ###
 
     def get_alignment_percentage_identity(self, chain):
         vals = self.clustal_matches[chain].values()
@@ -230,23 +254,17 @@ class PDBUniParcSequenceAligner(object):
             return vals[0]
         return None
 
-    def __repr__(self):
-        s = []
-        for c in sorted(self.chains):
-            if self.clustal_matches[c]:
-                match_string = ['%s (%.2f)%%' % (k, v) for k, v in sorted(self.clustal_matches[c].iteritems(), key = lambda x: x[1])] # this list should have be at most one element unless the matching did not go as expected
-                s.append("%c -> %s" % (c, match_string))
-            elif self.alignment[c]:
-                s.append("%c -> %s" % (c, self.alignment[c]))
-            else:
-                s.append("%c -> ?")
-        return "\n".join(s)
+    def get_uniparc_object(self, chain):
+        if self.alignment.get(chain):
+            return self.uniparc_objects.get(self.alignment[chain])
+        return None
+
+    ### Private methods ###
 
     def _align_with_clustal(self):
 
         for c in self.chains:
             #clustal_indices = {1 : c}
-            colortext.message("MATCHING CHAIN %s" % c)
             pdb_chain_id = '%s:%s' % (self.pdb_id, c)
 
             sa = SequenceAligner()
@@ -257,13 +275,12 @@ class PDBUniParcSequenceAligner(object):
                 sa.add_sequence(uniparc_id, uniparc_sequence)
                 #count += 1
             best_matches = sa.align()
-            self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id)
+            self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id, cut_off = self.cut_off)
 
     def _align_with_substrings(self):
         '''Simple substring-based matching'''
 
         for c in self.chains:
-            colortext.message("MATCHING CHAIN %s USING SUBSTRINGS" % c)
             fasta_sequence = self.fasta[c]
 
             substring_matches = {}
@@ -287,13 +304,16 @@ class PDBUniParcSequenceAligner(object):
 
             self.substring_matches[c] = substring_matches
 
-    def check_alignments(self):
+    def _check_alignments(self):
         alignment = {}
+        max_expected_matches_per_chain = 1
         for c in self.chains:
-            assert(len(self.clustal_matches[c]) <= 1)
+            if not(len(self.clustal_matches[c]) <= max_expected_matches_per_chain):
+                raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c]), self.clustal_matches[c])
             assert(len(self.substring_matches[c]) <= len(self.clustal_matches[c]))
             if self.clustal_matches[c]:
-                assert(len(self.clustal_matches[c].keys()) == 1)
+                if not (len(self.clustal_matches[c].keys()) == max_expected_matches_per_chain):
+                    raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c].keys()))
                 if self.substring_matches[c]:
                     if self.substring_matches[c].keys() != self.clustal_matches[c].keys():
                         print("ERROR: An inconsistent alignment was found between Clustal Omega and a substring search.")
