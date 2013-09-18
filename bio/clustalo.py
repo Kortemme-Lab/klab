@@ -13,12 +13,12 @@ import re
 import commands
 import platform
 
-from tools.fs.io import open_temp_file
+from tools.fs.io import open_temp_file, read_file
 from tools.process import Popen as _Popen
 from tools import colortext
-
 from uniprot import pdb_to_uniparc
 from fasta import FASTA
+from basics import SubstitutionScore, sequence_formatter
 
 ### Check for the necessary Clustal Omega and ClustalW software
 
@@ -86,9 +86,10 @@ class SequenceAligner(object):
 
     def __init__(self):
         self.records = []
-        self.sequence_ids = {}
+        self.sequence_ids = {} # A 1-indexed list of the sequences in the order that they were added (1-indexing to match Clustal numbering)
         self.matrix = None
         self.named_matrix = None
+        self.alignment_output = None
 
     ### API methods ###
 
@@ -102,7 +103,7 @@ class SequenceAligner(object):
 
         records = self.records
 
-        alignment_output = None
+        percentage_identity_output = None
 
         fasta_handle, fasta_filename = open_temp_file('/tmp')
         clustal_output_handle, clustal_filename = open_temp_file('/tmp')
@@ -117,13 +118,14 @@ class SequenceAligner(object):
             p = _Popen('.', shlex.split('clustalo --infile %(fasta_filename)s --verbose --outfmt clustal --outfile %(clustal_filename)s --force' % vars()))
             if p.errorcode:
                 raise Exception('An error occurred while calling clustalo to align sequences:\n%s' % p.stderr)
+            self.alignment_output = read_file(clustal_filename)
 
             p = _Popen('.', shlex.split('clustalw -INFILE=%(clustal_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -OUTFILE=/dev/null' % vars()))
             if p.errorcode:
                 raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
             else:
                 tempfiles.append("%s.dnd" % clustal_filename)
-                alignment_output = p.stdout
+                percentage_identity_output = p.stdout
         except:
             for t in tempfiles:
                 os.remove(t)
@@ -133,8 +135,7 @@ class SequenceAligner(object):
             try:
                 os.remove(t)
             except: pass
-
-        return self._parse_alignment_output(alignment_output)
+        return self._parse_percentage_identity_output(percentage_identity_output)
 
     def get_best_matches_by_id(self, id, cut_off = 98.0):
         best_matches = {}
@@ -144,9 +145,172 @@ class SequenceAligner(object):
                 best_matches[k] = v
         return best_matches
 
+    def get_residue_mapping(self):
+        '''Returns a mapping between the sequences ONLY IF there are exactly two. This restriction makes the code much simpler.'''
+        if len(self.sequence_ids) == 2:
+            if not self.alignment_output:
+                self.align()
+            assert(self.alignment_output)
+            return self._create_residue_map(self._get_alignment_lines(), self.sequence_ids[1], self.sequence_ids[2])
+        else:
+            return None
+
     ### Private methods ###
 
-    def _parse_alignment_output(self, alignment_output):
+    def _create_residue_map(self, alignment_lines, from_sequence_id, to_sequence_id):
+        from_sequence = alignment_lines[from_sequence_id]
+        to_sequence = alignment_lines[to_sequence_id]
+        match_sequence = alignment_lines[-1]
+
+        mapping = {}
+        match_mapping = {}
+        assert(len(from_sequence) == len(to_sequence) and len(to_sequence) == len(match_sequence))
+        from_residue_id = 0
+        to_residue_id = 0
+        for x in range(len(from_sequence)):
+            c = 0
+            from_residue = from_sequence[x]
+            to_residue = to_sequence[x]
+            match_type = match_sequence[x]
+            if from_residue != '-':
+                from_residue_id += 1
+                assert('A' <= from_residue <= 'Z')
+                c += 1
+            if to_residue != '-':
+                to_residue_id += 1
+                assert('A' <= to_residue <= 'Z')
+                c += 1
+            if c == 2:
+                if from_residue == to_residue:
+                    assert(match_type == '*')
+
+                # We do not want to include matches which are distant from other matches
+                has_surrounding_matches = ((x > 0) and (match_sequence[x - 1] != ' ')) or (((x + 1) < len(match_sequence)) and (match_sequence[x + 1] != ' '))
+                if match_type == '*':
+                    mapping[from_residue_id] = to_residue_id
+                    match_mapping[from_residue_id] = SubstitutionScore(1, from_residue, to_residue)
+                elif match_type == ':':
+                    if has_surrounding_matches:
+                        mapping[from_residue_id] = to_residue_id
+                        match_mapping[from_residue_id] = SubstitutionScore(0, from_residue, to_residue)
+                elif match_type == '.':
+                    if has_surrounding_matches:
+                        mapping[from_residue_id] = to_residue_id
+                        match_mapping[from_residue_id] = SubstitutionScore(-1, from_residue, to_residue)
+                else:
+                    assert(match_type == ' ')
+
+        ### Prune the mapping
+        # We probably do not want to consider all partial matches that Clustal reports as some may be coincidental
+        # e.g. part of a HIS-tag partially matching a tyrosine so we will prune the mapping.
+
+        # Remove any matches where there are no matches which are either direct neighbors or the neighbor of a direct
+        # neighbor e.g. the colon in this match "  ***..***  :  .*****" is on its own
+        while True:
+            remove_count = 0
+            all_keys = sorted(mapping.keys())
+            for k in all_keys:
+                current_keys = mapping.keys()
+                if (k - 2 not in current_keys) and (k - 1 not in current_keys) and (k + 1 not in current_keys) and (k - 2 not in current_keys):
+                    del mapping[k]
+                    del match_mapping[k]
+                    remove_count += 1
+            if remove_count == 0:
+                break
+
+        # Remove all leading partial matches except the last one
+        keys_so_far = set()
+        for k in sorted(mapping.keys()):
+            if match_mapping[k].clustal == 1:
+                break
+            else:
+                keys_so_far.add(k)
+        for k in sorted(keys_so_far)[:-1]:
+            del mapping[k]
+            del match_mapping[k]
+
+        # Remove all trailing partial matches except the first one
+        keys_so_far = set()
+        for k in sorted(mapping.keys(), reverse = True):
+            if match_mapping[k].clustal == 1:
+                break
+            else:
+                keys_so_far.add(k)
+        for k in sorted(keys_so_far)[1:]:
+            del mapping[k]
+            del match_mapping[k]
+
+        return mapping, match_mapping
+
+    def _get_alignment_lines(self):
+        ''' This function parses the Clustal Omega alignment output and returns the aligned sequences in a dict: sequence_id -> sequence_string.
+            The special key -1 is reserved for the match line (e.g. ' .:******* *').'''
+
+        if len(self.sequence_ids) != 2:
+            # No need to write the general version at this date
+            return None
+
+        # Strip the boilerplate lines
+        lines = self.alignment_output.split("\n")
+        assert(lines[0].startswith('CLUSTAL'))
+        lines = '\n'.join(lines[1:]).lstrip().split('\n')
+
+        # Create the list of sequence IDs
+        id_list = [v for k, v in sorted(self.sequence_ids.iteritems())]
+
+        # Determine the indentation level
+        first_id = id_list[0]
+        header_regex = re.compile("(.*?\s+)(.*)")
+        alignment_regex = re.compile("^([A-Z\-]+)\s*$")
+        mtchs = header_regex.match(lines[0])
+        assert(mtchs.group(1).strip() == first_id)
+        indentation = len(mtchs.group(1))
+        sequence = mtchs.group(2)
+        assert(sequence)
+        assert(alignment_regex.match(sequence))
+
+        # Create empty lists for the sequences
+        sequences = {}
+        for id in id_list:
+            sequences[id] = []
+        sequences[-1] = []
+
+        # Get the lists of sequences
+        num_ids = len(id_list)
+        for x in range(0, len(lines), num_ids + 2):
+            for y in range(num_ids):
+                id = id_list[y]
+                assert(lines[x + y][:indentation].strip() == id)
+                assert(lines[x + y][indentation - 1] == ' ')
+                sequence = lines[x + y][indentation:].strip()
+                assert(alignment_regex.match(sequence))
+                sequences[id].append(sequence)
+
+            # Get the length of the sequence lines
+            length_of_sequences = list(set(map(len, [v[-1] for k, v in sequences.iteritems() if k != -1])))
+            assert(len(length_of_sequences) == 1)
+            length_of_sequences = length_of_sequences[0]
+
+            # Parse the Clustal match line
+            assert(lines[x + num_ids][:indentation].strip() == '')
+            match_sequence = lines[x + num_ids][indentation:indentation + length_of_sequences]
+            assert(match_sequence.strip() == lines[x + num_ids].strip())
+            assert(lines[x + y][indentation - 1] == ' ')
+            sequences[-1].append(match_sequence)
+
+            # Check for the empty line
+            assert(lines[x + num_ids + 1].strip() == '')
+
+        # Create the sequences
+        lengths = set()
+        for k, v in sequences.iteritems():
+            sequences[k] = "".join(v)
+            lengths.add(len(sequences[k]))
+        assert(len(lengths) == 1)
+
+        return sequences
+
+    def _parse_percentage_identity_output(self, percentage_identity_output):
 
         # Initalize matrix
         matrix = dict.fromkeys(self.sequence_ids.keys(), None)
@@ -156,7 +320,7 @@ class SequenceAligner(object):
                 matrix[x + 1][y + 1] = None
             matrix[x + 1][x + 1] = 100.0
 
-        matches = alignment_results_regex.match(alignment_output)
+        matches = alignment_results_regex.match(percentage_identity_output)
         if matches:
             assert(len(matches.groups(0)) == 1)
             for l in matches.group(1).strip().split('\n'):
@@ -173,7 +337,7 @@ class SequenceAligner(object):
                 else:
                     raise colortext.Exception("Error parsing alignment line for alignment scores. The line was:\n%s" % l)
         else:
-            raise colortext.Exception("Error parsing alignment output for alignment scores. The output was:\n%s" % alignment_output)
+            raise colortext.Exception("Error parsing alignment output for alignment scores. The output was:\n%s" % percentage_identity_output)
 
         self.matrix = matrix
         return self._create_named_matrix()
@@ -213,6 +377,8 @@ class PDBUniParcSequenceAligner(object):
         self.fasta = f
         self.clustal_matches = dict.fromkeys(self.chains, None)
         self.substring_matches = dict.fromkeys(self.chains, None)
+        self.residue_mapping = {}
+        self.residue_match_mapping = {}
 
         # Retrieve the related UniParc sequences
         uniparc_sequences = {}
@@ -228,6 +394,7 @@ class PDBUniParcSequenceAligner(object):
         self._align_with_clustal()
         self._align_with_substrings()
         self._check_alignments()
+        self._get_residue_mapping()
 
     ### Object methods ###
 
@@ -260,6 +427,25 @@ class PDBUniParcSequenceAligner(object):
         return None
 
     ### Private methods ###
+
+    def _get_residue_mapping(self):
+        '''Creates a mapping between the residues of the chains and the associated UniParc entries.'''
+        self.residue_mapping = {}
+        self.residue_match_mapping = {}
+        alignment = self.alignment
+        for c in self.chains:
+            if alignment.get(c):
+                uniparc_entry = self.get_uniparc_object(c)
+                sa = SequenceAligner()
+                sa.add_sequence(c, self.fasta[c])
+                sa.add_sequence(uniparc_entry.UniParcID, uniparc_entry.sequence)
+                sa.align()
+                residue_mapping, residue_match_mapping = sa.get_residue_mapping()
+                self.residue_mapping[c] = residue_mapping
+                self.residue_match_mapping[c] = residue_match_mapping
+            else:
+                self.residue_mapping[c] = {}
+                self.residue_match_mapping[c] = {}
 
     def _align_with_clustal(self):
 
@@ -310,7 +496,7 @@ class PDBUniParcSequenceAligner(object):
         for c in self.chains:
             if not(len(self.clustal_matches[c]) <= max_expected_matches_per_chain):
                 raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c]), self.clustal_matches[c])
-            assert(len(self.substring_matches[c]) <= len(self.clustal_matches[c]))
+            assert(len(self.substring_matches[c]) == 1 or len(self.substring_matches[c]) <= len(self.clustal_matches[c]))
             if self.clustal_matches[c]:
                 if not (len(self.clustal_matches[c].keys()) == max_expected_matches_per_chain):
                     raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c].keys()))
