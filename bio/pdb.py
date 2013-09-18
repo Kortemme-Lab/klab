@@ -14,6 +14,7 @@ from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
 from basics import PDBResidue, Sequence, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+import rcsb
 
 # todo: related packages will need to be fixed since my refactoring
 # The PDB constructor has now changed
@@ -36,7 +37,7 @@ from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, n
 # - computeMeanAndStandardDeviation was renamed to pymath.stats.get_mean_and_standard_deviation
 # - computeMeanAndStandardDeviation was renamed to get_mean_and_standard_deviation
 # - checkPDBAgainstMutations and checkPDBAgainstMutationsTuple have now been made into object functions
-# - getSEQRESSequences is now get_SEQRES_sequences and handles RNA properly.
+# - getSEQRESSequences is now _get_SEQRES_sequences and handles RNA properly. IT DOES NOT RETURN anything and is not a private function.
 # - getMoleculeInfo is now get_molecules_and_source
 # - ProperResidueIDToAAMap is now get_residue_id_to_type_map. The buggy aa_resid2type function has been deleted.
 # - getJournal is now get_journal.  parseJRNL has been removed.
@@ -291,6 +292,8 @@ class PDB:
         self.format_version = None
         self.modified_residues = None
         self.modified_residue_mapping_3 = {}
+        self.chains_in_order = []
+        self.seqres_sequences = {}
 
         self.lines = pdb_content.split("\n")
         self._split_lines()
@@ -298,6 +301,7 @@ class PDB:
         self.pdb_id = self.get_pdb_id()     # parse the PDB ID if it is not passed in
         self._get_pdb_format_version()
         self._get_modified_residues()
+        self._get_SEQRES_sequences()
 
     ### Class functions ###
 
@@ -410,7 +414,28 @@ class PDB:
             self.modified_residue_mapping_3 = modified_residue_mapping_3
             self.modified_residues = modified_residues
 
-    ### PDB FILE PARSING FUNCTIONS ###
+    ### PDB mutating functions ###
+
+    def strip_to_chains(self, chains):
+        '''Throw away all ATOM/HETATM lines for chains that are not in the chains list.'''
+        if chains:
+            chains = set(chains)
+
+            # Remove any structure lines associated with the chains
+            self.lines = [l for l in self.lines if not(l.startswith('ATOM  ') or l.startswith('HETATM')) or l[21] in chains]
+            self._update_structure_lines()
+            # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
+
+    def strip_HETATMs(self, only_strip_these_chains = []):
+        '''Throw away all HETATM lines. If only_strip_these_chains is specified then only strip HETATMs lines for those chains.'''
+        if only_strip_these_chains:
+            self.lines = [l for l in self.lines if not(l.startswith('HETATM')) or l[21] not in only_strip_these_chains]
+        else:
+            self.lines = [l for l in self.lines if not(l.startswith('HETATM'))]
+        self._update_structure_lines()
+        # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
+
+    ### PDB file parsing functions ###
 
     def _get_pdb_format_version(self):
         '''Remark 4 indicates the version of the PDB File Format used to generate the file.'''
@@ -665,7 +690,7 @@ class PDB:
 
     ### Sequence-related functions ###
 
-    def get_SEQRES_sequences(self):
+    def _get_SEQRES_sequences(self):
         '''Returns the SEQRES sequences and the chains in order of their appearance in the SEQRES records. This second
            return value should be removed since it does not always agree with the order in the ATOM records which seems
            the more important value.'''
@@ -675,6 +700,7 @@ class PDB:
         SEQRES_lines = self.parsed_lines["SEQRES"]
 
         modified_residue_mapping_3 = self.modified_residue_mapping_3
+        # I commented this out since we do not need it for my current test cases
         #for k, v in self.modified_residues.iteritems():
         #    assert(v['modified_residue'] not in modified_residues)
         #    modified_residues[v['modified_residue']] = v['original_residue_3']
@@ -768,7 +794,8 @@ class PDB:
                                 raise Exception("Unknown protein residue %s in chain %s." % (r, chain_id))
             sequences[chain_id] = "".join(sequence)
 
-        return sequences, chains_in_order
+        self.chains_in_order = chains_in_order
+        self.seqres_sequences = sequences
 
     ### END OF REFACTORED CODE
 
@@ -789,7 +816,8 @@ class PDB:
 
     def get_all_sequences(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
 
-        seqres_sequences, chains_in_order = self.get_SEQRES_sequences()
+        seqres_sequences = self.seqres_sequences
+        chains_in_order = self.chains_in_order
 
         colortext.warning('seqres')
         for chain_id, s in seqres_sequences.iteritems():
