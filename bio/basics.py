@@ -18,6 +18,8 @@ Created by Shane O'Connor 2013
 #   The Residue class is now located here and renamed to PDBResidue (since we assert that the chain is 1 character long).
 #   The Mutation class is now located here. ChainMutation was called something else.
 
+from Bio.SubsMat.MatrixInfo import blosum62 as _blosum62, pam250 as _pam250# The amino acid codes BXZ in these blosum62 and pam250 matrices appear to be amino acid ambiguity codes
+import tools.colortext as colortext
 
 ###
 # Residue maps and sets.
@@ -126,7 +128,28 @@ all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
 nucleotide_types_1 = set(dna_nucleotides_2to1_map.values()) # for use in SEQRES sequences
 
 ###
-# Mutations
+# Substitution matrices
+# Create full matrices to make the lookup logic simpler
+# e.g. "pam250.get(x, y) or pam250.get(y, x)" fails due to Python's semantics when the first term is 0 and the second is None - in this case None is returned whereas 0 is what is probably wanted.
+# "pam250.get(x, y) or pam250.get(y, x) or 0" is just plain ugly
+###
+
+pam250 = {}
+for k, v in _pam250.iteritems():
+    if k[0] != k[1]:
+        assert((k[1], k[0])) not in _pam250
+        pam250[(k[1], k[0])] = v
+    pam250[(k[0], k[1])] = v
+
+blosum62 = {}
+for k, v in _blosum62.iteritems():
+    if k[0] != k[1]:
+        assert((k[1], k[0])) not in _blosum62
+        blosum62[(k[1], k[0])] = v
+    blosum62[(k[0], k[1])] = v
+
+###
+# Sequences
 #
 
 class Sequence(object):
@@ -166,6 +189,39 @@ class Sequence(object):
             count += 1
         return s
 
+def sequence_formatter(sequences):
+    assert(sequences and (len(set(map(len, sequences))) == 1))
+    first_sequence = sequences[0]
+    header = ("%s%s" % ("1234567890" * (len(first_sequence)/10), "1234567890"[:len(first_sequence) - (len(first_sequence)/10 * 10)])).replace('0', colortext.make('0', 'orange'))
+    s = ['|%s|' % header]
+    for sequence in sequences:
+        s.append('|%s|' % sequence)
+    return "\n".join(s)
+
+###
+# Substitutions
+#
+
+class SubstitutionScore(object):
+    ''' Container class to score substitution matrix scores for a residue match.
+        The clustal score is based on the Clustal Omega alignment output (clustal format). A score of 1 (asterix) means
+        identical residue types, 0 (colon) indicates "conservation between groups of strongly similar properties -
+        scoring > 0.5 in the Gonnet PAM 250 matrix." A score of -1 (period) indicates "conservation between groups of
+        weakly similar properties - scoring =< 0.5 in the Gonnet PAM 250 matrix." '''
+
+    clustal_symbols = {1 : '*', 0 : ':', -1 : '.'}
+
+    def __init__(self, clustal, from_residue, to_residue):
+        assert(-1 <= clustal <= 1)
+        self.clustal = clustal
+        self.blosum62 = blosum62[(from_residue, to_residue)]
+        self.pam250 = pam250[(from_residue, to_residue)]
+
+    def __repr__(self):
+        return "(%s, b%d, p%d)" % (SubstitutionScore.clustal_symbols[self.clustal], self.blosum62, self.pam250)
+###
+# Residues
+#
 
 class Residue(object):
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
