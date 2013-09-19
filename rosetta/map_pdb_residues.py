@@ -1,24 +1,29 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+map_pdb_residues.py
+
+Python functions to map PDB residue IDs to Rosetta/pose IDs by using the features database.
+Warning: The inputs to the commands.getstatusoutput (one of these is an executable) are unsanitized. Only use these functions if you trust the caller.
+
+Sample command line:
+  python map_pdb_residues.py -d ~/rosetta/main/database -e ~/rosetta/main/source/bin/rosetta_scripts.static.linuxgccrelease -f 1QG8.pdb -c A
+
+Created by Shane O'Connor 2013
+"""
+
 import sys
 import os
 import tempfile
 import commands
 import traceback
 import sqlite3
-from optparse import OptionParser # deprecated since Python 2.7
+from optparse import OptionParser # todo: deprecated since Python 2.7
 
 if __name__ == '__main__':
     sys.path.insert(0, "../..")
 
 from tools.fs.io import write_temp_file, read_file
-from tools.bio.basics import Residue, Sequence, residue_type_3to1_map, dna_nucleotides, rna_nucleotides, residue_types_3
-from tools.bio.pdb import PDB
-
-# Python functions to map PDB residue IDs to Rosetta/pose IDs by using the features database.
-# Direct complaints to shane.oconnor@ucsf.edu
-# Warning: The inputs to the commands.getstatusoutput (one of these is an executable) are unsanitized. Only use these functions if you trust the caller.
-#
-# Sample command line:
-#   python map_pdb_residues.py -d ~/rosetta/main/database -e ~/rosetta/main/source/bin/rosetta_scripts.static.linuxgccrelease -f 1QG8.pdb -c A
 
 script = '''<ROSETTASCRIPTS>
   <MOVERS>
@@ -34,15 +39,17 @@ script = '''<ROSETTASCRIPTS>
   </PROTOCOLS>
 </ROSETTASCRIPTS>'''
 
-def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path):
+
+def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path, pdb_id = None, extra_flags = ''):
     '''Takes a string containing a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
-       On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
+       On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.
+    '''
     filename = write_temp_file("/tmp", pdb_file_contents)
-    success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path)
+    success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path, pdb_id = pdb_id, extra_flags = extra_flags)
     os.remove(filename)
     return success, mapping
 
-def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path):
+def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path, pdb_id = None, extra_flags = ''):
     '''Takes a path to a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.'''
     mapping = {}
@@ -55,7 +62,7 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
         db_path = script_path + ".db3"
         script_handle.write(script % db_path)
         script_handle.close()
-        command_line = '%s -database %s -constant_seed -ignore_unrecognized_res -in:file:s %s -parser:protocol %s -overwrite -out:nooutput' % (rosetta_scripts_path, rosetta_database_path, pdb_path, script_path)
+        command_line = '%s -database %s -constant_seed -ignore_unrecognized_res -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, rosetta_database_path, pdb_path, script_path, extra_flags)
 
         exit_code, stdout = commands.getstatusoutput(command_line)
         if exit_code != 0:
@@ -74,6 +81,7 @@ INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id A
                     mapping["%s%s%s" % (r[0], str(r[1]).rjust(4), r[2])] = {'pose_residue_id' : r[4], 'name3' : r[5], 'res_type' : r[6]}
                     rosetta_residue_ids.append(r[4])
 
+                # Ensure that the the range of the map is exactly the set of Rosetta residues i.e. the map from (a subset of) the PDB residues to the Rosetta residues is surjective
                 raw_residue_list = [r for r in conn.cursor().execute('''SELECT resNum, name3 FROM residues ORDER BY resNum''')]
                 assert(sorted([r[0] for r in raw_residue_list]) == sorted(rosetta_residue_ids))
 
@@ -134,6 +142,7 @@ def get_stripped_pdb_to_pose_residue_map(input_pdb_path, rosetta_scripts_path, r
             return False, mapping
     return False, result
 
+
 if __name__ == '__main__':
     chains = []
     
@@ -172,9 +181,9 @@ if __name__ == '__main__':
     elif not(os.path.exists(rosetta_scripts_path)):
         if os.path.exists(os.path.join(os.getcwd(), rosetta_scripts_path)):
             rosetta_scripts_path = "./%s" % os.path.join(os.getcwd(), rosetta_scripts_path)
-	else:
-	    print("\nError: The path '%s' does not exist.\n" % rosetta_scripts_path)
-            sys.exit(1)
+    else:
+        print("\nError: The path '%s' does not exist.\n" % rosetta_scripts_path)
+        sys.exit(1)
     rosetta_scripts_path = os.path.abspath(rosetta_scripts_path)
     if chains:
         chains = chains.split(",")
