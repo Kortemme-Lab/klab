@@ -18,7 +18,7 @@ from tools.process import Popen as _Popen
 from tools import colortext
 from uniprot import pdb_to_uniparc
 from fasta import FASTA
-from basics import SubstitutionScore, sequence_formatter
+from basics import SubstitutionScore, Sequence
 
 ### Check for the necessary Clustal Omega and ClustalW software
 
@@ -385,7 +385,7 @@ class PDBUniParcSequenceAligner(object):
         uniparc_objects = {}
         pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir)
         for upe in pdb_uniparc_mapping[pdb_id]:
-            uniparc_sequences[upe.UniParcID] = upe.sequence
+            uniparc_sequences[upe.UniParcID] = Sequence.from_sequence(upe.UniParcID, upe.sequence)
             uniparc_objects[upe.UniParcID] = upe
         self.uniparc_sequences = uniparc_sequences
         self.uniparc_objects = uniparc_objects
@@ -458,7 +458,7 @@ class PDBUniParcSequenceAligner(object):
             #count = 2
             for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
                 #clustal_indices[count] = uniparc_id
-                sa.add_sequence(uniparc_id, uniparc_sequence)
+                sa.add_sequence(uniparc_id, str(uniparc_sequence))
                 #count += 1
             best_matches = sa.align()
             self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id, cut_off = self.cut_off)
@@ -472,6 +472,7 @@ class PDBUniParcSequenceAligner(object):
             substring_matches = {}
 
             for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
+                uniparc_sequence = str(uniparc_sequence)
                 idx = uniparc_sequence.find(fasta_sequence)
                 if idx != -1:
                     substring_matches[uniparc_id] = 0
