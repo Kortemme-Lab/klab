@@ -8,12 +8,13 @@ import types
 import string
 import types
 
-import tools.colortext as colortext
+from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
+from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools import colortext
 from tools.fs.io import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
-from basics import PDBResidue, Sequence, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
-from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
 import rcsb
 
 # todo: related packages will need to be fixed since my refactoring
@@ -48,6 +49,17 @@ import rcsb
 
 allowed_PDB_residues_types = protonated_residues_types_3.union(residue_types_3)
 allowed_PDB_residues_and_nucleotides = allowed_PDB_residues_types.union(dna_nucleotides).union(rna_nucleotides)
+
+### Rosetta hacks
+
+# Rosetta fails on some edge cases with certain residues. Since we rely on a lot of logic associated with this module (mappings between residues), it seems best to fix those here.
+HACKS_residues_to_remove = {
+    '1A2P' : set(['B   3 ']), # terminal residue B 3 gets removed which triggers an exception "( anchor_rsd.is_polymer() && !anchor_rsd.is_upper_terminus() ) && ( new_rsd.is_polymer() && !new_rsd.is_lower_terminus() ), Exit from: src/core/conformation/Conformation.cc line: 449". This seems like a Rosetta deficiency.
+}
+
+# For use with get_pdb_contents_to_pose_residue_map e.g. {'1A2P' : '-ignore_zero_occupancy false', ... }
+HACKS_pdb_specific_hacks = {
+}
 
 ### UniProt-related variables
 
@@ -282,8 +294,7 @@ class PDB:
 
         assert(type(pdb_content) is types.StringType)
         self.parsed_lines = {}
-        self.structure_lines = [] # For ATOM and HETATM records
-        self.chains_in_document_order = []
+        self.structure_lines = []                       # For ATOM and HETATM records
         self.ddGresmap = None
         self.ddGiresmap = None
         self.lines = []
@@ -292,16 +303,32 @@ class PDB:
         self.format_version = None
         self.modified_residues = None
         self.modified_residue_mapping_3 = {}
-        self.chains_in_order = []
-        self.seqres_sequences = {}
+
+        self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
+        self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
+        self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
+        self.atom_sequences = {}                        # A dict mapping chain IDs to ATOM Sequence objects
+
+        self.rosetta_to_atom_sequence_maps = {}
+        self.rosetta_residues = []
 
         self.lines = pdb_content.split("\n")
         self._split_lines()
         self.pdb_id = pdb_id
-        self.pdb_id = self.get_pdb_id()     # parse the PDB ID if it is not passed in
+        self.pdb_id = self.get_pdb_id()                 # parse the PDB ID if it is not passed in
         self._get_pdb_format_version()
         self._get_modified_residues()
         self._get_SEQRES_sequences()
+        self._get_ATOM_sequences()
+
+        self._apply_hacks()
+
+    def _apply_hacks(self):
+        pdb_id = self.pdb_id
+        if pdb_id and HACKS_residues_to_remove.get(pdb_id):
+            hacks = HACKS_residues_to_remove[pdb_id]
+            self.lines = [l for l in self.lines if not(l.startswith('ATOM'  )) or (l[21:27] not in hacks)]
+            self._split_lines()
 
     ### Class functions ###
 
@@ -358,18 +385,18 @@ class PDB:
     def _update_structure_lines(self):
         '''ATOM and HETATM lines may be altered by function calls. When this happens, this function should be called to keep self.structure_lines up to date.'''
         structure_lines = []
-        chains_in_document_order = []
+        atom_chain_order = []
 
         for line in self.lines:
             linetype = line[0:6]
             if linetype == 'ATOM  ' or linetype == 'HETATM' or linetype == 'TER   ':
                 structure_lines.append(line)
                 chainID = line[21]
-                if chainID not in chains_in_document_order:
-                    chains_in_document_order.append(chainID)
+                if chainID not in atom_chain_order:
+                    atom_chain_order.append(chainID)
                     
         self.structure_lines = structure_lines
-        self.chains_in_document_order = chains_in_document_order
+        self.atom_chain_order = atom_chain_order
 
     ### Basic functions ###
 
@@ -396,7 +423,7 @@ class PDB:
 
     def get_ATOM_and_HETATM_chains(self):
         '''todo: remove this function as it now just returns a member element'''
-        return self.chains_in_document_order
+        return self.atom_chain_order
 
     def _get_modified_residues(self):
         if not self.modified_residues:
@@ -691,10 +718,8 @@ class PDB:
     ### Sequence-related functions ###
 
     def _get_SEQRES_sequences(self):
-        '''Returns the SEQRES sequences and the chains in order of their appearance in the SEQRES records. This second
-           return value should be removed since it does not always agree with the order in the ATOM records which seems
-           the more important value.'''
-         # todo: remove the second return value
+        '''Creates the SEQRES Sequences and stores the chains in order of their appearance in the SEQRES records. This order of chains
+           in the SEQRES sequences does not always agree with the order in the ATOM records.'''
 
         pdb_id = self.get_pdb_id()
         SEQRES_lines = self.parsed_lines["SEQRES"]
@@ -711,15 +736,15 @@ class PDB:
         if not SEQRES_lines:
             raise MissingRecordsException("No SEQRES records were found. Handle this gracefully.") # return None
 
-        chains_in_order = []
+        seqres_chain_order = []
         SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
 
         # Collect all residues for all chains, remembering the chain order
         chain_tokens = {}
         for line in SEQRES_lines:
             chainID = line[0]
-            if chainID not in chains_in_order:
-                chains_in_order.append(chainID)
+            if chainID not in seqres_chain_order:
+                seqres_chain_order.append(chainID)
             chain_tokens[chainID] = chain_tokens.get(chainID, [])
             chain_tokens[chainID].extend(line[6:].strip().split())
 
@@ -794,50 +819,19 @@ class PDB:
                                 raise Exception("Unknown protein residue %s in chain %s." % (r, chain_id))
             sequences[chain_id] = "".join(sequence)
 
-        self.chains_in_order = chains_in_order
-        self.seqres_sequences = sequences
+        self.seqres_chain_order = seqres_chain_order
 
-    ### END OF REFACTORED CODE
+        # Create Sequence objects for the SEQRES sequences
+        for chain_id, sequence in sequences.iteritems():
+            self.seqres_sequences[chain_id] = Sequence.from_sequence(chain_id, sequence, self.chain_types[chain_id])
 
-    def get_atom_sequences(self):
-        pass
-
-    def get_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
-        from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-        if ignore_HETATMs:
-            pdb_file_contents = "\n".join([l for l in self.structure_lines if not(l.startswith('HETATM'))])
-        else:
-            pdb_file_contents = "\n".join(self.structure_lines)
-        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path)
-        if not success:
-            raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
-        self.pdb_residue_to_rosetta_residue_map = mapping
-        self.rosetta_residues = [v['pose_residue_id'] for k, v in self.pdb_residue_to_rosetta_residue_map.iteritems()]
-
-    def get_all_sequences(self, rosetta_scripts_path, rosetta_database_path, ignore_HETATMs):
-
-        seqres_sequences = self.seqres_sequences
-        chains_in_order = self.chains_in_order
-
-        colortext.warning('seqres')
-        for chain_id, s in seqres_sequences.iteritems():
-            colortext.warning(chain_id)
-            sequence = Sequence.from_sequence(chain_id, s, self.chain_types[chain_id])
-            print(sequence.sequence_type)
-            print(sequence)
-            print('***')
-
-
-        self.get_pdb_to_rosetta_residue_map(rosetta_scripts_path, rosetta_database_path, ignore_HETATMs)
-        pdb_to_rosetta_map = self.pdb_residue_to_rosetta_residue_map
-        rosetta_residues = self.rosetta_residues
-        print('here')
-        print(rosetta_residues)
+    def _get_ATOM_sequences(self):
+        '''Creates the ATOM Sequences.'''
 
         # Get a list of all residues with ATOM or HETATM records
         atom_sequences = {}
         structural_residue_IDs_set = set() # use a set for a quicker lookup
-        ignore_HETATMs = True
+        ignore_HETATMs = True # todo: fix this if we need to deal with HETATMs
         for l in self.structure_lines:
             if (not(ignore_HETATMs)) or (not(l.startswith("HETATM"))):
                 residue_id = l[21:27]
@@ -848,7 +842,6 @@ class PDB:
                     residue_type = l[17:20].strip()
 
                     residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
-                    print(1,residue_type)
                     if residue_type == 'UNK':
                         short_residue_type = 'X'
                     elif chain_type == 'Protein':
@@ -864,12 +857,63 @@ class PDB:
                     atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
                     structural_residue_IDs_set.add(residue_id)
 
-        print(atom_sequences)
+        self.atom_sequences = atom_sequences
+
+    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
+        ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
+            Next, the object's rosetta_sequences (a dict of Sequences) element is created.
+            Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
+        '''
+
+        ## Create a mapping from Rosetta-numbered residues to PDB ATOM residues
+
+        # Apply any PDB-specific hacks
+        specific_flag_hacks = None
+        if self.pdb_id and HACKS_pdb_specific_hacks.get(self.pdb_id):
+            specific_flag_hacks = HACKS_pdb_specific_hacks[self.pdb_id]
+
+        # Get the residue mapping using the features database
+        pdb_file_contents = "\n".join(self.structure_lines)
+        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path, pdb_id = self.pdb_id, extra_flags = specific_flag_hacks or '')
+        if not success:
+            raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
+
+        ## Create Sequences for the Rosetta residues (self.rosetta_sequences)
+
+        # Initialize maps
+        rosetta_residues = {}
+        rosetta_sequences = {}
+        for chain_id in self.atom_chain_order:
+            chain_type = self.chain_types[chain_id]
+            rosetta_residues[chain_id] = {}
+            rosetta_sequences[chain_id] = Sequence(chain_type)
+
+        # Create a map rosetta_residues, Chain -> Rosetta residue ID -> Rosetta residue information
+        rosetta_pdb_mappings = {}
+        for chain_id in self.atom_chain_order:
+            rosetta_pdb_mappings[chain_id] = {}
+        for k, v in mapping.iteritems():
+            rosetta_residues[k[0]][v['pose_residue_id']] = v
+            rosetta_pdb_mappings[k[0]][v['pose_residue_id']] = k
+
+        # Create rosetta_sequences map Chain -> Sequence(Residue)
+        for chain_id, v in sorted(rosetta_residues.iteritems()):
+            chain_type = self.chain_types[chain_id]
+            for rosetta_id, residue_info in sorted(v.iteritems()):
+                short_residue_type = residue_type_3to1_map[residue_info['name3']]
+                rosetta_sequences[chain_id].add(Residue(chain_id, rosetta_id, short_residue_type, chain_type))
 
 
-        print(pdb_to_rosetta_map)
+        ## Create SequenceMap objects to map the Rosetta Sequences to the ATOM Sequences
+        rosetta_to_atom_sequence_maps = {}
+        for chain_id, rosetta_pdb_mapping in rosetta_pdb_mappings.iteritems():
+            rosetta_to_atom_sequence_maps[chain_id] = SequenceMap.from_dict(rosetta_pdb_mapping)
 
-        #ATOM_list =
+        self.rosetta_to_atom_sequence_maps = rosetta_to_atom_sequence_maps
+        self.rosetta_sequences = rosetta_sequences
+
+    ### END OF REFACTORED CODE
+
 
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         sequences, residue_map = self.GetRosettaResidueMap(ConvertMSEToAtom = ConvertMSEToAtom, RemoveIncompleteFinalResidues = RemoveIncompleteFinalResidues, RemoveIncompleteResidues = RemoveIncompleteResidues)
