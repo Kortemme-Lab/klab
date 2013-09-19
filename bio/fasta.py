@@ -17,6 +17,7 @@ if __name__ == '__main__':
 from tools import colortext
 from tools.fs.io import read_file, write_file
 import rcsb
+from basics import Sequence
 
 visible_colors = [
     'lightblue',
@@ -140,6 +141,19 @@ class FASTA(dict):
         self.identical_sequences = identical_sequences
 
     ### Public methods
+    def get_sequences(self, pdb_id = None):
+        '''Create Sequence objects for each FASTA sequence.'''
+        sequences = {}
+        if pdb_id:
+            for chain_id, sequence in self.get(pdb_id, {}).iteritems():
+                sequences[chain_id] = Sequence.from_sequence(chain_id, sequence)
+        else:
+            for pdb_id, v in self.iteritems():
+                sequences[pdb_id] = {}
+                for chain_id, sequence in v.iteritems():
+                    sequences[pdb_id][chain_id] = Sequence.from_sequence(chain_id, sequence)
+        return sequences
+
 
     def get_number_of_unique_sequences(self):
         return len(self.unique_sequences)
