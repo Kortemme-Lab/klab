@@ -18,6 +18,8 @@ Created by Shane O'Connor 2013
 #   The Residue class is now located here and renamed to PDBResidue (since we assert that the chain is 1 character long).
 #   The Mutation class is now located here. ChainMutation was called something else.
 
+import types
+
 from Bio.SubsMat.MatrixInfo import blosum62 as _blosum62, pam250 as _pam250# The amino acid codes BXZ in these blosum62 and pam250 matrices appear to be amino acid ambiguity codes
 import tools.colortext as colortext
 
@@ -153,28 +155,56 @@ for k, v in _blosum62.iteritems():
 #
 
 class Sequence(object):
-    '''A class to hold a list of Residues in the same chain. The order of the sequence is the order of addition.'''
+    ''' A class to hold a list of Residues in the same chain.
+        This class maintains two elements:
+            1) order        List(ID)            : a list of residue IDs in the order of addition;
+            2) sequence     Dict(ID->Residue)   : a map from residue IDs to a Residue object (chain, residue ID, residue type, sequence_type).
+    '''
     def __init__(self, sequence_type = None):
-        self.sequence = []
-        if sequence_type:
-            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA')
+
+        self.order = []
+        self.sequence = {}
         self.sequence_type = sequence_type
 
+        if sequence_type:
+            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA')
+
+    def __iter__(self):
+        self._iter_index = 0
+        return self
+
+    def ids(self):
+        return self.sequence.keys()
+
+    def next(self): # todo: This is __next__ in Python 3.x
+        try:
+            id = self.order[self._iter_index]
+            self._iter_index += 1
+            return id, self.sequence[id]
+        except:
+            raise StopIteration
+
     def add(self, r):
-        if self.sequence:
-            assert(r.Chain == self.sequence[-1].Chain)
-            assert(r.residue_type == self.sequence[-1].residue_type)
-        self.sequence.append(r)
+        '''Takes an id and a Residue r and adds them to the Sequence.'''
+        id = r.get_residue_id()
+        if self.order:
+            last_id = self.order[-1]
+            assert(r.Chain == self.sequence[last_id].Chain)
+            assert(r.residue_type == self.sequence[last_id].residue_type)
+        self.order.append(id)
+        self.sequence[id] = r
 
     def set_type(self, sequence_type):
         '''Set the type of a Sequence if it has not been set.'''
         if not(self.sequence_type):
-            for r in self.sequence:
-                r.sequence_type = sequence_type
+            for id, r in self.sequence.iteritems():
+                assert(r.residue_type == None)
+                r.residue_type = sequence_type
             self.sequence_type = sequence_type
 
     def __repr__(self):
-        return "".join([r.ResidueAA for r in self.sequence])
+        sequence = self.sequence
+        return "".join([sequence[id].ResidueAA for id in self.order])
 
     @staticmethod
     def from_sequence(chain, list_of_residues, sequence_type = None):
@@ -182,12 +212,65 @@ class Sequence(object):
         s = Sequence(sequence_type)
         count = 1
         for ResidueAA in list_of_residues:
-            if sequence_type:
-                s.add(Residue(chain, count, ResidueAA, sequence_type))
-            else:
-                s.add(Residue(chain, count, ResidueAA, sequence_type))
+            s.add(Residue(chain, count, ResidueAA, sequence_type))
             count += 1
         return s
+
+
+class SequenceMap():
+    ''' A class to map the IDs of one Sequence to another.'''
+
+    def __init__(self):
+        self.map = {}
+        self.substitution_scores = {}
+
+    @staticmethod
+    def from_dict(d):
+        for k, v in d.iteritems():
+            assert(type(k) == types.IntType or type(k) == types.StringType or type(k) == types.UnicodeType)
+            assert(type(v) == types.IntType or type(v) == types.StringType or type(v) == types.UnicodeType)
+        s = SequenceMap()
+        s.map = d
+        s.substitution_scores = dict.fromkeys(d.keys(), None)
+        return s
+
+    def __setitem__(self, key, value):
+        assert(type(key) == types.IntType or type(key) == types.StringType)
+        assert(type(value) == types.IntType or type(value) == types.StringType)
+        self.map[key] = value
+        self.substitution_scores[key] = None
+
+    def __getitem__(self, item):
+        return self.map.get(item)
+
+    def add(self, key, value, substitution_score):
+        self[key] = value
+        self.substitution_scores[key] = substitution_score
+
+    def keys(self):
+        return self.map.keys()
+
+    def values(self):
+        return self.map.values()
+
+    def __repr__(self):
+        s = []
+        substitution_scores = self.substitution_scores
+        for k, v in sorted(self.map.iteritems()):
+            if type(k) == types.StringType or type(k) == types.UnicodeType:
+                key = "'%s'" % k
+            else:
+                key = str(k)
+            if type(v) == types.StringType or type(v) == types.UnicodeType:
+                val = "'%s'" % v
+            else:
+                val = str(v)
+            if substitution_scores.get(k):
+                s.append('%s->%s (%s)' % (str(key), str(val), str(substitution_scores[k])))
+            else:
+                s.append('%s->%s' % (str(key), str(val)))
+        return ", ".join(s)
+
 
 def sequence_formatter(sequences):
     assert(sequences and (len(set(map(len, sequences))) == 1))
@@ -224,6 +307,7 @@ class SubstitutionScore(object):
 #
 
 class Residue(object):
+    # For residues ResidueID
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
         if residue_type:
             if residue_type == 'Protein':
@@ -242,6 +326,9 @@ class Residue(object):
         '''Basic form of equality, just checking the amino acid types. This lets us check equality over different chains with different residue IDs.'''
         return (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
 
+    def get_residue_id(self):
+        return self.ResidueID
+
 class PDBResidue(Residue):
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type, Residue3AA = None):
         '''Residue3AA has to be used when matching non-canonical residues/HETATMs to the SEQRES record e.g. 34H in 1A2C.'''
@@ -254,6 +341,9 @@ class PDBResidue(Residue):
         self.x, self.y, self.z = x, y, z
 
     def __repr__(self):
+        return "%s%s" % (self.Chain, self.ResidueID)
+
+    def get_residue_id(self):
         return "%s%s" % (self.Chain, self.ResidueID)
 
 class IdentifyingPDBResidue(PDBResidue):
