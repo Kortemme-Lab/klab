@@ -8,9 +8,10 @@ Created by Shane O'Connor 2013
 """
 
 import os
+import types
 from xml.dom.minidom import parse, parseString
 
-from basics import IdentifyingPDBResidue, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
+from basics import IdentifyingPDBResidue, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
 from pdb import PDB
 import rcsb
 from tools.fs.io import read_file, write_file
@@ -31,7 +32,7 @@ class PDBML(object):
         self.xml_version = None
         self.schema = None
         self._dom = parseString(xml_contents)
-        self.residue_map = {}
+        self.atom_to_seqres_sequence_maps = {}
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -94,6 +95,7 @@ class PDBML(object):
 
         residue_map = {}
         residues_read = {}
+        int_type = types.IntType
         for t in atom_site_tags:
             r, seqres, ResidueAA = PDBML.parse_atom_site(t, self.modified_residues)
             if r:
@@ -102,9 +104,16 @@ class PDBML(object):
                     assert(residues_read[full_residue_id] == (r.ResidueAA, seqres))
                 else:
                     residues_read[full_residue_id] = (r.ResidueAA, seqres)
-                    residue_map[r] = seqres
+                    residue_map[r.Chain] = residue_map.get(r.Chain, {})
+                    assert(type(seqres) == int_type)
+                    residue_map[r.Chain][str(r)] = seqres
 
-        self.residue_map = residue_map
+        ## Create SequenceMap objects to map the ATOM Sequences to the SEQRES Sequences
+        atom_to_seqres_sequence_maps = {}
+        for chain_id, atom_seqres_mapping in residue_map.iteritems():
+            atom_to_seqres_sequence_maps[chain_id] = SequenceMap.from_dict(atom_seqres_mapping)
+
+        self.atom_to_seqres_sequence_maps = atom_to_seqres_sequence_maps
 
     @staticmethod
     def parse_atom_site(t, modified_residues):
@@ -114,6 +123,7 @@ class PDBML(object):
             return None, None, None
         assert(parse_singular_string(t, 'PDBx:group_PDB') == 'ATOM')
 
+        # NOTE: x, y, z values are per-ATOM but we do not use them yet
         x, y, z = parse_singular_float(t, "PDBx:Cartn_x"), parse_singular_float(t, "PDBx:Cartn_y"), parse_singular_float(t, "PDBx:Cartn_z")
 
         PDB_chain_id = parse_singular_alphabetic_character(t, 'PDBx:auth_asym_id')
