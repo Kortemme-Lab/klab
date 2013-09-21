@@ -7,6 +7,7 @@ A class for relating residues using Rosetta numbering, PDB ATOM numbering, SEQRE
 Created by Shane O'Connor 2013
 """
 
+import types
 import traceback
 
 from fasta import FASTA
@@ -24,12 +25,24 @@ class ResidueRelatrix(object):
         self.rosetta_scripts_path = rosetta_scripts_path
         self.rosetta_database_path = rosetta_database_path
 
+        self.alignment_cutoff = None
+
         self.FASTA = None
         self.pdb = None
         self.pdbml = None
         self.PDB_UniParc_SA = None
 
-        self.alignment_cutoff = None
+        self.uniparc_sequences = None
+        self.fasta_sequences = None
+        self.seqres_sequences = None
+        self.atom_sequences = None
+        self.rosetta_sequences = None
+
+        self.rosetta_to_atom_sequence_maps = None
+        self.atom_to_seqres_sequence_maps = None
+        self.seqres_to_uniparc_sequence_maps = None
+
+        self.pdb_chain_to_uniparc_chain_mapping = {}
 
         self._create_objects(chains_to_keep, min_clustal_cut_off, True, cache_dir) # todo: at present, we always strip HETATMs. We may want to change this in the future.
         self._create_sequences()
@@ -39,9 +52,14 @@ class ResidueRelatrix(object):
     ### Private methods ###
 
     def _validate(self):
-        '''Get all of the SequenceMaps - Rosetta->ATOM, ATOM->SEQRES/FASTA, SEQRES->UniParc.'''
+        '''Validate the mappings.'''
 
-        ## Make sure the domains and ranges of the SequenceMaps match the Sequences
+        self._validate_mapping_signature()
+        self._validate_id_types()
+        self._validate_residue_types()
+
+    def _validate_mapping_signature(self):
+        '''Make sure the domains and ranges of the SequenceMaps match the Sequences.'''
 
         # rosetta_to_atom_sequence_maps
         for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.iteritems():
@@ -50,27 +68,81 @@ class ResidueRelatrix(object):
 
             # Check that all ATOM residues in the mapping exist and that the mapping is injective
             rng = set(sequence_map.values())
-            atom_ids = set(self.atom_sequences[chain_id].ids())
-            assert(rng.intersection(set(self.atom_sequences[chain_id].ids())) == rng)
+            atom_residue_ids = set(self.atom_sequences[chain_id].ids())
+            assert(rng.intersection(atom_residue_ids) == rng)
             assert(len(rng) == len(sequence_map.values()))
 
         # atom_to_seqres_sequence_maps
-        #todo self.atom_to_seqres_sequence_maps
+        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
+            # Check that all ATOM residues have a mapping
+            assert(sorted(sequence_map.keys()) == sorted(self.atom_sequences[chain_id].ids()))
+
+            # Check that all SEQRES residues in the mapping exist and that the mapping is injective
+            rng = set(sequence_map.values())
+            seqres_residue_ids = set(self.seqres_sequences[chain_id].ids())
+            assert(rng.intersection(seqres_residue_ids) == rng)
+            assert(len(rng) == len(sequence_map.values()))
 
         # seqres_to_uniparc_sequence_maps
-        #todo self.seqres_to_uniparc_sequence_maps
+        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
+            # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e. low BLOSUM62/PAM250 scores). I chose 90% arbitrarily.
+            mapped_SEQRES_residues = set(sequence_map.keys())
+            all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
+            assert(0.9 <= (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues)))) <= 1.0)
+
+            # Check that all UniParc residues in the mapping exist and that the mapping is injective
+            rng = set(sequence_map.values())
+            uniparc_chain_id = self.pdb_chain_to_uniparc_chain_mapping[chain_id]
+            uniparc_residue_ids = set(self.uniparc_sequences[uniparc_chain_id].ids())
+            assert(rng.intersection(uniparc_residue_ids) == rng)
+            assert(len(rng) == len(sequence_map.values()))
 
 
-        #todo: make sure all the residue types map through translation
+    def _validate_id_types(self):
+        '''Check that the ID types are integers for Rosetta, SEQRES, and UniParc sequences and 6-character PDB IDs for the ATOM sequences.'''
+
+        for sequences in [self.uniparc_sequences, self.fasta_sequences, self.seqres_sequences, self.rosetta_sequences]:
+            for chain_id, sequence in sequences.iteritems():
+                sequence_id_types = set(map(type, sequence.ids()))
+                assert(len(sequence_id_types) == 1)
+                assert(sequence_id_types.pop() == types.IntType)
+
+        for chain_id, sequence in self.atom_sequences.iteritems():
+            sequence_id_types = set(map(type, sequence.ids()))
+            assert(len(sequence_id_types) == 1)
+            sequence_id_type = sequence_id_types.pop()
+            assert(sequence_id_type == types.StringType or sequence_id_type == types.UnicodeType)
+
+
+    def _validate_residue_types(self):
+        '''Make sure all the residue types map through translation.'''
+
+        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.iteritems():
+            rosetta_sequence = self.rosetta_sequences[chain_id]
+            atom_sequence = self.atom_sequences[chain_id]
+            for rosetta_id, atom_id, _ in sequence_map:
+                assert(rosetta_sequence[rosetta_id].ResidueAA == atom_sequence[atom_id].ResidueAA)
+
+        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
+            atom_sequence = self.atom_sequences[chain_id]
+            seqres_sequence = self.seqres_sequences[chain_id]
+            for atom_id, seqres_id, _ in sequence_map:
+                assert(atom_sequence[atom_id].ResidueAA == seqres_sequence[seqres_id].ResidueAA)
+
+        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
+            seqres_sequence = self.seqres_sequences[chain_id]
+            uniparc_sequence = self.uniparc_sequences[self.pdb_chain_to_uniparc_chain_mapping[chain_id]]
+            for seqres_id, uniparc_id, substitution_match in sequence_map:
+                # Some of the matches may not be identical but all the '*' Clustal Omega matches should be identical
+                if substitution_match.clustal == 1:
+                    assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
 
     def _create_sequence_maps(self):
         '''Get all of the SequenceMaps - Rosetta->ATOM, ATOM->SEQRES/FASTA, SEQRES->UniParc.'''
 
         self.rosetta_to_atom_sequence_maps = self.pdb.rosetta_to_atom_sequence_maps
-        #todo self.atom_to_seqres_sequence_maps = self.pdb.atom_to_seqres_sequence_maps
-        #todo self.seqres_to_uniparc_sequence_maps = ???
-
-        #todo: make sure all the residue types map through translation
+        self.atom_to_seqres_sequence_maps = self.pdbml.atom_to_seqres_sequence_maps
+        self.seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
 
     def _create_sequences(self):
         '''Get all of the Sequences - Rosetta, ATOM, SEQRES, FASTA, UniParc.'''
@@ -98,6 +170,8 @@ class ResidueRelatrix(object):
             sequence_type = sequence_type.pop()
             assert(self.uniparc_sequences[uniparc_chain_id].sequence_type == None)
             self.uniparc_sequences[uniparc_chain_id].set_type(sequence_type)
+            for p in pdb_chain_ids:
+                self.pdb_chain_to_uniparc_chain_mapping[p] = uniparc_chain_id
 
         # Update the chain types for the FASTA sequences
         for chain_id, sequence in self.seqres_sequences.iteritems():
