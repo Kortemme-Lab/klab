@@ -18,7 +18,7 @@ from tools.process import Popen as _Popen
 from tools import colortext
 from uniprot import pdb_to_uniparc
 from fasta import FASTA
-from basics import SubstitutionScore, Sequence
+from basics import SubstitutionScore, Sequence, SequenceMap
 
 ### Check for the necessary Clustal Omega and ClustalW software
 
@@ -377,8 +377,7 @@ class PDBUniParcSequenceAligner(object):
         self.fasta = f
         self.clustal_matches = dict.fromkeys(self.chains, None)
         self.substring_matches = dict.fromkeys(self.chains, None)
-        self.residue_mapping = {}
-        self.residue_match_mapping = {}
+        self.seqres_to_uniparc_sequence_maps = {}
 
         # Retrieve the related UniParc sequences
         uniparc_sequences = {}
@@ -430,8 +429,7 @@ class PDBUniParcSequenceAligner(object):
 
     def _get_residue_mapping(self):
         '''Creates a mapping between the residues of the chains and the associated UniParc entries.'''
-        self.residue_mapping = {}
-        self.residue_match_mapping = {}
+        self.seqres_to_uniparc_sequence_maps = {}
         alignment = self.alignment
         for c in self.chains:
             if alignment.get(c):
@@ -441,11 +439,16 @@ class PDBUniParcSequenceAligner(object):
                 sa.add_sequence(uniparc_entry.UniParcID, uniparc_entry.sequence)
                 sa.align()
                 residue_mapping, residue_match_mapping = sa.get_residue_mapping()
-                self.residue_mapping[c] = residue_mapping
-                self.residue_match_mapping[c] = residue_match_mapping
+
+                # Create a SequenceMap
+                s = SequenceMap()
+                assert(sorted(residue_mapping.keys()) == sorted(residue_match_mapping.keys()))
+                for k, v in residue_mapping.iteritems():
+                    s.add(k, v, residue_match_mapping[k])
+                self.seqres_to_uniparc_sequence_maps[c] = s
+
             else:
-                self.residue_mapping[c] = {}
-                self.residue_match_mapping[c] = {}
+                self.seqres_to_uniparc_sequence_maps[c] = {}
 
     def _align_with_clustal(self):
 
