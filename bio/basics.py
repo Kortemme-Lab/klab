@@ -173,6 +173,9 @@ class Sequence(object):
         self._iter_index = 0
         return self
 
+    def __getitem__(self, item):
+        return self.sequence[item]
+
     def ids(self):
         return self.sequence.keys()
 
@@ -233,6 +236,17 @@ class SequenceMap():
         s.map = d
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
+
+    def __iter__(self):
+        self._iter_keys = set(self.map.keys())
+        return self
+
+    def next(self): # todo: This is __next__ in Python 3.x
+        try:
+            id = self._iter_keys.pop()
+            return id, self.map[id], self.substitution_scores[id]
+        except:
+            raise StopIteration
 
     def __setitem__(self, key, value):
         assert(type(key) == types.IntType or type(key) == types.StringType)
@@ -320,7 +334,7 @@ class Residue(object):
         self.residue_type = residue_type
 
     def __repr__(self):
-        return "%s:%s %s" % (self.Chain, self.ResidueID.strip(), self.ResidueAA)
+        return "%s:%s %s" % (self.Chain, str(self.ResidueID).strip(), self.ResidueAA)
 
     def __eq__(self, other):
         '''Basic form of equality, just checking the amino acid types. This lets us check equality over different chains with different residue IDs.'''
