@@ -98,6 +98,7 @@ SOURCE_field_map = {
 modified_residues_patch = {
     '1A2C' : {
         '34H' : 'UNK',
+        #'TYS' : 'TYR',
 #        'NA'  : 'UNK',
 #        'HOH' : 'UNK',
     },
@@ -833,29 +834,34 @@ class PDB:
         structural_residue_IDs_set = set() # use a set for a quicker lookup
         ignore_HETATMs = True # todo: fix this if we need to deal with HETATMs
         for l in self.structure_lines:
-            if (not(ignore_HETATMs)) or (not(l.startswith("HETATM"))):
-                residue_id = l[21:27]
-                if residue_id not in structural_residue_IDs_set:
-                    chain_id = l[21]
-                    chain_type = self.chain_types[chain_id]
-                    atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
-                    residue_type = l[17:20].strip()
+            residue_type = l[17:20].strip()
+            if l.startswith("HETATM"):
+                if self.modified_residue_mapping_3.get(residue_type):
+                    residue_type = self.modified_residue_mapping_3[residue_type]
+                elif ignore_HETATMs:
+                    continue
+            residue_id = l[21:27]
+            if residue_id not in structural_residue_IDs_set:
+                chain_id = l[21]
+                chain_type = self.chain_types[chain_id]
+                atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
+                residue_type = l[17:20].strip()
 
-                    residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
-                    if residue_type == 'UNK':
-                        short_residue_type = 'X'
-                    elif chain_type == 'Protein':
-                        short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
-                    elif chain_type == 'DNA':
-                        short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
-                    elif chain_type == 'RNA':
-                        short_residue_type = non_canonical_rna.get(residue_type) or residue_type
+                residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
+                if residue_type == 'UNK':
+                    short_residue_type = 'X'
+                elif chain_type == 'Protein':
+                    short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
+                elif chain_type == 'DNA':
+                    short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
+                elif chain_type == 'RNA':
+                    short_residue_type = non_canonical_rna.get(residue_type) or residue_type
 
-                    assert(short_residue_type)
+                assert(short_residue_type)
 
-                    #structural_residue_IDs.append((residue_id, short_residue_type))
-                    atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
-                    structural_residue_IDs_set.add(residue_id)
+                #structural_residue_IDs.append((residue_id, short_residue_type))
+                atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
+                structural_residue_IDs_set.add(residue_id)
 
         self.atom_sequences = atom_sequences
 
