@@ -59,6 +59,20 @@ class FASTA(dict):
         self._parse(fasta_contents)
         self._find_identical_sequences()
 
+    def replace_sequence(self, pdb_ID, chain_id, replacement_sequence):
+        '''Replaces a sequence with another. Typically not useful but I use it in the ResidueRelatrix to make sure that the FASTA and SEQRES sequences match.'''
+        old_sequences = self.sequences
+        old_unique_sequences = self.unique_sequences
+        self.sequences = []
+        self.unique_sequences = {}
+        for s in old_sequences:
+            if s[0] == pdb_ID and s[1] == chain_id:
+                self._add_sequence(pdb_ID, chain_id, replacement_sequence)
+            else:
+                self._add_sequence(s[0], s[1], s[2])
+
+        self._find_identical_sequences()
+
     def __add__(self, other):
         return FASTA("\n".join([self.fasta_contents, other.fasta_contents]))
 
@@ -153,7 +167,6 @@ class FASTA(dict):
                 for chain_id, sequence in v.iteritems():
                     sequences[pdb_id][chain_id] = Sequence.from_sequence(chain_id, sequence)
         return sequences
-
 
     def get_number_of_unique_sequences(self):
         return len(self.unique_sequences)
