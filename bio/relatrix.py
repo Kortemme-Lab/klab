@@ -17,13 +17,15 @@ from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
 from tools import colortext
 from basics import SequenceMap
 
+use_seqres_sequence_for_fasta_sequence = set(['1A2C'])
+
 class ResidueRelatrix(object):
     ''' A class for relating residue IDs from different schemes.
         Note: we assume throughout that there is one map from SEQRES to UniParc. This is not always true e.g. Polyubiquitin-C (UPI000000D74D) has 9 copies of the ubiquitin sequence.'''
 
     schemes = ['rosetta', 'atom', 'seqres', 'fasta', 'uniparc']
 
-    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False): # keep_HETATMS = False
+    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, starting_clustal_cut_off = 100): # keep_HETATMS = False
 
         self.pdb_id = pdb_id
         self.silent = silent
@@ -53,7 +55,7 @@ class ResidueRelatrix(object):
 
         self.pdb_chain_to_uniparc_chain_mapping = {}
 
-        self._create_objects(chains_to_keep, min_clustal_cut_off, True, cache_dir) # todo: at present, we always strip HETATMs. We may want to change this in the future.
+        self._create_objects(chains_to_keep, starting_clustal_cut_off, min_clustal_cut_off, True, cache_dir) # todo: at present, we always strip HETATMs. We may want to change this in the future.
         self._create_sequences()
         self._create_sequence_maps()
         self._validate()
@@ -141,7 +143,10 @@ class ResidueRelatrix(object):
         pdb_id = self.pdb_id
         for chain_id, sequence in self.pdb.seqres_sequences.iteritems():
             if str(sequence) != self.FASTA[pdb_id][chain_id]:
-                pass #raise colortext.Exception("The SEQRES and FASTA sequences disagree for chain %s in %s. This can happen but special-case handling should be added to the file containing the %s class." % (chain_id, pdb_id, self.__class__.__name__))
+                if self.pdb_id in use_seqres_sequence_for_fasta_sequence:
+                    self.FASTA.replace_sequence(self.pdb_id, chain_id, str(sequence))
+                if str(sequence) != self.FASTA[pdb_id][chain_id]:
+                    raise colortext.Exception("The SEQRES and FASTA sequences disagree for chain %s in %s. This can happen but special-case handling should be added to the file containing the %s class." % (chain_id, pdb_id, self.__class__.__name__))
 
 
     def _validate_mapping_signature(self):
@@ -174,14 +179,16 @@ class ResidueRelatrix(object):
             # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e. low BLOSUM62/PAM250 scores). I chose 90% arbitrarily.
             mapped_SEQRES_residues = set(sequence_map.keys())
             all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
-            assert(0.9 <= (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues)))) <= 1.0)
+            if len(all_SEQRES_residues) >= 20:
+                assert(0.9 <= (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues)))) <= 1.0)
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
-            rng = set(sequence_map.values())
-            uniparc_chain_id = self.pdb_chain_to_uniparc_chain_mapping[chain_id]
-            uniparc_residue_ids = set(self.uniparc_sequences[uniparc_chain_id].ids())
-            assert(rng.intersection(uniparc_residue_ids) == rng)
-            assert(len(rng) == len(sequence_map.values()))
+            if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
+                rng = set(sequence_map.values())
+                uniparc_chain_id = self.pdb_chain_to_uniparc_chain_mapping[chain_id]
+                uniparc_residue_ids = set(self.uniparc_sequences[uniparc_chain_id].ids())
+                assert(rng.intersection(uniparc_residue_ids) == rng)
+                assert(len(rng) == len(sequence_map.values()))
 
 
     def _validate_id_types(self):
@@ -216,12 +223,13 @@ class ResidueRelatrix(object):
                 assert(atom_sequence[atom_id].ResidueAA == seqres_sequence[seqres_id].ResidueAA)
 
         for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
-            seqres_sequence = self.seqres_sequences[chain_id]
-            uniparc_sequence = self.uniparc_sequences[self.pdb_chain_to_uniparc_chain_mapping[chain_id]]
-            for seqres_id, uniparc_id, substitution_match in sequence_map:
-                # Some of the matches may not be identical but all the '*' Clustal Omega matches should be identical
-                if substitution_match.clustal == 1:
-                    assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
+            if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
+                seqres_sequence = self.seqres_sequences[chain_id]
+                uniparc_sequence = self.uniparc_sequences[self.pdb_chain_to_uniparc_chain_mapping[chain_id]]
+                for seqres_id, uniparc_id, substitution_match in sequence_map:
+                    # Some of the matches may not be identical but all the '*' Clustal Omega matches should be identical
+                    if substitution_match.clustal == 1:
+                        assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
 
     ### Private Sequence and SequenceMap collection functions ###
 
@@ -296,10 +304,10 @@ class ResidueRelatrix(object):
 
     ### Private object creation functions ###
 
-    def _create_objects(self, chains_to_keep, min_clustal_cut_off, strip_HETATMS, cache_dir):
+    def _create_objects(self, chains_to_keep, starting_clustal_cut_off, min_clustal_cut_off, strip_HETATMS, cache_dir):
 
         pdb_id = self.pdb_id
-        assert(20 <= min_clustal_cut_off <= 100)
+        assert(20 <= min_clustal_cut_off <= starting_clustal_cut_off <= 100)
 
         # Create the FASTA object
         if not self.silent:
@@ -337,7 +345,7 @@ class ResidueRelatrix(object):
         try:
             PDB_UniParc_SA = None
             cut_off = None
-            for x in range(100, min_clustal_cut_off, -1):
+            for x in range(starting_clustal_cut_off, min_clustal_cut_off, -1):
                 cut_off = x
                 if not self.silent:
                     colortext.warning("\tTrying to align sequences with a cut-off of %d%%." % cut_off)
