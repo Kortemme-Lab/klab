@@ -249,8 +249,8 @@ class SequenceMap():
             raise StopIteration
 
     def __setitem__(self, key, value):
-        assert(type(key) == types.IntType or type(key) == types.StringType)
-        assert(type(value) == types.IntType or type(value) == types.StringType)
+        assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
+        assert(type(value) == types.IntType or type(value) == types.StringType or type(key) == types.UnicodeType)
         self.map[key] = value
         self.substitution_scores[key] = None
 
