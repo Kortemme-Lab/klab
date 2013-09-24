@@ -22,18 +22,18 @@ def test_ddg_pdb_ids():
 
     fix_later = set([
 
-        # SELECT * FROM `Experiment` WHERE `PDBFileID`='1HIO'
-        # SELECT * FROM `DataSetDDG` WHERE `PDBFileID`='1HIO'
-        # SELECT * FROM `UserDataSetExperiment` WHERE `PDBFileID`='1HIO'
-        # SELECT * FROM `UserAnalysisSet` WHERE `PDB_ID`='1HIO'
+        # SELECT * FROM `Experiment` WHERE `PDBFileID` IN ('1XAS', '2TMA')
+        # SELECT * FROM `DataSetDDG` WHERE `PDBFileID` IN ('1XAS', '2TMA')
+        # SELECT * FROM `UserDataSetExperiment` WHERE `PDBFileID` IN ('1XAS', '2TMA')
+        # SELECT * FROM `UserAnalysisSet` WHERE `PDB_ID` IN ('1XAS', '2TMA')
 
         # "the generated pose has no residues" - the PDB file only contains CA atoms.
+        '1LRP', # THIS IS CURRENTLY USED IN Experiments, the ProTherm (42 records) and Guerois (2 records) datasets, and UserDataSetExperiments and UserAnalysis sets.
         '1AIN', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
         '1C53', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
         '1HIO', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
-        '1LRP', #
-        '1XAS', #
-        '2TMA', #
+        '1XAS', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
+        '2TMA', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
 
         # Good test for speeding things up w.r.t. recreating UniParc entry each time
         #'1HIO', or '487D',
@@ -47,16 +47,6 @@ def test_ddg_pdb_ids():
         '1EHK', # Rosetta bug where the terminal residue has an incomplete set of ATOMs and is then removed. Bug is in chain B.
         '1ZNJ', # Rosetta bug where the terminal residue has an incomplete set of ATOMs and is then removed. Bug is in chains B and F.
         '487D', # LOW MATCH - 80% or so. Rosetta bug where the terminal residue has an incomplete set of ATOMs and is then removed. Bug is in chain N.
-
-        # DNA
-        '1APL', # The DNA may be messing this up - chains A and B are DNA
-        '1AZP', # The DNA may be messing this up - chains B and C are DNA
-        '1BF4', # The DNA may be messing this up - chains B and C are DNA
-        '1BNZ', # The DNA may be messing this up - chains B and C are DNA
-        '1DDN',
-        '1LLI',
-        '1TUP',
-        '2AC0',
 
         # This needs investigation. 'Relatrix construction failed creating the PDBUniParcSequenceAligner object for 1CBW.'. File "/home/oconchus/dev/tools/bio/uniprot.py", line 88, in uniprot_map: assert(len(v) == len(set(v)))
         '1CBW', # This needs investigation. 'Relatrix construction failed creating the PDBUniParcSequenceAligner object for 1CBW.'. File "/home/oconchus/dev/tools/bio/uniprot.py", line 88, in uniprot_map: assert(len(v) == len(set(v)))
@@ -140,16 +130,29 @@ def test_ddg_pdb_ids():
 
     specific_cut_offs = {
         '1AR1' : (78, 76, 73.00), # Chain C has a Clustal Omega match at 77%
+        '1BF4' : (80, 77, 87.00), # Chain A has a Clustal Omega match at 79%
     }
 
     failed_cases = []
 
-    print(len(ddG_pdb_ids))
-    sys.exit(0)
-    test_these = []
+    test_these = [
+        # DNA
+        '1BF4', # The DNA may be messing this up - chains B and C are DNA
+
+        '1DDN',
+        '1LLI',
+        '1TUP',
+        '2AC0',
+
+        '1BNZ', # The DNA may be messing this up - chains B and C are DNA
+        '1APL', # The DNA may be messing this up - chains A and B are DNA
+        '1AZP', # The DNA may be messing this up - chains B and C are DNA
+
+    ]
+    ddG_pdb_ids = test_these
 
     colortext.message('Testing %d PDB files for the DDG database.' % len(ddG_pdb_ids))
-    start_x = 1
+    start_x = 0
     #start_x = 0
 
     for x in range(start_x, len(ddG_pdb_ids)):
@@ -158,17 +161,17 @@ def test_ddg_pdb_ids():
             continue
         if ddG_pdb_id not in fix_later:
             colortext.warning('Testing PDB file number %d: %s' % (x, ddG_pdb_id))
-            starting_clustal_cut_off = 82
+            starting_clustal_cut_off = 100
             min_clustal_cut_off = 80
             acceptable_sequence_percentage_match = 90.0
             if specific_cut_offs.get(ddG_pdb_id):
                 starting_clustal_cut_off, min_clustal_cut_off, acceptable_sequence_percentage_match = specific_cut_offs[ddG_pdb_id]
             try:
                 rr = ResidueRelatrix(ddG_pdb_id, rosetta_scripts_path, rosetta_database_path, starting_clustal_cut_off = starting_clustal_cut_off, min_clustal_cut_off = min_clustal_cut_off, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = '/home/oconchus/temp')
+                #print(rr.pdb_chain_to_uniparc_chain_mapping)
+                #print(rr.seqres_to_uniparc_sequence_maps)
             except SpecificException:
                 failed_cases.append((x, ddG_pdb_id))
-                if len(failed_cases) > 200:
-                    break
         else:
             colortext.warning('SKIPPING PDB file number %d: %s' % (x, ddG_pdb_id))
 
@@ -421,7 +424,7 @@ for k, v in sorted(px.atom_to_seqres_sequence_maps.iteritems(), key=lambda x:(x[
     print(k,v)
 
 
-p = PDB.from_filepath('../.testdata/1H38.pdb')
+p = PDB.from_filepath('../.testdata/1H38.pdb') # has protein, DNA, RNA
 p = PDB.from_filepath('../.testdata/1ZC8.pdb')
 p = PDB.from_filepath('../.testdata/4IHY.pdb')
 #p = PDB('../.testdata/2GRB.pdb')

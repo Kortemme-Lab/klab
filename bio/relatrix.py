@@ -185,12 +185,13 @@ class ResidueRelatrix(object):
             # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e.
             # low BLOSUM62/PAM250 scores). I chose 90% arbitrarily but this can be overridden with the
             # acceptable_sequence_percentage_match argument to the constructor.
-            mapped_SEQRES_residues = set(sequence_map.keys())
-            all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
-            if len(all_SEQRES_residues) >= 20:
-                match_percentage = 100.0 * (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues))))
-                if not (self.acceptable_sequence_percentage_match <= match_percentage <= 100.0):
-                    raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
+            if self.sequence_types[chain_id] == 'Protein':
+                mapped_SEQRES_residues = set(sequence_map.keys())
+                all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
+                if len(all_SEQRES_residues) >= 20:
+                    match_percentage = 100.0 * (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues))))
+                    if not (self.acceptable_sequence_percentage_match <= match_percentage <= 100.0):
+                        raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
@@ -361,18 +362,28 @@ class ResidueRelatrix(object):
                     colortext.warning("\tTrying to align sequences with a cut-off of %d%%." % cut_off)
 
                 # todo: this will be slow for UniParc entries with large amounts of data/associated UniProt IDs since we create a UniParc entry each time. Refactor the code so that we do not create new entries each time.
-                PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off)
-                num_matches_per_chain = set(map(len, PDB_UniParc_SA.clustal_matches.values()))
+                PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types)
+
+                # We only care about protein chain matches so early out as soon as we have them all matched
+                protein_chain_matches = {}
+                for _c, _st in self.sequence_types.iteritems():
+                    if _st == 'Protein':
+                        protein_chain_matches[_c] = PDB_UniParc_SA.clustal_matches[_c]
+
+                num_matches_per_chain = set(map(len, protein_chain_matches.values()))
                 if len(num_matches_per_chain) == 1 and num_matches_per_chain.pop() == 1:
+                    # We have exactly one match per protein chain. Early out.
                     if not self.silent:
                         colortext.message("\tSuccessful match with a cut-off of %d%%." % cut_off)
                     self.PDB_UniParc_SA = PDB_UniParc_SA
                     self.alignment_cutoff = cut_off
                     break
                 else:
+                    # We have ambiguity - more than one match per protein chain. Exception.
                     if [n for n in num_matches_per_chain if n > 1]:
                         raise MultipleAlignmentException("Too many matches found at cut-off %d." % cut_off)
             if not self.PDB_UniParc_SA:
+                print(PDB_UniParc_SA.clustal_matches.values())
                 num_matches_per_chain = set(map(len, PDB_UniParc_SA.clustal_matches.values()))
                 if num_matches_per_chain == set([0, 1]):
                     # We got matches but are missing chains
