@@ -111,6 +111,11 @@ non_canonical_amino_acids = {
 dna_nucleotides = set(['DA', 'DC', 'DG', 'DT', 'DU', 'DI']) # deoxyribonucleic acids
 rna_nucleotides = set(['A', 'C', 'G', 'U', 'I']) # ribonucleic acids
 
+dna_nucleotides_3to1_map = {
+    # Used to map Rosetta features database mappings to single letter sequences
+    'ADE' : 'A', 'CYT' : 'C', 'GUA' : 'G', 'THY' : 'T', #'DU' : 'U', 'DI' : 'I',
+}
+
 dna_nucleotides_2to1_map = {
     # Used to map PDB SEQRES DNA sequences to single letter sequences
     'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T', 'DU' : 'U', 'DI' : 'I',
