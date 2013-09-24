@@ -12,7 +12,7 @@ import types
 from xml.dom.minidom import parse, parseString
 
 from basics import IdentifyingPDBResidue, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
-from pdb import PDB
+from pdb import PDB, cases_with_ACE_residues_we_can_ignore
 import rcsb
 from tools.fs.io import read_file, write_file
 from tools.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_alphabetic_character, parse_singular_string
@@ -25,6 +25,7 @@ class PDBML(object):
 
     def __init__(self, xml_contents, pdb_contents):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
+        self.pdb_id = None
         self.contents = xml_contents
         self.lines = xml_contents.split("\n")
         self.parsed_lines = {}
@@ -77,6 +78,10 @@ class PDBML(object):
         main_tags = self._dom.getElementsByTagName("PDBx:datablock")
         assert(len(main_tags) == 1)
         self.main_tag = main_tags[0]
+
+        if self.main_tag.hasAttribute('datablockName'):
+            self.pdb_id = self.main_tag.getAttribute('datablockName')
+
         xsd_version = os.path.split(self.main_tag.getAttribute('xmlns:PDBx'))[1]
         if xsd_versions.get(xsd_version):
             self.xml_version = xsd_versions[xsd_version]
@@ -97,16 +102,18 @@ class PDBML(object):
         residues_read = {}
         int_type = types.IntType
         for t in atom_site_tags:
-            r, seqres, ResidueAA = PDBML.parse_atom_site(t, self.modified_residues)
+            r, seqres, ResidueAA, Residue3AA = PDBML.parse_atom_site(t, self.modified_residues)
             if r:
-                full_residue_id = str(r)
-                if residues_read.get(full_residue_id):
-                    assert(residues_read[full_residue_id] == (r.ResidueAA, seqres))
-                else:
-                    residues_read[full_residue_id] = (r.ResidueAA, seqres)
-                    residue_map[r.Chain] = residue_map.get(r.Chain, {})
-                    assert(type(seqres) == int_type)
-                    residue_map[r.Chain][str(r)] = seqres
+                # skip certain ACE residues
+                if not(self.pdb_id in cases_with_ACE_residues_we_can_ignore and Residue3AA == 'ACE'):
+                    full_residue_id = str(r)
+                    if residues_read.get(full_residue_id):
+                        assert(residues_read[full_residue_id] == (r.ResidueAA, seqres))
+                    else:
+                        residues_read[full_residue_id] = (r.ResidueAA, seqres)
+                        residue_map[r.Chain] = residue_map.get(r.Chain, {})
+                        assert(type(seqres) == int_type)
+                        residue_map[r.Chain][str(r)] = seqres
 
         ## Create SequenceMap objects to map the ATOM Sequences to the SEQRES Sequences
         atom_to_seqres_sequence_maps = {}
@@ -120,7 +127,7 @@ class PDBML(object):
 
         # Only parse ATOM records
         if parse_singular_string(t, 'PDBx:group_PDB') == 'HETATM':
-            return None, None, None
+            return None, None, None, None
         assert(parse_singular_string(t, 'PDBx:group_PDB') == 'ATOM')
 
         # NOTE: x, y, z values are per-ATOM but we do not use them yet
@@ -151,4 +158,4 @@ class PDBML(object):
         r = IdentifyingPDBResidue(PDB_chain_id, ("%d%s" % (ATOM_residue_id, PDB_insertion_code)).rjust(5), residue_1_letter, None, residue_3_letter)
         r.add_position(x, y, z)
 
-        return r, SEQRES_index, residue_1_letter
+        return r, SEQRES_index, residue_1_letter, residue_3_letter
