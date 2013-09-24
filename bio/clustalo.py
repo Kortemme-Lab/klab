@@ -364,11 +364,13 @@ class PDBUniParcSequenceAligner(object):
 
     ### Constructor methods ###
 
-    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0):
+    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0, sequence_types = {}):
         ''' The sequences are matched up to a percentage identity specified by cut_off (0.0 - 100.0).
+            sequence_types e.g. {'A' : 'Protein', 'B' : 'RNA',...} should be passed in if the PDB file contains DNA or RNA chains. Otherwise, the aligner will attempt to match their sequences.
         '''
         self.pdb_id = pdb_id
         self.cut_off = cut_off
+        self.sequence_types = sequence_types
         assert(0.0 <= cut_off <= 100.0)
 
         # Retrieve the FASTA record
@@ -453,18 +455,22 @@ class PDBUniParcSequenceAligner(object):
     def _align_with_clustal(self):
 
         for c in self.chains:
-            #clustal_indices = {1 : c}
-            pdb_chain_id = '%s:%s' % (self.pdb_id, c)
+            if self.sequence_types.get(c, 'Protein') == 'Protein':
+                #clustal_indices = {1 : c}
+                pdb_chain_id = '%s:%s' % (self.pdb_id, c)
 
-            sa = SequenceAligner()
-            sa.add_sequence(pdb_chain_id, self.fasta[c])
-            #count = 2
-            for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
-                #clustal_indices[count] = uniparc_id
-                sa.add_sequence(uniparc_id, str(uniparc_sequence))
-                #count += 1
-            best_matches = sa.align()
-            self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id, cut_off = self.cut_off)
+                sa = SequenceAligner()
+                sa.add_sequence(pdb_chain_id, self.fasta[c])
+                #count = 2
+                for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
+                    #clustal_indices[count] = uniparc_id
+                    sa.add_sequence(uniparc_id, str(uniparc_sequence))
+                    #count += 1
+                best_matches = sa.align()
+                self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id, cut_off = self.cut_off)
+            else:
+                # Do not try to match DNA or RNA
+                self.clustal_matches[c] = {}
 
     def _align_with_substrings(self):
         '''Simple substring-based matching'''

@@ -9,7 +9,7 @@ import string
 import types
 
 from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
-from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
 from tools.fs.io import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
@@ -436,8 +436,14 @@ class PDB:
                 modified_residue_mapping_3[k] = v
 
             for line in self.parsed_lines["MODRES"]:
-                modified_residues["%s%s" % (line[16], line[18:23])] = {'modified_residue' : line[12:15], 'original_residue_3' : line[24:27], 'original_residue_1' : residue_type_3to1_map[line[24:27]]}
-                modified_residue_mapping_3[line[12:15]] = line[24:27]
+                restype = line[24:27].strip()
+                restype_1 = residue_type_3to1_map.get(restype) or dna_nucleotides_2to1_map.get(restype)
+                if not restype_1:
+                    assert(restype in rna_nucleotides)
+                    restype_1 = restype
+
+                modified_residues["%s%s" % (line[16], line[18:23])] = {'modified_residue' : line[12:15], 'original_residue_3' : restype, 'original_residue_1' : restype_1}
+                modified_residue_mapping_3[line[12:15]] = restype
 
             self.modified_residue_mapping_3 = modified_residue_mapping_3
             self.modified_residues = modified_residues
@@ -857,7 +863,6 @@ class PDB:
                     short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
                 elif chain_type == 'RNA':
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
-
                 assert(short_residue_type)
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
@@ -907,7 +912,19 @@ class PDB:
         for chain_id, v in sorted(rosetta_residues.iteritems()):
             chain_type = self.chain_types[chain_id]
             for rosetta_id, residue_info in sorted(v.iteritems()):
-                short_residue_type = residue_type_3to1_map[residue_info['name3']]
+                short_residue_type = None
+
+                if chain_type == 'Protein':
+                    residue_type = residue_info['name3'].strip()
+                    short_residue_type = residue_type_3to1_map[residue_type]
+                else:
+                    assert(chain_type == 'DNA' or chain_type == 'RNA')
+                    residue_type = residue_info['res_type'].strip()
+                    if residue_type.find('UpperDNA') != -1 or residue_type.find('LowerDNA') != -1:
+                        residue_type = residue_type[:3]
+                    short_residue_type = dna_nucleotides_3to1_map.get(residue_type) # Commenting this out since Rosetta does not seem to handle these "or non_canonical_dna.get(residue_type)"
+
+                assert(short_residue_type)
                 rosetta_sequences[chain_id].add(Residue(chain_id, rosetta_id, short_residue_type, chain_type))
 
 
