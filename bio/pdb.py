@@ -806,7 +806,8 @@ class PDB:
                             continue
                         # Skip these residues
                         elif r == 'ACE' and pdb_id in cases_with_ACE_residues_we_can_ignore:
-                            continue
+                            sequence.append('X')
+                            #continue
                         # End of skipped residues
                         else:
                             #print(modified_residue_mapping_3)
