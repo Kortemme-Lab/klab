@@ -25,7 +25,10 @@ class ResidueRelatrix(object):
 
     schemes = ['rosetta', 'atom', 'seqres', 'fasta', 'uniparc']
 
-    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, starting_clustal_cut_off = 100): # keep_HETATMS = False
+    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 90.0, starting_clustal_cut_off = 100): # keep_HETATMS = False
+        '''acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually 90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues.'''
+
+        assert(0.0 <= acceptable_sequence_percentage_match <= 100.0)
 
         self.pdb_id = pdb_id
         self.silent = silent
@@ -33,6 +36,7 @@ class ResidueRelatrix(object):
         self.rosetta_database_path = rosetta_database_path
 
         self.alignment_cutoff = None
+        self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
 
         self.FASTA = None
         self.pdb = None
@@ -146,6 +150,8 @@ class ResidueRelatrix(object):
                 if self.pdb_id in use_seqres_sequence_for_fasta_sequence:
                     self.FASTA.replace_sequence(self.pdb_id, chain_id, str(sequence))
                 if str(sequence) != self.FASTA[pdb_id][chain_id]:
+                    #print(str(sequence))
+                    #print(self.FASTA[pdb_id][chain_id])
                     raise colortext.Exception("The SEQRES and FASTA sequences disagree for chain %s in %s. This can happen but special-case handling should be added to the file containing the %s class." % (chain_id, pdb_id, self.__class__.__name__))
 
 
@@ -176,11 +182,15 @@ class ResidueRelatrix(object):
 
         # seqres_to_uniparc_sequence_maps
         for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
-            # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e. low BLOSUM62/PAM250 scores). I chose 90% arbitrarily.
+            # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e.
+            # low BLOSUM62/PAM250 scores). I chose 90% arbitrarily but this can be overridden with the
+            # acceptable_sequence_percentage_match argument to the constructor.
             mapped_SEQRES_residues = set(sequence_map.keys())
             all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
             if len(all_SEQRES_residues) >= 20:
-                assert(0.9 <= (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues)))) <= 1.0)
+                match_percentage = 100.0 * (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues))))
+                if not (self.acceptable_sequence_percentage_match <= match_percentage <= 100.0):
+                    raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
