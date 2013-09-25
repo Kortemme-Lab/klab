@@ -187,6 +187,7 @@ class PDBParsingException(Exception): pass
 class MissingRecordsException(Exception): pass
 class NonCanonicalResidueException(Exception): pass
 class PDBValidationException(Exception): pass
+class PDBMissingMainchainAtomsException(Exception): pass
 
 class JRNL(object):
 
@@ -309,6 +310,7 @@ class PDB:
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
         self.atom_sequences = {}                        # A dict mapping chain IDs to ATOM Sequence objects
+        self.chain_atoms = {}                           # A dict mapping chain IDs to a set of ATOM types. This is useful to test whether some chains only have CA entries e.g. in 1LRP, 1AIN, 1C53, 1HIO, 1XAS, 2TMA
 
         self.rosetta_to_atom_sequence_maps = {}
         self.rosetta_residues = []
@@ -387,17 +389,24 @@ class PDB:
         '''ATOM and HETATM lines may be altered by function calls. When this happens, this function should be called to keep self.structure_lines up to date.'''
         structure_lines = []
         atom_chain_order = []
+        chain_atoms = {}
 
         for line in self.lines:
             linetype = line[0:6]
             if linetype == 'ATOM  ' or linetype == 'HETATM' or linetype == 'TER   ':
                 structure_lines.append(line)
-                chainID = line[21]
-                if chainID not in atom_chain_order:
-                    atom_chain_order.append(chainID)
+                chain_id = line[21]
+                if chain_id not in atom_chain_order:
+                    atom_chain_order.append(chain_id)
+                if linetype == 'ATOM  ':
+                    atom_type = line[12:16].strip()
+                    if atom_type:
+                        chain_atoms[chain_id] = chain_atoms.get(chain_id, set())
+                        chain_atoms[chain_id].add(atom_type)
                     
         self.structure_lines = structure_lines
         self.atom_chain_order = atom_chain_order
+        self.chain_atoms = chain_atoms
 
     ### Basic functions ###
 
@@ -764,6 +773,7 @@ class PDB:
             # 1ZC8 is similar but also has examples of DU
             # 4IHY has examples of DI (I is inosine)
             # 2GRB has RNA examples of I and U
+            # 1LRP has protein chains with only CA atoms
             # This will throw an exception when a non-canonical is found which is not listed in basics.py. In that case, the list in basics.py should be updated.
 
             chain_type = None
@@ -776,6 +786,8 @@ class PDB:
                 assert(len(set(tokens).intersection(dna_nucleotides)) == 0)
                 assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
                 chain_type = 'Protein'
+                if self.chain_atoms[chain_id] == set(['CA']):
+                    chain_type = 'Protein skeleton'
 
             # Get the sequence, mapping non-canonicals to the appropriate letter
             self.chain_types[chain_id] = chain_type
@@ -857,7 +869,7 @@ class PDB:
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
-                elif chain_type == 'Protein':
+                elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
                     short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
                 elif chain_type == 'DNA':
                     short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
@@ -883,6 +895,10 @@ class PDB:
         specific_flag_hacks = None
         if self.pdb_id and HACKS_pdb_specific_hacks.get(self.pdb_id):
             specific_flag_hacks = HACKS_pdb_specific_hacks[self.pdb_id]
+
+        skeletal_chains = sorted([k for k in self.chain_types.keys() if self.chain_types[k] == 'Protein skeleton'])
+        if skeletal_chains:
+            raise PDBMissingMainchainAtomsException('The PDB to Rosetta residue map could not be created as chains %s only have CA atoms present.' % ", ".join(skeletal_chains))
 
         # Get the residue mapping using the features database
         pdb_file_contents = "\n".join(self.structure_lines)

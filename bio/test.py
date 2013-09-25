@@ -23,17 +23,9 @@ def test_ddg_pdb_ids():
     fix_later = set([
 
         # SELECT * FROM `Experiment` WHERE `PDBFileID` IN ('1XAS', '2TMA')
-        # SELECT * FROM `DataSetDDG` WHERE `PDBFileID` IN ('1XAS', '2TMA')
+        # SELECT * FROM `DataSetDDG` WHERE `PDBFileID` IN ('1LMB')
         # SELECT * FROM `UserDataSetExperiment` WHERE `PDBFileID` IN ('1XAS', '2TMA')
         # SELECT * FROM `UserAnalysisSet` WHERE `PDB_ID` IN ('1XAS', '2TMA')
-
-        # "the generated pose has no residues" - the PDB file only contains CA atoms.
-        '1LRP', # THIS IS CURRENTLY USED IN Experiments, the ProTherm (42 records) and Guerois (2 records) datasets, and UserDataSetExperiments and UserAnalysis sets.
-        '1AIN', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
-        '1C53', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
-        '1HIO', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
-        '1XAS', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
-        '2TMA', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
 
         # Good test for speeding things up w.r.t. recreating UniParc entry each time
         #'1HIO', or '487D',
@@ -136,17 +128,15 @@ def test_ddg_pdb_ids():
     failed_cases = []
 
     test_these = [
-        # DNA
-        '1BF4', # The DNA may be messing this up - chains B and C are DNA
+        # "the generated pose has no residues" - the PDB file only contains CA atoms.
+        #'107L',
+        '1C53', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
+        '1LRP', # THIS IS CURRENTLY USED IN Experiments, the ProTherm (42 records) and Guerois (2 records) datasets, and UserDataSetExperiments and UserAnalysis sets.
+        '1AIN', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
+        '1HIO', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
+        '1XAS', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
+        '2TMA', # This is not used in any of the four current datasets or in any Experiments or UserDataSetExperiments.
 
-        '1DDN',
-        '1LLI',
-        '1TUP',
-        '2AC0',
-
-        '1BNZ', # The DNA may be messing this up - chains B and C are DNA
-        '1APL', # The DNA may be messing this up - chains A and B are DNA
-        '1AZP', # The DNA may be messing this up - chains B and C are DNA
 
     ]
     ddG_pdb_ids = test_these
@@ -178,10 +168,37 @@ def test_ddg_pdb_ids():
         print("failed_cases", failed_cases)
 
     print("failed_cases", failed_cases)
+
+def test_ResidueRelatrix_1LRP():
+    # This case has no Rosetta residues as only CA atoms exist in the PDB and the features database script would crashes. This is a test that the case is handled gracefully.
+
+    rr = ResidueRelatrix('1LRP', rosetta_scripts_path, rosetta_database_path, min_clustal_cut_off = 80, cache_dir = '/home/oconchus/temp')
+
+    atom_id_1 = 'C  89 '
+    chain_id = atom_id_1[0]
+
+    # Single jumps forward
+    seqres_id_1 = rr.convert(chain_id, atom_id_1, 'atom', 'seqres')
+    uniparc_id_1 = rr.convert(chain_id, seqres_id_1, 'seqres', 'uniparc')
+
+    # Double jumps forward
+    uniparc_id_2 = rr.convert(chain_id, atom_id_1, 'atom', 'uniparc')
+
+    # Single jumps backward
+    seqres_id_2 = rr.convert(chain_id, uniparc_id_1, 'uniparc', 'seqres')
+    atom_id_2 = rr.convert(chain_id, seqres_id_1, 'seqres', 'atom')
+
+    # Double/triple jumps backward
+    atom_id_3 = rr.convert(chain_id, uniparc_id_1, 'uniparc', 'atom')
+
+
+    assert(atom_id_1 == atom_id_2 and atom_id_2 == atom_id_3)
+    assert(seqres_id_1 == seqres_id_2)
+    assert(uniparc_id_1 == uniparc_id_2)
+
 test_ddg_pdb_ids()
 
 sys.exit(0)
-
 
 def test_ResidueRelatrix_104L():
     # Rosetta residue 45 -> 'A  44A' is an insertion residue which does not appear in the UniParc sequence

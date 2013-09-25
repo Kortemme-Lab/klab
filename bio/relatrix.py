@@ -11,11 +11,11 @@ import types
 import traceback
 
 from fasta import FASTA
-from pdb import PDB
+from pdb import PDB, PDBMissingMainchainAtomsException
 from pdbml import PDBML
 from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
 from tools import colortext
-from basics import SequenceMap
+from basics import Sequence, SequenceMap
 
 use_seqres_sequence_for_fasta_sequence = set(['1A2C'])
 
@@ -48,6 +48,7 @@ class ResidueRelatrix(object):
         self.seqres_sequences = None
         self.atom_sequences = None
         self.rosetta_sequences = None
+        self.pdb_to_rosetta_residue_map_error = False
 
         self.rosetta_to_atom_sequence_maps = None
         self.atom_to_seqres_sequence_maps = None
@@ -185,7 +186,7 @@ class ResidueRelatrix(object):
             # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e.
             # low BLOSUM62/PAM250 scores). I chose 90% arbitrarily but this can be overridden with the
             # acceptable_sequence_percentage_match argument to the constructor.
-            if self.sequence_types[chain_id] == 'Protein':
+            if self.sequence_types[chain_id] == 'Protein' or self.sequence_types[chain_id] == 'Protein skeleton':
                 mapped_SEQRES_residues = set(sequence_map.keys())
                 all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
                 if len(all_SEQRES_residues) >= 20:
@@ -208,8 +209,9 @@ class ResidueRelatrix(object):
         for sequences in [self.uniparc_sequences, self.fasta_sequences, self.seqres_sequences, self.rosetta_sequences]:
             for chain_id, sequence in sequences.iteritems():
                 sequence_id_types = set(map(type, sequence.ids()))
-                assert(len(sequence_id_types) == 1)
-                assert(sequence_id_types.pop() == types.IntType)
+                if sequence_id_types:
+                    assert(len(sequence_id_types) == 1)
+                    assert(sequence_id_types.pop() == types.IntType)
 
         for chain_id, sequence in self.atom_sequences.iteritems():
             sequence_id_types = set(map(type, sequence.ids()))
@@ -274,7 +276,12 @@ class ResidueRelatrix(object):
     def _create_sequence_maps(self):
         '''Get all of the SequenceMaps - Rosetta->ATOM, ATOM->SEQRES/FASTA, SEQRES->UniParc.'''
 
-        self.rosetta_to_atom_sequence_maps = self.pdb.rosetta_to_atom_sequence_maps
+        if self.pdb_to_rosetta_residue_map_error:
+            self.rosetta_to_atom_sequence_maps = {}
+            for c in self.atom_sequences.keys():
+                self.rosetta_to_atom_sequence_maps[c] = SequenceMap()
+        else:
+            self.rosetta_to_atom_sequence_maps = self.pdb.rosetta_to_atom_sequence_maps
         self.atom_to_seqres_sequence_maps = self.pdbml.atom_to_seqres_sequence_maps
         self.seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
 
@@ -282,14 +289,22 @@ class ResidueRelatrix(object):
         '''Get all of the Sequences - Rosetta, ATOM, SEQRES, FASTA, UniParc.'''
 
         # Create the Rosetta sequences and the maps from the Rosetta sequences to the ATOM sequences
-        self.pdb.construct_pdb_to_rosetta_residue_map(self.rosetta_scripts_path, self.rosetta_database_path)
+        try:
+            self.pdb.construct_pdb_to_rosetta_residue_map(self.rosetta_scripts_path, self.rosetta_database_path)
+        except PDBMissingMainchainAtomsException:
+            self.pdb_to_rosetta_residue_map_error = True
 
         # Get all the Sequences
         self.uniparc_sequences = self.PDB_UniParc_SA.uniparc_sequences
         self.fasta_sequences = self.FASTA.get_sequences(self.pdb_id)
         self.seqres_sequences = self.pdb.seqres_sequences
         self.atom_sequences = self.pdb.atom_sequences
-        self.rosetta_sequences = self.pdb.rosetta_sequences
+        if self.pdb_to_rosetta_residue_map_error:
+            self.rosetta_sequences = {}
+            for c in self.atom_sequences.keys():
+                self.rosetta_sequences[c] = Sequence()
+        else:
+            self.rosetta_sequences = self.pdb.rosetta_sequences
 
         # Update the chain types for the UniParc sequences
         uniparc_pdb_chain_mapping = {}
@@ -367,7 +382,7 @@ class ResidueRelatrix(object):
                 # We only care about protein chain matches so early out as soon as we have them all matched
                 protein_chain_matches = {}
                 for _c, _st in self.sequence_types.iteritems():
-                    if _st == 'Protein':
+                    if _st == 'Protein' or _st == 'Protein skeleton':
                         protein_chain_matches[_c] = PDB_UniParc_SA.clustal_matches[_c]
 
                 num_matches_per_chain = set(map(len, protein_chain_matches.values()))
