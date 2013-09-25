@@ -172,7 +172,7 @@ class Sequence(object):
         self.sequence_type = sequence_type
 
         if sequence_type:
-            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA')
+            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton')
 
     def __iter__(self):
         self._iter_index = 0
@@ -329,7 +329,7 @@ class Residue(object):
     # For residues ResidueID
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
         if residue_type:
-            if residue_type == 'Protein':
+            if residue_type == 'Protein' or residue_type == 'Protein skeleton':
                 assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X'))
             else:
                 assert(ResidueAA in nucleotide_types_1)

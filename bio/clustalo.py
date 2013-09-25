@@ -455,12 +455,15 @@ class PDBUniParcSequenceAligner(object):
     def _align_with_clustal(self):
 
         for c in self.chains:
-            if self.sequence_types.get(c, 'Protein') == 'Protein':
+            # Only align protein chains
+            chain_type = self.sequence_types.get(c, 'Protein')
+            if chain_type == 'Protein' or chain_type == 'Protein skeleton':
                 #clustal_indices = {1 : c}
                 pdb_chain_id = '%s:%s' % (self.pdb_id, c)
 
                 sa = SequenceAligner()
                 sa.add_sequence(pdb_chain_id, self.fasta[c])
+
                 #count = 2
                 for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
                     #clustal_indices[count] = uniparc_id
