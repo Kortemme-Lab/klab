@@ -19,6 +19,8 @@ from tools.parsers.xml import parse_singular_float, parse_singular_int, parse_si
 
 xsd_versions = {
     'pdbx-v40.xsd' : 4.0,
+    'pdbx-v32.xsd' : 3.2,
+    'pdbx.xsd' : 3.1,
 }
 
 class PDBML(object):
@@ -35,10 +37,14 @@ class PDBML(object):
         self._dom = parseString(xml_contents)
         self.atom_to_seqres_sequence_maps = {}
 
+        self.deprecated = False
+        self.replacement_pdb_id = None
+
         self.modified_residues = PDB(pdb_contents).modified_residues
 
         self.main_tag = None
         self.parse_header()
+        self.parse_deprecation()
         self.parse_atoms()
 
     @staticmethod
@@ -80,13 +86,34 @@ class PDBML(object):
         self.main_tag = main_tags[0]
 
         if self.main_tag.hasAttribute('datablockName'):
-            self.pdb_id = self.main_tag.getAttribute('datablockName')
+            self.pdb_id = self.main_tag.getAttribute('datablockName').upper()
 
         xsd_version = os.path.split(self.main_tag.getAttribute('xmlns:PDBx'))[1]
         if xsd_versions.get(xsd_version):
             self.xml_version = xsd_versions[xsd_version]
         else:
             raise Exception("XML version is %s. This module only handles versions %s so far." % (xsd_version, ", ".join(xsd_versions.keys())))
+
+    def parse_deprecation(self):
+        '''Checks to see if the PDB file has been deprecated and, if so, what the new ID is.'''
+        deprecation_tag = self.main_tag.getElementsByTagName("PDBx:pdbx_database_PDB_obs_sprCategory")
+        assert(len(deprecation_tag) <= 1)
+        if deprecation_tag:
+            deprecation_tag = deprecation_tag[0]
+
+            deprecation_subtag = deprecation_tag.getElementsByTagName("PDBx:pdbx_database_PDB_obs_spr")
+            assert(len(deprecation_subtag) == 1)
+            deprecation_subtag = deprecation_subtag[0]
+            assert(deprecation_subtag.hasAttribute('replace_pdb_id'))
+            assert(deprecation_subtag.hasAttribute('pdb_id'))
+            old_pdb_id = deprecation_subtag.getAttribute('replace_pdb_id').upper()
+            new_pdb_id = deprecation_subtag.getAttribute('pdb_id').upper()
+
+            if self.pdb_id == old_pdb_id:
+                self.deprecated = True
+                self.replacement_pdb_id = new_pdb_id
+            else:
+                assert(self.pdb_id == new_pdb_id)
 
     def parse_atoms(self):
         '''All ATOM lines are parsed even though only one per residue needs to be parsed. The reason for parsing all the
@@ -135,9 +162,17 @@ class PDBML(object):
 
         PDB_chain_id = parse_singular_alphabetic_character(t, 'PDBx:auth_asym_id')
         ATOM_residue_id = parse_singular_int(t, 'PDBx:auth_seq_id')
+
+        #print(PDB_chain_i , ATOM_residue_id)
+
+        # Parse insertion code. Sometimes this tag exists but is set as nil in its attributes (xsi:nil = "true").
         PDB_insertion_code = " "
-        if t.getElementsByTagName('PDBx:pdbx_PDB_ins_code'):
-            PDB_insertion_code = parse_singular_alphabetic_character(t, 'PDBx:pdbx_PDB_ins_code')
+        insertion_code_tags = t.getElementsByTagName('PDBx:pdbx_PDB_ins_code')
+        if insertion_code_tags:
+            assert(len(insertion_code_tags) == 1)
+            insertion_code_tag = insertion_code_tags[0]
+            if not(insertion_code_tag.hasAttribute('xsi:nil') and insertion_code_tag.getAttribute('xsi:nil') == 'true'):
+                PDB_insertion_code = parse_singular_alphabetic_character(t, 'PDBx:pdbx_PDB_ins_code')
 
         SEQRES_index = parse_singular_int(t, 'PDBx:label_seq_id')
 
