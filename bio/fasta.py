@@ -136,6 +136,7 @@ class FASTA(dict):
             where the identical chains have the format 'pdb_id:chain_id'
             e.g. for 1A2P, we get {'1A2P': {'A': ['1A2P:B', '1A2P:C'], 'C': ['1A2P:A', '1A2P:B'], 'B': ['1A2P:A', '1A2P:C']}}
         '''
+
         sequences = self.sequences
         identical_sequences = {}
         numseq = len(self.sequences)

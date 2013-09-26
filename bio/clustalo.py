@@ -16,8 +16,9 @@ import platform
 from tools.fs.io import open_temp_file, read_file
 from tools.process import Popen as _Popen
 from tools import colortext
-from uniprot import pdb_to_uniparc
+from uniprot import pdb_to_uniparc, uniprot_map, UniParcEntry
 from fasta import FASTA
+from pdb import PDB
 from basics import SubstitutionScore, Sequence, SequenceMap
 
 ### Check for the necessary Clustal Omega and ClustalW software
@@ -91,7 +92,29 @@ class SequenceAligner(object):
         self.named_matrix = None
         self.alignment_output = None
 
+    ### Class methods
+    @staticmethod
+    def from_list_of_FASTA_content(FASTA_content_list):
+        f = FASTA(FASTA_content_list[0])
+        for x in FASTA_content_list[1:]:
+            f += FASTA(x)
+        return SequenceAligner.from_FASTA(f)
+
+    @staticmethod
+    def from_FASTA(f):
+        sa = SequenceAligner()
+        for sequence in f.sequences:
+            sa.add_sequence('%s:%s' % (sequence[0], sequence[1]), sequence[2])
+        best_matches = sa.align()
+        return sa
+
     ### API methods ###
+    def __repr__(self):
+        s = []
+        best_matches = self.align()
+        for k, v in sorted(best_matches.iteritems()):
+            s.append("%s: %s" % (k, ["%s, %s" % (x, y) for x, y in sorted(v.iteritems(), key=lambda x:-x[1]) if x !=k ]))
+        return "\n".join(s)
 
     def add_sequence(self, sequence_id, sequence):
         if sequence_id in self.sequence_ids.values():
@@ -359,39 +382,55 @@ class MultipleAlignmentException(Exception):
     def __init__(self, chain_id, max_expected_matches_per_chain, num_actual_matches, match_list):
         super(MultipleAlignmentException, self).__init__("Each chain was expected to match at most %d other sequences but chain %s matched %d chains: %s." % (max_expected_matches_per_chain, chain_id, num_actual_matches, ", ".join(match_list)))
 
+class NoPDBUniParcMappingExists(Exception): pass
 
 class PDBUniParcSequenceAligner(object):
 
     ### Constructor methods ###
 
-    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0, sequence_types = {}):
+    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0, sequence_types = {}, replacement_pdb_id = None):
         ''' The sequences are matched up to a percentage identity specified by cut_off (0.0 - 100.0).
             sequence_types e.g. {'A' : 'Protein', 'B' : 'RNA',...} should be passed in if the PDB file contains DNA or RNA chains. Otherwise, the aligner will attempt to match their sequences.
+
+            replacement_pdb_id is used to get a mapping from deprecated PDB IDs to uniparc sequences. It should be the new PDB ID corresponding to the obsolete pdb_id.
+            The PDB and PDBML classes parse the deprecation information from the PDB file or XML respectively and store the new PDB ID in their replacement_pdb_id variable.
+
         '''
+        # todo: We could speed up the matching by only matching unique sequences rather than matching all sequences
+
         self.pdb_id = pdb_id
+        self.replacement_pdb_id = replacement_pdb_id
         self.cut_off = cut_off
         self.sequence_types = sequence_types
         assert(0.0 <= cut_off <= 100.0)
 
         # Retrieve the FASTA record
-        f = FASTA.retrieve(pdb_id, cache_dir = cache_dir)[pdb_id]
+        f = FASTA.retrieve(pdb_id, cache_dir = cache_dir)
+        self.identical_sequences = {}
+        if f.identical_sequences.get(pdb_id):
+            self.identical_sequences = f.identical_sequences[pdb_id]
+        f = f[pdb_id]
         self.chains = sorted(f.keys())
         self.fasta = f
         self.clustal_matches = dict.fromkeys(self.chains, None)
         self.substring_matches = dict.fromkeys(self.chains, None)
+        self.alignment = {}
         self.seqres_to_uniparc_sequence_maps = {}
+        self.uniparc_sequences = {}
+        self.uniparc_objects = {}
+        self.equivalence_fiber = {}
+        self.representative_chains = []
 
-        # Retrieve the related UniParc sequences
-        uniparc_sequences = {}
-        uniparc_objects = {}
-        pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir)
-        for upe in pdb_uniparc_mapping[pdb_id]:
-            uniparc_sequences[upe.UniParcID] = Sequence.from_sequence(upe.UniParcID, upe.sequence)
-            uniparc_objects[upe.UniParcID] = upe
-        self.uniparc_sequences = uniparc_sequences
-        self.uniparc_objects = uniparc_objects
+        # Retrieve the list of associated UniParc entries
+        self._get_uniparc_sequences_through_uniprot(cache_dir)
 
-        # Run the alignment with clustal
+        # Reduce the set of chains to a set of chains where there is exactly one chain from the equivalence class where equivalence is defined as sequence equality
+        # This is used later to reduce the amount of matching we need to do by not matching the same sequences again
+        self._determine_representative_chains()
+
+        # All of the above only needs to be run once
+        # The alignment can be run multiple times with different cut-offs
+        # Run an initial alignment with clustal using the supplied cut-off
         self._align_with_clustal()
         self._align_with_substrings()
         self._check_alignments()
@@ -405,16 +444,41 @@ class PDBUniParcSequenceAligner(object):
     def __repr__(self):
         s = []
         for c in sorted(self.chains):
-            if self.clustal_matches[c]:
+            if self.clustal_matches.get(c):
                 match_string = ['%s (%.2f%%)' % (k, v) for k, v in sorted(self.clustal_matches[c].iteritems(), key = lambda x: x[1])] # this list should have be at most one element unless the matching did not go as expected
-                s.append("%c -> %s" % (c, ", ".join(match_string)))
-            elif self.alignment[c]:
-                s.append("%c -> %s" % (c, self.alignment[c]))
+                s.append("%s -> %s" % (c, ", ".join(match_string)))
+            elif self.alignment.get(c):
+                s.append("%s -> %s" % (c, self.alignment[c]))
             else:
-                s.append("%c -> ?")
+                s.append("%s -> ?" % c)
         return "\n".join(s)
 
     ### API methods ###
+
+    def realign(self, cut_off, chains_to_skip = set()):
+        ''' Alter the cut-off and run alignment again. This is much quicker than creating a new PDBUniParcSequenceAligner
+            object as the UniParcEntry creation etc. in the constructor does not need to be repeated.
+
+            The chains_to_skip argument (a Set) allows us to skip chains that were already matched which speeds up the alignment even more.
+        '''
+        if cut_off != self.cut_off:
+            self.cut_off = cut_off
+
+            # Wipe any existing information for chains not in chains_to_skip
+            for c in self.chains:
+                if c not in chains_to_skip:
+                    self.clustal_matches[c] = None
+                    self.substring_matches[c] = None
+                    if self.alignment.get(c):
+                        del self.alignment[c]
+                    if self.seqres_to_uniparc_sequence_maps.get(c):
+                        del self.seqres_to_uniparc_sequence_maps[c]
+
+            # Run alignment for the remaining chains
+            self._align_with_clustal(chains_to_skip = chains_to_skip)
+            self._align_with_substrings(chains_to_skip = chains_to_skip)
+            self._check_alignments(chains_to_skip = chains_to_skip)
+            self._get_residue_mapping(chains_to_skip = chains_to_skip)
 
     def get_alignment_percentage_identity(self, chain):
         vals = self.clustal_matches[chain].values()
@@ -429,96 +493,221 @@ class PDBUniParcSequenceAligner(object):
 
     ### Private methods ###
 
-    def _get_residue_mapping(self):
-        '''Creates a mapping between the residues of the chains and the associated UniParc entries.'''
-        self.seqres_to_uniparc_sequence_maps = {}
-        alignment = self.alignment
+    def _determine_representative_chains(self):
+        ''' Quotient the chains to get equivalence classes of chains. These will be used for the actual mapping.'''
+        # todo: This logic should be moved into the FASTA class or a more general module (maybe a fast exists which uses a C/C++ library?) but at present it is easier to write here since we do not need to worry about other PDB IDs.
+
+        equivalence_fiber = {}
+        matched_chains = set()
+        for chain_id, equivalent_chains in self.identical_sequences.iteritems():
+            matched_chains.add(chain_id)
+            equivalent_chain_ids = set()
+            for equivalent_chain in equivalent_chains:
+                assert(len(equivalent_chain) == 6)
+                assert(equivalent_chain[:5] == '%s:' % self.pdb_id)
+                equivalent_chain_ids.add(equivalent_chain[5])
+            found = False
+            for equivalent_chain_id in equivalent_chain_ids:
+                if equivalence_fiber.get(equivalent_chain_id):
+                    found = True
+                    assert(equivalence_fiber[equivalent_chain_id] == equivalent_chain_ids.union(set([chain_id])))
+                    break
+            if not found:
+                equivalence_fiber[chain_id] = set(equivalent_chain_ids)
+                equivalence_fiber[chain_id].add(chain_id)
+
         for c in self.chains:
-            if alignment.get(c):
-                uniparc_entry = self.get_uniparc_object(c)
-                sa = SequenceAligner()
-                sa.add_sequence(c, self.fasta[c])
-                sa.add_sequence(uniparc_entry.UniParcID, uniparc_entry.sequence)
-                sa.align()
-                residue_mapping, residue_match_mapping = sa.get_residue_mapping()
+            if c not in matched_chains:
+                equivalence_fiber[c] = set([c])
 
-                # Create a SequenceMap
-                s = SequenceMap()
-                assert(sorted(residue_mapping.keys()) == sorted(residue_match_mapping.keys()))
-                for k, v in residue_mapping.iteritems():
-                    s.add(k, v, residue_match_mapping[k])
-                self.seqres_to_uniparc_sequence_maps[c] = s
+        self.equivalence_fiber = equivalence_fiber
+        self.representative_chains = equivalence_fiber.keys()
+        # we could remove each chain from its image in the fiber which would be marginally more efficient in the logic below but that destroys the reflexivity in the equivalence class. Mathematics would cry a little.
 
+    def _get_uniparc_sequences_through_uniprot(self, cache_dir):
+        # Retrieve the related UniParc sequences
+        pdb_id = self.pdb_id
+        replacement_pdb_id = self.replacement_pdb_id
+
+        # This is the usual path. We get a PDB->UniProt/UniParc mapping using the UniProt web API. This usually works
+        # if there are matches.
+        # todo: We *either* use the UniProt web API *or (exclusively)* use the DBREF entries. In cases where the UniProt API has mappings for, say chain A in a PDB file but not chain B but the DBREF maps B, we will not have a mapping for B. In this case, a hybrid method would be best.
+        uniparc_sequences = {}
+        uniparc_objects = {}
+        mapping_pdb_id = pdb_id
+        pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir) # we could pass both pdb_id and replacement_pdb_id here but I prefer the current (longer) logic at present
+        if not pdb_uniparc_mapping:
+            if replacement_pdb_id:
+                mapping_pdb_id = replacement_pdb_id
+                pdb_uniparc_mapping = pdb_to_uniparc([replacement_pdb_id], cache_dir = cache_dir)
+
+        dbref_exists = False
+        if not pdb_uniparc_mapping:
+            # We could not get a UniProt mapping using the UniProt web API. Instead, try using the PDB DBREF fields.
+            # This fixes some cases e.g. 3ZKB (at the time of writing) where the UniProt database is not up-to-date.
+            uniprot_ACs = set()
+
+            p = PDB.retrieve(pdb_id, cache_dir = cache_dir)
+            uniprot_mapping = p.get_DB_references().get(pdb_id).get('UNIPROT')
+            if uniprot_mapping:
+                for chain_id, details in uniprot_mapping.iteritems():
+                    uniprot_ACs.add(details['dbAccession'])
+
+            if not(uniprot_ACs) and replacement_pdb_id:
+                p = PDB.retrieve(replacement_pdb_id, cache_dir = cache_dir)
+                uniprot_mapping = p.get_DB_references().get(replacement_pdb_id).get('UNIPROT')
+                if uniprot_mapping:
+                    for chain_id, details in uniprot_mapping.iteritems():
+                        uniprot_ACs.add(details['dbAccession'])
+                mapping_pdb_id = replacement_pdb_id
             else:
-                self.seqres_to_uniparc_sequence_maps[c] = {}
+                mapping_pdb_id = pdb_id
 
-    def _align_with_clustal(self):
+            pdb_uniparc_mapping = self._get_uniparc_sequences_through_uniprot_ACs(mapping_pdb_id, list(uniprot_ACs), cache_dir)
 
-        for c in self.chains:
-            # Only align protein chains
-            chain_type = self.sequence_types.get(c, 'Protein')
-            if chain_type == 'Protein' or chain_type == 'Protein skeleton':
-                #clustal_indices = {1 : c}
-                pdb_chain_id = '%s:%s' % (self.pdb_id, c)
-
-                sa = SequenceAligner()
-                sa.add_sequence(pdb_chain_id, self.fasta[c])
-
-                #count = 2
-                for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
-                    #clustal_indices[count] = uniparc_id
-                    sa.add_sequence(uniparc_id, str(uniparc_sequence))
-                    #count += 1
-                best_matches = sa.align()
-                self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id, cut_off = self.cut_off)
+        # If there is no mapping whatsoever found from PDB chains to UniParc sequences then we cannot continue. Again, the hybrid method mentioned in the to-do above would solve some of these cases.
+        if not pdb_uniparc_mapping:
+            extra_str = ''
+            if not(dbref_exists):
+                extra_str = ' No DBREF records were found in the PDB file.'
+            if replacement_pdb_id:
+                raise NoPDBUniParcMappingExists('No PDB->UniParc mapping was found for %s (obsolete) or its replacement %s.%s' % (pdb_id, replacement_pdb_id, extra_str))
             else:
-                # Do not try to match DNA or RNA
-                self.clustal_matches[c] = {}
+                raise NoPDBUniParcMappingExists('No PDB->UniParc mapping was found for %s.%s' % (pdb_id, extra_str))
 
-    def _align_with_substrings(self):
-        '''Simple substring-based matching'''
+        for upe in pdb_uniparc_mapping[mapping_pdb_id]:
+            uniparc_sequences[upe.UniParcID] = Sequence.from_sequence(upe.UniParcID, upe.sequence)
+            uniparc_objects[upe.UniParcID] = upe
+        self.uniparc_sequences = uniparc_sequences
+        self.uniparc_objects = uniparc_objects
 
-        for c in self.chains:
-            fasta_sequence = self.fasta[c]
+    def _get_uniparc_sequences_through_uniprot_ACs(self, mapping_pdb_id, uniprot_ACs, cache_dir):
+        '''Get the UniParc sequences associated with the UniProt accession number.'''
 
-            substring_matches = {}
+        # Map the UniProt ACs to the UniParc IDs
+        m = uniprot_map('ACC', 'UPARC', uniprot_ACs, cache_dir = cache_dir)
+        UniParcIDs = []
+        for _, v in m.iteritems():
+            UniParcIDs.extend(v)
 
-            for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
-                uniparc_sequence = str(uniparc_sequence)
-                idx = uniparc_sequence.find(fasta_sequence)
-                if idx != -1:
-                    substring_matches[uniparc_id] = 0
-                elif len(fasta_sequence) > 30:
-                    idx = uniparc_sequence.find(fasta_sequence[5:-5])
-                    if idx != -1:
-                        substring_matches[uniparc_id] = 5
-                    else:
-                        idx = uniparc_sequence.find(fasta_sequence[7:-7])
-                        if idx != -1:
-                            substring_matches[uniparc_id] = 7
-                elif len(fasta_sequence) > 15:
-                    idx = uniparc_sequence.find(fasta_sequence[3:-3])
-                    if idx != -1:
-                        substring_matches[uniparc_id] = 3
+        # Create a mapping from the mapping_pdb_id to the UniParcEntry objects. This must match the return type from pdb_to_uniparc.
+        mapping = {mapping_pdb_id : []}
+        for UniParcID in UniParcIDs:
+            entry = UniParcEntry(UniParcID, cache_dir = cache_dir)
+            mapping[mapping_pdb_id].append(entry)
 
-            self.substring_matches[c] = substring_matches
+        return mapping
 
-    def _check_alignments(self):
-        alignment = {}
-        max_expected_matches_per_chain = 1
-        for c in self.chains:
-            if not(len(self.clustal_matches[c]) <= max_expected_matches_per_chain):
-                raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c]), self.clustal_matches[c])
-            assert(len(self.substring_matches[c]) == 1 or len(self.substring_matches[c]) <= len(self.clustal_matches[c]))
-            if self.clustal_matches[c]:
-                if not (len(self.clustal_matches[c].keys()) == max_expected_matches_per_chain):
-                    raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c].keys()))
-                if self.substring_matches[c]:
-                    if self.substring_matches[c].keys() != self.clustal_matches[c].keys():
-                        print("ERROR: An inconsistent alignment was found between Clustal Omega and a substring search.")
-                    else:
-                        alignment[c] = self.clustal_matches[c].keys()[0]
+    def _align_with_clustal(self, chains_to_skip = set()):
+        for c in self.representative_chains:
+            # Skip specified chains
+            if c not in chains_to_skip:
+                # Only align protein chains
+                chain_type = self.sequence_types.get(c, 'Protein')
+                if chain_type == 'Protein' or chain_type == 'Protein skeleton':
+
+                    pdb_chain_id = '%s:%s' % (self.pdb_id, c)
+
+                    sa = SequenceAligner()
+                    sa.add_sequence(pdb_chain_id, self.fasta[c])
+
+                    for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
+                        sa.add_sequence(uniparc_id, str(uniparc_sequence))
+                    best_matches = sa.align()
+                    self.clustal_matches[c] = sa.get_best_matches_by_id(pdb_chain_id, cut_off = self.cut_off)
                 else:
-                    alignment[c] = self.clustal_matches[c].keys()[0]
-        self.alignment = alignment
+                    # Do not try to match DNA or RNA
+                    self.clustal_matches[c] = {}
 
+        # Use the representatives' alignments for their respective equivalent classes
+        for c_1, related_chains in self.equivalence_fiber.iteritems():
+            for c_2 in related_chains:
+                self.clustal_matches[c_2] = self.clustal_matches[c_1]
+
+    def _align_with_substrings(self, chains_to_skip = set()):
+        '''Simple substring-based matching'''
+        for c in self.representative_chains:
+            # Skip specified chains
+            if c not in chains_to_skip:
+                fasta_sequence = self.fasta[c]
+
+                substring_matches = {}
+
+                for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
+                    uniparc_sequence = str(uniparc_sequence)
+                    idx = uniparc_sequence.find(fasta_sequence)
+                    if idx != -1:
+                        substring_matches[uniparc_id] = 0
+                    elif len(fasta_sequence) > 30:
+                        idx = uniparc_sequence.find(fasta_sequence[5:-5])
+                        if idx != -1:
+                            substring_matches[uniparc_id] = 5
+                        else:
+                            idx = uniparc_sequence.find(fasta_sequence[7:-7])
+                            if idx != -1:
+                                substring_matches[uniparc_id] = 7
+                    elif len(fasta_sequence) > 15:
+                        idx = uniparc_sequence.find(fasta_sequence[3:-3])
+                        if idx != -1:
+                            substring_matches[uniparc_id] = 3
+
+                self.substring_matches[c] = substring_matches
+
+        # Use the representatives' alignments for their respective equivalent classes
+        for c_1, related_chains in self.equivalence_fiber.iteritems():
+            for c_2 in related_chains:
+                self.substring_matches[c_2] = self.substring_matches[c_1]
+
+    def _check_alignments(self, chains_to_skip = set()):
+        max_expected_matches_per_chain = 1
+        for c in self.representative_chains:
+            # Skip specified chains
+            if c not in chains_to_skip:
+                if not(len(self.clustal_matches[c]) <= max_expected_matches_per_chain):
+                    raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c]), self.clustal_matches[c])
+                assert(len(self.substring_matches[c]) == 1 or len(self.substring_matches[c]) <= len(self.clustal_matches[c]))
+                if self.clustal_matches[c]:
+                    if not (len(self.clustal_matches[c].keys()) == max_expected_matches_per_chain):
+                        raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c].keys()))
+                    if self.substring_matches[c]:
+                        if self.substring_matches[c].keys() != self.clustal_matches[c].keys():
+                            print("ERROR: An inconsistent alignment was found between Clustal Omega and a substring search.")
+                        else:
+                            self.alignment[c] = self.clustal_matches[c].keys()[0]
+                    else:
+                        self.alignment[c] = self.clustal_matches[c].keys()[0]
+
+        # Use the representatives' alignments for their respective equivalent classes. This saves memory as the same SequenceMap is used.
+        for c_1, related_chains in self.equivalence_fiber.iteritems():
+            for c_2 in related_chains:
+                if self.alignment.get(c_1):
+                    self.alignment[c_2] = self.alignment[c_1]
+
+    def _get_residue_mapping(self, chains_to_skip = set()):
+        '''Creates a mapping between the residues of the chains and the associated UniParc entries.'''
+        for c in self.representative_chains:
+            # Skip specified chains
+            if c not in chains_to_skip:
+                if self.alignment.get(c):
+                    uniparc_entry = self.get_uniparc_object(c)
+                    sa = SequenceAligner()
+                    sa.add_sequence(c, self.fasta[c])
+                    sa.add_sequence(uniparc_entry.UniParcID, uniparc_entry.sequence)
+                    sa.align()
+                    residue_mapping, residue_match_mapping = sa.get_residue_mapping()
+
+                    # Create a SequenceMap
+                    s = SequenceMap()
+                    assert(sorted(residue_mapping.keys()) == sorted(residue_match_mapping.keys()))
+                    for k, v in residue_mapping.iteritems():
+                        s.add(k, v, residue_match_mapping[k])
+                    self.seqres_to_uniparc_sequence_maps[c] = s
+
+                else:
+                    self.seqres_to_uniparc_sequence_maps[c] = {}
+
+        # Use the representatives' alignments for their respective equivalent classes. This saves memory as the same SequenceMap is used.
+        for c_1, related_chains in self.equivalence_fiber.iteritems():
+            for c_2 in related_chains:
+                if self.seqres_to_uniparc_sequence_maps.get(c_1):
+                    self.seqres_to_uniparc_sequence_maps[c_2] = self.seqres_to_uniparc_sequence_maps[c_1]
