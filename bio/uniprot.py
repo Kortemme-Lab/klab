@@ -28,7 +28,7 @@ from tools.bio.uniprot_patches import * # UniParcMergedSubmittedNamesRemap, UniP
 class ProteinSubsectionOverlapException(colortext.Exception): pass
 class UniParcEntryStandardizationException(colortext.Exception): pass
 
-def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None):
+def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, silent = True):
     '''Maps from one ID scheme to another using the UniProt service.
         list_of_ids should be a list of strings.
         This function was adapted from http://www.uniprot.org/faq/28#id_mapping_examples which also gives examples of
@@ -57,7 +57,8 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None):
     assert(set(remaining_ids + requested_mapping.keys()) == set(list_of_from_ids))
 
     if remaining_ids:
-        print("Getting %s->%s mapping" % (from_scheme, to_scheme))
+        if not silent:
+            print("Getting %s->%s mapping" % (from_scheme, to_scheme))
         url = 'http://www.uniprot.org/mapping/'
         params = {
             'from'      : from_scheme,
@@ -103,7 +104,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None):
     # Map PDB IDs to UniProtKB AC
     if not silent:
         colortext.write("Retrieving PDB to UniProtKB AC mapping: ", 'cyan')
-    pdb_ac_mapping = uniprot_map('PDB_ID', 'ACC', pdb_ids, cache_dir = cache_dir)
+    pdb_ac_mapping = uniprot_map('PDB_ID', 'ACC', pdb_ids, cache_dir = cache_dir, silent = silent)
     if not silent:
         colortext.write("done\n", 'green')
 
@@ -120,7 +121,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None):
     # Map UniProtKB ACs to UniParc IDs
     if not silent:
         colortext.write("Retrieving UniProtKB AC to UniParc ID mapping: ", 'cyan')
-    ac_uniparc_mapping = uniprot_map('ACC', 'UPARC', AC_IDs, cache_dir = cache_dir)
+    ac_uniparc_mapping = uniprot_map('ACC', 'UPARC', AC_IDs, cache_dir = cache_dir, silent = silent)
     for k, v in ac_uniparc_mapping.iteritems():
         assert(len(v) == 1)
         ac_uniparc_mapping[k] = v[0]
@@ -128,7 +129,8 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None):
         colortext.write("done\n", 'green')
 
     # Map UniProtKB ACs to UniProtKB IDs
-    ac_id_mapping = uniprot_map('ACC', 'ID', AC_IDs, cache_dir = cache_dir)
+    ac_id_mapping = uniprot_map('ACC', 'ID', AC_IDs, cache_dir = cache_dir, silent = silent)
+
     for k, v in ac_id_mapping.iteritems():
         assert(len(v) == 1)
         ac_id_mapping[k] = v[0]
@@ -282,11 +284,12 @@ class UniProtACEntry(object):
         'Neutron'   : 'neutron diffraction',
     }
 
-    def __init__(self, UniProtAC, XML = None, cache_dir = None):
+    def __init__(self, UniProtAC, XML = None, cache_dir = None, silent = True):
         if cache_dir and not(os.path.exists(cache_dir)):
             raise Exception("The cache directory %s does not exist." % cache_dir)
 
         self.UniProtAC = UniProtAC
+        self.silent = silent
 
         # Get XML
         if XML == None:
@@ -297,7 +300,8 @@ class UniProtACEntry(object):
             if cached_filepath and os.path.exists(cached_filepath):
                 protein_xml = read_file(cached_filepath)
             else:
-                colortext.write("Retrieving %s\n" % UniProtAC, "cyan")
+                if not silent:
+                    colortext.write("Retrieving %s\n" % UniProtAC, "cyan")
                 url = 'http://www.uniprot.org/uniprot/%s.xml' % UniProtAC
                 protein_xml = http_get(url)
                 if cached_filepath:
@@ -367,7 +371,8 @@ class UniProtACEntry(object):
                                 mmkey = "/".join(sorted(chain_ids))
                                 if missing_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}).get(pdb_id, {}).get(mmkey):
                                     starting_index, ending_index = missing_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}).get(pdb_id, {}).get(mmkey)
-                                    colortext.error("Fixing starting_index, ending_index to %d, %d for PDB chains %s." % (starting_index, ending_index, str(chain_ids)))
+                                    if not self.silent:
+                                        colortext.error("Fixing starting_index, ending_index to %d, %d for PDB chains %s." % (starting_index, ending_index, str(chain_ids)))
                                 else:
                                     if not set(chain_ids) in broken_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}).get(pdb_id, []):
                                         raise colortext.Exception("The starting index and ending index for %s, chains %s in UniProtKB AC entry %s is broken or missing. Fix the mapping or mark it as missing in uniprot_patches.py" % (pdb_id, ",".join(chain_ids), self.UniProtAC))
@@ -377,7 +382,8 @@ class UniProtACEntry(object):
                                 assert(len(chain_id) == 1)
                                 if fixed_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}).get(pdb_id, {}).get(chain_id):
                                     fixed_chain_id = fixed_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}).get(pdb_id, {}).get(chain_id)
-                                    colortext.error("Fixing PDB chain from %s to %s." % (chain_id, fixed_chain_id))
+                                    if not self.silent:
+                                        colortext.error("Fixing PDB chain from %s to %s." % (chain_id, fixed_chain_id))
                                     chain_id = fixed_chain_id
                                 chains.append((chain_id, starting_index, ending_index))
 
@@ -388,7 +394,8 @@ class UniProtACEntry(object):
                     temp_method = missing_AC_PDB_methods.get(self.UniProtAC, {}).get(pdb_id, [])
                     if temp_method:
                         method = temp_method[0]
-                        colortext.error("Fixing method to %s for PDB %s." % (method, pdb_id))
+                        if not self.silent:
+                            colortext.error("Fixing method to %s for PDB %s." % (method, pdb_id))
 
                 if not chains:
                     assert(pdb_id in broken_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}))
@@ -410,9 +417,11 @@ class UniProtACEntry(object):
 
         if False:
             for pdb_id, details in sorted(mapping.iteritems()):
-                colortext.message("%s, %s, %sA" % (str(pdb_id), str(details['method']), str(details['resolution'])))
+                if not self.silent:
+                    colortext.message("%s, %s, %sA" % (str(pdb_id), str(details['method']), str(details['resolution'])))
                 for chain, indices in sorted(details['chains'].iteritems()):
-                    colortext.warning(" Chain %s: %s-%s" % (chain, str(indices[0]).rjust(5), str(indices[1]).ljust(5)))
+                    if not self.silent:
+                        colortext.warning(" Chain %s: %s-%s" % (chain, str(indices[0]).rjust(5), str(indices[1]).ljust(5)))
 
 
     def _parse_evidence_tag(self):
@@ -430,7 +439,8 @@ class UniProtACEntry(object):
         feature_tags = [child for child in entry_tag.childNodes if child.nodeType == child.ELEMENT_NODE and child.tagName == 'feature']
 
         for additional_subsection in subsections_for_addition.get(self.UniProtAC, []):
-            colortext.warning("Adding additional subsection %s." % str(additional_subsection))
+            if not self.silent:
+                colortext.warning("Adding additional subsection %s." % str(additional_subsection))
             subsections.add(additional_subsection[0], additional_subsection[1], additional_subsection[2], additional_subsection[3])
 
         if self.UniProtAC not in AC_entries_where_we_ignore_the_subsections:
@@ -465,7 +475,8 @@ class UniProtACEntry(object):
                         if (begin_position, end_position) in differing_subsection_name_patch.get(self.UniProtAC, {}):
                             description_pair = differing_subsection_name_patch[self.UniProtAC][(begin_position, end_position)]
                             if description_pair[0] == description:
-                                colortext.warning("Changing subsection name from '%s' to '%s'." % description_pair)
+                                if not self.silent:
+                                    colortext.warning("Changing subsection name from '%s' to '%s'." % description_pair)
                                 description = description_pair[1]
 
                         if begin_position and end_position:
@@ -475,9 +486,11 @@ class UniProtACEntry(object):
                                     #colortext.message("Adding subsection %s." % str(subsection_for_addition))
                                     subsections.add(subsection_for_addition[0], subsection_for_addition[1], subsection_for_addition[2], subsection_for_addition[3])
                                 else:
-                                    colortext.warning("Skipping overlapping subsection %s." % str(subsection_for_addition))
+                                    if not self.silent:
+                                        colortext.warning("Skipping overlapping subsection %s." % str(subsection_for_addition))
                             else:
-                                colortext.warning("Skipping clashing subsection %s." % str(subsection_for_addition))
+                                if not self.silent:
+                                    colortext.warning("Skipping clashing subsection %s." % str(subsection_for_addition))
 
         self.subsections = subsections
 
@@ -580,23 +593,24 @@ class UniProtACEntry(object):
 
 class UniParcEntry(object):
 
-    def __init__(self, UniParcID, UniProtACs = None, UniProtIDs = None, cache_dir = None):
+    def __init__(self, UniParcID, UniProtACs = None, UniProtIDs = None, cache_dir = None, silent = True):
         if cache_dir and not(os.path.exists(os.path.abspath(cache_dir))):
             raise Exception("The cache directory %s does not exist." % os.path.abspath(cache_dir))
         self.UniParcID = UniParcID
         self.cache_dir = cache_dir
         self.recommended_name = None
+        self.silent = silent
 
         # Get AC mapping
         if not UniProtACs:
-            mapping = uniprot_map('UPARC', 'ACC', [UniParcID], cache_dir = cache_dir)[UniParcID]
+            mapping = uniprot_map('UPARC', 'ACC', [UniParcID], cache_dir = cache_dir, silent = silent)[UniParcID]
             self.UniProtACs = mapping
         else:
             self.UniProtACs = UniProtACs
 
         # Get ID mapping
         if not UniProtIDs:
-            mapping = uniprot_map('UPARC', 'ID', [UniParcID], cache_dir = cache_dir)[UniParcID]
+            mapping = uniprot_map('UPARC', 'ID', [UniParcID], cache_dir = cache_dir, silent = silent)[UniParcID]
             self.UniProtIDs = mapping
         else:
             self.UniProtIDs = UniProtIDs
@@ -608,7 +622,8 @@ class UniParcEntry(object):
         if cached_filepath and os.path.exists(cached_filepath):
             fasta = read_file(cached_filepath)
         else:
-            print("Getting FASTA file")
+            if not silent:
+                print("Getting FASTA file")
             url = 'http://www.uniprot.org/uniparc/%s.fasta' % UniParcID
             fasta = http_get(url)
             if cached_filepath:
@@ -633,7 +648,7 @@ class UniParcEntry(object):
         subsections = ProteinSubsectionHolder(len(sequence))
         for UniProtAC in self.UniProtACs:
             #colortext.write("%s\n" % UniProtAC, 'cyan')
-            AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir)
+            AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir, silent = silent)
             self.AC_entries[UniProtAC] = AC_entry
 
             # Mass sanity check
@@ -688,7 +703,8 @@ class UniParcEntry(object):
         elif UniParcID in UniParcMergedSubmittedNamesRemap:
             recommended_names = [[UniParcMergedSubmittedNamesRemap[UniParcID], 1]]
 
-        colortext.write('Subsections\n', 'orange')
+        if not silent:
+            colortext.write('Subsections\n', 'orange')
         #print(subsections)
 
         if len(recommended_names) == 0 and len(alternative_names) == 0 and len(submitted_names) == 0:
@@ -735,7 +751,8 @@ class UniParcEntry(object):
         if cached_filepath and os.path.exists(cached_filepath):
             uparc_xml = read_file(cached_filepath)
         else:
-            colortext.write("Retrieving %s\n" % self.UniParcID, "cyan")
+            if not self.silent:
+                colortext.write("Retrieving %s\n" % self.UniParcID, "cyan")
             url = 'http://www.uniprot.org/uniparc/%s.xml' % self.UniParcID
             uparc_xml = http_get(url)
             if cached_filepath:
@@ -782,8 +799,9 @@ class UniParcEntry(object):
             else:
                 if UniProtAC in ['N2XE95', 'N1E9H6', 'N2JUB3', 'N2Z3Z2']: # hack for bad XML documents at time of writing
                     continue
-                colortext.warning("Retrieving %s" % UniProtAC)
-                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir)
+                if not self.silent:
+                    colortext.warning("Retrieving %s" % UniProtAC)
+                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir, silent = self.silent)
             for o in AC_entry.organisms:
                 name_count[o['scientific']] = name_count.get(o['scientific'], 0)
                 name_count[o['scientific']] += 1
