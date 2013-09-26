@@ -312,6 +312,11 @@ class PDB:
         self.atom_sequences = {}                        # A dict mapping chain IDs to ATOM Sequence objects
         self.chain_atoms = {}                           # A dict mapping chain IDs to a set of ATOM types. This is useful to test whether some chains only have CA entries e.g. in 1LRP, 1AIN, 1C53, 1HIO, 1XAS, 2TMA
 
+        # PDB deprecation fields
+        self.deprecation_date = None
+        self.deprecated = False
+        self.replacement_pdb_id = None
+
         self.rosetta_to_atom_sequence_maps = {}
         self.rosetta_residues = []
 
@@ -321,6 +326,7 @@ class PDB:
         self.pdb_id = self.get_pdb_id()                 # parse the PDB ID if it is not passed in
         self._get_pdb_format_version()
         self._get_modified_residues()
+        self._get_replacement_pdb_id()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
 
@@ -456,6 +462,26 @@ class PDB:
 
             self.modified_residue_mapping_3 = modified_residue_mapping_3
             self.modified_residues = modified_residues
+
+    def _get_replacement_pdb_id(self):
+        '''Checks to see if the PDB file has been deprecated and, if so, what the new ID is.'''
+        deprecation_lines = self.parsed_lines['OBSLTE']
+        date_regex = re.compile('(\d+)-(\w{3})-(\d+)')
+        if deprecation_lines:
+            assert(len(deprecation_lines) == 1)
+            tokens = deprecation_lines[0].split()[1:]
+            assert(len(tokens) == 3)
+            if self.pdb_id:
+                mtchs = date_regex.match(tokens[0])
+                assert(mtchs)
+                _day = int(mtchs.group(1))
+                _month = mtchs.group(2)
+                _year = int(mtchs.group(3)) # only two characters?
+                assert(tokens[1] == self.pdb_id)
+                assert(len(tokens[2]) == 4)
+                self.deprecation_date = (_day, _month, _year) # no need to do anything fancier unless this is ever needed
+                self.deprecated = True
+                self.replacement_pdb_id = tokens[2]
 
     ### PDB mutating functions ###
 
