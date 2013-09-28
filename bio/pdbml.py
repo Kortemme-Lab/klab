@@ -25,9 +25,9 @@ from tools.debug.profile import ProfileTimer
 int_type = types.IntType
 
 xsd_versions = {
-    'pdbx-v40.xsd' : 4.0,
-    'pdbx-v32.xsd' : 3.2,
-    'pdbx.xsd' : 3.1,
+    'pdbx-v40.xsd'  : 4.0,
+    'pdbx-v32.xsd'  : 3.2,
+    'pdbx.xsd'      : 3.1,
 }
 
 # Old, slow class using xml.dom.minidom
@@ -37,18 +37,11 @@ class PDBML_slow(object):
     def __init__(self, xml_contents, pdb_contents):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
 
-        self.profiler = ProfileTimer()
-
-        self.profiler.start('Constructor A')
-
         self.pdb_id = None
         self.contents = xml_contents
         self.xml_version = None
 
-        self.profiler.start('Constructor B')
         self._dom = parseString(xml_contents)
-
-        self.profiler.start('Constructor C')
 
         self.deprecated = False
         self.replacement_pdb_id = None
@@ -57,19 +50,9 @@ class PDBML_slow(object):
 
         self.main_tag = None
 
-        self.profiler.start('Parse header')
         self.parse_header()
-
-        self.profiler.start('Parse deprecation')
         self.parse_deprecation()
-
-        self.profiler.start('Parse atoms')
         self.parse_atoms()
-
-        self.profiler.stop()
-
-        print(self.profiler.getProfile(html = False))
-
 
     @staticmethod
     def retrieve(pdb_id, cache_dir = None):
@@ -218,7 +201,10 @@ class PDBML_slow(object):
         return r, SEQRES_index, residue_1_letter, residue_3_letter
 
 
-class AtomSite():
+
+
+class AtomSite(object):
+    # Same as AtomSite but no x, y, z data
     fields = [
         # Field name                    PDBML tag name          Values                                      Expected type that we store
         'IsHETATM',                 #   PDBx:group_PDB          True iff record type is HETATM              Boolean
@@ -227,9 +213,6 @@ class AtomSite():
         'ATOMResidueID',            #   PDBx:auth_seq_id        Residue ID (not including insertion code)   Int
         'ATOMResidueiCode',         #   PDBx:pdbx_PDB_ins_code  Residue insertion code                      Character (alpha)
         'ATOMResidueiCodeIsNull',   #   PDBx:pdbx_PDB_ins_code  Need to determine if icode is nil           Boolean
-        'x',                        #   PDBx:Cartn_x            x coordinate                                Float
-        'y',                        #   PDBx:Cartn_y            y coordinate                                Float
-        'z',                        #   PDBx:Cartn_z            z coordinate                                Float
         'SEQRESIndex',              #   PDBx:label_seq_id       The SEQRES index                            Int
         'ATOMResidueAA',            #   PDBx:auth_comp_id       The residue type in the ATOM sequence       String (we seem to assume 3 letter protein residues here...)
         'ATOMSeqresResidueAA',      #   PDBx:label_comp_id      The residue type in the SEQRES sequence     String (we seem to assume 3 letter protein residues here...)
@@ -240,7 +223,7 @@ class AtomSite():
 
     def clear(self):
         d = self.__dict__
-        for f in AtomSite.fields:
+        for f in self.__class__.fields:
             d[f] = None
         d['IsHETATM'] = False
         d['IsATOM'] = False
@@ -283,20 +266,52 @@ class AtomSite():
             residue_1_letter = 'X'
 
         pdb_residue = IdentifyingPDBResidue(self.PDBChainID, ("%d%s" % (self.ATOMResidueID, self.ATOMResidueiCode)).rjust(5), residue_1_letter, None, residue_3_letter)
-        pdb_residue.add_position(self.x, self.y, self.z)
         return pdb_residue, self.SEQRESIndex, residue_1_letter, residue_3_letter
 
     def __repr__(self):
         # For debugging
-        return '\n'.join([('%s : %s' % (f.ljust(23), self.__dict__[f])) for f in AtomSite.fields if self.__dict__[f] != None])
+        return '\n'.join([('%s : %s' % (f.ljust(23), self.__dict__[f])) for f in self.__class__.fields if self.__dict__[f] != None])
 
-# Faster class using xml.sax
+class AtomSite_xyz(AtomSite):
+    fields = [
+        # Field name                    PDBML tag name          Values                                      Expected type that we store
+        'IsHETATM',                 #   PDBx:group_PDB          True iff record type is HETATM              Boolean
+        'IsATOM',                   #   PDBx:group_PDB          True iff record type is ATOM                Boolean
+        'PDBChainID',               #   PDBx:auth_asym_id       PDB chain ID                                Character (alphanumeric)
+        'ATOMResidueID',            #   PDBx:auth_seq_id        Residue ID (not including insertion code)   Int
+        'ATOMResidueiCode',         #   PDBx:pdbx_PDB_ins_code  Residue insertion code                      Character (alpha)
+        'ATOMResidueiCodeIsNull',   #   PDBx:pdbx_PDB_ins_code  Need to determine if icode is nil           Boolean
+        'x',                        #   PDBx:Cartn_x            x coordinate                                Float
+        'y',                        #   PDBx:Cartn_y            y coordinate                                Float
+        'z',                        #   PDBx:Cartn_z            z coordinate                                Float
+        'SEQRESIndex',              #   PDBx:label_seq_id       The SEQRES index                            Int
+        'ATOMResidueAA',            #   PDBx:auth_comp_id       The residue type in the ATOM sequence       String (we seem to assume 3 letter protein residues here...)
+        'ATOMSeqresResidueAA',      #   PDBx:label_comp_id      The residue type in the SEQRES sequence     String (we seem to assume 3 letter protein residues here...)
+    ]
+
+    def convert_to_residue(self, modified_residues):
+        residue_3_letter = self.ATOMResidueAA
+        residue_1_letter = residue_type_3to1_map.get(residue_3_letter) or protonated_residue_type_3to1_map.get(residue_3_letter) or non_canonical_amino_acids.get(residue_3_letter)
+
+        if not residue_1_letter:
+            residue_identifier = self.get_pdb_residue_id()
+            if modified_residues.get(residue_identifier):
+                residue_1_letter = modified_residues[residue_identifier]['original_residue_1']
+        if not residue_1_letter:
+            '''Too many cases to worry about... we will have to use residue_3_letter to sort those out.'''
+            residue_1_letter = 'X'
+
+        pdb_residue = IdentifyingPDBResidue(self.PDBChainID, ("%d%s" % (self.ATOMResidueID, self.ATOMResidueiCode)).rjust(5), residue_1_letter, None, residue_3_letter)
+        pdb_residue.add_position(self.x, self.y, self.z)
+        return pdb_residue, self.SEQRESIndex, residue_1_letter, residue_3_letter
+
+
+# Faster classes using xml.sax
+
 class PDBML(xml.sax.handler.ContentHandler):
 
     def __init__(self, xml_contents, pdb_contents):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
-
-        self.profiler = ProfileTimer()
 
         self.xml_contents = xml_contents
         self.atom_to_seqres_sequence_maps = {}
@@ -310,9 +325,8 @@ class PDBML(xml.sax.handler.ContentHandler):
         self._BLOCK = None                      # This is used to create a simple FSA for the parsing
         self.current_atom_site = AtomSite()
 
-        self.profiler.start('Create PDB')
+        # Create the PDB
         self.modified_residues = PDB(pdb_contents).modified_residues
-        self.profiler.stop()
 
         self.deprecated = True
         self.replacement_pdb_id = None
@@ -376,17 +390,14 @@ class PDBML(xml.sax.handler.ContentHandler):
             self._BLOCK = 2
             self.current_atom_site.clear()
             assert(self.in_atom_sites_block)
-            self.profiler.start('Parse atoms')
 
         elif name == 'PDBx:atom_siteCategory':
             self.in_atom_sites_block = True
             self.counters['PDBx:atom_siteCategory'] = self.counters.get('PDBx:atom_siteCategory', 0) + 1
 
         elif name == 'PDBx:datablock':
-            self.profiler.start('Parse header')
             self.counters['PDBx:datablock'] = self.counters.get('PDBx:datablock', 0) + 1
             self.parse_header(attributes)
-            self.profiler.stop()
 
         elif name == "PDBx:pdbx_database_PDB_obs_sprCategory":
             self._BLOCK = 1
@@ -394,7 +405,6 @@ class PDBML(xml.sax.handler.ContentHandler):
 
     def parse_deprecated_tags(self, name, attributes):
         '''Checks to see if the PDB file has been deprecated and, if so, what the new ID is.'''
-        self.profiler.start('Parse deprecation')
         if name == 'PDBx:pdbx_database_PDB_obs_spr':
             self.counters['PDBx:pdbx_database_PDB_obs_spr'] = self.counters.get('PDBx:pdbx_database_PDB_obs_spr', 0) + 1
             old_pdb_id = attributes.get('replace_pdb_id').upper()
@@ -406,7 +416,6 @@ class PDBML(xml.sax.handler.ContentHandler):
                 self.replacement_pdb_id = new_pdb_id
             else:
                 assert(self.pdb_id == new_pdb_id)
-        self.profiler.stop()
 
     def end_element(self, name):
         tag_content = ("".join(self.tag_data)).strip()
@@ -469,14 +478,133 @@ class PDBML(xml.sax.handler.ContentHandler):
         current_atom_site = self.current_atom_site
         if current_atom_site.IsHETATM:
             # Early out - do not parse HETATM records
-            self.profiler.stop()
             return
 
         elif name == 'PDBx:atom_site':
             # We have to handle the atom_site close tag here since we jump based on self._BLOCK first in end_element
             # To keep the code a little neater, I separate the logic out into end_atom_tag at the cost of one function call per atom
-            self.end_atom_tag()
-            self.profiler.stop()
+
+            #self.end_atom_tag()
+            #'''Add the residue to the residue map.'''
+            self._BLOCK = None
+            current_atom_site = self.current_atom_site
+            current_atom_site.validate()
+            if current_atom_site.IsATOM:
+                # Only parse ATOM records
+                r, seqres, ResidueAA, Residue3AA = current_atom_site.convert_to_residue(self.modified_residues)
+                if r:
+                    if not(self.pdb_id in cases_with_ACE_residues_we_can_ignore and Residue3AA == 'ACE'):
+                        # skip certain ACE residues
+                        full_residue_id = str(r)
+                        if self._residues_read.get(full_residue_id):
+                            assert(self._residues_read[full_residue_id] == (r.ResidueAA, seqres))
+                        else:
+                            self._residues_read[full_residue_id] = (r.ResidueAA, seqres)
+                            self._residue_map[r.Chain] = self._residue_map.get(r.Chain, {})
+                            assert(type(seqres) == int_type)
+                            self._residue_map[r.Chain][str(r)] = seqres
+
+        # Record type
+        elif name == 'PDBx:group_PDB':
+            # ATOM or HETATM
+            if tag_content == 'ATOM':
+                current_atom_site.IsATOM = True
+            elif tag_content == 'HETATM':
+                current_atom_site.IsHETATM = True
+            else:
+                raise Exception("PDBx:group_PDB was expected to be 'ATOM' or 'HETATM'. '%s' read instead." % tag_content)
+
+        # Residue identifier - chain ID, residue ID, insertion code
+        elif name == 'PDBx:auth_asym_id':
+            assert(not(current_atom_site.PDBChainID))
+            current_atom_site.PDBChainID = tag_content
+        elif name == 'PDBx:auth_seq_id':
+            assert(not(current_atom_site.ATOMResidueID))
+            current_atom_site.ATOMResidueID = int(tag_content)
+        elif name == "PDBx:pdbx_PDB_ins_code":
+            if current_atom_site.ATOMResidueiCodeIsNull:
+                assert(len(tag_content) == 0)
+            else:
+                assert(current_atom_site.ATOMResidueiCode == ' ')
+                current_atom_site.ATOMResidueiCode = tag_content
+        elif name == "PDBx:auth_comp_id":
+            assert(not(current_atom_site.ATOMResidueAA))
+            current_atom_site.ATOMResidueAA = tag_content
+
+        elif name == "PDBx:label_seq_id":
+            assert(not(current_atom_site.SEQRESIndex))
+            current_atom_site.SEQRESIndex = int(tag_content)
+        elif name == "PDBx:label_comp_id":
+            assert(not(current_atom_site.ATOMSeqresResidueAA))
+            current_atom_site.ATOMSeqresResidueAA = tag_content
+
+    def create_atom_data(self):
+        '''The atom site work is split into two parts. This function type-converts the tags.'''
+
+        current_atom_site = self.current_atom_site
+
+        # Only parse ATOM records
+        if current_atom_site.IsHETATM:
+            # Early out - do not parse HETATM records
+            return None, None, None, None
+        elif current_atom_site.IsATOM:
+            return current_atom_site.convert_to_residue(self.modified_residues)
+        else:
+            raise Exception('current_atom_site')
+
+    def end_document(self):
+        assert(self.counters.get('PDBx:datablock') == 1)
+        assert(self.counters.get('PDBx:atom_siteCategory') == 1)
+        assert(self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0) <= 1)
+        assert(self.counters.get('PDBx:pdbx_database_PDB_obs_spr', 0) == self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0))
+
+    def characters(self, ch):
+        self.tag_data.append(ch)
+
+    startDocument = start_document
+    endDocument = end_document
+    startElement = start_element
+    endElement = end_element
+
+
+
+class PDBML_xyz(PDBML):
+    '''A subclass which parses x, y, z coordinates (we do not use this at present.'''
+
+    def __init__(self, xml_contents, pdb_contents):
+        super(PDBML_xyz, self).__init__(xml_contents, pdb_contents)
+        self.current_atom_site = AtomSite()
+
+    def parse_atom_tag_data(self, name, tag_content):
+        '''Parse the atom tag data.'''
+        current_atom_site = self.current_atom_site
+        if current_atom_site.IsHETATM:
+            # Early out - do not parse HETATM records
+            return
+
+        elif name == 'PDBx:atom_site':
+            # We have to handle the atom_site close tag here since we jump based on self._BLOCK first in end_element
+            # To keep the code a little neater, I separate the logic out into end_atom_tag at the cost of one function call per atom
+
+            #self.end_atom_tag()
+            #'''Add the residue to the residue map.'''
+            self._BLOCK = None
+            current_atom_site = self.current_atom_site
+            current_atom_site.validate()
+            if current_atom_site.IsATOM:
+                # Only parse ATOM records
+                r, seqres, ResidueAA, Residue3AA = current_atom_site.convert_to_residue(self.modified_residues)
+                if r:
+                    if not(self.pdb_id in cases_with_ACE_residues_we_can_ignore and Residue3AA == 'ACE'):
+                        # skip certain ACE residues
+                        full_residue_id = str(r)
+                        if self._residues_read.get(full_residue_id):
+                            assert(self._residues_read[full_residue_id] == (r.ResidueAA, seqres))
+                        else:
+                            self._residues_read[full_residue_id] = (r.ResidueAA, seqres)
+                            self._residue_map[r.Chain] = self._residue_map.get(r.Chain, {})
+                            assert(type(seqres) == int_type)
+                            self._residue_map[r.Chain][str(r)] = seqres
 
         # Record type
         elif name == 'PDBx:group_PDB':
@@ -522,34 +650,3 @@ class PDBML(xml.sax.handler.ContentHandler):
         elif name == "PDBx:Cartn_z":
             assert(not(current_atom_site.z))
             current_atom_site.z = float(tag_content)
-
-    def create_atom_data(self):
-        '''The atom site work is split into two parts. This function type-converts the tags.'''
-
-        current_atom_site = self.current_atom_site
-
-        # Only parse ATOM records
-        if current_atom_site.IsHETATM:
-            # Early out - do not parse HETATM records
-            return None, None, None, None
-        elif current_atom_site.IsATOM:
-            return current_atom_site.convert_to_residue(self.modified_residues)
-        else:
-            raise Exception('current_atom_site')
-
-    def end_document(self):
-        assert(self.counters.get('PDBx:datablock') == 1)
-        assert(self.counters.get('PDBx:atom_siteCategory') == 1)
-        assert(self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0) <= 1)
-        assert(self.counters.get('PDBx:pdbx_database_PDB_obs_spr', 0) == self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0))
-
-    def characters(self, ch):
-        self.tag_data.append(ch)
-
-    startDocument = start_document
-    endDocument = end_document
-    startElement = start_element
-    endElement = end_element
-
-
-
