@@ -48,12 +48,11 @@ def test_pdbml_speed():
         p_minidom = PDBML_slow.retrieve(test_case, cache_dir = cache_dir)
         t2 = time.clock()
         colortext.message("Done in %0.2fs!" % (t2 - t1))
-        print("")
 
+        print("")
         colortext.printf("Using the new sax class", color = 'cyan')
         t1 = time.clock()
         p_sax = PDBML.retrieve(test_case, cache_dir = cache_dir)
-        print(p_sax.profiler.getProfile(html = False))
         t2 = time.clock()
         colortext.message("Done in %0.2fs!" % (t2 - t1))
 
