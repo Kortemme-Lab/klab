@@ -1,14 +1,17 @@
 import sys
 sys.path.insert(0, "../..")
+import commands
+
 from tools.bio.pdb import PDB
 from tools.fs.io import read_file
 from tools import colortext
 
-from pdbml import PDBML
+from pdbml import PDBML, PDBML_slow
 from uniprot import pdb_to_uniparc
 from fasta import FASTA
 from clustalo import SequenceAligner, PDBUniParcSequenceAligner
 from relatrix import ResidueRelatrix
+import time
 
 rosetta_scripts_path = '~/Rosetta3.5/rosetta_source/build/src/release/linux/3.8/64/x86/gcc/4.7/default/rosetta_scripts.default.linuxgccrelease'
 rosetta_database_path = '~/Rosetta3.5/rosetta_database/'
@@ -24,16 +27,49 @@ class SpecificException(Exception): pass
 #PDB_UniParc_SA = PDBUniParcSequenceAligner('3ZKB', cache_dir = '/home/oconchus/temp', cut_off = 80)
 
 def test_pdbml_speed():
-    colortext.message("Creating PDBML object")
-    PDBML.retrieve('3ZKB', cache_dir = cache_dir)
-    colortext.message("Done!")
 
-    import commands
-    print(commands.getstatusoutput('date'))
+    test_cases = [
+        '1WSY',
+        '1YGV',
+        '487D',
+        '1HIO',
+        '1H38',
+        '3ZKB',
+    ]
+    for test_case in test_cases:
+        print("\n")
 
-    sys.exit(0)
+        colortext.message("Creating PDBML object for %s" % test_case)
+        #PDBML.retrieve(test_case, cache_dir = cache_dir)
 
-#test_pdbml_speed()
+        print("")
+        colortext.printf("Using the old minidom class", color = 'cyan')
+        t1 = time.clock()
+        p_minidom = PDBML_slow.retrieve(test_case, cache_dir = cache_dir)
+        t2 = time.clock()
+        colortext.message("Done in %0.2fs!" % (t2 - t1))
+        print("")
+
+        colortext.printf("Using the new sax class", color = 'cyan')
+        t1 = time.clock()
+        p_sax = PDBML.retrieve(test_case, cache_dir = cache_dir)
+        print(p_sax.profiler.getProfile(html = False))
+        t2 = time.clock()
+        colortext.message("Done in %0.2fs!" % (t2 - t1))
+
+        colortext.write("\nEquality test: ", color = 'cyan')
+        try:
+            assert(p_minidom.atom_to_seqres_sequence_maps.keys() == p_sax.atom_to_seqres_sequence_maps.keys())
+            for c, s_1 in p_minidom.atom_to_seqres_sequence_maps.iteritems():
+                s_2 = p_sax.atom_to_seqres_sequence_maps[c]
+                assert(str(s_1) == str(s_2))
+            colortext.message("passed\n")
+        except:
+            colortext.error("failed\n")
+
+
+test_pdbml_speed()
+sys.exit(0)
 
 def FASTA_alignment():
     # example for talk
