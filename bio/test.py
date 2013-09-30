@@ -26,49 +26,6 @@ class SpecificException(Exception): pass
 
 #PDB_UniParc_SA = PDBUniParcSequenceAligner('3ZKB', cache_dir = '/home/oconchus/temp', cut_off = 80)
 
-def test_pdbml_speed():
-
-    test_cases = [
-        '1WSY',
-        '1YGV',
-        '487D',
-        '1HIO',
-        '1H38',
-        '3ZKB',
-    ]
-    for test_case in test_cases:
-        print("\n")
-
-        colortext.message("Creating PDBML object for %s" % test_case)
-        #PDBML.retrieve(test_case, cache_dir = cache_dir)
-
-        print("")
-        colortext.printf("Using the old minidom class", color = 'cyan')
-        t1 = time.clock()
-        p_minidom = PDBML_slow.retrieve(test_case, cache_dir = cache_dir)
-        t2 = time.clock()
-        colortext.message("Done in %0.2fs!" % (t2 - t1))
-
-        print("")
-        colortext.printf("Using the new sax class", color = 'cyan')
-        t1 = time.clock()
-        p_sax = PDBML.retrieve(test_case, cache_dir = cache_dir)
-        t2 = time.clock()
-        colortext.message("Done in %0.2fs!" % (t2 - t1))
-
-        colortext.write("\nEquality test: ", color = 'cyan')
-        try:
-            assert(p_minidom.atom_to_seqres_sequence_maps.keys() == p_sax.atom_to_seqres_sequence_maps.keys())
-            for c, s_1 in p_minidom.atom_to_seqres_sequence_maps.iteritems():
-                s_2 = p_sax.atom_to_seqres_sequence_maps[c]
-                assert(str(s_1) == str(s_2))
-            colortext.message("passed\n")
-        except:
-            colortext.error("failed\n")
-
-
-test_pdbml_speed()
-sys.exit(0)
 
 def FASTA_alignment():
     # example for talk
@@ -86,9 +43,6 @@ def test_ddg_pdb_ids():
         # SELECT * FROM `DataSetDDG` WHERE `PDBFileID` IN ('1LMB')
         # SELECT * FROM `UserDataSetExperiment` WHERE `PDBFileID` IN ('1XAS', '2TMA')
         # SELECT * FROM `UserAnalysisSet` WHERE `PDB_ID` IN ('1XAS', '2TMA')
-
-        # Good test for speeding things up w.r.t. recreating UniParc entry each time
-        #'1HIO', or '487D',
 
         '1BAO', # Rosetta bug where the terminal residue has an incomplete set of ATOMs and is then removed
         '1BNI', # Rosetta bug where the terminal residue has an incomplete set of ATOMs and is then removed. Bug is in chain C however if we ONLY use chain C then the bug does not fire.
@@ -185,14 +139,7 @@ def test_ddg_pdb_ids():
 
     test_these = [
         # PDBML different XML version
-        #'1GTX', # pdbx.xsd
-                        #'1SEE', # pdbx.xsd
-        #'1WSY', # pdbx.xsd
-        #'1YGV', # pdbx-v32.xsd
-        #'487D',
-        #'1HIO',
-        #'1H38',
-        '3ZKB',
+        '3ZKB', # pdbx-v32.xsd
     ]
     ddG_pdb_ids = test_these
 
@@ -224,6 +171,50 @@ def test_ddg_pdb_ids():
 
     print("failed_cases", failed_cases)
 
+test_ddg_pdb_ids()
+print('done')
+sys.exit(0)
+
+def test_pdbml_speed():
+
+    test_cases = [
+        '1WSY',
+        '1YGV',
+        '487D',
+        '1HIO',
+        '1H38',
+        '3ZKB',
+    ]
+    for test_case in test_cases:
+        print("\n")
+
+        colortext.message("Creating PDBML object for %s" % test_case)
+        #PDBML.retrieve(test_case, cache_dir = cache_dir)
+
+        print("")
+        colortext.printf("Using the old minidom class", color = 'cyan')
+        t1 = time.clock()
+        p_minidom = PDBML_slow.retrieve(test_case, cache_dir = cache_dir)
+        t2 = time.clock()
+        colortext.message("Done in %0.2fs!" % (t2 - t1))
+
+        print("")
+        colortext.printf("Using the new sax class", color = 'cyan')
+        t1 = time.clock()
+        p_sax = PDBML.retrieve(test_case, cache_dir = cache_dir)
+        t2 = time.clock()
+        colortext.message("Done in %0.2fs!" % (t2 - t1))
+
+        colortext.write("\nEquality test: ", color = 'cyan')
+        try:
+            assert(p_minidom.atom_to_seqres_sequence_maps.keys() == p_sax.atom_to_seqres_sequence_maps.keys())
+            for c, s_1 in p_minidom.atom_to_seqres_sequence_maps.iteritems():
+                s_2 = p_sax.atom_to_seqres_sequence_maps[c]
+                assert(str(s_1) == str(s_2))
+            colortext.message("passed\n")
+        except:
+            colortext.error("failed\n")
+
 def test_ResidueRelatrix_1LRP():
     # This case has no Rosetta residues as only CA atoms exist in the PDB and the features database script would crashes. This is a test that the case is handled gracefully.
 
@@ -251,9 +242,7 @@ def test_ResidueRelatrix_1LRP():
     assert(seqres_id_1 == seqres_id_2)
     assert(uniparc_id_1 == uniparc_id_2)
 
-test_ddg_pdb_ids()
 
-sys.exit(0)
 
 def test_ResidueRelatrix_104L():
     # Rosetta residue 45 -> 'A  44A' is an insertion residue which does not appear in the UniParc sequence

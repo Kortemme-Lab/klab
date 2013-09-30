@@ -558,8 +558,14 @@ class PDBML(xml.sax.handler.ContentHandler):
         assert(self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0) <= 1)
         assert(self.counters.get('PDBx:pdbx_database_PDB_obs_spr', 0) == self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0))
 
-    def characters(self, ch):
-        self.tag_data.append(ch)
+    def characters(self, chrs):
+        # todo: I use a list to store self.tag_data, append to the list, then join the contents into a string.
+        # In general, this is a better approach than string concatenation since there is less garbage created. However,
+        # if the strings are small and the list only ever contains one string (which could be the case with this particular
+        # class), my approach may create more garbage. 3ZKB is a good single test case and there is no noticeable speed
+        # difference with either method but it is worth profiling the heap to see which approach makes less allocations.
+        # My guess would be that string concatenation (since this probably never happens) allocates less memory.
+        self.tag_data.append(chrs)
 
     startDocument = start_document
     endDocument = end_document
