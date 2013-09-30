@@ -25,8 +25,10 @@ class ResidueRelatrix(object):
 
     schemes = ['rosetta', 'atom', 'seqres', 'fasta', 'uniparc']
 
-    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 90.0, starting_clustal_cut_off = 100): # keep_HETATMS = False
-        '''acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually 90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues.'''
+    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, starting_clustal_cut_off = 100): # keep_HETATMS = False
+        ''' acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually
+            90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues. I set
+            this to 80.00% to cover most cases.'''
 
         assert(0.0 <= acceptable_sequence_percentage_match <= 100.0)
 
@@ -185,9 +187,9 @@ class ResidueRelatrix(object):
 
         # seqres_to_uniparc_sequence_maps
         for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
-            # Check that 90% of all SEQRES residues have a mapping (there may have been insertions or bad mismatches i.e.
-            # low BLOSUM62/PAM250 scores). I chose 90% arbitrarily but this can be overridden with the
-            # acceptable_sequence_percentage_match argument to the constructor.
+            # Check that acceptable_sequence_percentage_match% of all SEQRES residues have a mapping (there may have been
+            # insertions or bad mismatches i.e. low BLOSUM62/PAM250 scores). I chose 80% arbitrarily but this can be overridden
+            #  with the acceptable_sequence_percentage_match argument to the constructor.
             if self.sequence_types[chain_id] == 'Protein' or self.sequence_types[chain_id] == 'Protein skeleton':
                 mapped_SEQRES_residues = set(sequence_map.keys())
                 all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
