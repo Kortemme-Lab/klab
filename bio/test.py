@@ -1,6 +1,7 @@
 import sys
 sys.path.insert(0, "../..")
 import commands
+import gc
 
 from tools.bio.pdb import PDB
 from tools.fs.io import read_file
@@ -79,22 +80,6 @@ def test_ddg_pdb_ids():
         '1VFB', # 0%
         '2ZAJ', #??
 
-        # PDBML parsing error - no floats allowed
-        '1E6K',
-        '1EL1',
-        '1H7M',
-        '1HZ6',
-        '1KDU',
-        '1N02',
-        '1TPK',
-        '1YCC',
-        '1YEA',
-        '2CRO',
-
-        # PDBML parsing error - expected alpha (chain ID?)
-        '1LMB',
-        '1RTP',
-
         # Give a better error message
         '3K0NA_lin',
 
@@ -138,8 +123,8 @@ def test_ddg_pdb_ids():
     failed_cases = []
 
     test_these = [
-        # PDBML different XML version
-        '3ZKB', # pdbx-v32.xsd
+        '3ZKB',
+        #'1N02',
     ]
     ddG_pdb_ids = test_these
 
@@ -155,7 +140,7 @@ def test_ddg_pdb_ids():
             colortext.warning('Testing PDB file number %d: %s' % (x, ddG_pdb_id))
             starting_clustal_cut_off = 100
             min_clustal_cut_off = 70
-            acceptable_sequence_percentage_match = 90.0
+            acceptable_sequence_percentage_match = 80.0
             if specific_cut_offs.get(ddG_pdb_id):
                 starting_clustal_cut_off, min_clustal_cut_off, acceptable_sequence_percentage_match = specific_cut_offs[ddG_pdb_id]
             try:
@@ -172,7 +157,7 @@ def test_ddg_pdb_ids():
     print("failed_cases", failed_cases)
 
 test_ddg_pdb_ids()
-print('done')
+
 sys.exit(0)
 
 def test_pdbml_speed():
