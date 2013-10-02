@@ -8,7 +8,6 @@ Created by Shane O'Connor 2011/2012
 """
 
 import os
-from httplib import HTTPConnection
 from tools.comms.http import get_resource
 
 from tools import colortext
