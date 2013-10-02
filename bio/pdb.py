@@ -53,8 +53,18 @@ allowed_PDB_residues_and_nucleotides = allowed_PDB_residues_types.union(dna_nucl
 ### Rosetta hacks
 
 # Rosetta fails on some edge cases with certain residues. Since we rely on a lot of logic associated with this module (mappings between residues), it seems best to fix those here.
-HACKS_residues_to_remove = {
+ROSETTA_HACKS_residues_to_remove = {
     '1A2P' : set(['B   3 ']), # terminal residue B 3 gets removed which triggers an exception "( anchor_rsd.is_polymer() && !anchor_rsd.is_upper_terminus() ) && ( new_rsd.is_polymer() && !new_rsd.is_lower_terminus() ), Exit from: src/core/conformation/Conformation.cc line: 449". This seems like a Rosetta deficiency.
+    '1BAO' : set(['B   3 ']), # similar
+    '1BNI' : set(['C   3 ']), # similar
+    '1BRH' : set(['A   3 ', 'B   3 ', 'C   3 ']), # similar
+    '1BRI' : set(['A   3 ', 'B   3 ']), # similar
+    '1BRJ' : set(['A   3 ', 'B   3 ', 'C   3 ']), # similar
+    '1BRK' : set(['B   3 ']), # similar
+    '1EHK' : set(['B   3 ']), # similar
+    '1ZNJ' : set(['B  30 ', 'F   1 ']), # similar
+    '487D' : set(['N   1 ']),
+
 }
 
 # For use with get_pdb_contents_to_pose_residue_map e.g. {'1A2P' : '-ignore_zero_occupancy false', ... }
@@ -69,9 +79,15 @@ known_chimeras = set([
 
 maps_to_multiple_uniprot_ACs = set([('1Z1I', 'A'), ])
 
+### PDB hacks
+
+missing_chain_ids = {
+    '2MBP' : 'A', # The FASTA file lists this as 'A' so we need to patch records up to match
+}
+
 ### Whitelist for PDB files with ACE residues (we could allow all to pass but it may be good to manually look at each case)
 
-cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD'])
+cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX'])
 
 ### Parsing-related variables
 
@@ -101,6 +117,12 @@ modified_residues_patch = {
         #'TYS' : 'TYR',
 #        'NA'  : 'UNK',
 #        'HOH' : 'UNK',
+    },
+    '2ATC' : {
+        'ASX' : 'ASN',
+    },
+    '1XY1' : {
+        'MPT' : 'UNK',
     },
 }
 
@@ -305,6 +327,7 @@ class PDB:
         self.format_version = None
         self.modified_residues = None
         self.modified_residue_mapping_3 = {}
+        self.pdb_id = None
 
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
@@ -321,23 +344,37 @@ class PDB:
         self.rosetta_residues = []
 
         self.lines = pdb_content.split("\n")
+
         self._split_lines()
         self.pdb_id = pdb_id
         self.pdb_id = self.get_pdb_id()                 # parse the PDB ID if it is not passed in
+        self._apply_hacks()
         self._get_pdb_format_version()
         self._get_modified_residues()
         self._get_replacement_pdb_id()
+        if missing_chain_ids.get(self.pdb_id):
+            self._update_structure_lines()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
 
-        self._apply_hacks()
-
     def _apply_hacks(self):
-        pdb_id = self.pdb_id
-        if pdb_id and HACKS_residues_to_remove.get(pdb_id):
-            hacks = HACKS_residues_to_remove[pdb_id]
-            self.lines = [l for l in self.lines if not(l.startswith('ATOM'  )) or (l[21:27] not in hacks)]
-            self._split_lines()
+        pdb_id = self.pdb_id.upper()
+        if pdb_id:
+            if pdb_id == '2MBP':
+                newlines = []
+                for l in self.lines:
+                    if l.startswith("ATOM  ") or l.startswith("HETATM") or l.startswith("TER"):
+                        newlines.append('%s%s%s' % (l[0:21], 'A', l[22:]))
+                    elif l.startswith("SEQRES"):
+                        newlines.append('%s%s%s' % (l[0:12], 'A', l[13:]))
+                    else:
+                        newlines.append(l)
+                self.lines = newlines
+            elif ROSETTA_HACKS_residues_to_remove.get(pdb_id):
+                hacks = ROSETTA_HACKS_residues_to_remove[pdb_id]
+                self.lines = [l for l in self.lines if not(l.startswith('ATOM'  )) or (l[21:27] not in hacks)]
+
+        self._split_lines()
 
     ### Class functions ###
 
@@ -400,8 +437,10 @@ class PDB:
         for line in self.lines:
             linetype = line[0:6]
             if linetype == 'ATOM  ' or linetype == 'HETATM' or linetype == 'TER   ':
-                structure_lines.append(line)
                 chain_id = line[21]
+                if missing_chain_ids.get(self.pdb_id):
+                    chain_id = missing_chain_ids[self.pdb_id]
+                structure_lines.append(line)
                 if chain_id not in atom_chain_order:
                     atom_chain_order.append(chain_id)
                 if linetype == 'ATOM  ':
@@ -409,7 +448,10 @@ class PDB:
                     if atom_type:
                         chain_atoms[chain_id] = chain_atoms.get(chain_id, set())
                         chain_atoms[chain_id].add(atom_type)
-                    
+            if linetype == 'ENDMDL':
+                print("ENDMDL detected: Breaking out early. We do not currently handle NMR structures properly.")
+                break
+
         self.structure_lines = structure_lines
         self.atom_chain_order = atom_chain_order
         self.chain_atoms = chain_atoms
@@ -573,6 +615,9 @@ class PDB:
         if not techniques:
             raise PDBParsingException("Could not determine techniques used.")
         return techniques
+
+    def get_UniProt_ACs(self):
+        return [v['dbAccession'] for k, v in self.get_DB_references().get(self.pdb_id, {}).get('UNIPROT', {}).iteritems()]
 
     def get_DB_references(self):
         ''' "The DBREF record provides cross-reference links between PDB sequences (what appears in SEQRES record) and
@@ -779,12 +824,14 @@ class PDB:
             raise MissingRecordsException("No SEQRES records were found. Handle this gracefully.") # return None
 
         seqres_chain_order = []
-        SEQRES_lines = [line[11:].strip() for line in SEQRES_lines]
+        SEQRES_lines = [line[11:].rstrip() for line in SEQRES_lines] # we cannot strip the left characters as some cases e.g. 2MBP are missing chain identifiers
 
         # Collect all residues for all chains, remembering the chain order
         chain_tokens = {}
         for line in SEQRES_lines:
             chainID = line[0]
+            if missing_chain_ids.get(self.pdb_id):
+                chainID = missing_chain_ids[self.pdb_id]
             if chainID not in seqres_chain_order:
                 seqres_chain_order.append(chainID)
             chain_tokens[chainID] = chain_tokens.get(chainID, [])
@@ -792,6 +839,7 @@ class PDB:
 
         sequences = {}
         self.chain_types = {}
+
         for chain_id, tokens in chain_tokens.iteritems():
 
             # Determine whether the chain is DNA, RNA, or a protein chain
@@ -841,7 +889,10 @@ class PDB:
                     if residue_type_3to1_map.get(r):
                         sequence.append(residue_type_3to1_map[r])
                     else:
-                        if non_canonical_amino_acids.get(r):
+
+                        if self.modified_residue_mapping_3.get(r):
+                            sequence.append(residue_type_3to1_map[self.modified_residue_mapping_3.get(r)])
+                        elif non_canonical_amino_acids.get(r):
                             #print('Mapping non-canonical residue %s to %s.' % (r, non_canonical_amino_acids[r]))
                             #print(SEQRES_lines)
                             #print(line)
@@ -878,6 +929,97 @@ class PDB:
         atom_sequences = {}
         structural_residue_IDs_set = set() # use a set for a quicker lookup
         ignore_HETATMs = True # todo: fix this if we need to deal with HETATMs
+
+        residue_lines_by_chain = []
+        structural_residue_IDs_set = []
+
+        model_index = 0
+        residue_lines_by_chain.append([])
+        structural_residue_IDs_set.append(set())
+        for l in self.structure_lines:
+            if l.startswith("TER   "):
+                model_index += 1
+                residue_lines_by_chain.append([])
+                structural_residue_IDs_set.append(set())
+            else:
+                residue_id = l[21:27]
+                if residue_id not in structural_residue_IDs_set[model_index]:
+                    residue_lines_by_chain[model_index].append(l)
+                    structural_residue_IDs_set[model_index].add(residue_id)
+
+        line_types_by_chain = []
+        chain_ids = []
+        for model_index in range(len(residue_lines_by_chain)):
+            line_types = set()
+            if residue_lines_by_chain[model_index]:
+                if missing_chain_ids.get(self.pdb_id):
+                    chain_ids.append(missing_chain_ids[self.pdb_id])
+                else:
+                    chain_ids.append(residue_lines_by_chain[model_index][0][21])
+            for l in residue_lines_by_chain[model_index]:
+                line_types.add(l[0:6])
+            if line_types == set(['ATOM']):
+                line_types_by_chain.append('ATOM')
+            elif line_types == set(['HETATM']):
+                line_types_by_chain.append('HETATM')
+            else:
+                line_types_by_chain.append('Mixed')
+
+
+        for x in range(0, len(residue_lines_by_chain)):
+            residue_lines = residue_lines_by_chain[x]
+            line_types = line_types_by_chain[x]
+            if ignore_HETATMs and line_types == 'HETATM':
+                continue
+
+            for y in range(len(residue_lines)):
+                l = residue_lines[y]
+                residue_type = l[17:20].strip()
+                if l.startswith("HETATM"):
+                    if self.modified_residue_mapping_3.get(residue_type):
+                        residue_type = self.modified_residue_mapping_3[residue_type]
+                    elif y == (len(residue_lines) - 1):
+                        # last residue in the chain
+                        if residue_type == 'NH2':
+                            residue_type = 'UNK' # fixes a few cases e.g. 1MBG, 1K9Q, 1KA6
+
+                    elif ignore_HETATMs:
+                        continue
+
+                residue_id = l[21:27]
+                chain_id = l[21]
+                if missing_chain_ids.get(self.pdb_id):
+                    chain_id = missing_chain_ids[self.pdb_id]
+
+                chain_type = self.chain_types[chain_id]
+                atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
+
+                residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
+
+                if residue_type == 'UNK':
+                    short_residue_type = 'X'
+                elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
+                    short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type) or non_canonical_amino_acids.get(residue_type)
+                elif chain_type == 'DNA':
+                    short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
+                elif chain_type == 'RNA':
+                    short_residue_type = non_canonical_rna.get(residue_type) or residue_type
+
+                if not short_residue_type:
+                    raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
+
+                #structural_residue_IDs.append((residue_id, short_residue_type))
+                atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
+
+        self.atom_sequences = atom_sequences
+
+    def _get_ATOM_sequences_2(self):
+        '''Creates the ATOM Sequences.'''
+
+        # Get a list of all residues with ATOM or HETATM records
+        atom_sequences = {}
+        structural_residue_IDs_set = set() # use a set for a quicker lookup
+        ignore_HETATMs = True # todo: fix this if we need to deal with HETATMs
         for l in self.structure_lines:
             residue_type = l[17:20].strip()
             if l.startswith("HETATM"):
@@ -885,6 +1027,7 @@ class PDB:
                     residue_type = self.modified_residue_mapping_3[residue_type]
                 elif ignore_HETATMs:
                     continue
+
             residue_id = l[21:27]
             if residue_id not in structural_residue_IDs_set:
                 chain_id = l[21]
@@ -901,13 +1044,15 @@ class PDB:
                     short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
                 elif chain_type == 'RNA':
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
-                assert(short_residue_type)
+                if not short_residue_type:
+                    raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
                 atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
                 structural_residue_IDs_set.add(residue_id)
 
         self.atom_sequences = atom_sequences
+
 
     def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
@@ -1005,6 +1150,8 @@ class PDB:
         for line in self.lines:
             if line[0:4] == 'ATOM' or (ConvertMSEToAtom and (line[0:6] == 'HETATM') and (line[17:20] == 'MSE')):
                 chainID = line[21]
+                if missing_chain_ids.get(self.pdb_id):
+                    chainID = missing_chain_ids[self.pdb_id]
                 if chainID not in chains:
                     chains.append(chainID)
                 residue_longname = line[17:20]
