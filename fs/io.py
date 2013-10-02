@@ -8,6 +8,8 @@ import os
 import tempfile
 import gzip
 
+# Note: I should use the same convention for all methods here but read_file differs. We should really support the whole fopen cstdio spec.
+
 def read_file(filepath, binary = False):
     if binary:
         output_handle = open(filepath,'rb')
@@ -20,8 +22,8 @@ def read_file(filepath, binary = False):
 def get_file_lines(filepath):
     return read_file(filepath, binary = False).splitlines()
 
-def write_file(filepath, contents):
-    output_handle = open(filepath,'w')
+def write_file(filepath, contents, ftype = 'w'):
+    output_handle = open(filepath, ftype)
     output_handle.write(contents)
     output_handle.close()
 
@@ -30,8 +32,8 @@ def open_temp_file(path, ftype = 'w'):
     output_handle = os.fdopen(F, ftype)
     return output_handle, fname
 
-def write_temp_file(path, contents):
-    output_handle, fname = open_temp_file(path)
+def write_temp_file(path, contents, ftype = 'w'):
+    output_handle, fname = open_temp_file(path, ftype = ftype)
     output_handle.write(contents)
     output_handle.close()
     return fname
