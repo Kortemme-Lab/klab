@@ -1,3 +1,12 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+http.py
+http wrappers
+
+Created by Shane O'Connor 2012
+"""
+
 from httplib import HTTPConnection
 
 def get(url):
