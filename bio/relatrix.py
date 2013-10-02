@@ -11,13 +11,14 @@ import types
 import traceback
 
 from fasta import FASTA
-from pdb import PDB, PDBMissingMainchainAtomsException
+from pdb import PDB, PDBMissingMainchainAtomsException, ROSETTA_HACKS_residues_to_remove
 from pdbml import PDBML
 from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
 from tools import colortext
 from basics import Sequence, SequenceMap
 
-use_seqres_sequence_for_fasta_sequence = set(['1A2C'])
+use_seqres_sequence_for_fasta_sequence = set(['1A2C', '4CPA', '2ATC', '1OLR'])
+use_fasta_sequence_for_seqres_sequence = set(['1DEQ'])
 
 class ResidueRelatrix(object):
     ''' A class for relating residue IDs from different schemes.
@@ -32,7 +33,9 @@ class ResidueRelatrix(object):
 
         assert(0.0 <= acceptable_sequence_percentage_match <= 100.0)
 
-        self.pdb_id = pdb_id
+        if not(type(pdb_id) == types.StringType and len(pdb_id) == 4 and pdb_id.isalnum()):
+            raise Exception("Expected an 4-character long alphanumeric PDB identifer. Received '%s'." % str(pdb_id))
+        self.pdb_id = pdb_id.upper()
         self.silent = silent
         self.rosetta_scripts_path = rosetta_scripts_path
         self.rosetta_database_path = rosetta_database_path
@@ -154,10 +157,11 @@ class ResidueRelatrix(object):
             if str(sequence) != self.FASTA[pdb_id][chain_id]:
                 if self.pdb_id in use_seqres_sequence_for_fasta_sequence:
                     self.FASTA.replace_sequence(self.pdb_id, chain_id, str(sequence))
+                elif self.pdb_id in use_fasta_sequence_for_seqres_sequence:
+                    self.pdb.seqres_sequences[chain_id] = Sequence.from_sequence(chain_id, self.FASTA[pdb_id][chain_id], self.sequence_types[chain_id])
+                    sequence = self.FASTA[pdb_id][chain_id]
                 if str(sequence) != self.FASTA[pdb_id][chain_id]:
-                    #print(str(sequence))
-                    #print(self.FASTA[pdb_id][chain_id])
-                    raise colortext.Exception("The SEQRES and FASTA sequences disagree for chain %s in %s. This can happen but special-case handling should be added to the file containing the %s class." % (chain_id, pdb_id, self.__class__.__name__))
+                    raise colortext.Exception("The SEQRES and FASTA sequences disagree for chain %s in %s. This can happen but special-case handling (use_seqres_sequence_for_fasta_sequence) should be added to the file containing the %s class." % (chain_id, pdb_id, self.__class__.__name__))
 
 
     def _validate_mapping_signature(self):
@@ -177,6 +181,8 @@ class ResidueRelatrix(object):
         # atom_to_seqres_sequence_maps
         for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
             # Check that all ATOM residues have a mapping
+            #print(sorted(sequence_map.keys()))
+            #print(sorted(self.atom_sequences[chain_id].ids()))
             assert(sorted(sequence_map.keys()) == sorted(self.atom_sequences[chain_id].ids()))
 
             # Check that all SEQRES residues in the mapping exist and that the mapping is injective
@@ -191,12 +197,13 @@ class ResidueRelatrix(object):
             # insertions or bad mismatches i.e. low BLOSUM62/PAM250 scores). I chose 80% arbitrarily but this can be overridden
             #  with the acceptable_sequence_percentage_match argument to the constructor.
             if self.sequence_types[chain_id] == 'Protein' or self.sequence_types[chain_id] == 'Protein skeleton':
-                mapped_SEQRES_residues = set(sequence_map.keys())
-                all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
-                if len(all_SEQRES_residues) >= 20:
-                    match_percentage = 100.0 * (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues))))
-                    if not (self.acceptable_sequence_percentage_match <= match_percentage <= 100.0):
-                        raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
+                if sequence_map:
+                    mapped_SEQRES_residues = set(sequence_map.keys())
+                    all_SEQRES_residues = set(self.seqres_sequences[chain_id].ids())
+                    if len(all_SEQRES_residues) >= 20:
+                        match_percentage = 100.0 * (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues))))
+                        if not (self.acceptable_sequence_percentage_match <= match_percentage <= 100.0):
+                            raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
@@ -236,7 +243,7 @@ class ResidueRelatrix(object):
         for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
             atom_sequence = self.atom_sequences[chain_id]
             seqres_sequence = self.seqres_sequences[chain_id]
-            for atom_id, seqres_id, _ in sequence_map:
+            for atom_id, seqres_id, _ in sorted(sequence_map):
                 assert(atom_sequence[atom_id].ResidueAA == seqres_sequence[seqres_id].ResidueAA)
 
         for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
@@ -286,7 +293,14 @@ class ResidueRelatrix(object):
                 self.rosetta_to_atom_sequence_maps[c] = SequenceMap()
         else:
             self.rosetta_to_atom_sequence_maps = self.pdb.rosetta_to_atom_sequence_maps
+
+        # If we removed atoms from the PDB file, we need to remove them from the maps so that our validations hold later on
         self.atom_to_seqres_sequence_maps = self.pdbml.atom_to_seqres_sequence_maps
+        if self.pdb_id in ROSETTA_HACKS_residues_to_remove:
+            for residue_to_remove in ROSETTA_HACKS_residues_to_remove[self.pdb_id]:
+                chain_id = residue_to_remove[0]
+                self.atom_to_seqres_sequence_maps[chain_id].remove(residue_to_remove)
+
         self.seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
 
     def _create_sequences(self):
@@ -303,6 +317,7 @@ class ResidueRelatrix(object):
         self.fasta_sequences = self.FASTA.get_sequences(self.pdb_id)
         self.seqres_sequences = self.pdb.seqres_sequences
         self.atom_sequences = self.pdb.atom_sequences
+
         if self.pdb_to_rosetta_residue_map_error:
             self.rosetta_sequences = {}
             for c in self.atom_sequences.keys():
@@ -396,7 +411,7 @@ class ResidueRelatrix(object):
 
                 if not self.PDB_UniParc_SA:
                     # Initialize the PDBUniParcSequenceAligner the first time through
-                    self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id)
+                    self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
                 else:
                     # We have already retrieved the UniParc entries. We just need to try the mapping again. This saves
                     # lots of time for entries with large numbers of UniProt entries e.g. 1HIO even if disk caching is used.
@@ -440,6 +455,17 @@ class ResidueRelatrix(object):
                         raise MultipleAlignmentException("Too many matches found at cut-off %d." % cut_off)
 
             if not matched_all_chains:
+                protein_chains = [c for c in self.sequence_types if self.sequence_types[c].startswith('Protein')]
+
+                if not self.silent:
+                    colortext.warning('\nNote: Not all chains were matched:')
+                    for c in protein_chains:
+                        if protein_chain_matches.get(c):
+                            colortext.message('  %s matched %s' % (c, protein_chain_matches[c]))
+                        else:
+                            colortext.warning('  %s was not matched' % c)
+                    print('')
+
                 num_matches_per_chain = set(map(len, self.PDB_UniParc_SA.clustal_matches.values()))
                 if num_matches_per_chain == set([0, 1]):
                     # We got matches but are missing chains
