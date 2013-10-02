@@ -201,8 +201,6 @@ class PDBML_slow(object):
         return r, SEQRES_index, residue_1_letter, residue_3_letter
 
 
-
-
 class AtomSite(object):
     # Same as AtomSite but no x, y, z data
     fields = [
@@ -210,6 +208,7 @@ class AtomSite(object):
         'IsHETATM',                 #   PDBx:group_PDB          True iff record type is HETATM              Boolean
         'IsATOM',                   #   PDBx:group_PDB          True iff record type is ATOM                Boolean
         'PDBChainID',               #   PDBx:auth_asym_id       PDB chain ID                                Character (alphanumeric)
+        'PDBChainIDIsNull',         #   PDBx:auth_asym_id       PDB chain ID                                Boolean
         'ATOMResidueID',            #   PDBx:auth_seq_id        Residue ID (not including insertion code)   Int
         'ATOMResidueiCode',         #   PDBx:pdbx_PDB_ins_code  Residue insertion code                      Character (alpha)
         'ATOMResidueiCodeIsNull',   #   PDBx:pdbx_PDB_ins_code  Need to determine if icode is nil           Boolean
@@ -251,7 +250,7 @@ class AtomSite(object):
         assert(self.ATOMResidueAA == self.ATOMSeqresResidueAA)
 
         assert(len(self.PDBChainID) == 1)
-        assert(self.PDBChainID.isalnum())
+        assert(self.PDBChainID.isalnum() or self.PDBChainID == ' ') # e.g. 2MBP
 
     def convert_to_residue(self, modified_residues):
         residue_3_letter = self.ATOMResidueAA
@@ -452,26 +451,10 @@ class PDBML(xml.sax.handler.ContentHandler):
             assert(not(self.current_atom_site.ATOMResidueiCodeIsNull))
             if attributes.get('xsi:nil') == 'true':
                 self.current_atom_site.ATOMResidueiCodeIsNull = True
-
-    def end_atom_tag(self):
-        '''Add the residue to the residue map.'''
-        self._BLOCK = None
-        current_atom_site = self.current_atom_site
-        current_atom_site.validate()
-        if current_atom_site.IsATOM:
-            # Only parse ATOM records
-            r, seqres, ResidueAA, Residue3AA = current_atom_site.convert_to_residue(self.modified_residues)
-            if r:
-                if not(self.pdb_id in cases_with_ACE_residues_we_can_ignore and Residue3AA == 'ACE'):
-                    # skip certain ACE residues
-                    full_residue_id = str(r)
-                    if self._residues_read.get(full_residue_id):
-                        assert(self._residues_read[full_residue_id] == (r.ResidueAA, seqres))
-                    else:
-                        self._residues_read[full_residue_id] = (r.ResidueAA, seqres)
-                        self._residue_map[r.Chain] = self._residue_map.get(r.Chain, {})
-                        assert(type(seqres) == int_type)
-                        self._residue_map[r.Chain][str(r)] = seqres
+        if name == "PDBx:auth_asym_id":
+            assert(not(self.current_atom_site.PDBChainIDIsNull))
+            if attributes.get('xsi:nil') == 'true':
+                self.current_atom_site.PDBChainIDIsNull = True
 
     def parse_atom_tag_data(self, name, tag_content):
         '''Parse the atom tag data.'''
@@ -482,9 +465,7 @@ class PDBML(xml.sax.handler.ContentHandler):
 
         elif name == 'PDBx:atom_site':
             # We have to handle the atom_site close tag here since we jump based on self._BLOCK first in end_element
-            # To keep the code a little neater, I separate the logic out into end_atom_tag at the cost of one function call per atom
 
-            #self.end_atom_tag()
             #'''Add the residue to the residue map.'''
             self._BLOCK = None
             current_atom_site = self.current_atom_site
@@ -518,6 +499,13 @@ class PDBML(xml.sax.handler.ContentHandler):
         elif name == 'PDBx:auth_asym_id':
             assert(not(current_atom_site.PDBChainID))
             current_atom_site.PDBChainID = tag_content
+            if not tag_content:
+                assert(current_atom_site.PDBChainIDIsNull)
+                if self.pdb_id.upper() == '2MBP':
+                    current_atom_site.PDBChainID = 'A' # e.g. 2MBP
+                else:
+                    current_atom_site.PDBChainID = ' ' # e.g. 2MBP
+
         elif name == 'PDBx:auth_seq_id':
             assert(not(current_atom_site.ATOMResidueID))
             current_atom_site.ATOMResidueID = int(tag_content)
@@ -556,7 +544,7 @@ class PDBML(xml.sax.handler.ContentHandler):
         assert(self.counters.get('PDBx:datablock') == 1)
         assert(self.counters.get('PDBx:atom_siteCategory') == 1)
         assert(self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0) <= 1)
-        assert(self.counters.get('PDBx:pdbx_database_PDB_obs_spr', 0) == self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0))
+        assert(self.counters.get('PDBx:pdbx_database_PDB_obs_spr', 0) >= self.counters.get('PDBx:pdbx_database_PDB_obs_sprCategory', 0))
 
     def characters(self, chrs):
         # Note: I use a list to store self.tag_data, append to the list, then join the contents into a string. In general,
