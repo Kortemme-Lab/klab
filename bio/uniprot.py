@@ -44,7 +44,6 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
         cached_mapping_file = os.path.join(cache_dir, '%s.%s' % (from_scheme, to_scheme))
         if os.path.exists(cached_mapping_file):
             full_mapping = simplejson.loads(read_file(cached_mapping_file))
-
     list_of_from_ids = set(list_of_from_ids)
 
     requested_mapping = {}
@@ -66,6 +65,7 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
             'format'    : 'tab',
             'query'     : ' '.join(sorted(list(list_of_from_ids))),
         }
+
         data = urllib.urlencode(params)
         request = urllib2.Request(url, data)
         contact = "" # Please set your email address here to help us debug in case of problems.
@@ -73,6 +73,7 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
         response = urllib2.urlopen(request)
         page = response.read(200000)
         lines = page.split("\n")
+
         assert(lines[-1] == '')
         assert(lines[0].split("\t") == ['From', 'To'])
         for line in lines[1:-1]:
@@ -86,17 +87,17 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
 
     # Sort the IDs
     for k, v in requested_mapping.iteritems():
-        assert(len(v) == len(set(v)))
-        requested_mapping[k] = sorted(v)
+        #assert(len(v) == len(set(v)))
+        requested_mapping[k] = sorted(set(v))
     for k, v in full_mapping.iteritems():
-        assert(len(v) == len(set(v)))
-        full_mapping[k] = sorted(v)
+        #assert(len(v) == len(set(v)))
+        full_mapping[k] = sorted(set(v))
 
     if remaining_ids and cached_mapping_file:
         write_file(cached_mapping_file, simplejson.dumps(full_mapping))
     return requested_mapping
 
-def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None):
+def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None, manual_additions = {}):
     ''' Returns a mapping {PDB ID -> List(UniParcEntry)}
         The UniParcEntry objects have a to_dict() method which may be useful.
     '''
@@ -105,6 +106,15 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None):
     if not silent:
         colortext.write("Retrieving PDB to UniProtKB AC mapping: ", 'cyan')
     pdb_ac_mapping = uniprot_map('PDB_ID', 'ACC', pdb_ids, cache_dir = cache_dir, silent = silent)
+
+    for k, v in manual_additions.iteritems():
+        if k in pdb_ids:
+            if pdb_ac_mapping.get(k):
+                pdb_ac_mapping[k].extend(v)
+                pdb_ac_mapping[k] = list(set(pdb_ac_mapping[k]))
+            else:
+                pdb_ac_mapping[k] = v
+
     if not silent:
         colortext.write("done\n", 'green')
 
@@ -261,6 +271,7 @@ class ProteinSubsectionHolder(object):
     def __repr__(self):
         return "\n".join([str(s) for s in self.sections])
 
+class EmptyUniProtACXMLException(Exception): pass
 
 class UniProtACEntry(object):
 
@@ -304,6 +315,8 @@ class UniProtACEntry(object):
                     colortext.write("Retrieving %s\n" % UniProtAC, "cyan")
                 url = 'http://www.uniprot.org/uniprot/%s.xml' % UniProtAC
                 protein_xml = http_get(url)
+                if not(protein_xml.strip()):
+                    raise EmptyUniProtACXMLException('The file %s is empty.' % UniProtAC)
                 if cached_filepath:
                     write_file(cached_filepath, protein_xml)
             self.XML = protein_xml
@@ -315,7 +328,13 @@ class UniProtACEntry(object):
         self.alternative_names = []
 
         # Get DOM
-        self._dom = parseString(protein_xml)
+        try:
+            self._dom = parseString(protein_xml)
+        except:
+            if cached_filepath:
+                raise Exception("The UniProtAC XML for '%s' was invalid. The cached file is located at %s. Check this file - if it is not valid XML then delete the file and rerun the script." % (UniProtAC, cached_filepath))
+            else:
+                raise Exception("The UniProtAC XML for '%s' was invalid." % UniProtAC)
         main_tags = self._dom.getElementsByTagName("uniprot")
         assert(len(main_tags) == 1)
         entry_tags = main_tags[0].getElementsByTagName("entry")
@@ -593,7 +612,7 @@ class UniProtACEntry(object):
 
 class UniParcEntry(object):
 
-    def __init__(self, UniParcID, UniProtACs = None, UniProtIDs = None, cache_dir = None, silent = True):
+    def __init__(self, UniParcID, UniProtACs = None, UniProtIDs = None, cache_dir = None, silent = False):
         if cache_dir and not(os.path.exists(os.path.abspath(cache_dir))):
             raise Exception("The cache directory %s does not exist." % os.path.abspath(cache_dir))
         self.UniParcID = UniParcID
@@ -602,7 +621,7 @@ class UniParcEntry(object):
         self.silent = silent
 
         # Get AC mapping
-        if not UniProtACs:
+        if not UniProtACs or UniParcID=='UPI0000047CA3': # todo: is this UPI0000047CA3 special handling necessary?
             mapping = uniprot_map('UPARC', 'ACC', [UniParcID], cache_dir = cache_dir, silent = silent)[UniParcID]
             self.UniProtACs = mapping
         else:
@@ -646,9 +665,13 @@ class UniParcEntry(object):
 
         self.AC_entries = {}
         subsections = ProteinSubsectionHolder(len(sequence))
+
         for UniProtAC in self.UniProtACs:
             #colortext.write("%s\n" % UniProtAC, 'cyan')
-            AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir, silent = silent)
+            try:
+                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir, silent = silent)
+            except EmptyUniProtACXMLException:
+                continue
             self.AC_entries[UniProtAC] = AC_entry
 
             # Mass sanity check
@@ -801,7 +824,11 @@ class UniParcEntry(object):
                     continue
                 if not self.silent:
                     colortext.warning("Retrieving %s" % UniProtAC)
-                AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir, silent = self.silent)
+                try:
+                    AC_entry = UniProtACEntry(UniProtAC, cache_dir = self.cache_dir, silent = self.silent)
+                except EmptyUniProtACXMLException:
+                    continue
+
             for o in AC_entry.organisms:
                 name_count[o['scientific']] = name_count.get(o['scientific'], 0)
                 name_count[o['scientific']] += 1
