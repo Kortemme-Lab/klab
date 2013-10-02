@@ -47,7 +47,8 @@ residue_type_3to1_map = {
     "THR": "T",
     "VAL": "V",
     "TRP": "W",
-    "TYR": "Y"
+    "TYR": "Y",
+    "UNK": 'X',
 }
 
 residue_types_3 = set(residue_type_3to1_map.keys())
@@ -99,7 +100,7 @@ non_canonical_amino_acids = {
     'PTR' : 'Y', # phospotyrosine
     'BHD' : 'D', # (3S)-3-HYDROXY-L-ASPARTIC ACID
     #
-    'ASX' : 'B', # ??? N in UniProt entry P0A786 for 2ATC, chain A
+    'ASX' : 'N', # ??? N in UniProt entry P0A786 for 2ATC, chain A
     'GLX' : 'Q', # ??? Q in UniProt entry P01075 for 4CPA, chain I
 }
 
@@ -266,6 +267,12 @@ class SequenceMap():
         self[key] = value
         self.substitution_scores[key] = substitution_score
 
+    def remove(self, key):
+        if self.map.get(key):
+            del self.map[key]
+        if self.substitution_scores.get(key):
+            del self.substitution_scores[key]
+
     def keys(self):
         return self.map.keys()
 
@@ -330,7 +337,7 @@ class Residue(object):
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
         if residue_type:
             if residue_type == 'Protein' or residue_type == 'Protein skeleton':
-                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X'))
+                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X') or (ResidueAA == 'B'))
             else:
                 assert(ResidueAA in nucleotide_types_1)
         self.Chain = Chain
