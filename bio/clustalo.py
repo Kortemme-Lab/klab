@@ -66,6 +66,8 @@ else:
 alignment_results_regex = re.compile('.*?Aligning[.]{3}(.*?)Guide tree file created', re.DOTALL)
 alignment_line_regex = re.compile('Sequences [(](\d+):(\d+)[)] Aligned. Score:\s*(\d+)')
 
+class NoPDBUniParcMappingExists(Exception): pass
+class MalformedSequenceException(Exception): pass
 
 class SequenceAligner(object):
     ''' This class is used to align sequences. To use it, first add sequences using the add_sequence function. Next, call the align function to perform
@@ -119,6 +121,8 @@ class SequenceAligner(object):
     def add_sequence(self, sequence_id, sequence):
         if sequence_id in self.sequence_ids.values():
             raise Exception("Sequence IDs must be unique")
+        if list(set(sequence)) == ['X']:
+            raise MalformedSequenceException('The sequence contains only X characters. This will crash Clustal Omega.')
         self.records.append(">%s\n%s" % (sequence_id, "\n".join([sequence[i:i+80] for i in range(0, len(sequence), 80)])))
         self.sequence_ids[len(self.sequence_ids) + 1] = sequence_id
 
@@ -382,13 +386,11 @@ class MultipleAlignmentException(Exception):
     def __init__(self, chain_id, max_expected_matches_per_chain, num_actual_matches, match_list):
         super(MultipleAlignmentException, self).__init__("Each chain was expected to match at most %d other sequences but chain %s matched %d chains: %s." % (max_expected_matches_per_chain, chain_id, num_actual_matches, ", ".join(match_list)))
 
-class NoPDBUniParcMappingExists(Exception): pass
-
 class PDBUniParcSequenceAligner(object):
 
     ### Constructor methods ###
 
-    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0, sequence_types = {}, replacement_pdb_id = None):
+    def __init__(self, pdb_id, cache_dir = None, cut_off = 98.0, sequence_types = {}, replacement_pdb_id = None, added_uniprot_ACs = []):
         ''' The sequences are matched up to a percentage identity specified by cut_off (0.0 - 100.0).
             sequence_types e.g. {'A' : 'Protein', 'B' : 'RNA',...} should be passed in if the PDB file contains DNA or RNA chains. Otherwise, the aligner will attempt to match their sequences.
 
@@ -401,6 +403,7 @@ class PDBUniParcSequenceAligner(object):
         self.pdb_id = pdb_id
         self.replacement_pdb_id = replacement_pdb_id
         self.cut_off = cut_off
+        self.added_uniprot_ACs = added_uniprot_ACs
         self.sequence_types = sequence_types
         assert(0.0 <= cut_off <= 100.0)
 
@@ -535,7 +538,8 @@ class PDBUniParcSequenceAligner(object):
         uniparc_sequences = {}
         uniparc_objects = {}
         mapping_pdb_id = pdb_id
-        pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir) # we could pass both pdb_id and replacement_pdb_id here but I prefer the current (longer) logic at present
+        pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir, manual_additions = {self.pdb_id : self.added_uniprot_ACs}) # we could pass both pdb_id and replacement_pdb_id here but I prefer the current (longer) logic at present
+
         if not pdb_uniparc_mapping:
             if replacement_pdb_id:
                 mapping_pdb_id = replacement_pdb_id
@@ -599,6 +603,9 @@ class PDBUniParcSequenceAligner(object):
         return mapping
 
     def _align_with_clustal(self, chains_to_skip = set()):
+        if not(self.uniparc_sequences):
+            raise NoPDBUniParcMappingExists("No matches were found to any UniParc sequences.")
+
         for c in self.representative_chains:
             # Skip specified chains
             if c not in chains_to_skip:
@@ -609,7 +616,11 @@ class PDBUniParcSequenceAligner(object):
                     pdb_chain_id = '%s:%s' % (self.pdb_id, c)
 
                     sa = SequenceAligner()
-                    sa.add_sequence(pdb_chain_id, self.fasta[c])
+                    try:
+                        sa.add_sequence(pdb_chain_id, self.fasta[c])
+                    except MalformedSequenceException:
+                        self.clustal_matches[c] = {}
+                        continue
 
                     for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
                         sa.add_sequence(uniparc_id, str(uniparc_sequence))
