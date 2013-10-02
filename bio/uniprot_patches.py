@@ -331,6 +331,7 @@ if use_patches:
         'P01636' : {'1AR1' : [set(['C'])]},
         'P61823' : {'1UN5' : [set(['A'])]},
         'P00559' : {'2PGK' : [set(['A'])]},
+        'P29395' : {'1IP8' : [set(['G'])]},
     }
 
     # These entries have missing position mapping in UniProt but are easily fixed
