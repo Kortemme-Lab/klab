@@ -3,6 +3,8 @@
 """
 stats.py
 For filesystem statistics functions
+
+Created by Shane O'Connor 2013
 """
 
 import os
@@ -63,15 +65,15 @@ def df(unit = 'GB'):
     return details
 
 class FileCounter(object):
+    '''Counts the number of files in all directories below the specified root directory. We keep a count per directory as well as a count under a directory i.e. the sum of the number of files in the directory plus the number of all files under that directory.'''
 
-    def __init__(self, top_dir, cut_off = None):
+    def __init__(self, top_dir):
         if top_dir.endswith('/'):
             top_dir = top_dir[:-1]
         self.root = top_dir
         self.counts = {}
         self.cumulative_counts = {}
         self.depth_list = []
-        self.cut_off = cut_off
 
         self.count_files(top_dir)
         self.depth_list = sorted(self.depth_list, reverse = True)
@@ -86,7 +88,6 @@ class FileCounter(object):
             assert(self.counts.get(dirpath) == None)
             self.counts[dirpath] = len(filenames)
 
-
     def create_cumulative_counts(self):
         for k, v in self.counts.iteritems():
             self.cumulative_counts[k] = v
@@ -97,7 +98,7 @@ class FileCounter(object):
             if child_dir != self.root:
                 self.cumulative_counts[prnt_dir] += self.cumulative_counts[child_dir]
 
-    def send_email(self, email_address):
+    def send_email(self, email_address, cut_off = None):
         s = ['Cumulative file counts for directories under %s.\n' % self.root]
         for k, v in sorted(self.cumulative_counts.iteritems(), key = lambda x:-x[1]):
             if v:
@@ -115,5 +116,5 @@ if __name__ == '__main__':
             cut_off = int(sys.argv[2])
 
         root_dir = sys.argv[1]
-        fc = FileCounter(os.path.abspath(os.path.normpath(root_dir)), cut_off)
-        fc.send_email('shane.oconnor@ucsf.edu')
+        fc = FileCounter(os.path.abspath(os.path.normpath(root_dir)))
+        fc.send_email('shane.oconnor@ucsf.edu', cut_off = cut_off)
