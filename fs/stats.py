@@ -5,7 +5,14 @@ stats.py
 For filesystem statistics functions
 """
 
+import os
 import subprocess
+
+if __name__ == '__main__':
+    import sys
+    sys.path.insert(0, '../..')
+
+from tools.comms.mail import MailServer
 
 df_conversions = {
     'MB': float(2 ** 10),
@@ -54,3 +61,59 @@ def df(unit = 'GB'):
         details[tokens[0]] = d
 
     return details
+
+class FileCounter(object):
+
+    def __init__(self, top_dir, cut_off = None):
+        if top_dir.endswith('/'):
+            top_dir = top_dir[:-1]
+        self.root = top_dir
+        self.counts = {}
+        self.cumulative_counts = {}
+        self.depth_list = []
+        self.cut_off = cut_off
+
+        self.count_files(top_dir)
+        self.depth_list = sorted(self.depth_list, reverse = True)
+        self.create_cumulative_counts()
+
+    def count_files(self, top_dir):
+        for dirpath, dirnames, filenames in os.walk(top_dir, topdown=True, onerror=None, followlinks=False):
+            if dirpath.endswith('/'):
+                dirpath = dirpath[:-1]
+            depth = len([t for t in dirpath.split('/') if t])
+            self.depth_list.append((depth, dirpath))
+            assert(self.counts.get(dirpath) == None)
+            self.counts[dirpath] = len(filenames)
+
+
+    def create_cumulative_counts(self):
+        for k, v in self.counts.iteritems():
+            self.cumulative_counts[k] = v
+
+        for tpl in self.depth_list:
+            child_dir = tpl[1]
+            prnt_dir = os.path.split(child_dir)[0]
+            if child_dir != self.root:
+                self.cumulative_counts[prnt_dir] += self.cumulative_counts[child_dir]
+
+    def send_email(self, email_address):
+        s = ['Cumulative file counts for directories under %s.\n' % self.root]
+        for k, v in sorted(self.cumulative_counts.iteritems(), key = lambda x:-x[1]):
+            if v:
+                if not(cut_off) or v >= cut_off:
+                    s.append('%s: %d' % (k, v))
+        msg = '\n'.join(s)
+        ms = MailServer()
+        ms.sendgmail('Directory file count statistics', [email_address], msg)
+
+if __name__ == '__main__':
+    if 2 <= len(sys.argv) <= 3 and os.path.exists(sys.argv[1]):
+        cut_off = None
+        if len(sys.argv) == 3:
+            assert(sys.argv[2].isdigit())
+            cut_off = int(sys.argv[2])
+
+        root_dir = sys.argv[1]
+        fc = FileCounter(os.path.abspath(os.path.normpath(root_dir)), cut_off)
+        fc.send_email('shane.oconnor@ucsf.edu')
