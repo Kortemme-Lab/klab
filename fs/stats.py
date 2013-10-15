@@ -15,6 +15,7 @@ if __name__ == '__main__':
     sys.path.insert(0, '../..')
 
 from tools.comms.mail import MailServer
+from tools.fs.fsio import write_file
 
 df_conversions = {
     'MB': float(2 ** 10),
@@ -25,15 +26,15 @@ df_conversions = {
 def df(unit = 'GB'):
     '''A wrapper for the df shell command.'''
     details = {}
-    headers = ['Filesystem', 'Type', 'Size', 'Used', 'Available', 'Use%', 'MountedOn']
+    headers = ['Filesystem', 'Type', 'Size', 'Used', 'Available', 'Capacity', 'MountedOn']
     n = len(headers)
 
     unit = df_conversions[unit]
-    p = subprocess.Popen(args = ['df', '-T'], stdout = subprocess.PIPE)
+    p = subprocess.Popen(args = ['df', '-TP'], stdout = subprocess.PIPE) # -P prevents line wrapping on long filesystem names
     stdout, stderr = p.communicate()
 
     lines = stdout.split("\n")
-    lines[0] = lines[0].replace("Mounted on", "MountedOn").replace("1K-blocks", "Size")
+    lines[0] = lines[0].replace("Mounted on", "MountedOn").replace("1K-blocks", "Size").replace("1024-blocks", "Size")
     assert(lines[0].split() == headers)
 
     lines = [l.strip() for l in lines if l.strip()]
@@ -41,12 +42,14 @@ def df(unit = 'GB'):
         tokens = line.split()
         if tokens[0] == 'none': # skip uninteresting entries
             continue
+
         assert(len(tokens) == n)
         d = {}
         for x in range(1, len(headers)):
             d[headers[x]] = tokens[x]
         d['Size'] = float(d['Size']) / unit
-        assert(d['Use%'].endswith("%"))
+        assert(d['Capacity'].endswith("%"))
+        d['Use%'] = d['Capacity']
         d['Used'] = float(d['Used']) / unit
         d['Available'] = float(d['Available']) / unit
         d['Using'] = 100*(d['Used']/d['Size']) # same as Use% but with more precision
@@ -60,6 +63,7 @@ def df(unit = 'GB'):
                 if tokens[0].find(e3fs) != -1:
                     d['Using'] += 5 # ext3 reserves 5%
                     break
+
         details[tokens[0]] = d
 
     return details
@@ -105,8 +109,9 @@ class FileCounter(object):
                 if not(cut_off) or v >= cut_off:
                     s.append('%s: %d' % (k, v))
         msg = '\n'.join(s)
+        write_file('/tmp/filecount_output.txt', msg)
         ms = MailServer()
-        ms.sendgmail('Directory file count statistics', [email_address], msg)
+        ms.sendgmail('Directory file count statistics', [email_address], msg, pw_filepath = '/admin/pw/google')
 
 if __name__ == '__main__':
     if 2 <= len(sys.argv) <= 3 and os.path.exists(sys.argv[1]):
