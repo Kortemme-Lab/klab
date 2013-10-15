@@ -4,6 +4,8 @@
 fsio.py
 For common file I/O functions
 Note: The module name 'io' could not be used as this conflicts with the standard io module.
+
+Created by Shane O'Connor 2013
 """
 import os
 import tempfile
