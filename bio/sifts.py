@@ -19,6 +19,14 @@ from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
 from basics import SequenceMap, PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
 from uniprot import uniprot_map
 
+# Known bad cases (only up-to-date at the time of commit)
+
+BadSIFTSMappingCases = set([
+    '1N02', # PDB residues 'A   4 ' -> 'A  49 ' should map to indices 54->99 of the UniParc sequence
+])
+NoSIFTSPDBUniParcMappingCases = set([
+    '2IMM',
+])
 
 # Methods
 
@@ -31,9 +39,10 @@ def retrieve_file_from_EBI(resource, silent = True):
 def retrieve_xml(pdb_id, silent = True):
     return retrieve_file_from_EBI("/pub/databases/msd/sifts/xml/%s.xml.gz" % pdb_id.lower(), silent)
 
-
 # Classes
-
+class MissingSIFTSRecord(Exception): pass
+class BadSIFTSMapping(Exception): pass
+class NoSIFTSPDBUniParcMapping(Exception): pass
 
 class SIFTSResidue(object):
     # Same as AtomSite but no x, y, z data
@@ -152,6 +161,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         pdb_contents = None
         xml_contents = None
         pdb_id = pdb_id.upper()
+
         l_pdb_id = pdb_id.lower()
 
         if len(pdb_id) != 4 or not pdb_id.isalnum():
@@ -180,7 +190,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 if cache_dir:
                     write_file(os.path.join(cache_dir, "%s.sifts.xml.gz" % l_pdb_id), xml_contents)
             except FTPException550:
-                raise Exception('The file "%s.sifts.xml.gz" could not be found on the EBI FTP server.' % l_pdb_id)
+                raise MissingSIFTSRecord('The file "%s.sifts.xml.gz" could not be found on the EBI FTP server.' % l_pdb_id)
 
         xml_contents = safe_gz_unzip(xml_contents)
 
@@ -385,11 +395,17 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         # Check the match percentage
         if residue_count == 0:
-            raise Exception('No residue information matching PDB residues to UniProt residues was found.')
+            if self.pdb_id and self.pdb_id in NoSIFTSPDBUniParcMappingCases:
+                raise NoSIFTSPDBUniParcMapping('The PDB file %s has a known bad SIFTS mapping at the time of writing.' % self.pdb_id)
+            else:
+                raise Exception('No residue information matching PDB residues to UniProt residues was found.')
         else:
             percentage_matched = float(residues_matched)*100.0/float(residue_count)
             if percentage_matched < self.acceptable_sequence_percentage_match:
-                raise Exception('Expected %.2f%% sequence match on matched residues but the SIFTS results only gave us %.2f%%.' % (self.acceptable_sequence_percentage_match, percentage_matched))
+                if self.pdb_id and self.pdb_id in BadSIFTSMappingCases:
+                    raise BadSIFTSMapping('The PDB file %s has a known bad SIFTS mapping at the time of writing.' % self.pdb_id)
+                else:
+                    raise Exception('Expected %.2f%% sequence match on matched residues but the SIFTS results only gave us %.2f%%.' % (self.acceptable_sequence_percentage_match, percentage_matched))
 
         self._validate()
 
