@@ -81,7 +81,35 @@ class MailServer(object):
         else:
             smtpserver.login(gmail_account, read_file('pw'))
         for recipient in recipients:
+
+            if htmltext:
+                msg = MIMEText(htmltext, 'html')
+                msg['From'] = gmail_account
+                msg['To'] = recipient
+                msg['Subject'] = subject
+                smtpserver.sendmail(gmail_account, recipient, msg.as_string())
+            else:
+                header = 'To:' + recipient + '\n' + 'From: ' + gmail_account + '\n' + 'Subject:' + subject + '\n'
+                msg = header + '\n ' + plaintext + '\n\n'
+                smtpserver.sendmail(gmail_account, recipient, msg)
+        smtpserver.close()
+
+    def sendgmail2(self, subject, recipients, plaintext, htmltext=None, cc=None, debug=False, useMIMEMultipart=True, gmail_account = 'kortemmelab@gmail.com', pw_filepath = None):
+        '''For this function to work, the password for the gmail user must be colocated with this file or passed in.'''
+        smtpserver = smtplib.SMTP("smtp.gmail.com", 587)
+        smtpserver.ehlo()
+        smtpserver.starttls()
+        smtpserver.ehlo
+        gmail_account = 'kortemmelab@gmail.com'
+        if pw_filepath:
+            smtpserver.login(gmail_account, read_file(pw_filepath))
+        else:
+            smtpserver.login(gmail_account, read_file('pw'))
+        for recipient in recipients:
             header = 'To:' + recipient + '\n' + 'From: ' + gmail_account + '\n' + 'Subject:' + subject + '\n'
-            msg = header + '\n ' + plaintext + '\n\n'
+            if htmltext:
+                msg = header + '\n ' + htmltext + '\n\n'
+            else:
+                msg = header + '\n ' + plaintext + '\n\n'
             smtpserver.sendmail(gmail_account, recipient, msg)
         smtpserver.close()
