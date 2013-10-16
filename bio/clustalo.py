@@ -540,7 +540,7 @@ class PDBUniParcSequenceAligner(object):
         mapping_pdb_id = pdb_id
         pdb_uniparc_mapping = pdb_to_uniparc([pdb_id], cache_dir = cache_dir, manual_additions = {self.pdb_id : self.added_uniprot_ACs}) # we could pass both pdb_id and replacement_pdb_id here but I prefer the current (longer) logic at present
 
-        if not pdb_uniparc_mapping:
+        if not pdb_uniparc_mapping.get(pdb_id):
             if replacement_pdb_id:
                 mapping_pdb_id = replacement_pdb_id
                 pdb_uniparc_mapping = pdb_to_uniparc([replacement_pdb_id], cache_dir = cache_dir)
