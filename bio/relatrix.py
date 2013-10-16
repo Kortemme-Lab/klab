@@ -16,6 +16,7 @@ from pdbml import PDBML
 from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
 from tools import colortext
 from basics import Sequence, SequenceMap
+from sifts import SIFTS, MissingSIFTSRecord, BadSIFTSMapping, NoSIFTSPDBUniParcMapping
 
 use_seqres_sequence_for_fasta_sequence = set(['1A2C', '4CPA', '2ATC', '1OLR'])
 use_fasta_sequence_for_seqres_sequence = set(['1DEQ'])
@@ -26,12 +27,15 @@ class ResidueRelatrix(object):
 
     schemes = ['rosetta', 'atom', 'seqres', 'fasta', 'uniparc']
 
-    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, starting_clustal_cut_off = 100): # keep_HETATMS = False
+    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, acceptable_sifts_sequence_percentage_match = None, starting_clustal_cut_off = 100): # keep_HETATMS = False
         ''' acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually
             90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues. I set
             this to 80.00% to cover most cases.'''
 
+        if acceptable_sifts_sequence_percentage_match == None:
+            acceptable_sifts_sequence_percentage_match = acceptable_sequence_percentage_match
         assert(0.0 <= acceptable_sequence_percentage_match <= 100.0)
+        assert(0.0 <= acceptable_sifts_sequence_percentage_match <= 100.0)
 
         if not(type(pdb_id) == types.StringType and len(pdb_id) == 4 and pdb_id.isalnum()):
             raise Exception("Expected an 4-character long alphanumeric PDB identifer. Received '%s'." % str(pdb_id))
@@ -42,6 +46,7 @@ class ResidueRelatrix(object):
 
         self.alignment_cutoff = None
         self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
+        self.acceptable_sifts_sequence_percentage_match = acceptable_sifts_sequence_percentage_match
 
         self.replacement_pdb_id = None
 
@@ -49,6 +54,7 @@ class ResidueRelatrix(object):
         self.pdb = None
         self.pdbml = None
         self.PDB_UniParc_SA = None
+        self.sifts = None
 
         self.uniparc_sequences = None
         self.fasta_sequences = None
@@ -64,6 +70,10 @@ class ResidueRelatrix(object):
         self.atom_to_rosetta_sequence_maps = None
         self.seqres_to_atom_sequence_maps = None
         self.uniparc_to_seqres_sequence_maps = None # this map uses PDB chain IDs as PDB chains may map to zero or one UniParc IDs whereas UniParc IDs may map to many PDB chains
+
+        self.sifts_atom_to_seqres_sequence_maps = None
+        self.sifts_seqres_to_uniparc_sequence_maps = None
+        self.sifts_atom_to_uniparc_sequence_maps = None
 
         self.pdb_chain_to_uniparc_chain_mapping = {}
 
@@ -303,6 +313,11 @@ class ResidueRelatrix(object):
 
         self.seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
 
+        if self.sifts:
+            self.sifts_atom_to_seqres_sequence_maps = self.sifts.atom_to_seqres_sequence_maps
+            self.sifts_seqres_to_uniparc_sequence_maps = self.sifts.seqres_to_uniparc_sequence_maps
+            self.sifts_atom_to_uniparc_sequence_maps = self.sifts.atom_to_uniparc_sequence_maps
+
     def _create_sequences(self):
         '''Get all of the Sequences - Rosetta, ATOM, SEQRES, FASTA, UniParc.'''
 
@@ -346,6 +361,7 @@ class ResidueRelatrix(object):
         # Update the chain types for the FASTA sequences
         for chain_id, sequence in self.seqres_sequences.iteritems():
             self.fasta_sequences[chain_id].set_type(sequence.sequence_type)
+
 
     ### Private object creation functions ###
 
@@ -395,6 +411,16 @@ class ResidueRelatrix(object):
             else:
                 self.replacement_pdb_id = self.pdbml.replacement_pdb_id
 
+        # Create the SIFTS object
+        try:
+            self.sifts = SIFTS.retrieve(pdb_id, cache_dir = cache_dir, acceptable_sequence_percentage_match = self.acceptable_sifts_sequence_percentage_match)
+        except MissingSIFTSRecord:
+            colortext.warning("No SIFTS entry was found for %s." % pdb_id)
+        except BadSIFTSMapping:
+            colortext.warning("The SIFTS mapping for %s was considered a bad mapping at the time of writing." % pdb_id)
+        except NoSIFTSPDBUniParcMapping:
+            colortext.warning("The PDB file %s has a known bad SIFTS mapping at the time of writing." % pdb_id)
+
         # Create the PDBUniParcSequenceAligner object. We try the best alignment at first (100%) and then fall back to more relaxed alignments down to min_clustal_cut_off percent.
         if not self.silent:
             colortext.message("Creating the PDB to UniParc SequenceAligner object.")
@@ -440,6 +466,7 @@ class ResidueRelatrix(object):
                         protein_chain_matches[_c] = self.PDB_UniParc_SA.clustal_matches[_c]
                         if protein_chain_matches[_c]:
                             matched_chains.add(_c)
+                print(protein_chain_matches)
 
                 num_matches_per_chain = set(map(len, protein_chain_matches.values()))
                 if len(num_matches_per_chain) == 1 and num_matches_per_chain.pop() == 1:
