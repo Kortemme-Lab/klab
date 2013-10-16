@@ -22,7 +22,7 @@ if __name__ == '__main__':
 from tools.comms.http import get as http_get
 from tools import colortext
 from tools.hash import CRC64
-from tools.fs.io import read_file, write_file
+from tools.fs.fsio import read_file, write_file
 from tools.bio.uniprot_patches import * # UniParcMergedSubmittedNamesRemap, UniParcMergedRecommendedNamesRemap, clashing_subsections_for_removal, subsections_for_addition, AC_entries_where_we_ignore_the_subsections, overlapping_subsections_for_removal, PDBs_marked_as_XRay_with_no_resolution
 
 class ProteinSubsectionOverlapException(colortext.Exception): pass
