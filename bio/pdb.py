@@ -11,7 +11,7 @@ import types
 from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
-from tools.fs.io import read_file, write_file
+from tools.fs.fsio import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
 from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map

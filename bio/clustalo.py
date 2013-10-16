@@ -13,7 +13,7 @@ import re
 import commands
 import platform
 
-from tools.fs.io import open_temp_file, read_file
+from tools.fs.fsio import open_temp_file, read_file
 from tools.process import Popen as _Popen
 from tools import colortext
 from uniprot import pdb_to_uniparc, uniprot_map, UniParcEntry
