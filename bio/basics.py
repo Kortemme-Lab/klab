@@ -297,6 +297,23 @@ class SequenceMap():
                 s.append('%s->%s' % (str(key), str(val)))
         return ", ".join(s)
 
+class PDBUniParcSequenceMap(SequenceMap):
+    ''' A class to map the IDs of a PDB chain's Sequence (ATOM/SEQRES/FASTA) to a UniParc residue pairs (UniParcID, sequence index).
+        Mapping to tuples is necessary for some cases e.g. for chimeras like 1M7T.
+    '''
+
+    @staticmethod
+    def from_dict(d):
+        for k, v in d.iteritems():
+            assert(len(v) == 2)
+            assert(type(k) == types.IntType or type(k) == types.StringType or type(k) == types.UnicodeType)
+            assert((type(v[0]) == types.StringType or type(v[0]) == types.UnicodeType) and (type(v[1]) == types.IntType))
+
+        s = PDBUniParcSequenceMap()
+        s.map = d
+        s.substitution_scores = dict.fromkeys(d.keys(), None)
+        return s
+
 
 def sequence_formatter(sequences):
     assert(sequences and (len(set(map(len, sequences))) == 1))
