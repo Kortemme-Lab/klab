@@ -11,7 +11,7 @@ import getpass
 from datetime import datetime
 from string import join
 
-from tools.fs.io import read_file
+from tools.fs.fsio import read_file
 
 DictCursor = MySQLdb.cursors.DictCursor
 StdCursor = MySQLdb.cursors.Cursor

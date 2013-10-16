@@ -11,7 +11,7 @@ import os
 import traceback
 from ftplib import FTP, FTP_TLS
 
-from tools.fs.io import read_file, open_temp_file
+from tools.fs.fsio import read_file, open_temp_file
 
 class FTPException550(Exception): pass
 
