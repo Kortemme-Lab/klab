@@ -11,12 +11,13 @@ import os
 import xml
 from xml.sax import parse as parse_xml
 
-from tools.fs.io import read_file, write_file, safe_gz_unzip
+from tools.fs.fsio import read_file, write_file, safe_gz_unzip
 from tools.comms.ftp import get_insecure_resource, FTPException550
 from tools import colortext
 import rcsb
 from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
-from basics import SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
+from basics import PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
+from uniprot import uniprot_map
 
 
 # Methods
@@ -101,14 +102,15 @@ class SIFTSResidue(object):
 
 class SIFTS(xml.sax.handler.ContentHandler):
 
-    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0):
+    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
 
-        self.atom_to_uniparc_sequence_maps = {} # UniProt AC -> SequenceMap(PDB ResidueID -> UniParc sequence index) where the UniParc sequence index is 1-based (first element has index 1)
+        self.atom_to_uniparc_sequence_map = {} # UniProt AC -> SequenceMap(PDB ResidueID -> UniParc sequence index) where the UniParc sequence index is 1-based (first element has index 1)
         self.counters = {}
         self.pdb_id = None
         self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
         self.tag_data = []
+        self.cache_dir = cache_dir
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -160,7 +162,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         xml_contents = safe_gz_unzip(xml_contents)
 
         # Return the object
-        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match)
+        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir)
         xml.sax.parseString(xml_contents, handler)
         return handler
 
@@ -287,8 +289,20 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         residue_count = 0
         residues_matched = 0
-        residue_maps = {}
+        residue_map = {}
         residues_encountered = set()
+
+        UniProtACs = set()
+        for r in self.residues:
+            UniProtACs.add(r.UniProtAC)
+        print(UniProtACs)
+        ACC_to_UPARC_mapping = uniprot_map('ACC', 'UPARC', list(UniProtACs), cache_dir = self.cache_dir)
+        assert(ACC_to_UPARC_mapping.keys() == list(UniProtACs))
+        for k, v in ACC_to_UPARC_mapping.iteritems():
+            assert(len(v) == 1)
+            ACC_to_UPARC_mapping[k] = v[0]
+        print(ACC_to_UPARC_mapping)
+
         for r in self.residues:
 
             if not(r.PDBResidueID.isalnum() and int(r.PDBResidueID.isalnum()) < 0):
@@ -298,9 +312,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
             # Store the PDB->UniProt mapping
             UniProtAC = r.UniProtAC
+            UniParcID = ACC_to_UPARC_mapping[UniProtAC]
             full_pdb_residue_ID = r.get_pdb_residue_id()
-            residue_maps[UniProtAC] = residue_maps.get(UniProtAC, {})
-            residue_maps[UniProtAC][full_pdb_residue_ID] = r.UniProtResidueIndex
+            residue_map[full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
 
             # Make sure we only have at most one match per PDB residue
             assert(full_pdb_residue_ID not in residues_encountered)
@@ -314,9 +328,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
             residue_count += 1
 
         # Create the SequenceMaps
-        self.atom_to_uniparc_sequence_maps = {}
-        for UniProtAC, atom_uniparc_mapping in residue_maps.iteritems():
-            self.atom_to_uniparc_sequence_maps[UniProtAC] = SequenceMap.from_dict(atom_uniparc_mapping)
+        self.atom_to_uniparc_sequence_map = PDBUniParcSequenceMap.from_dict(residue_map)
 
         # Check the match percentage
         if residue_count == 0:
