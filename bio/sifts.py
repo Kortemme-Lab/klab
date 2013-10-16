@@ -105,7 +105,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
     def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
 
-        self.atom_to_uniparc_sequence_map = {} # UniProt AC -> SequenceMap(PDB ResidueID -> UniParc sequence index) where the UniParc sequence index is 1-based (first element has index 1)
+        self.atom_to_uniparc_sequence_maps = {} # PDB Chain -> SequenceMap(PDB ResidueID -> (UniParc ID, UniParc sequence index)) where the UniParc sequence index is 1-based (first element has index 1)
         self.counters = {}
         self.pdb_id = None
         self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
@@ -303,6 +303,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
             ACC_to_UPARC_mapping[k] = v[0]
         print(ACC_to_UPARC_mapping)
 
+        map_chains = set()
         for r in self.residues:
 
             if not(r.PDBResidueID.isalnum() and int(r.PDBResidueID.isalnum()) < 0):
@@ -314,7 +315,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
             UniProtAC = r.UniProtAC
             UniParcID = ACC_to_UPARC_mapping[UniProtAC]
             full_pdb_residue_ID = r.get_pdb_residue_id()
-            residue_map[full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
+            PDBChainID = r.PDBChainID
+            map_chains.add(PDBChainID)
+            residue_map[PDBChainID] = residue_map.get(PDBChainID, {})
+            residue_map[PDBChainID][full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
 
             # Make sure we only have at most one match per PDB residue
             assert(full_pdb_residue_ID not in residues_encountered)
@@ -328,7 +332,8 @@ class SIFTS(xml.sax.handler.ContentHandler):
             residue_count += 1
 
         # Create the SequenceMaps
-        self.atom_to_uniparc_sequence_map = PDBUniParcSequenceMap.from_dict(residue_map)
+        for c in map_chains:
+            self.atom_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(residue_map[c])
 
         # Check the match percentage
         if residue_count == 0:
