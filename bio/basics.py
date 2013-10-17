@@ -281,7 +281,7 @@ class SequenceMap():
 
     def __setitem__(self, key, value):
         assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
-        assert(type(value) == types.IntType or type(value) == types.StringType or type(key) == types.UnicodeType)
+        assert(type(value) == types.IntType or type(value) == types.StringType or type(value) == types.UnicodeType)
         self.map[key] = value
         self.substitution_scores[key] = None
 
