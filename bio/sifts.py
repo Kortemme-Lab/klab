@@ -16,8 +16,9 @@ from tools.comms.ftp import get_insecure_resource, FTPException550
 from tools import colortext
 import rcsb
 from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
-from basics import SequenceMap, PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
-from uniprot import uniprot_map
+from basics import Sequence, SequenceMap, PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
+from uniprot import uniprot_map, UniParcEntry
+
 
 # Known bad cases (only up-to-date at the time of commit)
 
@@ -143,6 +144,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
         self.tag_data = []
         self.cache_dir = cache_dir
+        self.uniparc_sequences = {}
+        self.uniparc_objects = {}
+        self.pdb_chain_to_uniparc_id_map = {}
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -150,9 +154,44 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.current_residue = None
         self.residues = []
         self.reading_unobserved_property = False
+        self.uniparc_ids = set()
 
         assert(0 <= acceptable_sequence_percentage_match <= 100)
         assert(xml_contents.find("encoding='UTF-8'") != -1)
+
+    def get_pdb_chain_to_uniparc_id_map(self):
+        if self.pdb_chain_to_uniparc_id_map:
+            return self.pdb_chain_to_uniparc_id_map
+        else:
+            self.pdb_chain_to_uniparc_id_map = {}
+
+            for c, mp in self.atom_to_uniparc_sequence_maps.iteritems():
+                self.pdb_chain_to_uniparc_id_map[c] = self.pdb_chain_to_uniparc_id_map.get(c, set())
+                for _, v, _ in mp:
+                    self.pdb_chain_to_uniparc_id_map[c].add(v[0])
+
+            for c, mp in self.seqres_to_uniparc_sequence_maps.iteritems():
+                self.pdb_chain_to_uniparc_id_map[c] = self.pdb_chain_to_uniparc_id_map.get(c, set())
+                for _, v, _ in mp:
+                    self.pdb_chain_to_uniparc_id_map[c].add(v[0])
+
+            for c, s in self.pdb_chain_to_uniparc_id_map.iteritems():
+                self.pdb_chain_to_uniparc_id_map[c] = sorted(s)
+
+            return self.pdb_chain_to_uniparc_id_map
+
+    def get_uniparc_sequences(self):
+        if self.uniparc_sequences:
+            return self.uniparc_sequences
+        else:
+            self.uniparc_sequences = {}
+            self.uniparc_objects = {}
+            for UniParcID in self.uniparc_ids:
+                entry = UniParcEntry(UniParcID, cache_dir = self.cache_dir)
+                self.uniparc_sequences[entry.UniParcID] = Sequence.from_sequence(entry.UniParcID, entry.sequence)
+                self.uniparc_objects[entry.UniParcID] = entry
+            return self.uniparc_sequences
+
 
     @staticmethod
     def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0):
@@ -362,6 +401,8 @@ class SIFTS(xml.sax.handler.ContentHandler):
             UniParcID = ACC_to_UPARC_mapping[UniProtAC]
             #colortext.message('%s %d (%s)' % (r.PDBeChainID, r.PDBeResidueID, r.PDBeResidue3AA))
             #print(r)
+
+            self.uniparc_ids.add(UniParcID)
 
             full_pdb_residue_ID = r.get_pdb_residue_id()
             PDBChainID = r.PDBChainID
