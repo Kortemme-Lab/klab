@@ -15,11 +15,16 @@ from pdb import PDB, PDBMissingMainchainAtomsException, ROSETTA_HACKS_residues_t
 from pdbml import PDBML
 from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
 from tools import colortext
-from basics import Sequence, SequenceMap
+from basics import Sequence, SequenceMap, UniParcPDBSequenceMap
 from sifts import SIFTS, MissingSIFTSRecord, BadSIFTSMapping, NoSIFTSPDBUniParcMapping
 
 use_seqres_sequence_for_fasta_sequence = set(['1A2C', '4CPA', '2ATC', '1OLR'])
 use_fasta_sequence_for_seqres_sequence = set(['1DEQ'])
+
+# In these
+use_SIFTS_match_for_seqres_sequence = set([
+    '1AAR', # not surprising since this is Polyubiquitin-C
+])
 
 class ResidueRelatrix(object):
     ''' A class for relating residue IDs from different schemes.
@@ -69,7 +74,7 @@ class ResidueRelatrix(object):
 
         self.atom_to_rosetta_sequence_maps = None
         self.seqres_to_atom_sequence_maps = None
-        self.uniparc_to_seqres_sequence_maps = None # this map uses PDB chain IDs as PDB chains may map to zero or one UniParc IDs whereas UniParc IDs may map to many PDB chains
+        self.uniparc_to_seqres_sequence_maps = None # This map is indexed by PDB chain IDs
 
         self.sifts_atom_to_seqres_sequence_maps = None
         self.sifts_seqres_to_uniparc_sequence_maps = None
@@ -122,6 +127,7 @@ class ResidueRelatrix(object):
                     return atom_id
                 return self.convert(chain_id, atom_id, 'atom', to_scheme)
         if from_scheme == 'uniparc':
+            raise Exception('I need to update this to take a tuple as an argument.')
             seqres_id = self.uniparc_to_seqres_sequence_maps.get(chain_id, {})[residue_id]
             if to_scheme == 'seqres':
                 return seqres_id
@@ -217,7 +223,7 @@ class ResidueRelatrix(object):
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
-                rng = set(sequence_map.values())
+                rng = set([v[1] for v in sequence_map.values()])
                 uniparc_chain_id = self.pdb_chain_to_uniparc_chain_mapping[chain_id]
                 uniparc_residue_ids = set(self.uniparc_sequences[uniparc_chain_id].ids())
                 assert(rng.intersection(uniparc_residue_ids) == rng)
@@ -260,7 +266,8 @@ class ResidueRelatrix(object):
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
                 seqres_sequence = self.seqres_sequences[chain_id]
                 uniparc_sequence = self.uniparc_sequences[self.pdb_chain_to_uniparc_chain_mapping[chain_id]]
-                for seqres_id, uniparc_id, substitution_match in sequence_map:
+                for seqres_id, uniparc_id_resid_pair, substitution_match in sequence_map:
+                    uniparc_id = uniparc_id_resid_pair[1]
                     # Some of the matches may not be identical but all the '*' Clustal Omega matches should be identical
                     if substitution_match.clustal == 1:
                         assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
@@ -289,7 +296,7 @@ class ResidueRelatrix(object):
         # This map uses PDB chain IDs as PDB chains may map to zero or one UniParc IDs whereas UniParc IDs may map to many PDB chains
         self.uniparc_to_seqres_sequence_maps = {}
         for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
-            s = SequenceMap()
+            s = UniParcPDBSequenceMap()
             for k, v, substitution_match in sequence_map:
                 s.add(v, k, substitution_match)
             self.uniparc_to_seqres_sequence_maps[chain_id] = s
@@ -341,10 +348,35 @@ class ResidueRelatrix(object):
                     except:
                         raise colortext.Exception("Mapping cross-validation failed checking atom to seqres sequence maps between PDBML and SIFTS in %s, chain %s." % (self.pdb_id, c))
 
-        colortext.message('self.seqres_to_uniparc_sequence_maps')
-        print(self.seqres_to_uniparc_sequence_maps)
-        colortext.warning('self.sifts_seqres_to_uniparc_sequence_maps')
-        print(self.sifts_seqres_to_uniparc_sequence_maps)
+            for c, seqmap in sorted(self.seqres_to_uniparc_sequence_maps.iteritems()):
+                if self.sequence_types[c] == 'Protein' or self.sequence_types[c] == 'Protein skeleton':
+
+                    if self.pdb_id in use_SIFTS_match_for_seqres_sequence:
+                        #assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
+                        assert(self.seqres_to_uniparc_sequence_maps[c].keys() == self.sifts_seqres_to_uniparc_sequence_maps[c].keys())
+                        for k in self.seqres_to_uniparc_sequence_maps[c].keys():
+                            v_1 = self.seqres_to_uniparc_sequence_maps[c][k]
+                            v_2 = self.sifts_seqres_to_uniparc_sequence_maps[c][k]
+
+                            # Make sure the UniParc IDs agree
+                            assert(v_1[0] == v_2[0])
+
+                            # Make sure the residue types agree
+                            assert(self.uniparc_sequences[v_1[0]][v_1[1]].ResidueAA == self.uniparc_sequences[v_1[0]][v_2[1]].ResidueAA)
+
+                            # Copy the substitution scores over. Since the residue types agree, this is valid
+                            self.sifts_seqres_to_uniparc_sequence_maps[c].substitution_scores[k] = self.seqres_to_uniparc_sequence_maps[c].substitution_scores[k]
+
+                        self.seqres_to_uniparc_sequence_maps[c] = self.sifts_seqres_to_uniparc_sequence_maps[c]
+
+                    colortext.message('self.seqres_to_uniparc_sequence_maps[%s]' % c)
+                    print(self.seqres_to_uniparc_sequence_maps[c])
+                    colortext.warning('self.sifts_seqres_to_uniparc_sequence_maps[%s]' % c)
+                    print(self.sifts_seqres_to_uniparc_sequence_maps[c])
+                    try:
+                        assert(self.seqres_to_uniparc_sequence_maps[c].matches(self.sifts_seqres_to_uniparc_sequence_maps[c]))
+                    except:
+                        raise colortext.Exception("Mapping cross-validation failed checking atom to seqres sequence maps between Clustal and SIFTS in %s, chain %s." % (self.pdb_id, c))
 
         colortext.message('self.sifts_atom_to_uniparc_sequence_maps')
         print(self.sifts_atom_to_uniparc_sequence_maps)
