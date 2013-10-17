@@ -367,11 +367,13 @@ class SIFTS(xml.sax.handler.ContentHandler):
             PDBChainID = r.PDBChainID
             map_chains.add(PDBChainID)
 
-            atom_to_uniparc_residue_map[PDBChainID] = atom_to_uniparc_residue_map.get(PDBChainID, {})
-            atom_to_uniparc_residue_map[PDBChainID][full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
+            if not r.WasNotObserved:
+                # Do not add ATOM mappings when the ATOM data does not exist
+                atom_to_uniparc_residue_map[PDBChainID] = atom_to_uniparc_residue_map.get(PDBChainID, {})
+                atom_to_uniparc_residue_map[PDBChainID][full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
 
-            atom_to_seqres_residue_map[PDBChainID] = atom_to_seqres_residue_map.get(PDBChainID, {})
-            atom_to_seqres_residue_map[PDBChainID][full_pdb_residue_ID] = r.PDBeResidueID
+                atom_to_seqres_residue_map[PDBChainID] = atom_to_seqres_residue_map.get(PDBChainID, {})
+                atom_to_seqres_residue_map[PDBChainID][full_pdb_residue_ID] = r.PDBeResidueID
 
             seqres_to_uniparc_residue_map[PDBChainID] = seqres_to_uniparc_residue_map.get(PDBChainID, {})
             seqres_to_uniparc_residue_map[PDBChainID][r.PDBeResidueID] = (UniParcID, r.UniProtResidueIndex)
