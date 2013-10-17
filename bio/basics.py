@@ -327,6 +327,14 @@ class PDBUniParcSequenceMap(SequenceMap):
         Mapping to tuples is necessary for some cases e.g. for chimeras like 1M7T.
     '''
 
+    def __setitem__(self, key, value):
+        assert(len(value) == 2)
+        assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
+        assert((type(value[0]) == types.StringType or type(value[0]) == types.UnicodeType) and (type(value[1]) == types.IntType))
+
+        self.map[key] = value
+        self.substitution_scores[key] = None
+
     @staticmethod
     def from_dict(d):
         for k, v in d.iteritems():
@@ -339,6 +347,30 @@ class PDBUniParcSequenceMap(SequenceMap):
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
 
+class UniParcPDBSequenceMap(SequenceMap):
+    ''' A class to map the IDs of UniParc residue pairs (UniParcID, sequence index) to a PDB chain's Sequence (ATOM/SEQRES/FASTA).
+        Mapping from tuples is necessary for some cases e.g. for chimeras like 1M7T.
+    '''
+
+    def __setitem__(self, key, value):
+        assert(len(key) == 2)
+        assert(type(value) == types.IntType or type(value) == types.StringType or type(value) == types.UnicodeType)
+        assert((type(key[0]) == types.StringType or type(key[0]) == types.UnicodeType) and (type(key[1]) == types.IntType))
+
+        self.map[key] = value
+        self.substitution_scores[key] = None
+
+    @staticmethod
+    def from_dict(d):
+        for k, v in d.iteritems():
+            assert(len(k) == 2)
+            assert(type(v) == types.IntType or type(v) == types.StringType or type(v) == types.UnicodeType)
+            assert((type(k[0]) == types.StringType or type(k[0]) == types.UnicodeType) and (type(k[1]) == types.IntType))
+
+        s = PDBUniParcSequenceMap()
+        s.map = d
+        s.substitution_scores = dict.fromkeys(d.keys(), None)
+        return s
 
 def sequence_formatter(sequences):
     assert(sequences and (len(set(map(len, sequences))) == 1))
