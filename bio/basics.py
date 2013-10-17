@@ -225,6 +225,7 @@ class Sequence(object):
             count += 1
         return s
 
+class InconsistentMappingException(Exception): pass
 
 class SequenceMap():
     ''' A class to map the IDs of one Sequence to another.'''
@@ -243,26 +244,6 @@ class SequenceMap():
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
 
-    def __iter__(self):
-        self._iter_keys = set(self.map.keys())
-        return self
-
-    def next(self): # todo: This is __next__ in Python 3.x
-        try:
-            id = self._iter_keys.pop()
-            return id, self.map[id], self.substitution_scores[id]
-        except:
-            raise StopIteration
-
-    def __setitem__(self, key, value):
-        assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
-        assert(type(value) == types.IntType or type(value) == types.StringType or type(key) == types.UnicodeType)
-        self.map[key] = value
-        self.substitution_scores[key] = None
-
-    def __getitem__(self, item):
-        return self.map.get(item)
-
     def add(self, key, value, substitution_score):
         self[key] = value
         self.substitution_scores[key] = substitution_score
@@ -273,18 +254,47 @@ class SequenceMap():
         if self.substitution_scores.get(key):
             del self.substitution_scores[key]
 
-    def keys(self):
-        return self.map.keys()
-
-    def values(self):
-        return self.map.values()
-
     def matches(self, other):
         overlap = set(self.keys()).intersection(set(other.keys()))
         for k in overlap:
             if self[k] != other[k]:
                 return False
         return True
+
+    def substitution_scores_match(self, other):
+        '''Check to make sure that the substitution scores agree. If one map has a null score and the other has a non-null score, we trust the other's score and vice versa.'''
+        overlap = set(self.substitution_scores.keys()).intersection(set(other.substitution_scores.keys()))
+        for k in overlap:
+            if not(self.substitution_scores[k] == None or other.substitution_scores[k] == None):
+                if self.substitution_scores[k] != other.substitution_scores[k]:
+                    return False
+        return True
+
+    def keys(self):
+        return self.map.keys()
+
+    def values(self):
+        return self.map.values()
+
+    def __getitem__(self, item):
+        return self.map.get(item)
+
+    def __setitem__(self, key, value):
+        assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
+        assert(type(value) == types.IntType or type(value) == types.StringType or type(key) == types.UnicodeType)
+        self.map[key] = value
+        self.substitution_scores[key] = None
+
+    def next(self): # todo: This is __next__ in Python 3.x
+        try:
+            id = self._iter_keys.pop()
+            return id, self.map[id], self.substitution_scores[id]
+        except:
+            raise StopIteration
+
+    def __iter__(self):
+        self._iter_keys = set(self.map.keys())
+        return self
 
     def __eq__(self, other):
         if self.keys() == other.keys():
@@ -303,6 +313,41 @@ class SequenceMap():
             return True
         else:
             return False
+
+    def glue(self, other):
+        return self + other
+
+    def __add__(self, other):
+        '''Glue two maps together. The operation is defined on maps which agree on the intersection of their domain as:
+             (f + g)(x) = f(x) if x not in dom(f)
+             (f + g)(x) = g(x) if x not in dom(g)
+             (f + g)(x) = f(x) = g(x) if x in dom(f) n dom(g)
+        '''
+
+        if not self.matches(other):
+            overlap = set(self.keys()).intersection(set(other.keys()))
+            mismatches = [k for k in overlap if self[k] != other[k]]
+            raise InconsistentMappingException('The two maps disagree on the common domain elements %s.' % str(mismatches))
+        elif not self.substitution_scores_match(other):
+            overlap = set(self.substitution_scores.keys()).intersection(set(other.substitution_scores.keys()))
+            mismatches = [k for k in overlap if self.substitution_scores[k] != other.substitution_scores[k]]
+            raise InconsistentMappingException('The two maps scores disagree on the common domain elements %s.' % str(mismatches))
+        elif not self.__class__ == other.__class__:
+            raise InconsistentMappingException('''The two maps have different classes: '%s' and '%s'.''' % ( self.__class__, other.__class__))
+        else:
+            d, s = {}, {}
+            other_domain = set(other.keys()).difference(set(self.keys()))
+            for k in self.keys():
+                d[k] = self.map[k]
+                s[k] = self.substitution_scores[k]
+            for k in other_domain:
+                assert(self.map.get(k) == None)
+                assert(self.substitution_scores.get(k) == None)
+                d[k] = other.map[k]
+                s[k] = other.substitution_scores[k]
+            o = self.__class__.from_dict(d)
+            o.substitution_scores = s
+            return o
 
     def __repr__(self):
         s = []
