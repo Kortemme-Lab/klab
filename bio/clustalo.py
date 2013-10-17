@@ -19,7 +19,7 @@ from tools import colortext
 from uniprot import pdb_to_uniparc, uniprot_map, UniProtACEntry, UniParcEntry
 from fasta import FASTA
 from pdb import PDB
-from basics import SubstitutionScore, Sequence, SequenceMap
+from basics import SubstitutionScore, Sequence, SequenceMap, PDBUniParcSequenceMap
 
 ### Check for the necessary Clustal Omega and ClustalW software
 
@@ -717,10 +717,10 @@ class PDBUniParcSequenceAligner(object):
                     residue_mapping, residue_match_mapping = sa.get_residue_mapping()
 
                     # Create a SequenceMap
-                    s = SequenceMap()
+                    s = PDBUniParcSequenceMap()
                     assert(sorted(residue_mapping.keys()) == sorted(residue_match_mapping.keys()))
                     for k, v in residue_mapping.iteritems():
-                        s.add(k, v, residue_match_mapping[k])
+                        s.add(k, (uniparc_entry.UniParcID, v), residue_match_mapping[k])
                     self.seqres_to_uniparc_sequence_maps[c] = s
 
                 else:
