@@ -16,7 +16,7 @@ import platform
 from tools.fs.fsio import open_temp_file, read_file
 from tools.process import Popen as _Popen
 from tools import colortext
-from uniprot import pdb_to_uniparc, uniprot_map, UniParcEntry
+from uniprot import pdb_to_uniparc, uniprot_map, UniProtACEntry, UniParcEntry
 from fasta import FASTA
 from pdb import PDB
 from basics import SubstitutionScore, Sequence, SequenceMap
@@ -400,6 +400,14 @@ class PDBUniParcSequenceAligner(object):
         '''
         # todo: We could speed up the matching by only matching unique sequences rather than matching all sequences
 
+        # Remove any deprecated UniProt AC records that may be stored in PDB files. This depends on the cache directory being up to date.
+        added_uniprot_ACs = list(set(added_uniprot_ACs))
+        for AC in added_uniprot_ACs:
+            try:
+                UniProtACEntry(AC, cache_dir = cache_dir)
+            except:
+                added_uniprot_ACs.remove(AC)
+
         self.pdb_id = pdb_id
         self.replacement_pdb_id = replacement_pdb_id
         self.cut_off = cut_off
@@ -554,6 +562,7 @@ class PDBUniParcSequenceAligner(object):
             p = PDB.retrieve(pdb_id, cache_dir = cache_dir)
             uniprot_mapping = p.get_DB_references().get(pdb_id).get('UNIPROT')
             if uniprot_mapping:
+                dbref_exists = True
                 for chain_id, details in uniprot_mapping.iteritems():
                     uniprot_ACs.add(details['dbAccession'])
 
