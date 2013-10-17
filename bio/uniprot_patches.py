@@ -50,6 +50,7 @@ if use_patches:
         'UPI00004F0556' : {'Name' : 'Acylphosphatase-1', 'EC numbers' : ['3.6.1.7'], 'Short names' : []},
         'UPI000002D10B' : {'Name' : 'Thiol:disulfide interchange protein', 'EC numbers' : [], 'Short names' : []},
         'UPI0000054B9A' : {'Name' : 'DSBA-like thioredoxin domain protein', 'EC numbers' : [], 'Short names' : []},
+        'UPI0000021092' : {'Name' : '', 'EC numbers' : [], 'Short names' : []},
     }
 
     # These entries had no recommended names - the names here are merges of submitted names
