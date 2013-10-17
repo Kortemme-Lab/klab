@@ -279,6 +279,31 @@ class SequenceMap():
     def values(self):
         return self.map.values()
 
+    def matches(self, other):
+        overlap = set(self.keys()).intersection(set(other.keys()))
+        for k in overlap:
+            if self[k] != other[k]:
+                return False
+        return True
+
+    def __eq__(self, other):
+        if self.keys() == other.keys():
+            for k in self.keys():
+                if self[k] != other[k]:
+                    return False
+            return True
+        else:
+            return False
+
+    def __le__(self, other):
+        if set(self.keys()).issubset == set(other.keys()):
+            for k in self.keys():
+                if self[k] != other[k]:
+                    return False
+            return True
+        else:
+            return False
+
     def __repr__(self):
         s = []
         substitution_scores = self.substitution_scores
