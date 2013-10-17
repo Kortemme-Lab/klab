@@ -33,6 +33,12 @@ known_bad_clustal_to_sifts_mappings = set([
     ('1BF4', 'A'),
 ])
 
+do_not_use_the_sequence_aligner = set([
+    '1CBW',
+])
+
+
+
 class ResidueRelatrix(object):
     ''' A class for relating residue IDs from different schemes.
         Note: we assume throughout that there is one map from SEQRES to UniParc. This is not always true e.g. Polyubiquitin-C (UPI000000D74D) has 9 copies of the ubiquitin sequence.'''
@@ -369,7 +375,8 @@ class ResidueRelatrix(object):
                 #if self.sifts:
                 #    self.sifts_atom_to_seqres_sequence_maps[chain_id].remove(residue_to_remove)
 
-        self.clustal_seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
+        if self.pdb_id not in do_not_use_the_sequence_aligner:
+            self.clustal_seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
 
     def _merge_sifts_maps(self):
         ''' Make sure that the pdbml_atom_to_seqres_sequence_maps and clustal_seqres_to_uniparc_sequence_maps agree with SIFTS and merge the maps.
@@ -378,7 +385,11 @@ class ResidueRelatrix(object):
                 SIFTS does not seem to contain ATOM to SEQRES mappings for (at least some) DNA chains e.g. 1APL, chain A
             Because of these cases, we just assert that the overlap agrees so that we can perform a gluing of maps.'''
 
-        if self.sifts:
+        if self.pdb_id in do_not_use_the_sequence_aligner:
+            assert(self.sifts)
+            self.atom_to_seqres_sequence_maps = self.sifts_atom_to_seqres_sequence_maps
+            self.seqres_to_uniparc_sequence_maps = self.sifts_seqres_to_uniparc_sequence_maps
+        elif self.sifts:
             self.atom_to_seqres_sequence_maps = {}
             self.seqres_to_uniparc_sequence_maps = {}
             for c, seqmap in sorted(self.pdbml_atom_to_seqres_sequence_maps.iteritems()):
@@ -470,7 +481,11 @@ class ResidueRelatrix(object):
             self.pdb_to_rosetta_residue_map_error = True
 
         # Get all the Sequences
-        self.uniparc_sequences = self.PDB_UniParc_SA.uniparc_sequences
+        if self.pdb_id not in do_not_use_the_sequence_aligner:
+            self.uniparc_sequences = self.PDB_UniParc_SA.uniparc_sequences
+        else:
+            self.uniparc_sequences = self.sifts.get_uniparc_sequences()
+
         self.fasta_sequences = self.FASTA.get_sequences(self.pdb_id)
         self.seqres_sequences = self.pdb.seqres_sequences
         self.atom_sequences = self.pdb.atom_sequences
@@ -484,13 +499,20 @@ class ResidueRelatrix(object):
 
         # Update the chain types for the UniParc sequences
         uniparc_pdb_chain_mapping = {}
-        for pdb_chain_id, matches in self.PDB_UniParc_SA.clustal_matches.iteritems():
-            if matches:
-                # we are not guaranteed to have a match e.g. the short chain J in 1A2C, chimeras, etc.
-                uniparc_chain_id = matches.keys()[0]
-                assert(len(matches) == 1)
-                uniparc_pdb_chain_mapping[uniparc_chain_id] = uniparc_pdb_chain_mapping.get(uniparc_chain_id, [])
-                uniparc_pdb_chain_mapping[uniparc_chain_id].append(pdb_chain_id)
+        if self.pdb_id not in do_not_use_the_sequence_aligner:
+            for pdb_chain_id, matches in self.PDB_UniParc_SA.clustal_matches.iteritems():
+                if matches:
+                    # we are not guaranteed to have a match e.g. the short chain J in 1A2C, chimeras, etc.
+                    uniparc_chain_id = matches.keys()[0]
+                    assert(len(matches) == 1)
+                    uniparc_pdb_chain_mapping[uniparc_chain_id] = uniparc_pdb_chain_mapping.get(uniparc_chain_id, [])
+                    uniparc_pdb_chain_mapping[uniparc_chain_id].append(pdb_chain_id)
+        else:
+            for pdb_chain_id, uniparc_chain_ids in self.sifts.get_pdb_chain_to_uniparc_id_map().iteritems():
+                for uniparc_chain_id in uniparc_chain_ids:
+                    uniparc_pdb_chain_mapping[uniparc_chain_id] = uniparc_pdb_chain_mapping.get(uniparc_chain_id, [])
+                    uniparc_pdb_chain_mapping[uniparc_chain_id].append(pdb_chain_id)
+
         for uniparc_chain_id, pdb_chain_ids in uniparc_pdb_chain_mapping.iteritems():
             sequence_type = set([self.seqres_sequences[p].sequence_type for p in pdb_chain_ids])
             assert(len(sequence_type) == 1)
@@ -571,73 +593,75 @@ class ResidueRelatrix(object):
             matched_chains = set()
             matched_all_chains = False
             self.PDB_UniParc_SA = None
-            cut_off = None
-            for x in range(starting_clustal_cut_off, min_clustal_cut_off - 1, -1):
-                cut_off = x
-                if not self.silent:
-                    colortext.warning("\tTrying to align sequences with a cut-off of %d%%." % cut_off)
 
-                if not self.PDB_UniParc_SA:
-                    # Initialize the PDBUniParcSequenceAligner the first time through
-                    self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
-                else:
-                    # We have already retrieved the UniParc entries. We just need to try the mapping again. This saves
-                    # lots of time for entries with large numbers of UniProt entries e.g. 1HIO even if disk caching is used.
-                    # We also stop trying to match a chain once a match has been found in a previous iteration.
-                    # This speeds up the matching in multiple ways. First, we do not waste time by recreating the same UniParcEntry.
-                    # Next, we do not waste time rematching chains we previously matched. Finally, we only match equivalence
-                    # classes of chains where the equivalence is defined as having an identical sequence.
-                    # For example we sped up:
-                    #   matching 1YGV (3 protein chains, 2 identical) starting at 100% by 67% (down from 86s to 28.5s with a match at 85%); (this case may be worth profiling)
-                    #       speed ups at each stage; not recreating PDB_UniParc_SA (due to low match%), only matching chains once (as A, C are found at 95%), and skipping sequence-equivalent chains (as A and C have the same sequence)
-                    #   matching 1HIO (4 protein chains, all unique) starting at 100% by 83% down from 33s to 5.5s (match at 95%);
-                    #       main speed-up due to not recreating PDB_UniParc_SA
-                    #   matching 1H38 (4 identical protein chains) starting at 100% by 5% down from 57s to 54s (match at 100%);
-                    #       no real speed-up since the match is at 100%
-                    #   matching the extreme case 487D (7 protein chains, all unique) starting at 100% by 94% down from 1811s to 116s (with a min_clustal_cut_off of 71%). A lot of the time in this case is in constructing the UniParcEntry object.
-                    #       main speed-up due to not recreating PDB_UniParc_SA
-                    #   matching 3ZKB (16 protein chains, all identical) starting at 100% by 90% (down from 31s to 3s with a match at 98%); (this case may be worth profiling)
-                    #       a lot of time was spent in PDBML creation (another optimization problem) so I only profiled this PDB_UniParc_SA section
-                    #       minor speed-up (31s to 27s) by not recreating PDB_UniParc_SA (match at 98%), main speed-up due to skipping sequence-equivalent chain (we only have to match one sequence)
-                    self.PDB_UniParc_SA.realign(cut_off, chains_to_skip = matched_chains)
-
-                # We only care about protein chain matches so early out as soon as we have them all matched
-                protein_chain_matches = {}
-                for _c, _st in self.sequence_types.iteritems():
-                    if _st == 'Protein' or _st == 'Protein skeleton':
-                        protein_chain_matches[_c] = self.PDB_UniParc_SA.clustal_matches[_c]
-                        if protein_chain_matches[_c]:
-                            matched_chains.add(_c)
-
-                num_matches_per_chain = set(map(len, protein_chain_matches.values()))
-                if len(num_matches_per_chain) == 1 and num_matches_per_chain.pop() == 1:
-                    # We have exactly one match per protein chain. Early out.
+            if self.pdb_id not in do_not_use_the_sequence_aligner:
+                cut_off = None
+                for x in range(starting_clustal_cut_off, min_clustal_cut_off - 1, -1):
+                    cut_off = x
                     if not self.silent:
-                        colortext.message("\tSuccessful match with a cut-off of %d%%." % cut_off)
-                    matched_all_chains = True
-                    self.alignment_cutoff = cut_off
-                    break
-                else:
-                    # We have ambiguity - more than one match per protein chain. Exception.
-                    if [n for n in num_matches_per_chain if n > 1]:
-                        raise MultipleAlignmentException("Too many matches found at cut-off %d." % cut_off)
+                        colortext.warning("\tTrying to align sequences with a cut-off of %d%%." % cut_off)
 
-            if not matched_all_chains:
-                protein_chains = [c for c in self.sequence_types if self.sequence_types[c].startswith('Protein')]
+                    if not self.PDB_UniParc_SA:
+                        # Initialize the PDBUniParcSequenceAligner the first time through
+                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
+                    else:
+                        # We have already retrieved the UniParc entries. We just need to try the mapping again. This saves
+                        # lots of time for entries with large numbers of UniProt entries e.g. 1HIO even if disk caching is used.
+                        # We also stop trying to match a chain once a match has been found in a previous iteration.
+                        # This speeds up the matching in multiple ways. First, we do not waste time by recreating the same UniParcEntry.
+                        # Next, we do not waste time rematching chains we previously matched. Finally, we only match equivalence
+                        # classes of chains where the equivalence is defined as having an identical sequence.
+                        # For example we sped up:
+                        #   matching 1YGV (3 protein chains, 2 identical) starting at 100% by 67% (down from 86s to 28.5s with a match at 85%); (this case may be worth profiling)
+                        #       speed ups at each stage; not recreating PDB_UniParc_SA (due to low match%), only matching chains once (as A, C are found at 95%), and skipping sequence-equivalent chains (as A and C have the same sequence)
+                        #   matching 1HIO (4 protein chains, all unique) starting at 100% by 83% down from 33s to 5.5s (match at 95%);
+                        #       main speed-up due to not recreating PDB_UniParc_SA
+                        #   matching 1H38 (4 identical protein chains) starting at 100% by 5% down from 57s to 54s (match at 100%);
+                        #       no real speed-up since the match is at 100%
+                        #   matching the extreme case 487D (7 protein chains, all unique) starting at 100% by 94% down from 1811s to 116s (with a min_clustal_cut_off of 71%). A lot of the time in this case is in constructing the UniParcEntry object.
+                        #       main speed-up due to not recreating PDB_UniParc_SA
+                        #   matching 3ZKB (16 protein chains, all identical) starting at 100% by 90% (down from 31s to 3s with a match at 98%); (this case may be worth profiling)
+                        #       a lot of time was spent in PDBML creation (another optimization problem) so I only profiled this PDB_UniParc_SA section
+                        #       minor speed-up (31s to 27s) by not recreating PDB_UniParc_SA (match at 98%), main speed-up due to skipping sequence-equivalent chain (we only have to match one sequence)
+                        self.PDB_UniParc_SA.realign(cut_off, chains_to_skip = matched_chains)
 
-                if not self.silent:
-                    colortext.warning('\nNote: Not all chains were matched:')
-                    for c in protein_chains:
-                        if protein_chain_matches.get(c):
-                            colortext.message('  %s matched %s' % (c, protein_chain_matches[c]))
-                        else:
-                            colortext.warning('  %s was not matched' % c)
-                    print('')
+                    # We only care about protein chain matches so early out as soon as we have them all matched
+                    protein_chain_matches = {}
+                    for _c, _st in self.sequence_types.iteritems():
+                        if _st == 'Protein' or _st == 'Protein skeleton':
+                            protein_chain_matches[_c] = self.PDB_UniParc_SA.clustal_matches[_c]
+                            if protein_chain_matches[_c]:
+                                matched_chains.add(_c)
 
-                num_matches_per_chain = set(map(len, self.PDB_UniParc_SA.clustal_matches.values()))
-                if num_matches_per_chain == set([0, 1]):
-                    # We got matches but are missing chains
-                    self.alignment_cutoff = cut_off
+                    num_matches_per_chain = set(map(len, protein_chain_matches.values()))
+                    if len(num_matches_per_chain) == 1 and num_matches_per_chain.pop() == 1:
+                        # We have exactly one match per protein chain. Early out.
+                        if not self.silent:
+                            colortext.message("\tSuccessful match with a cut-off of %d%%." % cut_off)
+                        matched_all_chains = True
+                        self.alignment_cutoff = cut_off
+                        break
+                    else:
+                        # We have ambiguity - more than one match per protein chain. Exception.
+                        if [n for n in num_matches_per_chain if n > 1]:
+                            raise MultipleAlignmentException("Too many matches found at cut-off %d." % cut_off)
+
+                if not matched_all_chains:
+                    protein_chains = [c for c in self.sequence_types if self.sequence_types[c].startswith('Protein')]
+
+                    if not self.silent:
+                        colortext.warning('\nNote: Not all chains were matched:')
+                        for c in protein_chains:
+                            if protein_chain_matches.get(c):
+                                colortext.message('  %s matched %s' % (c, protein_chain_matches[c]))
+                            else:
+                                colortext.warning('  %s was not matched' % c)
+                        print('')
+
+                    num_matches_per_chain = set(map(len, self.PDB_UniParc_SA.clustal_matches.values()))
+                    if num_matches_per_chain == set([0, 1]):
+                        # We got matches but are missing chains
+                        self.alignment_cutoff = cut_off
         except MultipleAlignmentException, e:
             # todo: this will probably fail with DNA or RNA so do not include those in the alignment
             raise colortext.Exception("Relatrix construction failed creating the PDBUniParcSequenceAligner object for %s. The cut-off level reached %d%% without finding a match for all chains but at that level, the mapping from chains to UniParc IDs was not injective.\n%s" % (pdb_id, cut_off, str(e)))
