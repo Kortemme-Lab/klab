@@ -297,6 +297,11 @@ class ResidueRelatrix(object):
     def _create_sequence_maps(self):
         '''Get all of the SequenceMaps - Rosetta->ATOM, ATOM->SEQRES/FASTA, SEQRES->UniParc.'''
 
+        if self.sifts:
+            self.sifts_atom_to_seqres_sequence_maps = self.sifts.atom_to_seqres_sequence_maps
+            self.sifts_seqres_to_uniparc_sequence_maps = self.sifts.seqres_to_uniparc_sequence_maps
+            self.sifts_atom_to_uniparc_sequence_maps = self.sifts.atom_to_uniparc_sequence_maps
+
         if self.pdb_to_rosetta_residue_map_error:
             self.rosetta_to_atom_sequence_maps = {}
             for c in self.atom_sequences.keys():
@@ -310,13 +315,39 @@ class ResidueRelatrix(object):
             for residue_to_remove in ROSETTA_HACKS_residues_to_remove[self.pdb_id]:
                 chain_id = residue_to_remove[0]
                 self.atom_to_seqres_sequence_maps[chain_id].remove(residue_to_remove)
+                #if self.sifts:
+                #    self.sifts_atom_to_seqres_sequence_maps[chain_id].remove(residue_to_remove)
 
         self.seqres_to_uniparc_sequence_maps = self.PDB_UniParc_SA.seqres_to_uniparc_sequence_maps
 
+        colortext.message('self.rosetta_to_atom_sequence_maps')
+        print(self.rosetta_to_atom_sequence_maps)
+
+
+        # Make sure that the atom_to_seqres_sequence_map agrees with SIFTS.
+        #   SIFTS may have more entries since we discard PDB residues which break Rosetta.
+        #   SIFTS may have less entries for some cases e.g. 1AR1, chain C where SIFTS does not map ATOMs 99-118.
+        #   SIFTS does not seem to contain ATOM to SEQRES mappings for (at least some) DNA chains e.g. 1APL, chain A
+        # Because of these cases, we just assert that the overlap agrees so that we can perform a gluing of maps.
         if self.sifts:
-            self.sifts_atom_to_seqres_sequence_maps = self.sifts.atom_to_seqres_sequence_maps
-            self.sifts_seqres_to_uniparc_sequence_maps = self.sifts.seqres_to_uniparc_sequence_maps
-            self.sifts_atom_to_uniparc_sequence_maps = self.sifts.atom_to_uniparc_sequence_maps
+            for c, seqmap in sorted(self.atom_to_seqres_sequence_maps.iteritems()):
+                if self.sequence_types[c] == 'Protein' or self.sequence_types[c] == 'Protein skeleton':
+                    colortext.message('self.atom_to_seqres_sequence_maps[%s]' % c)
+                    print(self.atom_to_seqres_sequence_maps[c])
+                    colortext.warning('self.sifts_atom_to_seqres_sequence_maps[%s]' % c)
+                    print(self.sifts_atom_to_seqres_sequence_maps[c])
+                    try:
+                        assert(self.atom_to_seqres_sequence_maps[c].matches(self.sifts_atom_to_seqres_sequence_maps[c]))
+                    except:
+                        raise colortext.Exception("Mapping cross-validation failed checking atom to seqres sequence maps between PDBML and SIFTS in %s, chain %s." % (self.pdb_id, c))
+
+        colortext.message('self.seqres_to_uniparc_sequence_maps')
+        print(self.seqres_to_uniparc_sequence_maps)
+        colortext.warning('self.sifts_seqres_to_uniparc_sequence_maps')
+        print(self.sifts_seqres_to_uniparc_sequence_maps)
+
+        colortext.message('self.sifts_atom_to_uniparc_sequence_maps')
+        print(self.sifts_atom_to_uniparc_sequence_maps)
 
     def _create_sequences(self):
         '''Get all of the Sequences - Rosetta, ATOM, SEQRES, FASTA, UniParc.'''
@@ -499,6 +530,6 @@ class ResidueRelatrix(object):
                     self.alignment_cutoff = cut_off
         except MultipleAlignmentException, e:
             # todo: this will probably fail with DNA or RNA so do not include those in the alignment
-            raise colortext.Exception("Relatrix construction failed creating the PDBUniParcSequenceAligner object for %s. The cut-off level reached %d without finding a match for all chains but at that level, the mapping from chains to UniParc IDs was not injective.\n%s" % (pdb_id, cut_off, str(e)))
+            raise colortext.Exception("Relatrix construction failed creating the PDBUniParcSequenceAligner object for %s. The cut-off level reached %d%% without finding a match for all chains but at that level, the mapping from chains to UniParc IDs was not injective.\n%s" % (pdb_id, cut_off, str(e)))
         except:
             raise colortext.Exception("Relatrix construction failed creating the PDBUniParcSequenceAligner object for %s.\n%s" % (pdb_id, traceback.format_exc()))
