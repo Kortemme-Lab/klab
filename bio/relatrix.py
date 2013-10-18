@@ -33,6 +33,36 @@ known_bad_clustal_to_sifts_mappings = set([
     ('1BF4', 'A'),
 ])
 
+# todo
+check_these = set([
+    ('1CPM', 'A'),
+    ('1DEQ', 'C'), ('1DEQ', 'F'), ('1DEQ', 'P'), ('1DEQ', 'S'),
+    ('1DVF', 'D'),
+    ('1HGH', 'A'),
+    ('1OTR', 'B'),
+    ('1SCE', 'A'),
+    ('1UBQ', 'A'),
+    ('1URK', 'A'),
+    ('2ATC', 'B'),
+    ('487D', 'H'),
+
+    #('1E6N') failed outright
+    #('2FX5', # failed outright
+
+    #('2IMM', # failed outright
+
+    ('1ORC', 'A'), # problems with injectivity
+
+    ('1KJ1', 'A'), # expected - Ambiguous matches - the sequences are too close
+    #('1M7T') failed outright (expected - chimera case)
+    #('1Z1I'), # Expected bad case. This (306 residues) maps to P0C6U8/UPI000018DB89 (Replicase polyprotein 1a,  4,382 residues) A 3241-3546, the '3C-like proteinase' region
+])
+
+
+
+use_SIFTS_match_for_seqres_sequence = use_SIFTS_match_for_seqres_sequence.union(check_these)
+known_bad_clustal_to_sifts_mappings = known_bad_clustal_to_sifts_mappings.union(check_these)
+
 do_not_use_the_sequence_aligner = set([
     '1CBW',
 ])
@@ -49,6 +79,8 @@ class ResidueRelatrix(object):
         ''' acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually
             90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues. I set
             this to 80.00% to cover most cases.'''
+
+        # todo: add an option to not use the Clustal sequence aligner and only use the SIFTS mapping. This could be useful for a web interface where we do not want to have to fix things manually.
 
         if acceptable_sifts_sequence_percentage_match == None:
             acceptable_sifts_sequence_percentage_match = acceptable_sequence_percentage_match
@@ -415,11 +447,13 @@ class ResidueRelatrix(object):
                         for k in self.clustal_seqres_to_uniparc_sequence_maps[c].keys():
                             v_1 = self.clustal_seqres_to_uniparc_sequence_maps[c][k]
                             v_2 = self.sifts_seqres_to_uniparc_sequence_maps[c][k]
+                            print((self.pdb_id, c))
 
-                            if not (self.pdb_id, c) in known_bad_clustal_to_sifts_mappings or v_2:
+                            if not (self.pdb_id, c) in known_bad_clustal_to_sifts_mappings and v_2:
                                 # Make sure the UniParc IDs agree
                                 assert(v_1[0] == v_2[0])
 
+                            if not (self.pdb_id, c) in known_bad_clustal_to_sifts_mappings:
                                 # Make sure the residue types agree
                                 assert(self.uniparc_sequences[v_1[0]][v_1[1]].ResidueAA == self.uniparc_sequences[v_1[0]][v_2[1]].ResidueAA)
 
