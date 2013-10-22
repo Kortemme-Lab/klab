@@ -26,45 +26,41 @@ use_SIFTS_match_for_seqres_sequence = set([
     ('1AAR', 'A'), ('1AAR', 'B'), # not surprising since this is Polyubiquitin-C
     ('1AR1', 'D'), # for seqres to uniparc, chain D, Clustal maps 94->None, 95->None, 96->95, 97->96 whereas SIFTS maps 94->94, 95->95, 96->None, 97->96. Either mapping seems acceptable on a purely sequential level (although SIFTS seems better) but I am assuming that the SIFTS mapping makes more sense.
     ('1BF4', 'A'), # for seqres to uniparc, chain A, Clustal maps 35->36, 36->None, 37->None, 38->38 whereas SIFTS maps 35->36, 36->37, 37->38, 38->None. Either mapping seems acceptable on a purely sequential level (although SIFTS seems better) but I am assuming that the SIFTS mapping makes more sense.
+    ('1CPM', 'A'), # DBREF / UniProt says UPI000012BD97, SIFTS says UPI000005F74B. Either fits from a purely sequential standpoint as these two proteins have the same sequence apart from the 38th residue which is R in the former and P in the latter
+    ('1DEQ', 'C'), ('1DEQ', 'F'), ('1DEQ', 'P'), ('1DEQ', 'S'), # Clustal maps 222->247, SIFTS maps 222->245. Either one is correct - the sequence in GTG where one G is mapped to and the TG (or GT) is unmapped.
+    ('1OTR', 'B'), # Poly-ubiquitin. Clustal matches at position 153 (3rd copy), SIFTS matches at position 305 (5th and last copy).
+    ('1UBQ', 'A'), # Poly-ubiquitin. Clustal matches at position 305 (5th copy), SIFTS matches at position 609 (9th and last full copy). Clustal also maps the final residue weirdly (to the final residue of the 6th copy rather than the 5th copy)
+    ('1SCE', 'A'), ('1SCE', 'B'), ('1SCE', 'C'), ('1SCE', 'D'), # SIFTS has a better mapping
+    ('1ORC', 'A'), # Both matches are valid but neither are ideal (I would have done 53->53,...56->56,...62->57, 63->58,... skipping the inserted residues with ATOM IDs 56A-56E). I'll go with SIFTS since that is somewhat standard.
 ])
 
 known_bad_clustal_to_sifts_mappings = set([
     ('1AAR', 'A'), ('1AAR', 'B'),
     ('1BF4', 'A'),
-])
-
-# todo
-check_these = set([
     ('1CPM', 'A'),
-    ('1DEQ', 'C'), ('1DEQ', 'F'), ('1DEQ', 'P'), ('1DEQ', 'S'),
-    ('1DVF', 'D'),
-    ('1HGH', 'A'),
-    ('1OTR', 'B'),
-    ('1SCE', 'A'),
-    ('1UBQ', 'A'),
-    ('1URK', 'A'),
-    ('2ATC', 'B'),
-    ('487D', 'H'),
-
-    #('1E6N') failed outright
-    #('2FX5', # failed outright
-
-    #('2IMM', # failed outright
-
-    ('1ORC', 'A'), # problems with injectivity
-
-    ('1KJ1', 'A'), # expected - Ambiguous matches - the sequences are too close
-    #('1M7T') failed outright (expected - chimera case)
-    #('1Z1I'), # Expected bad case. This (306 residues) maps to P0C6U8/UPI000018DB89 (Replicase polyprotein 1a,  4,382 residues) A 3241-3546, the '3C-like proteinase' region
+    ('1DEQ', 'C'), ('1DEQ', 'F'), ('1DEQ', 'P'), ('1DEQ', 'S'), # the residue types actually agree but the key check will fail
+    ('1SCE', 'A'), ('1SCE', 'B'), ('1SCE', 'C'), ('1SCE', 'D'),
+    ('487D', 'H'), ('487D', 'I'), ('487D', 'J'), ('487D', 'K'), ('487D', 'L'), ('487D', 'M'), ('487D', 'N'), # The mapping SIFTS gets (from UniProt) is not as close as the DBREF entries
+    ('1ORC', 'A'), # the residue types actually agree but the key check will fail
 ])
 
+do_not_use_SIFTS_for_these_chains = set([
+    ('1HGH', 'A'), # The DBREF match (UPI000012C4CD) is better in terms of sequence and the reference also states that the A/Aichi/2/1968 (H3N2) isolate is under study
+    ('1URK', 'A'), # The DBREF/UniProt match (UPI00002BDB5) is a super-sequence of the SIFTS match (UPI000002C604)
+    ('2ATC', 'B'), # Clustal maps the K129 lysine deletion correctly, mapping RRADD->R(K)RAND. SIFTS maps RRADD->RKR(A)ND
+    ('487D', 'H'), ('487D', 'I'), ('487D', 'J'), ('487D', 'K'), ('487D', 'L'), ('487D', 'M'), ('487D', 'N'), # The mapping SIFTS gets (from UniProt) is not as close as the DBREF entries
+    ('1E6N', 'A'), ('1E6N', 'B'), # The DBREF match (UPI0000000F1C) matches the sequence. The UniProt SIFTS match (UPI00000B96E8) is not exact but is close. I don't know which is the better match but I chose the DBREF one.
+])
 
-
-use_SIFTS_match_for_seqres_sequence = use_SIFTS_match_for_seqres_sequence.union(check_these)
-known_bad_clustal_to_sifts_mappings = known_bad_clustal_to_sifts_mappings.union(check_these)
+pdbs_with_do_not_use_SIFTS_for_these_chains = set([p[0] for p in do_not_use_SIFTS_for_these_chains])
 
 do_not_use_the_sequence_aligner = set([
     '1CBW',
+    '1KJ1', # The sequences are too close for Clustal to match properly
+    '1M7T', # Chimera. SIFTS maps this properly
+    '1Z1I', # This (306 residues) maps to P0C6U8/UPI000018DB89 (Replicase polyprotein 1a,  4,382 residues) A 3241-3546, the '3C-like proteinase' region
+            #                         and P0C6X7/UPI000019098F (Replicase polyprotein 1ab, 7,073 residues) A 3241-3546, the '3C-like proteinase' region
+            # which gives our Clustal sequence aligner an ambiguous mapping. Both are valid mappings. SIFTS chooses the the longer one, UPI000019098F.
 ])
 
 
@@ -268,7 +264,9 @@ class ResidueRelatrix(object):
                     if len(all_SEQRES_residues) >= 20:
                         match_percentage = 100.0 * (float(len(mapped_SEQRES_residues))/float((len(all_SEQRES_residues))))
                         if not (self.acceptable_sequence_percentage_match <= match_percentage <= 100.0):
-                            raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
+                            if not set(list(str(self.seqres_sequences[chain_id]))) == set(['X']):
+                                # Skip cases where all residues are unknown e.g. 1DEQ, chain M
+                                raise Exception("Chain %s in %s only had a match percentage of %0.2f%%" % (chain_id, self.pdb_id, match_percentage))
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
@@ -276,25 +274,11 @@ class ResidueRelatrix(object):
                 uniparc_chain_id = self.pdb_chain_to_uniparc_chain_mapping[chain_id]
                 uniparc_residue_ids = set(self.uniparc_sequences[uniparc_chain_id].ids())
                 assert(rng.intersection(uniparc_residue_ids) == rng)
-                #a = rng
-                #b = sorted([r for r in sequence_map.values()])
-                #print(chain_id)
-                #print(a, len(a))
-                #print(b, len(b))
-                #b = set([x[1] for x in b])
-                #print('a.difference(b)')
-                #print(a.difference(b))
-                #print('b.difference(a)')
-                #print(b.difference(a))
-                #print(chain_id, self.pdb_chain_to_uniparc_chain_mapping.get(chain_id), len(rng), len(sequence_map.values()))
                 if len(rng) != len(sequence_map.values()):
                     rng_vals = set()
                     for x in sequence_map.values():
                         if x[1] in rng_vals:
                             err_msg = ['The SEQRES to UniParc map is not injective for %s, chain %s; the element %s occurs more than once in the range.' % (self.pdb_id, chain_id, str(x))]
-                            err_msg.append(colortext.make('The seqres_to_uniparc_sequence_maps mapping is:', color = 'green'))
-                            for k, v in sequence_map.map.iteritems():
-                                err_msg.append(' %s -> %s' % (str(k).ljust(7), str(v).ljust(20)))
 
                             err_msg.append(colortext.make('The seqres_to_uniparc_sequence_maps mapping is:', color = 'green'))
                             for k, v in sequence_map.map.iteritems():
@@ -390,6 +374,12 @@ class ResidueRelatrix(object):
             self.sifts_atom_to_seqres_sequence_maps = self.sifts.atom_to_seqres_sequence_maps
             self.sifts_seqres_to_uniparc_sequence_maps = self.sifts.seqres_to_uniparc_sequence_maps
             self.sifts_atom_to_uniparc_sequence_maps = self.sifts.atom_to_uniparc_sequence_maps
+            if self.pdb_id in pdbs_with_do_not_use_SIFTS_for_these_chains:
+                for chain_id in self.sifts_atom_to_seqres_sequence_maps.keys() + self.sifts_seqres_to_uniparc_sequence_maps.keys() + self.sifts_atom_to_uniparc_sequence_maps.keys():
+                    if (self.pdb_id, chain_id) in do_not_use_SIFTS_for_these_chains:
+                        self.sifts_atom_to_seqres_sequence_maps[chain_id] = SequenceMap()
+                        self.sifts_seqres_to_uniparc_sequence_maps = SequenceMap()
+                        self.sifts_atom_to_uniparc_sequence_maps = SequenceMap()
 
         if self.pdb_to_rosetta_residue_map_error:
             self.rosetta_to_atom_sequence_maps = {}
@@ -441,34 +431,37 @@ class ResidueRelatrix(object):
                 if self.sequence_types[c] == 'Protein' or self.sequence_types[c] == 'Protein skeleton':
                     if (self.pdb_id, c) in use_SIFTS_match_for_seqres_sequence:
                         #assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
-                        if not (self.pdb_id, c) in known_bad_clustal_to_sifts_mappings:
+                        if (self.pdb_id, c) not in known_bad_clustal_to_sifts_mappings:
                             # Flag cases for manual inspection
                             assert(self.clustal_seqres_to_uniparc_sequence_maps[c].keys() == self.sifts_seqres_to_uniparc_sequence_maps[c].keys())
                         for k in self.clustal_seqres_to_uniparc_sequence_maps[c].keys():
                             v_1 = self.clustal_seqres_to_uniparc_sequence_maps[c][k]
                             v_2 = self.sifts_seqres_to_uniparc_sequence_maps[c][k]
-                            print((self.pdb_id, c))
 
-                            if not (self.pdb_id, c) in known_bad_clustal_to_sifts_mappings and v_2:
+                            if (self.pdb_id, c) not in known_bad_clustal_to_sifts_mappings and v_2:
                                 # Make sure the UniParc IDs agree
                                 assert(v_1[0] == v_2[0])
 
-                            if not (self.pdb_id, c) in known_bad_clustal_to_sifts_mappings:
+                            if (self.pdb_id, c) not in known_bad_clustal_to_sifts_mappings:
                                 # Make sure the residue types agree
                                 assert(self.uniparc_sequences[v_1[0]][v_1[1]].ResidueAA == self.uniparc_sequences[v_1[0]][v_2[1]].ResidueAA)
 
-                            # Copy the substitution scores over. Since the residue types agree, this is valid
-                            self.sifts_seqres_to_uniparc_sequence_maps[c].substitution_scores[k] = self.clustal_seqres_to_uniparc_sequence_maps[c].substitution_scores[k]
+                                # Copy the substitution scores over. Since the residue types agree, this is valid
+                                self.sifts_seqres_to_uniparc_sequence_maps[c].substitution_scores[k] = self.clustal_seqres_to_uniparc_sequence_maps[c].substitution_scores[k]
 
                         self.clustal_seqres_to_uniparc_sequence_maps[c] = self.sifts_seqres_to_uniparc_sequence_maps[c]
 
                     try:
                         if self.sifts_seqres_to_uniparc_sequence_maps.get(c):
-                            assert(self.clustal_seqres_to_uniparc_sequence_maps[c].matches(self.sifts_seqres_to_uniparc_sequence_maps[c]))
+                            if not self.clustal_seqres_to_uniparc_sequence_maps[c].matches(self.sifts_seqres_to_uniparc_sequence_maps[c]):
+                                mismatched_keys = self.clustal_seqres_to_uniparc_sequence_maps[c].get_mismatches(self.sifts_seqres_to_uniparc_sequence_maps[c])
+                                raise Exception("self.clustal_seqres_to_uniparc_sequence_maps[c].matches(self.sifts_seqres_to_uniparc_sequence_maps[c])")
                             self.seqres_to_uniparc_sequence_maps[c] = self.clustal_seqres_to_uniparc_sequence_maps[c] + self.sifts_seqres_to_uniparc_sequence_maps[c]
                         else:
                             self.seqres_to_uniparc_sequence_maps[c] = self.clustal_seqres_to_uniparc_sequence_maps[c]
-                    except:
+                    except Exception, e:
+                        colortext.warning(traceback.format_exc())
+                        colortext.error(str(e))
                         raise colortext.Exception("Mapping cross-validation failed checking atom to seqres sequence maps between Clustal and SIFTS in %s, chain %s." % (self.pdb_id, c))
                 else:
                     self.clustal_seqres_to_uniparc_sequence_maps[c] = seqmap

@@ -724,7 +724,7 @@ class PDBUniParcSequenceAligner(object):
                     self.seqres_to_uniparc_sequence_maps[c] = s
 
                 else:
-                    self.seqres_to_uniparc_sequence_maps[c] = {}
+                    self.seqres_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap()
 
         # Use the representatives' alignments for their respective equivalent classes. This saves memory as the same SequenceMap is used.
         for c_1, related_chains in self.equivalence_fiber.iteritems():

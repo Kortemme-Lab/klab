@@ -51,6 +51,8 @@ if use_patches:
         'UPI000002D10B' : {'Name' : 'Thiol:disulfide interchange protein', 'EC numbers' : [], 'Short names' : []},
         'UPI0000054B9A' : {'Name' : 'DSBA-like thioredoxin domain protein', 'EC numbers' : [], 'Short names' : []},
         'UPI0000021092' : {'Name' : '', 'EC numbers' : [], 'Short names' : []},
+        'UPI00000B96E8' : {'Name' : 'Chitinase', 'EC numbers' : [], 'Short names' : []},
+        'UPI00000C5AE8' : {'Name' : '', 'EC numbers' : [], 'Short names' : []},
     }
 
     # These entries had no recommended names - the names here are merges of submitted names

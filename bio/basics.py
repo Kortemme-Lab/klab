@@ -261,6 +261,10 @@ class SequenceMap():
                 return False
         return True
 
+    def get_mismatches(self, other):
+        overlap = set(self.keys()).intersection(set(other.keys()))
+        return [k for k in overlap if self[k] != other[k]]
+
     def substitution_scores_match(self, other):
         '''Check to make sure that the substitution scores agree. If one map has a null score and the other has a non-null score, we trust the other's score and vice versa.'''
         overlap = set(self.substitution_scores.keys()).intersection(set(other.substitution_scores.keys()))
@@ -269,6 +273,9 @@ class SequenceMap():
                 if self.substitution_scores[k] != other.substitution_scores[k]:
                     return False
         return True
+
+    def get(self, k, default_value = None):
+        return self.map.get(k, default_value)
 
     def keys(self):
         return self.map.keys()
