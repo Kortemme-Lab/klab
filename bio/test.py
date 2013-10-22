@@ -36,7 +36,6 @@ def FASTA_alignment():
     sa = SequenceAligner.from_FASTA(f)
     print(sa)
 
-
 def test_ddg_pdb_ids():
 
     # Test set - 845 PDB IDs. A small number required manual intervention but most are parsed and mapped automatically. 5 needed to use the SIFTS mappings.
@@ -61,32 +60,22 @@ def test_ddg_pdb_ids():
     }
 
     to_be_hardcoded = {
-        # Do not hardcode - use SIFTS for the mappings
-        '1KJ1', # Ambiguous matches - the sequences are too close
-        '1Z1I', # This (306 residues) maps to P0C6U8/UPI000018DB89 (Replicase polyprotein 1a,  4,382 residues) A 3241-3546, the '3C-like proteinase' region
-                #                         and P0C6X7/UPI000019098F (Replicase polyprotein 1ab, 7,073 residues) A 3241-3546, the '3C-like proteinase' region
-                # Both are valid mappings so we choose the longer one, UPI000019098F
-        '1CBW', # Ambiguous matches - the sequences are too close
-
-        # Special case: 1N02
+        # Special case: 1N02. This needs to be handled manually.
         # DBREF  1N02 A    1     3  UNP    P81180   CVN_NOSEL        1      3
-        # DBREF  1N02 A    4    49  UNP    P81180   CVN_NOSEL       54     99
+        # DBREF  1N02 A    4    49  UNP    P81180   CVN_NOSEL       54     992IMM
         # DBREF  1N02 A   50    54  UNP    P81180   CVN_NOSEL       49     53
         # DBREF  1N02 A   55    99  UNP    P81180   CVN_NOSEL        4     48
         # DBREF  1N02 A  100   101  UNP    P81180   CVN_NOSEL      100    101
         '1N02',
-        '1M7T', # chimera case - best handled with SIFTS
-
+        ('2IMM'), # No PDB <-> UniProt mapping
     }
     test_these = [
-        #'1KJ1',
-        '1WSY',
+        '1KJ1'
     ]
-    ddG_pdb_ids = test_these
 
     colortext.message('Testing %d PDB files for the DDG database.' % len(ddG_pdb_ids))
-    start_x = 0
     #start_x = 0
+    start_x = 0
 
     for x in range(start_x, len(ddG_pdb_ids)):
         ddG_pdb_id = ddG_pdb_ids[x]
@@ -101,16 +90,38 @@ def test_ddg_pdb_ids():
                 starting_clustal_cut_off, min_clustal_cut_off, acceptable_sequence_percentage_match = specific_cut_offs[ddG_pdb_id]
             try:
                 rr = ResidueRelatrix(ddG_pdb_id, rosetta_scripts_path, rosetta_database_path, starting_clustal_cut_off = starting_clustal_cut_off, min_clustal_cut_off = min_clustal_cut_off, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = '/home/oconchus/temp')
-                #print(rr.pdb_chain_to_uniparc_chain_mapping)
-                #print(rr.seqres_to_uniparc_sequence_maps)
+
             except SpecificException:
-                failed_cases.append((x, ddG_pdb_id))
+                failed_cases.append((x, ddG_pdb_id, str(e)))
         else:
             colortext.warning('SKIPPING PDB file number %d: %s' % (x, ddG_pdb_id))
 
-        print("failed_cases", failed_cases)
+        if failed_cases:
+            colortext.error('Failed cases:')
+            fcc = 0
+            for f in failed_cases:
+                if fcc == 0:
+                    colortext.warning(str(f))
+                else:
+                    colortext.printf(str(f), color = 'cyan')
+                fcc = (fcc + 1) % 2
+
 
     print("failed_cases", failed_cases)
+
+test_ddg_pdb_ids()
+sys.exit(0)
+
+sifts_map = SIFTS.retrieve('1DEQ', cache_dir = cache_dir)
+print(sifts_map.atom_to_uniparc_sequence_maps['D'])
+print('--')
+print(sifts_map.atom_to_seqres_sequence_maps['D'])
+print('--')
+print(sifts_map.seqres_to_uniparc_sequence_maps['D'])
+
+sys.exit(0)
+test_ddg_pdb_ids()
+sys.exit(0)
 
 def test_sifts_module():
     failures = []
@@ -146,43 +157,6 @@ def test_sifts_module():
         colortext.error('Failures: %d/%d' % (len(failures), num_cases))
         for f in failures:
             colortext.warning(f)
-
-test_ddg_pdb_ids()
-sys.exit(0)
-sifts_map = SIFTS.retrieve('1KJ1', cache_dir = cache_dir)
-#sifts_map = SIFTS.retrieve('1M7T', cache_dir = cache_dir)
-for c, m in sorted(sifts_map.atom_to_uniparc_sequence_maps.iteritems()):
-    colortext.message(c)
-    print(m)
-    print(sifts_map.atom_to_seqres_sequence_maps[c])
-    print(sifts_map.seqres_to_uniparc_sequence_maps[c])
-
-#test_ddg_pdb_ids()
-
-sys.exit(0)
-print(sifts_map.atom_to_uniparc_sequence_map)
-
-sifts_map = SIFTS.retrieve('1H38', cache_dir = cache_dir)
-print(sifts_map.atom_to_uniparc_sequence_map)
-sifts_map = SIFTS.retrieve('1ZC8', cache_dir = cache_dir)
-print(sifts_map.atom_to_uniparc_sequence_map)
-sifts_map = SIFTS.retrieve('4IHY', cache_dir = cache_dir)
-print(sifts_map.atom_to_uniparc_sequence_map)
-sifts_map = SIFTS.retrieve('1J1M', cache_dir = cache_dir)
-print(sifts_map.atom_to_uniparc_sequence_map)
-sifts_map = SIFTS.retrieve('1A2C', cache_dir = cache_dir)
-print(sifts_map.atom_to_uniparc_sequence_map)
-
-#p = PDB.from_filepath('../.testdata/1H38.pdb') # has protein, DNA, RNA
-#p = PDB.from_filepath('../.testdata/1ZC8.pdb')
-#p = PDB.from_filepath('../.testdata/4IHY.pdb')
-#p = PDB.from_filepath('../.testdata/1J1M.pdb')
-#p = PDB.from_filepath('../.testdata/1H38.pdb')
-#p = PDB.from_filepath('../.testdata/1A2C.pdb')
-#104L
-
-
-sys.exit(0)
 
 def test_pdbml_speed():
 
@@ -252,14 +226,11 @@ def test_ResidueRelatrix_1LRP():
     assert(uniparc_id_1 == uniparc_id_2)
 
 
-
 def test_ResidueRelatrix_104L():
     # Rosetta residue 45 -> 'A  44A' is an insertion residue which does not appear in the UniParc sequence
 
     rr = ResidueRelatrix('104L', rosetta_scripts_path, rosetta_database_path, min_clustal_cut_off = 80, cache_dir = '/home/oconchus/temp')
     rosetta_id_1 = 45
-
-    print(rr.rosetta_to_atom_sequence_maps['A'])
 
     # Single jumps forward
     atom_id_1 = rr.convert('A', rosetta_id_1, 'rosetta', 'atom')
@@ -284,7 +255,6 @@ def test_ResidueRelatrix_104L():
 
     rosetta_id_4 = rr.convert('A', seqres_id_2, 'seqres', 'rosetta')
 
-    print(rosetta_id_1, atom_id_1, seqres_id_1, uniparc_id_1)
     assert(rosetta_id_1 == rosetta_id_2 and rosetta_id_2 == rosetta_id_4)
     assert(rosetta_id_3 == None)
     assert(atom_id_1 == atom_id_2)
@@ -308,7 +278,7 @@ def test_ResidueRelatrix_1A2C():
     seqres_id_1 = rr.convert(chain_id, atom_id_1, 'atom', 'seqres')
     assert(seqres_id_1== 121)
     uniparc_id_1 = rr.convert(chain_id, seqres_id_1, 'seqres', 'uniparc')
-    assert(uniparc_id_1 == 484)
+    assert(uniparc_id_1 == (u'UPI0000136ECD', 484))
 
     # Double/triple jumps forward
     seqres_id_2 = rr.convert(chain_id, rosetta_id_1, 'rosetta', 'seqres')
@@ -345,17 +315,17 @@ def test_ResidueRelatrix_1A2P():
     seqres_id_1 = rr.convert('A', atom_id_1, 'atom', 'seqres')
     assert(seqres_id_1 == 81)
     uniparc_id_1 = rr.convert('A', seqres_id_1, 'seqres', 'uniparc')
-    assert(uniparc_id_1 == 128)
+    assert(uniparc_id_1 == (u'UPI000013432A', 128))
 
     # Double/triple jumps forward
     seqres_id_2 = rr.convert('A', rosetta_id_1, 'rosetta', 'seqres')
     assert(seqres_id_2 == 81)
     uniparc_id_2 = rr.convert('A', rosetta_id_1, 'rosetta', 'uniparc')
-    assert(uniparc_id_2 == 128)
+    assert(uniparc_id_2 == (u'UPI000013432A', 128))
 
     # Double jumps forward
     uniparc_id_3 = rr.convert('A', atom_id_1, 'atom', 'uniparc')
-    assert(uniparc_id_3 == 128)
+    assert(uniparc_id_3 == (u'UPI000013432A', 128))
 
 
     # Single jumps backward
@@ -384,16 +354,52 @@ def test_ResidueRelatrix_1A2P():
     #print(rr.rosetta_to_atom_sequence_maps)
     assert(rr.convert_from_rosetta(3, 'atom') == 'A   5 ')
     assert(rr.convert_from_rosetta(3, 'seqres') == 5)
-    assert(rr.convert_from_rosetta(3, 'uniparc') == 52)
+    assert(rr.convert_from_rosetta(3, 'uniparc') == (u'UPI000013432A', 52))
 
     # Rosetta residue 159 maps to 'B  54 '
     # Rosetta residue 248 maps to 'C  35 '
 
-#test_ResidueRelatrix_1A2P()
-#test_ResidueRelatrix_104L()
+test_ResidueRelatrix_1A2P()
+test_ResidueRelatrix_104L()
 test_ResidueRelatrix_1A2C()
+test_ResidueRelatrix_1LRP()
 
 sys.exit(0)
+sifts_map = SIFTS.retrieve('1KJ1', cache_dir = cache_dir)
+#sifts_map = SIFTS.retrieve('1M7T', cache_dir = cache_dir)
+for c, m in sorted(sifts_map.atom_to_uniparc_sequence_maps.iteritems()):
+    colortext.message(c)
+    print(m)
+    print(sifts_map.atom_to_seqres_sequence_maps[c])
+    print(sifts_map.seqres_to_uniparc_sequence_maps[c])
+
+#test_ddg_pdb_ids()
+
+sys.exit(0)
+print(sifts_map.atom_to_uniparc_sequence_map)
+
+sifts_map = SIFTS.retrieve('1H38', cache_dir = cache_dir)
+print(sifts_map.atom_to_uniparc_sequence_map)
+sifts_map = SIFTS.retrieve('1ZC8', cache_dir = cache_dir)
+print(sifts_map.atom_to_uniparc_sequence_map)
+sifts_map = SIFTS.retrieve('4IHY', cache_dir = cache_dir)
+print(sifts_map.atom_to_uniparc_sequence_map)
+sifts_map = SIFTS.retrieve('1J1M', cache_dir = cache_dir)
+print(sifts_map.atom_to_uniparc_sequence_map)
+sifts_map = SIFTS.retrieve('1A2C', cache_dir = cache_dir)
+print(sifts_map.atom_to_uniparc_sequence_map)
+
+#p = PDB.from_filepath('../.testdata/1H38.pdb') # has protein, DNA, RNA
+#p = PDB.from_filepath('../.testdata/1ZC8.pdb')
+#p = PDB.from_filepath('../.testdata/4IHY.pdb')
+#p = PDB.from_filepath('../.testdata/1J1M.pdb')
+#p = PDB.from_filepath('../.testdata/1H38.pdb')
+#p = PDB.from_filepath('../.testdata/1A2C.pdb')
+#104L
+
+
+sys.exit(0)
+
 
 sa = PDBUniParcSequenceAligner('1KI1', cache_dir = '/home/oconchus/temp', cut_off = 85.0)
 print('d', sa.residue_mapping)
