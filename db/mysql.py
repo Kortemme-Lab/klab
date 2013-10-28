@@ -2,8 +2,6 @@
 # -*- coding: iso-8859-15 -*-
 
 import sys, os
-import MySQLdb
-import MySQLdb.cursors
 import traceback
 import re
 from time import sleep
@@ -13,8 +11,17 @@ from string import join
 
 from tools.fs.fsio import read_file
 
-DictCursor = MySQLdb.cursors.DictCursor
-StdCursor = MySQLdb.cursors.Cursor
+# Database import functions
+# Use oursql if available; it's more up to date
+try:
+    import oursql as MySQLdb
+    import oursql.cursors as cursors
+except ImportError:
+    import MySQLdb
+    import MySQLdb.cursors as cursors
+
+DictCursor = cursors.DictCursor
+StdCursor = cursors.Cursor
 
 class DatabaseInterface(object):
 
