@@ -50,6 +50,7 @@ cd $REPO_DIR/source
 nice -n 15 ./scons.py bin mode=release -j $NUMPROC &>> parent_release.compilation.out
 echo "Compilation done"
 echo "Finished compiling parent_release at: `date`" >> ../$output_file
+echo "  output at: source/parent_release.compilation.out" >> ../$output_file
 cd ../..
 
 # echo "Running initial score to build dunbrack binary..."
@@ -65,6 +66,7 @@ cd $REPO_DIR/tests/integration
 nice -n 15 ./integration.py -j $NUMPROC -d ../../database &>> parent_integration.out
 cd ../../..
 echo "Finished running parent integration tests at: `date`" >> $REPO_DIR/$output_file
+echo "  output at: tests/integration/parent_integration.out" >> $REPO_DIR/$output_file
 
 echo "Running parent integration tests again..."
 # We have to do this until the problems with Dunbrack binaries are fixed
@@ -74,6 +76,7 @@ rm -rf ref
 mv new ref
 cd ../../..
 echo "Finished running parent integration tests again at: `date`" >> $REPO_DIR/$output_file
+echo "  output at: tests/integration/parent_integration.out" >> $REPO_DIR/$output_file
 
 echo "Compiling new_release..."
 cd $REPO_DIR/source
@@ -88,6 +91,8 @@ cd $REPO_DIR/tests/integration
 nice -n 15 ./integration.py -j $NUMPROC -d ../../database &>> new_integration.out
 cd ../../..
 echo "Finished running new integration tests at: `date`" >> $REPO_DIR/$output_file
+echo "  output at: tests/integration/new_integration.out" >> $REPO_DIR/$output_file
+
 
 echo "Compiling new_debug..."
 cd $REPO_DIR/source
@@ -95,12 +100,15 @@ nice -n 15 ./scons.py -j $NUMPROC &>> new_debug.compilation.out
 nice -n 15 ./scons.py -j $NUMPROC cat=test &>> new_debug.compilation.out
 echo "Compilation done"
 echo "Finished compiling new_debug at: `date`" >> ../$output_file
+echo "  output at: source/new_debug.compilation.out" >> ../$output_file
+
 cd ../..
 
 echo "Running unit tests"
 cd $REPO_DIR/source
-nice -n 15 python test/run.py -j $NUMPROC -d ../database --mute all &>> unit_tests
+nice -n 15 python test/run.py -j $NUMPROC -d ../database --mute all &>> unit_tests.out
 echo "Finished running unit tests at: `date`" >> ../$output_file
+echo "  output at: source/unit_tests.out" >> ../$output_file
 echo "Finishing time: `date`" >> ../$output_file
 cd ../..
 
