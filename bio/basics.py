@@ -102,8 +102,8 @@ non_canonical_amino_acids = {
     #
     'ASX' : 'N', # ??? N in UniProt entry P0A786 for 2ATC, chain A
     'GLX' : 'Q', # ??? Q in UniProt entry P01075 for 4CPA, chain I
-    'CRT' : 'CRT', # Specially defined by Noah
-    'CRG' : 'CRG'  # Specially defined by Noah
+    'CRT' : 'T', # Specially defined by Noah
+    'CRG' : 'YG'  # Specially defined by Noah
 }
 
 ###
