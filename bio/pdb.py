@@ -316,12 +316,14 @@ class PDB:
     def __init__(self, pdb_content, pdb_id = None):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
-        assert(type(pdb_content) is types.StringType)
+        if type(pdb_content) is types.StringType:
+            self.lines =  pdb_content.split("\n")
+        else:
+            self.lines = [line.strip() for line in pdb_content]
         self.parsed_lines = {}
         self.structure_lines = []                       # For ATOM and HETATM records
         self.ddGresmap = None
         self.ddGiresmap = None
-        self.lines = []
         self.journal = None
         self.chain_types = {}
         self.format_version = None
@@ -343,8 +345,6 @@ class PDB:
         self.rosetta_to_atom_sequence_maps = {}
         self.rosetta_residues = []
 
-        self.lines = pdb_content.split("\n")
-
         self._split_lines()
         self.pdb_id = pdb_id
         self.pdb_id = self.get_pdb_id()                 # parse the PDB ID if it is not passed in
@@ -358,8 +358,8 @@ class PDB:
         self._get_ATOM_sequences()
 
     def _apply_hacks(self):
-        pdb_id = self.pdb_id.upper()
-        if pdb_id:
+        if self.pdb_id:
+            pdb_id = self.pdb_id.upper()
             if pdb_id == '2MBP':
                 newlines = []
                 for l in self.lines:
@@ -821,7 +821,8 @@ class PDB:
             assert(SEQRES_lines[x][7:10].strip().isdigit())
 
         if not SEQRES_lines:
-            raise MissingRecordsException("No SEQRES records were found. Handle this gracefully.") # return None
+            colortext.warning("WARNING: No SEQRES records were found. Kyle is trying to handle this gracefully, but Shane may need to fix it")
+            return None
 
         seqres_chain_order = []
         SEQRES_lines = [line[11:].rstrip() for line in SEQRES_lines] # we cannot strip the left characters as some cases e.g. 2MBP are missing chain identifiers
@@ -922,6 +923,9 @@ class PDB:
         for chain_id, sequence in sequences.iteritems():
             self.seqres_sequences[chain_id] = Sequence.from_sequence(chain_id, sequence, self.chain_types[chain_id])
 
+    def _set_chain_types(self):
+        pass
+
     def _get_ATOM_sequences(self):
         '''Creates the ATOM Sequences.'''
 
@@ -965,7 +969,6 @@ class PDB:
             else:
                 line_types_by_chain.append('Mixed')
 
-
         for x in range(0, len(residue_lines_by_chain)):
             residue_lines = residue_lines_by_chain[x]
             line_types = line_types_by_chain[x]
@@ -991,7 +994,13 @@ class PDB:
                 if missing_chain_ids.get(self.pdb_id):
                     chain_id = missing_chain_ids[self.pdb_id]
 
-                chain_type = self.chain_types[chain_id]
+                if chain_id in self.chain_types:
+                    # This means the pdb had SEQRES and we constructed atom_sequences
+                    chain_type = self.chain_types[chain_id]
+                else:
+                    # Otherwise assume this is protein
+                    chain_type = 'Protein'
+                
                 atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
 
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
@@ -1009,7 +1018,12 @@ class PDB:
                     raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
-                atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
+                # KAB - way to allow for multiresidue noncanonical AA's
+                if len(short_residue_type) == 1:
+                    atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], short_residue_type, chain_type))
+                else:
+                    for char in short_residue_type:
+                        atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], char, chain_type))
 
         self.atom_sequences = atom_sequences
 

@@ -102,6 +102,8 @@ non_canonical_amino_acids = {
     #
     'ASX' : 'N', # ??? N in UniProt entry P0A786 for 2ATC, chain A
     'GLX' : 'Q', # ??? Q in UniProt entry P01075 for 4CPA, chain I
+    'CRT' : 'CRT', # Specially defined by Noah
+    'CRG' : 'CRG'  # Specially defined by Noah
 }
 
 ###
@@ -175,6 +177,8 @@ class Sequence(object):
         if sequence_type:
             assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton')
 
+        self.special_insertion_count = 1
+
     def __iter__(self):
         self._iter_index = 0
         return self
@@ -198,6 +202,12 @@ class Sequence(object):
         id = r.get_residue_id()
         if self.order:
             last_id = self.order[-1]
+
+            # KAB - allow for multiresidue noncanonicals
+            if id in self.order:
+                id = '%s.%d'%(str(id),self.special_insertion_count)
+                self.special_insertion_count += 1
+
             assert(r.Chain == self.sequence[last_id].Chain)
             assert(r.residue_type == self.sequence[last_id].residue_type)
         self.order.append(id)
