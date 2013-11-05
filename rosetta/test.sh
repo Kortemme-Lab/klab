@@ -27,6 +27,11 @@ else
     mkdir $TESTING_DIR
 fi
 
+cd main
+echo "Initial fetch"
+git fetch
+cd ..
+
 cd $TESTING_DIR
 
 echo "Cloning repository"
