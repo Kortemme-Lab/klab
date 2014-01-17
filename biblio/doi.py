@@ -11,6 +11,10 @@ described here
    http://www.crossref.org/schema/documentation/unixref1.0/unixref.html
    http://www.crossref.org/schema/documentation/unixref1.1/unixref1.1.html
 
+Note: xml.dom.minidom is slow but incredibly easy to write/follow. I think it should be fine for our scale of use (occassionally
+parsing a few, small files). xml.sax could be a lot faster for huge amounts of files (or not) so if speed becomes an issue
+then that would be a good place to start.
+
 Created by Shane O'Connor 2014
 """
 import sys
