@@ -69,9 +69,16 @@ class DOI(object):
     '''
 
     def __init__(self, doi):
+
+        # Allow for 'doi:10.1038/nature12443' or '10.1038/nature12443'
+        doi = doi.strip()
+        if doi.lower().startswith('doi:'):
+            doi = doi[4:].strip()
+
         self.issue = {}
         self.article = {}
         self.doi = doi
+
         data = self.get_info()
         self.parse(data)
 
@@ -224,5 +231,8 @@ class DOI(object):
         return "\n".join(s)
 
 if __name__ == '__main__':
-    d = DOI('10.1371/journal.pone.0063906')
-    print(d)
+    DOIs = ('10.1371/journal.pone.0063906', 'doi:10.1038/nature12443')
+    for d in DOIs:
+        colortext.message(d)
+        doi = DOI(d)
+        print(doi)
