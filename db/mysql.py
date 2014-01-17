@@ -26,7 +26,7 @@ StdCursor = cursors.Cursor
 class DatabaseInterface(object):
 
     def __init__(self, settings, isInnoDB=True, numTries=1, host=None, db=None, user=None, passwd=None, port=None,
-                 unix_socket=None, passwdfile=None, use_utf=False):
+                 unix_socket=None, passwdfile=None, use_utf=False, use_locking=True):
         self.connection = None
         self.StdCursor_connection = None
         self.queries_run = 0
@@ -39,6 +39,10 @@ class DatabaseInterface(object):
         self.passwd = passwd or settings["SQLPassword"]
         self.port = port or settings["SQLPort"]
         self.unix_socket = unix_socket or settings["SQLSocket"]
+        if use_locking == True or use_locking == False:
+            self.use_locking = use_locking
+        else:
+            settings["SQLUseLocking"]
         self.numTries = numTries
         self.lastrowid = None
         if (not self.passwd) and passwdfile:
@@ -48,9 +52,12 @@ class DatabaseInterface(object):
                 passwd = getpass.getpass("Enter password to connect to MySQL database:")
 
         self.locked = False
-        self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r.values()[0] for r in self.execute("SHOW TABLES")],
-                                                  ", ")
-        self.unlockstring = "UNLOCK TABLES"
+        if use_locking:
+            self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r.values()[0] for r in self.execute("SHOW TABLES")], ", ")
+            self.unlockstring = "UNLOCK TABLES"
+        else:
+            self.lockstring = ""
+            self.unlockstring = ""
 
         # Store a list of the table names
         self.TableNames = [r.values()[0] for r in self.execute("SHOW TABLES")]
@@ -147,7 +154,8 @@ class DatabaseInterface(object):
                 self._get_StdCursor_connection()
                 cursor = self.StdCursor_connection.cursor()
                 if locked:
-                    cursor.execute(self.lockstring)
+                    if self.lockstring:
+                        cursor.execute(self.lockstring)
                     self.locked = True
                 if parameters:
                     errcode = cursor.execute(sql, parameters)
@@ -158,14 +166,16 @@ class DatabaseInterface(object):
                     self.StdCursor_connection.commit()
                 results = cursor.fetchall()
                 if locked:
-                    cursor.execute(self.unlockstring)
+                    if self.unlockstring:
+                        cursor.execute(self.unlockstring)
                     self.locked = False
                 cursor.close()
                 return results
             except MySQLdb.OperationalError, e:
                 if cursor:
                     if self.locked:
-                        cursor.execute(self.unlockstring)
+                        if self.unlockstring:
+                            cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
                 caughte = str(e)
@@ -174,7 +184,8 @@ class DatabaseInterface(object):
             except Exception, e:
                 if cursor:
                     if self.locked:
-                        cursor.execute(self.unlockstring)
+                        if self.unlockstring:
+                            cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
                 caughte = str(e)
@@ -216,7 +227,6 @@ class DatabaseInterface(object):
 
     def execute(self, sql, parameters=None, quiet=False, locked=False, do_commit=True, allow_unsafe_query=False):
         """Execute SQL query. This uses DictCursor by default."""
-
         if do_commit:
             pass#print('s')
             self.queries_run += 1
@@ -234,7 +244,8 @@ class DatabaseInterface(object):
                 self._get_connection(force = i > 1)
                 cursor = self.connection.cursor()
                 if locked:
-                    cursor.execute(self.lockstring)
+                    if self.lockstring:
+                        cursor.execute(self.lockstring)
                     self.locked = True
                 if parameters:
                     errcode = cursor.execute(sql, parameters)
@@ -245,7 +256,8 @@ class DatabaseInterface(object):
                     self.connection.commit()
                 results = cursor.fetchall()
                 if locked:
-                    cursor.execute(self.unlockstring)
+                    if self.unlockstring:
+                        cursor.execute(self.unlockstring)
                     self.locked = False
                 cursor.close()
                 return results
@@ -254,7 +266,8 @@ class DatabaseInterface(object):
                     print(i, "MySQLdb.OperationalError", str(e))
                 if cursor:
                     if self.locked:
-                        cursor.execute(self.unlockstring)
+                        if self.unlockstring:
+                            cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
                 caughte = str(e)
@@ -265,7 +278,8 @@ class DatabaseInterface(object):
                     print(i, "Exception", str(e))
                 if cursor:
                     if self.locked:
-                        cursor.execute(self.unlockstring)
+                        if self.unlockstring:
+                            cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
                 caughte = str(e)
