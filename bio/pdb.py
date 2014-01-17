@@ -449,7 +449,7 @@ class PDB:
                         chain_atoms[chain_id] = chain_atoms.get(chain_id, set())
                         chain_atoms[chain_id].add(atom_type)
             if linetype == 'ENDMDL':
-                print("ENDMDL detected: Breaking out early. We do not currently handle NMR structures properly.")
+                colortext.warning("ENDMDL detected: Breaking out early. We do not currently handle NMR structures properly.")
                 break
 
         self.structure_lines = structure_lines
@@ -822,7 +822,7 @@ class PDB:
 
         if not SEQRES_lines:
             colortext.warning("WARNING: No SEQRES records were found. Kyle is trying to handle this gracefully, but Shane may need to fix it")
-            return None
+            return
 
         seqres_chain_order = []
         SEQRES_lines = [line[11:].rstrip() for line in SEQRES_lines] # we cannot strip the left characters as some cases e.g. 2MBP are missing chain identifiers
@@ -861,6 +861,9 @@ class PDB:
                 assert(len(set(tokens).intersection(dna_nucleotides)) == 0)
                 assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
                 chain_type = 'Protein'
+                if not self.chain_atoms.get(chain_id):
+                    # possible for biological unit files
+                    continue
                 if self.chain_atoms[chain_id] == set(['CA']):
                     chain_type = 'Protein skeleton'
 
@@ -985,6 +988,8 @@ class PDB:
                         # last residue in the chain
                         if residue_type == 'NH2':
                             residue_type = 'UNK' # fixes a few cases e.g. 1MBG, 1K9Q, 1KA6
+                        elif ignore_HETATMs:
+                            continue
 
                     elif ignore_HETATMs:
                         continue
