@@ -7,6 +7,9 @@ This module gets publication data from a DOI identifier.
 It currently hinges on the CrossRef.org website POST format. This can be inspected by looking at the POST requests when
 using the form on the webpage. At present, it resolves to this format:
    http://www.crossref.org/guestquery?queryType=doi&restype=unixref&doi=10.5555%2F12345678&doi_search=Search
+described here
+   http://www.crossref.org/schema/documentation/unixref1.0/unixref.html
+   http://www.crossref.org/schema/documentation/unixref1.1/unixref1.1.html
 
 Created by Shane O'Connor 2014
 """
@@ -60,7 +63,7 @@ class DOI(object):
            online: 2013-05-22 00:00:00
          title: Serverification of Molecular Modeling Applications: The Rosetta Online Server That Includes Everyone (ROSIE)
     '''
-    
+
     def __init__(self, doi):
         self.issue = {}
         self.article = {}
