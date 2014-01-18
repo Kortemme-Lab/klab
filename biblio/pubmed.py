@@ -30,6 +30,7 @@ converter_types = ['pmcid', 'pmid', 'mid', 'doi']
 
 
 class PubMedIDRetrievalException(Exception): pass
+class NoCorrespondingDOIMappingException(Exception): pass
 class PubMedConverterTypeException(Exception):
     '''Exception class thrown when incorrect conversion types are passed.'''
     def __init__(self, bad_type):
@@ -96,9 +97,9 @@ def convert_single(ID, from_type, to_type):
 
     results = convert([ID], from_type)
     if ID in results:
-        return results[ID][to_type]
+        return results[ID].get(to_type)
     else:
-        return results[ID.upper()][to_type]
+        return results[ID.upper()].get(to_type)
 
 
 class PubMed(DOI):
@@ -116,7 +117,10 @@ class PubMed(DOI):
             raise PubMedIDRetrievalException("PubMed identifiers are expected to be numeric strings with or without a prefix of 'pmid'. The passed value '%s' does not meet this requirement." % pubmed_id)
         doi = convert_single(pubmed_id, 'pmid', 'doi')
 
-        super(PubMed, self).__init__(doi)
+        if doi == None:
+            raise NoCorrespondingDOIMappingException
+        else:
+            super(PubMed, self).__init__(doi)
 
 
 if __name__ == '__main__':
@@ -125,7 +129,7 @@ if __name__ == '__main__':
     print(convert(['PMC3531190,PMC3245039'], 'pmcid'))
 
     print('')
-    pubmed_IDs = ('23717507', '23193287')
+    pubmed_IDs = ('23717507', '23193287', '24005320')
     for p in pubmed_IDs:
         colortext.message(p)
         pubmed = PubMed(p)
