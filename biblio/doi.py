@@ -26,7 +26,6 @@ import urllib2
 from xml.dom.minidom import parse, parseString
 
 from tools.comms.http import get_resource
-from tools.fs.io import read_file, write_file
 from tools import colortext
 
 
@@ -78,14 +77,43 @@ class DOI(object):
         self.issue = {}
         self.article = {}
         self.doi = doi
+        self.print_string = ''
+        self.data = self.get_info()
 
-        data = self.get_info()
-        self.parse(data)
+        self.parse()
+        self.create_print_string()
+
+
+    def create_print_string(self):
+
+        author_str = []
+        for author in self.article.get('authors', []):
+            author_str.append(('%s %s' % (author.get('given_name'), author.get('surname'))).strip())
+        author_str = ', '.join(author_str)
+
+        title_str = self.article.get('title', '')
+
+        issue_str = ''
+        if self.issue.get('full_title'):
+            issue_str += self.issue['full_title']
+            if self.issue.get('volume'):
+                if self.issue.get('issue'):
+                    issue_str += ' %s(%s)' % (self.issue['volume'], self.issue['issue'])
+                else:
+                    issue_str += ' %s' % self.issue['volume']
+                if self.article.get('first_page'):
+                    issue_str += ':%s' % self.article['first_page']
+                    if self.article.get('last_page'):
+                        issue_str += '-%s' % self.article['last_page']
+
+        self.print_string = '%s. %s. %s.' % (author_str, title_str, issue_str)
+
 
     def extract_node_data(self, tag, fieldnames):
         d = {}
         if tag and len(tag) == 1:
             return self.extract_node_data_2(tag[0], fieldnames)
+
 
     def extract_node_data_2(self, tag, fieldnames):
         d = {}
@@ -94,6 +122,7 @@ class DOI(object):
             if len(t) > 0:
                 d[f] = t[0].childNodes[0].nodeValue
         return d
+
 
     def parse_journal_data_xml(self, journal_tag):
         d = {}
@@ -115,7 +144,7 @@ class DOI(object):
                 self.issue['volume'] = int(volume_tag[0].getElementsByTagName("volume")[0].childNodes[0].nodeValue) # this type-cast may be too strong e.g. for electronic editions
             issue_tag = journal_issue_tag.getElementsByTagName("issue")
             if len(issue_tag) == 1:
-                self.issue['issue'] = int(issue_tag[0].childNodes[0].nodeValue)
+                self.issue['issue'] = issue_tag[0].childNodes[0].nodeValue # not necessarily an int e.g. pmid:23193287 / doi:10.1093/nar/gks1195
 
         article_tag = journal_tag.getElementsByTagName("journal_article")
         if len(article_tag) == 1:
@@ -136,6 +165,11 @@ class DOI(object):
                 if contributor.getAttribute('contributor_role') == "author":
                     fields = self.extract_node_data_2(contributor, ['given_name', 'surname'])
                     self.article['authors'].append(fields)
+
+            article_pages =  self.extract_node_data(article_tag.getElementsByTagName("pages"), ['first_page', 'last_page'])
+            for k, v in article_pages.iteritems():
+                self.article[k] = v
+
 
         # Convert dates
         for k, dct in self.issue.get('__issue_date', {}).iteritems():
@@ -162,7 +196,8 @@ class DOI(object):
         del self.issue['meta_data']
 
 
-    def parse(self, data):
+    def parse(self):
+        data = self.data
         try:
             self._dom = parseString(data)
         except Exception, e:
@@ -199,10 +234,10 @@ class DOI(object):
         if len(xml_matches) == 0:
             raise DOIRetrievalException('No matches found for the DOI "%s".' % self.doi)
         elif len(xml_matches) == 1:
-            write_file('test.xml', xml_matches[0])
             return xml_matches[0]
         else:
             raise DOIRetrievalException('Multiple (%d) matches found for the DOI "%s".' % (len(xml_matches), self.doi))
+
 
     def __repr__(self):
         s = ['issue']
@@ -228,11 +263,17 @@ class DOI(object):
                         s.append('   %s' % str(v_))
                 else:
                     s.append(' %s: %s' % (k, str(v)))
+
         return "\n".join(s)
+
 
 if __name__ == '__main__':
     DOIs = ('10.1371/journal.pone.0063906', 'doi:10.1038/nature12443')
     for d in DOIs:
         colortext.message(d)
         doi = DOI(d)
+
         print(doi)
+        print(doi.data)
+        colortext.message('print_string')
+        print(doi.print_string)
