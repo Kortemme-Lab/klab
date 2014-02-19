@@ -226,7 +226,7 @@ class ScaffoldDesignChainMapper(PDBChainMapper):
         b.run(ScaffoldDesignCrystalBuilder, [structures])
 
 if __name__ == '__main__':
-    chain_mapper = ScaffoldDesignChainMapper.from_file_paths('1z1s_DIG5_scaffold.pdb', 'DIG5_1_model.pdb')
+    chain_mapper = ScaffoldDesignChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
 
     for chain_id, mapping in sorted(chain_mapper.residue_id_mapping.iteritems()):
         colortext.message('Mapping from chain %s of the design to the scaffold' % chain_id)
