@@ -99,7 +99,9 @@ class ScaffoldDesignCrystalBuilder(object):
         return os.path.join(self.outdir, filename)
 
     def _create_temp_files(self):
-        self.outdir = create_temp_755_path(self.rootdir)
+        #self.outdir = create_temp_755_path(self.rootdir)
+        self.outdir = '/tmp/tmpWnoJXI'
+
         colortext.message('self.outdir: ' + self.outdir)
         write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
         write_file(self._filepath('design.pdb'), self.Design.pdb_contents)
@@ -117,10 +119,10 @@ class ScaffoldDesignCrystalBuilder(object):
 cd %(outdir)s''' % self.__dict__
         if self.Crystal:
             script += '''
-load crystal.pdb Crystal'''
+load crystal.pdb, Crystal'''
         script += '''
-load design.pdb Design
-load scaffold.pdb Scaffold
+load design.pdb, Design
+load scaffold.pdb, Scaffold
 
 # set general view options
 viewport 1200,800
@@ -151,8 +153,7 @@ select design_ligand, Design and resn LG1
 show sticks, design_ligand'''
         if self.Crystal:
             script += '''
-select template_ligand, Crystal and resn LG1'''
-        script += '''
+select template_ligand, Crystal and resn LG1
 color gray, template_ligand
 show sticks, template_ligand
 pair_fit template_ligand, design_ligand'''
@@ -163,13 +164,7 @@ disable Crystal'''
         script += '''
 
 # orient view
-set_view (
-     0.750491261,   -0.332692802,   -0.570965469,
-    -0.572279274,    0.104703479,   -0.813287377,
-     0.330366731,    0.937145591,   -0.111799516,
-     0.000000000,    0.000000000, -129.595489502,
-    36.783428192,   36.119152069,   77.293815613,
-   112.102447510,  147.088562012,  -20.000000000 )
+set_view (0.750491261,   -0.332692802,   -0.570965469,  -0.572279274,    0.104703479,   -0.813287377,   0.330366731,    0.937145591,   -0.111799516,    0.000000000,    0.000000000, -129.595489502,    36.783428192,   36.119152069,   77.293815613,   112.102447510,  147.088562012,  -20.000000000 )
 
 # superimpose original scaffold onto the design
 super Scaffold, Design
@@ -186,10 +181,9 @@ disable Scaffold
 #        if self.Crystal:
 #            script += '''
 #create template_motif_residues, Crystal and not resn LG1 and resi ''' + self.Crystal.residues_of_interest
-        script += '''
-create template_motif_residues, Scaffold and not resn LG1 and resi ''' + ",".join(self.Scaffold.residues_of_interest)
-
-        script += '''
+        if self.Scaffold.residues_of_interest and self.Design.residues_of_interest:
+            script += '''
+create template_motif_residues, Scaffold and not resn LG1 and resi ''' + ",".join(self.Scaffold.residues_of_interest) + '''
 select design_motif_residues, Design and not resn LG1 and resi ''' + ",".join(self.Design.residues_of_interest) + '''
 set stick_radius, 0.1, template_motif_residues
 show sticks, template_motif_residues and not symbol h and not name C+N+O
@@ -204,35 +198,54 @@ create template_env, Crystal and byres template_ligand around %(visualization_sh
 
         script += '''
 create design_env, Design and byres design_ligand around %(visualization_shell)s
-create scaffold_env, Scaffold and byres design_ligand around %(visualization_shell)s
+create scaffold_env, Scaffold and byres design_ligand around %(visualization_shell)s''' % self.__dict__
+        if self.Crystal:
+            script += '''
 set stick_radius, 0.1, template_env
-show sticks, template_env and not symbol h and not name C+N+O
+show sticks, template_env and not symbol h and not name C+N+O'''
+        script += '''
 show sticks, design_env and not symbol h
-show sticks, scaffold_env and not symbol h
-set cartoon_transparency, 1, template_env
+show sticks, scaffold_env and not symbol h'''
+        if self.Crystal:
+            script += '''
+set cartoon_transparency, 1, template_env'''
+        script += '''
 set cartoon_transparency, 1, design_env
 set cartoon_transparency, 1, scaffold_env
 
-# hide ligand environment
-disable template_env
+# hide ligand environment'''
+
+        if self.Crystal:
+            script += '''
+disable template_env'''
+        script += '''
 disable design_env
 disable scaffold_env
 
-# create binding pocket
+# create binding pocket'''
+
+        if self.Crystal:
+            script += '''
 create template_env_surface, template_env
-create design_env_surface, design_env
 hide sticks, template_env_surface
-hide sticks, design_env_surface
 show surface, template_env_surface
+#color gray70, template_env_surface
+set cartoon_transparency, 1, template_env_surface'''
+
+        script += '''
+create design_env_surface, design_env
+hide sticks, design_env_surface
 show surface, design_env_surface
 set transparency, 0.25
-#color gray70, template_env_surface
 #color gray70, design_env_surface
-set cartoon_transparency, 1, template_env_surface
 set cartoon_transparency, 1, design_env_surface
 
-# hide binding pocket
-disable template_env_surface
+# hide binding pocket'''
+
+        if self.Crystal:
+            script += '''
+disable template_env_surface'''
+        script += '''
 disable design_env_surface
 
 # ray tracing and output
@@ -245,10 +258,7 @@ set two_sided_lighting, on
 zoom design_ligand, 10
 heavy_chain_residues=[]
 light_chain_residues=[]
-one_letter ={"VAL":"V", "ILE":"I", "LEU":"L", "GLU":"E", "GLN":"Q",
-"ASP":"D", "ASN":"N", "HIS":"H", "TRP":"W", "PHE":"F", "TYR":"Y",
-"ARG":"R", "LYS":"K", "SER":"S", "THR":"T", "MET":"M", "ALA":"A",
-"GLY":"G", "PRO":"P", "CYS":"C"}
+one_letter ={"VAL":"V", "ILE":"I", "LEU":"L", "GLU":"E", "GLN":"Q", "ASP":"D", "ASN":"N", "HIS":"H", "TRP":"W", "PHE":"F", "TYR":"Y", "ARG":"R", "LYS":"K", "SER":"S", "THR":"T", "MET":"M", "ALA":"A", "GLY":"G", "PRO":"P", "CYS":"C"}
 #cmd.iterate(selector.process("Design and chain '+heavy_chain.id+' and name ca"),"heavy_chain_residues.append(resn)")
 #cmd.iterate(selector.process("Design and chain '+light_chain.id+' and name ca"),"light_chain_residues.append(resn)")
 #heavy_chain_seq=""
@@ -270,17 +280,13 @@ quit
     def run(self):
         self.create_script()
         write_file(self._filepath('script.pml'), self.script)
-        return
+
         #run pymol
-        print
-        print 'running',pymol_scriptname
-        if outfile_name!=None:
-            functions_lib.run(pymol+' -c '+pymol_scriptname)
+
+        print 'running'
+        if False:
+            colortext.message(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
+            functions_lib.run(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
             print 'writing session file...'
         else:
-            functions_lib.run(pymol+' '+pymol_scriptname)
-        #-
-
-        end_time=time.time()
-        print
-        print "\ntime consumed: "+str(end_time-start_time)
+            functions_lib.run(self.visualization_pymol + ' ' + self._filepath('script.pml'))
