@@ -102,7 +102,7 @@ class ScaffoldDesignCrystalBuilder(object):
 
     def _create_temp_files(self):
         #self.outdir = create_temp_755_path(self.rootdir)
-        self.outdir = '/tmp/tmpWnoJXI'
+        self.outdir = '/tmp/tmpALRepn'
 
         colortext.message('self.outdir: ' + self.outdir)
         write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
@@ -185,8 +185,8 @@ disable Scaffold
 #create template_motif_residues, Crystal and not resn LG1 and resi ''' + self.Crystal.residues_of_interest
         if self.Scaffold.residues_of_interest and self.Design.residues_of_interest:
             script += '''
-create template_motif_residues, Scaffold and not resn LG1 and resi ''' + ",".join(self.Scaffold.residues_of_interest) + '''
-select design_motif_residues, Design and not resn LG1 and resi ''' + ",".join(self.Design.residues_of_interest) + '''
+create template_motif_residues, Scaffold and not resn LG1 and resi ''' + "+".join(self.Scaffold.residues_of_interest) + '''
+select design_motif_residues, Design and not resn LG1 and resi ''' + "+".join(self.Design.residues_of_interest) + '''
 set stick_radius, 0.1, template_motif_residues
 show sticks, template_motif_residues and not symbol h and not name C+N+O
 show sticks, design_motif_residues and not symbol h
@@ -289,7 +289,7 @@ quit
         if True:
             colortext.message(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
             #po = tprocess.Popen(self.outdir, [self.visualization_pymol, ' -c %s' % self._filepath('script.pml')])
-            po = tprocess.Popen(self.outdir, [self.visualization_pymol, self._filepath('script.pml')])
+            po = tprocess.Popen(self.outdir, [self.visualization_pymol, '-c', self._filepath('script.pml')])
             colortext.message(po.stdout)
             colortext.warning(po.errorcode)
             colortext.error(po.stderr)
