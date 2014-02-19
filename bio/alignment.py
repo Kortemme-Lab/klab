@@ -1,3 +1,12 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+alignment.py
+Higher-level alignment functionality which uses the clustalo module and the PyMOL PSE builder module.
+
+Created by Shane O'Connor 2014.
+"""
+
 import sys
 sys.path.insert(0, '../../..')
 
