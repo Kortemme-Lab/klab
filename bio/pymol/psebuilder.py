@@ -19,6 +19,7 @@ from tools.unmerged.rpache import functions_lib
 from tools.unmerged.rpache import PDB_files
 from tools.fs.fsio import read_file, create_temp_755_path, write_file
 from tools import colortext
+from tools import process as tprocess
 
 ###############################################
 ## Visualization parameters
@@ -87,6 +88,7 @@ class ScaffoldDesignCrystalBuilder(object):
         self.match_posfiles_interface_distance = 15
         self.rootdir = rootdir
         self.outdir = None
+        self.PSE = None
 
     def __del__(self):
         if self.outdir:
@@ -284,9 +286,18 @@ quit
         #run pymol
 
         print 'running'
-        if False:
+        if True:
             colortext.message(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
-            functions_lib.run(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
+            #po = tprocess.Popen(self.outdir, [self.visualization_pymol, ' -c %s' % self._filepath('script.pml')])
+            po = tprocess.Popen(self.outdir, [self.visualization_pymol, self._filepath('script.pml')])
+            colortext.message(po.stdout)
+            colortext.warning(po.errorcode)
+            colortext.error(po.stderr)
+            #functions_lib.run(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
             print 'writing session file...'
         else:
             functions_lib.run(self.visualization_pymol + ' ' + self._filepath('script.pml'))
+
+        pse_path = self._filepath('session.pse')
+        if os.path.exists(pse_path):
+            self.PSE = read_file(pse_path, binary = True)
