@@ -1,1 +1,1 @@
-'''A package containing Python code for bioinformatics.'''
+'''A package containing Python code for PyMOL-related tools.'''

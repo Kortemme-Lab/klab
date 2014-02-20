@@ -10,8 +10,9 @@ Created by Shane O'Connor 2014.
 import sys
 sys.path.insert(0, '../../..')
 
-from tools.bio.pymol.psebuilder import *
-
+from tools import colortext
+from tools.bio.pymol.psebuilder import BatchBuilder, PDBContainer
+from tools.bio.pymol.scaffold_design_crystal import ScaffoldDesignCrystalBuilder
 from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
 
@@ -207,43 +208,62 @@ class ScaffoldDesignChainMapper(PDBChainMapper):
         design_pdb = PDB.from_filepath(design_pdb_path)
         return ScaffoldDesignChainMapper(scaffold_pdb, design_pdb, cut_off = cut_off)
 
+    @staticmethod
+    def from_file_contents(scaffold_pdb_contents, design_pdb_contents, cut_off = 60.0):
+        scaffold_pdb = PDB(scaffold_pdb_contents)
+        design_pdb = PDB(design_pdb_contents)
+        return ScaffoldDesignChainMapper(scaffold_pdb, design_pdb, cut_off = cut_off)
+
     def get_differing_design_residue_ids(self):
         return self.pdb1_differing_residue_ids
 
     def get_differing_scaffold_residue_ids(self):
         return self.pdb2_differing_residue_ids
 
-    def generate_pymol_session(self):
-        return
-        #scaffold_pdb.pdb_content, design_pdb.pdb_content
+    def generate_pymol_session(self, crystal_pdb = None):
         b = BatchBuilder()
-        structures = PDBContainer.from_filename_triple((
-            ('Scaffold', '1z1s_DIG5_scaffold.pdb', chain_mapper.get_differing_scaffold_residue_ids()),
-            ('Design', 'DIG5_1_model.pdb', chain_mapper.get_differing_design_residue_ids()),
-        ))
+        structures_list = [
+            ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
+            ('Design', self.design_pdb.pdb_content, self.get_differing_design_residue_ids()),
+        ]
 
-        print(structures)
-        b.run(ScaffoldDesignCrystalBuilder, [structures])
+        if crystal_pdb:
+            structures_list.append(('Crystal', crystal_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
+
+        PSE_files = b.run(ScaffoldDesignCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
+        return PSE_files[0]
 
 if __name__ == '__main__':
+    from tools.fs.fsio import read_file
+
+    # Example of how to create a mapper from file paths
     chain_mapper = ScaffoldDesignChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
 
+    # Example of how to create a mapper from file contents
+    chain_mapper = ScaffoldDesignChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
+
+    # Example of how to get residue -> residue mapping
     for chain_id, mapping in sorted(chain_mapper.residue_id_mapping.iteritems()):
         colortext.message('Mapping from chain %s of the design to the scaffold' % chain_id)
         for design_res, scaffold_res in sorted(mapping.iteritems()):
             print("\t'%s' -> '%s'" % (design_res, scaffold_res))
 
+    # Example of how to list the PDB residue IDs for the positions in the design which differ
     colortext.message('Residues IDs for the residues which differ in the design.')
     print(chain_mapper.get_differing_design_residue_ids())
 
+    # Example of how to list the PDB residue IDs for the positions in the scaffold which differ
     colortext.message('Residues IDs for the residues which differ in the scaffold.')
     print(chain_mapper.get_differing_scaffold_residue_ids())
 
+    # Example of how to print out a plaintext sequence alignment
     colortext.warning('Sequence alignment - plain formatting, width = 120.')
     print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(width = 120)))
 
+    # Example of how to print out a HTML formatted alignment. This output would require CSS for an appropriate presentation.
     colortext.warning('Sequence alignment - HTML formatting, width = 100.')
     colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(width = 100))
 
-    chain_mapper.generate_pymol_session()
+    # Example of how to generate a PyMOL session
+    PSE_file = chain_mapper.generate_pymol_session()
 
