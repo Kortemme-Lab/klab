@@ -137,10 +137,45 @@ class PDBChainMapper(object):
         html = []
         for alignment_string in alignment_strings:
             lines = alignment_string.split('\n')
+
+            alignment_tokens = []
             for line in lines:
                 tokens = line.split()
                 assert(len(tokens) == 2)
-                html.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span></div>' % (tokens[0], tokens[1]))
+                label_tokens = tokens[0].split(':')
+                #alignment_html.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
+                #alignment_tokens.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
+                alignment_tokens.append([label_tokens[0], label_tokens[1], tokens[1]])
+
+            if len(alignment_tokens) % 2 == 0:
+                passed = True
+                for x in range(0, len(alignment_tokens), 2):
+                    if alignment_tokens[x][0] != 'Scaffold':
+                        passed = False
+                    if alignment_tokens[x+1][0] != 'Design':
+                        passed = False
+                for x in range(0, len(alignment_tokens), 2):
+                    scaffold_residues = alignment_tokens[x][2]
+                    design_residues = alignment_tokens[x+1][2]
+                    if passed and (len(scaffold_residues) == len(design_residues)):
+                        new_scaffold_string = []
+                        new_design_string = []
+                        for y in range(len(scaffold_residues)):
+                            if scaffold_residues[y] == design_residues[y]:
+                                new_scaffold_string.append(scaffold_residues[y])
+                                new_design_string.append(design_residues[y])
+                            else:
+                                new_scaffold_string.append('<dd>%s</dd>' % scaffold_residues[y])
+                                new_design_string.append('<dd>%s</dd>' % design_residues[y])
+                        alignment_tokens[x][2] = ''.join(new_scaffold_string)
+                        alignment_tokens[x+1][2] = ''.join(new_design_string)
+
+
+            for trpl in alignment_tokens:
+                html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (trpl[0], trpl[0], trpl[1], trpl[2]))
+
+
+
             html.append('<div class="sequence_alignment_chain_separator"></div>')
 
         html.pop() # remove the last chain separator div
@@ -220,8 +255,8 @@ class ScaffoldDesignChainMapper(PDBChainMapper):
     def get_differing_scaffold_residue_ids(self):
         return self.pdb2_differing_residue_ids
 
-    def generate_pymol_session(self, crystal_pdb = None):
-        b = BatchBuilder()
+    def generate_pymol_session(self, crystal_pdb = None, pymol_executable = None):
+        b = BatchBuilder(pymol_executable = pymol_executable)
         structures_list = [
             ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
             ('Design', self.design_pdb.pdb_content, self.get_differing_design_residue_ids()),
