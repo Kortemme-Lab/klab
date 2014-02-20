@@ -64,9 +64,9 @@ class PDBContainer(object):
 
 class BatchBuilder(object):
 
-    def __init__(self):
+    def __init__(self, pymol_executable = 'pymol'):
         self.visualization_shell = 6
-        self.visualization_pymol = 'pymol' # the command used to run pymol - change as necessary for Mac OS X
+        self.visualization_pymol = pymol_executable # the command used to run pymol - change as necessary for Mac OS X
 
     def run(self, builder_class, list_of_pdb_containers):
         PSE_files = []

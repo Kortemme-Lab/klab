@@ -21,7 +21,7 @@ class ScaffoldDesignCrystalBuilder(PyMOLSessionBuilder):
         self.Crystal = pdb_containers.get('Crystal')
 
     def _create_input_files(self):
-        colortext.message('self.outdir: ' + self.outdir)
+        #colortext.message('self.outdir: ' + self.outdir)
         write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
         write_file(self._filepath('design.pdb'), self.Design.pdb_contents)
         if self.Crystal:
