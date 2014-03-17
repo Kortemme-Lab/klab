@@ -24,11 +24,12 @@ errcode = 0
 # The location of the text file containing the names of the configuration scripts
 configurationFilesLocation = "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
 
-# The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
+# The command line used to call the fragment generating script.
 make_fragments_script = "/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl"
 
 # Command line template
 make_fragments_cmd = make_fragments_script + ' -verbose -id %(pdbid)s%(chain)s %(fasta)s %(no_homologs)s'
+
 template ='''
 #!/bin/csh	    
 #$ -N %(jobname)s 
