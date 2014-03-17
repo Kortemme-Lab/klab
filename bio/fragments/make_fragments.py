@@ -24,11 +24,8 @@ errcode = 0
 # The location of the text file containing the names of the configuration scripts
 configurationFilesLocation = "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
 
-# The command line used to call the fragment generating script.
-make_fragments_script = "/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl"
-
-# Command line template
-make_fragments_cmd = make_fragments_script + ' -verbose -id %(pdbid)s%(chain)s %(fasta)s %(no_homologs)s'
+# The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
+cmd = '/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl -verbose -id %(pdbid)s%(chain)s %(fasta)s %(no_homologs)s'
 
 template ='''
 #!/bin/csh	    
@@ -59,9 +56,9 @@ cd %(outpath)s
 '''
 
 template += '''
-echo "<cmd>%(make_fragments_cmd)s</cmd>"
+echo "<cmd>%(cmd)s</cmd>"
 echo "<output>"
-%(make_fragments_cmd)s
+%(cmd)s
 '''  % vars()
 
 template += '''
@@ -83,6 +80,9 @@ class LogFile(object):
 		self.format = "%s: Job ID %s results will be saved in %s.%s"
 		self.regex = re.compile(self.format % ("^(.*)", "(\\d+)", "(.+)\\", "$"))
 		
+	def getName(self):
+		return self.logfile
+	
 	def readFromLogfile(self):
 		joblist = {}
 		F = open(self.logfile, "r")
@@ -144,10 +144,9 @@ def parseArgs():
 	description.append("Example 2: make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA")
 	description.append("-----------------------------------------------------------------------------")
 	description.append("The output of the computation will be saved in the output directory, along with the input FASTA file which is generated from the supplied FASTA file.")
-	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.logfile)
+	description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.getName())
 	description.append("Warning: Do not reuse the same output directory for multiple runs. Results from a previous run may confuse the executable chain and lead to erroneous results.")
 	description.append("To prevent this occurring e.g. in batch submissions, use the -S option to create the results in a subdirectory of the output directory.")
-	description.append("If multiple runs are run in the same subdirectory using the -S option, successive runs will be stored in increasingly-numbered subdirectories.")
 	description = join(description, "\n")
 	parser = OptionParser(usage="usage: %prog [options]", version="%prog 1.0A", description = description)
 	parser.add_option("-f", "--fasta", dest="fasta", help="The input FASTA file. This defaults to OUTPUT_DIRECTORY/PDBID.fasta.txt if the PDB ID is supplied.", metavar="FASTA")
@@ -155,10 +154,10 @@ def parseArgs():
 	parser.add_option("-p", "--pdbid", dest="pdbid", help="The input PDB identifier. This is optional if the FASTA file is specified and only contains one PDB identifier.", metavar="PDBID")
 	parser.add_option("-H", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
 	parser.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.logfile, metavar="JOBID")
+	parser.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
 	parser.add_option("-N", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
 	parser.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
-	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against job IDs stored in %s and then quit." % logfile.logfile)
+	parser.add_option("-Q", "--qstat", dest="qstat", action="store_true", help="Optional. Query qstat results against %s and then quit." % logfile.getName())
 	parser.set_defaults(outdir = os.getcwd())
 	parser.set_defaults(nohoms = False)
 	parser.set_defaults(noprompt = False)
@@ -184,9 +183,9 @@ def parseArgs():
 			jobIsRunning = qstat(int(options.check))
 			if not joblist.get(jobID):
 				if not jobIsRunning:
-					errors.append("Job %d is not running but also has no entry in the logfile %s." % (jobID, logfile.logfile))
+					errors.append("Job %d is not running but also has no entry in the logfile %s." % (jobID, logfile.getName()))
 				else:
-					errors.append("Job %d is running but has no entry in the logfile %s." % (jobID, logfile.logfile))
+					errors.append("Job %d is running but has no entry in the logfile %s." % (jobID, logfile.getName()))
 			else:
 				global clusterJobName
 				cname = clusterJobName
@@ -415,7 +414,7 @@ def parseFASTA(fastafile):
 
 def qstat(jobID = None):
 	"""If jobID is an integer then return False if the job has finished and True if it is still running.
-	   Otherwise, print the jobs run by the user."""
+	   Otherwise, returns a table of jobs run by the user."""
 	
 	joblist = logfile.readFromLogfile()
 	
@@ -438,7 +437,7 @@ def qstat(jobID = None):
 	output = output.strip().split("\n")
 	if len(output) > 2:
 		for line in output[2:]:
-			# We assume that our script names contain no spaces for the parsing below to work
+			# We assume that our script names contain no spaces for the parsing below to work (this should be ensured by ClusterTask) 
 			tokens = line.split()
 			jid = int(tokens[0])
 			jobstate = tokens[4]
@@ -602,6 +601,10 @@ if __name__ == "__main__":
 	options = parseArgs()
 	if options["outpath"] and options["fasta"] and options["pdbid"] and options["chain"]:
 		template = template % options
+
+		# todo: remove this when we want to run the jobs
+		print(template)
+		sys.exit(0)
 		qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
 		F = open(qcmdfile, "w")
 		F.write(template)
