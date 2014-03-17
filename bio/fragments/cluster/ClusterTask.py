@@ -1,0 +1,3 @@
+
+class ClusterTask(object):
+    pass
