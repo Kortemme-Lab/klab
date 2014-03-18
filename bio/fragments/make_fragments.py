@@ -1,6 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # Created 2011-10-13 by Shane O'Connor, Kortemme Lab
+# Updated 2014-03-18 by Shane O'Connor, Kortemme Lab
 
 import sys
 import os
@@ -52,11 +53,6 @@ configurationFilesLocation = "make_fragments_confs.txt" # "/netapp/home/klabqb3b
 #################
 
 
-def get_username():
-    return getpass.getuser()
-    #return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
-
-
 class FastaException(Exception): pass
 
 
@@ -87,6 +83,11 @@ class JobInput(object):
         self.fasta_file = fasta_file
         self.pdb_id = pdb_id
         self.chain = chain
+
+
+def get_username():
+    return getpass.getuser()
+    #return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
 
 
 def parse_FASTA_files(fasta_files):
@@ -464,7 +465,6 @@ def create_inputs(options, outpath, found_sequences):
     return job_inputs, errors
 
 
-
 def searchConfigurationFiles(findstr, replacestr = None):
     '''This function could be used to find and replace paths in the configuration files.
         At present, it only finds phrases.'''
@@ -495,6 +495,7 @@ def searchConfigurationFiles(findstr, replacestr = None):
                     alloutput[line] = output.split("\n")
     return alloutput, allerrors
 
+
 def checkConfigurationPaths():
     pathregex1 = re.compile('.*"(/netapp.*?)".*')
     pathregex2 = re.compile('.*".*(/netapp.*?)\\\\".*')
@@ -517,6 +518,7 @@ def checkConfigurationPaths():
             errors.append((flname, m_errors))
 
     return errors
+
 
 if __name__ == "__main__":
 
