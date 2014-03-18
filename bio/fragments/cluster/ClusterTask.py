@@ -1,7 +1,7 @@
 
 class ClusterTask(object):
 
-    def __init__(self, make_fragments_perl_script):
-        super(MultipleTask, self).__init__(make_fragments_perl_script)
+    def __init__(self, make_fragments_perl_script, options):
         self.make_fragments_perl_script = make_fragments_perl_script
+        self.options = options
 

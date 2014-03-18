@@ -43,7 +43,7 @@ errcode = 0
 #  Globals
 
 logfile = LogFile("make_fragments_destinations.txt")
-clusterJobName = "fragment_generation"
+cluster_job_name = "fragment_generation" # set this to identify the job on the cluster
 make_fragments_script = "make_fragments_RAP_cluster.pl"
 
 # The location of the text file containing the names of the configuration scripts
@@ -81,6 +81,14 @@ class MultiOption(Option):
             Option.take_action(self, action, dest, opt, value, values, parser)
 
 
+class JobInput(object):
+
+    def __init__(self, fasta_file, pdb_id, chain):
+        self.fasta_file = fasta_file
+        self.pdb_id = pdb_id
+        self.chain = chain
+
+
 def parse_FASTA_files(fasta_files):
 
     records = {}
@@ -96,7 +104,8 @@ def parse_FASTA_files(fasta_files):
         if not fasta:
             raise Exception("Empty FASTA file.")
 
-        if fasta[0][0] != '>':
+        first_line = [line for line in fasta if line.strip()][0]
+        if first_line[0] != '>':
             raise Exception("The FASTA file is not formatted properly - the first non-blank line is not a description line (does not start with '>').")
 
         key = None
@@ -107,55 +116,26 @@ def parse_FASTA_files(fasta_files):
             if line:
                 if line[0] == '>':
                     record_count += 1
-                    tokens = [t.strip() for t in line[1].split('|') if t.strip()]
+                    tokens = [t.strip() for t in line[1:].split('|') if t.strip()]
                     if len(tokens) < 2:
                         raise Exception("The description line ('%s') of record %d of %s is invalid. It must contain both a protein description and a chain identifier, separated by a pipe ('|') symbol." % (line, record_count, fasta_file))
                     if len(tokens[0]) < 4:
                         raise Exception("The protein description in the description line ('%s') of record %d of %s is too short. It must be at least four characters long." % (line, record_count, fasta_file))
                     if len(tokens[1]) != 1:
                         raise Exception("The chain identifier in the description line ('%s') of record %d of %s is the wrong length. It must be exactky one character long." % (line, record_count, fasta_file))
-                    key = '%s%s' % (tokens[0][0:4], tokens[1])
+
+                    # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
+                    key = (tokens[0][0:4].lower(), tokens[1], fasta_file)
                     if key in records:
                         raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatentated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file))
                     key_location[key] = fasta_file
 
-                    records[(record_count, key[0:4], key[4])] = [line]
+                    records[key] = [line]
                 else:
-                    assert(len(key) == 5)
                     mtchs = sequenceLine.match(line)
                     if not mtchs:
                         raise FastaException("Expected a record header or sequence line at line %d." % line_count)
-                    records[(record_count, key[0:4], key[4])] = [line]
-    return records
-
-    chain_line = re.compile("^>(\w{4,})|(\w)\s+\n?$")
-    chain_line = re.compile("^>(\w{4,})|(\w)|.*\n?$")
-
-    records = {}
-    pdbid = None
-    chain = None
-    count = 1
-    recordcount = 0
-    for line in fasta:
-        if line.strip():
-            if chain == None and pdbid == None:
-                mtchs = chain_line.match(line)
-                if not mtchs:
-                    raise FastaException("Expected a record header at line %d." % count)
-
-            mtchs = chain_line.match(line)
-            if mtchs:
-                recordcount += 1
-                pdbid = (mtchs.group(1))
-                chain = (mtchs.group(2))
-                records[(recordcount, pdbid, chain)] = [line]
-            else:
-                mtchs = sequenceLine.match(line)
-                if not mtchs:
-                    raise FastaException("Expected a record header or sequence line at line %d." % count)
-                records[(recordcount, pdbid, chain)].append(line)
-
-        count += 1
+                    records[key].append(line)
     return records
 
 
@@ -171,9 +151,6 @@ def parseArgs():
     description.append("-----------------------------------------------------------------------------")
     description.append("The output of the computation will be saved in the output directory, along with the input FASTA file which is generated from the supplied FASTA file.")
     description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.getName())
-    description.append("")
-    description.append("Warning: Do not reuse the same output directory for multiple runs. Results from a previous run may confuse the executable chain and lead to erroneous results.")
-    description.append("To prevent this occurring e.g. in batch submissions, use the -S option to create the results in a subdirectory of the output directory.")
     description.append("")
     description.append("The FASTA description lines must have the following format: '>protein_id|chain_letter', optionally followed by more text preceded by a bar symbol.")
     description.append("The underlying Perl script requires a 5-character ID with the first four characters being the protein id (PDB ID) and the final character being the chain identifier.")
@@ -195,10 +172,10 @@ def parseArgs():
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "General options")
-    group.add_option("-H", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-    group.add_option("-N", "--noprompt", dest="noprompt", action="store_true", help="Optional. Create the output directory without prompting.")
-    group.add_option("-S", "--subdirs", dest="subdirs", action="store_true", help="Optional. Create a subdirectory in the output directory named <PDBID><CHAIN>. See the notes above.")
+    group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
+    group.add_option("-V", "--overwrite", dest="overwrite", action="store_true", help="Optional. If the output directory <PDBID><CHAIN> for the fragment job(s) exists, delete the current contents.")
+    group.add_option("-F", "--force", dest="force", action="store_true", help="Optional. Create the output directory without prompting.")
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
@@ -207,9 +184,9 @@ def parseArgs():
     parser.add_option_group(group)
 
     parser.set_defaults(outdir = os.getcwd())
+    parser.set_defaults(overwrite = False)
     parser.set_defaults(nohoms = False)
-    parser.set_defaults(noprompt = False)
-    parser.set_defaults(subdirs = False)
+    parser.set_defaults(force = False)
     parser.set_defaults(query = False)
     (options, args) = parser.parse_args()
 
@@ -232,8 +209,12 @@ def parseArgs():
     validOptions = options.query or options.check
 
     # PDB ID
-    if options.pdbid and not pdbpattern.match(options.pdbid):
-        errors.append("Please enter a valid PDB identifier.")
+    if options.pdbid:
+        if not pdbpattern.match(options.pdbid):
+            errors.append("Please enter a valid PDB identifier.")
+        else:
+            # Note: We stored the PDB ID as lower-case so that the user does not have to worry about case-sensitivity. Here, we convert the user's PDB ID argument to lower-case as well.
+            options.pdbid = options.pdbid.lower()
 
     # CHAIN
     if options.chain and not (len(options.chain) == 1):
@@ -242,14 +223,16 @@ def parseArgs():
     # OUTDIR
     outpath = options.outdir
     if outpath[0] != "/":
-        outpath = os.path.join(os.getcwd(), outpath)
-    userdir = os.path.join("/netapp/home", username)
+        outpath = os.path.abspath(outpath)
     outpath = os.path.normpath(outpath)
-    if os.path.commonprefix([userdir, outpath]) != userdir:
-        errors.append("Please enter an output directory inside your netapp space (-d option).")
+
+    if 'netapp' in os.getcwd():
+        userdir = os.path.join("/netapp/home", username)
+        if os.path.commonprefix([userdir, outpath]) != userdir:
+            errors.append("Please enter an output directory inside your netapp space (-d option).")
     else:
         if not os.path.exists(outpath):
-            createDir = options.noprompt
+            createDir = options.force
             if not createDir:
                 answer = ""
                 colorprinter.prompt("Output path '%(outpath)s' does not exist. Create it now with 755 permissions (y/n)?" % vars())
@@ -277,7 +260,6 @@ def parseArgs():
     # BATCH
     batch_files = []
     if options.batch:
-        print(options.batch)
         batch_params = options.batch
         missing_files = []
 
@@ -310,193 +292,17 @@ def parseArgs():
 
     if (options.fasta) and (batch_files):
         parser.print_help()
-        print('\nError: You must either use single sequence mode or batch mode. Both were specified')
+        colorprinter.error('\nError: You must either use single sequence mode or batch mode. Both were specified')
         sys.exit(ERRCODE_ARGUMENTS)
 
     if options.fasta:
         if not os.path.exists(options.fasta):
             errors.append("FASTA file %s does not exist." % options.fasta)
         elif not errors:
-            fastadata = None
-            try:
-                fastadata = parse_FASTA_files([options.fasta])
-                if not fastadata:
-                    errors.append("No data found in the FASTA file %s." % options.fasta)
-
-            except Exception, e:
-                errors.append("Error parsing FASTA file %s:\n%s" % (options.fasta, str(e)))
-
-            if fastadata:
-                sequencecount = len(fastadata)
-                recordfrequency = {}
-                for record in fastadata.keys():
-                    k = (record[1], record[2])
-                    recordfrequency[k] = recordfrequency.get(k, 0) + 1
-                multipledefinitions = ["\tPDB ID: %s, Chain %s" % (record[0], record[1]) for record, count in sorted(recordfrequency.iteritems()) if count > 1]
-                chainspresent = sorted([record[2] for record in fastadata.keys()])
-                pdbidspresent = sorted(list(set([record[1] for record in fastadata.keys()])))
-                if len(multipledefinitions) > 0:
-                    errors.append("The FASTA file %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (options.fasta, join(multipledefinitions, "\n")))
-                elif sequencecount == 0:
-                    errors.append("No sequences found in the FASTA file %s." % options.fasta)
-                else:
-                    if not options.chain and sequencecount > 1:
-                        errors.append("Please enter a chain. Valid chains are: %s." % join(chainspresent, ", "))
-                    elif not options.pdbid and len(pdbidspresent) > 1:
-                        errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbidspresent, ", "))
-                    else:
-                        foundsequence = None
-
-                        if sequencecount == 1:
-                            key = fastadata.keys()[0]
-                            (temp, options.pdbid, options.chain) = key
-                            foundsequence = fastadata[key]
-                            colorprinter.message("One chain and PDB ID pair (%s, %s) found in %s. Using that pair as input." % (options.chain, options.pdbid, options.fasta))
-                        elif not options.pdbid:
-                            assert(len(pdbidspresent) == 1)
-                            options.pdbid = pdbidspresent[0]
-                            colorprinter.message("No PDB ID specified. Using the only one present in the fasta file, %s." % options.pdbid)
-                            if sequencecount > 1:
-                                for (recordnumber, pdbid, chain), sequence in sorted(fastadata.iteritems()):
-                                    if pdbid.upper() == options.pdbid.upper() and chain == options.chain:
-                                        foundsequence = sequence
-
-                        # This line determines in which case the filenames will be generated for the command chain
-                        options.pdbid = options.pdbid.lower()
-
-                        # Create subdirectories if specified
-                        assert(options.pdbid and options.chain)
-                        if options.subdirs:
-                            newoutpath = os.path.join(outpath, "%s%s" % (options.pdbid, options.chain))
-                            if os.path.exists(newoutpath):
-                                count = 1
-                                while count < 1000:
-                                    newoutpath = os.path.join(outpath, "%s%s_%.3i" % (options.pdbid, options.chain, count))
-                                    if not os.path.exists(newoutpath):
-                                        break
-                                    count += 1
-                                if count == 1000:
-                                    colorprinter.error("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
-                                    sys.exit(ERRCODE_OLDRESULTS)
-                            outpath = newoutpath
-                            os.makedirs(outpath, 0755)
-
-                        # Create a pruned FASTA file in the output directory
-                        if foundsequence:
-                            fpath, ffile = os.path.split(options.fasta)
-                            newfile = os.path.join(outpath, "%s%s.fasta" % (options.pdbid, options.chain))
-                            colorprinter.message("Creating a new FASTA file %s." % newfile)
-
-                            writefile = True
-                            if os.path.exists(newfile):
-                                colorprinter.prompt("The file %(newfile)s exists. Do you want to overwrite it?" % vars())
-                                answer = None
-                                while answer not in ['Y', 'N']:
-                                    colorprinter.prompt()
-                                    answer = sys.stdin.readline().upper().strip()
-                                if answer == 'N':
-                                    writefile = False
-                                    errors.append("Please remove the existing file %(newfile)s to continue." % vars())
-                            if writefile:
-                                F = open(newfile, "w")
-                                for line in foundsequence:
-                                    F.write("%s" % line)
-                                F.close()
-                                options.fasta = newfile
-                        else:
-                            errors.append("Could not find the sequence for chain %s in structure %s in FASTA file %s." % (options.chain, options.pdbid, options.fasta))
-
+            job_inputs, errors = setup_jobs(outpath, options, [options.fasta], False)
     elif batch_files:
         if not errors:
-            fastadata = None
-            try:
-                fastadata = parse_FASTA_files([options.fasta])
-                if not fastadata:
-                    errors.append("No data found in the FASTA file %s." % options.fasta)
-
-            except Exception, e:
-                errors.append("Error parsing FASTA file %s:\n%s" % (options.fasta, str(e)))
-
-            sys.exit(0)
-            if fastadata:
-                sequencecount = len(fastadata)
-                recordfrequency = {}
-                for record in fastadata.keys():
-                    k = (record[1], record[2])
-                    recordfrequency[k] = recordfrequency.get(k, 0) + 1
-                multipledefinitions = ["\tPDB ID: %s, Chain %s" % (record[0], record[1]) for record, count in sorted(recordfrequency.iteritems()) if count > 1]
-                chainspresent = sorted([record[2] for record in fastadata.keys()])
-                pdbidspresent = sorted(list(set([record[1] for record in fastadata.keys()])))
-                if len(multipledefinitions) > 0:
-                    errors.append("The FASTA file %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (options.fasta, join(multipledefinitions, "\n")))
-                elif sequencecount == 0:
-                    errors.append("No sequences found in the FASTA file %s." % options.fasta)
-                else:
-                    if not options.chain and sequencecount > 1:
-                        errors.append("Please enter a chain. Valid chains are: %s." % join(chainspresent, ", "))
-                    elif not options.pdbid and len(pdbidspresent) > 1:
-                        errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbidspresent, ", "))
-                    else:
-                        foundsequence = None
-
-                        if sequencecount == 1:
-                            key = fastadata.keys()[0]
-                            (temp, options.pdbid, options.chain) = key
-                            foundsequence = fastadata[key]
-                            colorprinter.message("One chain and PDB ID pair (%s, %s) found in %s. Using that pair as input." % (options.chain, options.pdbid, options.fasta))
-                        elif not options.pdbid:
-                            assert(len(pdbidspresent) == 1)
-                            options.pdbid = pdbidspresent[0]
-                            colorprinter.message("No PDB ID specified. Using the only one present in the fasta file, %s." % options.pdbid)
-                            if sequencecount > 1:
-                                for (recordnumber, pdbid, chain), sequence in sorted(fastadata.iteritems()):
-                                    if pdbid.upper() == options.pdbid.upper() and chain == options.chain:
-                                        foundsequence = sequence
-
-                        # This line determines in which case the filenames will be generated for the command chain
-                        options.pdbid = options.pdbid.lower()
-
-                        # Create subdirectories if specified
-                        assert(options.pdbid and options.chain)
-                        if options.subdirs:
-                            newoutpath = os.path.join(outpath, "%s%s" % (options.pdbid, options.chain))
-                            if os.path.exists(newoutpath):
-                                count = 1
-                                while count < 1000:
-                                    newoutpath = os.path.join(outpath, "%s%s_%.3i" % (options.pdbid, options.chain, count))
-                                    if not os.path.exists(newoutpath):
-                                        break
-                                    count += 1
-                                if count == 1000:
-                                    colorprinter.error("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
-                                    sys.exit(ERRCODE_OLDRESULTS)
-                            outpath = newoutpath
-                            os.makedirs(outpath, 0755)
-
-                        # Create a pruned FASTA file in the output directory
-                        if foundsequence:
-                            fpath, ffile = os.path.split(options.fasta)
-                            newfile = os.path.join(outpath, "%s%s.fasta" % (options.pdbid, options.chain))
-                            colorprinter.message("Creating a new FASTA file %s." % newfile)
-
-                            writefile = True
-                            if os.path.exists(newfile):
-                                colorprinter.prompt("The file %(newfile)s exists. Do you want to overwrite it?" % vars())
-                                answer = None
-                                while answer not in ['Y', 'N']:
-                                    colorprinter.prompt()
-                                    answer = sys.stdin.readline().upper().strip()
-                                if answer == 'N':
-                                    writefile = False
-                                    errors.append("Please remove the existing file %(newfile)s to continue." % vars())
-                            if writefile:
-                                F = open(newfile, "w")
-                                for line in foundsequence:
-                                    F.write("%s" % line)
-                                F.close()
-                                options.fasta = newfile
-                        else:
-                            errors.append("Could not find the sequence for chain %s in structure %s in FASTA file %s." % (options.chain, options.pdbid, options.fasta))
+            job_inputs, errors = setup_jobs(outpath, options, batch_files, True)
 
     if errors:
         if not errcode:
@@ -519,12 +325,144 @@ def parseArgs():
         "no_homologs"	: no_homologs,
         "user"			: username,
         "outpath"		: outpath,
-        "pdbid"			: options.pdbid,
-        "chain"			: options.chain,
-        "fasta"			: options.fasta,
-        "jobname"		: clusterJobName,
+        "jobname"		: cluster_job_name,
+        "job_inputs"    : job_inputs,
         #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
         }
+
+def setup_jobs(outpath, options, fasta_files, batch_mode):
+    found_sequences, errors = get_sequences(options, fasta_files, batch_mode)
+    reformat(found_sequences)
+    if not errors:
+        job_inputs, errors = create_inputs(options, outpath, found_sequences)
+    return job_inputs, errors
+
+def get_sequences(options, fasta_files, batch_mode):
+    errors = []
+    fasta_files_str = ", ".join(fasta_files)
+    fasta_records = None
+    try:
+        fasta_records = parse_FASTA_files(fasta_files)
+        if not fasta_records:
+            errors.append("No data found in the FASTA file(s) %s." % fasta_files_str)
+    except Exception, e:
+        errors.append("Error parsing FASTA file(s) %s:\n%s" % (fasta_files_str, str(e)))
+
+    num_fasta_records = len(fasta_records)
+
+    print(fasta_records)
+    colorprinter.message('Found %d sequence(s).' % num_fasta_records)
+
+    found_sequences = None
+    if num_fasta_records == 0:
+        errors.append("No sequences found in the FASTA file(s) %s." % fasta_files_str)
+    elif num_fasta_records == 1:
+        # One record - we will revert to a single task job below regardless of whether the script was called with batch mode or not
+        key = fasta_records.keys()[0]
+        (options.pdbid, options.chain, file_name) = key
+        found_sequences = fasta_records
+        colorprinter.message("One chain and PDB ID pair (%s, %s) found in %s. Using that pair as input." % (options.chain, options.pdbid, file_name))
+    elif batch_mode:
+        found_sequences = fasta_records
+
+    if not found_sequences:
+        # In single sequence mode - find the record we are looking for
+
+        # Check for ambiguity in the records (same PDB ID, chain)
+        record_frequency = {}
+        for record in fasta_records.keys():
+            k = (record[0], record[1])
+            record_frequency[k] = record_frequency.get(k, 0) + 1
+        multipledefinitions = ["\tPDB ID: %s, Chain %s" % (record[0], record[1]) for record, count in sorted(record_frequency.iteritems()) if count > 1]
+
+        chains_present = sorted([record[1] for record in fasta_records.keys()])
+        pdbids_present = sorted(list(set([record[0] for record in fasta_records.keys()])))
+
+        if len(multipledefinitions) > 0:
+            errors.append("The FASTA file(s) %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (fasta_files_str, join(multipledefinitions, "\n")))
+        else:
+            if not options.chain:
+                if chains_present > 1:
+                    errors.append("Please enter a chain. Valid chains are: %s." % join(chains_present, ", "))
+                else:
+                    options.chain = chains_present[0]
+                    colorprinter.message("No chain specified. Using the only one present in the fasta file(s), %s." % options.chain)
+            if not options.pdbid:
+                if pdbids_present > 1:
+                    errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbids_present, ", "))
+                else:
+                    options.pdbid = pdbids_present[0].lower()
+                    colorprinter.message("No PDB ID specified. Using the only one present in the fasta file(s), %s." % options.pdbid)
+            if options.chain and options.pdbid:
+                for (pdbid, chain, file_name), sequence in sorted(fasta_records.iteritems()):
+                    if pdbid == options.pdbid and chain == options.chain:
+                        found_sequences = {(pdbid, chain, file_name) : sequence}
+                        break
+                if not found_sequences:
+                    errors.append('Could not find the sequence for PDB ID %s and chain %s in the file(s) %s.' % (options.pdbid, options.chain, fasta_files_str))
+
+    return found_sequences, errors
+
+
+def reformat(found_sequences):
+    '''Truncate the FASTA headers so that the first field is a 4-character ID.'''
+    for (pdb_id, chain, file_name), sequence in sorted(found_sequences.iteritems()):
+        header = sequence[0]
+        assert(header[0] == '>')
+        tokens = header.split('|')
+        tokens[0] = tokens[0][:5]
+        assert(len(tokens[0]) == 5)
+        sequence[0] = "|".join(tokens)
+
+
+def create_inputs(options, outpath, found_sequences):
+    errors = []
+    if len(found_sequences) == 1:
+        # In single sequence mode - find the record we are looking for
+        batch_mode = True
+
+    # Create subdirectories
+    job_inputs = []
+    for (pdb_id, chain, file_name), sequence in sorted(found_sequences.iteritems()):
+        created_new_subdirectory = False
+        subdir_path = os.path.join(outpath, "%s%s" % (pdb_id, chain))
+        try:
+            if os.path.exists(subdir_path):
+                if options.overwrite:
+                    colorprinter.warning("Path %s exists. Removing all files in that path as per the override option." % subdir_path)
+                    shutil.rmtree(subdir_path)
+                    created_new_subdirectory = True
+                else:
+                    errors.append('The directory %s already exists.' % subdir_path) # uncomment this if we want to turn on the _001, _002, etc. directories
+                    count = 1
+                    while count < 1000:
+                        subdir_path = os.path.join(outpath, "%s%s_%.3i" % (pdb_id, chain, count))
+                        if not os.path.exists(subdir_path):
+                            break
+                        count += 1
+                    if count == 1000:
+                        errors.append("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
+                        sys.exit(ERRCODE_OLDRESULTS)
+            os.makedirs(subdir_path, 0755)
+
+            # Create a FASTA file for the sequence in the output directory
+            fasta_file = os.path.join(subdir_path, "%s%s.fasta" % (pdb_id, chain))
+            colorprinter.message("Creating a new FASTA file %s." % fasta_file)
+
+            assert(not(os.path.exists(fasta_file)))
+            F = open(fasta_file, "w")
+            F.write('\n'.join(sequence))
+            F.close()
+            job_inputs.append(JobInput(fasta_file, pdb_id, chain))
+        except:
+            if created_new_subdirectory and os.path.exists(subdir_path):
+                shutil.rmtree(subdir_path)
+            errors.append('An error occurred creating the input for %s%s.' % (pdb_id, chain))
+            job_inputs = []
+            break
+
+    return job_inputs, errors
+
 
 
 def searchConfigurationFiles(findstr, replacestr = None):
@@ -581,6 +519,10 @@ def checkConfigurationPaths():
     return errors
 
 if __name__ == "__main__":
+
+    this_dir = os.path.dirname(os.path.realpath(__file__))
+    make_fragments_script = os.path.join(this_dir, make_fragments_script)
+
     errors = [] #checkConfigurationPaths()
     if errors:
         colorprinter.error("There is an error in the configuration files:")
@@ -593,34 +535,34 @@ if __name__ == "__main__":
                 colorprinter.error(e)
         sys.exit(ERRCODE_CONFIG)
 
+
     options = parseArgs()
     if options["outpath"]:
-        if options["fasta"] and options["pdbid"] and options["chain"]:
+        if len(options['job_inputs']) > 1:
             # Single sequence fragment generation
+            task = ClusterEngine.MultipleTask(make_fragments_script, options)
+            script = task.get_script()
 
-            template = template % options
-
-            # todo: remove this when we want to run the jobs
-            print(template)
-            sys.exit(0)
-            qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
-            F = open(qcmdfile, "w")
-            F.write(template)
-            F.close()
-
-            try:
-                (jobid, output) = ClusterEngine.submit(qcmdfile, options["outpath"] )
-            except Exception, e:
-                colorprinter.error("An exception occurred during submission to the cluster.")
-                colorprinter.error(str(e))
-                colorprinter.error(traceback.format_exc())
-                sys.exit(ERRCODE_CLUSTER)
-
-            colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
-            logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
-
-        elif options['batch']:
+        else:
             # Single sequence fragment generation
-            print(options['batch'])
+            task = ClusterEngine.SingleTask(make_fragments_script, options)
+            script = task.get_script()
+
+        qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
+        F = open(qcmdfile, "w")
+        F.write(template)
+        F.close()
+
+        try:
+            (jobid, output) = ClusterEngine.submit(qcmdfile, options["outpath"] )
+        except Exception, e:
+            colorprinter.error("An exception occurred during submission to the cluster.")
+            colorprinter.error(str(e))
+            colorprinter.error(traceback.format_exc())
+            sys.exit(ERRCODE_CLUSTER)
+
+        colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
+        logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
+
 
 
