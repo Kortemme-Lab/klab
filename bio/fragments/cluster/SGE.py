@@ -9,8 +9,10 @@ Created by Shane O'Connor 2013
 Use this as a basis for your cluster system module. The following functionality should be provided:
     - A SingleTask class for single job runs;
     - A MultipleTask class for parallel/multiple/array job runs;
-    - a query function which takes a job ID and returns information about the job via the cluster scheduler;
-    - a submit function
+    - a submit function which takes a command_filename e.g. cluster script and a working directory in which to run the script;
+    - a query function which takes a logfile path and an optional job ID and returns information, via the cluster scheduler, about all jobs (if job ID is not specified) or else the specified job;
+    - a check function which takes a logfile path and an optional job ID. This is similar to the query function but describes whether the job has finished or not.
+
 """
 
 import sys
@@ -88,7 +90,9 @@ subp = subprocess.Popen(['qstat', '-xml', '-j', os.environ['JOB_ID'], stdout=fil
 print("</make_fragments>")
 '''
 
-    def __init__(self):
+    def __init__(self, make_fragments_perl_script):
+        super(MultipleTask, self).__init__(make_fragments_perl_script)
+        self.make_fragments_perl_script = make_fragments_perl_script
         self.script = '%s%s%s%s' %(self.__class__.script_header, self.__class__.job_header, self.__class__.job_cmd, self.__class__.job_footer)
 
     def get_script(self, cmd_list, outpath, jobname, NumTasks = 1):
@@ -123,7 +127,7 @@ print("</output>")
 
 
 
-def submit(command_filename, workingdir, hold_jobid = None, showstdout = False):
+def submit(command_filename, workingdir):
     '''Submit the given command filename to the queue. Adapted from the qb3 example.'''
 
     # Open streams
