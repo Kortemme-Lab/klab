@@ -1,0 +1,12 @@
+#constants
+pymol_scriptname='visualize_antibody_design.pml'
+color_H='marine'
+color_L='purple'
+
+#parse input parameters
+if len(sys.argv)<3 or len(sys.argv)>4:
+    print
+    print 'Usage: ./visualize_antibody_design.py PDB PARAMETER_FILE outfile_name(optional)'
+    print
+    sys.exit()
+#-

@@ -1,0 +1,11 @@
+/netapp/home/klabqb3backrub/make_fragments/make_fragments.py
+/netapp/home/klabqb3backrub/make_fragments/make_fragments_netapp.pl
+/netapp/home/klabqb3backrub/r3.3/rosetta_tools/make_fragments_netapp.pl
+
+/netapp/home/klabqb3backrub/make_fragments/sam/bin/sam-t2k.conf
+/netapp/home/klabqb3backrub/make_fragments/sam/bin/sam-t99.conf
+
+/netapp/home/klabqb3backrub/make_fragments/porter/fixfasta.pl
+/netapp/home/klabqb3backrub/make_fragments/porter/runPorter.pl
+/netapp/home/klabqb3backrub/make_fragments/porter/run_porter.sh
+/netapp/home/klabqb3backrub/make_fragments/porter/run_psiblast.sh

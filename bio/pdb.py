@@ -316,6 +316,7 @@ class PDB:
     def __init__(self, pdb_content, pdb_id = None):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
+        self.pdb_content = pdb_content
         if type(pdb_content) is types.StringType:
             self.lines =  pdb_content.split("\n")
         else:
@@ -821,7 +822,7 @@ class PDB:
             assert(SEQRES_lines[x][7:10].strip().isdigit())
 
         if not SEQRES_lines:
-            colortext.warning("WARNING: No SEQRES records were found. Kyle is trying to handle this gracefully, but Shane may need to fix it")
+            #colortext.warning("WARNING: No SEQRES records were found. Kyle is trying to handle this gracefully, but Shane may need to fix it")
             return
 
         seqres_chain_order = []

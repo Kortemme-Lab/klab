@@ -162,6 +162,7 @@ class SequenceAligner(object):
             try:
                 os.remove(t)
             except: pass
+
         return self._parse_percentage_identity_output(percentage_identity_output)
 
     def get_best_matches_by_id(self, id, cut_off = 98.0):
