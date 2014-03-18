@@ -27,9 +27,6 @@ from utils import colorprinter
 
 class SingleTask(ClusterTask):
 
-    # The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
-    cmd = 'make_fragments_RAP_cluster.pl -verbose -id %(pdbid)s%(chain)s %(no_homologs)s %(fasta)s'
-
     script_header ='''
 #!/usr/bin/python
 #$ -N %(jobname)s
@@ -62,22 +59,7 @@ print("<arch>")
 print(platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
 print("</arch>")
 
-'''
-
-    job_cmd = '''
-workingdir = %(outpath)s
-print("<cwd>")
-print(workingdir)
-print("</cwd>")
-
-print("<cmd>")
-print(' '.join(%(cmd_list)s))
-print("</cmd>")
-
-print("<output>")
-subp = subprocess.Popen(%(cmd_list)s, stdout=file_stdout, stderr=file_stdout, cwd=workingdir)
-print("</output>")
-
+task_id = os.environ.get('SGE_TASK_ID')
 '''
 
     job_footer = '''
@@ -85,29 +67,57 @@ print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
 
-subp = subprocess.Popen(['qstat', '-xml', '-j', os.environ['JOB_ID'], stdout=file_stdout, stderr=file_stdout, cwd=workingdir)
+subp = subprocess.Popen(['qstat', '-xml', '-j', os.environ['JOB_ID'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
 
 print("</make_fragments>")
 '''
 
-    def __init__(self, make_fragments_perl_script):
-        super(MultipleTask, self).__init__(make_fragments_perl_script)
-        self.make_fragments_perl_script = make_fragments_perl_script
-        self.script = '%s%s%s%s' %(self.__class__.script_header, self.__class__.job_header, self.__class__.job_cmd, self.__class__.job_footer)
+    def __init__(self, make_fragments_perl_script, options):
+        '''options must contain jobname, outpath, no_homologs, NumTasks, [pdb_ids], [chains], and [fasta_files].'''
+        super(SingleTask, self).__init__(make_fragments_perl_script, options)
 
-    def get_script(self, cmd_list, outpath, jobname, NumTasks = 1):
-        assert(NumTasks == 1)
+    def get_script(self):
+        options = self.options
+
+        assert(1 == len(options['job_inputs']))
+        jobname = options['jobname']
+        outpath = options['outpath']
+        make_fragments_perl_script = self.make_fragments_perl_script
+
+        pdb_id = options['job_inputs'][0].pdb_id
+        chain = options['job_inputs'][0].chain
+        fasta_file = options['job_inputs'][0].fasta_file
+
+        fasta_file_dir = os.path.split(fasta_file)[0]
+        no_homologs = options['no_homologs']
+
+        job_cmd = '''
+job_root_dir = "%(fasta_file_dir)s"
+print("<cwd>")
+print(job_root_dir)
+print("</cwd>")
+
+print("<cmd>")
+print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s']))
+print("</cmd>")
+
+print("<output>")
+subp = subprocess.Popen(['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+print("</output>")
+''' % locals()
+
+        self.script = '\n'.join([self.__class__.script_header, self.__class__.job_header, job_cmd, self.__class__.job_footer])
         return self.script % locals()
 
 class MultipleTask(SingleTask):
 
-    job_header = SingleTask.script_header + '''
-#$ -t 1-%(NumTasks)s
+    # The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
+    cmd = 'make_fragments_RAP_cluster.pl -verbose -id %(pdbid)s%(chain)s %(no_homologs)s %(fasta)s'
 
-array_job_input_ids = %(input_ids)s
-task_input_id = array_job_input_ids[int(os.environ['SGE_TASK_ID']) - 1]
-
+    script_header = SingleTask.script_header + '''
+#$ -t 1-%(num_tasks)d
 '''
+
     job_cmd = '''
 working_dir = os.path.join("%(outpath)s", task_input_id)
 os.mkdir(working_dir)
@@ -120,11 +130,48 @@ subp = subprocess.Popen(%(cmd_list)s, stdout=file_stdout, stderr=file_stdout, cw
 print("</output>")
 '''
 
-    def get_script(self, cmd_list, outpath, jobname, NumTasks):
-        if NumTasks == 1:
-            return super(MultipleTask, self).get_script(cmd_list, outpath, jobname, NumTasks)
-        return self.script % locals()
+    def get_script(self):
+        options = self.options
 
+        jobname = options['jobname']
+        outpath = options['outpath']
+        make_fragments_perl_script = self.make_fragments_perl_script
+
+        job_inputs = options['job_inputs']
+        num_tasks = len(options['job_inputs'])
+
+
+        no_homologs = options['no_homologs']
+
+        job_arrays = []
+        job_arrays.append('chains = %s' % str([ji.chain for ji in job_inputs]))
+        job_arrays.append('pdb_ids = %s' % str([ji.pdb_id for ji in job_inputs]))
+        job_arrays.append('fasta_files = %s' % str([ji.fasta_file for ji in job_inputs]))
+        job_arrays = '\n'.join(job_arrays)
+
+        job_cmd = '''
+
+idx = task_id - 1
+chain = chains[idx]
+pdb_id = pdb_ids[idx]
+fasta_file = fasta_files[idx]
+
+job_root_dir = os.path.split(fasta_file)[0]
+print("<cwd>")
+print(job_root_dir)
+print("</cwd>")
+
+print("<cmd>")
+print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file]))
+print("</cmd>")
+
+print("<output>")
+subp = subprocess.Popen(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+print("</output>")
+''' % locals()
+
+        self.script = '\n'.join([self.__class__.script_header, self.__class__.job_header, job_arrays, job_cmd, self.__class__.job_footer])
+        return self.script % locals()
 
 
 def submit(command_filename, workingdir):
