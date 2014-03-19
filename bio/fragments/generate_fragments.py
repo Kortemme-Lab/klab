@@ -345,8 +345,10 @@ def parseArgs():
         }
 
 def setup_jobs(outpath, options, fasta_files, batch_mode):
+    job_inputs = None
     found_sequences, errors = get_sequences(options, fasta_files, batch_mode)
-    reformat(found_sequences)
+    if found_sequences or batch_mode:
+        reformat(found_sequences)
     if not errors:
         job_inputs, errors = create_inputs(options, outpath, found_sequences)
     return job_inputs, errors
@@ -413,7 +415,7 @@ def get_sequences(options, fasta_files, batch_mode):
                         break
                 if not found_sequences:
                     errors.append('Could not find the sequence for PDB ID %s and chain %s in the file(s) %s.' % (options.pdbid, options.chain, fasta_files_str))
-
+    
     return found_sequences, errors
 
 
