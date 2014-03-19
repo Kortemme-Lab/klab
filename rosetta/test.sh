@@ -29,13 +29,13 @@ fi
 
 cd main
 echo "Initial fetch"
-git fetch
+git fetch > /dev/null
 cd ..
 
 cd $TESTING_DIR
 
 echo "Cloning repository"
-git clone -n -l ../main $REPO_DIR
+git clone -n -l ../main $REPO_DIR > /dev/null
 cd $REPO_DIR
 echo "Starting time: `date`" > $output_file
 echo "  Testing new revision $1" >> $output_file
@@ -43,11 +43,11 @@ echo "   against parent revision $2" >> $output_file
 
 git remote rename origin local
 git remote add origin git@github.com:RosettaCommons/main.git
-git fetch origin
+git fetch origin > /dev/null
 
-git checkout -b parent $2
-git checkout -b $dev_branch_name $1
-git checkout parent
+git checkout -b parent $2 > /dev/null
+git checkout -b $dev_branch_name $1 > /dev/null
+git checkout parent > /dev/null
 cd ..
 
 echo "Compiling parent_release..."
