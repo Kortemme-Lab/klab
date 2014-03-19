@@ -207,7 +207,6 @@ print("</cmd>")
 
 print("<output>")
 subp = Popen(job_root_dir, cmd_args)
-#subp = subprocess.call(' '.join(cmd_args), shell = True)
 sys.stdout.write(subp.stdout)
 print("</output>")
 ''' % locals()
