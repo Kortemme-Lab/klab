@@ -39,11 +39,29 @@ class SingleTask(ClusterTask):
 #$ -l h_rt=6:00:00
 '''
     job_header = '''
+import sys
 from time import strftime
 import socket
 import os
 import platform
 import subprocess
+
+class ProcessOutput(object):
+
+    def __init__(self, stdout, stderr, errorcode):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.errorcode = errorcode
+    
+    def getError(self):
+        if self.errorcode != 0:
+            return("Errorcode: %%d\\n%%s" %% (self.errorcode, self.stderr))
+        return None
+
+def Popen(outdir, args):
+    subp = subprocess.Popen([str(arg) for arg in args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir, env={'SPARKSXDIR' : '/netapp/home/klabqb3backrub/tools/sparks-x'})
+    output = subp.communicate()
+    return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
 
 print("<make_fragments>")
 
@@ -56,7 +74,7 @@ print(socket.gethostname())
 print("</host>")
 
 print("<arch>")
-print(platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
+print(platform.machine() + ', ' + platform.processor() + ', ' + platform.platform())
 print("</arch>")
 
 task_id = os.environ.get('SGE_TASK_ID')
@@ -67,9 +85,16 @@ print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
 
-subp = subprocess.Popen(['qstat', '-xml', '-j', os.environ['JOB_ID'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+print("<qstat>")
+qstat_p = Popen(job_root_dir, ['qstat', '-xml', '-j', os.environ['JOB_ID']])
+print(qstat_p.stdout)
+print("</qstat>")
 
 print("</make_fragments>")
+
+if subp.errorcode != 0:
+    sys.stderr.write(subp.stderr)
+    sys.exit(subp.errorcode)
 '''
 
     def __init__(self, make_fragments_perl_script, options):
@@ -98,11 +123,13 @@ print(job_root_dir)
 print("</cwd>")
 
 print("<cmd>")
-print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s']))
+cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s'] if c]
+print(' '.join(cmd_args))
 print("</cmd>")
 
 print("<output>")
-subp = subprocess.Popen(['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+subp = Popen(job_root_dir, cmd_args)
+sys.stdout.write(subp.stdout)
 print("</output>")
 ''' % locals()
 
@@ -116,18 +143,6 @@ class MultipleTask(SingleTask):
 
     script_header = SingleTask.script_header + '''
 #$ -t 1-%(num_tasks)d
-'''
-
-    job_cmd = '''
-working_dir = os.path.join("%(outpath)s", task_input_id)
-os.mkdir(working_dir)
-print("<cwd>")
-print(workingdir)
-print("</cwd>")
-
-print("<output>")
-subp = subprocess.Popen(%(cmd_list)s, stdout=file_stdout, stderr=file_stdout, cwd=working_dir)
-print("</output>")
 '''
 
     def get_script(self):
@@ -166,7 +181,8 @@ print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + ch
 print("</cmd>")
 
 print("<output>")
-subp = subprocess.Popen(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+subp = Popen(job_root_dir, ['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file])
+sys.stdout.write(subp.stdout)
 print("</output>")
 ''' % locals()
 
@@ -184,9 +200,6 @@ def submit(command_filename, workingdir):
 
     # Form command
     command = ['qsub']
-    if hold_jobid:
-        command.append('-hold_jid')
-        command.append('%d' % hold_jobid)
     command.append(command_filename)
 
     # Submit the job and capture output.
@@ -228,7 +241,7 @@ def submit(command_filename, workingdir):
     print(output)
 
     os.remove(outfile)
-    os.remove(command_filename)
+    #os.remove(command_filename)
 
     return jobid, output
 
@@ -295,7 +308,7 @@ def query(logfile, jobID = None):
         return True
 
 
-def check(logfile, job_id):
+def check(logfile, job_id, cluster_job_name):
     joblist = logfile.readFromLogfile()
     jobIsRunning = query(logfile, job_id)
     if not joblist.get(job_id):
@@ -304,8 +317,7 @@ def check(logfile, job_id):
         else:
             errors.append("Job %d is running but has no entry in the logfile %s." % (job_id, logfile.getName()))
     else:
-        global clusterJobName
-        cname = clusterJobName
+        cname = cluster_job_name
         dir = joblist[job_id]["Directory"]
         if not jobIsRunning:
             outputfile = os.path.join(dir, "%(cname)s.o%(job_id)d" % vars())
