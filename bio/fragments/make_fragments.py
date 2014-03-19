@@ -15,7 +15,7 @@ from datetime import datetime
 from optparse import OptionParser, OptionGroup, Option
 import glob
 import getpass
-from utils import LogFile, colorprinter
+from utils import LogFile, colorprinter, JobInitializationException
 
 #################
 #  Configuration
@@ -44,6 +44,7 @@ errcode = 0
 #  Globals
 
 make_fragments_script = "make_fragments_RAP_cluster.pl"
+test_mode = False # set this to true for running quick tests on your cluster system (you will need to adapt the cluster/[engine].py code to use this argument
 logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
 cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster
 fasta_file_wildcards = ['*.fasta', '*.fasta.txt', '*.fa'] # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory in batch mode.
@@ -89,6 +90,12 @@ class JobInput(object):
 def get_username():
     return getpass.getuser()
     #return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
+
+
+def write_file(filepath, contents, ftype = 'w'):
+    output_handle = open(filepath, ftype)
+    output_handle.write(contents)
+    output_handle.close()
 
 
 def parse_FASTA_files(fasta_files):
@@ -181,6 +188,7 @@ def parseArgs():
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
+    group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q.", metavar="QUEUE_NAME")
     group.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
     group.add_option("-Q", "--query", dest="query", action="store_true", help="Optional. Query the progress of the cluster job against %s and then quit." % logfile.getName())
     parser.add_option_group(group)
@@ -190,6 +198,7 @@ def parseArgs():
     parser.set_defaults(nohoms = False)
     parser.set_defaults(force = False)
     parser.set_defaults(query = False)
+    parser.set_defaults(queue = 'lab.q')
     (options, args) = parser.parse_args()
 
     username = get_username()
@@ -206,7 +215,7 @@ def parseArgs():
         else:
             # The job has finished. Check the output file.
             jobID = int(options.check)
-            ClusterEngine.check(logfile, jobID, cluster_job_name)
+            errors.extend(ClusterEngine.check(logfile, jobID, cluster_job_name))
 
     validOptions = options.query or options.check
 
@@ -326,6 +335,7 @@ def parseArgs():
         no_homologs = "-nohoms"
 
     return {
+        "queue"         : options.queue,
         "no_homologs"	: no_homologs,
         "user"			: username,
         "outpath"		: outpath,
@@ -354,7 +364,6 @@ def get_sequences(options, fasta_files, batch_mode):
 
     num_fasta_records = len(fasta_records)
 
-    print(fasta_records)
     colorprinter.message('Found %d sequence(s).' % num_fasta_records)
 
     found_sequences = None
@@ -454,9 +463,7 @@ def create_inputs(options, outpath, found_sequences):
             colorprinter.message("Creating a new FASTA file %s." % fasta_file)
 
             assert(not(os.path.exists(fasta_file)))
-            F = open(fasta_file, "w")
-            F.write('\n'.join(sequence) + '\n') # The file must terminate in a newline for the Perl script to work
-            F.close()
+            write_file(fasta_file, '\n'.join(sequence) + '\n', 'w') # The file must terminate in a newline for the Perl script to work
             job_inputs.append(JobInput(fasta_file, pdb_id, chain))
         except:
             if created_new_subdirectory and os.path.exists(subdir_path):
@@ -543,23 +550,26 @@ if __name__ == "__main__":
 
     options = parseArgs()
     if options["outpath"] and options['job_inputs']:
-        if len(options['job_inputs']) > 1:
-            # Single sequence fragment generation
-            task = ClusterEngine.MultipleTask(make_fragments_script, options)
-            script = task.get_script()
+        try:
+            if len(options['job_inputs']) > 1:
+                # Single sequence fragment generation
+                task = ClusterEngine.MultipleTask(make_fragments_script, options, test_mode = test_mode)
+                submission_script, scripts = task.get_scripts()
+            else:
+                # Single sequence fragment generation
+                task = ClusterEngine.SingleTask(make_fragments_script, options, test_mode = test_mode)
+                submission_script, scripts = task.get_scripts()
+        except JobInitializationException, e:            
+            colorprinter.error(str(e))
+            sys.exit(ERRCODE_ARGUMENTS)
+        
+        for script_filename, script in scripts.iteritems():
+            write_file(os.path.join(options["outpath"], script_filename), script, 'w')
 
-        else:
-            # Single sequence fragment generation
-            task = ClusterEngine.SingleTask(make_fragments_script, options)
-            script = task.get_script()
-
-        qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
-        F = open(qcmdfile, "w")
-        F.write(script)
-        F.close()
+        submission_script = os.path.join(options["outpath"], submission_script)
 
         try:
-            (jobid, output) = ClusterEngine.submit(qcmdfile, options["outpath"] )
+            (jobid, output) = ClusterEngine.submit(submission_script, options["outpath"] )
         except Exception, e:
             colorprinter.error("An exception occurred during submission to the cluster.")
             colorprinter.error(str(e))
@@ -567,6 +577,8 @@ if __name__ == "__main__":
             sys.exit(ERRCODE_CLUSTER)
 
         colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
+        if options['no_homologs']:
+            print("The --nohoms option was selected.")
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
 
