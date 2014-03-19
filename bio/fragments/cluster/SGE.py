@@ -23,22 +23,32 @@ import subprocess
 from ClusterTask import ClusterTask
 
 sys.path.insert(0, "..")
-from utils import colorprinter
+from utils import colorprinter, JobInitializationException
+
+# todo: move these into a common file e.g. utils.py
+ERRCODE_ARGUMENTS = 1
+ERRCODE_CLUSTER = 2
+ERRCODE_OLDRESULTS = 3
+ERRCODE_CONFIG = 4
+ERRCODE_NOOUTPUT = 5
+ERRCODE_JOBFAILED = 6
+ERRCODE_MISSING_FILES = 1
+
 
 class SingleTask(ClusterTask):
 
-    script_header ='''
-#!/usr/bin/python
+    submission_script ='''
+#!/usr/bin/bash
 #$ -N %(jobname)s
 #$ -o %(outpath)s
 #$ -e %(outpath)s
 #$ -cwd
 #$ -r y
 #$ -l mem_free=1G
-#$ -l arch=lx24-amd64
-#$ -l h_rt=6:00:00
+#$ -l arch=linux-x64
 '''
-    job_header = '''
+
+    python_script_preamble = '''
 import sys
 from time import strftime
 import socket
@@ -80,15 +90,10 @@ print("</arch>")
 task_id = os.environ.get('SGE_TASK_ID')
 '''
 
-    job_footer = '''
+    python_script_postamble = '''
 print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
-
-print("<qstat>")
-qstat_p = Popen(job_root_dir, ['qstat', '-xml', '-j', os.environ['JOB_ID']])
-print(qstat_p.stdout)
-print("</qstat>")
 
 print("</make_fragments>")
 
@@ -97,11 +102,29 @@ if subp.errorcode != 0:
     sys.exit(subp.errorcode)
 '''
 
-    def __init__(self, make_fragments_perl_script, options):
+    def __init__(self, make_fragments_perl_script, options, test_mode = False):
         '''options must contain jobname, outpath, no_homologs, NumTasks, [pdb_ids], [chains], and [fasta_files].'''
         super(SingleTask, self).__init__(make_fragments_perl_script, options)
 
-    def get_script(self):
+        # NOTE: This if/elif block is specific to the QB3 cluster system and is only included for the benefit of QB3 users. Delete this line or alter it to fit your SGE cluster queue names.
+        if options['queue'] not in ['long.q', 'lab.q', 'short.q']: 
+            raise JobInitializationException("The queue you specified (%s) is invalid. Please use either long.q, lab.q, or short.q." % options['queue'])
+        elif options['queue'] == 'short.q':
+            test_mode = True
+
+        self.test_mode = test_mode
+        self.submission_script = self.__class__.submission_script
+        self.set_run_length_and_queue()
+        self.submission_script += '\npython python_script.py\n\n'
+
+    def set_run_length_and_queue(self):
+        if self.test_mode:
+            self.submission_script += '#$ -l h_rt=0:29:00\n'
+        else:
+            self.submission_script += '#$ -l h_rt=6:00:00\n'
+        self.submission_script += '#$ -q %s\n' % self.options['queue']
+
+    def get_scripts(self):
         options = self.options
 
         assert(1 == len(options['job_inputs']))
@@ -116,7 +139,7 @@ if subp.errorcode != 0:
         fasta_file_dir = os.path.split(fasta_file)[0]
         no_homologs = options['no_homologs']
 
-        job_cmd = '''
+        python_script = '''
 job_root_dir = "%(fasta_file_dir)s"
 print("<cwd>")
 print(job_root_dir)
@@ -133,19 +156,20 @@ sys.stdout.write(subp.stdout)
 print("</output>")
 ''' % locals()
 
-        self.script = '\n'.join([self.__class__.script_header, self.__class__.job_header, job_cmd, self.__class__.job_footer])
-        return self.script % locals()
+        return 'submission_script.sh', {
+            'submission_script.sh' : self.submission_script % locals(),
+            'python_script.py' : '\n'.join([self.__class__.python_script_preamble, python_script, self.__class__.python_script_postamble]) % locals()
+        }
+
 
 class MultipleTask(SingleTask):
 
     # The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
     cmd = 'make_fragments_RAP_cluster.pl -verbose -id %(pdbid)s%(chain)s %(no_homologs)s %(fasta)s'
 
-    script_header = SingleTask.script_header + '''
-#$ -t 1-%(num_tasks)d
-'''
+    submission_script = SingleTask.submission_script + '#$ -t 1-%(num_tasks)d\n'
 
-    def get_script(self):
+    def get_scripts(self):
         options = self.options
 
         jobname = options['jobname']
@@ -164,9 +188,9 @@ class MultipleTask(SingleTask):
         job_arrays.append('fasta_files = %s' % str([ji.fasta_file for ji in job_inputs]))
         job_arrays = '\n'.join(job_arrays)
 
-        job_cmd = '''
+        python_script = '''
 
-idx = task_id - 1
+idx = int(task_id) - 1
 chain = chains[idx]
 pdb_id = pdb_ids[idx]
 fasta_file = fasta_files[idx]
@@ -177,17 +201,21 @@ print(job_root_dir)
 print("</cwd>")
 
 print("<cmd>")
-print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file]))
+cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file] if c]
+print(' '.join(cmd_args))
 print("</cmd>")
 
 print("<output>")
-subp = Popen(job_root_dir, ['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file])
+subp = Popen(job_root_dir, cmd_args)
+#subp = subprocess.call(' '.join(cmd_args), shell = True)
 sys.stdout.write(subp.stdout)
 print("</output>")
 ''' % locals()
 
-        self.script = '\n'.join([self.__class__.script_header, self.__class__.job_header, job_arrays, job_cmd, self.__class__.job_footer])
-        return self.script % locals()
+        return 'submission_script.sh', {
+            'submission_script.sh' : self.submission_script % locals(),
+            'python_script.py' : '\n'.join([self.__class__.python_script_preamble, job_arrays, python_script, self.__class__.python_script_postamble]) % locals()
+        }
 
 
 def submit(command_filename, workingdir):
@@ -238,7 +266,6 @@ def submit(command_filename, workingdir):
     output = output.replace('"', "'")
     if output.startswith("qsub: ERROR"):
         raise Exception(output)
-    print(output)
 
     os.remove(outfile)
     #os.remove(command_filename)
@@ -249,9 +276,8 @@ def submit(command_filename, workingdir):
 def query(logfile, jobID = None):
     """If jobID is an integer then return False if the job has finished and True if it is still running.
        Otherwise, returns a table of jobs run by the user."""
-
+    
     joblist = logfile.readFromLogfile()
-
     if jobID and type(jobID) == type(1):
         command = ['qstat', '-j', str(jobID)]
     else:
@@ -268,6 +294,8 @@ def query(logfile, jobID = None):
         else:
             return True
 
+    if not output.strip():
+        colorprinter.message("No jobs running at present.")
     output = output.strip().split("\n")
     if len(output) > 2:
         for line in output[2:]:
@@ -309,6 +337,8 @@ def query(logfile, jobID = None):
 
 
 def check(logfile, job_id, cluster_job_name):
+    # todo: this needs to be updated for array jobs
+    errors = []
     joblist = logfile.readFromLogfile()
     jobIsRunning = query(logfile, job_id)
     if not joblist.get(job_id):
@@ -337,3 +367,4 @@ def check(logfile, job_id, cluster_job_name):
                     errcode = ERRCODE_NOOUTPUT
         else:
             colorprinter.warning("Job %d is still running. Results are being stored in %s." % (job_id, dir))
+    return errors

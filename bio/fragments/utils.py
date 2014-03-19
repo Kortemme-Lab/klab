@@ -3,6 +3,8 @@ import re
 import datetime
 import time
 
+class JobInitializationException(Exception): pass
+
 class LogFile(object):
 
     class LogFileException(Exception): pass
