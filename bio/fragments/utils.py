@@ -28,7 +28,7 @@ class LogFile(object):
                 nt = mtchs.group(1)
                 nt = nt.replace("-", "")
                 nt = nt[:nt.find(".")]
-                timetaken = datetime.now() - datetime(*time.strptime(nt, "%Y%m%dT%H:%M:%S")[0:6])
+                timetaken = datetime.datetime.now() - datetime.datetime(*time.strptime(nt, "%Y%m%dT%H:%M:%S")[0:6])
                 jobtime = timetaken.seconds
                 joblist[jobID] = {"Directory" : jobdir, "TimeInSeconds" : jobtime}
             else:

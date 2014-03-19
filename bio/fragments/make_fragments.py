@@ -205,7 +205,7 @@ def parseArgs():
         else:
             # The job has finished. Check the output file.
             jobID = int(options.check)
-            ClusterEngine.check(logfile, jobID)
+            ClusterEngine.check(logfile, jobID, cluster_job_name)
 
     validOptions = options.query or options.check
 
@@ -296,6 +296,7 @@ def parseArgs():
         colorprinter.error('\nError: You must either use single sequence mode or batch mode. Both were specified')
         sys.exit(ERRCODE_ARGUMENTS)
 
+    job_inputs = []
     if options.fasta:
         if not os.path.exists(options.fasta):
             errors.append("FASTA file %s does not exist." % options.fasta)
@@ -452,7 +453,7 @@ def create_inputs(options, outpath, found_sequences):
 
             assert(not(os.path.exists(fasta_file)))
             F = open(fasta_file, "w")
-            F.write('\n'.join(sequence))
+            F.write('\n'.join(sequence) + '\n') # The file must terminate in a newline for the Perl script to work
             F.close()
             job_inputs.append(JobInput(fasta_file, pdb_id, chain))
         except:
@@ -539,7 +540,7 @@ if __name__ == "__main__":
 
 
     options = parseArgs()
-    if options["outpath"]:
+    if options["outpath"] and options['job_inputs']:
         if len(options['job_inputs']) > 1:
             # Single sequence fragment generation
             task = ClusterEngine.MultipleTask(make_fragments_script, options)
@@ -552,7 +553,7 @@ if __name__ == "__main__":
 
         qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
         F = open(qcmdfile, "w")
-        F.write(template)
+        F.write(script)
         F.close()
 
         try:
