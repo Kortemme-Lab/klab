@@ -43,9 +43,10 @@ errcode = 0
 #################
 #  Globals
 
-logfile = LogFile("make_fragments_destinations.txt")
-cluster_job_name = "fragment_generation" # set this to identify the job on the cluster
 make_fragments_script = "make_fragments_RAP_cluster.pl"
+logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
+cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster
+fasta_file_wildcards = ['*.fasta', '*.fasta.txt', '*.fa'] # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory in batch mode.
 
 # The location of the text file containing the names of the configuration scripts
 configurationFilesLocation = "make_fragments_confs.txt" # "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
@@ -272,7 +273,8 @@ def parseArgs():
             elif batch_file_selector.find('?') != -1:
                 batch_files.extend(map(os.path.abspath, glob.glob(batch_file_selector)))
             elif os.path.isdir(batch_file_selector):
-                batch_files.extend(map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, '*.fasta'))))
+                for fasta_file_wildcard in fasta_file_wildcards:
+                    batch_files.extend(map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, fasta_file_wildcard))))
             else:
                 if not os.path.exists(batch_file_selector):
                     missing_files.append(batch_file_selector)
