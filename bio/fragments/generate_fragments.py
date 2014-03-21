@@ -153,18 +153,45 @@ def parseArgs():
     errors = []
     pdbpattern = re.compile("^\w{4}$")
     description = ['\n']
-    description.append("Single job, example 1 : make_fragments.py -d results -f /path/to/1CYO.fasta.txt")
-    description.append("Single job, example 2 : make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA")
-    description.append("Batch job,  example 1 : make_fragments.py -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
-    description.append("Batch job,  example 2 : make_fragments.py -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1")
-    description.append("-----------------------------------------------------------------------------")
-    description.append("The output of the computation will be saved in the output directory, along with the input FASTA file which is generated from the supplied FASTA file.")
-    description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.getName())
+    description.append("*** Help ***\n")
+    description.append("The output of the computation will be saved in the output directory, along with")
+    description.append("the input FASTA file which is generated from the supplied FASTA file.")
+    description.append("A log of the output directories for cluster jobs is saved in")
+    description.append("%s in the current directory to admit queries." % logfile.getName())
     description.append("")
-    description.append("The FASTA description lines must have the following format: '>protein_id|chain_letter', optionally followed by more text preceded by a bar symbol.")
-    description.append("The underlying Perl script requires a 5-character ID with the first four characters being the protein id (PDB ID) and the final character being the chain identifier.")
-    description.append("To create a 5-character ID, this script takes the first four characters from protein_id and the chain letter to create the 5-character ID. The list of these IDs must be unique.")
-    description.append("")
+    description.append("The FASTA description lines must have the following format:")
+    description.append("'>protein_id|chain_letter', optionally followed by more text preceded by a '|'")
+
+    description.append('''There are a few caveats:
+
+1. The underlying Perl script requires a 5-character ID for the sequence 
+identifier which is typically a PDB ID followed by a chain ID e.g. "1a2pA". 
+For this reason, our script expects FASTA record headers to have a form like
+ ">xxxx|y" where xxxx is a 4-letter identifier e.g. PDB ID and y is a chain
+ identifier. protein_id identifier may be longer than 4 characters and 
+chain_letter must be a single character. However, only the first 4 characters 
+of the identifier are used by the script. Any information after the chain 
+identifier must be preceded by a '|' character.
+
+For example, ">1A2P_001|A|some information" is a valid header but the 
+generated ID will be "1a2pA" (we convert PDB IDs to lowercase).
+
+2. If you are submitting a batch job, the list of 5-character IDs generated 
+from the FASTA files using the method above must be unique.
+
+For example, if you have two records ">1A2P_001|A|" and "">1A2P_002|A|" then 
+the job will fail.
+On the other hand, ">1A2P_001|A|" and "">1A2P_001|B|" is perfectly fine and 
+the script will output fragments for 1a2pA and 1a2pB.''')
+    
+    description.append("\n*** Examples ***\n")
+    description.append("Single-sequence fragment generation:")
+    description.append("1: make_fragments.py -d results -f /path/to/1CYO.fasta.txt")
+    description.append("2: make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA\n")
+    description.append("Multi-sequence fragment generation (batch job):")
+    description.append("1: make_fragments.py -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
+    description.append("2: make_fragments.py -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1\n\n")
+    
     description = "\n".join(description)
 
     parser = OptionParserWithNewlines(usage="usage: %prog [options]", version="%prog 1.1A", option_class=MultiOption)
@@ -581,6 +608,9 @@ if __name__ == "__main__":
         colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
         if options['no_homologs']:
             print("The --nohoms option was selected.")
+        if ClusterEngine.ClusterType == "SGE":
+            print("The jobs have been submitted using the %s queue." % options['queue'])
+        print('')
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
 
