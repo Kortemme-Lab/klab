@@ -34,6 +34,7 @@ ERRCODE_NOOUTPUT = 5
 ERRCODE_JOBFAILED = 6
 ERRCODE_MISSING_FILES = 1
 
+ClusterType = "SGE"
 
 class SingleTask(ClusterTask):
 
