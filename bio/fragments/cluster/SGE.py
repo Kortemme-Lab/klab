@@ -268,7 +268,7 @@ def submit(command_filename, workingdir, send_mail = False, username = None):
        
     if send_mail and username:
         #username = 'Shane.OConnor@ucsf.edu'
-        command.extend(['-m', 'beas', '-M', '%s@chef.compbio.ucsf.edu' % username])
+        command.extend(['-m', 'eas', '-M', '%s@chef.compbio.ucsf.edu' % username])
     command.append(command_filename)
     
     # Submit the job and capture output.
