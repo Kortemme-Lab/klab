@@ -45,8 +45,9 @@ class SingleTask(ClusterTask):
 #$ -e %(outpath)s
 #$ -cwd
 #$ -r y
-#$ -l mem_free=1G
+#$ -l mem_free=2G
 #$ -l arch=linux-x64
+#$ -l scratch=1G
 '''
 
     python_script_preamble = '''
@@ -56,6 +57,9 @@ import socket
 import os
 import platform
 import subprocess
+import tempfile
+import shutil
+import glob
 
 class ProcessOutput(object):
 
@@ -74,9 +78,15 @@ def Popen(outdir, args):
     output = subp.communicate()
     return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
 
+def create_scratch_path():
+    path = tempfile.mkdtemp(dir = '/scratch')
+    if not os.path.isdir(path):
+        raise os.error
+    return path
+
 print("<make_fragments>")
 
-print("<start_time>")
+print("<start_tiime>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</start_time>")
 
@@ -122,7 +132,7 @@ if subp.errorcode != 0:
         if self.test_mode:
             self.submission_script += '#$ -l h_rt=0:29:00\n'
         else:
-            self.submission_script += '#$ -l h_rt=6:00:00\n'
+            self.submission_script += '#$ -l h_rt=10:00:00\n'
         self.submission_script += '#$ -q %s\n' % self.options['queue']
 
     def get_scripts(self):
@@ -142,8 +152,13 @@ if subp.errorcode != 0:
 
         python_script = '''
 job_root_dir = "%(fasta_file_dir)s"
+
+# Set up scratch directory
+scratch_path = create_scratch_path()
+shutil.copy("%(fasta_file)s", scratch_path)
+
 print("<cwd>")
-print(job_root_dir)
+print(scratch_path)
 print("</cwd>")
 
 print("<cmd>")
@@ -152,9 +167,20 @@ print(' '.join(cmd_args))
 print("</cmd>")
 
 print("<output>")
-subp = Popen(job_root_dir, cmd_args)
+subp = Popen(scratch_path, cmd_args)
 sys.stdout.write(subp.stdout)
 print("</output>")
+
+# Copy files from scratch back to /netapp
+for f in glob.glob(os.path.join(scratch_path, "*")):
+    shutil.copy(f, job_root_dir)
+
+# Copy files from scratch back to /netapp
+os.remove("%(fasta_file)s")
+os.rmdir(job_root_dir)
+shutil.copytree(scratch_path, job_root_dir)
+shutil.rmtree(scratch_path)
+
 ''' % locals()
 
         return 'submission_script.sh', {
@@ -195,10 +221,14 @@ idx = int(task_id) - 1
 chain = chains[idx]
 pdb_id = pdb_ids[idx]
 fasta_file = fasta_files[idx]
-
 job_root_dir = os.path.split(fasta_file)[0]
+
+# Set up scratch directory
+scratch_path = create_scratch_path()
+shutil.copy(fasta_file, scratch_path)
+
 print("<cwd>")
-print(job_root_dir)
+print(scratch_path)
 print("</cwd>")
 
 print("<cmd>")
@@ -207,9 +237,16 @@ print(' '.join(cmd_args))
 print("</cmd>")
 
 print("<output>")
-subp = Popen(job_root_dir, cmd_args)
+subp = Popen(scratch_path, cmd_args)
 sys.stdout.write(subp.stdout)
 print("</output>")
+
+# Copy files from scratch back to /netapp
+os.remove(fasta_file)
+os.rmdir(job_root_dir)
+shutil.copytree(scratch_path, job_root_dir)
+shutil.rmtree(scratch_path)
+
 ''' % locals()
 
         return 'submission_script.sh', {
@@ -218,7 +255,7 @@ print("</output>")
         }
 
 
-def submit(command_filename, workingdir):
+def submit(command_filename, workingdir, send_mail = False, username = None):
     '''Submit the given command filename to the queue. Adapted from the qb3 example.'''
 
     # Open streams
@@ -228,8 +265,12 @@ def submit(command_filename, workingdir):
 
     # Form command
     command = ['qsub']
+       
+    if send_mail and username:
+        #username = 'Shane.OConnor@ucsf.edu'
+        command.extend(['-m', 'beas', '-M', '%s@chef.compbio.ucsf.edu' % username])
     command.append(command_filename)
-
+    
     # Submit the job and capture output.
     try:
         subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stdout, cwd=workingdir)

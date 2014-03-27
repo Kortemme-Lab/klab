@@ -184,13 +184,14 @@ the job will fail.
 On the other hand, ">1A2P_001|A|" and "">1A2P_001|B|" is perfectly fine and 
 the script will output fragments for 1a2pA and 1a2pB.''')
     
+    script_name = os.path.split(sys.argv[0])[1]
     description.append("\n*** Examples ***\n")
     description.append("Single-sequence fragment generation:")
-    description.append("1: make_fragments.py -d results -f /path/to/1CYO.fasta.txt")
-    description.append("2: make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA\n")
+    description.append("1: " + script_name + " -d results -f /path/to/1CYO.fasta.txt")
+    description.append("2: " + script_name + " -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA\n")
     description.append("Multi-sequence fragment generation (batch job):")
-    description.append("1: make_fragments.py -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
-    description.append("2: make_fragments.py -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1\n\n")
+    description.append("1: " + script_name + " -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
+    description.append("2: " + script_name + " -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1\n\n")
     
     description = "\n".join(description)
 
@@ -212,12 +213,13 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-V", "--overwrite", dest="overwrite", action="store_true", help="Optional. If the output directory <PDBID><CHAIN> for the fragment job(s) exists, delete the current contents.")
     group.add_option("-F", "--force", dest="force", action="store_true", help="Optional. Create the output directory without prompting.")
+    group.add_option("-M", "--email", dest="sendmail", action="store_true", help="Optional. If this option is set, an email is sent when the job finishes or fails (cluster-dependent). WARNING: On an SGE cluster, an email will be sent for each FASTA file i.e. for each task in the job array.")
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
     group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q.", metavar="QUEUE_NAME")
-    group.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
-    group.add_option("-Q", "--query", dest="query", action="store_true", help="Optional. Query the progress of the cluster job against %s and then quit." % logfile.getName())
+    group.add_option("-K", "--check", dest="check", help="Optional, needs to be fixed for batch mode. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
+    group.add_option("-Q", "--query", dest="query", action="store_true", help="Optional, needs to be fixed for batch mode. Query the progress of the cluster job against %s and then quit." % logfile.getName())
     parser.add_option_group(group)
 
     parser.set_defaults(outdir = os.getcwd())
@@ -225,6 +227,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     parser.set_defaults(nohoms = False)
     parser.set_defaults(force = False)
     parser.set_defaults(query = False)
+    parser.set_defaults(sendmail = False)
     parser.set_defaults(queue = 'lab.q')
     (options, args) = parser.parse_args()
 
@@ -363,6 +366,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
 
     return {
         "queue"         : options.queue,
+        "sendmail"         : options.sendmail,
         "no_homologs"	: no_homologs,
         "user"			: username,
         "outpath"		: outpath,
@@ -517,7 +521,7 @@ def searchConfigurationFiles(findstr, replacestr = None):
     for line in lines:
         line = line.strip()
         if line:
-            if line.endswith("make_fragments.py"):
+            if line.endswith("generate_fragments.py"):
                 # Do not parse the Python script but check that it exists
                 if not(os.path.exists(line)):
                     allerrors[line] = "File/directory %s does not exist." % line
@@ -598,14 +602,18 @@ if __name__ == "__main__":
         submission_script = os.path.join(options["outpath"], submission_script)
 
         try:
-            (jobid, output) = ClusterEngine.submit(submission_script, options["outpath"] )
+            send_mail = options['sendmail']
+            username = None
+            if send_mail:
+                username = get_username()
+            (jobid, output) = ClusterEngine.submit(submission_script, options["outpath"], send_mail = send_mail, username = username )
         except Exception, e:
             colorprinter.error("An exception occurred during submission to the cluster.")
             colorprinter.error(str(e))
             colorprinter.error(traceback.format_exc())
             sys.exit(ERRCODE_CLUSTER)
 
-        colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
+        colorprinter.message("\nFragment generation jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
         if options['no_homologs']:
             print("The --nohoms option was selected.")
         if ClusterEngine.ClusterType == "SGE":
