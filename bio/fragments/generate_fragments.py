@@ -15,7 +15,7 @@ from datetime import datetime
 from optparse import OptionParser, OptionGroup, Option
 import glob
 import getpass
-from utils import LogFile, colorprinter
+from utils import LogFile, colorprinter, JobInitializationException
 
 #################
 #  Configuration
@@ -43,9 +43,11 @@ errcode = 0
 #################
 #  Globals
 
-logfile = LogFile("make_fragments_destinations.txt")
-cluster_job_name = "fragment_generation" # set this to identify the job on the cluster
 make_fragments_script = "make_fragments_RAP_cluster.pl"
+test_mode = False # set this to true for running quick tests on your cluster system (you will need to adapt the cluster/[engine].py code to use this argument
+logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
+cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster
+fasta_file_wildcards = ['*.fasta', '*.fasta.txt', '*.fa'] # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory in batch mode.
 
 # The location of the text file containing the names of the configuration scripts
 configurationFilesLocation = "make_fragments_confs.txt" # "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
@@ -88,6 +90,12 @@ class JobInput(object):
 def get_username():
     return getpass.getuser()
     #return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
+
+
+def write_file(filepath, contents, ftype = 'w'):
+    output_handle = open(filepath, ftype)
+    output_handle.write(contents)
+    output_handle.close()
 
 
 def parse_FASTA_files(fasta_files):
@@ -145,18 +153,46 @@ def parseArgs():
     errors = []
     pdbpattern = re.compile("^\w{4}$")
     description = ['\n']
-    description.append("Single job, example 1 : make_fragments.py -d results -f /path/to/1CYO.fasta.txt")
-    description.append("Single job, example 2 : make_fragments.py -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA")
-    description.append("Batch job,  example 1 : make_fragments.py -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
-    description.append("Batch job,  example 2 : make_fragments.py -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1")
-    description.append("-----------------------------------------------------------------------------")
-    description.append("The output of the computation will be saved in the output directory, along with the input FASTA file which is generated from the supplied FASTA file.")
-    description.append("A log of the output directories for cluster jobs is saved in %s in the current directory to admit queries." % logfile.getName())
+    description.append("*** Help ***\n")
+    description.append("The output of the computation will be saved in the output directory, along with")
+    description.append("the input FASTA file which is generated from the supplied FASTA file.")
+    description.append("A log of the output directories for cluster jobs is saved in")
+    description.append("%s in the current directory to admit queries." % logfile.getName())
     description.append("")
-    description.append("The FASTA description lines must have the following format: '>protein_id|chain_letter', optionally followed by more text preceded by a bar symbol.")
-    description.append("The underlying Perl script requires a 5-character ID with the first four characters being the protein id (PDB ID) and the final character being the chain identifier.")
-    description.append("To create a 5-character ID, this script takes the first four characters from protein_id and the chain letter to create the 5-character ID. The list of these IDs must be unique.")
-    description.append("")
+    description.append("The FASTA description lines must have the following format:")
+    description.append("'>protein_id|chain_letter', optionally followed by more text preceded by a '|'")
+
+    description.append('''There are a few caveats:
+
+1. The underlying Perl script requires a 5-character ID for the sequence 
+identifier which is typically a PDB ID followed by a chain ID e.g. "1a2pA". 
+For this reason, our script expects FASTA record headers to have a form like
+ ">xxxx|y" where xxxx is a 4-letter identifier e.g. PDB ID and y is a chain
+ identifier. protein_id identifier may be longer than 4 characters and 
+chain_letter must be a single character. However, only the first 4 characters 
+of the identifier are used by the script. Any information after the chain 
+identifier must be preceded by a '|' character.
+
+For example, ">1A2P_001|A|some information" is a valid header but the 
+generated ID will be "1a2pA" (we convert PDB IDs to lowercase).
+
+2. If you are submitting a batch job, the list of 5-character IDs generated 
+from the FASTA files using the method above must be unique.
+
+For example, if you have two records ">1A2P_001|A|" and "">1A2P_002|A|" then 
+the job will fail.
+On the other hand, ">1A2P_001|A|" and "">1A2P_001|B|" is perfectly fine and 
+the script will output fragments for 1a2pA and 1a2pB.''')
+    
+    script_name = os.path.split(sys.argv[0])[1]
+    description.append("\n*** Examples ***\n")
+    description.append("Single-sequence fragment generation:")
+    description.append("1: " + script_name + " -d results -f /path/to/1CYO.fasta.txt")
+    description.append("2: " + script_name + " -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA\n")
+    description.append("Multi-sequence fragment generation (batch job):")
+    description.append("1: " + script_name + " -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
+    description.append("2: " + script_name + " -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1\n\n")
+    
     description = "\n".join(description)
 
     parser = OptionParserWithNewlines(usage="usage: %prog [options]", version="%prog 1.1A", option_class=MultiOption)
@@ -177,11 +213,13 @@ def parseArgs():
     group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-V", "--overwrite", dest="overwrite", action="store_true", help="Optional. If the output directory <PDBID><CHAIN> for the fragment job(s) exists, delete the current contents.")
     group.add_option("-F", "--force", dest="force", action="store_true", help="Optional. Create the output directory without prompting.")
+    group.add_option("-M", "--email", dest="sendmail", action="store_true", help="Optional. If this option is set, an email is sent when the job finishes or fails (cluster-dependent). WARNING: On an SGE cluster, an email will be sent for each FASTA file i.e. for each task in the job array.")
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
-    group.add_option("-K", "--check", dest="check", help="Optional. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
-    group.add_option("-Q", "--query", dest="query", action="store_true", help="Optional. Query the progress of the cluster job against %s and then quit." % logfile.getName())
+    group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q.", metavar="QUEUE_NAME")
+    group.add_option("-K", "--check", dest="check", help="Optional, needs to be fixed for batch mode. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
+    group.add_option("-Q", "--query", dest="query", action="store_true", help="Optional, needs to be fixed for batch mode. Query the progress of the cluster job against %s and then quit." % logfile.getName())
     parser.add_option_group(group)
 
     parser.set_defaults(outdir = os.getcwd())
@@ -189,6 +227,8 @@ def parseArgs():
     parser.set_defaults(nohoms = False)
     parser.set_defaults(force = False)
     parser.set_defaults(query = False)
+    parser.set_defaults(sendmail = False)
+    parser.set_defaults(queue = 'lab.q')
     (options, args) = parser.parse_args()
 
     username = get_username()
@@ -205,7 +245,7 @@ def parseArgs():
         else:
             # The job has finished. Check the output file.
             jobID = int(options.check)
-            ClusterEngine.check(logfile, jobID)
+            errors.extend(ClusterEngine.check(logfile, jobID, cluster_job_name))
 
     validOptions = options.query or options.check
 
@@ -272,7 +312,8 @@ def parseArgs():
             elif batch_file_selector.find('?') != -1:
                 batch_files.extend(map(os.path.abspath, glob.glob(batch_file_selector)))
             elif os.path.isdir(batch_file_selector):
-                batch_files.extend(map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, '*.fasta'))))
+                for fasta_file_wildcard in fasta_file_wildcards:
+                    batch_files.extend(map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, fasta_file_wildcard))))
             else:
                 if not os.path.exists(batch_file_selector):
                     missing_files.append(batch_file_selector)
@@ -296,6 +337,7 @@ def parseArgs():
         colorprinter.error('\nError: You must either use single sequence mode or batch mode. Both were specified')
         sys.exit(ERRCODE_ARGUMENTS)
 
+    job_inputs = []
     if options.fasta:
         if not os.path.exists(options.fasta):
             errors.append("FASTA file %s does not exist." % options.fasta)
@@ -323,6 +365,8 @@ def parseArgs():
         no_homologs = "-nohoms"
 
     return {
+        "queue"         : options.queue,
+        "sendmail"         : options.sendmail,
         "no_homologs"	: no_homologs,
         "user"			: username,
         "outpath"		: outpath,
@@ -332,8 +376,10 @@ def parseArgs():
         }
 
 def setup_jobs(outpath, options, fasta_files, batch_mode):
+    job_inputs = None
     found_sequences, errors = get_sequences(options, fasta_files, batch_mode)
-    reformat(found_sequences)
+    if found_sequences or batch_mode:
+        reformat(found_sequences)
     if not errors:
         job_inputs, errors = create_inputs(options, outpath, found_sequences)
     return job_inputs, errors
@@ -351,7 +397,6 @@ def get_sequences(options, fasta_files, batch_mode):
 
     num_fasta_records = len(fasta_records)
 
-    print(fasta_records)
     colorprinter.message('Found %d sequence(s).' % num_fasta_records)
 
     found_sequences = None
@@ -401,7 +446,7 @@ def get_sequences(options, fasta_files, batch_mode):
                         break
                 if not found_sequences:
                     errors.append('Could not find the sequence for PDB ID %s and chain %s in the file(s) %s.' % (options.pdbid, options.chain, fasta_files_str))
-
+    
     return found_sequences, errors
 
 
@@ -451,9 +496,7 @@ def create_inputs(options, outpath, found_sequences):
             colorprinter.message("Creating a new FASTA file %s." % fasta_file)
 
             assert(not(os.path.exists(fasta_file)))
-            F = open(fasta_file, "w")
-            F.write('\n'.join(sequence))
-            F.close()
+            write_file(fasta_file, '\n'.join(sequence) + '\n', 'w') # The file must terminate in a newline for the Perl script to work
             job_inputs.append(JobInput(fasta_file, pdb_id, chain))
         except:
             if created_new_subdirectory and os.path.exists(subdir_path):
@@ -478,7 +521,7 @@ def searchConfigurationFiles(findstr, replacestr = None):
     for line in lines:
         line = line.strip()
         if line:
-            if line.endswith("make_fragments.py"):
+            if line.endswith("generate_fragments.py"):
                 # Do not parse the Python script but check that it exists
                 if not(os.path.exists(line)):
                     allerrors[line] = "File/directory %s does not exist." % line
@@ -539,31 +582,43 @@ if __name__ == "__main__":
 
 
     options = parseArgs()
-    if options["outpath"]:
-        if len(options['job_inputs']) > 1:
-            # Single sequence fragment generation
-            task = ClusterEngine.MultipleTask(make_fragments_script, options)
-            script = task.get_script()
+    if options["outpath"] and options['job_inputs']:
+        try:
+            if len(options['job_inputs']) > 1:
+                # Single sequence fragment generation
+                task = ClusterEngine.MultipleTask(make_fragments_script, options, test_mode = test_mode)
+                submission_script, scripts = task.get_scripts()
+            else:
+                # Single sequence fragment generation
+                task = ClusterEngine.SingleTask(make_fragments_script, options, test_mode = test_mode)
+                submission_script, scripts = task.get_scripts()
+        except JobInitializationException, e:            
+            colorprinter.error(str(e))
+            sys.exit(ERRCODE_ARGUMENTS)
+        
+        for script_filename, script in scripts.iteritems():
+            write_file(os.path.join(options["outpath"], script_filename), script, 'w')
 
-        else:
-            # Single sequence fragment generation
-            task = ClusterEngine.SingleTask(make_fragments_script, options)
-            script = task.get_script()
-
-        qcmdfile = os.path.join(options["outpath"], "make_fragments_temp.cmd")
-        F = open(qcmdfile, "w")
-        F.write(template)
-        F.close()
+        submission_script = os.path.join(options["outpath"], submission_script)
 
         try:
-            (jobid, output) = ClusterEngine.submit(qcmdfile, options["outpath"] )
+            send_mail = options['sendmail']
+            username = None
+            if send_mail:
+                username = get_username()
+            (jobid, output) = ClusterEngine.submit(submission_script, options["outpath"], send_mail = send_mail, username = username )
         except Exception, e:
             colorprinter.error("An exception occurred during submission to the cluster.")
             colorprinter.error(str(e))
             colorprinter.error(traceback.format_exc())
             sys.exit(ERRCODE_CLUSTER)
 
-        colorprinter.message("\nmake_fragments jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
+        colorprinter.message("\nFragment generation jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
+        if options['no_homologs']:
+            print("The --nohoms option was selected.")
+        if ClusterEngine.ClusterType == "SGE":
+            print("The jobs have been submitted using the %s queue." % options['queue'])
+        print('')
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
 
