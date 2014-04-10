@@ -149,6 +149,7 @@ if subp.errorcode != 0:
 
         fasta_file_dir = os.path.split(fasta_file)[0]
         no_homologs = options['no_homologs']
+        zip_files = str(not(options['no_zip']))
 
         python_script = '''
 job_root_dir = "%(fasta_file_dir)s"
@@ -171,9 +172,17 @@ subp = Popen(scratch_path, cmd_args)
 sys.stdout.write(subp.stdout)
 print("</output>")
 
+if %(zip_files)s:
+    print("<gzip>")
+    for f in glob.glob(os.path.join(scratch_path, "*mers")) + [os.path.join(scratch_path, 'ss_blast')]:
+        if os.path.exists(f):
+            subpzip = Popen(scratch_path, ['gzip', f])
+            print(f)
+    print("</gzip>")
+
 # Copy files from scratch back to /netapp
-for f in glob.glob(os.path.join(scratch_path, "*")):
-    shutil.copy(f, job_root_dir)
+#for f in glob.glob(os.path.join(scratch_path, "*")):
+#    shutil.copy(f, job_root_dir)
 
 # Copy files from scratch back to /netapp
 os.remove("%(fasta_file)s")
@@ -205,9 +214,8 @@ class MultipleTask(SingleTask):
 
         job_inputs = options['job_inputs']
         num_tasks = len(options['job_inputs'])
-
-
         no_homologs = options['no_homologs']
+        zip_files = str(not(options['no_zip']))
 
         job_arrays = []
         job_arrays.append('chains = %s' % str([ji.chain for ji in job_inputs]))
@@ -240,6 +248,14 @@ print("<output>")
 subp = Popen(scratch_path, cmd_args)
 sys.stdout.write(subp.stdout)
 print("</output>")
+
+if %(zip_files)s:
+    print("<gzip>")
+    for f in glob.glob(os.path.join(scratch_path, "*mers")) + [os.path.join(scratch_path, 'ss_blast')]:
+        if os.path.exists(f):
+            subpzip = Popen(scratch_path, ['gzip', f])
+            print(f)
+    print("</gzip>")
 
 # Copy files from scratch back to /netapp
 os.remove(fasta_file)
