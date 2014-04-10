@@ -214,6 +214,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group.add_option("-V", "--overwrite", dest="overwrite", action="store_true", help="Optional. If the output directory <PDBID><CHAIN> for the fragment job(s) exists, delete the current contents.")
     group.add_option("-F", "--force", dest="force", action="store_true", help="Optional. Create the output directory without prompting.")
     group.add_option("-M", "--email", dest="sendmail", action="store_true", help="Optional. If this option is set, an email is sent when the job finishes or fails (cluster-dependent). WARNING: On an SGE cluster, an email will be sent for each FASTA file i.e. for each task in the job array.")
+    group.add_option("-Z", "--nozip", dest="nozip", action="store_true", help="Optional, false by default. If this is option is set then the resulting fragments are not compressed with gzip. We compress output by default as this can reduce the output size by 90% and the resulting zipped files can be passed directly to Rosetta.")
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
@@ -229,6 +230,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     parser.set_defaults(query = False)
     parser.set_defaults(sendmail = False)
     parser.set_defaults(queue = 'lab.q')
+    parser.set_defaults(nozip = False)
     (options, args) = parser.parse_args()
 
     username = get_username()
@@ -372,6 +374,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         "outpath"		: outpath,
         "jobname"		: cluster_job_name,
         "job_inputs"    : job_inputs,
+        "no_zip"           : options.nozip,
         #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
         }
 
@@ -616,6 +619,8 @@ if __name__ == "__main__":
         colorprinter.message("\nFragment generation jobs started with job ID %d. Results will be saved in %s." % (jobid, options["outpath"]))
         if options['no_homologs']:
             print("The --nohoms option was selected.")
+        if options['no_zip']:
+            print("The --nozip option was selected.")
         if ClusterEngine.ClusterType == "SGE":
             print("The jobs have been submitted using the %s queue." % options['queue'])
         print('')
