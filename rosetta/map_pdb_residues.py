@@ -17,7 +17,6 @@ import os
 import tempfile
 import commands
 import traceback
-import sqlite3
 from optparse import OptionParser # todo: deprecated since Python 2.7
 
 if __name__ == '__main__':
@@ -57,6 +56,7 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
     exit_code = 0
     F, script_path = tempfile.mkstemp(dir=".")
     script_handle = os.fdopen(F, "w")
+    import sqlite3 # should be moved to the top but we do this here for CentOS 5 support
 
     try:
         db_path = script_path + ".db3"

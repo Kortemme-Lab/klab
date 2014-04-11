@@ -237,7 +237,7 @@ class Sequence(object):
 
 class InconsistentMappingException(Exception): pass
 
-class SequenceMap():
+class SequenceMap(object):
     ''' A class to map the IDs of one Sequence to another.'''
 
     def __init__(self):
