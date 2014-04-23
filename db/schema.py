@@ -28,6 +28,10 @@ class MySQLSchema(object):
 
         self.db = db
         self.host = host
+        self.original_schema = []
+
+        if not(os.path.exists(unix_socket)):
+            unix_socket = '/var/run/mysqld/mysqld.sock' # Ubuntu hack
 
         if not passwd and passwdfile:
             if os.path.exists(passwdfile):
@@ -35,7 +39,7 @@ class MySQLSchema(object):
             else:
                 passwd = getpass.getpass("Enter password to connect to MySQL database:")
 
-        dbinterface = MySQLDatabaseInterface(settings, isInnoDB = isInnoDB, numTries = numTries, host = host, db = db, user = user, passwd = passwd, port = port, unix_socket = unix_socket)
+        dbinterface = MySQLDatabaseInterface(settings, isInnoDB = isInnoDB, numTries = numTries, host = host, db = db, user = user, passwd = passwd, port = port, unix_socket = unix_socket, use_locking = False)
 
         # Get the DB schema, normalizing for sqlt-diagram
         db_schema = []
@@ -43,6 +47,7 @@ class MySQLSchema(object):
             creation_string = dbinterface.execute_select('SHOW CREATE TABLE %s' % t)
             assert(len(creation_string) == 1)
             creation_string = '%s;' % creation_string[0]['Create Table'].strip()
+            self.original_schema.append(creation_string)
 
             # Fix input for sqlt-diagram (it is fussy)
             creation_string = creation_string.replace("default ''", "")
@@ -54,9 +59,13 @@ class MySQLSchema(object):
             creation_string = re.sub("CONSTRAINT.*?CHECK.*?[)][)]", ")", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
             creation_string = re.sub(" AUTO_INCREMENT=\d+", "", creation_string, re.DOTALL)
             creation_string = creation_string.replace("''", "")
+            creation_string = creation_string.replace('tg_', 'auth_')
             db_schema.append(creation_string)
         db_schema = '\n\n'.join(db_schema)
         self.db_schema = db_schema
+
+    def get_full_schema(self):
+        return '\n\n'.join(self.original_schema)
 
     def generate_schema_diagram(self, output_filepath = None, show_fk_only = False):
         tempfiles = self._generate_schema_diagram(show_fk_only)
@@ -115,4 +124,6 @@ if __name__ == '__main__':
     s.generate_schema_diagram(output_filepath = "mytest-ddG.png")
     s = MySQLSchema(host = "kortemmelab.ucsf.edu", db = "KortemmeLab", user = "root", passwdfile = 'mpw')
     s.generate_schema_diagram(output_filepath = "mytest-klab.png")
-
+    #s = MySQLSchema(host = "localhost", db = "DesignCollection", user = "root", passwd = '...')
+    #s.generate_schema_diagram(output_filepath = "DesignCollection_schema.png")
+    #print(s.get_full_schema())
