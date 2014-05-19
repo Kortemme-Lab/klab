@@ -27,7 +27,7 @@ def create_pymol_selection_from_PDB_residue_ids(residue_list):
     str = []
     for chain_id, residue_list in sorted(residues_by_chain.iteritems()):
         str.append('(chain %s and resi %s)' % (chain_id, '+'.join(map(string.strip, sorted(residue_list)))))
-    return ' and '.join(str)
+    return ' or '.join(str)
 
 class PDBContainer(object):
 
