@@ -442,7 +442,7 @@ class PDB:
                 if missing_chain_ids.get(self.pdb_id):
                     chain_id = missing_chain_ids[self.pdb_id]
                 structure_lines.append(line)
-                if chain_id not in atom_chain_order:
+                if (chain_id not in atom_chain_order) and (chain_id != ' '):
                     atom_chain_order.append(chain_id)
                 if linetype == 'ATOM  ':
                     atom_type = line[12:16].strip()
@@ -553,7 +553,10 @@ class PDB:
         '''Remark 4 indicates the version of the PDB File Format used to generate the file.'''
         if not self.format_version:
             version = None
-            version_lines = [line for line in self.parsed_lines['REMARK'] if int(line[7:10]) == 4 and line[10:].strip()]
+            version_lines = None
+            try:
+                version_lines = [line for line in self.parsed_lines['REMARK'] if int(line[7:10]) == 4 and line[10:].strip()]
+            except: pass
             if version_lines:
                 assert(len(version_lines) == 1)
                 version_line = version_lines[0]
