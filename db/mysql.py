@@ -16,11 +16,13 @@ from tools.fs.fsio import read_file
 try:
     import oursql as MySQLdb
     import oursql.cursors as cursors
+    raise Exception('oursql')
 except ImportError:
     import MySQLdb
     import MySQLdb.cursors as cursors
 
 DictCursor = cursors.DictCursor
+SSDictCursor = cursors.SSDictCursor
 StdCursor = cursors.Cursor
 
 class DatabaseInterface(object):
@@ -29,6 +31,7 @@ class DatabaseInterface(object):
                  unix_socket=None, passwdfile=None, use_utf=False, use_locking=True):
         self.connection = None
         self.StdCursor_connection = None
+        self.SSDictCursor_connection = None
         self.queries_run = 0
         self.procedures_run = 0
         self.use_utf = use_utf
@@ -116,9 +119,29 @@ class DatabaseInterface(object):
                 self.StdCursor_connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
                                                   port=self.port, unix_socket=self.unix_socket, cursorclass=StdCursor)
 
+    def _get_SSDictCursor_connection(self):
+        if not (self.SSDictCursor_connection and self.SSDictCursor_connection.open):
+            if self.use_utf:
+                self.SSDictCursor_connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
+                                                  port=self.port, unix_socket=self.unix_socket, cursorclass=SSDictCursor,
+                                                  charset='utf8', use_unicode=True)
+            else:
+                self.SSDictCursor_connection = MySQLdb.connect(host=self.host, db=self.db, user=self.user, passwd=self.passwd,
+                                                  port=self.port, unix_socket=self.unix_socket, cursorclass=SSDictCursor)
+
     def _close_connection(self):
         self.close()
 
+    def iterate_query(self, query, arraysize=100000):
+        self._get_SSDictCursor_connection()
+        c = self.SSDictCursor_connection.cursor()
+        c.execute(query)
+        while True:
+            nextrows = c.fetchmany(arraysize)
+            if not nextrows:
+                break
+            for row in nextrows:
+                yield row
 
     def getLastRowID(self):
         return self.lastrowid
@@ -136,6 +159,71 @@ class DatabaseInterface(object):
     def execute_select_StdCursor(self, sql, parameters=None, quiet=False, locked=False):
         return self.execute_StdCursor(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
 
+    def execute_select_SSDictCursor(self, sql, parameters=None, quiet=False, locked=False):
+        return self.execute_SSDictCursor(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
+
+    def execute_SSDictCursor(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
+        """Execute SQL query. This uses DictCursor by default."""
+        self.queries_run += 1
+        i = 0
+        errcode = 0
+        caughte = None
+        cursor = None
+        cursorClass = SSDictCursor
+        if sql.find(";") != -1 or sql.find("\\G") != -1:
+            # Catches some injections
+            raise Exception("The SQL command '%s' contains a semi-colon or \\G. This is a potential SQL injection." % sql)
+        while i < self.numTries:
+            i += 1
+            try:
+                self._get_SSDictCursor_connection()
+                cursor = self.SSDictCursor_connection.cursor()
+                if locked:
+                    if self.lockstring:
+                        cursor.execute(self.lockstring)
+                    self.locked = True
+                if parameters:
+                    errcode = cursor.execute(sql, parameters)
+                else:
+                    errcode = cursor.execute(sql)
+                self.lastrowid = int(cursor.lastrowid)
+                if do_commit and self.isInnoDB:
+                    self.SSDictCursor_connection.commit()
+                results = cursor.fetchall()
+                if locked:
+                    if self.unlockstring:
+                        cursor.execute(self.unlockstring)
+                    self.locked = False
+                cursor.close()
+                return results
+            except MySQLdb.OperationalError, e:
+                if cursor:
+                    if self.locked:
+                        if self.unlockstring:
+                            cursor.execute(self.unlockstring)
+                        self.locked = False
+                    cursor.close()
+                caughte = str(e)
+                errcode = e[0]
+                continue
+            except Exception, e:
+                if cursor:
+                    if self.locked:
+                        if self.unlockstring:
+                            cursor.execute(self.unlockstring)
+                        self.locked = False
+                    cursor.close()
+                caughte = str(e)
+                traceback.print_exc()
+                break
+            sleep(0.2)
+
+        if not quiet:
+            sys.stderr.write(
+                "\nSQL execution error in query %s at %s:" % (sql, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+            sys.stderr.write("\nErrorcode/Error: %d - '%s'.\n" % (errcode, str(caughte)))
+            sys.stderr.flush()
+        raise MySQLdb.OperationalError(caughte)
 
     def execute_StdCursor(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
         """Execute SQL query. This uses DictCursor by default."""
