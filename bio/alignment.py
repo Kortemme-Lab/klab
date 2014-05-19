@@ -30,6 +30,11 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
     pdb2_chains = pdb2.atom_sequences.keys()
 
     sa = SequenceAligner()
+
+    # If these assertions do not hold we will need to fix the logic below
+    assert(pdb1_name.find(':') == -1)
+    assert(pdb2_name.find(':') == -1)
+
     for c in pdb1_chains:
         sa.add_sequence('%s:%s' % (pdb1_name, c), str(pdb1.atom_sequences[c]))
     for c in pdb2_chains:
@@ -42,7 +47,7 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
         if best_matches_by_id:
             t = []
             for k, v in best_matches_by_id.iteritems():
-                if k.startswith(pdb2_name):
+                if k.startswith(pdb2_name + ':'):
                     t.append((v, k))
             if t:
                 best_match = sorted(t)[0]
@@ -94,8 +99,9 @@ class PDBChainMapper(object):
         # Match each chain in pdb1 to its best match in pdb2
         self.chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
         for k, v in self.chain_matches.iteritems():
-            self.mapping[k] = v[0]
-            self.mapping_percentage_identity[k] = v[1]
+            if v:
+                self.mapping[k] = v[0]
+                self.mapping_percentage_identity[k] = v[1]
 
         self.pdb1_differing_residue_ids = []
         self.pdb2_differing_residue_ids = []
@@ -178,7 +184,8 @@ class PDBChainMapper(object):
 
             html.append('<div class="sequence_alignment_chain_separator"></div>')
 
-        html.pop() # remove the last chain separator div
+        if html:
+            html.pop() # remove the last chain separator div
         return '\n'.join(html)
 
     def map_residues(self):
@@ -257,6 +264,7 @@ class ScaffoldDesignChainMapper(PDBChainMapper):
 
     def generate_pymol_session(self, crystal_pdb = None, pymol_executable = None):
         b = BatchBuilder(pymol_executable = pymol_executable)
+
         structures_list = [
             ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
             ('Design', self.design_pdb.pdb_content, self.get_differing_design_residue_ids()),
@@ -279,7 +287,6 @@ if __name__ == '__main__':
 
     # Example of how to get residue -> residue mapping
     for chain_id, mapping in sorted(chain_mapper.residue_id_mapping.iteritems()):
-        colortext.message('Mapping from chain %s of the design to the scaffold' % chain_id)
         for design_res, scaffold_res in sorted(mapping.iteritems()):
             print("\t'%s' -> '%s'" % (design_res, scaffold_res))
 
