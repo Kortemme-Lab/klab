@@ -94,15 +94,14 @@ util.cbc Scaffold
 disable Scaffold''')
 
     def _add_residue_highlighting_section(self):
-
-        scaffold_selection = 'Scaffold and %s' % (create_pymol_selection_from_PDB_residue_ids(self.Scaffold.residues_of_interest))
+        scaffold_selection = 'Scaffold and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Scaffold.residues_of_interest))
         self.script.append('''select scaffold_residues, %s''' % scaffold_selection)
         self.script.append('''show sticks, scaffold_residues''')
 
         #self.script.append('set label_color, black')
         #self.script.append('label n. CA and Scaffold and chain A and i. 122, "A122" ')
 
-        design_selection = 'Design and %s' % (create_pymol_selection_from_PDB_residue_ids(self.Design.residues_of_interest))
+        design_selection = 'Design and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Design.residues_of_interest))
         self.script.append('''select design_residues, %s''' % design_selection)
         self.script.append('''show sticks, design_residues''')
 
