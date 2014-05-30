@@ -609,6 +609,11 @@ class PDB:
             raise PDBParsingException("Could not determine resolution.")
         return resolution
 
+    def get_title(self):
+        if self.parsed_lines.get("TITLE "):
+            return " ".join([line[10:80].strip() for line in self.parsed_lines["TITLE "] if line[10:80].strip()])
+        return None
+
     def get_techniques(self):
         techniques = None
         for line in self.parsed_lines["EXPDTA"]:
