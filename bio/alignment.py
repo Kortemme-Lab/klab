@@ -12,7 +12,7 @@ sys.path.insert(0, '../../..')
 
 from tools import colortext
 from tools.bio.pymol.psebuilder import BatchBuilder, PDBContainer
-from tools.bio.pymol.scaffold_design_crystal import ScaffoldDesignCrystalBuilder
+from tools.bio.pymol.scaffold_model_crystal import ScaffoldModelCrystalBuilder
 from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
 
@@ -23,7 +23,7 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
        where percentage_identity_score is a float.
 
        Parameters: pdb1 and pdb2 are PDB objects from tools.bio.pdb. pdb1_name and pdb2_name are strings describing the
-        structures e.g. 'Design' and 'Scaffold'. cut_off is used in the matching to discard low-matching chains.
+        structures e.g. 'Model' and 'Scaffold'. cut_off is used in the matching to discard low-matching chains.
        '''
 
     pdb1_chains = pdb1.atom_sequences.keys()
@@ -158,23 +158,23 @@ class PDBChainMapper(object):
                 for x in range(0, len(alignment_tokens), 2):
                     if alignment_tokens[x][0] != 'Scaffold':
                         passed = False
-                    if alignment_tokens[x+1][0] != 'Design':
+                    if alignment_tokens[x+1][0] != 'Model':
                         passed = False
                 for x in range(0, len(alignment_tokens), 2):
                     scaffold_residues = alignment_tokens[x][2]
-                    design_residues = alignment_tokens[x+1][2]
-                    if passed and (len(scaffold_residues) == len(design_residues)):
+                    model_residues = alignment_tokens[x+1][2]
+                    if passed and (len(scaffold_residues) == len(model_residues)):
                         new_scaffold_string = []
-                        new_design_string = []
+                        new_model_string = []
                         for y in range(len(scaffold_residues)):
-                            if scaffold_residues[y] == design_residues[y]:
+                            if scaffold_residues[y] == model_residues[y]:
                                 new_scaffold_string.append(scaffold_residues[y])
-                                new_design_string.append(design_residues[y])
+                                new_model_string.append(model_residues[y])
                             else:
                                 new_scaffold_string.append('<dd>%s</dd>' % scaffold_residues[y])
-                                new_design_string.append('<dd>%s</dd>' % design_residues[y])
+                                new_model_string.append('<dd>%s</dd>' % model_residues[y])
                         alignment_tokens[x][2] = ''.join(new_scaffold_string)
-                        alignment_tokens[x+1][2] = ''.join(new_design_string)
+                        alignment_tokens[x+1][2] = ''.join(new_model_string)
 
 
             for trpl in alignment_tokens:
@@ -237,26 +237,26 @@ class PDBChainMapper(object):
         self.pdb1_differing_residue_ids = sorted(pdb1_differing_residue_ids)
         self.pdb2_differing_residue_ids = sorted(pdb2_differing_residue_ids)
 
-class ScaffoldDesignChainMapper(PDBChainMapper):
-    '''A convenience class for the special case where we are mapping specifically from a design structure to a scaffold structure.'''
-    def __init__(self, scaffold_pdb, design_pdb, cut_off = 60.0):
-        self.design_pdb = design_pdb
+class ScaffoldModelChainMapper(PDBChainMapper):
+    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
+    def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0):
+        self.model_pdb = model_pdb
         self.scaffold_pdb = scaffold_pdb
-        super(ScaffoldDesignChainMapper, self).__init__(design_pdb, 'Design', scaffold_pdb, 'Scaffold', cut_off)
+        super(ScaffoldModelChainMapper, self).__init__(model_pdb, 'Model', scaffold_pdb, 'Scaffold', cut_off)
 
     @staticmethod
-    def from_file_paths(scaffold_pdb_path, design_pdb_path, cut_off = 60.0):
+    def from_file_paths(scaffold_pdb_path, model_pdb_path, cut_off = 60.0):
         scaffold_pdb = PDB.from_filepath(scaffold_pdb_path)
-        design_pdb = PDB.from_filepath(design_pdb_path)
-        return ScaffoldDesignChainMapper(scaffold_pdb, design_pdb, cut_off = cut_off)
+        model_pdb = PDB.from_filepath(model_pdb_path)
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off)
 
     @staticmethod
-    def from_file_contents(scaffold_pdb_contents, design_pdb_contents, cut_off = 60.0):
+    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0):
         scaffold_pdb = PDB(scaffold_pdb_contents)
-        design_pdb = PDB(design_pdb_contents)
-        return ScaffoldDesignChainMapper(scaffold_pdb, design_pdb, cut_off = cut_off)
+        model_pdb = PDB(model_pdb_contents)
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off)
 
-    def get_differing_design_residue_ids(self):
+    def get_differing_model_residue_ids(self):
         return self.pdb1_differing_residue_ids
 
     def get_differing_scaffold_residue_ids(self):
@@ -267,32 +267,32 @@ class ScaffoldDesignChainMapper(PDBChainMapper):
 
         structures_list = [
             ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
-            ('Design', self.design_pdb.pdb_content, self.get_differing_design_residue_ids()),
+            ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
         ]
 
         if crystal_pdb:
             structures_list.append(('Crystal', crystal_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
 
-        PSE_files = b.run(ScaffoldDesignCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
+        PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
         return PSE_files[0]
 
 if __name__ == '__main__':
     from tools.fs.fsio import read_file
 
     # Example of how to create a mapper from file paths
-    chain_mapper = ScaffoldDesignChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
+    chain_mapper = ScaffoldModelChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
 
     # Example of how to create a mapper from file contents
-    chain_mapper = ScaffoldDesignChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
+    chain_mapper = ScaffoldModelChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
 
     # Example of how to get residue -> residue mapping
     for chain_id, mapping in sorted(chain_mapper.residue_id_mapping.iteritems()):
-        for design_res, scaffold_res in sorted(mapping.iteritems()):
-            print("\t'%s' -> '%s'" % (design_res, scaffold_res))
+        for model_res, scaffold_res in sorted(mapping.iteritems()):
+            print("\t'%s' -> '%s'" % (model_res, scaffold_res))
 
-    # Example of how to list the PDB residue IDs for the positions in the design which differ
-    colortext.message('Residues IDs for the residues which differ in the design.')
-    print(chain_mapper.get_differing_design_residue_ids())
+    # Example of how to list the PDB residue IDs for the positions in the model which differ
+    colortext.message('Residues IDs for the residues which differ in the model.')
+    print(chain_mapper.get_differing_model_residue_ids())
 
     # Example of how to list the PDB residue IDs for the positions in the scaffold which differ
     colortext.message('Residues IDs for the residues which differ in the scaffold.')
