@@ -1,8 +1,8 @@
 #!/usr/bin/python
 # encoding: utf-8
 """
-scaffold_design_crystal.py
-A PSE builder for scaffold/design/crystal structures.
+scaffold_model_crystal.py
+A PSE builder for scaffold/model/crystal structures.
 
 Created by Shane O'Connor 2014.
 The PyMOL commands are adapted from scripts developed and written by Roland A. Pache, Ph.D., Copyright (C) 2012, 2013.
@@ -12,18 +12,18 @@ from tools.fs.fsio import write_file
 from tools import colortext
 from psebuilder import PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
 
-class ScaffoldDesignCrystalBuilder(PyMOLSessionBuilder):
+class ScaffoldModelCrystalBuilder(PyMOLSessionBuilder):
 
     def __init__(self, pdb_containers, rootdir = '/tmp'):
-        super(ScaffoldDesignCrystalBuilder, self).__init__(pdb_containers, rootdir)
+        super(ScaffoldModelCrystalBuilder, self).__init__(pdb_containers, rootdir)
         self.Scaffold = pdb_containers['Scaffold']
-        self.Design = pdb_containers['Design']
+        self.Model = pdb_containers['Model']
         self.Crystal = pdb_containers.get('Crystal')
 
     def _create_input_files(self):
         #colortext.message('self.outdir: ' + self.outdir)
         write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
-        write_file(self._filepath('design.pdb'), self.Design.pdb_contents)
+        write_file(self._filepath('model.pdb'), self.Model.pdb_contents)
         if self.Crystal:
             write_file(self._filepath('crystal.pdb'), self.Crystal.pdb_contents)
 
@@ -34,7 +34,7 @@ class ScaffoldDesignCrystalBuilder(PyMOLSessionBuilder):
         self.script.append("# load structures")
         if self.Crystal:
             self.script.append("load crystal.pdb, Crystal")
-        self.script.append("load design.pdb, Design")
+        self.script.append("load model.pdb, Model")
         self.script.append("load scaffold.pdb, Scaffold")
 
     def _add_view_settings_section(self):
@@ -64,8 +64,8 @@ set stick_radius, 0.2
     def _add_specific_chain_settings_section(self):
         self.script.append('''
 # set cartoon_flat_sheets, off
-show car, Design
-color gray, Design
+show car, Model
+color gray, Model
 ''')
         if self.Crystal:
             self.script.append('''
@@ -74,9 +74,9 @@ show car, Crystal
 ''')
 
     def _add_superimposition_section(self):
-        self.script.append("super Scaffold, Design")
+        self.script.append("super Scaffold, Model")
         if self.Crystal:
-            self.script.append("super Crystal, Design")
+            self.script.append("super Crystal, Model")
 
     def _add_orient_view_section(self):
         self.script.append('''
@@ -101,9 +101,9 @@ disable Scaffold''')
         #self.script.append('set label_color, black')
         #self.script.append('label n. CA and Scaffold and chain A and i. 122, "A122" ')
 
-        design_selection = 'Design and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Design.residues_of_interest))
-        self.script.append('''select design_residues, %s''' % design_selection)
-        self.script.append('''show sticks, design_residues''')
+        model_selection = 'Model and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Model.residues_of_interest))
+        self.script.append('''select model_residues, %s''' % model_selection)
+        self.script.append('''show sticks, model_residues''')
 
         if self.Crystal:
             crystal_selection = 'Crystal and %s' % (create_pymol_selection_from_PDB_residue_ids(self.Crystal.residues_of_interest))
@@ -111,7 +111,7 @@ disable Scaffold''')
             self.script.append('''show sticks, crystal_residues''')
 
         self.script.append('color brightorange, scaffold_residues')
-        self.script.append('color tv_yellow, design_residues')
+        self.script.append('color tv_yellow, model_residues')
 
     def _add_raytracing_section(self):
         self.script.append('''
