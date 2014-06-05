@@ -34,7 +34,7 @@ class ScaffoldModelCrystalBuilder(PyMOLSessionBuilder):
         self.script.append("# load structures")
         if self.Crystal:
             self.script.append("load crystal.pdb, Crystal")
-        self.script.append("load model.pdb, Model")
+        self.script.append("load model.pdb, RosettaModel")
         self.script.append("load scaffold.pdb, Scaffold")
 
     def _add_view_settings_section(self):
@@ -64,8 +64,8 @@ set stick_radius, 0.2
     def _add_specific_chain_settings_section(self):
         self.script.append('''
 # set cartoon_flat_sheets, off
-show car, Model
-color gray, Model
+show car, RosettaModel
+color gray, RosettaModel
 ''')
         if self.Crystal:
             self.script.append('''
@@ -74,9 +74,9 @@ show car, Crystal
 ''')
 
     def _add_superimposition_section(self):
-        self.script.append("super Scaffold, Model")
+        self.script.append("super Scaffold, RosettaModel")
         if self.Crystal:
-            self.script.append("super Crystal, Model")
+            self.script.append("super Crystal, RosettaModel")
 
     def _add_orient_view_section(self):
         self.script.append('''
@@ -101,9 +101,9 @@ disable Scaffold''')
         #self.script.append('set label_color, black')
         #self.script.append('label n. CA and Scaffold and chain A and i. 122, "A122" ')
 
-        model_selection = 'Model and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Model.residues_of_interest))
-        self.script.append('''select model_residues, %s''' % model_selection)
-        self.script.append('''show sticks, model_residues''')
+        model_selection = 'RosettaModel and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Model.residues_of_interest))
+        self.script.append('''select rosetta_model_residues, %s''' % model_selection)
+        self.script.append('''show sticks, rosetta_model_residues''')
 
         if self.Crystal:
             crystal_selection = 'Crystal and %s' % (create_pymol_selection_from_PDB_residue_ids(self.Crystal.residues_of_interest))
@@ -111,7 +111,7 @@ disable Scaffold''')
             self.script.append('''show sticks, crystal_residues''')
 
         self.script.append('color brightorange, scaffold_residues')
-        self.script.append('color tv_yellow, model_residues')
+        self.script.append('color tv_yellow, rosetta_model_residues')
 
     def _add_raytracing_section(self):
         self.script.append('''
