@@ -276,6 +276,49 @@ class ScaffoldModelChainMapper(PDBChainMapper):
         PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
         return PSE_files[0]
 
+class ScaffoldModelDesignChainMapper(PDBChainMapper):
+    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
+    def __init__(self, scaffold_pdb, model_pdb, design_pdb, cut_off = 60.0):
+        self.scaffold_pdb = scaffold_pdb
+        self.model_pdb = model_pdb
+        self.design_pdb = design_pdb
+        super(ScaffoldModelDesignChainMapper, self).__init__(model_pdb, 'Model', scaffold_pdb, 'Scaffold', cut_off)
+
+    @staticmethod
+    def from_file_paths(scaffold_pdb_path, model_pdb_path, design_pdb_path, cut_off = 60.0):
+        scaffold_pdb = PDB.from_filepath(scaffold_pdb_path)
+        model_pdb = PDB.from_filepath(model_pdb_path)
+        design_pdb = PDB.from_filepath(design_pdb_path)
+        return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
+
+    @staticmethod
+    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, design_pdb_contents, cut_off = 60.0):
+        scaffold_pdb = PDB(scaffold_pdb_contents)
+        model_pdb = PDB(model_pdb_contents)
+        design_pdb = PDB(design_pdb_contents)
+        return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
+
+    def get_differing_model_residue_ids(self):
+        return self.pdb1_differing_residue_ids
+
+    def get_differing_scaffold_residue_ids(self):
+        return self.pdb2_differing_residue_ids
+
+    def generate_pymol_session(self, crystal_pdb = None, pymol_executable = None):
+        b = BatchBuilder(pymol_executable = pymol_executable)
+
+        structures_list = [
+            ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
+            ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
+            ('Crystal', self.design_pdb.pdb_content, self.get_differing_model_residue_ids()),
+        ]
+
+        if crystal_pdb:
+            structures_list.append(('Crystal', crystal_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
+
+        PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
+        return PSE_files[0]
+
 if __name__ == '__main__':
     from tools.fs.fsio import read_file
 
