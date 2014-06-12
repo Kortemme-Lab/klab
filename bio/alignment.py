@@ -180,8 +180,6 @@ class PDBChainMapper(object):
             for trpl in alignment_tokens:
                 html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (trpl[0], trpl[0], trpl[1], trpl[2]))
 
-
-
             html.append('<div class="sequence_alignment_chain_separator"></div>')
 
         if html:
@@ -237,6 +235,7 @@ class PDBChainMapper(object):
         self.pdb1_differing_residue_ids = sorted(pdb1_differing_residue_ids)
         self.pdb2_differing_residue_ids = sorted(pdb2_differing_residue_ids)
 
+
 class ScaffoldModelChainMapper(PDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
     def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0):
@@ -276,8 +275,9 @@ class ScaffoldModelChainMapper(PDBChainMapper):
         PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
         return PSE_files[0]
 
+
 class ScaffoldModelDesignChainMapper(PDBChainMapper):
-    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
+    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
     def __init__(self, scaffold_pdb, model_pdb, design_pdb, cut_off = 60.0):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
