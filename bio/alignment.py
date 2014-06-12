@@ -83,7 +83,13 @@ class SequenceAlignmentPrinter(object):
                     s.append('%s  %s' % (header_2, seq2_sequence_str[x:x + num_residues_per_line]))
         return line_separator.join(s)
 
-class PDBChainMapper(object):
+class BasePDBChainMapper(object):
+    def get_sequence_alignment_strings(self, reversed = True, width = 80, line_separator = '\n'):
+        raise Exception('Implement this function.')
+    def get_sequence_alignment_strings_as_html(self, reversed = True, width = 80, line_separator = '\n'):
+        raise Exception('Implement this function.')
+
+class PDBChainMapper(BasePDBChainMapper):
     '''Uses the match_pdb_chains function to map the chains of pdb1 to the chains of pdb2. The mapping member stores
         the mapping between chains when a mapping is found. The mapping_percentage_identity member stores how close the
         mapping was in terms of percentage identity.
@@ -106,13 +112,62 @@ class PDBChainMapper(object):
         self.pdb1_differing_residue_ids = []
         self.pdb2_differing_residue_ids = []
         self.residue_id_mapping = {}
-        self.map_residues()
+        self._map_residues()
 
     @staticmethod
     def from_file_paths(pdb1_path, pdb1_name, pdb2_path, pdb2_name, cut_off = 60.0):
         pdb1 = PDB.from_filepath(pdb1_path)
         pdb2 = PDB.from_filepath(pdb2_path)
         return PDBChainMapper(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
+
+    def _map_residues(self):
+        '''
+        '''
+        pdb1 = self.pdb1
+        pdb2 = self.pdb2
+        pdb1_name = self.pdb1_name
+        pdb2_name = self.pdb2_name
+        residue_id_mapping = {}
+        pdb1_differing_residue_ids = []
+        pdb2_differing_residue_ids = []
+        for pdb1_chain, pdb2_chain in self.mapping.iteritems():
+            residue_id_mapping[pdb1_chain] = {}
+
+            # Get the mapping between the sequences
+            # Note: sequences and mappings are 1-based following the UniProt convention
+            sa = SequenceAligner()
+            pdb1_sequence = pdb1.atom_sequences[pdb1_chain]
+            pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
+            sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
+            sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
+            mapping, match_mapping = sa.get_residue_mapping()
+
+            for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
+                pdb1_residue_id = pdb1_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
+                pdb2_residue_id = pdb2_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
+                residue_id_mapping[pdb1_chain][pdb1_residue_id] = pdb2_residue_id
+
+            # Determine which residues of each sequence differ between the sequences
+            # We ignore leading and trailing residues from both sequences
+            pdb1_residue_indices = mapping.keys()
+            pdb2_residue_indices = mapping.values()
+            differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
+            differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
+            for pdb1_residue_index, match_details in match_mapping.iteritems():
+                if match_details.clustal == 1:
+                    # the residues matched
+                    differing_pdb1_indices.remove(pdb1_residue_index)
+                    differing_pdb2_indices.remove(mapping[pdb1_residue_index])
+
+            # Convert the different sequence indices into PDB residue IDs
+            for idx in differing_pdb1_indices:
+                pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
+            for idx in differing_pdb2_indices:
+                pdb2_differing_residue_ids.append(pdb2_sequence.order[idx - 1])
+
+        self.residue_id_mapping = residue_id_mapping
+        self.pdb1_differing_residue_ids = sorted(pdb1_differing_residue_ids)
+        self.pdb2_differing_residue_ids = sorted(pdb2_differing_residue_ids)
 
     def get_sequence_alignment_strings(self, reversed = True, width = 80, line_separator = '\n'):
         '''Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
@@ -186,55 +241,6 @@ class PDBChainMapper(object):
             html.pop() # remove the last chain separator div
         return '\n'.join(html)
 
-    def map_residues(self):
-        '''
-        '''
-        pdb1 = self.pdb1
-        pdb2 = self.pdb2
-        pdb1_name = self.pdb1_name
-        pdb2_name = self.pdb2_name
-        residue_id_mapping = {}
-        pdb1_differing_residue_ids = []
-        pdb2_differing_residue_ids = []
-        for pdb1_chain, pdb2_chain in self.mapping.iteritems():
-            residue_id_mapping[pdb1_chain] = {}
-
-            # Get the mapping between the sequences
-            # Note: sequences and mappings are 1-based following the UniProt convention
-            sa = SequenceAligner()
-            pdb1_sequence = pdb1.atom_sequences[pdb1_chain]
-            pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
-            sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
-            sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
-            mapping, match_mapping = sa.get_residue_mapping()
-
-            for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
-                pdb1_residue_id = pdb1_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
-                pdb2_residue_id = pdb2_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
-                residue_id_mapping[pdb1_chain][pdb1_residue_id] = pdb2_residue_id
-
-            # Determine which residues of each sequence differ between the sequences
-            # We ignore leading and trailing residues from both sequences
-            pdb1_residue_indices = mapping.keys()
-            pdb2_residue_indices = mapping.values()
-            differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
-            differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
-            for pdb1_residue_index, match_details in match_mapping.iteritems():
-                if match_details.clustal == 1:
-                    # the residues matched
-                    differing_pdb1_indices.remove(pdb1_residue_index)
-                    differing_pdb2_indices.remove(mapping[pdb1_residue_index])
-
-            # Convert the different sequence indices into PDB residue IDs
-            for idx in differing_pdb1_indices:
-                pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
-            for idx in differing_pdb2_indices:
-                pdb2_differing_residue_ids.append(pdb2_sequence.order[idx - 1])
-
-        self.residue_id_mapping = residue_id_mapping
-        self.pdb1_differing_residue_ids = sorted(pdb1_differing_residue_ids)
-        self.pdb2_differing_residue_ids = sorted(pdb2_differing_residue_ids)
-
 
 class ScaffoldModelChainMapper(PDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
@@ -304,7 +310,7 @@ class ScaffoldModelDesignChainMapper(PDBChainMapper):
     def get_differing_scaffold_residue_ids(self):
         return self.pdb2_differing_residue_ids
 
-    def generate_pymol_session(self, crystal_pdb = None, pymol_executable = None):
+    def generate_pymol_session(self, crystal_pdb = None, pymol_executable = 'pymol'):
         b = BatchBuilder(pymol_executable = pymol_executable)
 
         structures_list = [
@@ -350,5 +356,9 @@ if __name__ == '__main__':
     colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(width = 100))
 
     # Example of how to generate a PyMOL session
-    PSE_file = chain_mapper.generate_pymol_session()
+    PSE_file = chain_mapper.generate_pymol_session(pymol_executable = 'pymol')
+    if PSE_file:
+        print('Length of PSE file: %d' % len(PSE_file))
+    else:
+        print('No PSE file was generated.')
 
