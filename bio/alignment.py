@@ -5,10 +5,16 @@ alignment.py
 Higher-level alignment functionality which uses the clustalo module and the PyMOL PSE builder module.
 
 Created by Shane O'Connor 2014.
+
+Updated in June 2014: The classes are now more general, handling multiple PDB files rather than a pair of PDB files. The
+plan should be to remove the specialized classes in favor of these more general classes.
 """
 
 import sys
 sys.path.insert(0, '../../..')
+
+if __name__ == '__main__':
+    sys.path.insert(0, '../..')
 
 from tools import colortext
 from tools.bio.pymol.psebuilder import BatchBuilder, PDBContainer
@@ -66,7 +72,7 @@ class SequenceAlignmentPrinter(object):
     def to_lines(self, width = 80, reversed = False, line_separator = '\n'):
         s = []
         label_width = max(len(self.seq1_name), len(self.seq2_name))
-        if label_width + 2 < width and len(self.seq1_name) == len(self.seq1_name):
+        if label_width + 2 < width:
             header_1 = self.seq1_name.ljust(label_width + 2)
             header_2 = self.seq2_name.ljust(label_width + 2)
 
@@ -81,6 +87,43 @@ class SequenceAlignmentPrinter(object):
                 else:
                     s.append('%s  %s' % (header_1, seq1_sequence_str[x:x + num_residues_per_line]))
                     s.append('%s  %s' % (header_2, seq2_sequence_str[x:x + num_residues_per_line]))
+        return line_separator.join(s)
+
+class MultipleSequenceAlignmentPrinter(object):
+    '''A generalized version of SequenceAlignmentPrinter which handles multiple sequences.'''
+
+    def __init__(self, sequence_names, sequences):
+        assert(len(sequence_names) == len(sequences) and len(sequence_names) > 1)
+        assert(len(set(sequence_names)) == len(sequence_names)) # sequence_names must be a list of unique names
+
+        # Make sure that the sequence lengths are all the same size
+        sequence_lengths = map(len, sequences)
+        assert(len(set(sequence_lengths)) == 1)
+        self.sequence_length = sequence_lengths[0]
+        self.label_width = max(map(len, sequence_names))
+
+        self.sequence_names = sequence_names
+        self.sequences = sequences
+
+    def to_lines(self, width = 80, reversed = False, line_separator = '\n'):
+        s = []
+
+        sequences, sequence_names = None, None
+        if reversed:
+            sequences, sequence_names = self.sequences[::-1], self.sequence_names[::-1]
+        else:
+            sequences, sequence_names = self.sequences, self.sequence_names
+
+        if self.label_width + 2 < width:
+
+            headers = [sequence_name.ljust(self.label_width + 2) for sequence_name in sequence_names]
+            num_residues_per_line = width - self.label_width
+            sequence_strs = map(str, sequences)
+
+            for x in range(0, self.sequence_length, num_residues_per_line):
+                for y in range(len(sequence_strs)):
+                    s.append('%s  %s' % (headers[y], sequence_strs[y][x:x + num_residues_per_line]))
+
         return line_separator.join(s)
 
 class BasePDBChainMapper(object):
@@ -242,6 +285,272 @@ class PDBChainMapper(BasePDBChainMapper):
         return '\n'.join(html)
 
 
+class PipelinePDBChainMapper(BasePDBChainMapper):
+    '''Similar to PDBChainMapper except this takes a list of PDB files which should be related in some way. The matching
+       is done pointwise, matching all PDBs in the list to each other.
+       This class is useful for a list of structures that are the result of a linear pipeline e.g. a scaffold structure (RCSB),
+       a model structure (Rosetta), and a design structure (experimental result).
+
+       Objects of this class have a differing_residue_ids mapping which maps the pair (pdb_name1, pdb_name2) to the list
+       of residues *in pdb_name1* that differ from those of pdb_name2.
+
+       The 'mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to the mapping from chain IDs in pdb_name1 to
+       chain IDs in pdb_name2 based on sequence alignment. The 'mapping_percentage_identity' member stores the percentage identities
+       for this alignment.
+
+       The 'residue_id_mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to a mapping
+            chains_of_pdb_name_1 -> residues of that chain -> corresponding residues in the corresponding chain of pdb_name2
+
+       For example, ('Model', 'Design') -> {'A': {'A 167 ': 'A 168, ...}, 'B': {'B 167 ': 'A 168, ...}, ...}
+
+       *todo: Do I handle the case where chain A in pdb1 maps to chains A and B in pdb2? In that case, the entries could overrun each other.
+              A good test case would be 3MWO -> 1BN1 where 3MWO:A and 3MWO:B both map to 1BN1:A
+       '''
+
+    def __init__(self, pdbs, pdb_names, cut_off = 60.0):
+
+        assert(len(pdbs) == len(pdb_names) and len(pdbs) > 1)
+        assert(len(set(pdb_names)) == len(pdb_names)) # pdb_names must be a list of unique names
+
+        self.pdbs = pdbs
+        self.pdb_names = pdb_names
+
+        self.pdb_name_to_structure_mapping = {}
+        for x in range(len(pdb_names)):
+            self.pdb_name_to_structure_mapping[pdb_names[x]] = pdbs[x]
+
+        self.mapping = {}
+        self.mapping_percentage_identity = {}
+
+        # differing_residue_ids is a mapping from (pdb_name1, pdb_name2) to the list of residues *in pdb_name1* that differ from those of pdb_name2
+        self.differing_residue_ids = {}
+
+        # For each pair of adjacent PDB files in the list, match each chain in the first pdb to its best match in the second pdb
+        for x in range(len(pdbs) - 1):
+            for y in range(x + 1, len(pdbs)):
+                pdb1, pdb2 = pdbs[x], pdbs[y]
+                pdb1_name, pdb2_name = pdb_names[x], pdb_names[y]
+
+                mapping_key = (pdb1_name, pdb2_name)
+                self.mapping[mapping_key] = {}
+                self.mapping_percentage_identity[mapping_key] = {}
+                self.differing_residue_ids[mapping_key] = {}
+
+                chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
+                for k, v in chain_matches.iteritems():
+                    if v:
+                        self.mapping[mapping_key][k] = v[0]
+                        self.mapping_percentage_identity[mapping_key][k] = v[1]
+
+                # todo: We could create the reverse entry from the results above which would be more efficient (match_pdb_chains
+                # performs a sequence alignment) but I will just repeat the logic here for now.
+                mapping_key = (pdb2_name, pdb1_name)
+                self.mapping[mapping_key] = {}
+                self.mapping_percentage_identity[mapping_key] = {}
+                self.differing_residue_ids[mapping_key] = {}
+
+                chain_matches = match_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off)
+                for k, v in chain_matches.iteritems():
+                    if v:
+                        self.mapping[mapping_key][k] = v[0]
+                        self.mapping_percentage_identity[mapping_key][k] = v[1]
+
+        self.residue_id_mapping = {}
+        self._map_residues()
+
+    @staticmethod
+    def from_file_paths(pdb1_path, pdb1_name, pdb2_path, pdb2_name, cut_off = 60.0):
+        pdb1 = PDB.from_filepath(pdb1_path)
+        pdb2 = PDB.from_filepath(pdb2_path)
+        return PDBChainMapper(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
+
+    def get_differing_residue_ids(self, pdb_name, pdb_list):
+        '''Returns a list of residues in pdb_name which differ from the pdbs corresponding to the names in pdb_list.'''
+
+        assert(pdb_name in self.pdb_names)
+        assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list)) # the names in pdb_list must be in pdb_names
+
+        differing_residue_ids = set()
+        for other_pdb in pdb_list:
+            differing_residue_ids = differing_residue_ids.union(set(self.differing_residue_ids[(pdb_name, other_pdb)]))
+
+        return sorted(differing_residue_ids)
+
+
+    def _map_residues(self):
+        '''For each pair of PDB files, match the residues of the first chain to the residues of the second chain.'''
+
+        pdbs = self.pdbs
+        pdb_names = self.pdb_names
+
+        for x in range(len(pdbs) - 1):
+            for y in range(x + 1, len(pdbs)):
+                pdb1, pdb2 = pdbs[x], pdbs[y]
+                pdb1_name, pdb2_name = pdb_names[x], pdb_names[y]
+                mapping_key = (pdb1_name, pdb2_name)
+                reverse_mapping_key = mapping_key[::-1]
+
+                residue_id_mapping = {}
+                pdb1_differing_residue_ids = []
+                pdb2_differing_residue_ids = []
+                for pdb1_chain, pdb2_chain in self.mapping[mapping_key].iteritems():
+                    residue_id_mapping[pdb1_chain] = {}
+
+                    # Get the mapping between the sequences
+                    # Note: sequences and mappings are 1-based following the UniProt convention
+                    sa = SequenceAligner()
+                    pdb1_sequence = pdb1.atom_sequences[pdb1_chain]
+                    pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
+                    sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
+                    sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
+                    mapping, match_mapping = sa.get_residue_mapping()
+
+                    for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
+                        pdb1_residue_id = pdb1_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
+                        pdb2_residue_id = pdb2_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
+                        residue_id_mapping[pdb1_chain][pdb1_residue_id] = pdb2_residue_id
+
+                    # Determine which residues of each sequence differ between the sequences
+                    # We ignore leading and trailing residues from both sequences
+                    pdb1_residue_indices = mapping.keys()
+                    pdb2_residue_indices = mapping.values()
+                    differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
+                    differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
+                    for pdb1_residue_index, match_details in match_mapping.iteritems():
+                        if match_details.clustal == 1:
+                            # the residues matched
+                            differing_pdb1_indices.remove(pdb1_residue_index)
+                            differing_pdb2_indices.remove(mapping[pdb1_residue_index])
+
+                    # Convert the different sequence indices into PDB residue IDs
+                    for idx in differing_pdb1_indices:
+                        pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
+                    for idx in differing_pdb2_indices:
+                        pdb2_differing_residue_ids.append(pdb2_sequence.order[idx - 1])
+
+                self.residue_id_mapping[mapping_key] = residue_id_mapping
+                self.differing_residue_ids[mapping_key] = pdb1_differing_residue_ids
+                self.differing_residue_ids[reverse_mapping_key] = pdb2_differing_residue_ids
+
+
+    def get_sequence_alignment_strings(self, pdb_list, reversed = True, width = 80, line_separator = '\n'):
+        '''Takes a list of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+            Using the first element of this list as a base, get the sequence alignments with chains in other members
+            of the list. For simplicity, if a chain in the first PDB  matches multiple chains in another PDB, we only
+            return the alignment for one of the chains.
+
+            Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
+            specified width, separated by the specified line separator.'''
+
+        assert(len(set(pdb_list)) == len(pdb_list) and (len(pdb_list) > 1))
+        assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list))
+
+        primary_pdb = self.pdb_name_to_structure_mapping[pdb_list[0]]
+        primary_pdb_name = pdb_list[0]
+        primary_pdb_chains = sorted(primary_pdb.chain_atoms.keys())
+
+
+        alignment_strings = []
+        for primary_pdb_chain in primary_pdb_chains:
+
+            sa = SequenceAligner()
+
+            # Add the primary PDB's sequence for the chain
+            primary_pdb_sequence = primary_pdb.atom_sequences[primary_pdb_chain]
+            sa.add_sequence('%s:%s' % (primary_pdb_name, primary_pdb_chain), str(primary_pdb_sequence))
+
+            for other_pdb_name in pdb_list[1:]:
+                other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
+                other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                if other_chain: # todo: assuming that one chain maps to at most one chain here which is not generally true
+                    other_pdb_sequence = other_pdb.atom_sequences[other_chain]
+                    sa.add_sequence('%s:%s' % (other_pdb_name, other_chain), str(other_pdb_sequence))
+
+            if len(sa.records) > 1:
+                # If there are no corresponding sequences in any other PDB, do not return the non-alignment
+                sa.align()
+
+                #pdb1_alignment_str = sa._get_alignment_lines()['%s:%s' % (primary_pdb_name, pdb1_chain)]
+                #pdb2_alignment_str = sa._get_alignment_lines()['%s:%s' % (pdb2_name, pdb2_chain)]
+
+                sequence_names, sequences = [], []
+                sequence_names.append('%s:%s' % (primary_pdb_name, primary_pdb_chain))
+                sequences.append(sa._get_alignment_lines()['%s:%s' % (primary_pdb_name, primary_pdb_chain)])
+                for other_pdb_name in pdb_list[1:]:
+                    other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                    sequence_names.append('%s:%s' % (other_pdb_name, other_chain))
+                    sequences.append(sa._get_alignment_lines()['%s:%s' % (other_pdb_name, other_chain)])
+
+                sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences)
+                alignment_strings.append(sap.to_lines(reversed = reversed, width = width, line_separator = line_separator))
+
+        return alignment_strings
+
+    def get_sequence_alignment_strings_as_html(self, pdb_list, reversed = True, width = 80, line_separator = '\n'):
+        alignment_strings = self.get_sequence_alignment_strings(pdb_list, reversed = reversed, width = width)
+        html = []
+        for alignment_string in alignment_strings:
+            lines = alignment_string.split('\n')
+
+            alignment_tokens = []
+            for line in lines:
+                tokens = line.split()
+                assert(len(tokens) == 2)
+                label_tokens = tokens[0].split(':')
+                #alignment_html.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
+                #alignment_tokens.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
+                alignment_tokens.append([label_tokens[0], label_tokens[1], tokens[1]])
+
+            if reversed:
+                pdb_list = pdb_list[::-1]
+
+            if len(alignment_tokens) % len(pdb_list) == 0:
+
+                passed = True
+                for x in range(0, len(alignment_tokens), len(pdb_list)):
+                    for y in range(0, len(pdb_list)):
+                        if alignment_tokens[x + y][0] != pdb_list[y]:
+                            passed = False
+
+                for x in range(0, len(alignment_tokens), len(pdb_list)):
+
+                    residue_sublist = []
+                    for y in range(0, len(pdb_list)):
+                        residue_sublist.append(alignment_tokens[x + y][2])
+
+                    #scaffold_residues = alignment_tokens[x][2]
+                    #model_residues = alignment_tokens[x+1][2]
+                    if passed and (len(set(map(len, residue_sublist))) == 1): # check that the lengths of all subsequences are the same
+                        #new_scaffold_string = []
+                        #new_model_string = []
+                        residue_substrings = []
+                        for y in range(0, len(pdb_list)):
+                            residue_substrings.append([])
+
+                        for z in range(len(residue_sublist[0])):
+                            residues = set([residue_sublist[y][z] for y in range(0, len(pdb_list))])
+
+                            if len(residues) == 1:
+                                # all residues are the same
+                                for y in range(0, len(pdb_list)):
+                                    residue_substrings[y].append(residue_sublist[y][z])
+                            else:
+                                for y in range(0, len(pdb_list)):
+                                    residue_substrings[y].append('<dd>%s</dd>' % residue_sublist[y][z])
+
+                        for y in range(0, len(pdb_list)):
+                            alignment_tokens[x + y][2] = ''.join(residue_substrings[y])
+
+            for trpl in alignment_tokens:
+                html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (trpl[0], trpl[0], trpl[1], trpl[2]))
+
+            html.append('<div class="sequence_alignment_chain_separator"></div>')
+
+        if html:
+            html.pop() # remove the last chain separator div
+        return '\n'.join(html)
+
+
 class ScaffoldModelChainMapper(PDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
     def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0):
@@ -282,13 +591,13 @@ class ScaffoldModelChainMapper(PDBChainMapper):
         return PSE_files[0]
 
 
-class ScaffoldModelDesignChainMapper(PDBChainMapper):
+class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
     def __init__(self, scaffold_pdb, model_pdb, design_pdb, cut_off = 60.0):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
         self.design_pdb = design_pdb
-        super(ScaffoldModelDesignChainMapper, self).__init__(model_pdb, 'Model', scaffold_pdb, 'Scaffold', cut_off)
+        super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'Design'], cut_off)
 
     @staticmethod
     def from_file_paths(scaffold_pdb_path, model_pdb_path, design_pdb_path, cut_off = 60.0):
@@ -305,10 +614,13 @@ class ScaffoldModelDesignChainMapper(PDBChainMapper):
         return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
 
     def get_differing_model_residue_ids(self):
-        return self.pdb1_differing_residue_ids
+        return self.get_differing_residue_ids('Model', ['Scaffold', 'Design'])
 
     def get_differing_scaffold_residue_ids(self):
-        return self.pdb2_differing_residue_ids
+        return self.get_differing_residue_ids('Scaffold', ['Model', 'Design'])
+
+    def get_differing_design_residue_ids(self):
+        return self.get_differing_residue_ids('Design', ['Scaffold', 'Model'])
 
     def generate_pymol_session(self, crystal_pdb = None, pymol_executable = 'pymol'):
         b = BatchBuilder(pymol_executable = pymol_executable)
@@ -316,14 +628,12 @@ class ScaffoldModelDesignChainMapper(PDBChainMapper):
         structures_list = [
             ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
             ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
-            ('Crystal', self.design_pdb.pdb_content, self.get_differing_model_residue_ids()),
+            ('Crystal', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
         ]
-
-        if crystal_pdb:
-            structures_list.append(('Crystal', crystal_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
 
         PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
         return PSE_files[0]
+
 
 if __name__ == '__main__':
     from tools.fs.fsio import read_file
@@ -333,6 +643,21 @@ if __name__ == '__main__':
 
     # Example of how to create a mapper from file contents
     chain_mapper = ScaffoldModelChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
+
+    # Example of how to create a mapper from file contents
+    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
+
+    print('''chain_mapper.get_differing_residue_ids('Design', ['Scaffold'])''')
+    print(chain_mapper.get_differing_residue_ids('Design', ['Model', 'Scaffold']))
+
+    print(chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'Design']))
+
+    print(chain_mapper.mapping)
+    print(chain_mapper.mapping_percentage_identity)
+    print(chain_mapper.residue_id_mapping)
+
+    print(chain_mapper.get_differing_model_residue_ids())
+    print(chain_mapper.get_differing_scaffold_residue_ids())
 
     # Example of how to get residue -> residue mapping
     for chain_id, mapping in sorted(chain_mapper.residue_id_mapping.iteritems()):
@@ -349,11 +674,11 @@ if __name__ == '__main__':
 
     # Example of how to print out a plaintext sequence alignment
     colortext.warning('Sequence alignment - plain formatting, width = 120.')
-    print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(width = 120)))
+    print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(['Model', 'Scaffold', 'Design'], width = 120)))
 
     # Example of how to print out a HTML formatted alignment. This output would require CSS for an appropriate presentation.
     colortext.warning('Sequence alignment - HTML formatting, width = 100.')
-    colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(width = 100))
+    colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(['Model', 'Scaffold', 'Design'], width = 100))
 
     # Example of how to generate a PyMOL session
     PSE_file = chain_mapper.generate_pymol_session(pymol_executable = 'pymol')

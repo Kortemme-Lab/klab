@@ -153,7 +153,7 @@ class SequenceAligner(object):
             else:
                 tempfiles.append("%s.dnd" % clustal_filename)
                 percentage_identity_output = p.stdout
-        except:
+        except Exception, e:
             for t in tempfiles:
                 os.remove(t)
             raise
@@ -274,10 +274,6 @@ class SequenceAligner(object):
         ''' This function parses the Clustal Omega alignment output and returns the aligned sequences in a dict: sequence_id -> sequence_string.
             The special key -1 is reserved for the match line (e.g. ' .:******* *').'''
 
-        if len(self.sequence_ids) != 2:
-            # No need to write the general version at this date
-            return None
-
         # Strip the boilerplate lines
         lines = self.alignment_output.split("\n")
         assert(lines[0].startswith('CLUSTAL'))
@@ -329,7 +325,7 @@ class SequenceAligner(object):
             # Check for the empty line
             assert(lines[x + num_ids + 1].strip() == '')
 
-        # Create the sequences
+        # Create the sequences, making sure that all sequences are the same length
         lengths = set()
         for k, v in sequences.iteritems():
             sequences[k] = "".join(v)
