@@ -642,18 +642,33 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
 if __name__ == '__main__':
     from tools.fs.fsio import read_file
 
-    # Example of how to create a mapper from file paths
-    chain_mapper = ScaffoldModelChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
+    if False:
+        # Example of how to create a mapper from file paths
+        chain_mapper = ScaffoldModelChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
 
-    # Example of how to create a mapper from file contents
-    chain_mapper = ScaffoldModelChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
+        # Example of how to create a mapper from file contents
+        chain_mapper = ScaffoldModelChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
 
-    # Example of how to create a mapper from file contents
-    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
+        # Example of how to create a mapper from file contents
+        chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
 
-    print('''chain_mapper.get_differing_residue_ids('Design', ['Scaffold'])''')
+
+    # 3MWO -> 1BN1 test case (3MWO:A and 3MWO:B map to 1BN1:A)
+    from rcsb import retrieve_pdb
+    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
+
+    colortext.message('''chain_mapper.get_differing_residue_ids('Design', ['Scaffold'])''')
     print(chain_mapper.get_differing_residue_ids('Design', ['Model', 'Scaffold']))
 
+    colortext.message('''\nchain_mapper.mapping''')
+    print(chain_mapper.mapping)
+
+    colortext.message('''\nchain_mapper.mapping_percentage_identity''')
+    print(chain_mapper.mapping_percentage_identity)
+
+    colortext.message('''\nresidue_id_mapping''')
+    print(chain_mapper.residue_id_mapping)
+    sys.exit(0)
     print(chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'Design']))
 
     print(chain_mapper.mapping)
@@ -685,7 +700,7 @@ if __name__ == '__main__':
     colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(['Model', 'Scaffold', 'Design'], width = 100))
 
     # Example of how to generate a PyMOL session
-    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'red'})
+    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
     if PSE_file:
         print('Length of PSE file: %d' % len(PSE_file))
     else:
