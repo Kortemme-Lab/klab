@@ -67,20 +67,28 @@ class BatchBuilder(object):
     def __init__(self, pymol_executable = 'pymol'):
         self.visualization_shell = 6
         self.visualization_pymol = pymol_executable # the command used to run pymol - change as necessary for Mac OS X
+        self.PSE_files = []
+        self.PSE_scripts = []
 
-    def run(self, builder_class, list_of_pdb_containers):
+    def run(self, builder_class, list_of_pdb_containers, settings = {}):
         PSE_files = []
+        PSE_scripts = []
         for pdb_containers in list_of_pdb_containers:
-            b = builder_class(pdb_containers)
+            b = builder_class(pdb_containers, settings)
             b.visualization_shell = self.visualization_shell
             b.visualization_pymol = self.visualization_pymol
             b.run()
             PSE_files.append(b.PSE)
+            PSE_scripts.append(b.script)
+
+        self.PSE_files = PSE_files
+        self.PSE_scripts = PSE_scripts
+
         return PSE_files
 
 class PyMOLSessionBuilder(object):
 
-    def __init__(self, pdb_containers, rootdir = '/tmp'):
+    def __init__(self, pdb_containers, settings = {}, rootdir = '/tmp'):
         self.visualization_shell = 6
         self.visualization_pymol = 'pymol'
         self.pdb_containers = pdb_containers
@@ -92,6 +100,10 @@ class PyMOLSessionBuilder(object):
         self.stdout = None
         self.stderr = None
         self.return_code = None
+        self.settings = {
+            'background-color' : 'white',
+        }
+        self.settings.update(settings)
 
     def __del__(self):
         if self.outdir:
