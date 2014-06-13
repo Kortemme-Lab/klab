@@ -23,11 +23,22 @@ from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
 from tools.fs.fsio import write_file
 
-def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
+
+def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0):
     '''Aligns two PDB files, returning a mapping from the chains in pdb1 to the chains of pdb2.
-       We return the best match for each chain in pdb1 if a match exists. The return value is a dict mapping
-            chain_id_in_pdb1 -> None or a tuple (chain_id_in_pdb_2, percentage_identity_score)
-       where percentage_identity_score is a float.
+       If allow_multiple_matches is False, we return the best match for each chain in pdb1 if a match exists. The return
+        value is a dict mapping
+            chain_id_in_pdb1 -> None or a list with a single tuple (chain_id_in_pdb_2, percentage_identity_score)
+       where percentage_identity_score is a float. e.g. 'A' -> [('B', 100)]. We return a list to keep the return type
+       consistent with the allow_multiple_matches case. Use the match_best_pdb_chains wrapper is you only want one match.
+
+       If allow_multiple_matches is True, we return multiple matches for each chain in pdb1 if any matches exists. The return
+        value is a dict mapping
+            chain_id_in_pdb1 -> None or a list of tuples of the form (chain_id_in_pdb_2, percentage_identity_score)
+       where percentage_identity_score is a float. multiple_match_error_margin is the amount of percentage identity difference
+       from the best match that we allow for e.g. a chain may map to chain_id1_in_pdb2 with 78% identity and chain_id2_in_pdb2
+       with 76% identity. If chain_id1_in_pdb2 is the best match and multiple_match_error_margin >= 2, chain_id2_in_pdb2 will
+       also be returned.
 
        Parameters: pdb1 and pdb2 are PDB objects from tools.bio.pdb. pdb1_name and pdb2_name are strings describing the
         structures e.g. 'Model' and 'Scaffold'. cut_off is used in the matching to discard low-matching chains.
@@ -48,7 +59,7 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
         sa.add_sequence('%s:%s' % (pdb2_name, c), str(pdb2.atom_sequences[c]))
     sa.align()
 
-    chain_matches = dict.fromkeys(pdb2_chains, None)
+    chain_matches = dict.fromkeys(pdb1_chains, None)
     for c in pdb1_chains:
         best_matches_by_id = sa.get_best_matches_by_id('%s:%s' % (pdb1_name, c), cut_off = cut_off)
         if best_matches_by_id:
@@ -57,10 +68,34 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
                 if k.startswith(pdb2_name + ':'):
                     t.append((v, k))
             if t:
-                best_match = sorted(t)[0]
-                chain_matches[c] = (best_match[1].split(':')[1], best_match[0])
+                # We may have multiple best matches here. Instead of just returning one
+                if allow_multiple_matches:
+                    best_matches = sorted(t)
+                    best_match_identity = best_matches[0][0]
+                    allowed_cutoff = max(cut_off, best_match_identity - multiple_match_error_margin)
+                    chain_matches[c] = []
+                    for best_match in best_matches:
+                        if best_match[0] >= allowed_cutoff:
+                            chain_matches[c].append((best_match[1].split(':')[1], best_match[0]))
+                    assert(len(chain_matches[c]) > 0)
+                else:
+                    best_match = sorted(t)[0]
+                    chain_matches[c] = [(best_match[1].split(':')[1], best_match[0])]
 
     return chain_matches
+
+
+def match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
+    '''A wrapper function for match_pdb_chains. This function only takes the best match. The return
+        value is a dict mapping
+            chain_id_in_pdb1 -> None or a tuple (chain_id_in_pdb_2, percentage_identity_score)
+       where percentage_identity_score is a float. e.g. 'A' -> ('B', 100).'''
+    d = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off, allow_multiple_matches = False)
+    for k, v in d.iteritems():
+        if v:
+            d[k] = v[0]
+    return d
+
 
 class SequenceAlignmentPrinter(object):
 
@@ -147,7 +182,7 @@ class PDBChainMapper(BasePDBChainMapper):
         self.mapping_percentage_identity = {}
 
         # Match each chain in pdb1 to its best match in pdb2
-        self.chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
+        self.chain_matches = match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
         for k, v in self.chain_matches.iteritems():
             if v:
                 self.mapping[k] = v[0]
@@ -337,7 +372,12 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 self.mapping_percentage_identity[mapping_key] = {}
                 self.differing_residue_ids[mapping_key] = {}
 
-                chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
+                # To allow for X cases, we allow the matcher to return multiple matches
+                # An artificial example X case would be 3MWO -> 1BN1 -> 3MWO where 3MWO:A and 3MWO:B both map to 1BN1:A
+                # In this case, we would like 1BN1:A to map to both 3MWO:A and 3MWO:B.
+                chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0)
+                #chain_matches = match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
+
                 for k, v in chain_matches.iteritems():
                     if v:
                         self.mapping[mapping_key][k] = v[0]
@@ -350,7 +390,8 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 self.mapping_percentage_identity[mapping_key] = {}
                 self.differing_residue_ids[mapping_key] = {}
 
-                chain_matches = match_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off)
+                chain_matches = match_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0)
+                #chain_matches = match_best_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off)
                 for k, v in chain_matches.iteritems():
                     if v:
                         self.mapping[mapping_key][k] = v[0]
@@ -642,6 +683,23 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
 if __name__ == '__main__':
     from tools.fs.fsio import read_file
 
+    from rcsb import retrieve_pdb
+
+    colortext.message('match_best_pdb_chains: 3MW0 -> 1BN1')
+    print(match_best_pdb_chains(PDB(retrieve_pdb('3MWO')), '3MWO', PDB(retrieve_pdb('1BN1')), '1BN1', cut_off = 60.0))
+
+    colortext.warning('match_best_pdb_chains: 1BN1 -> 3MW0')
+    print(match_best_pdb_chains(PDB(retrieve_pdb('1BN1')), '1BN1', PDB(retrieve_pdb('3MWO')), '3MWO', cut_off = 60.0))
+
+    colortext.message('match_pdb_chains: 3MW0 -> 1BN1')
+    print(match_pdb_chains(PDB(retrieve_pdb('3MWO')), '3MWO', PDB(retrieve_pdb('1BN1')), '1BN1', cut_off = 60.0, allow_multiple_matches = True))
+
+    colortext.warning('match_pdb_chains: 1BN1 -> 3MW0')
+    print(match_pdb_chains(PDB(retrieve_pdb('1BN1')), '1BN1', PDB(retrieve_pdb('3MWO')), '3MWO', cut_off = 60.0, allow_multiple_matches = True))
+
+
+
+    sys.exit(0)
     if False:
         # Example of how to create a mapper from file paths
         chain_mapper = ScaffoldModelChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
@@ -654,7 +712,6 @@ if __name__ == '__main__':
 
 
     # 3MWO -> 1BN1 test case (3MWO:A and 3MWO:B map to 1BN1:A)
-    from rcsb import retrieve_pdb
     chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
 
     colortext.message('''chain_mapper.get_differing_residue_ids('Design', ['Scaffold'])''')
