@@ -18,9 +18,10 @@ if __name__ == '__main__':
 
 from tools import colortext
 from tools.bio.pymol.psebuilder import BatchBuilder, PDBContainer
-from tools.bio.pymol.scaffold_model_crystal import ScaffoldModelCrystalBuilder
+from tools.bio.pymol.scaffold_model_design import ScaffoldModelDesignBuilder
 from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
+from tools.fs.fsio import write_file
 
 def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
     '''Aligns two PDB files, returning a mapping from the chains in pdb1 to the chains of pdb2.
@@ -576,7 +577,7 @@ class ScaffoldModelChainMapper(PDBChainMapper):
     def get_differing_scaffold_residue_ids(self):
         return self.pdb2_differing_residue_ids
 
-    def generate_pymol_session(self, crystal_pdb = None, pymol_executable = None):
+    def generate_pymol_session(self, design_pdb = None, pymol_executable = None, settings = {}):
         b = BatchBuilder(pymol_executable = pymol_executable)
 
         structures_list = [
@@ -584,10 +585,10 @@ class ScaffoldModelChainMapper(PDBChainMapper):
             ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
         ]
 
-        if crystal_pdb:
-            structures_list.append(('Crystal', crystal_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
+        if design_pdb:
+            structures_list.append(('Design', design_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
 
-        PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
+        PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
         return PSE_files[0]
 
 
@@ -622,17 +623,20 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
     def get_differing_design_residue_ids(self):
         return self.get_differing_residue_ids('Design', ['Scaffold', 'Model'])
 
-    def generate_pymol_session(self, crystal_pdb = None, pymol_executable = 'pymol'):
+    def generate_pymol_session(self, pymol_executable = 'pymol', settings = {}):
+        ''' Generates the PyMOL session for the scaffold, model, and design structures.
+            Returns this session and the script which generated it.'''
         b = BatchBuilder(pymol_executable = pymol_executable)
 
         structures_list = [
             ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
             ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
-            ('Crystal', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
+            ('Design', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
         ]
 
-        PSE_files = b.run(ScaffoldModelCrystalBuilder, [PDBContainer.from_content_triple(structures_list)])
-        return PSE_files[0]
+        PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
+
+        return PSE_files[0], b.PSE_scripts[0]
 
 
 if __name__ == '__main__':
@@ -681,9 +685,12 @@ if __name__ == '__main__':
     colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(['Model', 'Scaffold', 'Design'], width = 100))
 
     # Example of how to generate a PyMOL session
-    PSE_file = chain_mapper.generate_pymol_session(pymol_executable = 'pymol')
+    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'red'})
     if PSE_file:
         print('Length of PSE file: %d' % len(PSE_file))
     else:
         print('No PSE file was generated.')
+
+    print(PSE_script)
+    write_file('alignment_test.pse', PSE_file, ftype = 'wb')
 
