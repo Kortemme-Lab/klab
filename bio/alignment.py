@@ -174,6 +174,7 @@ class PDBChainMapper(BasePDBChainMapper):
         mapping was in terms of percentage identity.
     '''
     def __init__(self, pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
+        raise Exception('Deprecate this class in favor of PipelinePDBChainMapper.')
         self.pdb1 = pdb1
         self.pdb2 = pdb2
         self.pdb1_name = pdb1_name
@@ -321,27 +322,83 @@ class PDBChainMapper(BasePDBChainMapper):
         return '\n'.join(html)
 
 
+class MatchedChainList(object):
+    '''A helper class to store a list of chains related to pdb_name:chain_id and their percentage identities.'''
+
+    def __init__(self, pdb_name, chain_id):
+        self.pdb_name = pdb_name
+        self.chain_id = chain_id
+        self.chain_list = []
+
+    def add_chain(self, other_pdb_id, chain_id, percentage_identity):
+        self.chain_list.append((percentage_identity, other_pdb_id, chain_id))
+        self.chain_list = sorted(self.chain_list)
+
+    def get_related_chains_ids(self, other_pdb_id):
+        return [e[2] for e in self.chain_list if e[1] == other_pdb_id]
+
+    def get_related_chains_ids_and_identities(self, other_pdb_id):
+        return [(e[2], e[0]) for e in self.chain_list if e[1] == other_pdb_id]
+
+    def __repr__(self):
+        s = ['Matched chain list for %s:%s' % (self.pdb_name, self.chain_id)]
+        if self.chain_list:
+            for mtch in self.chain_list:
+                s.append('\t%s:%s at %s%%' % (mtch[1], mtch[2], mtch[0]))
+        else:
+            s.append('No matches.')
+        return '\n'.join(s)
+
+
 class PipelinePDBChainMapper(BasePDBChainMapper):
     '''Similar to PDBChainMapper except this takes a list of PDB files which should be related in some way. The matching
        is done pointwise, matching all PDBs in the list to each other.
        This class is useful for a list of structures that are the result of a linear pipeline e.g. a scaffold structure (RCSB),
        a model structure (Rosetta), and a design structure (experimental result).
 
-       Objects of this class have a differing_residue_ids mapping which maps the pair (pdb_name1, pdb_name2) to the list
-       of residues *in pdb_name1* that differ from those of pdb_name2.
-
-       The 'mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to the mapping from chain IDs in pdb_name1 to
-       chain IDs in pdb_name2 based on sequence alignment. The 'mapping_percentage_identity' member stores the percentage identities
-       for this alignment.
+       The 'chain_mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to the mapping from chain IDs in pdb_name1 to
+       a MatchedChainList object. This object can be used to return the list of chain IDs in pdb_name2 related to the
+       respective chain in pdb_name1 based on sequence alignment. It can also be used to return the percentage identities
+       for this alignment. The old mapping and mapping_percentage_identity members of this class can be built from this member
+       e.g.
+            self.mapping[('Scaffold', 'Design')] == self.get_chain_mapping('Scaffold', 'Design')
 
        The 'residue_id_mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to a mapping
-            chains_of_pdb_name_1 -> residues of that chain -> corresponding residues in the corresponding chain of pdb_name2
+            chains_of_pdb_name_1 -> residues of that chain -> list of corresponding residues in the corresponding chain of pdb_name2
+       For example, using the homodimer 3MW0 for both Scaffold and Design:
+        residue_id_mapping[('Scaffold', 'Design')]['A'] -> {'A 167 ': ['A 167 ', 'B 167 '], ...}
+        residue_id_mapping[('Scaffold', 'Design')]['B'] -> {'B 167 ': ['A 167 ', 'B 167 '], ...}
 
-       For example, ('Model', 'Design') -> {'A': {'A 167 ': 'A 168, ...}, 'B': {'B 167 ': 'A 168, ...}, ...}
+       Objects of this class have a differing_residue_ids mapping which maps the pair (pdb_name1, pdb_name2) to the list
+       of residues *in pdb_name1* that differ from those of pdb_name2. Note: there is some subtlety here in terms of
+       direction. For example, take this artificial example. We take a homodimer 3MWO as the scaffold and a monomer 1BN1
+       with identical sequence as the model. We mutate A110 in 1BN1. We then take 3MWO with a mutation on A106 as the design.
+         chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
+       differing_residue_ids then looks like this:
+         ('Model', 'Design') = ['A 106 ', 'A 110 '] # In Model, A110 is a mutation, reverted in Design. In Design, A106 is a mutation.
+         ('Model', 'Scaffold') = ['A 110 '] # In Model, A110 is a mutation.
 
-       *todo: Do I handle the case where chain A in pdb1 maps to chains A and B in pdb2? In that case, the entries could overrun each other.
-              A good test case would be 3MWO -> 1BN1 where 3MWO:A and 3MWO:B both map to 1BN1:A
+         ('Design', 'Model') =  ['A 106 ', 'A 110 ', 'B 110 '] # In Design, A106 is a mutation. A110 and B110 are revertant mutations from the Model.
+         ('Design', 'Scaffold') = ['A 106 '] # In Design, A106 is a mutation.
+
+         ('Scaffold', 'Design') = ['A 106 ', 'B 106 '] # Note: In Scaffold, A106 is the wildtype which was mutated in Design. Since B106 also maps to A106, that is added to the list of differing residues.
+         ('Scaffold', 'Model') = ['A 110 ', 'B 110 '] # In Scaffold, A110 and B110 are the wildtypes which was mutated in Model.
+       There is a subtlety here - the differing residue ids from Scaffold to Design are A106 and B106 corresponding to the
+       mutated A106 in the Design. However, the differing residue ids from Design to Scaffold has only one member - A106. This
+       makes sense as it is the only mutation however this may not be the desired behavior - one may wish instead to close
+       the list of residues over the relations mapping the residues between the structures i.e. to generate an equivalence
+       relation from the relation described by the mappings Scaffold->Design and Design->Scaffold. If that were done, then
+       ('Design', 'Scaffold') would be ['A 106 ', 'B 106 '] as Design:A106 -> {Scaffold:A106, Scaffold:B106} and
+       Scaffold:B106 -> {Design:A106, Design:B106} so Design:A106 and Design:B106 are in the same equivalence class.
        '''
+
+    # Constructors
+
+    @staticmethod
+    def from_file_paths(pdb_paths, pdb_names, cut_off = 60.0):
+        pdbs = [PDB.from_filepath(pdb_path) for pdb_path in pdb_paths]
+        return PipelinePDBChainMapper(pdbs, pdb_names, cut_off = cut_off)
+
 
     def __init__(self, pdbs, pdb_names, cut_off = 60.0):
 
@@ -355,11 +412,9 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         for x in range(len(pdb_names)):
             self.pdb_name_to_structure_mapping[pdb_names[x]] = pdbs[x]
 
-        self.mapping = {}
-        self.mapping_percentage_identity = {}
-
         # differing_residue_ids is a mapping from (pdb_name1, pdb_name2) to the list of residues *in pdb_name1* that differ from those of pdb_name2
         self.differing_residue_ids = {}
+        self.chain_mapping = {}
 
         # For each pair of adjacent PDB files in the list, match each chain in the first pdb to its best match in the second pdb
         for x in range(len(pdbs) - 1):
@@ -368,59 +423,47 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 pdb1_name, pdb2_name = pdb_names[x], pdb_names[y]
 
                 mapping_key = (pdb1_name, pdb2_name)
-                self.mapping[mapping_key] = {}
-                self.mapping_percentage_identity[mapping_key] = {}
+                self.chain_mapping[mapping_key] = {}
                 self.differing_residue_ids[mapping_key] = {}
 
                 # To allow for X cases, we allow the matcher to return multiple matches
                 # An artificial example X case would be 3MWO -> 1BN1 -> 3MWO where 3MWO:A and 3MWO:B both map to 1BN1:A
                 # In this case, we would like 1BN1:A to map to both 3MWO:A and 3MWO:B.
                 chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0)
-                #chain_matches = match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
-
-                for k, v in chain_matches.iteritems():
-                    if v:
-                        self.mapping[mapping_key][k] = v[0]
-                        self.mapping_percentage_identity[mapping_key][k] = v[1]
+                for pdb1_chain_id, list_of_matches in chain_matches.iteritems():
+                    if list_of_matches:
+                        mcl = MatchedChainList(pdb1_name, pdb1_chain_id)
+                        for l in list_of_matches:
+                            mcl.add_chain(pdb2_name, l[0], l[1])
+                        self.chain_mapping[mapping_key][pdb1_chain_id] = mcl
 
                 # todo: We could create the reverse entry from the results above which would be more efficient (match_pdb_chains
                 # performs a sequence alignment) but I will just repeat the logic here for now.
                 mapping_key = (pdb2_name, pdb1_name)
-                self.mapping[mapping_key] = {}
-                self.mapping_percentage_identity[mapping_key] = {}
+                self.chain_mapping[mapping_key] = {}
                 self.differing_residue_ids[mapping_key] = {}
 
                 chain_matches = match_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0)
-                #chain_matches = match_best_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off)
-                for k, v in chain_matches.iteritems():
-                    if v:
-                        self.mapping[mapping_key][k] = v[0]
-                        self.mapping_percentage_identity[mapping_key][k] = v[1]
+                for pdb2_chain_id, list_of_matches in chain_matches.iteritems():
+                    if list_of_matches:
+                        mcl = MatchedChainList(pdb2_name, pdb2_chain_id)
+                        for l in list_of_matches:
+                            mcl.add_chain(pdb1_name, l[0], l[1])
+                    self.chain_mapping[mapping_key][pdb2_chain_id] = mcl
 
         self.residue_id_mapping = {}
         self._map_residues()
 
-    @staticmethod
-    def from_file_paths(pdb1_path, pdb1_name, pdb2_path, pdb2_name, cut_off = 60.0):
-        pdb1 = PDB.from_filepath(pdb1_path)
-        pdb2 = PDB.from_filepath(pdb2_path)
-        return PDBChainMapper(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
 
-    def get_differing_residue_ids(self, pdb_name, pdb_list):
-        '''Returns a list of residues in pdb_name which differ from the pdbs corresponding to the names in pdb_list.'''
-
-        assert(pdb_name in self.pdb_names)
-        assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list)) # the names in pdb_list must be in pdb_names
-
-        differing_residue_ids = set()
-        for other_pdb in pdb_list:
-            differing_residue_ids = differing_residue_ids.union(set(self.differing_residue_ids[(pdb_name, other_pdb)]))
-
-        return sorted(differing_residue_ids)
+    # Private functions
 
 
     def _map_residues(self):
-        '''For each pair of PDB files, match the residues of the first chain to the residues of the second chain.'''
+        '''For each pair of PDB files, match the residues of the first chain to the residues of the second chain.
+
+            Note: we do a lot of repeated work here. Some of the lookups e.g. atom_sequences here could be cached.
+            If the sequences are expected to be similar of have lots of repeats, we could use a list of unique sequences
+            as equivalence class representatives and then duplicate the matching for the other equivalent sequences.'''
 
         pdbs = self.pdbs
         pdb_names = self.pdb_names
@@ -435,50 +478,85 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 residue_id_mapping = {}
                 pdb1_differing_residue_ids = []
                 pdb2_differing_residue_ids = []
-                for pdb1_chain, pdb2_chain in self.mapping[mapping_key].iteritems():
+
+                for pdb1_chain, pdb2_chains in self.get_chain_mapping(mapping_key[0], mapping_key[1]).iteritems():
+                #for pdb1_chain, pdb2_chain in self.chain_mapping[mapping_key].iteritems():
+
                     residue_id_mapping[pdb1_chain] = {}
-
-                    # Get the mapping between the sequences
-                    # Note: sequences and mappings are 1-based following the UniProt convention
-                    sa = SequenceAligner()
                     pdb1_sequence = pdb1.atom_sequences[pdb1_chain]
-                    pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
-                    sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
-                    sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
-                    mapping, match_mapping = sa.get_residue_mapping()
+                    for pdb2_chain in pdb2_chains:
+                        # Get the mapping between the sequences
+                        # Note: sequences and mappings are 1-based following the UniProt convention
+                        sa = SequenceAligner()
+                        pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
+                        sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
+                        sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
+                        mapping, match_mapping = sa.get_residue_mapping()
 
-                    for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
-                        pdb1_residue_id = pdb1_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
-                        pdb2_residue_id = pdb2_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
-                        residue_id_mapping[pdb1_chain][pdb1_residue_id] = pdb2_residue_id
+                        for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
+                            pdb1_residue_id = pdb1_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
+                            pdb2_residue_id = pdb2_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
 
-                    # Determine which residues of each sequence differ between the sequences
-                    # We ignore leading and trailing residues from both sequences
-                    pdb1_residue_indices = mapping.keys()
-                    pdb2_residue_indices = mapping.values()
-                    differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
-                    differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
-                    for pdb1_residue_index, match_details in match_mapping.iteritems():
-                        if match_details.clustal == 1:
-                            # the residues matched
-                            differing_pdb1_indices.remove(pdb1_residue_index)
-                            differing_pdb2_indices.remove(mapping[pdb1_residue_index])
+                            # We store a list of corresponding residues i.e. if pdb1_chain matches pdb2_chain_1 and pdb2_chain_2
+                            # then we may map a residue in pdb1_chain to a residue in each of those chains
+                            residue_id_mapping[pdb1_chain][pdb1_residue_id] = residue_id_mapping[pdb1_chain].get(pdb1_residue_id, [])
+                            residue_id_mapping[pdb1_chain][pdb1_residue_id].append(pdb2_residue_id)
 
-                    # Convert the different sequence indices into PDB residue IDs
-                    for idx in differing_pdb1_indices:
-                        pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
-                    for idx in differing_pdb2_indices:
-                        pdb2_differing_residue_ids.append(pdb2_sequence.order[idx - 1])
+                        # Determine which residues of each sequence differ between the sequences
+                        # We ignore leading and trailing residues from both sequences
+                        pdb1_residue_indices = mapping.keys()
+                        pdb2_residue_indices = mapping.values()
+                        differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
+                        differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
+                        for pdb1_residue_index, match_details in match_mapping.iteritems():
+                            if match_details.clustal == 1:
+                                # The residues matched
+                                differing_pdb1_indices.remove(pdb1_residue_index)
+                                differing_pdb2_indices.remove(mapping[pdb1_residue_index])
+
+                        # Convert the different sequence indices into PDB residue IDs
+                        for idx in differing_pdb1_indices:
+                            pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
+                        for idx in differing_pdb2_indices:
+                            pdb2_differing_residue_ids.append(pdb2_sequence.order[idx - 1])
 
                 self.residue_id_mapping[mapping_key] = residue_id_mapping
                 self.differing_residue_ids[mapping_key] = pdb1_differing_residue_ids
                 self.differing_residue_ids[reverse_mapping_key] = pdb2_differing_residue_ids
 
+        for k, v in sorted(self.differing_residue_ids.iteritems()):
+            self.differing_residue_ids[k] = sorted(set(v)) # the list of residues may not be unique in general so we make it unique here
+
+
+    # Public functions
+
+
+    def get_chain_mapping(self, pdb_name1, pdb_name2):
+        '''This replaces the old mapping member by constructing it from self.chain_mapping. This function returns a mapping from
+        chain IDs in pdb_name1 to chain IDs in pdb_name2.'''
+        d = {}
+        for pdb1_chain_id, matched_chain_list in self.chain_mapping[(pdb_name1, pdb_name2)].iteritems():
+            d[pdb1_chain_id] = matched_chain_list.get_related_chains_ids(pdb_name2)
+        return d
+
+
+    def get_differing_residue_ids(self, pdb_name, pdb_list):
+        '''Returns a list of residues in pdb_name which differ from the pdbs corresponding to the names in pdb_list.'''
+
+        assert(pdb_name in self.pdb_names)
+        assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list)) # the names in pdb_list must be in pdb_names
+
+        differing_residue_ids = set()
+        for other_pdb in pdb_list:
+            differing_residue_ids = differing_residue_ids.union(set(self.differing_residue_ids[(pdb_name, other_pdb)]))
+
+        return sorted(differing_residue_ids)
+
 
     def get_sequence_alignment_strings(self, pdb_list, reversed = True, width = 80, line_separator = '\n'):
         '''Takes a list of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
             Using the first element of this list as a base, get the sequence alignments with chains in other members
-            of the list. For simplicity, if a chain in the first PDB  matches multiple chains in another PDB, we only
+            of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
             return the alignment for one of the chains.
 
             Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
@@ -491,7 +569,6 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         primary_pdb_name = pdb_list[0]
         primary_pdb_chains = sorted(primary_pdb.chain_atoms.keys())
 
-
         alignment_strings = []
         for primary_pdb_chain in primary_pdb_chains:
 
@@ -503,8 +580,11 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
 
             for other_pdb_name in pdb_list[1:]:
                 other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
-                other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
-                if other_chain: # todo: assuming that one chain maps to at most one chain here which is not generally true
+
+                other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
+                #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                if other_chains:
+                    other_chain = sorted(other_chains)[0]
                     other_pdb_sequence = other_pdb.atom_sequences[other_chain]
                     sa.add_sequence('%s:%s' % (other_pdb_name, other_chain), str(other_pdb_sequence))
 
@@ -519,7 +599,9 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 sequence_names.append('%s:%s' % (primary_pdb_name, primary_pdb_chain))
                 sequences.append(sa._get_alignment_lines()['%s:%s' % (primary_pdb_name, primary_pdb_chain)])
                 for other_pdb_name in pdb_list[1:]:
-                    other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                    #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                    other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
+                    other_chain = sorted(other_chains)[0]
                     sequence_names.append('%s:%s' % (other_pdb_name, other_chain))
                     sequences.append(sa._get_alignment_lines()['%s:%s' % (other_pdb_name, other_chain)])
 
@@ -596,6 +678,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
 class ScaffoldModelChainMapper(PDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
     def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0):
+        raise Exception('Rewrite this class to use PipelinePDBChainMapper.')
         self.model_pdb = model_pdb
         self.scaffold_pdb = scaffold_pdb
         super(ScaffoldModelChainMapper, self).__init__(model_pdb, 'Model', scaffold_pdb, 'Scaffold', cut_off)
@@ -685,21 +768,12 @@ if __name__ == '__main__':
 
     from rcsb import retrieve_pdb
 
-    colortext.message('match_best_pdb_chains: 3MW0 -> 1BN1')
-    print(match_best_pdb_chains(PDB(retrieve_pdb('3MWO')), '3MWO', PDB(retrieve_pdb('1BN1')), '1BN1', cut_off = 60.0))
-
-    colortext.warning('match_best_pdb_chains: 1BN1 -> 3MW0')
-    print(match_best_pdb_chains(PDB(retrieve_pdb('1BN1')), '1BN1', PDB(retrieve_pdb('3MWO')), '3MWO', cut_off = 60.0))
-
     colortext.message('match_pdb_chains: 3MW0 -> 1BN1')
     print(match_pdb_chains(PDB(retrieve_pdb('3MWO')), '3MWO', PDB(retrieve_pdb('1BN1')), '1BN1', cut_off = 60.0, allow_multiple_matches = True))
 
     colortext.warning('match_pdb_chains: 1BN1 -> 3MW0')
     print(match_pdb_chains(PDB(retrieve_pdb('1BN1')), '1BN1', PDB(retrieve_pdb('3MWO')), '3MWO', cut_off = 60.0, allow_multiple_matches = True))
 
-
-
-    sys.exit(0)
     if False:
         # Example of how to create a mapper from file paths
         chain_mapper = ScaffoldModelChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
@@ -707,33 +781,26 @@ if __name__ == '__main__':
         # Example of how to create a mapper from file contents
         chain_mapper = ScaffoldModelChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
 
-        # Example of how to create a mapper from file contents
-        chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
+        # 3MWO -> 1BN1 test case (3MWO:A and 3MWO:B map to 1BN1:A)
+        chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
 
+    # Example of how to create a mapper from file contents
+    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
 
-    # 3MWO -> 1BN1 test case (3MWO:A and 3MWO:B map to 1BN1:A)
-    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
-
-    colortext.message('''chain_mapper.get_differing_residue_ids('Design', ['Scaffold'])''')
+    colortext.message('''chain_mapper.get_differing_residue_ids('Design', ['Model', 'Scaffold'])''')
     print(chain_mapper.get_differing_residue_ids('Design', ['Model', 'Scaffold']))
 
-    colortext.message('''\nchain_mapper.mapping''')
-    print(chain_mapper.mapping)
+    colortext.message('''chain_mapper.get_differing_model_residue_ids()''')
+    print(chain_mapper.get_differing_model_residue_ids())
 
-    colortext.message('''\nchain_mapper.mapping_percentage_identity''')
-    print(chain_mapper.mapping_percentage_identity)
+    colortext.message('''chain_mapper.get_differing_scaffold_residue_ids()''')
+    print(chain_mapper.get_differing_scaffold_residue_ids())
+
+    colortext.message('''\nchain_mapper.chain_mapping''')
+    print(chain_mapper.chain_mapping)
 
     colortext.message('''\nresidue_id_mapping''')
     print(chain_mapper.residue_id_mapping)
-    sys.exit(0)
-    print(chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'Design']))
-
-    print(chain_mapper.mapping)
-    print(chain_mapper.mapping_percentage_identity)
-    print(chain_mapper.residue_id_mapping)
-
-    print(chain_mapper.get_differing_model_residue_ids())
-    print(chain_mapper.get_differing_scaffold_residue_ids())
 
     # Example of how to get residue -> residue mapping
     for chain_id, mapping in sorted(chain_mapper.residue_id_mapping.iteritems()):
