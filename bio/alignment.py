@@ -361,13 +361,13 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
        respective chain in pdb_name1 based on sequence alignment. It can also be used to return the percentage identities
        for this alignment. The old mapping and mapping_percentage_identity members of this class can be built from this member
        e.g.
-            self.mapping[('Scaffold', 'Design')] == self.get_chain_mapping('Scaffold', 'Design')
+            self.mapping[('Scaffold', 'ExpStructure')] == self.get_chain_mapping('Scaffold', 'ExpStructure')
 
        The 'residue_id_mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to a mapping
             chains_of_pdb_name_1 -> residues of that chain -> list of corresponding residues in the corresponding chain of pdb_name2
-       For example, using the homodimer 3MW0 for both Scaffold and Design:
-        residue_id_mapping[('Scaffold', 'Design')]['A'] -> {'A 167 ': ['A 167 ', 'B 167 '], ...}
-        residue_id_mapping[('Scaffold', 'Design')]['B'] -> {'B 167 ': ['A 167 ', 'B 167 '], ...}
+       For example, using the homodimer 3MW0 for both Scaffold and ExpStructure:
+        residue_id_mapping[('Scaffold', 'ExpStructure')]['A'] -> {'A 167 ': ['A 167 ', 'B 167 '], ...}
+        residue_id_mapping[('Scaffold', 'ExpStructure')]['B'] -> {'B 167 ': ['A 167 ', 'B 167 '], ...}
 
        Objects of this class have a differing_residue_ids mapping which maps the pair (pdb_name1, pdb_name2) to the list
        of residues *in pdb_name1* that differ from those of pdb_name2. Note: there is some subtlety here in terms of
@@ -375,21 +375,21 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
        with identical sequence as the model. We mutate A110 in 1BN1. We then take 3MWO with a mutation on A106 as the design.
          chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
        differing_residue_ids then looks like this:
-         ('Model', 'Design') = ['A 106 ', 'A 110 '] # In Model, A110 is a mutation, reverted in Design. In Design, A106 is a mutation.
+         ('Model', 'ExpStructure') = ['A 106 ', 'A 110 '] # In Model, A110 is a mutation, reverted in ExpStructure. In ExpStructure, A106 is a mutation.
          ('Model', 'Scaffold') = ['A 110 '] # In Model, A110 is a mutation.
 
-         ('Design', 'Model') =  ['A 106 ', 'A 110 ', 'B 110 '] # In Design, A106 is a mutation. A110 and B110 are revertant mutations from the Model.
-         ('Design', 'Scaffold') = ['A 106 '] # In Design, A106 is a mutation.
+         ('ExpStructure', 'Model') =  ['A 106 ', 'A 110 ', 'B 110 '] # In ExpStructure, A106 is a mutation. A110 and B110 are revertant mutations from the Model.
+         ('ExpStructure', 'Scaffold') = ['A 106 '] # In ExpStructure, A106 is a mutation.
 
-         ('Scaffold', 'Design') = ['A 106 ', 'B 106 '] # Note: In Scaffold, A106 is the wildtype which was mutated in Design. Since B106 also maps to A106, that is added to the list of differing residues.
+         ('Scaffold', 'ExpStructure') = ['A 106 ', 'B 106 '] # Note: In Scaffold, A106 is the wildtype which was mutated in ExpStructure. Since B106 also maps to A106, that is added to the list of differing residues.
          ('Scaffold', 'Model') = ['A 110 ', 'B 110 '] # In Scaffold, A110 and B110 are the wildtypes which was mutated in Model.
-       There is a subtlety here - the differing residue ids from Scaffold to Design are A106 and B106 corresponding to the
-       mutated A106 in the Design. However, the differing residue ids from Design to Scaffold has only one member - A106. This
+       There is a subtlety here - the differing residue ids from Scaffold to ExpStructure are A106 and B106 corresponding to the
+       mutated A106 in the ExpStructure. However, the differing residue ids from ExpStructure to Scaffold has only one member - A106. This
        makes sense as it is the only mutation however this may not be the desired behavior - one may wish instead to close
        the list of residues over the relations mapping the residues between the structures i.e. to generate an equivalence
-       relation from the relation described by the mappings Scaffold->Design and Design->Scaffold. If that were done, then
-       ('Design', 'Scaffold') would be ['A 106 ', 'B 106 '] as Design:A106 -> {Scaffold:A106, Scaffold:B106} and
-       Scaffold:B106 -> {Design:A106, Design:B106} so Design:A106 and Design:B106 are in the same equivalence class.
+       relation from the relation described by the mappings Scaffold->ExpStructure and ExpStructure->Scaffold. If that were done, then
+       ('ExpStructure', 'Scaffold') would be ['A 106 ', 'B 106 '] as ExpStructure:A106 -> {Scaffold:A106, Scaffold:B106} and
+       Scaffold:B106 -> {ExpStructure:A106, ExpStructure:B106} so ExpStructure:A106 and ExpStructure:B106 are in the same equivalence class.
        '''
 
     # Constructors
@@ -710,7 +710,7 @@ class ScaffoldModelChainMapper(PDBChainMapper):
         ]
 
         if design_pdb:
-            structures_list.append(('Design', design_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
+            structures_list.append(('ExpStructure', design_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
 
         PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
         return PSE_files[0]
@@ -722,7 +722,7 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
         self.design_pdb = design_pdb
-        super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'Design'], cut_off)
+        super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'ExpStructure'], cut_off)
 
     @staticmethod
     def from_file_paths(scaffold_pdb_path, model_pdb_path, design_pdb_path, cut_off = 60.0):
@@ -739,13 +739,13 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
         return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
 
     def get_differing_model_residue_ids(self):
-        return self.get_differing_residue_ids('Model', ['Scaffold', 'Design'])
+        return self.get_differing_residue_ids('Model', ['Scaffold', 'ExpStructure'])
 
     def get_differing_scaffold_residue_ids(self):
-        return self.get_differing_residue_ids('Scaffold', ['Model', 'Design'])
+        return self.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure'])
 
     def get_differing_design_residue_ids(self):
-        return self.get_differing_residue_ids('Design', ['Scaffold', 'Model'])
+        return self.get_differing_residue_ids('ExpStructure', ['Scaffold', 'Model'])
 
     def generate_pymol_session(self, pymol_executable = 'pymol', settings = {}):
         ''' Generates the PyMOL session for the scaffold, model, and design structures.
@@ -755,7 +755,7 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
         structures_list = [
             ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
             ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
-            ('Design', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
+            ('ExpStructure', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
         ]
 
         PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
@@ -787,8 +787,8 @@ if __name__ == '__main__':
     # Example of how to create a mapper from file contents
     chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
 
-    colortext.message('''chain_mapper.get_differing_residue_ids('Design', ['Model', 'Scaffold'])''')
-    print(chain_mapper.get_differing_residue_ids('Design', ['Model', 'Scaffold']))
+    colortext.message('''chain_mapper.get_differing_residue_ids('ExpStructure', ['Model', 'Scaffold'])''')
+    print(chain_mapper.get_differing_residue_ids('ExpStructure', ['Model', 'Scaffold']))
 
     colortext.message('''chain_mapper.get_differing_model_residue_ids()''')
     print(chain_mapper.get_differing_model_residue_ids())
@@ -817,11 +817,11 @@ if __name__ == '__main__':
 
     # Example of how to print out a plaintext sequence alignment
     colortext.warning('Sequence alignment - plain formatting, width = 120.')
-    print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(['Model', 'Scaffold', 'Design'], width = 120)))
+    print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(['Model', 'Scaffold', 'ExpStructure'], width = 120)))
 
     # Example of how to print out a HTML formatted alignment. This output would require CSS for an appropriate presentation.
     colortext.warning('Sequence alignment - HTML formatting, width = 100.')
-    colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(['Model', 'Scaffold', 'Design'], width = 100))
+    colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(['Model', 'Scaffold', 'ExpStructure'], width = 100))
 
     # Example of how to generate a PyMOL session
     PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})

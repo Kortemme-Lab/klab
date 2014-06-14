@@ -18,22 +18,22 @@ class ScaffoldModelDesignBuilder(PyMOLSessionBuilder):
         super(ScaffoldModelDesignBuilder, self).__init__(pdb_containers, settings, rootdir)
         self.Scaffold = pdb_containers['Scaffold']
         self.Model = pdb_containers['Model']
-        self.Design = pdb_containers.get('Design')
+        self.ExpStructure = pdb_containers.get('ExpStructure')
 
     def _create_input_files(self):
         #colortext.message('self.outdir: ' + self.outdir)
         write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
         write_file(self._filepath('model.pdb'), self.Model.pdb_contents)
-        if self.Design:
-            write_file(self._filepath('design.pdb'), self.Design.pdb_contents)
+        if self.ExpStructure:
+            write_file(self._filepath('design.pdb'), self.ExpStructure.pdb_contents)
 
     def _add_preamble(self):
         self.script.append("cd %(outdir)s" % self.__dict__)
 
     def _add_load_section(self):
         self.script.append("### Load the structures")
-        if self.Design:
-            self.script.append("load design.pdb, Design")
+        if self.ExpStructure:
+            self.script.append("load design.pdb, ExpStructure")
         self.script.append("load model.pdb, RosettaModel")
         self.script.append("load scaffold.pdb, Scaffold")
 
@@ -68,25 +68,22 @@ set stick_radius, 0.2
 show car, RosettaModel
 color gray, RosettaModel
 ''')
-        if self.Design:
+        if self.ExpStructure:
             self.script.append('''
-# Design display
-color forest, Design
-show car, Design
+# ExpStructure display
+color forest, ExpStructure
+show car, ExpStructure
 ''')
 
     def _add_superimposition_section(self):
         self.script.append('''
 # Superimpose the structures
 super Scaffold, RosettaModel''')
-        if self.Design:
-            self.script.append("super Design, RosettaModel")
+        if self.ExpStructure:
+            self.script.append("super ExpStructure, RosettaModel")
 
     def _add_orient_view_section(self):
-        self.script.append('''
-# Orient view
-set_view (0.750491261,   -0.332692802,   -0.570965469,  -0.572279274,    0.104703479,   -0.813287377,   0.330366731,    0.937145591,   -0.111799516,    0.000000000,    0.000000000, -129.595489502,    36.783428192,   36.119152069,   77.293815613,   112.102447510,  147.088562012,  -20.000000000 )
-''')
+        pass
 
     def _add_scaffold_view_section(self):
           self.script.append('''
@@ -130,32 +127,29 @@ color tv_yellow, RosettaModel_mutations
 if cmd.count_atoms('RosettaModel and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('RosettaModel_HETATMs', 'RosettaModel and het and !(resn CSE+SEC+MSE)'); show sticks, RosettaModel_HETATMs
 ''' % vars())
 
-        if self.Design:
-            design_selection = 'Design and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Design.residues_of_interest))
+        if self.ExpStructure:
+            exp_structure_selection = 'ExpStructure and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.ExpStructure.residues_of_interest))
             self.script.append('''
-### Design objects ###
+### ExpStructure objects ###
 
-# Design mutations
-select Design_mutations, %(design_selection)s
-create Design_mutations, %(design_selection)s
-show sticks, Design_mutations
-color violet, Design_mutations
+# ExpStructure mutations
+select ExpStructure_mutations, %(exp_structure_selection)s
+create ExpStructure_mutations, %(exp_structure_selection)s
+show sticks, ExpStructure_mutations
+color violet, ExpStructure_mutations
 
-# Design HETATMs - create and display
-if cmd.count_atoms('Design and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('Design_HETATMs', 'Design and het and !(resn CSE+SEC+MSE)'); show sticks, Design_HETATMs
+# ExpStructure HETATMs - create and display
+if cmd.count_atoms('ExpStructure and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('ExpStructure_HETATMs', 'ExpStructure and het and !(resn CSE+SEC+MSE)'); show sticks, ExpStructure_HETATMs
 ''' % vars())
 
     def _add_raytracing_section(self):
         self.script.append('''
-# Ray tracing and output
+# Atom coloring
 select none
 util.cnc
-set two_sided_lighting, on
 
-# Unused - left over from Roland's project
-heavy_chain_residues=[]
-light_chain_residues=[]
-one_letter ={"VAL":"V", "ILE":"I", "LEU":"L", "GLU":"E", "GLN":"Q", "ASP":"D", "ASN":"N", "HIS":"H", "TRP":"W", "PHE":"F", "TYR":"Y", "ARG":"R", "LYS":"K", "SER":"S", "THR":"T", "MET":"M", "ALA":"A", "GLY":"G", "PRO":"P", "CYS":"C"}
+# Set lighting
+set two_sided_lighting, on
 ''')
     def _add_postamble(self):
         self.script.append('''
@@ -166,7 +160,7 @@ zoom
 order *,yes
 order Scaffold_mutations, location=bottom
 order RosettaModel_mutations, location=bottom
-order Design_mutations, location=bottom
+order ExpStructure_mutations, location=bottom
 
 save session.pse
 quit
