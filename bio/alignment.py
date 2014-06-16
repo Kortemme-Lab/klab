@@ -125,16 +125,18 @@ class SequenceAlignmentPrinter(object):
                     s.append('%s  %s' % (header_2, seq2_sequence_str[x:x + num_residues_per_line]))
         return line_separator.join(s)
 
+
 class MultipleSequenceAlignmentPrinter(object):
     '''A generalized version of SequenceAlignmentPrinter which handles multiple sequences.'''
 
     def __init__(self, sequence_names, sequences):
-        assert(len(sequence_names) == len(sequences) and len(sequence_names) > 1)
+        assert(len(sequence_names) == len(sequences) and len(sequence_names) > 1) # The sequence names must correspond with the number of sequences and we require at least two sequences
         assert(len(set(sequence_names)) == len(sequence_names)) # sequence_names must be a list of unique names
 
         # Make sure that the sequence lengths are all the same size
         sequence_lengths = map(len, sequences)
         assert(len(set(sequence_lengths)) == 1)
+
         self.sequence_length = sequence_lengths[0]
         self.label_width = max(map(len, sequence_names))
 
@@ -144,11 +146,9 @@ class MultipleSequenceAlignmentPrinter(object):
     def to_lines(self, width = 80, reversed = False, line_separator = '\n'):
         s = []
 
-        sequences, sequence_names = None, None
+        sequences, sequence_names = self.sequences, self.sequence_names
         if reversed:
             sequences, sequence_names = self.sequences[::-1], self.sequence_names[::-1]
-        else:
-            sequences, sequence_names = self.sequences, self.sequence_names
 
         if self.label_width + 2 < width:
 
@@ -159,167 +159,77 @@ class MultipleSequenceAlignmentPrinter(object):
             for x in range(0, self.sequence_length, num_residues_per_line):
                 for y in range(len(sequence_strs)):
                     s.append('%s  %s' % (headers[y], sequence_strs[y][x:x + num_residues_per_line]))
+        else:
+            raise Exception('The width (%d characters) is not large enough to display the sequence alignment.' % width)
 
         return line_separator.join(s)
+
+
+    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = ':'):
+        html = []
+        html.append('<div class="chain_alignment">')
+
+        sequences, sequence_names = self.sequences, self.sequence_names
+        if reversed:
+            sequences, sequence_names = self.sequences[::-1], self.sequence_names[::-1]
+
+        if self.label_width + 2 < width:
+            # headers is a list of pairs split by header_separator. If header_separator is not specified then the
+            # second element will be an empty string
+            if header_separator:
+                headers = [sequence_name.split(header_separator) for sequence_name in sequence_names]
+            else:
+                headers = [[sequence_name, ''] for sequence_name in sequence_names]
+
+            num_residues_per_line = width - self.label_width
+            sequence_strs = map(str, sequences)
+            num_sequences = len(sequence_strs)
+
+            # x iterates over a chunk of the sequence alignment
+            for x in range(0, self.sequence_length, num_residues_per_line):
+                html.append('<div class="sequence_block">')
+
+                # Create a list, subsequence_list, where each entry corresponds to the chunk of the sequence alignment for each sequenec
+                subsequence_list = []
+                residue_substrings = []
+                for y in range(num_sequences):
+                    subsequence_list.append(self.sequences[y][x:x+num_residues_per_line])
+                    residue_substrings.append([])
+
+                # check that the subsequences are the same length
+                subsequence_lengths = set(map(len, [rs for rs in subsequence_list]))
+                assert(len(subsequence_lengths) == 1)
+                subsequence_length = subsequence_lengths.pop()
+
+                # Iterate over all residues in the subsequences, marking up residues that differ
+                for z in range(subsequence_length):
+                    residues = set([subsequence_list[y][z] for y in range(num_sequences) if subsequence_list[y][z] != '-'])
+
+                    if len(residues) == 1:
+                        # all residues are the same
+                        for y in range(num_sequences):
+                            residue_substrings[y].append(subsequence_list[y][z])
+                    else:
+                        # The residues differ - mark up the
+                        for y in range(num_sequences):
+                            residue_substrings[y].append('<dd>%s</dd>' % subsequence_list[y][z])
+
+                for y in range(num_sequences):
+                    html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (headers[y][0], headers[y][0], headers[y][1], ''.join(residue_substrings[y])))
+
+                html.append('</div>') # sequence_block
+        else:
+            raise Exception('The width (%d characters) is not large enough to display the sequence alignment.' % width)
+
+        html.append('</div>')
+        return '\n'.join(html)
+
 
 class BasePDBChainMapper(object):
     def get_sequence_alignment_strings(self, reversed = True, width = 80, line_separator = '\n'):
         raise Exception('Implement this function.')
     def get_sequence_alignment_strings_as_html(self, reversed = True, width = 80, line_separator = '\n'):
         raise Exception('Implement this function.')
-
-class PDBChainMapper(BasePDBChainMapper):
-    '''Uses the match_pdb_chains function to map the chains of pdb1 to the chains of pdb2. The mapping member stores
-        the mapping between chains when a mapping is found. The mapping_percentage_identity member stores how close the
-        mapping was in terms of percentage identity.
-    '''
-    def __init__(self, pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0):
-        raise Exception('Deprecate this class in favor of PipelinePDBChainMapper.')
-        self.pdb1 = pdb1
-        self.pdb2 = pdb2
-        self.pdb1_name = pdb1_name
-        self.pdb2_name = pdb2_name
-        self.mapping = {}
-        self.mapping_percentage_identity = {}
-
-        # Match each chain in pdb1 to its best match in pdb2
-        self.chain_matches = match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
-        for k, v in self.chain_matches.iteritems():
-            if v:
-                self.mapping[k] = v[0]
-                self.mapping_percentage_identity[k] = v[1]
-
-        self.pdb1_differing_residue_ids = []
-        self.pdb2_differing_residue_ids = []
-        self.residue_id_mapping = {}
-        self._map_residues()
-
-    @staticmethod
-    def from_file_paths(pdb1_path, pdb1_name, pdb2_path, pdb2_name, cut_off = 60.0):
-        pdb1 = PDB.from_filepath(pdb1_path)
-        pdb2 = PDB.from_filepath(pdb2_path)
-        return PDBChainMapper(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off)
-
-    def _map_residues(self):
-        '''
-        '''
-        pdb1 = self.pdb1
-        pdb2 = self.pdb2
-        pdb1_name = self.pdb1_name
-        pdb2_name = self.pdb2_name
-        residue_id_mapping = {}
-        pdb1_differing_residue_ids = []
-        pdb2_differing_residue_ids = []
-        for pdb1_chain, pdb2_chain in self.mapping.iteritems():
-            residue_id_mapping[pdb1_chain] = {}
-
-            # Get the mapping between the sequences
-            # Note: sequences and mappings are 1-based following the UniProt convention
-            sa = SequenceAligner()
-            pdb1_sequence = pdb1.atom_sequences[pdb1_chain]
-            pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
-            sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
-            sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
-            mapping, match_mapping = sa.get_residue_mapping()
-
-            for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
-                pdb1_residue_id = pdb1_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
-                pdb2_residue_id = pdb2_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
-                residue_id_mapping[pdb1_chain][pdb1_residue_id] = pdb2_residue_id
-
-            # Determine which residues of each sequence differ between the sequences
-            # We ignore leading and trailing residues from both sequences
-            pdb1_residue_indices = mapping.keys()
-            pdb2_residue_indices = mapping.values()
-            differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
-            differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
-            for pdb1_residue_index, match_details in match_mapping.iteritems():
-                if match_details.clustal == 1:
-                    # the residues matched
-                    differing_pdb1_indices.remove(pdb1_residue_index)
-                    differing_pdb2_indices.remove(mapping[pdb1_residue_index])
-
-            # Convert the different sequence indices into PDB residue IDs
-            for idx in differing_pdb1_indices:
-                pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
-            for idx in differing_pdb2_indices:
-                pdb2_differing_residue_ids.append(pdb2_sequence.order[idx - 1])
-
-        self.residue_id_mapping = residue_id_mapping
-        self.pdb1_differing_residue_ids = sorted(pdb1_differing_residue_ids)
-        self.pdb2_differing_residue_ids = sorted(pdb2_differing_residue_ids)
-
-    def get_sequence_alignment_strings(self, reversed = True, width = 80, line_separator = '\n'):
-        '''Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
-        specified width, separated by the specified line separator.'''
-        pdb1 = self.pdb1
-        pdb2 = self.pdb2
-        pdb1_name = self.pdb1_name
-        pdb2_name = self.pdb2_name
-        alignment_strings = []
-        for pdb1_chain, pdb2_chain in sorted(self.mapping.iteritems()):
-            sa = SequenceAligner()
-            pdb1_sequence = pdb1.atom_sequences[pdb1_chain]
-            pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
-            sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
-            sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
-            sa.align()
-
-            pdb1_alignment_str = sa._get_alignment_lines()['%s:%s' % (pdb1_name, pdb1_chain)]
-            pdb2_alignment_str = sa._get_alignment_lines()['%s:%s' % (pdb2_name, pdb2_chain)]
-
-            sap = SequenceAlignmentPrinter('%s:%s' % (pdb1_name, pdb1_chain), pdb1_alignment_str, '%s:%s' % (pdb2_name, pdb2_chain), pdb2_alignment_str)
-            alignment_strings.append(sap.to_lines(reversed = reversed, width = width, line_separator = line_separator))
-
-        return alignment_strings
-
-    def get_sequence_alignment_strings_as_html(self, reversed = True, width = 80, line_separator = '\n'):
-        alignment_strings = self.get_sequence_alignment_strings(reversed = reversed, width = width)
-        html = []
-        for alignment_string in alignment_strings:
-            lines = alignment_string.split('\n')
-
-            alignment_tokens = []
-            for line in lines:
-                tokens = line.split()
-                assert(len(tokens) == 2)
-                label_tokens = tokens[0].split(':')
-                #alignment_html.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
-                #alignment_tokens.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
-                alignment_tokens.append([label_tokens[0], label_tokens[1], tokens[1]])
-
-            if len(alignment_tokens) % 2 == 0:
-                passed = True
-                for x in range(0, len(alignment_tokens), 2):
-                    if alignment_tokens[x][0] != 'Scaffold':
-                        passed = False
-                    if alignment_tokens[x+1][0] != 'Model':
-                        passed = False
-                for x in range(0, len(alignment_tokens), 2):
-                    scaffold_residues = alignment_tokens[x][2]
-                    model_residues = alignment_tokens[x+1][2]
-                    if passed and (len(scaffold_residues) == len(model_residues)):
-                        new_scaffold_string = []
-                        new_model_string = []
-                        for y in range(len(scaffold_residues)):
-                            if scaffold_residues[y] == model_residues[y]:
-                                new_scaffold_string.append(scaffold_residues[y])
-                                new_model_string.append(model_residues[y])
-                            else:
-                                new_scaffold_string.append('<dd>%s</dd>' % scaffold_residues[y])
-                                new_model_string.append('<dd>%s</dd>' % model_residues[y])
-                        alignment_tokens[x][2] = ''.join(new_scaffold_string)
-                        alignment_tokens[x+1][2] = ''.join(new_model_string)
-
-
-            for trpl in alignment_tokens:
-                html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (trpl[0], trpl[0], trpl[1], trpl[2]))
-
-            html.append('<div class="sequence_alignment_chain_separator"></div>')
-
-        if html:
-            html.pop() # remove the last chain separator div
-        return '\n'.join(html)
 
 
 class MatchedChainList(object):
@@ -351,8 +261,8 @@ class MatchedChainList(object):
 
 
 class PipelinePDBChainMapper(BasePDBChainMapper):
-    '''Similar to PDBChainMapper except this takes a list of PDB files which should be related in some way. The matching
-       is done pointwise, matching all PDBs in the list to each other.
+    '''Similar to the removed PDBChainMapper class except this takes a list of PDB files which should be related in some way.
+       The matching is done pointwise, matching all PDBs in the list to each other.
        This class is useful for a list of structures that are the result of a linear pipeline e.g. a scaffold structure (RCSB),
        a model structure (Rosetta), and a design structure (experimental result).
 
@@ -449,7 +359,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                         mcl = MatchedChainList(pdb2_name, pdb2_chain_id)
                         for l in list_of_matches:
                             mcl.add_chain(pdb1_name, l[0], l[1])
-                    self.chain_mapping[mapping_key][pdb2_chain_id] = mcl
+                        self.chain_mapping[mapping_key][pdb2_chain_id] = mcl
 
         self.residue_id_mapping = {}
         self._map_residues()
@@ -527,7 +437,6 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         for k, v in sorted(self.differing_residue_ids.iteritems()):
             self.differing_residue_ids[k] = sorted(set(v)) # the list of residues may not be unique in general so we make it unique here
 
-
     # Public functions
 
 
@@ -553,14 +462,18 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         return sorted(differing_residue_ids)
 
 
-    def get_sequence_alignment_strings(self, pdb_list, reversed = True, width = 80, line_separator = '\n'):
-        '''Takes a list of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+    def get_sequence_alignment_printer_objects(self, pdb_list = [], reversed = True, width = 80, line_separator = '\n'):
+        '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
             Using the first element of this list as a base, get the sequence alignments with chains in other members
             of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
-            return the alignment for one of the chains.
+            return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
+            members.
 
-            Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
-            specified width, separated by the specified line separator.'''
+            Returns a list of tuples (chain_id, sequence_alignment_printer_object). Each sequence_alignment_printer_object
+            can be used to generate a printable version of the sequence alignment. '''
+
+        if not pdb_list:
+            pdb_list = self.pdb_names
 
         assert(len(set(pdb_list)) == len(pdb_list) and (len(pdb_list) > 1))
         assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list))
@@ -569,7 +482,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         primary_pdb_name = pdb_list[0]
         primary_pdb_chains = sorted(primary_pdb.chain_atoms.keys())
 
-        alignment_strings = []
+        sequence_alignment_printer_objects = []
         for primary_pdb_chain in primary_pdb_chains:
 
             sa = SequenceAligner()
@@ -606,88 +519,62 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                     sequences.append(sa._get_alignment_lines()['%s:%s' % (other_pdb_name, other_chain)])
 
                 sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences)
-                alignment_strings.append(sap.to_lines(reversed = reversed, width = width, line_separator = line_separator))
+                sequence_alignment_printer_objects.append((primary_pdb_chain, sap))
+
+        return sequence_alignment_printer_objects
+
+
+    def get_sequence_alignment_strings(self, pdb_list = [], reversed = True, width = 80, line_separator = '\n'):
+        '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+            Using the first element of this list as a base, get the sequence alignments with chains in other members
+            of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
+            return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
+            members.
+
+            Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
+            specified width, separated by the specified line separator.'''
+
+        sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
+        alignment_strings = []
+        for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
+            primary_pdb_chain = sequence_alignment_printer_tuple[0]
+            sap = sequence_alignment_printer_tuple[1]
+            alignment_strings.append(sap.to_lines(reversed = reversed, width = width, line_separator = line_separator))
 
         return alignment_strings
 
-    def get_sequence_alignment_strings_as_html(self, pdb_list, reversed = True, width = 80, line_separator = '\n'):
-        alignment_strings = self.get_sequence_alignment_strings(pdb_list, reversed = reversed, width = width)
+
+    def get_sequence_alignment_strings_as_html(self, pdb_list = [], reversed = False, width = 80, line_separator = '\n'):
+        '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+            Using the first element of this list as a base, get the sequence alignments with chains in other members
+            of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
+            return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
+            members.
+
+            Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
+            specified width, separated by the specified line separator.'''
+
+        sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
         html = []
-        for alignment_string in alignment_strings:
-            lines = alignment_string.split('\n')
+        for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
+            primary_pdb_chain = sequence_alignment_printer_tuple[0]
+            sap = sequence_alignment_printer_tuple[1]
+            html.extend(sap.to_html(reversed = reversed, width = width, line_separator = line_separator))
 
-            alignment_tokens = []
-            for line in lines:
-                tokens = line.split()
-                assert(len(tokens) == 2)
-                label_tokens = tokens[0].split(':')
-                #alignment_html.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
-                #alignment_tokens.append('<div class="sequence_alignment_line"><span>%s</span><span>%s</span><span>%s</span></div>' % (label_tokens[0], label_tokens[1], tokens[1]))
-                alignment_tokens.append([label_tokens[0], label_tokens[1], tokens[1]])
+        return html
 
-            if reversed:
-                pdb_list = pdb_list[::-1]
-
-            if len(alignment_tokens) % len(pdb_list) == 0:
-
-                passed = True
-                for x in range(0, len(alignment_tokens), len(pdb_list)):
-                    for y in range(0, len(pdb_list)):
-                        if alignment_tokens[x + y][0] != pdb_list[y]:
-                            passed = False
-
-                for x in range(0, len(alignment_tokens), len(pdb_list)):
-
-                    residue_sublist = []
-                    for y in range(0, len(pdb_list)):
-                        residue_sublist.append(alignment_tokens[x + y][2])
-
-                    #scaffold_residues = alignment_tokens[x][2]
-                    #model_residues = alignment_tokens[x+1][2]
-                    if passed and (len(set(map(len, residue_sublist))) == 1): # check that the lengths of all subsequences are the same
-                        #new_scaffold_string = []
-                        #new_model_string = []
-                        residue_substrings = []
-                        for y in range(0, len(pdb_list)):
-                            residue_substrings.append([])
-
-                        for z in range(len(residue_sublist[0])):
-                            residues = set([residue_sublist[y][z] for y in range(0, len(pdb_list))])
-
-                            if len(residues) == 1:
-                                # all residues are the same
-                                for y in range(0, len(pdb_list)):
-                                    residue_substrings[y].append(residue_sublist[y][z])
-                            else:
-                                for y in range(0, len(pdb_list)):
-                                    residue_substrings[y].append('<dd>%s</dd>' % residue_sublist[y][z])
-
-                        for y in range(0, len(pdb_list)):
-                            alignment_tokens[x + y][2] = ''.join(residue_substrings[y])
-
-            for trpl in alignment_tokens:
-                html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (trpl[0], trpl[0], trpl[1], trpl[2]))
-
-            html.append('<div class="sequence_alignment_chain_separator"></div>')
-
-        if html:
-            html.pop() # remove the last chain separator div
-        return '\n'.join(html)
-
-
-class ScaffoldModelChainMapper(PDBChainMapper):
-    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure.'''
+class ScaffoldModelChainMapper(PipelinePDBChainMapper):
+    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
     def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0):
-        raise Exception('Rewrite this class to use PipelinePDBChainMapper.')
-        self.model_pdb = model_pdb
         self.scaffold_pdb = scaffold_pdb
-        super(ScaffoldModelChainMapper, self).__init__(model_pdb, 'Model', scaffold_pdb, 'Scaffold', cut_off)
+        self.model_pdb = model_pdb
+        super(ScaffoldModelChainMapper, self).__init__([scaffold_pdb, model_pdb], ['Scaffold', 'Model'], cut_off)
 
     @staticmethod
     def from_file_paths(scaffold_pdb_path, model_pdb_path, cut_off = 60.0):
         scaffold_pdb = PDB.from_filepath(scaffold_pdb_path)
         model_pdb = PDB.from_filepath(model_pdb_path)
-        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off)
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
 
     @staticmethod
     def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0):
@@ -696,12 +583,14 @@ class ScaffoldModelChainMapper(PDBChainMapper):
         return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off)
 
     def get_differing_model_residue_ids(self):
-        return self.pdb1_differing_residue_ids
+        return self.get_differing_residue_ids('Model', ['Scaffold'])
 
     def get_differing_scaffold_residue_ids(self):
-        return self.pdb2_differing_residue_ids
+        return self.get_differing_residue_ids('Scaffold', ['Model'])
 
-    def generate_pymol_session(self, design_pdb = None, pymol_executable = None, settings = {}):
+    def generate_pymol_session(self, pymol_executable = 'pymol', settings = {}):
+        ''' Generates the PyMOL session for the scaffold, model, and design structures.
+            Returns this session and the script which generated it.'''
         b = BatchBuilder(pymol_executable = pymol_executable)
 
         structures_list = [
@@ -709,11 +598,9 @@ class ScaffoldModelChainMapper(PDBChainMapper):
             ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
         ]
 
-        if design_pdb:
-            structures_list.append(('ExpStructure', design_pdb.pdb_content, self.get_differing_scaffold_residue_ids()))
-
         PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
-        return PSE_files[0]
+
+        return PSE_files[0], b.PSE_scripts[0]
 
 
 class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
