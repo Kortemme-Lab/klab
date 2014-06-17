@@ -683,9 +683,16 @@ if __name__ == '__main__':
     colortext.message('''chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure'])''')
     print(chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure']))
 
-    sys.exit(0)
     PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
     colortext.warning(PSE_script)
+    print(PSE_file)
+
+    if PSE_file:
+        print('Length of PSE file: %d' % len(PSE_file))
+        write_file('alignment_test.pse', PSE_file, ftype = 'wb')
+    else:
+        print('No PSE file was generated.')
+
     sys.exit(0)
 
     colortext.message('''chain_mapper.get_differing_model_residue_ids()''')
