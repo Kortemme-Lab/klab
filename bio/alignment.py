@@ -50,22 +50,23 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
     sa = SequenceAligner()
 
     # If these assertions do not hold we will need to fix the logic below
-    assert(pdb1_name.find(':') == -1)
-    assert(pdb2_name.find(':') == -1)
+    assert(pdb1_name.find('_') == -1)
+    assert(pdb2_name.find('_') == -1)
 
     for c in pdb1_chains:
-        sa.add_sequence('%s:%s' % (pdb1_name, c), str(pdb1.atom_sequences[c]))
+        sa.add_sequence('%s_%s' % (pdb1_name, c), str(pdb1.atom_sequences[c]))
     for c in pdb2_chains:
-        sa.add_sequence('%s:%s' % (pdb2_name, c), str(pdb2.atom_sequences[c]))
+        sa.add_sequence('%s_%s' % (pdb2_name, c), str(pdb2.atom_sequences[c]))
+
     sa.align()
 
     chain_matches = dict.fromkeys(pdb1_chains, None)
     for c in pdb1_chains:
-        best_matches_by_id = sa.get_best_matches_by_id('%s:%s' % (pdb1_name, c), cut_off = cut_off)
+        best_matches_by_id = sa.get_best_matches_by_id('%s_%s' % (pdb1_name, c), cut_off = cut_off)
         if best_matches_by_id:
             t = []
             for k, v in best_matches_by_id.iteritems():
-                if k.startswith(pdb2_name + ':'):
+                if k.startswith(pdb2_name + '_'):
                     t.append((v, k))
             if t:
                 # We may have multiple best matches here. Instead of just returning one
@@ -76,11 +77,11 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
                     chain_matches[c] = []
                     for best_match in best_matches:
                         if best_match[0] >= allowed_cutoff:
-                            chain_matches[c].append((best_match[1].split(':')[1], best_match[0]))
+                            chain_matches[c].append((best_match[1].split('_')[1], best_match[0]))
                     assert(len(chain_matches[c]) > 0)
                 else:
                     best_match = sorted(t)[0]
-                    chain_matches[c] = [(best_match[1].split(':')[1], best_match[0])]
+                    chain_matches[c] = [(best_match[1].split('_')[1], best_match[0])]
 
     return chain_matches
 
@@ -165,7 +166,7 @@ class MultipleSequenceAlignmentPrinter(object):
         return line_separator.join(s)
 
 
-    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = ':'):
+    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = '_'):
         html = []
         html.append('<div class="chain_alignment">')
 
@@ -251,10 +252,10 @@ class MatchedChainList(object):
         return [(e[2], e[0]) for e in self.chain_list if e[1] == other_pdb_id]
 
     def __repr__(self):
-        s = ['Matched chain list for %s:%s' % (self.pdb_name, self.chain_id)]
+        s = ['Matched chain list for %s_%s' % (self.pdb_name, self.chain_id)]
         if self.chain_list:
             for mtch in self.chain_list:
-                s.append('\t%s:%s at %s%%' % (mtch[1], mtch[2], mtch[0]))
+                s.append('\t%s_%s at %s%%' % (mtch[1], mtch[2], mtch[0]))
         else:
             s.append('No matches.')
         return '\n'.join(s)
@@ -337,9 +338,10 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 self.differing_residue_ids[mapping_key] = {}
 
                 # To allow for X cases, we allow the matcher to return multiple matches
-                # An artificial example X case would be 3MWO -> 1BN1 -> 3MWO where 3MWO:A and 3MWO:B both map to 1BN1:A
-                # In this case, we would like 1BN1:A to map to both 3MWO:A and 3MWO:B.
+                # An artificial example X case would be 3MWO -> 1BN1 -> 3MWO where 3MWO_A and 3MWO_B both map to 1BN1_A
+                # In this case, we would like 1BN1_A to map to both 3MWO_A and 3MWO_B.
                 chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0)
+
                 for pdb1_chain_id, list_of_matches in chain_matches.iteritems():
                     if list_of_matches:
                         mcl = MatchedChainList(pdb1_name, pdb1_chain_id)
@@ -401,8 +403,8 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                         sa = SequenceAligner()
                         pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
 
-                        sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
-                        sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
+                        sa.add_sequence('%s_%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
+                        sa.add_sequence('%s_%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
                         mapping, match_mapping = sa.get_residue_mapping()
 
                         for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
@@ -490,7 +492,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
 
             # Add the primary PDB's sequence for the chain
             primary_pdb_sequence = primary_pdb.atom_sequences[primary_pdb_chain]
-            sa.add_sequence('%s:%s' % (primary_pdb_name, primary_pdb_chain), str(primary_pdb_sequence))
+            sa.add_sequence('%s_%s' % (primary_pdb_name, primary_pdb_chain), str(primary_pdb_sequence))
 
             for other_pdb_name in pdb_list[1:]:
                 other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
@@ -500,7 +502,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 if other_chains:
                     other_chain = sorted(other_chains)[0]
                     other_pdb_sequence = other_pdb.atom_sequences[other_chain]
-                    sa.add_sequence('%s:%s' % (other_pdb_name, other_chain), str(other_pdb_sequence))
+                    sa.add_sequence('%s_%s' % (other_pdb_name, other_chain), str(other_pdb_sequence))
 
             if len(sa.records) > 1:
                 # If there are no corresponding sequences in any other PDB, do not return the non-alignment
@@ -510,14 +512,14 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 #pdb2_alignment_str = sa._get_alignment_lines()['%s:%s' % (pdb2_name, pdb2_chain)]
 
                 sequence_names, sequences = [], []
-                sequence_names.append('%s:%s' % (primary_pdb_name, primary_pdb_chain))
-                sequences.append(sa._get_alignment_lines()['%s:%s' % (primary_pdb_name, primary_pdb_chain)])
+                sequence_names.append('%s_%s' % (primary_pdb_name, primary_pdb_chain))
+                sequences.append(sa._get_alignment_lines()['%s_%s' % (primary_pdb_name, primary_pdb_chain)])
                 for other_pdb_name in pdb_list[1:]:
                     #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
                     other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
                     other_chain = sorted(other_chains)[0]
-                    sequence_names.append('%s:%s' % (other_pdb_name, other_chain))
-                    sequences.append(sa._get_alignment_lines()['%s:%s' % (other_pdb_name, other_chain)])
+                    sequence_names.append('%s_%s' % (other_pdb_name, other_chain))
+                    sequences.append(sa._get_alignment_lines()['%s_%s' % (other_pdb_name, other_chain)])
 
                 sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences)
                 sequence_alignment_printer_objects.append((primary_pdb_chain, sap))
@@ -656,20 +658,31 @@ if __name__ == '__main__':
 
     from rcsb import retrieve_pdb
 
-    colortext.message('match_pdb_chains: 3MW0 -> 1BN1')
-    print(match_pdb_chains(PDB(retrieve_pdb('3MWO')), '3MWO', PDB(retrieve_pdb('1BN1')), '1BN1', cut_off = 60.0, allow_multiple_matches = True))
+    #sa = SequenceAligner()
 
-    colortext.warning('match_pdb_chains: 1BN1 -> 3MW0')
-    print(match_pdb_chains(PDB(retrieve_pdb('1BN1')), '1BN1', PDB(retrieve_pdb('3MWO')), '3MWO', cut_off = 60.0, allow_multiple_matches = True))
+    #sa.add_sequence('1ki1_D', '''DMLTPTERKRQGYIHELIVTEENYVNDLQLVTEIFQKPLMESELLTEKEVAMIFVNWKELIMCNIKLLKALRVRKKMSGEKMPVKMIGDILSAQLPHMQPYIRFCSRQLNGAALIQQKTDEAPDFKEFVKRLEMDPRCKGMPLSSFILKPMQRVTRYPLIIKNILENTPENHPDHSHLKHALEKAEELCSQVNEGVREKENSDRLEWIQAHVQCEGLSEQLVFNSVTNCLGPRKFLHSGKLYKAKNNKELYGFLFNDFLLLTQITKPLGSSGTDKVFSPKSNLQYMYKTPIFLNEVLVKLPTDPSGDEPIFHISHIDRVYTLRAESINERTAWVQKIKAASELYIETEKKKR''')
+    #sa.add_sequence('3qbv_B', '''DMLTPTERKRQGYIHELIVTEENYVNDLQLVTEIFQKPLMESELLTEKEVAMIFVNWKELIMCNIKLLKALRVRKKMSGEKMPVKMIGDILSAQLPHMQPYIRFCSRQLNGAALIQQKTDEAPDFKEFVKRLAMDPRCKGMPLSEFILKPMQRVTRYPLIIKNILENTPENHPDHSHLKHALEKAEELCSQVNEGVREKENSDRLEWIQAHVQCEGLSEQLVFNSVTNCLGPRKFLHSGKLYKAKSNKELYGFLFNDFLLLTQITKPLGSSGTDKVFSPKSNLQYKMYKTPIFLNEVLVKLPTDPSGDEPIFHISHIDRVYTLRAESINERTAWVQKIKAASELYIETEKK''')
+
+    #sa.align()
+
+
+    #sys.exit(0)
 
     if False:
+
+        colortext.message('match_pdb_chains: 3MW0 -> 1BN1')
+        print(match_pdb_chains(PDB(retrieve_pdb('3MWO')), '3MWO', PDB(retrieve_pdb('1BN1')), '1BN1', cut_off = 60.0, allow_multiple_matches = True))
+
+        colortext.warning('match_pdb_chains: 1BN1 -> 3MW0')
+        print(match_pdb_chains(PDB(retrieve_pdb('1BN1')), '1BN1', PDB(retrieve_pdb('3MWO')), '3MWO', cut_off = 60.0, allow_multiple_matches = True))
+
         # Example of how to create a mapper from file paths
         chain_mapper = ScaffoldModelChainMapper.from_file_paths('../.testdata/1z1s_DIG5_scaffold.pdb', '../.testdata/DIG5_1_model.pdb')
 
         # Example of how to create a mapper from file contents
         chain_mapper = ScaffoldModelChainMapper.from_file_contents(read_file('../.testdata/1z1s_DIG5_scaffold.pdb'), read_file('../.testdata/DIG5_1_model.pdb'))
 
-        # 3MWO -> 1BN1 test case (3MWO:A and 3MWO:B map to 1BN1:A)
+        # 3MWO -> 1BN1 test case (3MWO_A and 3MWO_B map to 1BN1_A)
         chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
 
     # Example of how to create a mapper from file contents
@@ -679,13 +692,15 @@ if __name__ == '__main__':
 
     print('---')
     colortext.message('''chain_mapper.get_differing_residue_ids('ExpStructure', ['Model', 'Scaffold'])''')
+
     print(chain_mapper.get_differing_residue_ids('ExpStructure', ['Model', 'Scaffold']))
     colortext.message('''chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure'])''')
     print(chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure']))
+    colortext.message('''chain_mapper.get_differing_residue_ids('Model', ['Scaffold', 'ExpStructure'])''')
+    print(chain_mapper.get_differing_residue_ids('Model', ['Scaffold', 'ExpStructure']))
 
     PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
     colortext.warning(PSE_script)
-    print(PSE_file)
 
     if PSE_file:
         print('Length of PSE file: %d' % len(PSE_file))

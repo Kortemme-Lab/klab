@@ -77,22 +77,25 @@ class SequenceAligner(object):
 
         e.g.
             sa = SequenceAligner()
-            sa.add_sequence('1A2P:A', 'AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR')
-            sa.add_sequence('1B20:A', 'AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGSTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR')
-            sa.add_sequence('2KF4:A', 'AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDAYQTFTKIR')
-            best_matches = sa.align() # {'2KF4:A': {'2KF4:A': 100.0, '1A2P:A': 99.0, '1B20:A': 98.0}, '1A2P:A': {'2KF4:A': 99.0, '1A2P:A': 100.0, '1B20:A': 99.0}, '1B20:A': {'2KF4:A': 98.0, '1A2P:A': 99.0, '1B20:A': 100.0}}
-            best_matches_by_id = sa.get_best_matches_by_id('2KF4:A') # {'1A2P:A': 99.0, '1B20:A': 98.0}
+            sa.add_sequence('1A2P_A', 'AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR')
+            sa.add_sequence('1B20_A', 'AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGSTWREADINYTSGFRNSDRILYSSDWLIYKTTDHYQTFTKIR')
+            sa.add_sequence('2KF4_A', 'AQVINTFDGVADYLQTYHKLPDNYITKSEAQALGWVASKGNLADVAPGKSIGGDIFSNREGKLPGKSGRTWREADINYTSGFRNSDRILYSSDWLIYKTTDAYQTFTKIR')
+            best_matches = sa.align() # {'2KF4_A': {'2KF4_A': 100.0, '1A2P_A': 99.0, '1B20_A': 98.0}, '1A2P_A': {'2KF4_A': 99.0, '1A2P_A': 100.0, '1B20_A': 99.0}, '1B20_A': {'2KF4_A': 98.0, '1A2P_A': 99.0, '1B20_A': 100.0}}
+            best_matches_by_id = sa.get_best_matches_by_id('2KF4_A') # {'1A2P_A': 99.0, '1B20_A': 98.0}
 
     '''
 
     ### Constructor ###
 
-    def __init__(self):
+    def __init__(self, alignment_tool = 'clustalw'):
+        assert(alignment_tool == 'clustalw' or alignment_tool == 'clustalo')
+
         self.records = []
         self.sequence_ids = {} # A 1-indexed list of the sequences in the order that they were added (1-indexing to match Clustal numbering)
         self.matrix = None
         self.named_matrix = None
         self.alignment_output = None
+        self.alignment_tool = alignment_tool
 
     ### Class methods
     @staticmethod
@@ -106,7 +109,7 @@ class SequenceAligner(object):
     def from_FASTA(f):
         sa = SequenceAligner()
         for sequence in f.sequences:
-            sa.add_sequence('%s:%s' % (sequence[0], sequence[1]), sequence[2])
+            sa.add_sequence('%s_%s' % (sequence[0], sequence[1]), sequence[2])
         best_matches = sa.align()
         return sa
 
@@ -119,6 +122,11 @@ class SequenceAligner(object):
         return "\n".join(s)
 
     def add_sequence(self, sequence_id, sequence):
+
+        # This is a sanity check. ClustalO allows ':' in the chain ID but ClustalW replaces ':' with '_' which breaks our parsing
+        # All callers to add_sequence now need to replace ':' with '_' so that we can use ClustalW
+        assert(sequence_id.find(':') == -1)
+
         if sequence_id in self.sequence_ids.values():
             raise Exception("Sequence IDs must be unique")
         if list(set(sequence)) == ['X']:
@@ -142,17 +150,24 @@ class SequenceAligner(object):
         fasta_handle.close()
 
         try:
-            p = _Popen('.', shlex.split('clustalo --infile %(fasta_filename)s --verbose --outfmt clustal --outfile %(clustal_filename)s --force' % vars()))
-            if p.errorcode:
-                raise Exception('An error occurred while calling clustalo to align sequences:\n%s' % p.stderr)
-            self.alignment_output = read_file(clustal_filename)
-
-            p = _Popen('.', shlex.split('clustalw -INFILE=%(clustal_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -OUTFILE=/dev/null' % vars()))
-            if p.errorcode:
-                raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
-            else:
-                tempfiles.append("%s.dnd" % clustal_filename)
+            if self.alignment_tool == 'clustalo':
+                p = _Popen('.', shlex.split('clustalo --infile %(fasta_filename)s --verbose --outfmt clustal --outfile %(clustal_filename)s --force' % vars()))
+                if p.errorcode:
+                    raise Exception('An error occurred while calling clustalo to align sequences:\n%s' % p.stderr)
+                self.alignment_output = read_file(clustal_filename)
+                p = _Popen('.', shlex.split('clustalw -INFILE=%(clustal_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -OUTFILE=/dev/null' % vars()))
+                if p.errorcode:
+                    raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
                 percentage_identity_output = p.stdout
+            elif self.alignment_tool == 'clustalw':
+                p = _Popen('.', shlex.split('clustalw -INFILE=%(fasta_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -GAPOPEN=0.2 -OUTFILE=%(clustal_filename)s' % vars()))
+                if p.errorcode:
+                    raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
+                self.alignment_output = read_file(clustal_filename)
+                percentage_identity_output = p.stdout
+            else:
+                raise Exception("An unexpected alignment tool ('%s') was specified" % alignment_tool)
+
         except Exception, e:
             for t in tempfiles:
                 os.remove(t)
@@ -179,6 +194,12 @@ class SequenceAligner(object):
             if not self.alignment_output:
                 self.align()
             assert(self.alignment_output)
+            colortext.message(2)
+            print(self.sequence_ids[1])
+            colortext.message(3)
+            print(self.sequence_ids[2])
+            colortext.message(1)
+            print(self._get_alignment_lines())
             return self._create_residue_map(self._get_alignment_lines(), self.sequence_ids[1], self.sequence_ids[2])
         else:
             return None
@@ -378,7 +399,6 @@ class SequenceAligner(object):
             named_matrix[self.sequence_ids[x]] = {}
             for y, value in line.iteritems():
                 named_matrix[self.sequence_ids[x]][self.sequence_ids[y]] = value
-
         self.named_matrix = named_matrix
         return named_matrix
 
@@ -517,7 +537,7 @@ class PDBUniParcSequenceAligner(object):
             equivalent_chain_ids = set()
             for equivalent_chain in equivalent_chains:
                 assert(len(equivalent_chain) == 6)
-                assert(equivalent_chain[:5] == '%s:' % self.pdb_id)
+                assert(equivalent_chain[:5] == '%s_' % self.pdb_id)
                 equivalent_chain_ids.add(equivalent_chain[5])
             found = False
             for equivalent_chain_id in equivalent_chain_ids:
@@ -624,7 +644,7 @@ class PDBUniParcSequenceAligner(object):
                 chain_type = self.sequence_types.get(c, 'Protein')
                 if chain_type == 'Protein' or chain_type == 'Protein skeleton':
 
-                    pdb_chain_id = '%s:%s' % (self.pdb_id, c)
+                    pdb_chain_id = '%s_%s' % (self.pdb_id, c)
 
                     sa = SequenceAligner()
                     try:
