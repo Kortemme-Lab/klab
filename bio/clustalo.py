@@ -4,7 +4,10 @@
 clustalo.py
 Wrapper functions for Clustal Omega.
 
-Created by Shane O'Connor 2013
+Created by Shane O'Connor 2013.
+Note: The defaults I use here (ClustalW and a gap opening penalty of 0.2 rather than the default value of 10.0) seem to
+work well for aligning sequences with gaps and mutations e.g. wildtype and design sequences. You may want to adjust these
+values to fit your application.
 """
 
 import os
@@ -87,8 +90,11 @@ class SequenceAligner(object):
 
     ### Constructor ###
 
-    def __init__(self, alignment_tool = 'clustalw'):
+    def __init__(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2):
+        '''The constructor accepts an alignment tool used to create the alignment and a gap opening penalty. Note that
+           the gap opening penalty is currently only used by ClustalW.'''
         assert(alignment_tool == 'clustalw' or alignment_tool == 'clustalo')
+        gap_opening_penalty = float(gap_opening_penalty)
 
         self.records = []
         self.sequence_ids = {} # A 1-indexed list of the sequences in the order that they were added (1-indexing to match Clustal numbering)
@@ -96,6 +102,7 @@ class SequenceAligner(object):
         self.named_matrix = None
         self.alignment_output = None
         self.alignment_tool = alignment_tool
+        self.gap_opening_penalty = gap_opening_penalty
 
     ### Class methods
     @staticmethod
@@ -160,7 +167,8 @@ class SequenceAligner(object):
                     raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
                 percentage_identity_output = p.stdout
             elif self.alignment_tool == 'clustalw':
-                p = _Popen('.', shlex.split('clustalw -INFILE=%(fasta_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -GAPOPEN=0.2 -OUTFILE=%(clustal_filename)s' % vars()))
+                gap_opening_penalty = self.gap_opening_penalty
+                p = _Popen('.', shlex.split('clustalw -INFILE=%(fasta_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -GAPOPEN=%(gap_opening_penalty)0.2f -OUTFILE=%(clustal_filename)s' % vars()))
                 if p.errorcode:
                     raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
                 self.alignment_output = read_file(clustal_filename)
