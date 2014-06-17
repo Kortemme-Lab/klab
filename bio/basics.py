@@ -454,10 +454,10 @@ class SubstitutionScore(object):
         scoring > 0.5 in the Gonnet PAM 250 matrix." A score of -1 (period) indicates "conservation between groups of
         weakly similar properties - scoring =< 0.5 in the Gonnet PAM 250 matrix." '''
 
-    clustal_symbols = {1 : '*', 0 : ':', -1 : '.'}
+    clustal_symbols = {1 : '*', 0 : ':', -1 : '.', -2 : ' '}
 
     def __init__(self, clustal, from_residue, to_residue):
-        assert(-1 <= clustal <= 1)
+        assert(-2 <= clustal <= 1)
         self.clustal = clustal
         self.blosum62 = blosum62[(from_residue, to_residue)]
         self.pam250 = pam250[(from_residue, to_residue)]
