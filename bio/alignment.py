@@ -17,8 +17,8 @@ if __name__ == '__main__':
     sys.path.insert(0, '../..')
 
 from tools import colortext
-from tools.bio.pymol.psebuilder import BatchBuilder, PDBContainer
-from tools.bio.pymol.scaffold_model_design import ScaffoldModelDesignBuilder
+from tools.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
+from tools.bio.pymolmod.scaffold_model_design import ScaffoldModelDesignBuilder
 from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
 from tools.fs.fsio import write_file
