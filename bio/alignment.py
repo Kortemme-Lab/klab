@@ -397,8 +397,10 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                     for pdb2_chain in pdb2_chains:
                         # Get the mapping between the sequences
                         # Note: sequences and mappings are 1-based following the UniProt convention
+
                         sa = SequenceAligner()
                         pdb2_sequence = pdb2.atom_sequences[pdb2_chain]
+
                         sa.add_sequence('%s:%s' % (pdb1_name, pdb1_chain), str(pdb1_sequence))
                         sa.add_sequence('%s:%s' % (pdb2_name, pdb2_chain), str(pdb2_sequence))
                         mapping, match_mapping = sa.get_residue_mapping()
@@ -416,14 +418,13 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                         # We ignore leading and trailing residues from both sequences
                         pdb1_residue_indices = mapping.keys()
                         pdb2_residue_indices = mapping.values()
-                        differing_pdb1_indices = range(min(pdb1_residue_indices), max(pdb1_residue_indices) + 1)
-                        differing_pdb2_indices = range(min(pdb2_residue_indices), max(pdb2_residue_indices) + 1)
+                        differing_pdb1_indices = []
+                        differing_pdb2_indices = []
                         for pdb1_residue_index, match_details in match_mapping.iteritems():
-                            if match_details.clustal == 1:
-                                # The residues matched
-                                differing_pdb1_indices.remove(pdb1_residue_index)
-                                differing_pdb2_indices.remove(mapping[pdb1_residue_index])
-
+                            if match_details.clustal == 0 or match_details.clustal == -1 or match_details.clustal == -2:
+                                # The residues differed
+                                differing_pdb1_indices.append(pdb1_residue_index)
+                                differing_pdb2_indices.append(mapping[pdb1_residue_index])
                         # Convert the different sequence indices into PDB residue IDs
                         for idx in differing_pdb1_indices:
                             pdb1_differing_residue_ids.append(pdb1_sequence.order[idx - 1])
@@ -672,10 +673,20 @@ if __name__ == '__main__':
         chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
 
     # Example of how to create a mapper from file contents
-    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
+    #chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
 
+    chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('1ki1'), read_file('../.testdata/Sens_backrub_design.pdb'), retrieve_pdb('3QBV'))
+
+    print('---')
     colortext.message('''chain_mapper.get_differing_residue_ids('ExpStructure', ['Model', 'Scaffold'])''')
     print(chain_mapper.get_differing_residue_ids('ExpStructure', ['Model', 'Scaffold']))
+    colortext.message('''chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure'])''')
+    print(chain_mapper.get_differing_residue_ids('Scaffold', ['Model', 'ExpStructure']))
+
+    sys.exit(0)
+    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
+    colortext.warning(PSE_script)
+    sys.exit(0)
 
     colortext.message('''chain_mapper.get_differing_model_residue_ids()''')
     print(chain_mapper.get_differing_model_residue_ids())

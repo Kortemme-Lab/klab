@@ -225,8 +225,13 @@ class SequenceAligner(object):
                     if has_surrounding_matches:
                         mapping[from_residue_id] = to_residue_id
                         match_mapping[from_residue_id] = SubstitutionScore(-1, from_residue, to_residue)
+                elif match_type == ' ':
+                    # Allow unmatched residues if they have surrounding matches
+                    if has_surrounding_matches:
+                        mapping[from_residue_id] = to_residue_id
+                        match_mapping[from_residue_id] = SubstitutionScore(-2, from_residue, to_residue)
                 else:
-                    assert(match_type == ' ')
+                    assert(False)
 
         ### Prune the mapping
         # We probably do not want to consider all partial matches that Clustal reports as some may be coincidental
