@@ -50,8 +50,8 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
        sequence.
        '''
 
-    pdb1_chains = [c for c in pdb1.atom_chain_order] #pdb1.atom_sequences.keys()
-    pdb2_chains = [c for c in pdb2.atom_chain_order] #pdb2.atom_sequences.keys()
+    pdb1_chains = [c for c in pdb1.atom_chain_order]
+    pdb2_chains = [c for c in pdb2.atom_chain_order]
 
     # Extend the list of chains by the SEQRES chain IDs. These will typically be the same list but, just in case, we take
     # the set union.
@@ -60,14 +60,6 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
         pdb1_chains = sorted(set(pdb1_chains))
         pdb2_chains.extend(pdb2.seqres_chain_order)
         pdb2_chains = sorted(set(pdb2_chains))
-        #seqres_chain_order
-        #if pdb1.seqres_sequences:
-        #    pdb1_chains.extend(pdb1.seqres_sequences.keys())
-        #    pdb1_chains = sorted(set(pdb1_chains))
-        #if pdb2.seqres_sequences:
-        #    pdb2_chains.extend(pdb2.seqres_sequences.keys())
-        #    pdb2_chains = sorted(set(pdb2_chains))
-
 
     sa = SequenceAligner()
 
