@@ -76,7 +76,7 @@ class SequenceAligner(object):
     ''' This class is used to align sequences. To use it, first add sequences using the add_sequence function. Next, call the align function to perform
         the alignment. Alignment results are stored in the following object variables:
             matrix : the 1-indexed matrix returned from clustalw
-            named_matrix : [finish this on Monday...]
+            named_matrix : [finish this help section...]
 
         e.g.
             sa = SequenceAligner()
@@ -86,6 +86,9 @@ class SequenceAligner(object):
             best_matches = sa.align() # {'2KF4_A': {'2KF4_A': 100.0, '1A2P_A': 99.0, '1B20_A': 98.0}, '1A2P_A': {'2KF4_A': 99.0, '1A2P_A': 100.0, '1B20_A': 99.0}, '1B20_A': {'2KF4_A': 98.0, '1A2P_A': 99.0, '1B20_A': 100.0}}
             best_matches_by_id = sa.get_best_matches_by_id('2KF4_A') # {'1A2P_A': 99.0, '1B20_A': 98.0}
 
+        get_residue_mapping returns the mapping between the sequences. Note that this mapping is only based on the sequence strings
+        and not e.g. on the residue IDs in the PDB. Since the sequences are 1-indexed, the mapping is also 1-indexed. In the example
+        above, for 1A2P to 1B20, the residue mapping would be 1->1 for residue A, 2->2 for residue Q, 3->3 for residue V etc.
     '''
 
     ### Constructor ###
@@ -144,7 +147,6 @@ class SequenceAligner(object):
     def align(self):
 
         records = self.records
-
         percentage_identity_output = None
 
         fasta_handle, fasta_filename = open_temp_file('/tmp')
@@ -157,18 +159,22 @@ class SequenceAligner(object):
         fasta_handle.close()
 
         try:
+            # Note: By default, ClustalW can rearrange the sequence order in the alignment i.e. the order in which we add
+            # the sequences is not necessarily the order in which they appear in the output. For simplicity, the parsing
+            # logic assumes (and asserts) that order is maintained so we add the -OUTORDER=INPUT command to ClustalW to
+            # ensure this.
             if self.alignment_tool == 'clustalo':
                 p = _Popen('.', shlex.split('clustalo --infile %(fasta_filename)s --verbose --outfmt clustal --outfile %(clustal_filename)s --force' % vars()))
                 if p.errorcode:
                     raise Exception('An error occurred while calling clustalo to align sequences:\n%s' % p.stderr)
                 self.alignment_output = read_file(clustal_filename)
-                p = _Popen('.', shlex.split('clustalw -INFILE=%(clustal_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -OUTFILE=/dev/null' % vars()))
+                p = _Popen('.', shlex.split('clustalw -INFILE=%(clustal_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -OUTFILE=/dev/null -OUTORDER=INPUT' % vars()))
                 if p.errorcode:
                     raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
                 percentage_identity_output = p.stdout
             elif self.alignment_tool == 'clustalw':
                 gap_opening_penalty = self.gap_opening_penalty
-                p = _Popen('.', shlex.split('clustalw -INFILE=%(fasta_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -GAPOPEN=%(gap_opening_penalty)0.2f -OUTFILE=%(clustal_filename)s' % vars()))
+                p = _Popen('.', shlex.split('clustalw -INFILE=%(fasta_filename)s -PIM -TYPE=PROTEIN -STATS=%(stats_filename)s -GAPOPEN=%(gap_opening_penalty)0.2f -OUTFILE=%(clustal_filename)s -OUTORDER=INPUT' % vars()))
                 if p.errorcode:
                     raise Exception('An error occurred while calling clustalw to generate the Percent Identity Matrix:\n%s' % p.stderr)
                 self.alignment_output = read_file(clustal_filename)
@@ -202,12 +208,6 @@ class SequenceAligner(object):
             if not self.alignment_output:
                 self.align()
             assert(self.alignment_output)
-            colortext.message(2)
-            print(self.sequence_ids[1])
-            colortext.message(3)
-            print(self.sequence_ids[2])
-            colortext.message(1)
-            print(self._get_alignment_lines())
             return self._create_residue_map(self._get_alignment_lines(), self.sequence_ids[1], self.sequence_ids[2])
         else:
             return None
@@ -312,6 +312,9 @@ class SequenceAligner(object):
         lines = self.alignment_output.split("\n")
         assert(lines[0].startswith('CLUSTAL'))
         lines = '\n'.join(lines[1:]).lstrip().split('\n')
+
+        # The sequence IDs should be unique. Reassert this here
+        assert(len(self.sequence_ids.values()) == len(set(self.sequence_ids.values())))
 
         # Create the list of sequence IDs
         id_list = [v for k, v in sorted(self.sequence_ids.iteritems())]
