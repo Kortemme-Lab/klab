@@ -8,8 +8,8 @@ import types
 import string
 import types
 
-from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
-from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
+from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
 from tools.fs.fsio import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
@@ -483,6 +483,25 @@ class PDB:
     def get_ATOM_and_HETATM_chains(self):
         '''todo: remove this function as it now just returns a member element'''
         return self.atom_chain_order
+
+    def get_annotated_chain_sequence_string(self, chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = True):
+        '''A helper function to return the Sequence for a chain. If use_seqres_sequences_if_possible then we return the SEQRES
+           Sequence if it exists. We return a tuple of values, the first identifying which sequence was returned.'''
+        if use_seqres_sequences_if_possible and self.seqres_sequences and self.seqres_sequences.get(chain_id):
+            return ('SEQRES', self.seqres_sequences[chain_id])
+        elif self.atom_sequences.get(chain_id):
+            return ('ATOM', self.atom_sequences[chain_id])
+        elif raise_Exception_if_not_found:
+            raise Exception('Error: Chain %s expected but not found.' % (str(chain_id)))
+        else:
+            return None
+
+    def get_chain_sequence_string(self, chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = True):
+        '''Similar to get_annotated_chain_sequence_string except that we only return the Sequence and do not state which sequence it was.'''
+        chain_pair = self.get_annotated_chain_sequence_string(chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = raise_Exception_if_not_found)
+        if chain_pair:
+            return chain_pair[1]
+        return None
 
     def _get_modified_residues(self):
         if not self.modified_residues:
@@ -1081,6 +1100,39 @@ class PDB:
 
         self.atom_sequences = atom_sequences
 
+
+    def construct_seqres_to_atom_residue_map(self):
+        '''Uses the SequenceAligner to align the SEQRES and ATOM sequences and return the mappings.
+           If the SEQRES sequence does not exist for a chain, the mappings are None.
+           Note: The ResidueRelatrix is better equipped for this job since it can use the SIFTS mappings. This function
+           is provided for cases where it is not possible to use the ResidueRelatrix.'''
+        from tools.bio.clustalo import SequenceAligner
+
+        seqres_to_atom_maps = {}
+        atom_to_seqres_maps = {}
+        for c in self.seqres_chain_order:
+            if c in self.atom_chain_order:
+
+                # Get the sequences for chain c
+                seqres_sequence = self.seqres_sequences[c]
+                atom_sequence = self.atom_sequences[c]
+
+                # Align the sequences. mapping will be a mapping between the sequence *strings* (1-indexed)
+                sa = SequenceAligner()
+                sa.add_sequence('seqres_%s' % c, str(seqres_sequence))
+                sa.add_sequence('atom_%s' % c, str(atom_sequence))
+                mapping, match_mapping = sa.get_residue_mapping()
+
+                # Use the mapping from the sequence strings to look up the residue IDs and then create a mapping between these residue IDs
+                seqres_to_atom_maps[c] = {}
+                atom_to_seqres_maps[c] = {}
+                for seqres_residue_index, atom_residue_index in mapping.iteritems():
+                    seqres_residue_id = seqres_sequence.order[seqres_residue_index - 1] # order is a 0-based list
+                    atom_residue_id = atom_sequence.order[atom_residue_index - 1] # order is a 0-based list
+                    seqres_to_atom_maps[c][seqres_residue_id] = atom_residue_id
+                    atom_to_seqres_maps[c][atom_residue_id] = seqres_residue_id
+
+        return seqres_to_atom_maps, atom_to_seqres_maps
 
     def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
