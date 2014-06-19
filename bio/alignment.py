@@ -132,7 +132,7 @@ class MultipleSequenceAlignmentPrinter(object):
 
         assert(len(sequence_names) == len(sequences) and len(sequences) == len(sequence_tooltips) and len(sequence_names) > 1) # The sequence names must correspond with the number of sequences and we require at least two sequences
         assert(len(set(sequence_names)) == len(sequence_names)) # sequence_names must be a list of unique names
-        
+
         # Make sure that if a sequence has tooltips then there is an injection between the residues and the tooltips (a tooltip
         # may be None rather than a string)
         for x in range(len(sequences)):
@@ -264,7 +264,7 @@ class MultipleSequenceAlignmentPrinter(object):
         # Sanity check our tooltipping logic - ensure that the number of times we tried to assign a tooltip for a residue in a sequence matches the length of the sequence
         assert(residue_counters == [len([c for c in str(seq).strip() if c != '-' ]) for seq in sequences])
 
-        return '\n'.join(html)
+        return '\n'.join(html).replace(' class=""', '')
 
 
 class BasePDBChainMapper(object):
@@ -639,10 +639,10 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 sequence_names.append('%s_%s' % (primary_pdb_name, primary_pdb_chain))
                 primary_pdb_alignment_lines = sa._get_alignment_lines()['%s_%s' % (primary_pdb_name, primary_pdb_chain)]
                 sequences.append(primary_pdb_alignment_lines)
-                sequence_tooltips.append(self.get_sequence_tooltips(primary_pdb_sequence, primary_pdb_sequence_type, primary_pdb_name, primary_pdb_chain, primary_pdb_alignment_lines))
-
+                sequence_tooltips.append(self.get_sequence_tooltips(primary_pdb, primary_pdb_sequence, primary_pdb_sequence_type, primary_pdb_name, primary_pdb_chain, primary_pdb_alignment_lines))
                 for other_pdb_name in pdb_list[1:]:
                     #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                    other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
                     other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
                     if other_chains:
                         other_chain = sorted(other_chains)[0]
@@ -650,14 +650,14 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                         other_pdb_alignment_lines = sa._get_alignment_lines()['%s_%s' % (other_pdb_name, other_chain)]
                         sequences.append(other_pdb_alignment_lines)
                         other_pdb_sequence_type, other_pdb_sequence = other_chain_types_and_sequences[other_pdb_name]
-                        sequence_tooltips.append(self.get_sequence_tooltips(other_pdb_sequence, other_pdb_sequence_type, other_pdb_name, other_chain, other_pdb_alignment_lines))
+                        sequence_tooltips.append(self.get_sequence_tooltips(other_pdb, other_pdb_sequence, other_pdb_sequence_type, other_pdb_name, other_chain, other_pdb_alignment_lines))
 
                 sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences, sequence_tooltips)
                 sequence_alignment_printer_objects.append((primary_pdb_chain, sap))
 
         return sequence_alignment_printer_objects
 
-    def get_sequence_tooltips(self, pdb_sequence, pdb_sequence_type, pdb_name, pdb_chain, pdb_alignment_lines):
+    def get_sequence_tooltips(self, pdb_object, pdb_sequence, pdb_sequence_type, pdb_name, pdb_chain, pdb_alignment_lines):
         '''pdb_sequence is a Sequence object. pdb_sequence_type is a type returned by PDB.get_annotated_chain_sequence_string,
            pdb_name is the name of the PDB used throughout this object e.g. 'Scaffold', pdb_chain is the chain of interest,
            pdb_alignment_lines are the lines returned by SequenceAligner._get_alignment_lines.
@@ -667,24 +667,37 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
            in HTML.
            '''
         tooltips = None
-        if pdb_sequence_type == 'SEQRES':
-            seqres_to_atom_map = self.seqres_to_atom_maps.get(pdb_name, {}).get(pdb_chain, {})
-            tooltips = []
-            if seqres_to_atom_map:
-                idx = 1
+        atom_sequence = pdb_object.atom_sequences.get(pdb_chain)
+
+        try:
+            if pdb_sequence_type == 'SEQRES':
+                seqres_to_atom_map = self.seqres_to_atom_maps.get(pdb_name, {}).get(pdb_chain, {})
+                tooltips = []
+                if seqres_to_atom_map:
+                    idx = 1
+                    for aligned_residue in pdb_alignment_lines.strip():
+                        if aligned_residue != '-':
+                            atom_residue = seqres_to_atom_map.get(idx)
+                            if atom_residue:
+                                # This is a sanity check to make sure that the tooltips are mapping the correct residues types to
+                                # the correct residues types
+                                assert(aligned_residue == atom_sequence.sequence[atom_residue].ResidueAA)
+                            tooltips.append(atom_residue)
+                            idx += 1
+                    assert(len(tooltips) == len(str(pdb_sequence)))
+            elif pdb_sequence_type == 'ATOM':
+                tooltips = []
+                idx = 0
                 for aligned_residue in pdb_alignment_lines.strip():
                     if aligned_residue != '-':
-                        tooltips.append(seqres_to_atom_map.get(idx))
-                    idx += 1
+                        # This is a sanity check to make sure that the tooltips are mapping the correct residues types to
+                        # the correct residues types
+                        assert(aligned_residue == pdb_sequence.sequence[pdb_sequence.order[idx]].ResidueAA)
+                        tooltips.append(pdb_sequence.order[idx])
+                        idx += 1
                 assert(len(tooltips) == len(str(pdb_sequence)))
-        elif pdb_sequence_type == 'ATOM':
-            tooltips = []
-            idx = 0
-            for aligned_residue in pdb_alignment_lines.strip():
-                if aligned_residue != '-':
-                    tooltips.append(pdb_sequence.order[idx])
-                    idx += 1
-            assert(len(tooltips) == len(str(pdb_sequence)))
+        except:
+            raise Exception('An error occurred during HTML tooltip creation for the multiple sequence alignment.')
 
         return tooltips
 
@@ -846,7 +859,7 @@ if __name__ == '__main__':
         # 3MWO -> 1BN1 test case (3MWO_A and 3MWO_B map to 1BN1_A)
         chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
 
-    if True:
+    if False:
         # Test case for bad tooltips in 1KI1 vs 3QBV. There is a jump in the HTML generated for chain B of the scaffold from TYR B1513 to MET B1515 - the latter should be MET B1514. Similarly, ILE B1520 should be ILE B1519 in the exp. structure
         sequence_names = ['Scaffold_D', 'Model_B', 'ExpStructure_B']
         sequences = ['DMLTPTERKRQGYIHELIVTEENYVNDLQLVTEIFQKPLMESELLTEKEVAMIFVNWKELIMCNIKLLKALRVRKKMSGEKMPVKMIGDILSAQLPHMQPYIRFCSRQLNGAALIQQKTDEAPDFKEFVKRLEMDPRCKGMPLSSFILKPMQRVTRYPLIIKNILENTPENHPDHSHLKHALEKAEELCSQVNEGVREKENSDRLEWIQAHVQCEGLSEQLVFNSVTNCLGPRKFLHSGKLYKAKNNKELYGFLFNDFLLLTQITKPLGSSGTDKVFSPKSNLQY-MYKTPIFLNEVLVKLPTDPSGDEPIFHISHIDRVYTLRAESINERTAWVQKIKAASELYIETEKKKR',
@@ -858,14 +871,18 @@ if __name__ == '__main__':
             ['B1229 ', 'B1230 ', 'B1231 ', 'B1232 ', 'B1233 ', 'B1234 ', 'B1235 ', 'B1236 ', 'B1237 ', 'B1238 ', 'B1239 ', 'B1240 ', 'B1241 ', 'B1242 ', 'B1243 ', 'B1244 ', 'B1245 ', 'B1246 ', 'B1247 ', 'B1248 ', 'B1249 ', 'B1250 ', 'B1251 ', 'B1252 ', 'B1253 ', 'B1254 ', 'B1255 ', 'B1256 ', 'B1257 ', 'B1258 ', 'B1259 ', 'B1260 ', 'B1261 ', 'B1262 ', 'B1263 ', 'B1264 ', 'B1265 ', 'B1266 ', 'B1267 ', 'B1268 ', 'B1269 ', 'B1270 ', 'B1271 ', 'B1272 ', 'B1273 ', 'B1274 ', 'B1275 ', 'B1276 ', 'B1277 ', 'B1278 ', 'B1279 ', 'B1280 ', 'B1281 ', 'B1282 ', 'B1283 ', 'B1284 ', 'B1285 ', 'B1286 ', 'B1287 ', 'B1288 ', 'B1289 ', 'B1290 ', 'B1291 ', 'B1292 ', 'B1293 ', 'B1294 ', 'B1295 ', 'B1296 ', 'B1297 ', 'B1298 ', 'B1299 ', 'B1300 ', 'B1301 ', 'B1302 ', 'B1303 ', 'B1304 ', 'B1305 ', 'B1306 ', 'B1307 ', 'B1308 ', 'B1309 ', 'B1310 ', 'B1311 ', 'B1312 ', 'B1313 ', 'B1314 ', 'B1315 ', 'B1316 ', 'B1317 ', 'B1318 ', 'B1319 ', 'B1320 ', 'B1321 ', 'B1322 ', 'B1323 ', 'B1324 ', 'B1325 ', 'B1326 ', 'B1327 ', 'B1328 ', 'B1329 ', 'B1330 ', 'B1331 ', 'B1332 ', 'B1333 ', 'B1334 ', 'B1335 ', 'B1336 ', 'B1337 ', 'B1338 ', 'B1339 ', 'B1340 ', 'B1341 ', 'B1342 ', 'B1343 ', 'B1344 ', 'B1345 ', 'B1346 ', 'B1347 ', 'B1348 ', 'B1349 ', 'B1350 ', 'B1351 ', 'B1352 ', 'B1353 ', 'B1354 ', 'B1355 ', 'B1356 ', 'B1357 ', 'B1358 ', 'B1359 ', 'B1360 ', 'B1361 ', 'B1362 ', 'B1363 ', 'B1364 ', 'B1365 ', 'B1366 ', 'B1367 ', 'B1368 ', 'B1369 ', 'B1370 ', 'B1371 ', 'B1372 ', 'B1373 ', 'B1374 ', 'B1375 ', 'B1376 ', 'B1377 ', 'B1378 ', 'B1379 ', 'B1380 ', 'B1381 ', 'B1382 ', 'B1383 ', 'B1384 ', 'B1385 ', 'B1386 ', 'B1387 ', 'B1388 ', 'B1389 ', 'B1390 ', 'B1391 ', 'B1392 ', 'B1393 ', 'B1394 ', 'B1395 ', 'B1396 ', 'B1397 ', 'B1398 ', 'B1399 ', 'B1400 ', 'B1401 ', 'B1402 ', 'B1403 ', 'B1404 ', 'B1405 ', 'B1406 ', 'B1407 ', 'B1408 ', 'B1409 ', 'B1410 ', 'B1411 ', 'B1412 ', 'B1413 ', 'B1414 ', 'B1415 ', 'B1416 ', 'B1417 ', 'B1418 ', 'B1419 ', 'B1420 ', 'B1421 ', 'B1422 ', 'B1423 ', 'B1424 ', 'B1425 ', 'B1426 ', 'B1427 ', 'B1428 ', 'B1429 ', 'B1430 ', 'B1431 ', 'B1432 ', 'B1433 ', 'B1434 ', 'B1435 ', 'B1436 ', 'B1437 ', 'B1438 ', 'B1439 ', 'B1440 ', 'B1441 ', 'B1442 ', 'B1443 ', 'B1444 ', 'B1445 ', 'B1446 ', 'B1447 ', 'B1448 ', 'B1449 ', 'B1450 ', 'B1451 ', 'B1452 ', 'B1453 ', 'B1454 ', 'B1455 ', 'B1456 ', 'B1457 ', 'B1458 ', 'B1459 ', 'B1460 ', 'B1461 ', 'B1462 ', 'B1463 ', 'B1464 ', 'B1465 ', 'B1466 ', 'B1467 ', 'B1468 ', 'B1469 ', 'B1470 ', 'B1471 ', 'B1472 ', 'B1473 ', 'B1474 ', 'B1475 ', 'B1476 ', 'B1477 ', 'B1478 ', 'B1479 ', 'B1480 ', 'B1481 ', 'B1482 ', 'B1483 ', 'B1484 ', 'B1485 ', 'B1486 ', 'B1487 ', 'B1488 ', 'B1489 ', 'B1490 ', 'B1491 ', 'B1492 ', 'B1493 ', 'B1494 ', 'B1495 ', 'B1503 ', 'B1504 ', 'B1505 ', 'B1506 ', 'B1507 ', 'B1508 ', 'B1509 ', 'B1510 ', 'B1511 ', 'B1512 ', 'B1513 ', 'B1514 ', 'B1515 ', 'B1516 ', 'B1517 ', 'B1518 ', 'B1519 ', 'B1520 ', 'B1521 ', 'B1522 ', 'B1523 ', 'B1524 ', 'B1525 ', 'B1526 ', 'B1527 ', 'B1528 ', 'B1529 ', 'B1530 ', 'B1531 ', 'B1532 ', 'B1533 ', 'B1534 ', 'B1535 ', 'B1539 ', 'B1540 ', 'B1541 ', 'B1542 ', 'B1543 ', 'B1544 ', 'B1545 ', 'B1546 ', 'B1547 ', 'B1548 ', 'B1549 ', 'B1550 ', 'B1551 ', 'B1552 ', 'B1553 ', 'B1554 ', 'B1555 ', 'B1556 ', 'B1557 ', 'B1558 ', 'B1559 ', 'B1560 ', 'B1561 ', 'B1562 ', 'B1563 ', 'B1564 ', 'B1565 ', 'B1566 ', 'B1567 ', 'B1568 ', 'B1569 ', 'B1570 ', 'B1571 ', 'B1572 ', 'B1573 ', 'B1574 ', 'B1575 ', 'B1576 ', 'B1577 ', 'B1578 ', 'B1579 ', 'B1580 '],
             ['B1229 ', 'B1230 ', 'B1231 ', 'B1232 ', 'B1233 ', 'B1234 ', 'B1235 ', 'B1236 ', 'B1237 ', 'B1238 ', 'B1239 ', 'B1240 ', 'B1241 ', 'B1242 ', 'B1243 ', 'B1244 ', 'B1245 ', 'B1246 ', 'B1247 ', 'B1248 ', 'B1249 ', 'B1250 ', 'B1251 ', 'B1252 ', 'B1253 ', 'B1254 ', 'B1255 ', 'B1256 ', 'B1257 ', 'B1258 ', 'B1259 ', 'B1260 ', 'B1261 ', 'B1262 ', 'B1263 ', 'B1264 ', 'B1265 ', 'B1266 ', 'B1267 ', 'B1268 ', 'B1269 ', 'B1270 ', 'B1271 ', 'B1272 ', 'B1273 ', 'B1274 ', 'B1275 ', 'B1276 ', 'B1277 ', 'B1278 ', 'B1279 ', 'B1280 ', 'B1281 ', 'B1282 ', 'B1283 ', 'B1284 ', 'B1285 ', 'B1286 ', 'B1287 ', 'B1288 ', 'B1289 ', 'B1290 ', 'B1291 ', 'B1292 ', 'B1293 ', 'B1294 ', 'B1295 ', 'B1296 ', 'B1297 ', 'B1298 ', 'B1299 ', 'B1300 ', 'B1301 ', 'B1302 ', 'B1303 ', 'B1304 ', 'B1305 ', 'B1306 ', 'B1307 ', 'B1308 ', 'B1309 ', 'B1310 ', 'B1311 ', 'B1312 ', 'B1313 ', 'B1314 ', 'B1315 ', 'B1316 ', 'B1317 ', 'B1318 ', 'B1319 ', 'B1320 ', 'B1321 ', 'B1322 ', 'B1323 ', 'B1324 ', 'B1325 ', 'B1326 ', 'B1327 ', 'B1328 ', 'B1329 ', 'B1330 ', 'B1331 ', 'B1332 ', 'B1333 ', 'B1334 ', 'B1335 ', 'B1336 ', 'B1337 ', 'B1338 ', 'B1339 ', 'B1340 ', 'B1341 ', 'B1342 ', 'B1343 ', 'B1344 ', 'B1345 ', 'B1346 ', 'B1347 ', 'B1348 ', 'B1349 ', 'B1350 ', 'B1351 ', 'B1352 ', 'B1353 ', 'B1354 ', 'B1355 ', 'B1356 ', 'B1357 ', 'B1358 ', 'B1359 ', 'B1360 ', 'B1361 ', 'B1362 ', 'B1363 ', 'B1364 ', 'B1365 ', 'B1366 ', 'B1367 ', 'B1368 ', 'B1369 ', 'B1370 ', 'B1371 ', 'B1372 ', 'B1373 ', 'B1374 ', 'B1375 ', 'B1376 ', 'B1377 ', 'B1378 ', 'B1379 ', 'B1380 ', 'B1381 ', 'B1382 ', 'B1383 ', 'B1384 ', 'B1385 ', 'B1386 ', 'B1387 ', 'B1388 ', 'B1389 ', 'B1390 ', 'B1391 ', 'B1392 ', 'B1393 ', 'B1394 ', 'B1395 ', 'B1396 ', 'B1397 ', 'B1398 ', 'B1399 ', 'B1400 ', 'B1401 ', 'B1402 ', 'B1403 ', 'B1404 ', 'B1405 ', 'B1406 ', 'B1407 ', 'B1408 ', 'B1409 ', 'B1410 ', 'B1411 ', 'B1412 ', 'B1413 ', 'B1414 ', 'B1415 ', 'B1416 ', 'B1417 ', 'B1418 ', 'B1419 ', 'B1420 ', 'B1421 ', 'B1422 ', 'B1423 ', 'B1424 ', 'B1425 ', 'B1426 ', 'B1427 ', 'B1428 ', 'B1429 ', 'B1430 ', 'B1431 ', 'B1432 ', 'B1433 ', 'B1434 ', 'B1435 ', 'B1436 ', 'B1437 ', 'B1438 ', 'B1439 ', 'B1440 ', 'B1441 ', 'B1442 ', 'B1443 ', 'B1444 ', None, None, None, 'B1448 ', 'B1449 ', 'B1450 ', 'B1451 ', 'B1452 ', 'B1453 ', 'B1454 ', 'B1455 ', 'B1456 ', 'B1457 ', 'B1458 ', 'B1459 ', 'B1460 ', 'B1461 ', 'B1462 ', 'B1463 ', 'B1464 ', 'B1465 ', 'B1466 ', 'B1467 ', 'B1468 ', 'B1469 ', 'B1470 ', 'B1471 ', 'B1472 ', 'B1473 ', 'B1474 ', None, None, 'B1477 ', 'B1478 ', 'B1479 ', 'B1480 ', 'B1481 ', 'B1482 ', 'B1483 ', 'B1484 ', 'B1485 ', 'B1486 ', 'B1487 ', 'B1488 ', 'B1489 ', 'B1490 ', 'B1491 ', 'B1492 ', 'B1493 ', 'B1494 ', None, None, None, None, None, None, None, None, None, None, 'B1505 ', 'B1506 ', 'B1507 ', 'B1508 ', 'B1509 ', 'B1510 ', 'B1511 ', 'B1512 ', 'B1513 ', None, None, None, None, None, None, 'B1520 ', 'B1521 ', 'B1522 ', 'B1523 ', 'B1524 ', 'B1525 ', 'B1526 ', 'B1527 ', 'B1528 ', None, None, None, None, None, None, None, None, None, None, 'B1539 ', 'B1540 ', 'B1541 ', 'B1542 ', 'B1543 ', None, None, 'B1546 ', 'B1547 ', 'B1548 ', 'B1549 ', None, None, None, None, None, None, None, None, None, None, None, 'B1561 ', 'B1562 ', 'B1563 ', 'B1564 ', 'B1565 ', 'B1566 ', 'B1567 ', 'B1568 ', 'B1569 ', 'B1570 ', 'B1571 ', 'B1572 ', 'B1573 ', 'B1574 ', 'B1575 ', 'B1576 ', 'B1577 ', 'B1578 ', None]
         ]
+        msap = MultipleSequenceAlignmentPrinter(sequence_names, sequences, sequence_tooltips)
+        print(msap.to_html())
 
+    if False:
+        # Example of how to create a mapper from file contents
+        #chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
 
-    # Example of how to create a mapper from file contents
-    #chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(read_file('../.testdata/1x42_BH3_scaffold.pdb'), read_file('../.testdata/1x42_foldit2_BH32_design.pdb'), read_file('../.testdata/3U26.pdb'))
-
-    print(match_RCSB_pdb_chains('1ki1', '3QBV', cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0))
+        print(match_RCSB_pdb_chains('1ki1', '3QBV', cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0))
 
     chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('1ki1'), read_file('../.testdata/Sens_backrub_design.pdb'), retrieve_pdb('3QBV'))
+    chain_mapper.get_sequence_alignment_printer_objects()
+    sys.exit(0)
 
     print('---')
     colortext.message('''chain_mapper.get_differing_atom_residue_ids('ExpStructure', ['Model', 'Scaffold'])''')
