@@ -122,9 +122,17 @@ def match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, use_
 class MultipleSequenceAlignmentPrinter(object):
     '''A class for generating formatted strings from a multiple sequence alignment.'''
 
-    def __init__(self, sequence_names, sequences):
-        assert(len(sequence_names) == len(sequences) and len(sequence_names) > 1) # The sequence names must correspond with the number of sequences and we require at least two sequences
+    def __init__(self, sequence_names, sequences, sequence_tooltips = None):
+
+        if not sequence_tooltips:
+            sequence_tooltips = [None] * len(sequences)
+
+        assert(len(sequence_names) == len(sequences) and len(sequences) == len(sequence_tooltips) and len(sequence_names) > 1) # The sequence names must correspond with the number of sequences and we require at least two sequences
         assert(len(set(sequence_names)) == len(sequence_names)) # sequence_names must be a list of unique names
+
+        for x in range(len(sequences)):
+            if sequence_tooltips[x]:
+                assert(len(str(sequences[x]).replace('-', '')) == len(sequence_tooltips[x]))
 
         # Make sure that the sequence lengths are all the same size
         sequence_lengths = map(len, sequences)
@@ -135,6 +143,7 @@ class MultipleSequenceAlignmentPrinter(object):
 
         self.sequence_names = sequence_names
         self.sequences = sequences
+        self.sequence_tooltips = sequence_tooltips
 
     def to_lines(self, width = 80, reversed = False, line_separator = '\n'):
         s = []
@@ -158,13 +167,19 @@ class MultipleSequenceAlignmentPrinter(object):
         return line_separator.join(s)
 
 
-    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = '_'):
+    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = '_', add_tooltips = True):
         html = []
         html.append('<div class="chain_alignment">')
 
-        sequences, sequence_names = self.sequences, self.sequence_names
+        sequences, sequence_names, sequence_tooltips = self.sequences, self.sequence_names, self.sequence_tooltips
+        num_sequences = len(sequences)
+        # Turn off tooltips if requested
+        if not(add_tooltips):
+            sequence_tooltips = [None] * num_sequences
+
+        residue_counters = [0] * num_sequences
         if reversed:
-            sequences, sequence_names = self.sequences[::-1], self.sequence_names[::-1]
+            sequences, sequence_names = self.sequences[::-1], self.sequence_names[::-1], self.sequence_tooltips[::-1]
 
         if self.label_width + 2 < width:
             # headers is a list of pairs split by header_separator. If header_separator is not specified then the
@@ -176,7 +191,6 @@ class MultipleSequenceAlignmentPrinter(object):
 
             num_residues_per_line = width - self.label_width
             sequence_strs = map(str, sequences)
-            num_sequences = len(sequence_strs)
 
             # x iterates over a chunk of the sequence alignment
             for x in range(0, self.sequence_length, num_residues_per_line):
@@ -201,11 +215,31 @@ class MultipleSequenceAlignmentPrinter(object):
                     if len(residues) == 1:
                         # all residues are the same
                         for y in range(num_sequences):
-                            residue_substrings[y].append(subsequence_list[y][z])
+                            tooltip = ''
+                            if subsequence_list[y][z] != '-':
+                                tooltips = sequence_tooltips[y]
+                                residue_index = residue_counters[y]
+                                if tooltips and tooltips[residue_index] != None:
+                                    tooltip = tooltips[residue_index]
+                                residue_counters[y] += 1
+                            if tooltip:
+                                residue_substrings[y].append('<span title="%s">%s</span>' % (tooltip.strip(), subsequence_list[y][z]))
+                            else:
+                                residue_substrings[y].append(subsequence_list[y][z])
                     else:
                         # The residues differ - mark up the
                         for y in range(num_sequences):
-                            residue_substrings[y].append('<dd>%s</dd>' % subsequence_list[y][z])
+                            tooltip = ''
+                            if subsequence_list[y][z] != '-':
+                                tooltips = sequence_tooltips[y]
+                                residue_index = residue_counters[y]
+                                if tooltips and tooltips[residue_index] != None:
+                                    tooltip = tooltips[residue_index]
+                                residue_counters[y] += 1
+                            if tooltip:
+                                residue_substrings[y].append('<span class="differing_residue" title="%s">%s</span>' % (tooltip.strip(), subsequence_list[y][z]))
+                            else:
+                                residue_substrings[y].append('<span class="differing_residue">%s</span>' % (subsequence_list[y][z]))
 
                 for y in range(num_sequences):
                     html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (headers[y][0], headers[y][0], headers[y][1], ''.join(residue_substrings[y])))
@@ -215,6 +249,10 @@ class MultipleSequenceAlignmentPrinter(object):
             raise Exception('The width (%d characters) is not large enough to display the sequence alignment.' % width)
 
         html.append('</div>')
+
+        # Sanity check our tooltipping logic - ensure that the number of times we tried to assign a tooltip for a residue in a sequence matches the length of the sequence
+        assert(residue_counters == [len([c for c in str(seq).strip() if c != '-' ]) for seq in sequences])
+
         return '\n'.join(html)
 
 
@@ -563,9 +601,10 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             sa = SequenceAligner()
 
             # Add the primary PDB's sequence for the chain
-            primary_pdb_sequence = primary_pdb.get_chain_sequence_string(primary_pdb_chain, self.use_seqres_sequences_if_possible)
+            primary_pdb_sequence_type, primary_pdb_sequence = primary_pdb.get_annotated_chain_sequence_string(primary_pdb_chain, self.use_seqres_sequences_if_possible)
             sa.add_sequence('%s_%s' % (primary_pdb_name, primary_pdb_chain), str(primary_pdb_sequence))
 
+            other_chain_types_and_sequences = {}
             for other_pdb_name in pdb_list[1:]:
                 other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
 
@@ -573,7 +612,8 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
                 if other_chains:
                     other_chain = sorted(other_chains)[0]
-                    other_pdb_sequence = other_pdb.get_chain_sequence_string(other_chain, self.use_seqres_sequences_if_possible)
+                    other_pdb_sequence_type, other_pdb_sequence = other_pdb.get_annotated_chain_sequence_string(other_chain, self.use_seqres_sequences_if_possible)
+                    other_chain_types_and_sequences[other_pdb_name] = (other_pdb_sequence_type, other_pdb_sequence)
                     sa.add_sequence('%s_%s' % (other_pdb_name, other_chain), str(other_pdb_sequence))
 
             if len(sa.records) > 1:
@@ -583,20 +623,59 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 #pdb1_alignment_str = sa._get_alignment_lines()['%s:%s' % (primary_pdb_name, pdb1_chain)]
                 #pdb2_alignment_str = sa._get_alignment_lines()['%s:%s' % (pdb2_name, pdb2_chain)]
 
-                sequence_names, sequences = [], []
+                sequence_names, sequences, sequence_tooltips = [], [], []
+
                 sequence_names.append('%s_%s' % (primary_pdb_name, primary_pdb_chain))
-                sequences.append(sa._get_alignment_lines()['%s_%s' % (primary_pdb_name, primary_pdb_chain)])
+                primary_pdb_alignment_lines = sa._get_alignment_lines()['%s_%s' % (primary_pdb_name, primary_pdb_chain)]
+                sequences.append(primary_pdb_alignment_lines)
+                sequence_tooltips.append(self.get_sequence_tooltips(primary_pdb_sequence, primary_pdb_sequence_type, primary_pdb_name, primary_pdb_chain, primary_pdb_alignment_lines))
+
                 for other_pdb_name in pdb_list[1:]:
                     #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
                     other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
-                    other_chain = sorted(other_chains)[0]
-                    sequence_names.append('%s_%s' % (other_pdb_name, other_chain))
-                    sequences.append(sa._get_alignment_lines()['%s_%s' % (other_pdb_name, other_chain)])
+                    if other_chains:
+                        other_chain = sorted(other_chains)[0]
+                        sequence_names.append('%s_%s' % (other_pdb_name, other_chain))
+                        other_pdb_alignment_lines = sa._get_alignment_lines()['%s_%s' % (other_pdb_name, other_chain)]
+                        sequences.append(other_pdb_alignment_lines)
+                        other_pdb_sequence_type, other_pdb_sequence = other_chain_types_and_sequences[other_pdb_name]
+                        sequence_tooltips.append(self.get_sequence_tooltips(other_pdb_sequence, other_pdb_sequence_type, other_pdb_name, other_chain, other_pdb_alignment_lines))
 
-                sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences)
+                sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences, sequence_tooltips)
                 sequence_alignment_printer_objects.append((primary_pdb_chain, sap))
 
         return sequence_alignment_printer_objects
+
+    def get_sequence_tooltips(self, pdb_sequence, pdb_sequence_type, pdb_name, pdb_chain, pdb_alignment_lines):
+        '''pdb_sequence is a Sequence object. pdb_sequence_type is a type returned by PDB.get_annotated_chain_sequence_string,
+           pdb_name is the name of the PDB used throughout this object e.g. 'Scaffold', pdb_chain is the chain of interest,
+           pdb_alignment_lines are the lines returned by SequenceAligner._get_alignment_lines.
+
+           This function returns a set of tooltips corresponding to the residues in the sequence. The tooltips are the ATOM
+           residue IDs. These tooltips can be used to generate useful (and/or interactive using JavaScript) sequence alignments
+           in HTML.
+           '''
+        tooltips = None
+        if pdb_sequence_type == 'SEQRES':
+            seqres_to_atom_map = self.seqres_to_atom_maps.get(pdb_name, {}).get(pdb_chain, {})
+            tooltips = []
+            if seqres_to_atom_map:
+                idx = 1
+                for aligned_residue in pdb_alignment_lines.strip():
+                    if aligned_residue != '-':
+                        tooltips.append(seqres_to_atom_map.get(idx))
+                    idx += 1
+                assert(len(tooltips) == len(str(pdb_sequence)))
+        elif pdb_sequence_type == 'ATOM':
+            tooltips = []
+            idx = 0
+            for aligned_residue in pdb_alignment_lines.strip():
+                if aligned_residue != '-':
+                    tooltips.append(pdb_sequence.order[idx])
+                    idx += 1
+            assert(len(tooltips) == len(str(pdb_sequence)))
+
+        return tooltips
 
 
     def get_sequence_alignment_strings(self, pdb_list = [], reversed = True, width = 80, line_separator = '\n'):
@@ -626,17 +705,16 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
             members.
 
-            Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
-            specified width, separated by the specified line separator.'''
+            Returns HTML for the sequence alignments.'''
 
         sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
         html = []
         for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
             primary_pdb_chain = sequence_alignment_printer_tuple[0]
             sap = sequence_alignment_printer_tuple[1]
-            html.extend(sap.to_html(reversed = reversed, width = width, line_separator = line_separator))
+            html.append(sap.to_html(reversed = reversed, width = width, line_separator = line_separator))
 
-        return html
+        return '\n'.join(html)
 
 class ScaffoldModelChainMapper(PipelinePDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
@@ -810,19 +888,21 @@ if __name__ == '__main__':
 
     # Example of how to print out a plaintext sequence alignment
     colortext.warning('Sequence alignment - plain formatting, width = 120.')
-    print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(['Model', 'Scaffold', 'ExpStructure'], width = 120)))
+    #print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(['Model', 'Scaffold', 'ExpStructure'], width = 120)))
+    print('\n\n'.join(chain_mapper.get_sequence_alignment_strings(['Scaffold', 'Model', 'ExpStructure'], width = 120)))
 
     # Example of how to print out a HTML formatted alignment. This output would require CSS for an appropriate presentation.
     colortext.warning('Sequence alignment - HTML formatting, width = 100.')
     colortext.message(chain_mapper.get_sequence_alignment_strings_as_html(['Model', 'Scaffold', 'ExpStructure'], width = 100))
+    sys.exit(0)
 
     # Example of how to generate a PyMOL session
     PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
     if PSE_file:
         print('Length of PSE file: %d' % len(PSE_file))
+        write_file('alignment_test.pse', PSE_file, ftype = 'wb')
     else:
         print('No PSE file was generated.')
 
     print(PSE_script)
-    write_file('alignment_test.pse', PSE_file, ftype = 'wb')
 
