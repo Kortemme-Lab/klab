@@ -168,7 +168,7 @@ class MultipleSequenceAlignmentPrinter(object):
         return line_separator.join(s)
 
 
-    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = '_', add_tooltips = True):
+    def to_html(self, width = 80, reversed = False, line_separator = '\n', header_separator = '_', add_tooltips = True, extra_tooltip_class = ''):
         html = []
         html.append('<div class="chain_alignment">')
 
@@ -223,11 +223,13 @@ class MultipleSequenceAlignmentPrinter(object):
                                 if tooltips and tooltips[residue_index] != None:
                                     tooltip = tooltips[residue_index]
                                 residue_counters[y] += 1
+                            residue_type = subsequence_list[y][z]
                             if tooltip:
-                                residue_type = subsequence_list[y][z]
-                                residue_substrings[y].append('<span title="%s %s">%s</span>' % (residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
+                                residue_substrings[y].append('<span class="%s" title="%s %s">%s</span>' % (extra_tooltip_class, residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
+                            elif tooltips:
+                                residue_substrings[y].append('<span class="%s missing_ATOMs" title="No ATOM records">%s</span>' % (extra_tooltip_class, residue_type))
                             else:
-                                residue_substrings[y].append(subsequence_list[y][z])
+                                residue_substrings[y].append(residue_type)
                     else:
                         # The residues differ - mark up the
                         for y in range(num_sequences):
@@ -240,7 +242,9 @@ class MultipleSequenceAlignmentPrinter(object):
                                 residue_counters[y] += 1
                             if tooltip:
                                 residue_type = subsequence_list[y][z]
-                                residue_substrings[y].append('<span class="differing_residue" title="%s %s">%s</span>' % (residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
+                                residue_substrings[y].append('<span class="%s differing_residue" title="%s %s">%s</span>' % (extra_tooltip_class, residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
+                            elif tooltips:
+                                residue_substrings[y].append('<span class="%s differing_residue missing_ATOMs" title="No ATOM records">%s</span>' % (extra_tooltip_class, residue_type))
                             else:
                                 residue_substrings[y].append('<span class="differing_residue">%s</span>' % (subsequence_list[y][z]))
 
@@ -262,7 +266,7 @@ class MultipleSequenceAlignmentPrinter(object):
 class BasePDBChainMapper(object):
     def get_sequence_alignment_strings(self, reversed = True, width = 80, line_separator = '\n'):
         raise Exception('Implement this function.')
-    def get_sequence_alignment_strings_as_html(self, reversed = True, width = 80, line_separator = '\n'):
+    def get_sequence_alignment_strings_as_html(self, reversed = True, width = 80, line_separator = '\n', extra_tooltip_class = ''):
         raise Exception('Implement this function.')
 
 
@@ -701,7 +705,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         return alignment_strings
 
 
-    def get_sequence_alignment_strings_as_html(self, pdb_list = [], reversed = False, width = 80, line_separator = '\n'):
+    def get_sequence_alignment_strings_as_html(self, pdb_list = [], reversed = False, width = 80, line_separator = '\n', extra_tooltip_class = ''):
         '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
             Using the first element of this list as a base, get the sequence alignments with chains in other members
             of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
@@ -715,7 +719,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
             primary_pdb_chain = sequence_alignment_printer_tuple[0]
             sap = sequence_alignment_printer_tuple[1]
-            html.append(sap.to_html(reversed = reversed, width = width, line_separator = line_separator))
+            html.append(sap.to_html(reversed = reversed, width = width, line_separator = line_separator, extra_tooltip_class = extra_tooltip_class))
 
         return '\n'.join(html)
 
