@@ -51,6 +51,10 @@ residue_type_3to1_map = {
     "UNK": 'X',
 }
 
+residue_type_1to3_map = {}
+for k, v in residue_type_3to1_map.iteritems():
+    residue_type_1to3_map[v] = k
+
 residue_types_3 = set(residue_type_3to1_map.keys())
 residue_types_1 = set(residue_type_3to1_map.values()) # formally a list called amino_acid_codes
 relaxed_residue_types_1 = residue_types_1.union(set(['X']))

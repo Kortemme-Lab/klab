@@ -21,6 +21,7 @@ from tools.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
 from tools.bio.pymolmod.scaffold_model_design import ScaffoldModelDesignBuilder
 from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
+from tools.bio.basics import residue_type_1to3_map
 from tools.fs.fsio import write_file
 
 def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = True):
@@ -223,7 +224,8 @@ class MultipleSequenceAlignmentPrinter(object):
                                     tooltip = tooltips[residue_index]
                                 residue_counters[y] += 1
                             if tooltip:
-                                residue_substrings[y].append('<span title="%s">%s</span>' % (tooltip.strip(), subsequence_list[y][z]))
+                                residue_type = subsequence_list[y][z]
+                                residue_substrings[y].append('<span title="%s %s">%s</span>' % (residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
                             else:
                                 residue_substrings[y].append(subsequence_list[y][z])
                     else:
@@ -237,7 +239,8 @@ class MultipleSequenceAlignmentPrinter(object):
                                     tooltip = tooltips[residue_index]
                                 residue_counters[y] += 1
                             if tooltip:
-                                residue_substrings[y].append('<span class="differing_residue" title="%s">%s</span>' % (tooltip.strip(), subsequence_list[y][z]))
+                                residue_type = subsequence_list[y][z]
+                                residue_substrings[y].append('<span class="differing_residue" title="%s %s">%s</span>' % (residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
                             else:
                                 residue_substrings[y].append('<span class="differing_residue">%s</span>' % (subsequence_list[y][z]))
 
