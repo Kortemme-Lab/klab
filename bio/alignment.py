@@ -69,9 +69,19 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
     assert(pdb2_name.find('_') == -1)
 
     for c in pdb1_chains:
-        sa.add_sequence('%s_%s' % (pdb1_name, c), str(pdb1.get_chain_sequence_string(c, use_seqres_sequences_if_possible)))
+        # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
+        seq1 = pdb1.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
+        if seq1:
+            sa.add_sequence('%s_%s' % (pdb1_name, c), str(seq1))
+        else:
+            pdb1_chains.remove(c)
     for c in pdb2_chains:
-        sa.add_sequence('%s_%s' % (pdb2_name, c), str(pdb2.get_chain_sequence_string(c, use_seqres_sequences_if_possible)))
+        # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
+        seq2 = pdb2.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
+        if seq2:
+            sa.add_sequence('%s_%s' % (pdb2_name, c), str(seq2))
+        else:
+            pdb2_chains.remove(c)
 
     sa.align()
 
@@ -221,8 +231,8 @@ class MultipleSequenceAlignmentPrinter(object):
                         # all residues are the same
                         for y in range(num_sequences):
                             tooltip = ''
+                            tooltips = sequence_tooltips[y]
                             if subsequence_list[y][z] != '-':
-                                tooltips = sequence_tooltips[y]
                                 residue_index = residue_counters[y]
                                 if tooltips and tooltips[residue_index] != None:
                                     tooltip = tooltips[residue_index]
@@ -238,8 +248,8 @@ class MultipleSequenceAlignmentPrinter(object):
                         # The residues differ - mark up the
                         for y in range(num_sequences):
                             tooltip = ''
+                            tooltips = sequence_tooltips[y]
                             if subsequence_list[y][z] != '-':
-                                tooltips = sequence_tooltips[y]
                                 residue_index = residue_counters[y]
                                 if tooltips and tooltips[residue_index] != None:
                                     tooltip = tooltips[residue_index]
@@ -739,6 +749,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             html.append(sap.to_html(reversed = reversed, width = width, line_separator = line_separator, extra_tooltip_class = extra_tooltip_class))
 
         return '\n'.join(html)
+
 
 class ScaffoldModelChainMapper(PipelinePDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
