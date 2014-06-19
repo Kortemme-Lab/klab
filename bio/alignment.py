@@ -119,37 +119,8 @@ def match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, use_
     return d
 
 
-class SequenceAlignmentPrinter(object):
-
-    def __init__(self, seq1_name, seq1_sequence, seq2_name, seq2_sequence):
-        self.seq1_name = seq1_name
-        self.seq1_sequence = seq1_sequence
-        self.seq2_name = seq2_name
-        self.seq2_sequence = seq2_sequence
-
-    def to_lines(self, width = 80, reversed = False, line_separator = '\n'):
-        s = []
-        label_width = max(len(self.seq1_name), len(self.seq2_name))
-        if label_width + 2 < width:
-            header_1 = self.seq1_name.ljust(label_width + 2)
-            header_2 = self.seq2_name.ljust(label_width + 2)
-
-            num_residues_per_line = width - label_width
-            seq1_sequence_str = str(self.seq1_sequence)
-            seq2_sequence_str = str(self.seq2_sequence)
-
-            for x in range(0, len(seq1_sequence_str), num_residues_per_line):
-                if reversed:
-                    s.append('%s  %s' % (header_2, seq2_sequence_str[x:x + num_residues_per_line]))
-                    s.append('%s  %s' % (header_1, seq1_sequence_str[x:x + num_residues_per_line]))
-                else:
-                    s.append('%s  %s' % (header_1, seq1_sequence_str[x:x + num_residues_per_line]))
-                    s.append('%s  %s' % (header_2, seq2_sequence_str[x:x + num_residues_per_line]))
-        return line_separator.join(s)
-
-
 class MultipleSequenceAlignmentPrinter(object):
-    '''A generalized version of SequenceAlignmentPrinter which handles multiple sequences.'''
+    '''A class for generating formatted strings from a multiple sequence alignment.'''
 
     def __init__(self, sequence_names, sequences):
         assert(len(sequence_names) == len(sequences) and len(sequence_names) > 1) # The sequence names must correspond with the number of sequences and we require at least two sequences
