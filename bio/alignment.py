@@ -739,9 +739,11 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
             members.
 
-            Returns HTML for the sequence alignments.'''
+            Returns HTML for the sequence alignments and an empty string if no alignments were made.'''
 
         sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
+        if not sequence_alignment_printer_tuples:
+            return ''
         html = []
         for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
             primary_pdb_chain = sequence_alignment_printer_tuple[0]
