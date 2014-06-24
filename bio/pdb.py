@@ -87,7 +87,7 @@ missing_chain_ids = {
 
 ### Whitelist for PDB files with ACE residues (we could allow all to pass but it may be good to manually look at each case)
 
-cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX'])
+cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX', '1UNQ'])
 
 ### Parsing-related variables
 
