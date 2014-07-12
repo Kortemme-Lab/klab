@@ -12,6 +12,28 @@ from tools.fs.fsio import write_file
 from tools import colortext
 from psebuilder import PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
 
+# Notes:
+#
+# The select or cmd.select commands create the selection objects e.g. '(ExpStructure_mutations_s)' in the right pane. These
+# are just selection sets so clicking on the name in the pane only results in a selection.
+#
+# The create or cmd.create commands create an object e.g. ExpStructure_mutations in the right pane. Clicking on this name
+# toggles whether this selection is shown or not. To set up a default view, follow the create command with a show command
+# e.g. show sticks, Scaffold_mutations.
+#
+# However, if you want the selection to be hidden when the PSE is loaded, you need to use the disable command, *not the hide command*
+# e.g. disable spheres_Scaffold_HETATMs.
+#
+# There is another subtlety behavior difference between loading a PSE file versus pasting commands into the terminal of a PyMOL window.
+# If you write e.g.
+#     select Scaffold_mutations, [some selection string]
+#     create Scaffold_mutations, [some selection string]
+# into the terminal, two objects are created in the right pane. However, if you save the PSE and reload it, only one of these
+# objects works as expected. Therefore, if you need both, use two separately named objects. Below, I instead write the equivalent of:
+#     select Scaffold_mutations_s, [some selection string]
+#     create Scaffold_mutations, [some selection string]
+# to create two distinct objects. The '_s' is just my arbitrary convention to denote that the object came from a select command.
+
 class ScaffoldModelDesignBuilder(PyMOLSessionBuilder):
 
     def __init__(self, pdb_containers, settings = {}, rootdir = '/tmp'):
@@ -41,7 +63,9 @@ class ScaffoldModelDesignBuilder(PyMOLSessionBuilder):
         self.script.append('''
 # Set general view options and hide waters
 viewport 1200,800
+
 hide eve
+
 remove resn hoh
 bg_color %(background-color)s
 ''' % self.settings)
@@ -100,13 +124,21 @@ disable Scaffold''')
 ### Scaffold objects ###
 
 # Scaffold mutations
-select Scaffold_mutations, %(scaffold_selection)s
-create Scaffold_mutations, %(scaffold_selection)s
-show sticks, Scaffold_mutations
-color brightorange, Scaffold_mutations
+
+has_mutations = cmd.count_atoms('%(scaffold_selection)s') > 0
+if has_mutations: cmd.select('Scaffold_mutations_s', '%(scaffold_selection)s');
+if has_mutations: cmd.create('Scaffold_mutations', '%(scaffold_selection)s');
+if has_mutations: cmd.show('sticks', 'Scaffold_mutations')
+if has_mutations: cmd.color('brightorange', 'Scaffold_mutations')
 
 # Scaffold HETATMs - create
-if cmd.count_atoms('Scaffold and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('Scaffold_HETATMs', 'Scaffold and het and !(resn CSE+SEC+MSE)');
+has_hetatms = cmd.count_atoms('Scaffold and het and !(resn CSE+SEC+MSE)') > 0
+if has_hetatms: cmd.create('Scaffold_HETATMs', 'Scaffold and het and !(resn CSE+SEC+MSE)');
+if has_hetatms: cmd.show('sticks', 'Scaffold_HETATMs')
+if has_hetatms: cmd.disable('Scaffold_HETATMs')
+if has_hetatms: cmd.create('spheres_Scaffold_HETATMs', 'Scaffold and het and !(resn CSE+SEC+MSE)');
+if has_hetatms: cmd.show('spheres', 'spheres_Scaffold_HETATMs')
+if has_hetatms: cmd.disable('spheres_Scaffold_HETATMs')
 ''' % vars())
 
         #self.script.append('set label_color, black')
@@ -118,13 +150,20 @@ if cmd.count_atoms('Scaffold and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('
 ### Rosetta model objects ###
 
 # Rosetta model mutations
-select RosettaModel_mutations, %(model_selection)s
-create RosettaModel_mutations, %(model_selection)s
-show sticks, RosettaModel_mutations
-color tv_yellow, RosettaModel_mutations
+
+has_mutations = cmd.count_atoms('%(model_selection)s') > 0
+if has_mutations: cmd.select('RosettaModel_mutations_s', '%(model_selection)s');
+if has_mutations: cmd.create('RosettaModel_mutations', '%(model_selection)s');
+if has_mutations: cmd.show('sticks', 'RosettaModel_mutations')
+if has_mutations: cmd.color('tv_yellow', 'RosettaModel_mutations')
 
 # Rosetta model HETATMs - create and display
-if cmd.count_atoms('RosettaModel and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('RosettaModel_HETATMs', 'RosettaModel and het and !(resn CSE+SEC+MSE)'); show sticks, RosettaModel_HETATMs
+has_hetatms = cmd.count_atoms('RosettaModel and het and !(resn CSE+SEC+MSE)') > 0
+if has_hetatms: cmd.create('RosettaModel_HETATMs', 'RosettaModel and het and !(resn CSE+SEC+MSE)');
+if has_hetatms: cmd.show('sticks', 'RosettaModel_HETATMs')
+if has_hetatms: cmd.create('spheres_RosettaModel_HETATMs', 'RosettaModel and het and !(resn CSE+SEC+MSE)');
+if has_hetatms: cmd.show('spheres', 'spheres_RosettaModel_HETATMs')
+if has_hetatms: cmd.disable('spheres_RosettaModel_HETATMs')
 ''' % vars())
 
         if self.ExpStructure:
@@ -133,13 +172,20 @@ if cmd.count_atoms('RosettaModel and het and !(resn CSE+SEC+MSE)') > 0: cmd.crea
 ### ExpStructure objects ###
 
 # ExpStructure mutations
-select ExpStructure_mutations, %(exp_structure_selection)s
-create ExpStructure_mutations, %(exp_structure_selection)s
-show sticks, ExpStructure_mutations
-color violet, ExpStructure_mutations
+has_mutations = cmd.count_atoms('%(exp_structure_selection)s') > 0
+if has_mutations: cmd.select('ExpStructure_mutations_s', '%(exp_structure_selection)s');
+if has_mutations: cmd.create('ExpStructure_mutations', '%(exp_structure_selection)s');
+if has_mutations: cmd.show('sticks', 'ExpStructure_mutations')
+if has_mutations: cmd.color('violet', 'ExpStructure_mutations')
 
 # ExpStructure HETATMs - create and display
-if cmd.count_atoms('ExpStructure and het and !(resn CSE+SEC+MSE)') > 0: cmd.create('ExpStructure_HETATMs', 'ExpStructure and het and !(resn CSE+SEC+MSE)'); show sticks, ExpStructure_HETATMs
+has_hetatms = cmd.count_atoms('ExpStructure and het and !(resn CSE+SEC+MSE)') > 0
+if has_hetatms: cmd.create('ExpStructure_HETATMs', 'ExpStructure and het and !(resn CSE+SEC+MSE)');
+if has_hetatms: cmd.show('sticks', 'ExpStructure_HETATMs')
+if has_hetatms: cmd.create('spheres_ExpStructure_HETATMs', 'ExpStructure and het and !(resn CSE+SEC+MSE)');
+if has_hetatms: cmd.show('spheres', 'spheres_ExpStructure_HETATMs')
+if has_hetatms: cmd.disable('spheres_ExpStructure_HETATMs')
+#ExpStructure and het and !(resn CSE+SEC+MSE)')
 ''' % vars())
 
     def _add_raytracing_section(self):
@@ -153,14 +199,20 @@ set two_sided_lighting, on
 ''')
     def _add_postamble(self):
         self.script.append('''
+# Show only polar hydrogens
+hide (hydro)
+
 # Set zoom
 zoom
 
 # Re-order the objects in the right pane
 order *,yes
-order Scaffold_mutations, location=bottom
-order RosettaModel_mutations, location=bottom
-order ExpStructure_mutations, location=bottom
+order Scaffold_mutations_s, location=bottom
+order RosettaModel_mutations_s, location=bottom
+order ExpStructure_mutations_s, location=bottom
+order spheres_Scaffold_HETATMs, location=bottom
+order spheres_RosettaModel_HETATMs, location=bottom
+order spheres_ExpStructure_HETATMs, location=bottom
 
 save session.pse
 quit
@@ -180,3 +232,4 @@ quit
         self._add_raytracing_section()
         self._add_postamble()
         self.script = '\n'.join(self.script)
+        
