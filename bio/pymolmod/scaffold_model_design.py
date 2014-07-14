@@ -67,8 +67,8 @@ viewport 1200,800
 hide eve
 
 remove resn hoh
-bg_color %(background-color)s
-''' % self.settings)
+bg_color %(global.background-color)s
+''' % self.color_scheme)
 
     def _add_generic_chain_settings_section(self):
         self.script.append('''
@@ -88,16 +88,21 @@ set stick_radius, 0.2
 
     def _add_specific_chain_settings_section(self):
         self.script.append('''
+
+# Scaffold display
+color %(Scaffold.bb)s, Scaffold
+
 # RosettaModel display
 show car, RosettaModel
-color gray, RosettaModel
-''')
+color %(RosettaModel.bb)s, RosettaModel
+''' % self.color_scheme)
+
         if self.ExpStructure:
             self.script.append('''
 # ExpStructure display
-color forest, ExpStructure
 show car, ExpStructure
-''')
+color %(ExpStructure.bb)s, ExpStructure
+''' % self.color_scheme)
 
     def _add_superimposition_section(self):
         self.script.append('''
@@ -120,6 +125,7 @@ disable Scaffold''')
 
     def _add_residue_highlighting_section(self):
         scaffold_selection = 'Scaffold and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Scaffold.residues_of_interest))
+        print(vars())
         self.script.append('''
 ### Scaffold objects ###
 
@@ -129,7 +135,10 @@ has_mutations = cmd.count_atoms('%(scaffold_selection)s') > 0
 if has_mutations: cmd.select('Scaffold_mutations_s', '%(scaffold_selection)s');
 if has_mutations: cmd.create('Scaffold_mutations', '%(scaffold_selection)s');
 if has_mutations: cmd.show('sticks', 'Scaffold_mutations')
-if has_mutations: cmd.color('brightorange', 'Scaffold_mutations')
+''' % vars())
+
+        self.script.append('''
+if has_mutations: cmd.color('%(Scaffold.mutations)s', 'Scaffold_mutations')
 
 # Scaffold HETATMs - create
 has_hetatms = cmd.count_atoms('Scaffold and het and !(resn CSE+SEC+MSE)') > 0
@@ -139,7 +148,7 @@ if has_hetatms: cmd.disable('Scaffold_HETATMs')
 if has_hetatms: cmd.create('spheres_Scaffold_HETATMs', 'Scaffold and het and !(resn CSE+SEC+MSE)');
 if has_hetatms: cmd.show('spheres', 'spheres_Scaffold_HETATMs')
 if has_hetatms: cmd.disable('spheres_Scaffold_HETATMs')
-''' % vars())
+''' % self.color_scheme)
 
         #self.script.append('set label_color, black')
         #self.script.append('label n. CA and Scaffold and chain A and i. 122, "A122" ')
@@ -155,7 +164,10 @@ has_mutations = cmd.count_atoms('%(model_selection)s') > 0
 if has_mutations: cmd.select('RosettaModel_mutations_s', '%(model_selection)s');
 if has_mutations: cmd.create('RosettaModel_mutations', '%(model_selection)s');
 if has_mutations: cmd.show('sticks', 'RosettaModel_mutations')
-if has_mutations: cmd.color('tv_yellow', 'RosettaModel_mutations')
+''' % vars())
+
+        self.script.append('''
+if has_mutations: cmd.color('%(RosettaModel.mutations)s', 'RosettaModel_mutations')
 
 # Rosetta model HETATMs - create and display
 has_hetatms = cmd.count_atoms('RosettaModel and het and !(resn CSE+SEC+MSE)') > 0
@@ -164,7 +176,7 @@ if has_hetatms: cmd.show('sticks', 'RosettaModel_HETATMs')
 if has_hetatms: cmd.create('spheres_RosettaModel_HETATMs', 'RosettaModel and het and !(resn CSE+SEC+MSE)');
 if has_hetatms: cmd.show('spheres', 'spheres_RosettaModel_HETATMs')
 if has_hetatms: cmd.disable('spheres_RosettaModel_HETATMs')
-''' % vars())
+''' % self.color_scheme)
 
         if self.ExpStructure:
             exp_structure_selection = 'ExpStructure and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.ExpStructure.residues_of_interest))
@@ -176,7 +188,9 @@ has_mutations = cmd.count_atoms('%(exp_structure_selection)s') > 0
 if has_mutations: cmd.select('ExpStructure_mutations_s', '%(exp_structure_selection)s');
 if has_mutations: cmd.create('ExpStructure_mutations', '%(exp_structure_selection)s');
 if has_mutations: cmd.show('sticks', 'ExpStructure_mutations')
-if has_mutations: cmd.color('violet', 'ExpStructure_mutations')
+''' % vars())
+
+            self.script.append('''if has_mutations: cmd.color('%(ExpStructure.mutations)s', 'ExpStructure_mutations')
 
 # ExpStructure HETATMs - create and display
 has_hetatms = cmd.count_atoms('ExpStructure and het and !(resn CSE+SEC+MSE)') > 0
@@ -186,7 +200,7 @@ if has_hetatms: cmd.create('spheres_ExpStructure_HETATMs', 'ExpStructure and het
 if has_hetatms: cmd.show('spheres', 'spheres_ExpStructure_HETATMs')
 if has_hetatms: cmd.disable('spheres_ExpStructure_HETATMs')
 #ExpStructure and het and !(resn CSE+SEC+MSE)')
-''' % vars())
+''' % self.color_scheme)
 
     def _add_raytracing_section(self):
         self.script.append('''
