@@ -14,7 +14,7 @@ import string
 from tools.fs.fsio import read_file, create_temp_755_path, write_file
 from tools import colortext
 from tools import process as tprocess
-
+from colors import ColorScheme
 
 def create_pymol_selection_from_PDB_residue_ids(residue_list):
     residues_by_chain = {}
@@ -100,10 +100,10 @@ class PyMOLSessionBuilder(object):
         self.stdout = None
         self.stderr = None
         self.return_code = None
-        self.settings = {
-            'background-color' : 'white',
-        }
+        self.settings = {'colors' : {'global' : {'background-color' : 'black'}}}
         self.settings.update(settings)
+        self.color_scheme = ColorScheme(settings.get('colors', {}))
+        del self.settings['colors'] # to avoid confusion, remove the duplicated dict as the ColorScheme object may get updated
 
     def __del__(self):
         if self.outdir:

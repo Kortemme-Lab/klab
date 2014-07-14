@@ -906,7 +906,7 @@ if __name__ == '__main__':
     colortext.message('''chain_mapper.get_differing_atom_residue_ids('Model', ['Scaffold', 'ExpStructure'])''')
     print(chain_mapper.get_differing_atom_residue_ids('Model', ['Scaffold', 'ExpStructure']))
 
-    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
+    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'colors' : {'global' : {'background-color' : 'black'}}})
     colortext.warning(PSE_script)
 
     if PSE_file:
@@ -952,7 +952,7 @@ if __name__ == '__main__':
     sys.exit(0)
 
     # Example of how to generate a PyMOL session
-    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'background-color' : 'black'})
+    PSE_file, PSE_script = chain_mapper.generate_pymol_session(pymol_executable = 'pymol', settings = {'colors' : {'global' : {'background-color' : 'black'}}})
     if PSE_file:
         print('Length of PSE file: %d' % len(PSE_file))
         write_file('alignment_test.pse', PSE_file, ftype = 'wb')

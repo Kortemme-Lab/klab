@@ -223,5 +223,96 @@ predefined = {
     'zirconium' : (0.580392157, 0.878431373, 0.878431373),
 }
 
+default_color_scheme = {
+    'global' : {
+        'background-color' : 'white'
+    },
+    'Scaffold'  : {
+        'bb' : 'grey30',
+        'hetatm' : 'grey60',
+        'mutations' : 'grey80'
+    },
+    'RosettaModel'  : {
+        'bb' : 'brightorange',
+        'hetatm' : 'deepolive',
+        'mutations' : 'yellow'
+    },
+    'ExpStructure'  : {
+        'bb' : 'violetpurple',
+        'hetatm' : 'warmpink',
+        'mutations' : 'magenta'
+    }
+}
+
 def create_new_color_command(color_name, r, g, b):
     return 'set_color %(color_name)s, [%(r).10f,%(g).10f,%(b).10f]' % vars()
+
+class ColorScheme():
+    '''A dict wrapper class. The dict that is stored is intended to have a tree structure. The paths of the tree describe
+       how the color should be used e.g. RosettaModel.bb should be used to color the backbone of a Rosetta model. The leaves of the
+       tree are colors. If a new color is needed, use the create_new_color_command function to define the new color in
+       the script before use.'''
+
+    def __init__(self, custom_color_scheme = {}):
+        '''If a color_scheme is passed in then this is merged with the default color scheme.'''
+        color_scheme = {}
+        color_scheme.update(default_color_scheme)
+        if custom_color_scheme:
+            assert(type(custom_color_scheme) == type(predefined))
+            color_scheme.update(custom_color_scheme)
+        self.color_scheme = color_scheme
+        self.name = 'Default'
+
+    def update(self, path, node):
+        '''Update the dict with a new color using a 'path' through the dict. You can either pass an existing path e.g.
+           'Scaffold.mutations' to override a color or part of the hierarchy or you can add a new leaf node or dict.'''
+        assert(type(path) == type(self.name))
+        assert(type(node) == type(self.name) or type(node) == type(predefined))
+
+        d = self.color_scheme
+        tokens = path.split('.')
+        for t in tokens[:-1]:
+            d = d.get(t)
+            if d == None:
+                raise Exception("Path '%s' not found.")
+        d[tokens[-1]] = node
+
+    def lookup(self, path, must_be_leaf = False):
+        '''Looks up a part of the color scheme. If used for looking up colors, must_be_leaf should be True.'''
+        assert(type(path) == type(self.name))
+
+        d = self.color_scheme
+        tokens = path.split('.')
+        for t in tokens[:-1]:
+            d = d.get(t)
+            if d == None:
+                raise Exception("Path '%s' not found.")
+        if must_be_leaf:
+            assert(type(d[tokens[-1]]) == type(self.name))
+        return d[tokens[-1]]
+
+    def __repr__(self):
+        return str(self.color_scheme)
+
+    def __getitem__(self, path):
+        '''This lets us use the object somewhat like a dict where we do a lookup using a path e.g. cs['Scaffold.mutations']
+           This also lets us use the object in a string formatting e.g. print('%(Scaffold.mutations)s' % cs) which is useful
+           for the PyMOL script generators.'''
+        return self.lookup(path)
+
+
+if __name__ == '__main__':
+    cs = ColorScheme()
+    cs.update('ExpStructure.b', 'thallium')
+    cs.update('ExpStructure.mutations', 'thallium')
+    print('')
+    print(cs.lookup('ExpStructure.b', must_be_leaf = True))
+    print(cs['Scaffold.mutations'])
+    print('Testing string formatting: Scaffold.mutations = %(Scaffold.mutations)s, RosettaModel.hetatm = %(RosettaModel.hetatm)s.' % cs)
+    print(cs['global.background-color'])
+    print('')
+
+    cs = ColorScheme({'global' : {'background-color' : 'black'}})
+    print(cs)
+    print(cs['global.background-color'])
+    print('')
