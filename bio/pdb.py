@@ -347,6 +347,7 @@ class PDB:
         self.rosetta_to_atom_sequence_maps = {}
         self.rosetta_residues = []
 
+        self.fix_pdb()
         self._split_lines()
         self.pdb_id = pdb_id
         self.pdb_id = self.get_pdb_id()                 # parse the PDB ID if it is not passed in
@@ -358,6 +359,43 @@ class PDB:
             self._update_structure_lines()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
+
+    def fix_pdb(self):
+        '''A function to fix fatal errors in PDB files when they can be automatically fixed. At present, this only runs if
+           self.strict is False. We may want a separate property for this since we may want to keep strict mode but still
+           allow PDBs to be fixed.
+
+           The only fixes at the moment are for missing chain IDs which get filled in with a valid PDB ID, if possible.'''
+
+        if self.strict:
+            return
+
+        # Get the list of chains
+        chains = set()
+        for l in self.lines:
+            if l.startswith('ATOM  ') or l.startswith('HETATM'):
+                chains.add(l[21])
+
+        # If there is a chain with a blank ID, change that ID to a valid unused ID
+        if ' ' in chains:
+            fresh_id = None
+            allowed_chain_ids = list(string.uppercase) + list(string.lowercase) + map(str, range(10))
+            for c in chains:
+                try: allowed_chain_ids.remove(c)
+                except: pass
+            if allowed_chain_ids:
+                fresh_id = allowed_chain_ids[0]
+
+            # Rewrite the lines
+            new_lines = []
+            if fresh_id:
+                for l in self.lines:
+                    if (l.startswith('ATOM  ') or l.startswith('HETATM')) and l[21] == ' ':
+                        new_lines.append('%s%s%s' % (l[:21], fresh_id, l[22:]))
+                    else:
+                        new_lines.append(l)
+                self.lines = new_lines
+
 
     def _apply_hacks(self):
         if self.pdb_id:

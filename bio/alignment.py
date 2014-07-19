@@ -93,7 +93,13 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
                 kept_chains.append(c)
         pdb2_chains = kept_chains
 
-        sa.align()
+        if not(pdb1_chains):
+            raise ChainMatchingException('No valid sequences were found in %s. Alignment failed.' % pdb1_name)
+        elif not(pdb2_chains):
+            raise ChainMatchingException('No valid sequences were found in %s. Alignment failed.' % pdb2_name)
+        else:
+            sa.align()
+
         chain_matches = dict.fromkeys(pdb1_chains, None)
         for c in pdb1_chains:
             best_matches_by_id = sa.get_best_matches_by_id('%s_%s' % (pdb1_name, c), cut_off = cut_off)
@@ -118,6 +124,8 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
                         chain_matches[c] = [(best_match[1].split('_')[1], best_match[0])]
 
         return chain_matches
+    except ChainMatchingException, e:
+        raise
     except Exception, e:
         raise ChainMatchingException()
 
