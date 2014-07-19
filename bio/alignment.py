@@ -25,6 +25,8 @@ from tools.bio.basics import residue_type_1to3_map
 from tools.fs.fsio import write_file
 from tools.bio.pdb import PDBParsingException, NonCanonicalResidueException, PDBValidationException
 
+class ChainMatchingException(Exception): pass
+
 def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = True):
     '''Aligns two PDB files, returning a mapping from the chains in pdb1 to the chains of pdb2.
        If allow_multiple_matches is False, we return the best match for each chain in pdb1 if a match exists. The return
@@ -52,69 +54,72 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
        sequence.
        '''
 
-    pdb1_chains = [c for c in pdb1.atom_chain_order]
-    pdb2_chains = [c for c in pdb2.atom_chain_order]
-    unrecognized_residues = set(['X'])
+    try:
+        pdb1_chains = [c for c in pdb1.atom_chain_order]
+        pdb2_chains = [c for c in pdb2.atom_chain_order]
+        unrecognized_residues = set(['X'])
 
-    # Extend the list of chains by the SEQRES chain IDs. These will typically be the same list but, just in case, we take
-    # the set union.
-    if use_seqres_sequences_if_possible:
-        pdb1_chains.extend(pdb1.seqres_chain_order)
-        pdb1_chains = sorted(set(pdb1_chains))
-        pdb2_chains.extend(pdb2.seqres_chain_order)
-        pdb2_chains = sorted(set(pdb2_chains))
+        # Extend the list of chains by the SEQRES chain IDs. These will typically be the same list but, just in case, we take
+        # the set union.
+        if use_seqres_sequences_if_possible:
+            pdb1_chains.extend(pdb1.seqres_chain_order)
+            pdb1_chains = sorted(set(pdb1_chains))
+            pdb2_chains.extend(pdb2.seqres_chain_order)
+            pdb2_chains = sorted(set(pdb2_chains))
 
-    sa = SequenceAligner()
+        sa = SequenceAligner()
 
-    # If these assertions do not hold we will need to fix the logic below
-    assert(pdb1_name.find('_') == -1)
-    assert(pdb2_name.find('_') == -1)
+        # If these assertions do not hold we will need to fix the logic below
+        assert(pdb1_name.find('_') == -1)
+        assert(pdb2_name.find('_') == -1)
 
-    kept_chains = []
-    for c in pdb1_chains:
-        # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
-        seq1 = pdb1.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
+        kept_chains = []
+        for c in pdb1_chains:
+            # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
+            seq1 = pdb1.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
 
-        if seq1 and str(seq1) and set(str(seq1)) != unrecognized_residues:
-            sa.add_sequence('%s_%s' % (pdb1_name, c), str(seq1))
-            kept_chains.append(c)
-    pdb1_chains = kept_chains
+            if seq1 and str(seq1) and set(str(seq1)) != unrecognized_residues:
+                sa.add_sequence('%s_%s' % (pdb1_name, c), str(seq1))
+                kept_chains.append(c)
+        pdb1_chains = kept_chains
 
-    kept_chains = []
-    for c in pdb2_chains:
-        # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
-        seq2 = pdb2.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
+        kept_chains = []
+        for c in pdb2_chains:
+            # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
+            seq2 = pdb2.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
 
-        if seq2 and str(seq2) and set(str(seq2)) != unrecognized_residues:
-            sa.add_sequence('%s_%s' % (pdb2_name, c), str(seq2))
-            kept_chains.append(c)
-    pdb2_chains = kept_chains
+            if seq2 and str(seq2) and set(str(seq2)) != unrecognized_residues:
+                sa.add_sequence('%s_%s' % (pdb2_name, c), str(seq2))
+                kept_chains.append(c)
+        pdb2_chains = kept_chains
 
-    sa.align()
-    chain_matches = dict.fromkeys(pdb1_chains, None)
-    for c in pdb1_chains:
-        best_matches_by_id = sa.get_best_matches_by_id('%s_%s' % (pdb1_name, c), cut_off = cut_off)
-        if best_matches_by_id:
-            t = []
-            for k, v in best_matches_by_id.iteritems():
-                if k.startswith(pdb2_name + '_'):
-                    t.append((v, k))
-            if t:
-                # We may have multiple best matches here. Instead of just returning one
-                if allow_multiple_matches:
-                    best_matches = sorted(t)
-                    best_match_identity = best_matches[0][0]
-                    allowed_cutoff = max(cut_off, best_match_identity - multiple_match_error_margin)
-                    chain_matches[c] = []
-                    for best_match in best_matches:
-                        if best_match[0] >= allowed_cutoff:
-                            chain_matches[c].append((best_match[1].split('_')[1], best_match[0]))
-                    assert(len(chain_matches[c]) > 0)
-                else:
-                    best_match = sorted(t)[0]
-                    chain_matches[c] = [(best_match[1].split('_')[1], best_match[0])]
+        sa.align()
+        chain_matches = dict.fromkeys(pdb1_chains, None)
+        for c in pdb1_chains:
+            best_matches_by_id = sa.get_best_matches_by_id('%s_%s' % (pdb1_name, c), cut_off = cut_off)
+            if best_matches_by_id:
+                t = []
+                for k, v in best_matches_by_id.iteritems():
+                    if k.startswith(pdb2_name + '_'):
+                        t.append((v, k))
+                if t:
+                    # We may have multiple best matches here. Instead of just returning one
+                    if allow_multiple_matches:
+                        best_matches = sorted(t)
+                        best_match_identity = best_matches[0][0]
+                        allowed_cutoff = max(cut_off, best_match_identity - multiple_match_error_margin)
+                        chain_matches[c] = []
+                        for best_match in best_matches:
+                            if best_match[0] >= allowed_cutoff:
+                                chain_matches[c].append((best_match[1].split('_')[1], best_match[0]))
+                        assert(len(chain_matches[c]) > 0)
+                    else:
+                        best_match = sorted(t)[0]
+                        chain_matches[c] = [(best_match[1].split('_')[1], best_match[0])]
 
-    return chain_matches
+        return chain_matches
+    except Exception, e:
+        raise ChainMatchingException()
 
 
 def match_RCSB_pdb_chains(pdb_id1, pdb_id2, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = True, strict = True):
@@ -125,7 +130,7 @@ def match_RCSB_pdb_chains(pdb_id1, pdb_id2, cut_off = 60.0, allow_multiple_match
         stage = pdb_id2
         pdb_2 = PDB(retrieve_pdb(pdb_id2), strict = strict)
     except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
-        raise PDBChainMapperException("An error occurred while loading %s: '%s'" % (stage, str(e)))
+        raise PDBParsingException("An error occurred while loading %s: '%s'" % (stage, str(e)))
 
     return match_pdb_chains(pdb_1, pdb_id1, pdb_2, pdb_id2, cut_off = cut_off, allow_multiple_matches = allow_multiple_matches, multiple_match_error_margin = multiple_match_error_margin, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible)
 
@@ -323,8 +328,6 @@ class MatchedChainList(object):
             s.append('No matches.')
         return '\n'.join(s)
 
-class PDBChainMapperException(Exception): pass
-
 class PipelinePDBChainMapper(BasePDBChainMapper):
     '''Similar to the removed PDBChainMapper class except this takes a list of PDB files which should be related in some way.
        The matching is done pointwise, matching all PDBs in the list to each other.
@@ -385,7 +388,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
                 pdb_path = pdb_paths[x]
                 pdbs.append(PDB.from_filepath(pdb_path), strict = strict)
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
-            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+            raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
         return PipelinePDBChainMapper(pdbs, pdb_names, cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
 
@@ -793,7 +796,7 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
             stage = 'model'
             model_pdb = PDB.from_filepath(model_pdb_path, strict = strict)
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
-            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+            raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
         return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
@@ -805,7 +808,7 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
             stage = 'model'
             model_pdb = PDB(model_pdb_contents, strict = strict)
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
-            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+            raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
         return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict)
 
@@ -848,7 +851,7 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
             stage = 'design'
             design_pdb = PDB.from_filepath(design_pdb_path, strict = strict)
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
-            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+            raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
         return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
@@ -865,7 +868,7 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
             #import traceback
             #colortext.warning(traceback.format_exc())
-            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+            raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
         return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
