@@ -197,6 +197,7 @@ class SequenceAligner(object):
     def get_best_matches_by_id(self, id, cut_off = 98.0):
         best_matches = {}
         named_matrix = self.named_matrix
+        print(named_matrix, id)
         for k, v in named_matrix[id].iteritems():
             if k != id and v >= cut_off:
                 best_matches[k] = v
