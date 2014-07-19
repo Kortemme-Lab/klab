@@ -23,6 +23,7 @@ from tools.bio.pdb import PDB
 from tools.bio.clustalo import SequenceAligner
 from tools.bio.basics import residue_type_1to3_map
 from tools.fs.fsio import write_file
+from tools.bio.pdb import PDBParsingException, NonCanonicalResidueException, PDBValidationException
 
 def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = True):
     '''Aligns two PDB files, returning a mapping from the chains in pdb1 to the chains of pdb2.
@@ -53,6 +54,7 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
 
     pdb1_chains = [c for c in pdb1.atom_chain_order]
     pdb2_chains = [c for c in pdb2.atom_chain_order]
+    unrecognized_residues = set(['X'])
 
     # Extend the list of chains by the SEQRES chain IDs. These will typically be the same list but, just in case, we take
     # the set union.
@@ -68,23 +70,27 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
     assert(pdb1_name.find('_') == -1)
     assert(pdb2_name.find('_') == -1)
 
+    kept_chains = []
     for c in pdb1_chains:
         # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
         seq1 = pdb1.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
-        if seq1:
+
+        if seq1 and str(seq1) and set(str(seq1)) != unrecognized_residues:
             sa.add_sequence('%s_%s' % (pdb1_name, c), str(seq1))
-        else:
-            pdb1_chains.remove(c)
+            kept_chains.append(c)
+    pdb1_chains = kept_chains
+
+    kept_chains = []
     for c in pdb2_chains:
         # We do not handle chains with all HETATMs (and not ATOMs) well, generally. These conditions allow for those chains
         seq2 = pdb2.get_chain_sequence_string(c, use_seqres_sequences_if_possible, raise_Exception_if_not_found = False)
-        if seq2:
+
+        if seq2 and str(seq2) and set(str(seq2)) != unrecognized_residues:
             sa.add_sequence('%s_%s' % (pdb2_name, c), str(seq2))
-        else:
-            pdb2_chains.remove(c)
+            kept_chains.append(c)
+    pdb2_chains = kept_chains
 
     sa.align()
-
     chain_matches = dict.fromkeys(pdb1_chains, None)
     for c in pdb1_chains:
         best_matches_by_id = sa.get_best_matches_by_id('%s_%s' % (pdb1_name, c), cut_off = cut_off)
@@ -111,10 +117,16 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
     return chain_matches
 
 
-def match_RCSB_pdb_chains(pdb_id1, pdb_id2, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = True):
+def match_RCSB_pdb_chains(pdb_id1, pdb_id2, cut_off = 60.0, allow_multiple_matches = False, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = True, strict = True):
     '''A convenience function for match_pdb_chains. The required arguments are two PDB IDs from the RCSB.'''
-    pdb_1 = PDB(retrieve_pdb(pdb_id1))
-    pdb_2 = PDB(retrieve_pdb(pdb_id2))
+    try:
+        stage = pdb_id1
+        pdb_1 = PDB(retrieve_pdb(pdb_id1), strict = strict)
+        stage = pdb_id2
+        pdb_2 = PDB(retrieve_pdb(pdb_id2), strict = strict)
+    except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+        raise PDBChainMapperException("An error occurred while loading %s: '%s'" % (stage, str(e)))
+
     return match_pdb_chains(pdb_1, pdb_id1, pdb_2, pdb_id2, cut_off = cut_off, allow_multiple_matches = allow_multiple_matches, multiple_match_error_margin = multiple_match_error_margin, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible)
 
 
@@ -311,6 +323,7 @@ class MatchedChainList(object):
             s.append('No matches.')
         return '\n'.join(s)
 
+class PDBChainMapperException(Exception): pass
 
 class PipelinePDBChainMapper(BasePDBChainMapper):
     '''Similar to the removed PDBChainMapper class except this takes a list of PDB files which should be related in some way.
@@ -361,12 +374,23 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
     # Constructors
 
     @staticmethod
-    def from_file_paths(pdb_paths, pdb_names, cut_off = 60.0, use_seqres_sequences_if_possible = True):
-        pdbs = [PDB.from_filepath(pdb_path) for pdb_path in pdb_paths]
-        return PipelinePDBChainMapper(pdbs, pdb_names, cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible)
+    def from_file_paths(pdb_paths, pdb_names, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
+        assert(len(pdb_paths) == len(pdb_names) and len(pdb_paths) > 1)
+
+        pdbs = []
+        stage = None
+        try:
+            for x in range(len(pdb_paths)):
+                stage = pdb_names[x]
+                pdb_path = pdb_paths[x]
+                pdbs.append(PDB.from_filepath(pdb_path), strict = strict)
+        except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+
+        return PipelinePDBChainMapper(pdbs, pdb_names, cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
 
 
-    def __init__(self, pdbs, pdb_names, cut_off = 60.0, use_seqres_sequences_if_possible = True):
+    def __init__(self, pdbs, pdb_names, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
 
         assert(len(pdbs) == len(pdb_names) and len(pdbs) > 1)
         assert(len(set(pdb_names)) == len(pdb_names)) # pdb_names must be a list of unique names
@@ -374,6 +398,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         self.pdbs = pdbs
         self.pdb_names = pdb_names
         self.use_seqres_sequences_if_possible = use_seqres_sequences_if_possible
+        self.strict = strict
 
         self.pdb_name_to_structure_mapping = {}
         for x in range(len(pdb_names)):
@@ -755,22 +780,34 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
 
 class ScaffoldModelChainMapper(PipelinePDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
-    def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True):
+    def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
-        super(ScaffoldModelChainMapper, self).__init__([scaffold_pdb, model_pdb], ['Scaffold', 'Model'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible)
+        super(ScaffoldModelChainMapper, self).__init__([scaffold_pdb, model_pdb], ['Scaffold', 'Model'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
 
     @staticmethod
-    def from_file_paths(scaffold_pdb_path, model_pdb_path, cut_off = 60.0):
-        scaffold_pdb = PDB.from_filepath(scaffold_pdb_path)
-        model_pdb = PDB.from_filepath(model_pdb_path)
-        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
+    def from_file_paths(scaffold_pdb_path, model_pdb_path, cut_off = 60.0, strict = True):
+        try:
+            stage = 'scaffold'
+            scaffold_pdb = PDB.from_filepath(scaffold_pdb_path, strict = strict)
+            stage = 'model'
+            model_pdb = PDB.from_filepath(model_pdb_path, strict = strict)
+        except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
     @staticmethod
-    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0):
-        scaffold_pdb = PDB(scaffold_pdb_contents)
-        model_pdb = PDB(model_pdb_contents)
-        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off)
+    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0, strict = True):
+        try:
+            stage = 'scaffold'
+            scaffold_pdb = PDB(scaffold_pdb_contents, strict = strict)
+            stage = 'model'
+            model_pdb = PDB(model_pdb_contents, strict = strict)
+        except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict)
 
     def get_differing_model_residue_ids(self):
         return self.get_differing_atom_residue_ids('Model', ['Scaffold'])
@@ -795,25 +832,42 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
 
 class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
-    def __init__(self, scaffold_pdb, model_pdb, design_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True):
+    def __init__(self, scaffold_pdb, model_pdb, design_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
         self.design_pdb = design_pdb
-        super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'ExpStructure'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible)
+        super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'ExpStructure'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
 
     @staticmethod
-    def from_file_paths(scaffold_pdb_path, model_pdb_path, design_pdb_path, cut_off = 60.0):
-        scaffold_pdb = PDB.from_filepath(scaffold_pdb_path)
-        model_pdb = PDB.from_filepath(model_pdb_path)
-        design_pdb = PDB.from_filepath(design_pdb_path)
-        return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
+    def from_file_paths(scaffold_pdb_path, model_pdb_path, design_pdb_path, cut_off = 60.0, strict = True):
+        try:
+            stage = 'scaffold'
+            scaffold_pdb = PDB.from_filepath(scaffold_pdb_path, strict = strict)
+            stage = 'model'
+            model_pdb = PDB.from_filepath(model_pdb_path, strict = strict)
+            stage = 'design'
+            design_pdb = PDB.from_filepath(design_pdb_path, strict = strict)
+        except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+
+        return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
     @staticmethod
-    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, design_pdb_contents, cut_off = 60.0):
-        scaffold_pdb = PDB(scaffold_pdb_contents)
-        model_pdb = PDB(model_pdb_contents)
-        design_pdb = PDB(design_pdb_contents)
-        return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off)
+    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, design_pdb_contents, cut_off = 60.0, strict = True):
+
+        try:
+            stage = 'scaffold'
+            scaffold_pdb = PDB(scaffold_pdb_contents, strict = strict)
+            stage = 'model'
+            model_pdb = PDB(model_pdb_contents, strict = strict)
+            stage = 'design'
+            design_pdb = PDB(design_pdb_contents, strict = strict)
+        except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+            #import traceback
+            #colortext.warning(traceback.format_exc())
+            raise PDBChainMapperException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+
+        return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
     def get_differing_model_residue_ids(self):
         return self.get_differing_atom_residue_ids('Model', ['Scaffold', 'ExpStructure'])

@@ -313,7 +313,7 @@ class PDB:
 
     ### Constructor ###
 
-    def __init__(self, pdb_content, pdb_id = None):
+    def __init__(self, pdb_content, pdb_id = None, strict = True):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
         self.pdb_content = pdb_content
@@ -331,6 +331,7 @@ class PDB:
         self.modified_residues = None
         self.modified_residue_mapping_3 = {}
         self.pdb_id = None
+        self.strict = strict
 
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
@@ -380,17 +381,17 @@ class PDB:
     ### Class functions ###
 
     @staticmethod
-    def from_filepath(filepath):
+    def from_filepath(filepath, strict = True):
         '''A function to replace the old constructor call where a filename was passed in.'''
-        return PDB(read_file(filepath))
+        return PDB(read_file(filepath), strict = strict)
 
     @staticmethod
-    def from_lines(pdb_file_lines):
+    def from_lines(pdb_file_lines, strict = True):
         '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
-        return PDB("\n".join(pdb_file_lines))
+        return PDB("\n".join(pdb_file_lines), strict = strict)
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None):
+    def retrieve(pdb_id, cache_dir = None, strict = True):
         '''Creates a PDB object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
 
         # Check to see whether we have a cached copy
@@ -398,7 +399,7 @@ class PDB:
         if cache_dir:
             filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
             if os.path.exists(filename):
-                return PDB(read_file(filename))
+                return PDB(read_file(filename), strict = strict)
 
         # Get a copy from the RCSB
         contents = rcsb.retrieve_pdb(pdb_id)
@@ -408,7 +409,7 @@ class PDB:
             write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), contents)
 
         # Return the object
-        return PDB(contents)
+        return PDB(contents, strict = strict)
 
     ### Private functions ###
 
@@ -461,7 +462,7 @@ class PDB:
 
     def clone(self):
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
-        return PDB("\n".join(self.lines))
+        return PDB("\n".join(self.lines), pdb_id = self.pdb_id, strict = self.strict)
 
     def write(self, pdbpath, separator = '\n'):
         write_file(pdbpath, separator.join(self.lines))
@@ -1048,7 +1049,12 @@ class PDB:
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
 
                 if not short_residue_type:
-                    raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
+                    if l.startswith("ATOM") and l[12:16] == ' OH2' and l[17:20] == 'TIP':
+                        continue
+                    elif not self.strict:
+                        short_residue_type = 'X'
+                    else:
+                        raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
                 # KAB - way to allow for multiresidue noncanonical AA's
