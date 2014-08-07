@@ -8,7 +8,7 @@ import types
 import string
 import types
 
-from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
+from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation
 from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
 from tools.fs.fsio import read_file, write_file
@@ -1487,10 +1487,20 @@ class PDB:
         '''
         remappedMutations = []
         ddGResmap = self.get_ddGResmap()
+
         for m in mutations:
             ns = (PDB.ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % PDB.ChainResidueID2String(m['Chain'], m['ResidueID'])])))
-            remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
-        checkPDBAgainstMutationsTuple(pdbID, self, remappedMutations)
+            #remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
+            #print(ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA'])
+            remappedMutations.append(Mutation(m['WildTypeAA'], ns[1:].strip(), m['MutantAA'], ns[0]))
+
+        # Validate the mutations against the Rosetta residues
+        sequences, residue_map = self.GetRosettaResidueMap()
+        for rm in remappedMutations:
+            pr = residue_map[rm.Chain][int(rm.ResidueID) - 1]
+            assert(pr[0] == rm.ResidueID)
+            assert(pr[1] == rm.WildTypeAA)
+
         return remappedMutations
 
     def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
@@ -1642,7 +1652,7 @@ class PDB:
            Caveat: This function ignores occupancy - this function should be called once occupancy has been dealt with appropriately.'''
 
         resid2type = {}
-        atomlines = self.parsed_lines['ATOM']
+        atomlines = self.parsed_lines['ATOM  ']
         for line in atomlines:
             resname = line[17:20]
             if resname in allowed_PDB_residues_types and line[13:16] == 'CA ':
