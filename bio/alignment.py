@@ -806,7 +806,7 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
             raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
-        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict)
 
     @staticmethod
     def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0, strict = True):
