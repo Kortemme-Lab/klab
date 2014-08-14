@@ -19,6 +19,7 @@ Created by Shane O'Connor 2013
 #   The Mutation class is now located here. ChainMutation was called something else.
 
 import types
+import itertools
 
 from Bio.SubsMat.MatrixInfo import blosum62 as _blosum62, pam250 as _pam250# The amino acid codes BXZ in these blosum62 and pam250 matrices appear to be amino acid ambiguity codes
 import tools.colortext as colortext
@@ -576,7 +577,6 @@ class SimpleMutation(object):
         return True
 
     def __cmp__(self, other):
-        '''Only checks amino acid types and residue ID.'''
         if self.Chain != other.Chain:
             if ord(self.Chain) < ord(other.Chain):
                 return -1
@@ -634,3 +634,31 @@ class ChainMutation(Mutation):
         if self.Chain != other.Chain:
             return False
         return True
+
+    def is_the_same_position(self, other):
+        if self.Chain != other.Chain:
+            return False
+        if self.ResidueID != other.ResidueID:
+            return False
+        if self.WildTypeAA != other.WildTypeAA:
+            return Exception('The two residues have the same chain and residue ID but different wildtypes so they are incomparable.')
+        return True
+
+
+def mutation_combinations(mutations):
+    '''A generator which returns all non-empty combinations of ChainMutation objects, respecting residue position i.e. if two residues
+       have the same chain and residue ID then we do not return a combination with both residues.
+       Note: You need to use ChainMutation objects here as their equality considers the chain id.
+    '''
+    mutations = sorted(mutations)
+    combntn = itertools.chain.from_iterable(itertools.combinations(mutations, x) for x in range(len(mutations) + 1))
+    for c in combntn:
+        if len(c) > 0: # filter out the empty combination
+            positions = ['%s%s' % (m.Chain, m.ResidueID.strip()) for m in c]
+            if len(positions) == len(set(positions)): # filter out combinations where
+                yield c
+
+def generate_all_combinations_of_mutations(mutations):
+    '''A wrapper for the mutation_combinations generator.
+       Note: You need to use ChainMutation objects here as their equality considers the chain id.'''
+    return [mutation_set for mutation_set in mutation_combinations(mutations)]
