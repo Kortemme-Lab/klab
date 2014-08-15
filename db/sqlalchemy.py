@@ -56,22 +56,27 @@ class IntermediateField(object):
             is_numeric_type = True
             typedefs['sqlalchemy.types'].add('Float')
 
-        elif self.field_type == 'text' or self.field_type == 'mediumtext':
+        elif self.field_type == 'longtext' or self.field_type == 'text' or self.field_type == 'mediumtext':
             s += 'Text'
             is_numeric_type = True
             typedefs['sqlalchemy.types'].add('Text')
 
-        elif self.field_type == 'date':
+        elif self.field_type == 'date' or self.field_type == 'datetime':
             s += 'DateTime'
             is_numeric_type = True
             typedefs['sqlalchemy.types'].add('DateTime')
+
+        elif self.field_type == 'timestamp':
+            s += 'TIMESTAMP'
+            is_numeric_type = True
+            typedefs['sqlalchemy.types'].add('TIMESTAMP')
 
         elif self.field_type.startswith('enum('):
             s += self.field_type.replace('enum', 'Enum')
             is_string_type = True
             typedefs['sqlalchemy.types'].add('Enum')
 
-        elif self.field_type.startswith('int('):
+        elif self.field_type.startswith('int(') or self.field_type.startswith('bigint('):
             s += 'Integer'
             is_numeric_type = True
             typedefs['sqlalchemy.types'].add('Integer')
@@ -80,6 +85,11 @@ class IntermediateField(object):
             s += self.field_type.upper()
             is_numeric_type = True
             typedefs['sqlalchemy.dialects.mysql'].add('TINYINT')
+
+        elif self.field_type == 'longblob':
+            s += 'LONGBLOB'
+            is_numeric_type = True
+            typedefs['sqlalchemy.dialects.mysql'].add('LONGBLOB')
 
         else:
             raise Exception("Unhandled type: '%s'" % self.field_type)
