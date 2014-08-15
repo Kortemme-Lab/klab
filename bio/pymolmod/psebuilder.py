@@ -141,6 +141,9 @@ class PyMOLSessionBuilder(object):
         self.stderr = po.stderr
         self.return_code = po.errorcode
 
+        if self.return_code != 0:
+            raise Exception('Error: %s' % str(self.stderr))
+
         pse_path = self._filepath('session.pse')
         if os.path.exists(pse_path):
             self.PSE = read_file(pse_path, binary = True)
