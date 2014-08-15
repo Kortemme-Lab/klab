@@ -14,7 +14,7 @@ import string
 from tools.fs.fsio import read_file, create_temp_755_path, write_file
 from tools import colortext
 from tools import process as tprocess
-
+from colors import ColorScheme
 
 def create_pymol_selection_from_PDB_residue_ids(residue_list):
     residues_by_chain = {}
@@ -27,7 +27,7 @@ def create_pymol_selection_from_PDB_residue_ids(residue_list):
     str = []
     for chain_id, residue_list in sorted(residues_by_chain.iteritems()):
         str.append('(chain %s and resi %s)' % (chain_id, '+'.join(map(string.strip, sorted(residue_list)))))
-    return ' and '.join(str)
+    return ' or '.join(str)
 
 class PDBContainer(object):
 
@@ -67,20 +67,28 @@ class BatchBuilder(object):
     def __init__(self, pymol_executable = 'pymol'):
         self.visualization_shell = 6
         self.visualization_pymol = pymol_executable # the command used to run pymol - change as necessary for Mac OS X
+        self.PSE_files = []
+        self.PSE_scripts = []
 
-    def run(self, builder_class, list_of_pdb_containers):
+    def run(self, builder_class, list_of_pdb_containers, settings = {}):
         PSE_files = []
+        PSE_scripts = []
         for pdb_containers in list_of_pdb_containers:
-            b = builder_class(pdb_containers)
+            b = builder_class(pdb_containers, settings)
             b.visualization_shell = self.visualization_shell
             b.visualization_pymol = self.visualization_pymol
             b.run()
             PSE_files.append(b.PSE)
+            PSE_scripts.append(b.script)
+
+        self.PSE_files = PSE_files
+        self.PSE_scripts = PSE_scripts
+
         return PSE_files
 
 class PyMOLSessionBuilder(object):
 
-    def __init__(self, pdb_containers, rootdir = '/tmp'):
+    def __init__(self, pdb_containers, settings = {}, rootdir = '/tmp'):
         self.visualization_shell = 6
         self.visualization_pymol = 'pymol'
         self.pdb_containers = pdb_containers
@@ -92,6 +100,10 @@ class PyMOLSessionBuilder(object):
         self.stdout = None
         self.stderr = None
         self.return_code = None
+        self.settings = {'colors' : {'global' : {'background-color' : 'black'}}}
+        self.settings.update(settings)
+        self.color_scheme = ColorScheme(settings.get('colors', {}))
+        del self.settings['colors'] # to avoid confusion, remove the duplicated dict as the ColorScheme object may get updated
 
     def __del__(self):
         if self.outdir:

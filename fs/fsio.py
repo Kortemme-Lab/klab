@@ -55,6 +55,9 @@ def create_temp_755_path(temproot, suffix = None):
     os.chmod(path, permissions755SGID)
     return path
 
+def create_scratch_path():
+    return create_temp_755_path('/scratch')
+
 def safe_gz_unzip(contents):
     ''' Takes a file's contents passed as a string (contents) and either gz-unzips the contents and returns the uncompressed data or else returns the original contents.
         This function raises an exception if passed what appears to be gz-zipped data (from the magic number) but if gzip fails to decompress the contents.
