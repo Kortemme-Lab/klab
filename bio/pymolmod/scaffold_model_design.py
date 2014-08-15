@@ -125,7 +125,6 @@ disable Scaffold''')
 
     def _add_residue_highlighting_section(self):
         scaffold_selection = 'Scaffold and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Scaffold.residues_of_interest))
-        print(vars())
         self.script.append('''
 ### Scaffold objects ###
 
