@@ -156,6 +156,7 @@ class DOI(object):
             raise(RecordTypeParsingNotImplementedException('Multiple entries were found in the CrossRef record. This case is not currently handled.'))
         else:
             tag_type = child_nodes[0]
+            self.record_type = tag_type
             if tag_type == 'journal':
                 journal_tag = crossref_tag.getElementsByTagName("journal")
                 if len(journal_tag) == 1:
@@ -193,8 +194,6 @@ class DOI(object):
     # Look here also: http://doi.crossref.org/schemas/common4.3.0.xsd as that spec defines the subtypes like contributors.
 
     def parse_journal_data_xml(self, journal_tag):
-        d = {'record_type' : 'journal'}
-
         self.issue['meta_data'] = self.extract_node_data(journal_tag.getElementsByTagName("journal_metadata"), ['full_title', 'abbrev_title', 'issn'])
         journal_issue_tag = journal_tag.getElementsByTagName("journal_issue")
         assert(len(journal_issue_tag) <= 1)
@@ -333,6 +332,10 @@ class DOI(object):
 
     def to_json(self):
         '''A representation of that publication data that matches the schema we use in our databases.'''
+        if not self.record_type == 'journal':
+            # todo: it may be worthwhile creating subclasses for each entry type (journal, conference, etc.) with a common
+            # API e.g. to_json which creates output appropriately
+            raise Exception('This function has only been tested on journal entries at present.')
 
         author_list = []
         authors = self.article.get('authors', [])
@@ -371,17 +374,24 @@ class DOI(object):
         ))
 
 
-    def to_string(self, add_url = False):
+    def to_string(self, html = False, add_url = False):
+
+        if not self.record_type == 'journal':
+            raise Exception('This function has only been tested on journal entries at present.')
 
         author_str = []
         for author in self.article.get('authors', []):
             author_str.append(('%s %s' % (author.get('given_name'), author.get('surname'))).strip())
         author_str = (', '.join(author_str))
+        if html and author_str:
+            author_str = '<span class="publication_authors">%s.</span>' % author_str
 
         title_str = self.article.get('title', '')
         if title_str:
             if add_url:
                 title_str = '<a href="%s" target="_blank">%s</a>' % (self.get_url(), title_str)
+        if html and title_str:
+            title_str = '<span class="publication_title">%s.</span>' % title_str
 
         issue_str = ''
         if self.issue.get('full_title'):
@@ -395,17 +405,26 @@ class DOI(object):
                     issue_str += ':%s' % self.article['first_page']
                     if self.article.get('last_page'):
                         issue_str += '-%s' % self.article['last_page']
+        if html and issue_str:
+            issue_str = '<span class="publication_issue">%s.</span>' % issue_str
 
         earliest_date = self.get_earliest_date()
         if earliest_date:
             article_date = earliest_date
         else:
             article_date = self.get_year()
+        if html and article_date:
+            article_date = '<span class="publication_date">%s.</span>' % article_date
 
-        s = '. '.join([c for c in [author_str, title_str, issue_str, article_date] if c])
-        if s:
-            return s + '.'
-        return None
+        s = None
+        if html:
+            s = ' '.join([c for c in [author_str, title_str, issue_str, article_date] if c])
+        else:
+            s = '. '.join([c for c in [author_str, title_str, issue_str, article_date] if c])
+            if s:
+                s = s + '.'
+        return s
+
 
     def __repr__(self):
         s = ['issue']
@@ -662,7 +681,7 @@ if __name__ == '__main__':
             #colortext.warning(doi)
             #print(doi.data)
             #colortext.message('print_string')
-            print(colortext.make(doi.to_string(), 'cyan'))
+            print(colortext.make(doi.to_string(html=False), 'cyan'))
             #print(colortext.make(str(doi), 'orange'))
             colortext.warning(doi.issue.get('__issue_date') or doi.article.get('__issue_date'))
             colortext.warning(doi.get_earliest_date())
@@ -671,7 +690,6 @@ if __name__ == '__main__':
             if not (doi.issue.get('__issue_date') or doi.article.get('__issue_date')):
                 break
             j = doi.to_json()
-            print(json.loads(j)['authors'][0]['Surname'])
             print('')
         except RecordTypeParsingNotImplementedException, e:
             colortext.error('Unhandled type: %s' % str(e))
