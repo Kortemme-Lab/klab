@@ -202,7 +202,7 @@ publication_abbreviations = {
 
 class RISEntry(object):
 
-    def __init__(self, RIS, quiet = True):
+    def __init__(self, RIS, quiet = True, lenient_on_tag_order = False):
         if type(RIS) != unicode_type:
             raise Exception("RIS records should always be passed as unicode.")
 
@@ -224,7 +224,7 @@ class RISEntry(object):
         self.year = None
         self.doi = None
         self.url = None
-        self.errors, self.warnings = self.parse()
+        self.errors, self.warnings = self.parse(lenient_on_tag_order = lenient_on_tag_order)
 
     @staticmethod
     def _normalize_journal_name(j):
@@ -261,7 +261,7 @@ class RISEntry(object):
         else:
             return None
 
-    def parse(self):
+    def parse(self, lenient_on_tag_order = False):
         errors = []
         warnings = []
         d = {}
@@ -272,10 +272,11 @@ class RISEntry(object):
         lines = [l.strip() for l in RIS.split("\n") if l.strip()]
 
         # Check the first entry
-        if lines[0][0:5] != 'TY  -':
-            raise Exception("Bad RIS record. Expected a TY entry as the first entry, received '%s' instead." % lines[0])
-        if lines[-1][0:5] != 'ER  -':
-            raise Exception("Bad RIS record. Expected an ER entry as the last entry, received '%s' instead." % lines[-1])
+        if not lenient_on_tag_order:
+            if lines[0][0:5] != 'TY  -':
+                raise Exception("Bad RIS record. Expected a TY entry as the first entry, received '%s' instead." % lines[0])
+            if lines[-1][0:5] != 'ER  -':
+                raise Exception("Bad RIS record. Expected an ER entry as the last entry, received '%s' instead." % lines[-1])
 
         # Parse the record
         tag_data = {}
@@ -387,10 +388,12 @@ class RISEntry(object):
         if d['volume']:
             if not(d['issue']) and d['publication_type'] != "CHAP":
                 errors.append("No issue found.")
+
         if not (self.get_page_range_in_abbreviated_format()):
             warnings.append("No start or endpage found.")
-        elif not(self.startpage and self.endpage and self.startpage.isdigit() and self.endpage.isdigit()):
-            warnings.append("No start or endpage found.")
+        #Doesn't seem to make sense for electronic journals without an endpage
+        #elif not(self.startpage and self.endpage and self.startpage.isdigit() and self.endpage.isdigit()):
+        #    warnings.append("No start or endpage found.")
 
         if not(self.journal):
             errors.append("No journal name found.")
@@ -449,7 +452,7 @@ class RISEntry(object):
         # Abbreviate the journal name
         journal = self.journal
         if abbreviate_journal and self.publication_type != "CHAP":
-            journal = publication_abbreviations[self.journal]
+            journal = publication_abbreviations.get(self.journal, self.journal)
 
         # Abbreviate the authors' names
         authors_str = None
@@ -511,6 +514,41 @@ class RISEntry(object):
             elif self.url:
                 s.append('url: %s' % self.url)
         return " ".join(s)
+
+    def to_dict(self):
+        '''A representation of that publication data that matches the schema we use in our databases.'''
+
+        author_list = []
+        for author in self.authors:
+            author_list.append(
+                dict(
+                    AuthorOrder = author['AuthorOrder'] + 1, # we should always use 1-based indexing but since this is shared code, I do not want to change the logic above without checking to make sure I don't break dependencies
+                    FirstName = author['FirstName'],
+                    MiddleNames = ' '.join(author['MiddleNames']), # this is the main difference with the code above - the database expects a string, we maintain a list
+                    Surname = author['Surname']
+                )
+            )
+
+        pub_url = None
+        if self.url or self.doi:
+            pub_url = self.url or ('http://dx.doi.org/%s' % self.doi)
+
+        return dict(
+            Title = self.title,
+            PublicationName = self.journal,
+            Volume = self.volume,
+            Issue = self.issue,
+            StartPage = self.startpage,
+            EndPage = self.endpage,
+            PublicationYear = self.year,
+            PublicationDate = self.date,
+            RIS = self.RIS,
+            DOI = self.doi,
+            PubMedID = None,
+            URL = pub_url,
+            ISSN = None, # eight-digit number
+            authors = author_list,
+        )
 
 
 if __name__ == '__main__':
