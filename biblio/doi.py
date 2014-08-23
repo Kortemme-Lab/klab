@@ -330,7 +330,7 @@ class DOI(object):
         return None
 
 
-    def to_json(self):
+    def to_dict(self):
         '''A representation of that publication data that matches the schema we use in our databases.'''
         if not self.record_type == 'journal':
             # todo: it may be worthwhile creating subclasses for each entry type (journal, conference, etc.) with a common
@@ -356,7 +356,7 @@ class DOI(object):
                 )
             )
 
-        return json.dumps(dict(
+        return dict(
             Title = self.article.get('title'),
             PublicationName = self.issue.get('full_title'),
             Volume = self.issue.get('volume'),
@@ -371,7 +371,7 @@ class DOI(object):
             URL = 'http://dx.doi.org/%s' % self.doi,
             ISSN = None, # eight-digit number
             authors = author_list,
-        ))
+        )
 
 
     def to_string(self, html = False, add_url = False):
