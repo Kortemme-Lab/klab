@@ -122,6 +122,9 @@ class PubMed(DOI):
         else:
             super(PubMed, self).__init__(doi)
 
+    def get_pubmed_id(self):
+        return self.pubmed_id
+
 
 if __name__ == '__main__':
 
