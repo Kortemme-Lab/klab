@@ -180,7 +180,7 @@ class RISEntry(PublicationInterface):
 
         # Parse the record
         tag_data = {}
-        for line in lines[:-1]:
+        for line in lines:
             tag_type = line[0:2]
 
             if not tag_type in taglist:
@@ -417,7 +417,7 @@ class RISEntry(PublicationInterface):
         return " ".join(s)
 
     def get_earliest_date(self):
-        return self.date
+        return str(self.date).replace('-', '/')
 
     def get_url(self):
         if self.doi:
@@ -463,7 +463,7 @@ class RISEntry(PublicationInterface):
             ISSN = None, # eight-digit number
             authors = author_list,
             #
-            RecordType = RISEntry.record_types.get(self.record_type)
+            RecordType = RISEntry.record_types.get(self.publication_type)
         )
 
 
