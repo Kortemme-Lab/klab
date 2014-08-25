@@ -11,11 +11,11 @@ import sys
 import re
 if __name__ == '__main__':
     sys.path.insert(0, '../..')
-from os.path import commonprefix
 import datetime
 import traceback
 import urllib2
 
+from publication import PublicationInterface, publication_abbreviations
 from tools import colortext
 
 lsttype = type([])
@@ -116,91 +116,25 @@ tag_map = {
     u'EP' : 'endpage',
 }
 
-#pubEntry = PublicationEntry(d["TY"], authors, title, journal, entry, year, doi, d.get("UR"), d.get("C7"), d.get("T2"))
-#def __init__(self, publication_type, authors, title, journal, entry, year, doi, URL, ReferralURL, subtitle):
 
-publication_abbreviations = {
-    #"Advances in Protein Chemistry"                      : "Adv Protein Chem",
-    "ACS Chemical Biology"                                      : "ACS Chem Biol",
-    "Analytical Chemistry"                                      : "Analyt Chem",
-    "Aquatic Toxicology"                                        : "Aquatic Toxicol",
-    "Biochemical and Biophysical Research Communications"       : "Biochem Biophys Res Comms",
-    "Biochemical Journal"                                       : "Biochem J", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
-    "Biochemistry"                                              : "Biochemistry",
-    "Biochimica et Biophysica Acta (BBA) - Protein Structure"   : "BBA-Protein Struct M", # this was incorporated into the journal below
-    "Biochimica et Biophysica Acta (BBA) - Protein Structure and Molecular Enzymology" : "BBA-Protein Struct M",
-    "Bioconjugate Chemistry"                                    : "Bioconjugate Chem",
-    "Bioinformatics"                                            : "Bioinformatics",
-    "Biological Chemistry"                                      : "Biol Chem", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
-    "Bioorganic & Medicinal Chemistry"                          : "Bioorg Med Chem",
-    "Biophysical Chemistry"                                     : "Biophys Chem", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
-    "Biophysical Journal"                                       : "Biophys Journal",
-    "Biopolymers"                                       : "Biopolymers", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/B_abrvjt.html
-    "BMC Evolutionary Biology"                            : "BMC Evol Biol",
-    "BMC Systems Biology"                                : "BMC Sys Biol",
-    "Cell"                                                : "Cell",
-    "Chemistry & Biology"                                : "Chem Biol",
-    "Chemical Research in Toxicology"                    : "Chem Res Toxicol",
-    "Comprehensive Biophysics"                            : "Comprehensive Biophysics",
-    "Current Opinion in Chemical Biology"                : "Curr Opin Chem Biol",
-    "Current Opinion in Structural Biology"                : "Curr Opin Struct Biol",
-    "Current Opinion in Biotechnology"                    : "Curr Opin Biotechnol",
-    "EMBO Reports"                                        : "EMBO Rep",
-    "Environmental and Molecular Mutagenesis"            : "Environ Mol Mutagen",
-    "European Journal of Biochemistry" : "Eur J Biochem", # site:www.efm.leeds.ac.uk "European Journal of Biochemistry"
-    "FEBS Journal"                                        : "FEBS Journal",
-    "FEBS Letters"                                        : "FEBS Letters",
-    "Folding and Design"                             : "Folding and Design", # I am unsure what the abbreviation is
-    "Genome Biology"                                    : "Genome Biology",
-    "Genome Research"                                    : "Genome Research",
-    "Integrative and Comparative Biology"                : "Integr and Comparative Biol",
-    "International Journal of Biological Macromolecules" : "Int J Biol Macromol", #http://www.efm.leeds.ac.uk/~mark/ISIabbr/I_abrvjt.html
-    "Journal of Biochemistry"                           : 'J Biochem',
-    "Journal of Biological Chemistry"                    : "J Biol Chem",
-    "Journal of Biomedical & Laboratory Sciences"        : "J Biomed Lab Sci",
-    "Journal of Biotechnology"                          : "J Biotechnol", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/J_abrvjt.html
-    "Journal of Chemical Information and Modeling"        : "J Chem Inf Model",
-    "Journal of Computational Biology"                    : "J Comp Biol",
-    # This is a book series? If so, don't abbreviate. "Methods in Enzymology"                                : "Meth Enzym",
-    "Journal of Molecular Biology"                        : "J Mol Biol",
-    "Journal of Protein Chemistry"                           : "J Protein Chem", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/J_abrvjt.html
-    "Journal of the American Chemical Society"            : "J Am Chem Soc", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/J_abrvjt.html
-    "Metabolomics"                                        : "Metabolomics",
-    "Molecular & Cellular Proteomics"                    : "Mol Cell Proteomics",
-    "Molecular Cell"                                    : "Mol Cell",
-    "Molecular Systems Biology"                            : "Mol Syst Biol",
-    "Nature"                                            : "Nature",
-    "Nature Biotechnology"                                : "Nat Biotech",
-    "Nature Chemical Biology"                             : "Nat Chem Biol",
-    "Nature Methods"                                     : "Nat Methods",
-    "Nature Structural & Molecular Biology"             : "Nat Struct Mol Biol",
-    "Nucleic Acids Research"                            : "Nucleic Acids Res",
-    "NeuroToxicology"                                    : "NeuroToxicol",
-    "Physical Review E"                                    : "Phys Rev E",
-    "Physical Chemistry Chemical Physics"                : "Phys Chem Chem Phys",
-    "PLoS Biology"                                         : "PLoS Biol",
-    "PLoS Computational Biology"                         : "PLoS Comput Biol",
-    "PLoS ONE"                                            : "PLoS ONE",
-    "Proceedings of the 9th International Congress of Therapeutic Drug Monitoring & Clinical Toxicology" : "Ther Drug Mon",
-    "Proceedings of the National Academy of Sciences"    : "Proc Natl Acad Sci U S A",
-    'Protein Engineering' : 'Protein Eng', # Renamed to PEDS (below) in 2004
-    'Protein Engineering, Design and Selection' : 'Protein Eng Des Sel', # http://www.bioxbio.com/if/html/PROTEIN-ENG-DES-SEL.html
-    "Protein and Peptide Letters" : "Protein Pept Lett", # http://www.efm.leeds.ac.uk/~mark/ISIabbr/P_abrvjt.html
-    "Protein Science"                                    : "Protein Sci",
-    "Proteins: Structure, Function, and Bioinformatics"    : "Proteins",
-    "Proteomics"                                        : "Proteomics",
-    "Science's STKE : signal transduction knowledge environment"        : "Sci STKE",
-    "Science"                                            : "Science",
-    "Spectroscopy: An International Journal"            : "Spectr Int J",
-    "Structure"                                            : "Structure",
-    "The EMBO Journal"                                   : "EMBO J",
-    "The Journal of Physical Chemistry B"                 : "J Phys Chem B",
-    "The Journal of Cell Biology"                        : "J Cell Biol",
-    "The Journal of Immunology"                            : "J Immunol",
-    "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)"    : "Proceedings of the 2009 IEEE/ACM International Conference on Computer-Aided Design (ICCAD 2009)",
-}
+class RISEntry(PublicationInterface):
 
-class RISEntry(object):
+    record_types = {
+        'JOUR' : 'Journal',
+        'JFULL' : 'Journal',
+        'EJOUR' : 'Journal',
+        'CHAP' : 'Book',
+        'BOOK' : 'Book',
+        'EBOOK' : 'Book',
+        'ECHAP' : 'Book',
+        'EDBOOK' : 'Book',
+        'CONF' : 'Conference',
+        'CPAPER' : 'Conference',
+        'THES' : 'Dissertation',
+        'RPRT' : 'Report',
+        'STAND' : 'Standard',
+        'DBASE' : 'Database',
+    }
 
     def __init__(self, RIS, quiet = True, lenient_on_tag_order = False):
         if type(RIS) != unicode_type:
@@ -226,40 +160,6 @@ class RISEntry(object):
         self.url = None
         self.errors, self.warnings = self.parse(lenient_on_tag_order = lenient_on_tag_order)
 
-    @staticmethod
-    def _normalize_journal_name(j):
-        return j.strip().replace(".", "").replace(",", "").replace("  ", "").lower()
-
-    @staticmethod
-    def get_author_name_in_short_format(author):
-        initials = []
-        if author['FirstName']: # counterexample: Arvind :-)
-            initials.append(author['FirstName'][0])
-        initials += [mn[0] for mn in author['MiddleNames']]
-        return "%s, %s" % (author['Surname'], "".join(initials))
-
-    def get_author_names_in_short_format(self):
-        short = []
-        for author in self.authors:
-            short.append(RISEntry.get_author_name_in_short_format(author))
-        return short
-
-    def get_page_range_in_abbreviated_format(self):
-        startpage = self.startpage
-        endpage = self.endpage
-
-        if startpage and endpage:
-            # Abbreviate e.g. '6026-6029' to '6026-9'.
-            endpage_prefix = commonprefix([startpage, endpage])
-            if len(endpage_prefix) == len(endpage):
-                endpage = endpage[-1] # If the prefix is the end page, just use the last digit. # todo - isn't this test only valid when startpage=endpage? in that case, we just just return startpage. Test this.
-            else:
-                endpage = endpage[len(endpage_prefix):]
-            return "%s-%s" % (startpage, endpage)
-        elif startpage or endpage:
-            return startpage or endpage
-        else:
-            return None
 
     def parse(self, lenient_on_tag_order = False):
         errors = []
@@ -389,7 +289,7 @@ class RISEntry(object):
             if not(d['issue']) and d['publication_type'] != "CHAP":
                 errors.append("No issue found.")
 
-        if not (self.get_page_range_in_abbreviated_format()):
+        if not (PublicationInterface.get_page_range_in_abbreviated_format(self.startpage, self.endpage)):
             warnings.append("No start or endpage found.")
         #Doesn't seem to make sense for electronic journals without an endpage
         #elif not(self.startpage and self.endpage and self.startpage.isdigit() and self.endpage.isdigit()):
@@ -429,9 +329,9 @@ class RISEntry(object):
         else:
             if self.publication_type != "CHAP" and not(publication_abbreviations.get(self.journal)):
                 matched = False
-                normalized_journal_name = RISEntry._normalize_journal_name(self.journal)
+                normalized_journal_name = PublicationInterface._normalize_journal_name(self.journal)
                 for k, v in publication_abbreviations.iteritems():
-                    if RISEntry._normalize_journal_name(k) == normalized_journal_name or RISEntry._normalize_journal_name(v) == normalized_journal_name:
+                    if PublicationInterface._normalize_journal_name(k) == normalized_journal_name or PublicationInterface._normalize_journal_name(v) == normalized_journal_name:
                         self.journal = k
                         matched = True
                         break
@@ -442,8 +342,9 @@ class RISEntry(object):
 
         return errors, warnings
 
-    def format(self, abbreviate_journal = True, abbreviate_author_names = True, show_year = True, html = True, allow_errors = False):
 
+    def format(self, abbreviate_journal = True, abbreviate_author_names = True, show_year = True, html = True, allow_errors = False):
+        raise Exception('This function is deprecated in favor of PublicationInterface.to_string. Some functionality needs to be added to that function e.g. ReferralURL_link.')
         if self.errors and not allow_errors:
             if not self.quiet:
                 colortext.error("There were parsing errors: %s" % self.errors)
@@ -483,14 +384,14 @@ class RISEntry(object):
             if self.issue:
                 entry += "(%s)" % self.issue
 
-            pagerange = self.get_page_range_in_abbreviated_format()
+            pagerange = PublicationInterface.get_page_range_in_abbreviated_format(self.startpage, self.endpage)
             if pagerange:
                 entry += ":%s" % pagerange
         else:
             if self.startpage and self.endpage and self.startpage.isdigit() and self.endpage.isdigit():
                 if self.subtitle:
                     entry = " (%s)" % self.subtitle
-                pagerange = self.get_page_range_in_abbreviated_format()
+                pagerange = PublicationInterface.get_page_range_in_abbreviated_format(self.startpage, self.endpage)
                 if pagerange:
                     entry += ":%s" % pagerange
 
@@ -514,6 +415,19 @@ class RISEntry(object):
             elif self.url:
                 s.append('url: %s' % self.url)
         return " ".join(s)
+
+    def get_earliest_date(self):
+        return self.date
+
+    def get_url(self):
+        if self.doi:
+            return 'http://dx.doi.org/%s' % doi
+        elif self.url:
+            return self.url
+        return None
+
+    def get_year(self):
+        return self.year
 
     def to_dict(self):
         '''A representation of that publication data that matches the schema we use in our databases.'''
@@ -548,6 +462,8 @@ class RISEntry(object):
             URL = pub_url,
             ISSN = None, # eight-digit number
             authors = author_list,
+            #
+            RecordType = RISEntry.record_types.get(self.record_type)
         )
 
 
