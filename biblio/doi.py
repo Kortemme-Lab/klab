@@ -24,7 +24,7 @@ import urllib2
 import json
 from xml.dom.minidom import parse, parseString
 
-from publication import PublicationInterface
+from publication import PublicationInterface, publication_abbreviations
 from tools.comms.http import get_resource
 from tools import colortext
 
@@ -323,8 +323,64 @@ class DOI(PublicationInterface):
     def get_url(self):
         return 'http://dx.doi.org/%s' % self.doi
 
+    def convert_to_ris(self):
+        d = self.to_dict()
+
+        RIS = []
+
+        doi_to_ris_record_type_mapping = {
+            'Journal' : 'JOUR'
+        }
+
+        if doi_to_ris_record_type_mapping.get(d['RecordType']):
+            RIS.append('TY  - %s' % doi_to_ris_record_type_mapping[d['RecordType']])
+        else:
+            raise Exception("The logic needed to parse records of type '%s' has not been implemented yet." % d['RecordType'])
+
+        if d.get('Title'):
+            RIS.append('T1  - %(Title)s' % d)
+
+        for author in d['authors']:
+            if author['MiddleNames']:
+                first_names = ' '.join([author.get('FirstName')] + author['MiddleNames'].split())
+            else:
+                first_names = author.get('FirstName')
+            if author['Surname']:
+                RIS.append('A1  - %s, %s' % (author['Surname'], first_names))
+            else:
+                RIS.append('A1  - %s' % first_names)
+
+        if d.get('PublicationName'):
+            RIS.append('JF  - %(PublicationName)s' % d)
+            if publication_abbreviations.get(d['PublicationName']):
+                RIS.append('JA  - %s' % publication_abbreviations[d['PublicationName']])
+
+        if d.get('Volume'):
+            RIS.append('VL  - %(Volume)s' % d)
+
+        if d.get('Issue'):
+            RIS.append('IS  - %(Issue)s' % d)
+
+        if d.get('StartPage'):
+            RIS.append('SP  - %(StartPage)s' % d)
+
+        if d.get('EndPage'):
+            RIS.append('EP  - %(EndPage)s' % d)
+
+        if d.get('DOI'):
+            RIS.append('M3  - %(DOI)s' % d)
+            RIS.append('UR  - http://dx.doi.org/%(DOI)s' % d)
+
+        if d.get('PublicationDate'):
+            RIS.append('Y1  - %(PublicationDate)s' % d)
+        elif d.get('PublicationYear'):
+            RIS.append('Y1  - %(PublicationYear)s' % d)
+
+        RIS.append('ER  - ')
+        return '\n'.join(RIS)
 
     def get_earliest_date(self):
+        '''Returns the earliest date as a string.'''
         if self.published_dates:
             return str(sorted(self.published_dates)[0]).replace('-', '/')
         return None
