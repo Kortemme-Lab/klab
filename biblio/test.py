@@ -3556,6 +3556,7 @@ if __name__ == '__main__':
                 if not (doi.issue.get('__issue_date') or doi.article.get('__issue_date')):
                     break
                 j = doi.to_json()
+                r = doi.convert_to_ris()
                 print('')
             except RecordTypeParsingNotImplementedException, e:
                 colortext.error('Unhandled type: %s' % str(e))

@@ -421,7 +421,7 @@ class RISEntry(PublicationInterface):
 
     def get_url(self):
         if self.doi:
-            return 'http://dx.doi.org/%s' % doi
+            return 'http://dx.doi.org/%s' % self.doi
         elif self.url:
             return self.url
         return None
