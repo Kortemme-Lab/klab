@@ -332,7 +332,7 @@ class PDB:
         self.modified_residue_mapping_3 = {}
         self.pdb_id = None
         self.strict = strict
-
+        
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
@@ -1077,6 +1077,7 @@ class PDB:
 
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
 
+                short_residue_type = None
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
                 elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
@@ -1127,6 +1128,7 @@ class PDB:
                 residue_type = l[17:20].strip()
 
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
+                short_residue_type = None
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
                 elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
@@ -1135,7 +1137,9 @@ class PDB:
                     short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
                 elif chain_type == 'RNA':
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
-                if not short_residue_type:
+                elif not self.strict:
+                    short_residue_type = 'X'
+                else:
                     raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
@@ -1286,7 +1290,11 @@ class PDB:
                     # Skip unknown residues
                     continue
                 if residue_longname not in allowed_PDB_residues_types and not(ConvertMSEToAtom and residue_longname == 'MSE'):
-                    raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
+                    if not self.strict:
+                        # Skip unknown residues
+                        continue
+                    else:
+                        raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
                     resid = line[21:27]
                     #print(chainID, residue_longname, resid)

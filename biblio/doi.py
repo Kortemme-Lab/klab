@@ -187,7 +187,6 @@ class DOI(PublicationInterface):
                 else:
                     raise(CrossRefException("An unknown CrossRef exception occurred."))
             else:
-                print(self.data)
                 raise(UnexpectedRecordTypeException("An expected CrossRef record was found ('%s'). This case is not currently handled." % tag_type))
 
 
