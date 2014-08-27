@@ -38,13 +38,14 @@ class ScaffoldModelDesignBuilder(PyMOLSessionBuilder):
 
     def __init__(self, pdb_containers, settings = {}, rootdir = '/tmp'):
         super(ScaffoldModelDesignBuilder, self).__init__(pdb_containers, settings, rootdir)
-        self.Scaffold = pdb_containers['Scaffold']
+        self.Scaffold = pdb_containers.get('Scaffold')
         self.Model = pdb_containers['Model']
         self.ExpStructure = pdb_containers.get('ExpStructure')
 
     def _create_input_files(self):
         #colortext.message('self.outdir: ' + self.outdir)
-        write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
+        if self.Scaffold:
+            write_file(self._filepath('scaffold.pdb'), self.Scaffold.pdb_contents)
         write_file(self._filepath('model.pdb'), self.Model.pdb_contents)
         if self.ExpStructure:
             write_file(self._filepath('design.pdb'), self.ExpStructure.pdb_contents)
@@ -124,8 +125,9 @@ util.cbc Scaffold
 disable Scaffold''')
 
     def _add_residue_highlighting_section(self):
-        scaffold_selection = 'Scaffold and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Scaffold.residues_of_interest))
-        self.script.append('''
+        if self.Scaffold:
+            scaffold_selection = 'Scaffold and (%s)' % (create_pymol_selection_from_PDB_residue_ids(self.Scaffold.residues_of_interest))
+            self.script.append('''
 ### Scaffold objects ###
 
 # Scaffold mutations
@@ -136,7 +138,7 @@ if has_mutations: cmd.create('Scaffold_mutations', '%(scaffold_selection)s');
 if has_mutations: cmd.show('sticks', 'Scaffold_mutations')
 ''' % vars())
 
-        self.script.append('''
+            self.script.append('''
 if has_mutations: cmd.color('%(Scaffold.mutations)s', 'Scaffold_mutations')
 
 # Scaffold HETATMs - create
