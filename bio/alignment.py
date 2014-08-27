@@ -155,6 +155,74 @@ def match_best_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, use_
     return d
 
 
+class SingleSequencePrinter(object):
+    '''A class for generating formatted strings for a single sequence in the same fashion as the MultipleSequenceAlignmentPrinter.'''
+
+    def __init__(self, sequence_name, sequence, sequence_tooltips = None):
+
+        # Make sure that if the sequence has tooltips then there is an injection between the residues and the tooltips (a tooltip
+        # may be None rather than a string)
+        if sequence_tooltips:
+            assert(len(str(sequence).replace('-', '')) == len(sequence_tooltips))
+
+        # Make sure that the sequence lengths are all the same size
+        self.sequence_length = len(str(sequence))
+        self.label_width = len(sequence_name)
+        self.sequence_name = sequence_name
+        self.sequence = sequence
+        print(type(self.sequence))
+        self.sequence_tooltips = sequence_tooltips
+
+    def to_lines(self, width = 80, reversed = False, line_separator = '\n'): raise Exception('I have not written this function yet.')
+
+    def to_html(self, width = 80, header_separator = '_', add_tooltips = True, extra_tooltip_class = ''):
+        html = []
+        html.append('<div class="chain_alignment">')
+
+        sequence, sequence_name, sequence_tooltips = self.sequence, self.sequence_name, self.sequence_tooltips
+        # Turn off tooltips if requested
+        if not(add_tooltips):
+            sequence_tooltips = None
+
+        if self.label_width + 2 < width:
+            # headers is a list of pairs split by header_separator. If header_separator is not specified then the
+            # second element will be an empty string
+            if header_separator:
+                headers = sequence_name.split(header_separator)
+            else:
+                headers = [sequence_name, '']
+            print(headers)
+
+            num_residues_per_line = width - self.label_width
+            sequence_str = str(sequence)
+
+            # x iterates over a chunk of the sequence alignment
+            for x in range(0, self.sequence_length, num_residues_per_line):
+                html.append('<div class="sequence_block">')
+
+                # Create a list, subsequence_list, where each entry corresponds to the chunk of the sequence alignment for each sequenec
+                residue_substring = []
+                subsequence = sequence_str[x:x+num_residues_per_line]
+
+                # Iterate over all residues in the subsequences, marking up residues that differ
+                for z in range(len(subsequence)):
+                    residue_type = subsequence[z]
+                    if sequence_tooltips:
+                        residue_substring.append('<span class="%s" title="%s %s">%s</span>' % (extra_tooltip_class, residue_type_1to3_map[residue_type], tooltip.strip(), residue_type))
+                    elif sequence_tooltips:
+                        residue_substring.append('<span class="%s missing_ATOMs" title="No ATOM records">%s</span>' % (extra_tooltip_class, residue_type))
+                    else:
+                        residue_substring.append(residue_type)
+
+                html.append('<div class="sequence_alignment_line sequence_alignment_line_%s"><span>%s</span><span>%s</span><span>%s</span></div>' % (headers[0], headers[0], headers[1], ''.join(residue_substring)))
+                html.append('</div>') # sequence_block
+        else:
+            raise Exception('The width (%d characters) is not large enough to display the sequence alignment.' % width)
+
+        html.append('</div>')
+        return '\n'.join(html).replace(' class=""', '')
+
+
 class MultipleSequenceAlignmentPrinter(object):
     '''A class for generating formatted strings from a multiple sequence alignment. These strings should be the result
        of an MSA i.e. they should all have the same length.
@@ -236,7 +304,7 @@ class MultipleSequenceAlignmentPrinter(object):
             for x in range(0, self.sequence_length, num_residues_per_line):
                 html.append('<div class="sequence_block">')
 
-                # Create a list, subsequence_list, where each entry corresponds to the chunk of the sequence alignment for each sequenec
+                # Create a list, subsequence_list, where each entry corresponds to the chunk of the sequence alignment for each sequence
                 subsequence_list = []
                 residue_substrings = []
                 for y in range(num_sequences):
@@ -660,11 +728,9 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             # Add the primary PDB's sequence for the chain
             primary_pdb_sequence_type, primary_pdb_sequence = primary_pdb.get_annotated_chain_sequence_string(primary_pdb_chain, self.use_seqres_sequences_if_possible)
             sa.add_sequence('%s_%s' % (primary_pdb_name, primary_pdb_chain), str(primary_pdb_sequence))
-
             other_chain_types_and_sequences = {}
             for other_pdb_name in pdb_list[1:]:
                 other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
-
                 other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
                 #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
                 if other_chains:
@@ -776,7 +842,6 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             members.
 
             Returns HTML for the sequence alignments and an empty string if no alignments were made.'''
-
         sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
         if not sequence_alignment_printer_tuples:
             return ''
@@ -842,18 +907,26 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
 
 
 class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
-    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
+    '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.
+       The scaffold structure is allowed to be missing.
+    '''
     def __init__(self, scaffold_pdb, model_pdb, design_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
         self.design_pdb = design_pdb
-        super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'ExpStructure'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
+        if self.scaffold_pdb:
+            super(ScaffoldModelDesignChainMapper, self).__init__([scaffold_pdb, model_pdb, design_pdb], ['Scaffold', 'Model', 'ExpStructure'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
+        else:
+            super(ScaffoldModelDesignChainMapper, self).__init__([model_pdb, design_pdb], ['Model', 'ExpStructure'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
 
     @staticmethod
     def from_file_paths(scaffold_pdb_path, model_pdb_path, design_pdb_path, cut_off = 60.0, strict = True):
         try:
             stage = 'scaffold'
-            scaffold_pdb = PDB.from_filepath(scaffold_pdb_path, strict = strict)
+            scaffold_pdb = None
+            if scaffold_pdb_path:
+                # Allow the scaffold to be null
+                scaffold_pdb = PDB.from_filepath(scaffold_pdb_path, strict = strict)
             stage = 'model'
             model_pdb = PDB.from_filepath(model_pdb_path, strict = strict)
             stage = 'design'
@@ -868,7 +941,10 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
 
         try:
             stage = 'scaffold'
-            scaffold_pdb = PDB(scaffold_pdb_contents, strict = strict)
+            scaffold_pdb = None
+            if scaffold_pdb_contents:
+                # Allow the scaffold to be null
+                scaffold_pdb = PDB(scaffold_pdb_contents, strict = strict)
             stage = 'model'
             model_pdb = PDB(model_pdb_contents, strict = strict)
             stage = 'design'
