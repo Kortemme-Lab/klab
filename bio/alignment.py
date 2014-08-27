@@ -957,24 +957,37 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
         return ScaffoldModelDesignChainMapper(scaffold_pdb, model_pdb, design_pdb, cut_off = cut_off, strict = strict)
 
     def get_differing_model_residue_ids(self):
-        return self.get_differing_atom_residue_ids('Model', ['Scaffold', 'ExpStructure'])
+        if self.scaffold_pdb:
+            return self.get_differing_atom_residue_ids('Model', ['Scaffold', 'ExpStructure'])
+        else:
+            return self.get_differing_atom_residue_ids('Model', ['ExpStructure'])
 
     def get_differing_scaffold_residue_ids(self):
-        return self.get_differing_atom_residue_ids('Scaffold', ['Model', 'ExpStructure'])
+        if self.scaffold_pdb:
+            return self.get_differing_atom_residue_ids('Scaffold', ['Model', 'ExpStructure'])
 
     def get_differing_design_residue_ids(self):
-        return self.get_differing_atom_residue_ids('ExpStructure', ['Scaffold', 'Model'])
+        if self.scaffold_pdb:
+            return self.get_differing_atom_residue_ids('ExpStructure', ['Scaffold', 'Model'])
+        else:
+            return self.get_differing_atom_residue_ids('ExpStructure', ['Model'])
 
     def generate_pymol_session(self, pymol_executable = 'pymol', settings = {}):
         ''' Generates the PyMOL session for the scaffold, model, and design structures.
             Returns this session and the script which generated it.'''
         b = BatchBuilder(pymol_executable = pymol_executable)
 
-        structures_list = [
-            ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
-            ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
-            ('ExpStructure', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
-        ]
+        if self.scaffold_pdb:
+            structures_list = [
+                ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
+                ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
+                ('ExpStructure', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
+            ]
+        else:
+            structures_list = [
+                ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
+                ('ExpStructure', self.design_pdb.pdb_content, self.get_differing_design_residue_ids ()),
+            ]
 
         PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
 
