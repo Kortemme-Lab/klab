@@ -714,7 +714,7 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
             pdb_list = self.pdb_names
 
         assert(len(set(pdb_list)) == len(pdb_list) and (len(pdb_list) > 1))
-        assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list))
+        assert(sorted(set(pdb_list).intersection(set(self.pdb_names))) == sorted(set(pdb_list)))
 
         primary_pdb = self.pdb_name_to_structure_mapping[pdb_list[0]]
         primary_pdb_name = pdb_list[0]
