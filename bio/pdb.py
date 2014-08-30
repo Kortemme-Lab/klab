@@ -8,7 +8,7 @@ import types
 import string
 import types
 
-from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation
+from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation
 from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
 from tools.fs.fsio import read_file, write_file
@@ -604,6 +604,20 @@ class PDB:
             self.lines = [l for l in self.lines if not(l.startswith('HETATM'))]
         self._update_structure_lines()
         # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
+
+    def generate_all_point_mutations_for_chain(self, chain_id):
+        mutations = []
+        if self.atom_sequences.get(chain_id):
+            aas = sorted(residue_type_3to1_map.values())
+            aas.remove('X')
+            seq = self.atom_sequences[chain_id]
+            for res_id in seq.order:
+                r = seq.sequence[res_id]
+                assert(chain_id == r.Chain)
+                for mut_aa in aas:
+                    if mut_aa != r.ResidueAA:
+                        mutations.append(ChainMutation(r.ResidueAA, r.ResidueID, mut_aa, Chain = chain_id))
+        return mutations
 
     ### PDB file parsing functions ###
 
@@ -1385,7 +1399,7 @@ class PDB:
 
     @staticmethod
     def ResidueID2String(residueID):
-        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        '''Takes a residueID e.g. '123' or '123A' and returns the 5-character identifier spaced as in the PDB format.'''
         if residueID.isdigit():
             return "%s " % (residueID.rjust(4))
         else:
@@ -1498,17 +1512,15 @@ class PDB:
 
         for m in mutations:
             ns = (PDB.ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % PDB.ChainResidueID2String(m['Chain'], m['ResidueID'])])))
-            #remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
-            #print(ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA'])
             remappedMutations.append(Mutation(m['WildTypeAA'], ns[1:].strip(), m['MutantAA'], ns[0]))
 
         # Validate the mutations against the Rosetta residues
         sequences, residue_map = self.GetRosettaResidueMap()
         for rm in remappedMutations:
-            pr = residue_map[rm.Chain][int(rm.ResidueID) - 1]
+            offset = int(residue_map[rm.Chain][0][0])
+            pr = residue_map[rm.Chain][int(rm.ResidueID) - offset]
             assert(pr[0] == rm.ResidueID)
             assert(pr[1] == rm.WildTypeAA)
-
         return remappedMutations
 
     def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
