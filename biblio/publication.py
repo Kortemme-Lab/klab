@@ -9,7 +9,6 @@ Created by Shane O'Connor 2014
 """
 
 from os.path import commonprefix
-import json
 
 publication_abbreviations = {
     #"Advances in Protein Chemistry"                      : "Adv Protein Chem",
@@ -133,7 +132,9 @@ class PublicationInterface(object):
     def get_earliest_date(self): raise Exception('This function needs to be implemented by the subclasses.')
     def get_year(self): raise Exception('This function needs to be implemented by the subclasses.')
     def get_url(self): raise Exception('This function needs to be implemented by the subclasses.')
-    def to_json(self): return json.dumps(self.to_dict())
+    def to_json(self):
+        import json
+        return json.dumps(self.to_dict())
 
     def to_string(self, abbreviate_journal = True, html = False, add_url = False):
         d = self.to_dict()

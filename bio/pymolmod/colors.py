@@ -247,7 +247,7 @@ default_color_scheme = {
 def create_new_color_command(color_name, r, g, b):
     return 'set_color %(color_name)s, [%(r).10f,%(g).10f,%(b).10f]' % vars()
 
-class ColorScheme():
+class ColorScheme(object):
     '''A dict wrapper class. The dict that is stored is intended to have a tree structure. The paths of the tree describe
        how the color should be used e.g. RosettaModel.bb should be used to color the backbone of a Rosetta model. The leaves of the
        tree are colors. If a new color is needed, use the create_new_color_command function to define the new color in
