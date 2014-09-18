@@ -19,7 +19,7 @@ restriction_sites = {   # (fold)
 def reverse_translate(
         protein_seq,
         template_dna=None, leading_seq="", trailing_seq="",
-        restriction_sites=(), using_gen9=False):
+        forbidden_seqs=(), using_gen9=False):
     """
     Generate a well-behaved DNA sequence from the given protein sequence.  If a 
     template DNA sequence is specified, the returned DNA sequence will be as 
@@ -29,13 +29,13 @@ def reverse_translate(
     """
 
     if using_gen9:
-        restriction_sites += gen9.reserved_restriction_sites
+        forbidden_seqs += gen9.reserved_restriction_sites
 
     leading_seq = restriction_sites.get(leading_seq, leading_seq)
     trailing_seq = restriction_sites.get(trailing_seq, trailing_seq)
 
     codon_list = make_codon_list(protein_seq, template_dna)
-    sanitize_codon_list(codon_list, restriction_sites)
+    sanitize_codon_list(codon_list, forbidden_seqs)
     dna_seq = leading_seq + ''.join(codon_list) + trailing_seq
 
     if using_gen9:
@@ -71,7 +71,7 @@ def make_codon_list(protein_seq, template_dna=None):
 
     return codon_list
 
-def sanitize_codon_list(codon_list, restriction_sites=()):
+def sanitize_codon_list(codon_list, forbidden_seqs=()):
     """
     Make silent mutations to the given codon lists to remove any undesirable 
     sequences that are present within it.  Undesirable sequences include 
@@ -94,12 +94,12 @@ def sanitize_codon_list(codon_list, restriction_sites=()):
     bad_seqs = set()
     
     bad_seqs.union(
-            restriction_sites.get(rs, rs)
-            for rs in restriction_sites)
+            restriction_sites.get(seq, seq)
+            for seq in forbidden_seqs)
 
     bad_seqs.union(
-            dna.reverse_complement(rs)
-            for rs in bad_seqs)
+            dna.reverse_complement(seq)
+            for seq in bad_seqs)
 
     bad_seqs.union(
             base * (gen9.homopolymer_max_lengths[base] + 1)
