@@ -87,7 +87,7 @@ missing_chain_ids = {
 
 ### Whitelist for PDB files with ACE residues (we could allow all to pass but it may be good to manually look at each case)
 
-cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX', '1UNQ'])
+cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX', '1UNQ', '1DFJ'])
 
 ### Parsing-related variables
 
@@ -291,8 +291,12 @@ class JRNL(object):
             type = line[35:39]
             ID = line[40:65].strip()
             if type != "ISSN" and type != "ESSN":
-                raise Exception("Invalid type for REFN field (%s)" % type)
-            self.d["REFN"] = {"type" : type, "ID" : ID}
+                if type.strip():
+                    raise Exception("Invalid type for REFN field (%s)" % type)
+            if not type.strip():
+                pass # e.g. 1BXI has a null reference
+            else:
+                self.d["REFN"] = {"type" : type, "ID" : ID}
         else:
             assert(line.strip() == PRELUDE)
 
@@ -359,6 +363,7 @@ class PDB:
             self._update_structure_lines()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
+
 
     def fix_pdb(self):
         '''A function to fix fatal errors in PDB files when they can be automatically fixed. At present, this only runs if
@@ -619,6 +624,19 @@ class PDB:
                         mutations.append(ChainMutation(r.ResidueAA, r.ResidueID, mut_aa, Chain = chain_id))
         return mutations
 
+    ### FASTA functions ###
+
+
+    def create_fasta(self, length = 80):
+        s = ''
+        for c in self.seqres_chain_order:
+            s += '>%s:%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
+            seq = str(self.seqres_sequences[c])
+            for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
+                s += line + '\n'
+        return s
+
+
     ### PDB file parsing functions ###
 
     def _get_pdb_format_version(self):
@@ -785,6 +803,8 @@ class PDB:
                             'SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85, NEGATIVE REGULATOR OF THE PHO SYSTEM;')
             MD = MD.replace('SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80; AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;',
                             'SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80, AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;')
+            # Hack for 1JRH
+            MD = MD.replace('FAB FRAGMENT;PEPSIN DIGESTION OF INTACT ANTIBODY', 'FAB FRAGMENT,PEPSIN DIGESTION OF INTACT ANTIBODY')
 
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
 
@@ -1195,6 +1215,7 @@ class PDB:
                     atom_to_seqres_maps[c][atom_residue_id] = seqres_residue_id
 
         return seqres_to_atom_maps, atom_to_seqres_maps
+
 
     def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
