@@ -217,6 +217,11 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group.add_option("-Z", "--nozip", dest="nozip", action="store_true", help="Optional, false by default. If this is option is set then the resulting fragments are not compressed with gzip. We compress output by default as this can reduce the output size by 90% and the resulting zipped files can be passed directly to Rosetta.")
     parser.add_option_group(group)
 
+    group = OptionGroup(parser, "Job options")
+    group.add_option("-x", "--scratch", type="int", dest="scratch", help="Optional. Specifies the amount of /scratch space in GB to reserve for the job.")
+    group.add_option("-m", "--memfree", type="int", dest="memfree", help="Optional. Specifies the amount of RAM in GB that the job will require on the cluster. This must be at least 2GB.")
+    group.add_option("-r", "--runtime", type="int", dest="runtime", help="Optional. Specifies the runtime in hours that the job will require on the cluster. This must be at least 8 hours.")
+
     group = OptionGroup(parser, "Querying options")
     group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q.", metavar="QUEUE_NAME")
     group.add_option("-K", "--check", dest="check", help="Optional, needs to be fixed for batch mode. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
@@ -231,6 +236,10 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     parser.set_defaults(sendmail = False)
     parser.set_defaults(queue = 'lab.q')
     parser.set_defaults(nozip = False)
+    parser.set_defaults(scratch = 1)
+    parser.set_defaults(memfree = 2)
+    parser.set_defaults(runtime = 10)
+
     (options, args) = parser.parse_args()
 
     username = get_username()
@@ -250,6 +259,14 @@ the script will output fragments for 1a2pA and 1a2pB.''')
             errors.extend(ClusterEngine.check(logfile, jobID, cluster_job_name))
 
     validOptions = options.query or options.check
+
+    # RAM / scratch
+    if options.scratch < 1:
+        errors.append("The amount of scratch space requested must be at least 1 (GB).")
+    if options.memfree < 2:
+        errors.append("The amount of RAM requested must be at least 2 (GB).")
+    if options.runtime < 8:
+        errors.append("The requested runtime must be at least 8 (hours).")
 
     # PDB ID
     if options.pdbid:
@@ -375,6 +392,9 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         "jobname"		: cluster_job_name,
         "job_inputs"    : job_inputs,
         "no_zip"           : options.nozip,
+        "scratch"           : options.scratch,
+        "memfree"           : options.memfree,
+        "runtime"           : options.runtime,
         #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
         }
 
