@@ -84,7 +84,7 @@ def create_scratch_path():
 
 print("<make_fragments>")
 
-print("<start_tiime>")
+print("<start_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</start_time>")
 
