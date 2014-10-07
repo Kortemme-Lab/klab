@@ -45,9 +45,7 @@ class SingleTask(ClusterTask):
 #$ -e %(outpath)s
 #$ -cwd
 #$ -r y
-#$ -l mem_free=2G
 #$ -l arch=linux-x64
-#$ -l scratch=1G
 '''
 
     python_script_preamble = '''
@@ -86,7 +84,7 @@ def create_scratch_path():
 
 print("<make_fragments>")
 
-print("<start_time>")
+print("<start_tiime>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</start_time>")
 
@@ -126,14 +124,23 @@ if subp.errorcode != 0:
         self.test_mode = test_mode
         self.submission_script = self.__class__.submission_script
         self.set_run_length_and_queue()
+        self.set_memory_and_scratch()
         self.submission_script += '\npython python_script.py\n\n'
 
     def set_run_length_and_queue(self):
         if self.test_mode:
             self.submission_script += '#$ -l h_rt=0:29:00\n'
         else:
-            self.submission_script += '#$ -l h_rt=10:00:00\n'
+            self.submission_script += '#$ -l h_rt=%d:00:00\n' % int(self.options['runtime'])
         self.submission_script += '#$ -q %s\n' % self.options['queue']
+
+    def set_memory_and_scratch(self):
+        if self.test_mode:
+            self.submission_script += '#$ -l mem_free=2G\n'
+            self.submission_script += '#$ -l scratch=1G\n'
+        else:
+            self.submission_script += '#$ -l mem_free=%dG\n' % int(self.options['memfree'])
+            self.submission_script += '#$ -l scratch=%dG\n' % int(self.options['scratch'])
 
     def get_scripts(self):
         options = self.options
