@@ -26,6 +26,9 @@ $| = 1; # disable stdout buffering
 #    ./databases/nr_pfilt  from ./databases/nr using ./psipred/bin/pfilt
 #    ./sparks-x            http://sparks.informatics.iupui.edu/index.php?pageLoc=Services
 
+# Set SPARKXDIR environment variable.
+$ENV{'SPARKSXDIR'} = '/netapp/home/klabqb3backrub/tools/sparks-x';
+
 # ROSETTA
 #my $FRAGMENT_PICKER = "$Bin/../../main/source/bin/fragment_picker.boost_thread.linuxgccrelease";
 my $FRAGMENT_PICKER = "/netapp/home/rpac/Rosetta_56471/main/source/bin/fragment_picker.default.linuxgccrelease";
@@ -62,6 +65,7 @@ my $PSIPRED_USE_weights_dat4 = 0;    # set to 0 if using psipred version 3.2+
 #my $PFILTNR = "/netapp/home/klabqb3backrub/mirror/RefSeq/nrfilt";
 my $PFILTNR = "/netapp/database/blast/blastdb/nrfilt";
 
+my $PDB_SEQRES      = "/netapp/home/klabqb3backrub/mirror/pdb/derived_data/pdb_seqres.txt";
 my $INTERNET_HOST = "ws0"; # "localhost";
 
 ### EXTRA OPTIONAL FEATURES ###################################################
@@ -243,7 +247,7 @@ if (!-s $PFILTNR) {
 # for homolog detection
 my $VALL_BLAST_DB = "$VALL.blast";
 $VALL_BLAST_DB =~ s/\.gz\.blast$/\.blast/;
-my $PDB_SEQRES      = "$Bin/pdb_seqres.txt";
+#my $PDB_SEQRES      = "$Bin/pdb_seqres.txt";
 if ( !$options{homs} ) {
 	if (!-s "$VALL_BLAST_DB.phr") {
 		system("gunzip $VALL_BLAST_DB.gz") if (-s "$VALL_BLAST_DB.gz");

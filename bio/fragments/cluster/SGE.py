@@ -23,27 +23,66 @@ import subprocess
 from ClusterTask import ClusterTask
 
 sys.path.insert(0, "..")
-from utils import colorprinter
+from utils import colorprinter, JobInitializationException
+
+# todo: move these into a common file e.g. utils.py
+ERRCODE_ARGUMENTS = 1
+ERRCODE_CLUSTER = 2
+ERRCODE_OLDRESULTS = 3
+ERRCODE_CONFIG = 4
+ERRCODE_NOOUTPUT = 5
+ERRCODE_JOBFAILED = 6
+ERRCODE_MISSING_FILES = 1
+
+ClusterType = "SGE"
 
 class SingleTask(ClusterTask):
 
-    script_header ='''
-#!/usr/bin/python
+    submission_script ='''
+#!/usr/bin/bash
 #$ -N %(jobname)s
 #$ -o %(outpath)s
 #$ -e %(outpath)s
 #$ -cwd
 #$ -r y
-#$ -l mem_free=1G
-#$ -l arch=lx24-amd64
-#$ -l h_rt=6:00:00
+#$ -l mem_free=2G
+#$ -l arch=linux-x64
+#$ -l scratch=1G
 '''
-    job_header = '''
+
+    python_script_preamble = '''
+import sys
 from time import strftime
 import socket
 import os
 import platform
 import subprocess
+import tempfile
+import shutil
+import glob
+
+class ProcessOutput(object):
+
+    def __init__(self, stdout, stderr, errorcode):
+        self.stdout = stdout
+        self.stderr = stderr
+        self.errorcode = errorcode
+    
+    def getError(self):
+        if self.errorcode != 0:
+            return("Errorcode: %%d\\n%%s" %% (self.errorcode, self.stderr))
+        return None
+
+def Popen(outdir, args):
+    subp = subprocess.Popen([str(arg) for arg in args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir, env={'SPARKSXDIR' : '/netapp/home/klabqb3backrub/tools/sparks-x'})
+    output = subp.communicate()
+    return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
+
+def create_scratch_path():
+    path = tempfile.mkdtemp(dir = '/scratch')
+    if not os.path.isdir(path):
+        raise os.error
+    return path
 
 print("<make_fragments>")
 
@@ -56,27 +95,47 @@ print(socket.gethostname())
 print("</host>")
 
 print("<arch>")
-print(platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
+print(platform.machine() + ', ' + platform.processor() + ', ' + platform.platform())
 print("</arch>")
 
 task_id = os.environ.get('SGE_TASK_ID')
 '''
 
-    job_footer = '''
+    python_script_postamble = '''
 print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
 
-subp = subprocess.Popen(['qstat', '-xml', '-j', os.environ['JOB_ID'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
-
 print("</make_fragments>")
+
+if subp.errorcode != 0:
+    sys.stderr.write(subp.stderr)
+    sys.exit(subp.errorcode)
 '''
 
-    def __init__(self, make_fragments_perl_script, options):
+    def __init__(self, make_fragments_perl_script, options, test_mode = False):
         '''options must contain jobname, outpath, no_homologs, NumTasks, [pdb_ids], [chains], and [fasta_files].'''
         super(SingleTask, self).__init__(make_fragments_perl_script, options)
 
-    def get_script(self):
+        # NOTE: This if/elif block is specific to the QB3 cluster system and is only included for the benefit of QB3 users. Delete this line or alter it to fit your SGE cluster queue names.
+        if options['queue'] not in ['long.q', 'lab.q', 'short.q']: 
+            raise JobInitializationException("The queue you specified (%s) is invalid. Please use either long.q, lab.q, or short.q." % options['queue'])
+        elif options['queue'] == 'short.q':
+            test_mode = True
+
+        self.test_mode = test_mode
+        self.submission_script = self.__class__.submission_script
+        self.set_run_length_and_queue()
+        self.submission_script += '\npython python_script.py\n\n'
+
+    def set_run_length_and_queue(self):
+        if self.test_mode:
+            self.submission_script += '#$ -l h_rt=0:29:00\n'
+        else:
+            self.submission_script += '#$ -l h_rt=10:00:00\n'
+        self.submission_script += '#$ -q %s\n' % self.options['queue']
+
+    def get_scripts(self):
         options = self.options
 
         assert(1 == len(options['job_inputs']))
@@ -90,47 +149,63 @@ print("</make_fragments>")
 
         fasta_file_dir = os.path.split(fasta_file)[0]
         no_homologs = options['no_homologs']
+        zip_files = str(not(options['no_zip']))
 
-        job_cmd = '''
+        python_script = '''
 job_root_dir = "%(fasta_file_dir)s"
+
+# Set up scratch directory
+scratch_path = create_scratch_path()
+shutil.copy("%(fasta_file)s", scratch_path)
+
 print("<cwd>")
-print(job_root_dir)
+print(scratch_path)
 print("</cwd>")
 
 print("<cmd>")
-print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s']))
+cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s'] if c]
+print(' '.join(cmd_args))
 print("</cmd>")
 
 print("<output>")
-subp = subprocess.Popen(['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s'], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+subp = Popen(scratch_path, cmd_args)
+sys.stdout.write(subp.stdout)
 print("</output>")
+
+if %(zip_files)s:
+    print("<gzip>")
+    for f in glob.glob(os.path.join(scratch_path, "*mers")) + [os.path.join(scratch_path, 'ss_blast')]:
+        if os.path.exists(f):
+            subpzip = Popen(scratch_path, ['gzip', f])
+            print(f)
+    print("</gzip>")
+
+# Copy files from scratch back to /netapp
+#for f in glob.glob(os.path.join(scratch_path, "*")):
+#    shutil.copy(f, job_root_dir)
+
+# Copy files from scratch back to /netapp
+os.remove("%(fasta_file)s")
+os.rmdir(job_root_dir)
+shutil.copytree(scratch_path, job_root_dir)
+shutil.rmtree(scratch_path)
+
 ''' % locals()
 
-        self.script = '\n'.join([self.__class__.script_header, self.__class__.job_header, job_cmd, self.__class__.job_footer])
-        return self.script % locals()
+        return 'submission_script.sh', {
+            'submission_script.sh' : self.submission_script % locals(),
+            'python_script.py' : '\n'.join([self.__class__.python_script_preamble, python_script, self.__class__.python_script_postamble]) % locals()
+        }
+
 
 class MultipleTask(SingleTask):
 
     # The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
     cmd = 'make_fragments_RAP_cluster.pl -verbose -id %(pdbid)s%(chain)s %(no_homologs)s %(fasta)s'
 
-    script_header = SingleTask.script_header + '''
-#$ -t 1-%(num_tasks)d
-'''
+    submission_script = SingleTask.submission_script + '#$ -t 1-%(num_tasks)d\n'
 
-    job_cmd = '''
-working_dir = os.path.join("%(outpath)s", task_input_id)
-os.mkdir(working_dir)
-print("<cwd>")
-print(workingdir)
-print("</cwd>")
-
-print("<output>")
-subp = subprocess.Popen(%(cmd_list)s, stdout=file_stdout, stderr=file_stdout, cwd=working_dir)
-print("</output>")
-'''
-
-    def get_script(self):
+    def get_scripts(self):
         options = self.options
 
         jobname = options['jobname']
@@ -139,9 +214,8 @@ print("</output>")
 
         job_inputs = options['job_inputs']
         num_tasks = len(options['job_inputs'])
-
-
         no_homologs = options['no_homologs']
+        zip_files = str(not(options['no_zip']))
 
         job_arrays = []
         job_arrays.append('chains = %s' % str([ji.chain for ji in job_inputs]))
@@ -149,32 +223,55 @@ print("</output>")
         job_arrays.append('fasta_files = %s' % str([ji.fasta_file for ji in job_inputs]))
         job_arrays = '\n'.join(job_arrays)
 
-        job_cmd = '''
+        python_script = '''
 
-idx = task_id - 1
+idx = int(task_id) - 1
 chain = chains[idx]
 pdb_id = pdb_ids[idx]
 fasta_file = fasta_files[idx]
-
 job_root_dir = os.path.split(fasta_file)[0]
+
+# Set up scratch directory
+scratch_path = create_scratch_path()
+shutil.copy(fasta_file, scratch_path)
+
 print("<cwd>")
-print(job_root_dir)
+print(scratch_path)
 print("</cwd>")
 
 print("<cmd>")
-print(' '.join(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file]))
+cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file] if c]
+print(' '.join(cmd_args))
 print("</cmd>")
 
 print("<output>")
-subp = subprocess.Popen(['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=job_root_dir)
+subp = Popen(scratch_path, cmd_args)
+sys.stdout.write(subp.stdout)
 print("</output>")
+
+if %(zip_files)s:
+    print("<gzip>")
+    for f in glob.glob(os.path.join(scratch_path, "*mers")) + [os.path.join(scratch_path, 'ss_blast')]:
+        if os.path.exists(f):
+            subpzip = Popen(scratch_path, ['gzip', f])
+            print(f)
+    print("</gzip>")
+
+# Copy files from scratch back to /netapp
+os.remove(fasta_file)
+os.rmdir(job_root_dir)
+shutil.copytree(scratch_path, job_root_dir)
+shutil.rmtree(scratch_path)
+
 ''' % locals()
 
-        self.script = '\n'.join([self.__class__.script_header, self.__class__.job_header, job_arrays, job_cmd, self.__class__.job_footer])
-        return self.script % locals()
+        return 'submission_script.sh', {
+            'submission_script.sh' : self.submission_script % locals(),
+            'python_script.py' : '\n'.join([self.__class__.python_script_preamble, job_arrays, python_script, self.__class__.python_script_postamble]) % locals()
+        }
 
 
-def submit(command_filename, workingdir):
+def submit(command_filename, workingdir, send_mail = False, username = None):
     '''Submit the given command filename to the queue. Adapted from the qb3 example.'''
 
     # Open streams
@@ -184,11 +281,12 @@ def submit(command_filename, workingdir):
 
     # Form command
     command = ['qsub']
-    if hold_jobid:
-        command.append('-hold_jid')
-        command.append('%d' % hold_jobid)
+       
+    if send_mail and username:
+        #username = 'Shane.OConnor@ucsf.edu'
+        command.extend(['-m', 'eas', '-M', '%s@chef.compbio.ucsf.edu' % username])
     command.append(command_filename)
-
+    
     # Submit the job and capture output.
     try:
         subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stdout, cwd=workingdir)
@@ -225,10 +323,9 @@ def submit(command_filename, workingdir):
     output = output.replace('"', "'")
     if output.startswith("qsub: ERROR"):
         raise Exception(output)
-    print(output)
 
     os.remove(outfile)
-    os.remove(command_filename)
+    #os.remove(command_filename)
 
     return jobid, output
 
@@ -236,9 +333,8 @@ def submit(command_filename, workingdir):
 def query(logfile, jobID = None):
     """If jobID is an integer then return False if the job has finished and True if it is still running.
        Otherwise, returns a table of jobs run by the user."""
-
+    
     joblist = logfile.readFromLogfile()
-
     if jobID and type(jobID) == type(1):
         command = ['qstat', '-j', str(jobID)]
     else:
@@ -255,6 +351,8 @@ def query(logfile, jobID = None):
         else:
             return True
 
+    if not output.strip():
+        colorprinter.message("No jobs running at present.")
     output = output.strip().split("\n")
     if len(output) > 2:
         for line in output[2:]:
@@ -295,7 +393,9 @@ def query(logfile, jobID = None):
         return True
 
 
-def check(logfile, job_id):
+def check(logfile, job_id, cluster_job_name):
+    # todo: this needs to be updated for array jobs
+    errors = []
     joblist = logfile.readFromLogfile()
     jobIsRunning = query(logfile, job_id)
     if not joblist.get(job_id):
@@ -304,8 +404,7 @@ def check(logfile, job_id):
         else:
             errors.append("Job %d is running but has no entry in the logfile %s." % (job_id, logfile.getName()))
     else:
-        global clusterJobName
-        cname = clusterJobName
+        cname = cluster_job_name
         dir = joblist[job_id]["Directory"]
         if not jobIsRunning:
             outputfile = os.path.join(dir, "%(cname)s.o%(job_id)d" % vars())
@@ -325,3 +424,4 @@ def check(logfile, job_id):
                     errcode = ERRCODE_NOOUTPUT
         else:
             colorprinter.warning("Job %d is still running. Results are being stored in %s." % (job_id, dir))
+    return errors
