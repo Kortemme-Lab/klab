@@ -7,6 +7,7 @@ http wrappers
 Created by Shane O'Connor 2012
 """
 
+import os
 from httplib import HTTPConnection
 
 def get(url):

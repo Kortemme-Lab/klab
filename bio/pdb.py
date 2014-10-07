@@ -8,8 +8,8 @@ import types
 import string
 import types
 
-from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3
-from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation
+from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
 from tools.fs.fsio import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
@@ -87,7 +87,7 @@ missing_chain_ids = {
 
 ### Whitelist for PDB files with ACE residues (we could allow all to pass but it may be good to manually look at each case)
 
-cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX'])
+cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX', '1UNQ', '1DFJ'])
 
 ### Parsing-related variables
 
@@ -291,8 +291,12 @@ class JRNL(object):
             type = line[35:39]
             ID = line[40:65].strip()
             if type != "ISSN" and type != "ESSN":
-                raise Exception("Invalid type for REFN field (%s)" % type)
-            self.d["REFN"] = {"type" : type, "ID" : ID}
+                if type.strip():
+                    raise Exception("Invalid type for REFN field (%s)" % type)
+            if not type.strip():
+                pass # e.g. 1BXI has a null reference
+            else:
+                self.d["REFN"] = {"type" : type, "ID" : ID}
         else:
             assert(line.strip() == PRELUDE)
 
@@ -313,7 +317,7 @@ class PDB:
 
     ### Constructor ###
 
-    def __init__(self, pdb_content, pdb_id = None):
+    def __init__(self, pdb_content, pdb_id = None, strict = True):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
         self.pdb_content = pdb_content
@@ -331,7 +335,8 @@ class PDB:
         self.modified_residues = None
         self.modified_residue_mapping_3 = {}
         self.pdb_id = None
-
+        self.strict = strict
+        
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
@@ -346,6 +351,7 @@ class PDB:
         self.rosetta_to_atom_sequence_maps = {}
         self.rosetta_residues = []
 
+        self.fix_pdb()
         self._split_lines()
         self.pdb_id = pdb_id
         self.pdb_id = self.get_pdb_id()                 # parse the PDB ID if it is not passed in
@@ -357,6 +363,44 @@ class PDB:
             self._update_structure_lines()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
+
+
+    def fix_pdb(self):
+        '''A function to fix fatal errors in PDB files when they can be automatically fixed. At present, this only runs if
+           self.strict is False. We may want a separate property for this since we may want to keep strict mode but still
+           allow PDBs to be fixed.
+
+           The only fixes at the moment are for missing chain IDs which get filled in with a valid PDB ID, if possible.'''
+
+        if self.strict:
+            return
+
+        # Get the list of chains
+        chains = set()
+        for l in self.lines:
+            if l.startswith('ATOM  ') or l.startswith('HETATM'):
+                chains.add(l[21])
+
+        # If there is a chain with a blank ID, change that ID to a valid unused ID
+        if ' ' in chains:
+            fresh_id = None
+            allowed_chain_ids = list(string.uppercase) + list(string.lowercase) + map(str, range(10))
+            for c in chains:
+                try: allowed_chain_ids.remove(c)
+                except: pass
+            if allowed_chain_ids:
+                fresh_id = allowed_chain_ids[0]
+
+            # Rewrite the lines
+            new_lines = []
+            if fresh_id:
+                for l in self.lines:
+                    if (l.startswith('ATOM  ') or l.startswith('HETATM')) and l[21] == ' ':
+                        new_lines.append('%s%s%s' % (l[:21], fresh_id, l[22:]))
+                    else:
+                        new_lines.append(l)
+                self.lines = new_lines
+
 
     def _apply_hacks(self):
         if self.pdb_id:
@@ -380,17 +424,17 @@ class PDB:
     ### Class functions ###
 
     @staticmethod
-    def from_filepath(filepath):
+    def from_filepath(filepath, strict = True):
         '''A function to replace the old constructor call where a filename was passed in.'''
-        return PDB(read_file(filepath))
+        return PDB(read_file(filepath), strict = strict)
 
     @staticmethod
-    def from_lines(pdb_file_lines):
+    def from_lines(pdb_file_lines, strict = True):
         '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
-        return PDB("\n".join(pdb_file_lines))
+        return PDB("\n".join(pdb_file_lines), strict = strict)
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None):
+    def retrieve(pdb_id, cache_dir = None, strict = True):
         '''Creates a PDB object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
 
         # Check to see whether we have a cached copy
@@ -398,7 +442,7 @@ class PDB:
         if cache_dir:
             filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
             if os.path.exists(filename):
-                return PDB(read_file(filename))
+                return PDB(read_file(filename), strict = strict)
 
         # Get a copy from the RCSB
         contents = rcsb.retrieve_pdb(pdb_id)
@@ -408,7 +452,7 @@ class PDB:
             write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), contents)
 
         # Return the object
-        return PDB(contents)
+        return PDB(contents, strict = strict)
 
     ### Private functions ###
 
@@ -442,7 +486,7 @@ class PDB:
                 if missing_chain_ids.get(self.pdb_id):
                     chain_id = missing_chain_ids[self.pdb_id]
                 structure_lines.append(line)
-                if chain_id not in atom_chain_order:
+                if (chain_id not in atom_chain_order) and (chain_id != ' '):
                     atom_chain_order.append(chain_id)
                 if linetype == 'ATOM  ':
                     atom_type = line[12:16].strip()
@@ -461,7 +505,7 @@ class PDB:
 
     def clone(self):
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
-        return PDB("\n".join(self.lines))
+        return PDB("\n".join(self.lines), pdb_id = self.pdb_id, strict = self.strict)
 
     def write(self, pdbpath, separator = '\n'):
         write_file(pdbpath, separator.join(self.lines))
@@ -483,6 +527,25 @@ class PDB:
     def get_ATOM_and_HETATM_chains(self):
         '''todo: remove this function as it now just returns a member element'''
         return self.atom_chain_order
+
+    def get_annotated_chain_sequence_string(self, chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = True):
+        '''A helper function to return the Sequence for a chain. If use_seqres_sequences_if_possible then we return the SEQRES
+           Sequence if it exists. We return a tuple of values, the first identifying which sequence was returned.'''
+        if use_seqres_sequences_if_possible and self.seqres_sequences and self.seqres_sequences.get(chain_id):
+            return ('SEQRES', self.seqres_sequences[chain_id])
+        elif self.atom_sequences.get(chain_id):
+            return ('ATOM', self.atom_sequences[chain_id])
+        elif raise_Exception_if_not_found:
+            raise Exception('Error: Chain %s expected but not found.' % (str(chain_id)))
+        else:
+            return None
+
+    def get_chain_sequence_string(self, chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = True):
+        '''Similar to get_annotated_chain_sequence_string except that we only return the Sequence and do not state which sequence it was.'''
+        chain_pair = self.get_annotated_chain_sequence_string(chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = raise_Exception_if_not_found)
+        if chain_pair:
+            return chain_pair[1]
+        return None
 
     def _get_modified_residues(self):
         if not self.modified_residues:
@@ -547,13 +610,43 @@ class PDB:
         self._update_structure_lines()
         # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
 
+    def generate_all_point_mutations_for_chain(self, chain_id):
+        mutations = []
+        if self.atom_sequences.get(chain_id):
+            aas = sorted(residue_type_3to1_map.values())
+            aas.remove('X')
+            seq = self.atom_sequences[chain_id]
+            for res_id in seq.order:
+                r = seq.sequence[res_id]
+                assert(chain_id == r.Chain)
+                for mut_aa in aas:
+                    if mut_aa != r.ResidueAA:
+                        mutations.append(ChainMutation(r.ResidueAA, r.ResidueID, mut_aa, Chain = chain_id))
+        return mutations
+
+    ### FASTA functions ###
+
+
+    def create_fasta(self, length = 80):
+        s = ''
+        for c in self.seqres_chain_order:
+            s += '>%s:%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
+            seq = str(self.seqres_sequences[c])
+            for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
+                s += line + '\n'
+        return s
+
+
     ### PDB file parsing functions ###
 
     def _get_pdb_format_version(self):
         '''Remark 4 indicates the version of the PDB File Format used to generate the file.'''
         if not self.format_version:
             version = None
-            version_lines = [line for line in self.parsed_lines['REMARK'] if int(line[7:10]) == 4 and line[10:].strip()]
+            version_lines = None
+            try:
+                version_lines = [line for line in self.parsed_lines['REMARK'] if int(line[7:10]) == 4 and line[10:].strip()]
+            except: pass
             if version_lines:
                 assert(len(version_lines) == 1)
                 version_line = version_lines[0]
@@ -605,6 +698,11 @@ class PDB:
         if not resolution:
             raise PDBParsingException("Could not determine resolution.")
         return resolution
+
+    def get_title(self):
+        if self.parsed_lines.get("TITLE "):
+            return " ".join([line[10:80].strip() for line in self.parsed_lines["TITLE "] if line[10:80].strip()])
+        return None
 
     def get_techniques(self):
         techniques = None
@@ -705,6 +803,8 @@ class PDB:
                             'SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85, NEGATIVE REGULATOR OF THE PHO SYSTEM;')
             MD = MD.replace('SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80; AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;',
                             'SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80, AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;')
+            # Hack for 1JRH
+            MD = MD.replace('FAB FRAGMENT;PEPSIN DIGESTION OF INTACT ANTIBODY', 'FAB FRAGMENT,PEPSIN DIGESTION OF INTACT ANTIBODY')
 
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
 
@@ -1011,6 +1111,7 @@ class PDB:
 
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
 
+                short_residue_type = None
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
                 elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
@@ -1021,7 +1122,12 @@ class PDB:
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
 
                 if not short_residue_type:
-                    raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
+                    if l.startswith("ATOM") and l[12:16] == ' OH2' and l[17:20] == 'TIP':
+                        continue
+                    elif not self.strict:
+                        short_residue_type = 'X'
+                    else:
+                        raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
                 # KAB - way to allow for multiresidue noncanonical AA's
@@ -1056,6 +1162,7 @@ class PDB:
                 residue_type = l[17:20].strip()
 
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
+                short_residue_type = None
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
                 elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
@@ -1064,7 +1171,9 @@ class PDB:
                     short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
                 elif chain_type == 'RNA':
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
-                if not short_residue_type:
+                elif not self.strict:
+                    short_residue_type = 'X'
+                else:
                     raise NonCanonicalResidueException("Unrecognized residue type %s in PDB file '%s', residue ID '%s'." % (residue_type, str(self.pdb_id), str(residue_id)))
 
                 #structural_residue_IDs.append((residue_id, short_residue_type))
@@ -1072,6 +1181,40 @@ class PDB:
                 structural_residue_IDs_set.add(residue_id)
 
         self.atom_sequences = atom_sequences
+
+
+    def construct_seqres_to_atom_residue_map(self):
+        '''Uses the SequenceAligner to align the SEQRES and ATOM sequences and return the mappings.
+           If the SEQRES sequence does not exist for a chain, the mappings are None.
+           Note: The ResidueRelatrix is better equipped for this job since it can use the SIFTS mappings. This function
+           is provided for cases where it is not possible to use the ResidueRelatrix.'''
+        from tools.bio.clustalo import SequenceAligner
+
+        seqres_to_atom_maps = {}
+        atom_to_seqres_maps = {}
+        for c in self.seqres_chain_order:
+            if c in self.atom_chain_order:
+
+                # Get the sequences for chain c
+                seqres_sequence = self.seqres_sequences[c]
+                atom_sequence = self.atom_sequences[c]
+
+                # Align the sequences. mapping will be a mapping between the sequence *strings* (1-indexed)
+                sa = SequenceAligner()
+                sa.add_sequence('seqres_%s' % c, str(seqres_sequence))
+                sa.add_sequence('atom_%s' % c, str(atom_sequence))
+                mapping, match_mapping = sa.get_residue_mapping()
+
+                # Use the mapping from the sequence strings to look up the residue IDs and then create a mapping between these residue IDs
+                seqres_to_atom_maps[c] = {}
+                atom_to_seqres_maps[c] = {}
+                for seqres_residue_index, atom_residue_index in mapping.iteritems():
+                    seqres_residue_id = seqres_sequence.order[seqres_residue_index - 1] # order is a 0-based list
+                    atom_residue_id = atom_sequence.order[atom_residue_index - 1] # order is a 0-based list
+                    seqres_to_atom_maps[c][seqres_residue_id] = atom_residue_id
+                    atom_to_seqres_maps[c][atom_residue_id] = seqres_residue_id
+
+        return seqres_to_atom_maps, atom_to_seqres_maps
 
 
     def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
@@ -1182,7 +1325,11 @@ class PDB:
                     # Skip unknown residues
                     continue
                 if residue_longname not in allowed_PDB_residues_types and not(ConvertMSEToAtom and residue_longname == 'MSE'):
-                    raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
+                    if not self.strict:
+                        # Skip unknown residues
+                        continue
+                    else:
+                        raise NonCanonicalResidueException("Residue %s encountered: %s" % (line[17:20], line))
                 else:
                     resid = line[21:27]
                     #print(chainID, residue_longname, resid)
@@ -1273,7 +1420,7 @@ class PDB:
 
     @staticmethod
     def ResidueID2String(residueID):
-        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        '''Takes a residueID e.g. '123' or '123A' and returns the 5-character identifier spaced as in the PDB format.'''
         if residueID.isdigit():
             return "%s " % (residueID.rjust(4))
         else:
@@ -1383,10 +1530,18 @@ class PDB:
         '''
         remappedMutations = []
         ddGResmap = self.get_ddGResmap()
+
         for m in mutations:
             ns = (PDB.ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % PDB.ChainResidueID2String(m['Chain'], m['ResidueID'])])))
-            remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
-        checkPDBAgainstMutationsTuple(pdbID, self, remappedMutations)
+            remappedMutations.append(Mutation(m['WildTypeAA'], ns[1:].strip(), m['MutantAA'], ns[0]))
+
+        # Validate the mutations against the Rosetta residues
+        sequences, residue_map = self.GetRosettaResidueMap()
+        for rm in remappedMutations:
+            offset = int(residue_map[rm.Chain][0][0])
+            pr = residue_map[rm.Chain][int(rm.ResidueID) - offset]
+            assert(pr[0] == rm.ResidueID)
+            assert(pr[1] == rm.WildTypeAA)
         return remappedMutations
 
     def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
@@ -1538,7 +1693,7 @@ class PDB:
            Caveat: This function ignores occupancy - this function should be called once occupancy has been dealt with appropriately.'''
 
         resid2type = {}
-        atomlines = self.parsed_lines['ATOM']
+        atomlines = self.parsed_lines['ATOM  ']
         for line in atomlines:
             resname = line[17:20]
             if resname in allowed_PDB_residues_types and line[13:16] == 'CA ':
