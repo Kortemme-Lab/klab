@@ -8,14 +8,14 @@ import types
 import string
 import types
 
-from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation
-from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
-from tools import colortext
-from tools.fs.fsio import read_file, write_file
-from tools.pymath.stats import get_mean_and_standard_deviation
-from tools.pymath.cartesian import spatialhash
-from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-import rcsb
+from .basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation
+from .basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from .. import colortext
+from ..fs.fsio import read_file, write_file
+from ..pymath.stats import get_mean_and_standard_deviation
+from ..pymath.cartesian import spatialhash
+from ..rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
+from . import rcsb
 
 # todo: related packages will need to be fixed since my refactoring
 # The PDB constructor has now changed
@@ -628,13 +628,20 @@ class PDB:
 
 
     def create_fasta(self, length = 80):
-        s = ''
-        for c in self.seqres_chain_order:
-            s += '>%s:%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
-            seq = str(self.seqres_sequences[c])
+        fasta_string = ''
+        chain_order = self.seqres_chain_order or self.atom_chain_order
+        sequences = self.seqres_sequences or self.atom_sequences
+
+        for c in chain_order:
+            if c not in sequences:
+                continue
+            
+            fasta_string += '>%s|%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
+            seq = str(sequences[c])
             for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
-                s += line + '\n'
-        return s
+                fasta_string += line + '\n'
+
+        return fasta_string
 
 
     ### PDB file parsing functions ###
