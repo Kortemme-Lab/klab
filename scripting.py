@@ -15,3 +15,11 @@ def clear_directory(directory):
     if os.path.exists(directory): shutil.rmtree(directory)
     os.makedirs(directory)
 
+def mkdir(newdir):
+    if os.path.isdir(newdir):
+        pass
+    elif os.path.isfile(newdir):
+        raise OSError("a file with the same name as the desired " \
+                      "dir, '%s', already exists." % newdir)
+    else:
+        os.makedirs(newdir)
