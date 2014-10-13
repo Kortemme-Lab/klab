@@ -19,6 +19,8 @@ permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
 def read_file(filepath, binary = False):
     if binary:
         output_handle = open(filepath, 'rb')
+    elif filepath.endswith('.gz'):
+        output_handle = gzip.open(filepath, 'r')
     else:
         output_handle = open(filepath, 'r')
     contents = output_handle.read()
