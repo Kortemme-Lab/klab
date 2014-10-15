@@ -668,6 +668,7 @@ class PDB:
 
     def get_resolution(self):
         resolution = None
+        resolution_lines_exist = False
         for line in self.parsed_lines["REMARK"]:
             if line[9] == "2" and line[11:22] == "RESOLUTION.":
                 #if id == :
@@ -688,6 +689,7 @@ class PDB:
                 # Instead, we use the code below:
                 if resolution:
                     raise Exception("Found multiple RESOLUTION lines.")
+                resolution_lines_exist = True
                 strippedline = line[22:].strip()
                 Aindex = strippedline.find("ANGSTROMS.")
                 if strippedline == "NOT APPLICABLE.":
@@ -702,7 +704,7 @@ class PDB:
                             raise PDBParsingException("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard. Expected data for diffraction experiments." % line )
                 else:
                     raise PDBParsingException("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard." % line )
-        if not resolution:
+        if resolution_lines_exist and not resolution:
             raise PDBParsingException("Could not determine resolution.")
         return resolution
 
@@ -713,12 +715,14 @@ class PDB:
 
     def get_techniques(self):
         techniques = None
+        technique_lines_exist = False
         for line in self.parsed_lines["EXPDTA"]:
+            technique_lines_exist = True
             techniques = line[10:71].split(";")
             for k in range(len(techniques)):
                 techniques[k] = techniques[k].strip()
             techniques = ";".join(techniques)
-        if not techniques:
+        if technique_lines_exist and not techniques:
             raise PDBParsingException("Could not determine techniques used.")
         return techniques
 
@@ -906,9 +910,11 @@ class PDB:
         return [v for k, v in sorted(molecules.iteritems())]
 
     def get_journal(self):
-        if not self.journal:
-            self.journal = JRNL(self.parsed_lines["JRNL  "])
-        return self.journal.get_info()
+        if self.parsed_lines["JRNL  "]:
+            if not self.journal:
+                self.journal = JRNL(self.parsed_lines["JRNL  "])
+            return self.journal.get_info()
+        return None
 
     ### Sequence-related functions ###
 
