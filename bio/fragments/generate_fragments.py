@@ -452,13 +452,13 @@ def get_sequences(options, fasta_files, batch_mode):
             errors.append("The FASTA file(s) %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (fasta_files_str, join(multipledefinitions, "\n")))
         else:
             if not options.chain:
-                if chains_present > 1:
+                if len(chains_present) > 1:
                     errors.append("Please enter a chain. Valid chains are: %s." % join(chains_present, ", "))
                 else:
                     options.chain = chains_present[0]
                     colorprinter.message("No chain specified. Using the only one present in the fasta file(s), %s." % options.chain)
             if not options.pdbid:
-                if pdbids_present > 1:
+                if len(pdbids_present) > 1:
                     errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbids_present, ", "))
                 else:
                     options.pdbid = pdbids_present[0].lower()

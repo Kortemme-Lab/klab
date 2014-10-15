@@ -11,8 +11,11 @@ import gzip
 # Note: I should use the same convention for all methods here but read_file differs. We should really support the whole fopen cstdio spec.
 
 def read_file(filepath, binary = False):
+    print filepath
     if binary:
         output_handle = open(filepath,'rb')
+    elif filepath.endswith('.gz'):
+        output_handle = gzip.open(filepath,'r')
     else:
         output_handle = open(filepath,'r')
     contents = output_handle.read()
