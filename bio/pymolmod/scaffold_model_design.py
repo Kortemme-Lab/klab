@@ -116,12 +116,15 @@ super Scaffold, RosettaModel''')
         pass
 
     def _add_scaffold_view_section(self):
-          self.script.append('''
+        self.script.append('''
 # Scaffold view options
 hide lines, Scaffold
 hide ribbon, Scaffold
 show car, Scaffold
-util.cbc Scaffold
+util.cbc Scaffold''')
+        if self.ExpStructure:
+            # Hide the scaffold if there is an experimental structure
+            self.script.append('''
 disable Scaffold''')
 
     def _add_residue_highlighting_section(self):
