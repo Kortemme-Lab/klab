@@ -275,17 +275,16 @@ class ReusableDatabaseInterface(DatabaseInterface):
 		self.host = host or settings["SQLHost"]
 		self.db = db or settings["SQLDatabase"]
 		self.user = user or settings["SQLUser"]
-		self.passwd = passwd or settings["SQLPassword"]
+		self.passwd = passwd or settings.get("SQLPassword")
 		self.port = port or settings["SQLPort"]
 		self.unix_socket	= unix_socket or settings["SQLSocket"]
 		self.numTries = numTries
 		self.lastrowid = None
 		if (not self.passwd) and passwdfile:
 			if os.path.exists(passwdfile):
-				passwd = rosettahelper.readFile(passwdfile).strip()
+				self.passwd = rosettahelper.readFile(passwdfile).strip()
 			else:
-				passwd = getpass.getpass("Enter password to connect to MySQL database:")
-				
+				self.passwd = getpass.getpass("Enter password to connect to MySQL database:")
 		self.locked = False
 		self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r.values()[0] for r in self.execute("SHOW TABLES")], ", ")
 		self.unlockstring = "UNLOCK TABLES"

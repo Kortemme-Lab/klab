@@ -220,8 +220,12 @@ class RISEntry(PublicationInterface):
                     for val in v:
                         if len(val.split("/")) == 3 or len(val.split("/")) == 4:
                             found = True
+                            d[k] = val
+                        if not found:
                             d[k] = v[0]
                     assert(found)
+                elif k == 'url':
+                    d[k] = v[0]
                 else:
                     assert(k in ['authors'])
         assert(type(d['authors'] == lsttype))

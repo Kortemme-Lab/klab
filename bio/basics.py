@@ -21,7 +21,6 @@ Created by Shane O'Connor 2013
 import types
 import itertools
 
-from Bio.SubsMat.MatrixInfo import blosum62 as _blosum62, pam250 as _pam250# The amino acid codes BXZ in these blosum62 and pam250 matrices appear to be amino acid ambiguity codes
 import tools.colortext as colortext
 
 ###
@@ -149,19 +148,30 @@ nucleotide_types_1 = set(dna_nucleotides_2to1_map.values()) # for use in SEQRES 
 # "pam250.get(x, y) or pam250.get(y, x) or 0" is just plain ugly
 ###
 
-pam250 = {}
-for k, v in _pam250.iteritems():
-    if k[0] != k[1]:
-        assert((k[1], k[0])) not in _pam250
-        pam250[(k[1], k[0])] = v
-    pam250[(k[0], k[1])] = v
+try:
+    # The amino acid codes BXZ in these blosum62 and pam250 matrices appear to 
+    # be amino acid ambiguity codes
+    from Bio.SubsMat.MatrixInfo import blosum62 as _blosum62, pam250 as _pam250
 
-blosum62 = {}
-for k, v in _blosum62.iteritems():
-    if k[0] != k[1]:
-        assert((k[1], k[0])) not in _blosum62
-        blosum62[(k[1], k[0])] = v
-    blosum62[(k[0], k[1])] = v
+    pam250 = {}
+    for k, v in _pam250.iteritems():
+        if k[0] != k[1]:
+            assert((k[1], k[0])) not in _pam250
+            pam250[(k[1], k[0])] = v
+        pam250[(k[0], k[1])] = v
+
+    blosum62 = {}
+    for k, v in _blosum62.iteritems():
+        if k[0] != k[1]:
+            assert((k[1], k[0])) not in _blosum62
+            blosum62[(k[1], k[0])] = v
+        blosum62[(k[0], k[1])] = v
+
+except ImportError:
+    # Biopython is not available on chef.
+    pam250 = {}
+    blosum62 = {}
+
 
 ###
 # Sequences

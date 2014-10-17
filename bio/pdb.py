@@ -8,14 +8,14 @@ import types
 import string
 import types
 
-from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation
-from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
-from tools import colortext
-from tools.fs.fsio import read_file, write_file
-from tools.pymath.stats import get_mean_and_standard_deviation
-from tools.pymath.cartesian import spatialhash
-from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-import rcsb
+from .basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation
+from .basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from .. import colortext
+from ..fs.fsio import read_file, write_file
+from ..pymath.stats import get_mean_and_standard_deviation
+from ..pymath.cartesian import spatialhash
+from ..rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
+from . import rcsb
 
 # todo: related packages will need to be fixed since my refactoring
 # The PDB constructor has now changed
@@ -87,7 +87,7 @@ missing_chain_ids = {
 
 ### Whitelist for PDB files with ACE residues (we could allow all to pass but it may be good to manually look at each case)
 
-cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX', '1UNQ'])
+cases_with_ACE_residues_we_can_ignore = set(['3UB5', '1TIN', '2ZTA', '5CPV', '1ATN', '1LFO', '1OVA', '3PGK', '2FAL', '2SOD', '1SPD', '1UOX', '1UNQ', '1DFJ'])
 
 ### Parsing-related variables
 
@@ -291,8 +291,12 @@ class JRNL(object):
             type = line[35:39]
             ID = line[40:65].strip()
             if type != "ISSN" and type != "ESSN":
-                raise Exception("Invalid type for REFN field (%s)" % type)
-            self.d["REFN"] = {"type" : type, "ID" : ID}
+                if type.strip():
+                    raise Exception("Invalid type for REFN field (%s)" % type)
+            if not type.strip():
+                pass # e.g. 1BXI has a null reference
+            else:
+                self.d["REFN"] = {"type" : type, "ID" : ID}
         else:
             assert(line.strip() == PRELUDE)
 
@@ -359,6 +363,7 @@ class PDB:
             self._update_structure_lines()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
+
 
     def fix_pdb(self):
         '''A function to fix fatal errors in PDB files when they can be automatically fixed. At present, this only runs if
@@ -605,6 +610,40 @@ class PDB:
         self._update_structure_lines()
         # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
 
+    def generate_all_point_mutations_for_chain(self, chain_id):
+        mutations = []
+        if self.atom_sequences.get(chain_id):
+            aas = sorted(residue_type_3to1_map.values())
+            aas.remove('X')
+            seq = self.atom_sequences[chain_id]
+            for res_id in seq.order:
+                r = seq.sequence[res_id]
+                assert(chain_id == r.Chain)
+                for mut_aa in aas:
+                    if mut_aa != r.ResidueAA:
+                        mutations.append(ChainMutation(r.ResidueAA, r.ResidueID, mut_aa, Chain = chain_id))
+        return mutations
+
+    ### FASTA functions ###
+
+
+    def create_fasta(self, length = 80):
+        fasta_string = ''
+        chain_order = self.seqres_chain_order or self.atom_chain_order
+        sequences = self.seqres_sequences or self.atom_sequences
+
+        for c in chain_order:
+            if c not in sequences:
+                continue
+            
+            fasta_string += '>%s|%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
+            seq = str(sequences[c])
+            for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
+                fasta_string += line + '\n'
+
+        return fasta_string
+
+
     ### PDB file parsing functions ###
 
     def _get_pdb_format_version(self):
@@ -629,6 +668,7 @@ class PDB:
 
     def get_resolution(self):
         resolution = None
+        resolution_lines_exist = False
         for line in self.parsed_lines["REMARK"]:
             if line[9] == "2" and line[11:22] == "RESOLUTION.":
                 #if id == :
@@ -649,6 +689,7 @@ class PDB:
                 # Instead, we use the code below:
                 if resolution:
                     raise Exception("Found multiple RESOLUTION lines.")
+                resolution_lines_exist = True
                 strippedline = line[22:].strip()
                 Aindex = strippedline.find("ANGSTROMS.")
                 if strippedline == "NOT APPLICABLE.":
@@ -663,7 +704,7 @@ class PDB:
                             raise PDBParsingException("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard. Expected data for diffraction experiments." % line )
                 else:
                     raise PDBParsingException("Error parsing PDB file to determine resolution. The resolution line\n  '%s'\ndoes not match the PDB standard." % line )
-        if not resolution:
+        if resolution_lines_exist and not resolution:
             raise PDBParsingException("Could not determine resolution.")
         return resolution
 
@@ -674,12 +715,14 @@ class PDB:
 
     def get_techniques(self):
         techniques = None
+        technique_lines_exist = False
         for line in self.parsed_lines["EXPDTA"]:
+            technique_lines_exist = True
             techniques = line[10:71].split(";")
             for k in range(len(techniques)):
                 techniques[k] = techniques[k].strip()
             techniques = ";".join(techniques)
-        if not techniques:
+        if technique_lines_exist and not techniques:
             raise PDBParsingException("Could not determine techniques used.")
         return techniques
 
@@ -771,6 +814,8 @@ class PDB:
                             'SYNONYM: SERINE/THREONINE-PROTEIN KINASE PHO85, NEGATIVE REGULATOR OF THE PHO SYSTEM;')
             MD = MD.replace('SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80; AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;',
                             'SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80, AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;')
+            # Hack for 1JRH
+            MD = MD.replace('FAB FRAGMENT;PEPSIN DIGESTION OF INTACT ANTIBODY', 'FAB FRAGMENT,PEPSIN DIGESTION OF INTACT ANTIBODY')
 
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
 
@@ -865,9 +910,11 @@ class PDB:
         return [v for k, v in sorted(molecules.iteritems())]
 
     def get_journal(self):
-        if not self.journal:
-            self.journal = JRNL(self.parsed_lines["JRNL  "])
-        return self.journal.get_info()
+        if self.parsed_lines["JRNL  "]:
+            if not self.journal:
+                self.journal = JRNL(self.parsed_lines["JRNL  "])
+            return self.journal.get_info()
+        return None
 
     ### Sequence-related functions ###
 
@@ -1182,6 +1229,7 @@ class PDB:
 
         return seqres_to_atom_maps, atom_to_seqres_maps
 
+
     def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
@@ -1385,7 +1433,7 @@ class PDB:
 
     @staticmethod
     def ResidueID2String(residueID):
-        '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
+        '''Takes a residueID e.g. '123' or '123A' and returns the 5-character identifier spaced as in the PDB format.'''
         if residueID.isdigit():
             return "%s " % (residueID.rjust(4))
         else:
@@ -1498,17 +1546,15 @@ class PDB:
 
         for m in mutations:
             ns = (PDB.ChainResidueID2String(m['Chain'], str(ddGResmap['ATOM-%s' % PDB.ChainResidueID2String(m['Chain'], m['ResidueID'])])))
-            #remappedMutations.append((ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA']))
-            #print(ns[0], ns[1:].strip(), m['WildTypeAA'], m['MutantAA'])
             remappedMutations.append(Mutation(m['WildTypeAA'], ns[1:].strip(), m['MutantAA'], ns[0]))
 
         # Validate the mutations against the Rosetta residues
         sequences, residue_map = self.GetRosettaResidueMap()
         for rm in remappedMutations:
-            pr = residue_map[rm.Chain][int(rm.ResidueID) - 1]
+            offset = int(residue_map[rm.Chain][0][0])
+            pr = residue_map[rm.Chain][int(rm.ResidueID) - offset]
             assert(pr[0] == rm.ResidueID)
             assert(pr[1] == rm.WildTypeAA)
-
         return remappedMutations
 
     def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
