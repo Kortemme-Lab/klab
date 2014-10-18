@@ -39,6 +39,16 @@ def clear_directory(directory):
     if os.path.exists(directory): shutil.rmtree(directory)
     os.makedirs(directory)
 
+def relative_symlink(target, link_name):
+    """Make a symlink to target using the shortest possible relative path."""
+    link_name = os.path.abspath(link_name)
+    abs_target = os.path.abspath(target)
+    rel_target = os.path.relpath(target, os.path.dirname(link_name))
+
+    if os.path.exists(link_name):
+        os.remove(link_name)
+    os.symlink(rel_target, link_name)
+    
 
 # Bread'n'butter shell commands.
 
