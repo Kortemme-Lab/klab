@@ -21,7 +21,7 @@ def catch_and_print_errors():
         print
 
     except Exception as error:
-        if hasattr(error, 'no_stack_trace'): print_warning(error)
+        if hasattr(error, 'no_stack_trace'): print_warning(str(error))
         else: raise
 
 def use_path_completion():
