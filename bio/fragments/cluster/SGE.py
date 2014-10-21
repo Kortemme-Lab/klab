@@ -157,7 +157,7 @@ if subp.errorcode != 0:
         fasta_file_dir = os.path.split(fasta_file)[0]
         no_homologs = options['no_homologs']
 
-        frag_sizes = '-frag_sizes %s' % ','.join(map,str(options['frag_sizes']))
+        frag_sizes = '-frag_sizes %s' % ','.join(map(str, options['frag_sizes']))
         n_frags = '-n_frags %d' % options['n_frags']
         n_candidates = '-n_candidates %d' % options['n_candidates']
 
