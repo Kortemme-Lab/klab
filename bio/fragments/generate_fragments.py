@@ -208,16 +208,24 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group.add_option("-b", "--batch", action="extend", dest="batch", help="Batch mode. The argument to this option is a comma-separated (no spaces) list of: i) FASTA files; ii) wildcard strings e.g. '/path/to/%.fasta'; or iii) directories. Fragment generation will be performed for all sequences in the explicitly lists files, files matching the wildcard selection, and '.fasta' files in any directory listed. Note: The 5-character IDs (see above) must be unique for this mode. Also, note that '%' is used as a wildcard character rather than '*' to prevent shell wildcard-completion.", metavar="LIST OF FILES or DIRECTORY")
     parser.add_option_group(group)
 
+    group = OptionGroup(parser, "Fragment generation options")
+    group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
+    group.add_option("-s", "--frag_sizes", dest="frag_sizes", help="Optional. A list of fragment sizes e.g. -s 3,6,9 specifies that 3-mer, 6-mer, and 9-mer fragments are to be generated. The default is for 3-mer and 9-mer fragments to be generated.")
+    group.add_option("--n_frags", dest="n_frags", help="Optional. The number of fragments to generate. This must be less than the number of candidates. The default value is 200.")
+    group.add_option("--n_candidates", dest="n_candidates", help="Optional. The number of candidates to generate. The default value is 1000.")
+    group.add_option("--add_vall_files", dest="add_vall_files", help="Optional and untested. This option allows extra Vall files to be added to the run. The files must be comma-separated.")
+    group.add_option("--use_vall_files", dest="use_vall_files", help="Optional and untested. This option specifies that the run should use only the following Vall files. The files must be comma-separated.")
+    group.add_option("--add_pdbs_to_vall", dest="add_pdbs_to_vall", help="Optional and untested. This option adds extra pdb Vall files to the run. The files must be comma-separated.")
+
     group = OptionGroup(parser, "General options")
     group.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")
-    group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-V", "--overwrite", dest="overwrite", action="store_true", help="Optional. If the output directory <PDBID><CHAIN> for the fragment job(s) exists, delete the current contents.")
     group.add_option("-F", "--force", dest="force", action="store_true", help="Optional. Create the output directory without prompting.")
     group.add_option("-M", "--email", dest="sendmail", action="store_true", help="Optional. If this option is set, an email is sent when the job finishes or fails (cluster-dependent). WARNING: On an SGE cluster, an email will be sent for each FASTA file i.e. for each task in the job array.")
     group.add_option("-Z", "--nozip", dest="nozip", action="store_true", help="Optional, false by default. If this is option is set then the resulting fragments are not compressed with gzip. We compress output by default as this can reduce the output size by 90% and the resulting zipped files can be passed directly to Rosetta.")
     parser.add_option_group(group)
 
-    group = OptionGroup(parser, "Job options")
+    group = OptionGroup(parser, "Cluster options")
     group.add_option("-x", "--scratch", type="int", dest="scratch", help="Optional. Specifies the amount of /scratch space in GB to reserve for the job.")
     group.add_option("-m", "--memfree", type="int", dest="memfree", help="Optional. Specifies the amount of RAM in GB that the job will require on the cluster. This must be at least 2GB.")
     group.add_option("-r", "--runtime", type="int", dest="runtime", help="Optional. Specifies the runtime in hours that the job will require on the cluster. This must be at least 8 hours.")
@@ -240,6 +248,13 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     parser.set_defaults(scratch = 1)
     parser.set_defaults(memfree = 2)
     parser.set_defaults(runtime = 10)
+
+    parser.set_defaults(frag_sizes = '3,9')
+    parser.set_defaults(n_frags = 200)
+    parser.set_defaults(n_candidates = 1000)
+    parser.set_defaults(add_vall_files = '')
+    parser.set_defaults(use_vall_files = '')
+    parser.set_defaults(add_pdbs_to_vall = '')
 
     (options, args) = parser.parse_args()
 
@@ -286,6 +301,47 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     if outpath[0] != "/":
         outpath = os.path.abspath(outpath)
     outpath = os.path.normpath(outpath)
+
+    # Fragment sizes
+    if options.frag_sizes:
+        sizes = []
+        try:
+            sizes = [s.strip() for s in options.frag_sizes.split(',') if s.strip()]
+            for s in sizes:
+                assert(s.isdigit() and (3 <= int(s) <= 20))
+            sizes = sorted(map(int, sizes))
+        except Exception, e:
+            #print(str(e))
+            #print(traceback.format_exc())
+            errors.append('The frag_size argument must be a comma-separated list of integers between 3 and 20.')
+        if not sizes:
+            errors.append('The frag_sizes argument was not successfully parsed.')
+        if len(sizes) != len(set(sizes)):
+            errors.append('The frag_sizes argument contains duplicate values.')
+        else:
+            options.frag_sizes = sizes
+
+    # n_frags and n_candidates
+    if options.n_frags:
+        try:
+            assert(options.n_frags.isdigit())
+            options.n_frags = int(options.n_frags)
+        except Exception, e:
+            print(traceback.format_exc())
+            errors.append('The n_frags argument must be an integer.')
+    if options.n_frags < 10:
+        errors.append('The n_frags argument is set to 200 by default; %d seems like a very low number.' % options.n_frags)
+    if options.n_candidates:
+        try:
+            assert(options.n_candidates.isdigit())
+            options.n_candidates = int(options.n_candidates)
+        except Exception, e:
+            print(traceback.format_exc())
+            errors.append('The n_candidates argument must be an integer.')
+    if options.n_candidates < 100:
+        errors.append('The n_candidates argument is set to 1000 by default; %d seems like a very low number.' % options.n_candidates)
+    if options.n_frags > options.n_candidates:
+        errors.append('The value of n_candidates argument must be greater than the value of n_frags.')
 
     if 'netapp' in os.getcwd():
         userdir = os.path.join("/netapp/home", username)
@@ -384,20 +440,26 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     if options.nohoms:
         no_homologs = "-nohoms"
 
-    return {
-        "queue"         : options.queue,
-        "sendmail"         : options.sendmail,
-        "no_homologs"	: no_homologs,
-        "user"			: username,
-        "outpath"		: outpath,
-        "jobname"		: cluster_job_name,
-        "job_inputs"    : job_inputs,
-        "no_zip"           : options.nozip,
-        "scratch"           : options.scratch,
-        "memfree"           : options.memfree,
-        "runtime"           : options.runtime,
+    return dict(
+        queue            = options.queue,
+        sendmail         = options.sendmail,
+        no_homologs      = no_homologs,
+        user             = username,
+        outpath          = outpath,
+        jobname          = cluster_job_name,
+        job_inputs       = job_inputs,
+        no_zip           = options.nozip,
+        scratch          = options.scratch,
+        memfree          = options.memfree,
+        runtime          = options.runtime,
+        frag_sizes       = options.frag_sizes,
+        n_frags           = options.n_frags,
+        n_candidates     = options.n_candidates,
+        add_vall_files   = options.add_vall_files,
+        use_vall_files   = options.use_vall_files,
+        add_pdbs_to_vall = options.add_pdbs_to_vall,
         #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
-        }
+    )
 
 def setup_jobs(outpath, options, fasta_files, batch_mode):
     job_inputs = None
