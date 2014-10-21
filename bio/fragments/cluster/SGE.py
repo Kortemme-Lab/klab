@@ -156,6 +156,11 @@ if subp.errorcode != 0:
 
         fasta_file_dir = os.path.split(fasta_file)[0]
         no_homologs = options['no_homologs']
+
+        frag_sizes = '-frag_sizes %s' % ','.join(map,str(options['frag_sizes']))
+        n_frags = '-n_frags %d' % options['n_frags']
+        n_candidates = '-n_candidates %d' % options['n_candidates']
+
         zip_files = str(not(options['no_zip']))
 
         python_script = '''
@@ -170,7 +175,7 @@ print(scratch_path)
 print("</cwd>")
 
 print("<cmd>")
-cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(fasta_file)s'] if c]
+cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', '%(pdb_id)s%(chain)s', '%(no_homologs)s', '%(frag_sizes)s', '%(n_frags)s', '%(n_candidates)s', '%(fasta_file)s'] if c]
 print(' '.join(cmd_args))
 print("</cmd>")
 
@@ -222,6 +227,11 @@ class MultipleTask(SingleTask):
         job_inputs = options['job_inputs']
         num_tasks = len(options['job_inputs'])
         no_homologs = options['no_homologs']
+
+        frag_sizes = '-frag_sizes %s' % ','.join(map,str(options['frag_sizes']))
+        n_frags = '-n_frags %d' % options['n_frags']
+        n_candidates = '-n_candidates %d' % options['n_candidates']
+
         zip_files = str(not(options['no_zip']))
 
         job_arrays = []
@@ -247,7 +257,7 @@ print(scratch_path)
 print("</cwd>")
 
 print("<cmd>")
-cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', fasta_file] if c]
+cmd_args = [c for c in ['%(make_fragments_perl_script)s', '-verbose', '-id', pdb_id + chain, '%(no_homologs)s', '%(frag_sizes)s', '%(n_frags)s', '%(n_candidates)s', fasta_file] if c]
 print(' '.join(cmd_args))
 print("</cmd>")
 
