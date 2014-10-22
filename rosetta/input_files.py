@@ -19,7 +19,7 @@ Created by Shane O'Connor 2014
 
 class RosettaFileParsingException(Exception): pass
 
-def parse_loop_file(contents, ignore_whitespace = True, ignore_errors = True):
+def parse_loop_file(contents, ignore_whitespace = True, ignore_errors = False):
     '''This parser is forgiving and allows leading whitespace.'''
     records = []
     for l in contents.strip().split('\n'):
