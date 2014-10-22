@@ -158,6 +158,8 @@ def parse_FASTA_files(options, fasta_files):
     # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
     # shorter than the length of the total sequence e.g. in cases where the protein has @1000 residues but we only care about
     # 100 residues in particular loop regions.
+    # colortext.warning(options)
+    # sys.exit(0)
     if options.loops_file:
         colortext.warning(options.loops_file)
         loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
@@ -167,7 +169,7 @@ def parse_FASTA_files(options, fasta_files):
             for p in options.indices:
                 loops_definition.add(p[0], p[1])
 
-        segment_list = loops_definition.get_distinct_segments_from_loops_file()
+        segment_list = loops_definition.get_distinct_segments()
         final_loops_residue = segment_list[-1][1]
         for k, v in sorted(records.iteritems()):
             assert(v[0].startswith('>'))
@@ -451,26 +453,22 @@ the script will output fragments for 1a2pA and 1a2pB.''')
                     batch_files.append(os.path.abspath(batch_file_selector))
         batch_files = list(set(batch_files))
 
-        if missing_files:
-            if missing_files == 1:
-                errors.append("FASTA file %s does not exist." % options.fasta)
-            else:
-                errors.append("FASTA files %s do not exist." % ', '.join(missing_files))
+        if len(missing_files) == 1:
+            errors.append("FASTA file %s does not exist." % (options.fasta or ''))
+        elif len(missing_files) > -0:
+            errors.append("FASTA files %s do not exist." % ', '.join(missing_files))
 
     if (not options.fasta) and (not batch_files):
         if not validOptions:
-            parser.print_help()
-            sys.exit(ERRCODE_ARGUMENTS)
+            print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS)
 
     if (options.fasta) and (batch_files):
-        parser.print_help()
-        colorprinter.error('\nError: You must either use single sequence mode or batch mode. Both were specified')
-        sys.exit(ERRCODE_ARGUMENTS)
+        print_errors_and_exit(parser, ['\nError: You must either use single sequence mode or batch mode. Both were specified'], ERRCODE_ARGUMENTS)
 
     job_inputs = []
     if options.fasta:
         if not os.path.exists(options.fasta):
-            errors.append("FASTA file %s does not exist." % options.fasta)
+            errors.append("FASTA file %s does not exist." % (options.fasta or ''))
         elif not errors:
             job_inputs, errors = setup_jobs(outpath, options, [options.fasta], False)
     elif batch_files:
@@ -478,17 +476,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
             job_inputs, errors = setup_jobs(outpath, options, batch_files, True)
 
     if errors:
-        if not errcode:
-            parser.print_help()
-
-        print("")
-        for e in errors:
-            colorprinter.error(e)
-        print("")
-
-        if errcode:
-            sys.exit(errcode)
-        sys.exit(ERRCODE_ARGUMENTS)
+        print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
 
     no_homologs = ""
     if options.nohoms:
@@ -514,6 +502,21 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         add_pdbs_to_vall = options.add_pdbs_to_vall,
         #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
     )
+
+
+def print_errors_and_exit(parser, errors, errcode, print_help = True):
+    if print_help:
+        parser.print_help()
+    errors.insert(0, '')
+    errors.append('')
+    for e in errors:
+        colorprinter.error(e.replace('  ', ' '))
+
+    if errcode:
+        sys.exit(errcode)
+    else:
+        sys.exit(ERRCODE_ARGUMENTS)
+
 
 def setup_jobs(outpath, options, fasta_files, batch_mode):
     ''' This function sets up the jobs by creating the necessary input files as expected.
