@@ -41,7 +41,7 @@ class LoopsFile(object):
 
     def parse_loops_file(self, contents, ignore_whitespace = True, ignore_errors = False):
         '''This parser is forgiving and allows leading whitespace.'''
-        for l in contents.strip().split('\n'):
+        for l in [l for l in contents.strip().split('\n') if l]:
             try:
                 if ignore_whitespace:
                     l = l.strip()
@@ -103,18 +103,27 @@ class LoopsFile(object):
         assert(start < end)
 
 
-    def get_distinct_segments(self, left_offset = 0, right_offset = 0):
+    def get_distinct_segments(self, left_offset = 0, right_offset = 0, sequence_length = None):
         '''Returns a list of segments (pairs of start and end positions) based on the loop definitions. The returned segments
             merge overlapping loops e.g. if the loops file contains sections 32-40, 23-30, 28-33, and 43-46 then the returned
             segments will be [(23, 40), (43, 46)].
             This may not be the fastest way to calculate this (numpy?) but that is probably not an issue.
+
+            The offsets are used to select the residues surrounding the loop regions. For example, i.e. if a sequence segment
+            is 7 residues long at positions 13-19 and we require 9-mers, we must consider the segment from positions 5-27 so
+            that all possible 9-mers are considered.
         '''
 
         # Create a unique, sorted list of all loop terminus positions
         positions = set()
         for l in self.data:
             assert(l['start'] < l['end'])
-            positions = positions.union(range(l['start'], l['end'] + 1))
+            if sequence_length:
+                # If we know the sequence length then we can return valid positions
+                positions = positions.union(range(max(1, l['start'] - left_offset + 1), min(sequence_length + 1, l['end'] + 1 + right_offset - 1))) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
+            else:
+                # Otherwise, we may return positions outside the sequence length however Python splicing can handle this gracefully
+                positions = positions.union(range(max(1, l['start'] - left_offset + 1), l['end'] + 1 + right_offset - 1)) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
         positions = sorted(positions)
 
         # Iterate through the list to define the segments
