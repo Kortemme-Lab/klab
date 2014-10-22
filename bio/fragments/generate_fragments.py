@@ -15,6 +15,7 @@ from datetime import datetime
 from optparse import OptionParser, OptionGroup, Option
 import glob
 import getpass
+import json
 from utils import LogFile, colorprinter, JobInitializationException
 sys.path.insert(0, '../..')
 import colortext
@@ -490,10 +491,10 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         if not os.path.exists(options.fasta):
             errors.append("FASTA file %s does not exist." % (options.fasta or ''))
         elif not errors:
-            job_inputs, errors = setup_jobs(outpath, options, [options.fasta], False)
+            job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, [options.fasta], False)
     elif batch_files:
         if not errors:
-            job_inputs, errors = setup_jobs(outpath, options, batch_files, True)
+            job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, batch_files, True)
 
     if errors:
         print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
@@ -520,6 +521,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         add_vall_files   = options.add_vall_files,
         use_vall_files   = options.use_vall_files,
         add_pdbs_to_vall = options.add_pdbs_to_vall,
+        has_segment_mapping = has_segment_mapping,
         #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
     )
 
@@ -545,12 +547,18 @@ def setup_jobs(outpath, options, fasta_files, batch_mode):
           - batch_mode is a boolean stating whether or not batch mode is being used.
     '''
     job_inputs = None
-    found_sequences, errors = get_sequences(options, fasta_files, batch_mode)
+    reverse_mapping = None
+    found_sequences, reverse_mapping, errors = get_sequences(options, fasta_files, batch_mode)
     if found_sequences: # or batch_mode:
         reformat(found_sequences)
     if not errors:
         job_inputs, errors = create_inputs(options, outpath, found_sequences)
-    return job_inputs, errors
+        if reverse_mapping:
+            segment_mapping_file = os.path.join(outpath, "segment_map.json")
+            colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
+            write_file(segment_mapping_file, json.dumps(reverse_mapping))
+
+    return job_inputs, reverse_mapping != None, errors
 
 def get_sequences(options, fasta_files, batch_mode):
     ''' This function returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
@@ -561,6 +569,7 @@ def get_sequences(options, fasta_files, batch_mode):
     errors = []
     fasta_files_str = ", ".join(fasta_files)
     fasta_records = None
+    reverse_mapping = {}
     try:
         fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_files)
         if not fasta_records:
@@ -624,7 +633,7 @@ def get_sequences(options, fasta_files, batch_mode):
                 if not found_sequences:
                     errors.append('Could not find the sequence for PDB ID %s and chain %s in the file(s) %s.' % (options.pdbid, options.chain, fasta_files_str))
     
-    return found_sequences, errors
+    return found_sequences, reverse_mapping, errors
 
 
 def reformat(found_sequences):
