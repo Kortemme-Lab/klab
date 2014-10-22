@@ -16,16 +16,16 @@ from optparse import OptionParser, OptionGroup, Option
 import glob
 import getpass
 from utils import LogFile, colorprinter, JobInitializationException
-sys.path.insert(0, '../../..')
-from tools import colortext
-from tools.rosetta.input_files import LoopsFile
-from tools.fs.fsio import read_file
+sys.path.insert(0, '../..')
+import colortext
+from rosetta.input_files import LoopsFile
+from fs.fsio import read_file
 
 #################
 #  Configuration
 
 # Choose the Python classes for your type of cluster system
-import cluster.SGE as ClusterEngine
+import hpc.SGE as ClusterEngine
 #
 #################
 
@@ -250,6 +250,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group.add_option("--add_vall_files", dest="add_vall_files", help="Optional and untested. This option allows extra Vall files to be added to the run. The files must be comma-separated.")
     group.add_option("--use_vall_files", dest="use_vall_files", help="Optional and untested. This option specifies that the run should use only the following Vall files. The files must be comma-separated.")
     group.add_option("--add_pdbs_to_vall", dest="add_pdbs_to_vall", help="Optional and untested. This option adds extra pdb Vall files to the run. The files must be comma-separated.")
+    parser.add_option_group(group)
 
     group = OptionGroup(parser, "General options")
     group.add_option("-d", "--outdir", dest="outdir", help="Optional. Output directory relative to user space on netapp. Defaults to the current directory so long as that is within the user's netapp space.", metavar="OUTPUT_DIRECTORY")

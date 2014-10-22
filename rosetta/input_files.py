@@ -7,7 +7,7 @@ Simple parsers for Rosetta input file types.
 Created by Shane O'Connor 2014
 """
 
-from tools.fs.fsio import read_file
+from fs.fsio import read_file
 
 class RosettaFileParsingException(Exception): pass
 
@@ -60,7 +60,6 @@ class LoopsFile(object):
 
 
     def parse_loop_line(self, tokens):
-        print(tokens)
         if tokens[0] != 'LOOP':
             raise RosettaFileParsingException('Lines in a loops file must start with the keyword "LOOP".')
         try:
