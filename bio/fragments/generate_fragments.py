@@ -161,6 +161,12 @@ def parse_FASTA_files(options, fasta_files):
     if options.loops_file:
         colortext.warning(options.loops_file)
         loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
+
+        # If the user supplied more ranges of residues, use those as well
+        if options.indices:
+            for p in options.indices:
+                loops_definition.add(p[0], p[1])
+
         segment_list = loops_definition.get_distinct_segments_from_loops_file()
         final_loops_residue = segment_list[-1][1]
         for k, v in sorted(records.iteritems()):
@@ -238,6 +244,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-s", "--frag_sizes", dest="frag_sizes", help="Optional. A list of fragment sizes e.g. -s 3,6,9 specifies that 3-mer, 6-mer, and 9-mer fragments are to be generated. The default is for 3-mer and 9-mer fragments to be generated.")
     group.add_option("-l", "--loops_file", dest="loops_file", help="Optional but recommended. A Rosetta loops file which will be used to select sections of the FASTA sequences from which fragments will be generated. This saves a lot of time on large sequences.")
+    group.add_option("-i", "--indices", dest="indices", help="Optional. A comma-separated list of start and end index. There must be an even number of numbers in this list with each pair itself being in order. These indices will be used to select a part of the supplied sequences for fragment generation. Similarly to the loops_file option, this restriction may save a lot of computational resources. If this option is used in addition to the loops_file option then the sections defined by the indices are combined with those in the loops file.")
     group.add_option("--n_frags", dest="n_frags", help="Optional. The number of fragments to generate. This must be less than the number of candidates. The default value is 200.")
     group.add_option("--n_candidates", dest="n_candidates", help="Optional. The number of candidates to generate. The default value is 1000.")
     group.add_option("--add_vall_files", dest="add_vall_files", help="Optional and untested. This option allows extra Vall files to be added to the run. The files must be comma-separated.")
@@ -335,6 +342,21 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         if not(os.path.exists(options.loops_file)):
             errors.append('The loops file %s does not exist.' % options.loops_file)
 
+    if options.indices:
+        try:
+            tokens = [s.strip() for s in options.indices.split(',') if s.strip()]
+            if len(tokens) % 2 ==0:
+                for x in range(0, len(tokens), 2):
+                    assert(tokens[x].isdigit() and tokens[x+1].isdigit())
+                tokens = map(int, tokens)
+                for x in range(0, len(tokens), 2):
+                    assert(tokens[x] < tokens[x+1])
+                options.indices = [tokens[i:i+2] for i in range(0, len(tokens), 2)]
+            else:
+                errors.append('An even number of indices must be specified.')
+        except Exception, e:
+            errors.append('The indices must be an array of even length where the ith value is less than the i+1th values for even values of i i.e. it should be a list of start and end indices.')
+
     # Fragment sizes
     if options.frag_sizes:
         sizes = []
@@ -344,8 +366,6 @@ the script will output fragments for 1a2pA and 1a2pB.''')
                 assert(s.isdigit() and (3 <= int(s) <= 20))
             sizes = sorted(map(int, sizes))
         except Exception, e:
-            #print(str(e))
-            #print(traceback.format_exc())
             errors.append('The frag_size argument must be a comma-separated list of integers between 3 and 20.')
         if not sizes:
             errors.append('The frag_sizes argument was not successfully parsed.')
