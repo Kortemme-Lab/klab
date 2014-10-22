@@ -108,6 +108,7 @@ def parse_FASTA_files(options, fasta_files):
           - fasta_files is a list of paths to FASTA files.
     '''
     records = {}
+    reverse_mapping = {}
     key_location = {}
     sequenceLine = re.compile("^[ACDEFGHIKLMNPQRSTVWY]+\n?$")
 
@@ -176,6 +177,21 @@ def parse_FASTA_files(options, fasta_files):
                     loops_definition.add(p[0], p[1])
 
         segment_list = loops_definition.get_distinct_segments(residue_offset, residue_offset)
+
+        # Create the reverse_mapping from the indices in the sequences defined by the segment_list to the indices in the original sequences.
+        # This will be used to rewrite the fragments files to make them compatible with the original sequences.
+        # Note that this mapping ignores the length of the sequences (which may vary in length) so it may be mapping residues indices
+        # which are outside of the length of some of the sequences.
+        assert(sorted(segment_list) == segment_list) # sanity check
+        count = 1
+        for x in range(len(segment_list)):
+            segment = segment_list[x]
+            if x < len(segment_list) - 1:
+                assert(segment[1] < segment_list[x+1][0]) # sanity check
+            for y in range(segment[0], segment[1] + 1):
+                reverse_mapping[count] = y
+                count += 1
+
         for k, v in sorted(records.iteritems()):
             assert(v[0].startswith('>'))
             sequence = ''.join([s.strip() for s in v[1:]])
@@ -183,7 +199,7 @@ def parse_FASTA_files(options, fasta_files):
             cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
 
-    return records
+    return records, reverse_mapping
 
 
 def parseArgs():
@@ -546,7 +562,7 @@ def get_sequences(options, fasta_files, batch_mode):
     fasta_files_str = ", ".join(fasta_files)
     fasta_records = None
     try:
-        fasta_records = parse_FASTA_files(options, fasta_files)
+        fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_files)
         if not fasta_records:
             errors.append("No data found in the FASTA file(s) %s." % fasta_files_str)
     except Exception, e:
