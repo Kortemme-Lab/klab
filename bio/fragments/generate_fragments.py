@@ -16,6 +16,10 @@ from optparse import OptionParser, OptionGroup, Option
 import glob
 import getpass
 from utils import LogFile, colorprinter, JobInitializationException
+sys.path.insert(0, '../../..')
+from tools import colortext
+from tools.rosetta.input_files import LoopsFile
+from tools.fs.fsio import read_file
 
 #################
 #  Configuration
@@ -98,8 +102,11 @@ def write_file(filepath, contents, ftype = 'w'):
     output_handle.close()
 
 
-def parse_FASTA_files(fasta_files):
-
+def parse_FASTA_files(options, fasta_files):
+    ''' This function iterates through each filepath in fasta_files and returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
+          - options is the usual OptionParser member.
+          - fasta_files is a list of paths to FASTA files.
+    '''
     records = {}
     key_location = {}
     sequenceLine = re.compile("^[ACDEFGHIKLMNPQRSTVWY]+\n?$")
@@ -136,6 +143,7 @@ def parse_FASTA_files(fasta_files):
                     # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
                     key = (tokens[0][0:4].lower(), tokens[1], fasta_file)
                     if key in records:
+                        # todo: we include the fasta_file in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file as part of the check for a more stringent check?
                         raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatentated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file))
                     key_location[key] = fasta_file
 
@@ -145,6 +153,24 @@ def parse_FASTA_files(fasta_files):
                     if not mtchs:
                         raise FastaException("Expected a record header or sequence line at line %d." % line_count)
                     records[key].append(line)
+
+    # If a loops file was passed in, use that to cut up the sequences and concatenate these subsequences to generate a
+    # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
+    # shorter than the length of the total sequence e.g. in cases where the protein has @1000 residues but we only care about
+    # 100 residues in particular loop regions.
+    if options.loops_file:
+        colortext.warning(options.loops_file)
+        loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
+        segment_list = loops_definition.get_distinct_segments_from_loops_file()
+        final_loops_residue = segment_list[-1][1]
+        for k, v in sorted(records.iteritems()):
+            assert(v[0].startswith('>'))
+            sequence = ''.join([s.strip() for s in v[1:]])
+            assert(1 <= final_loops_residue <= len(sequence)) # Make sure that the loops file is compatible with the sequence
+            assert(sequenceLine.match(sequence) != None) # sanity check
+            cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
+            records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
+
     return records
 
 
@@ -211,6 +237,7 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     group = OptionGroup(parser, "Fragment generation options")
     group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-s", "--frag_sizes", dest="frag_sizes", help="Optional. A list of fragment sizes e.g. -s 3,6,9 specifies that 3-mer, 6-mer, and 9-mer fragments are to be generated. The default is for 3-mer and 9-mer fragments to be generated.")
+    group.add_option("-l", "--loops_file", dest="loops_file", help="Optional but recommended. A Rosetta loops file which will be used to select sections of the FASTA sequences from which fragments will be generated. This saves a lot of time on large sequences.")
     group.add_option("--n_frags", dest="n_frags", help="Optional. The number of fragments to generate. This must be less than the number of candidates. The default value is 200.")
     group.add_option("--n_candidates", dest="n_candidates", help="Optional. The number of candidates to generate. The default value is 1000.")
     group.add_option("--add_vall_files", dest="add_vall_files", help="Optional and untested. This option allows extra Vall files to be added to the run. The files must be comma-separated.")
@@ -248,7 +275,6 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     parser.set_defaults(scratch = 1)
     parser.set_defaults(memfree = 2)
     parser.set_defaults(runtime = 10)
-
     parser.set_defaults(frag_sizes = '3,9')
     parser.set_defaults(n_frags = '200')
     parser.set_defaults(n_candidates = '1000')
@@ -301,6 +327,13 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     if outpath[0] != "/":
         outpath = os.path.abspath(outpath)
     outpath = os.path.normpath(outpath)
+
+    # Loops file
+    if options.loops_file:
+        if not os.path.isabs(options.loops_file):
+            options.loops_file = os.path.realpath(options.loops_file)
+        if not(os.path.exists(options.loops_file)):
+            errors.append('The loops file %s does not exist.' % options.loops_file)
 
     # Fragment sizes
     if options.frag_sizes:
@@ -462,24 +495,38 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     )
 
 def setup_jobs(outpath, options, fasta_files, batch_mode):
+    ''' This function sets up the jobs by creating the necessary input files as expected.
+          - outpath is where the output is to be stored, options is the usual OptionParser member.
+          - fasta_files is a list of paths to FASTA files.
+          - batch_mode is a boolean stating whether or not batch mode is being used.
+    '''
     job_inputs = None
     found_sequences, errors = get_sequences(options, fasta_files, batch_mode)
-    if found_sequences or batch_mode:
+    if found_sequences: # or batch_mode:
         reformat(found_sequences)
     if not errors:
         job_inputs, errors = create_inputs(options, outpath, found_sequences)
     return job_inputs, errors
 
 def get_sequences(options, fasta_files, batch_mode):
+    ''' This function returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
+          - options is the usual OptionParser member.
+          - fasta_files is a list of paths to FASTA files.
+          - batch_mode is a boolean stating whether or not batch mode is being used.
+    '''
     errors = []
     fasta_files_str = ", ".join(fasta_files)
     fasta_records = None
     try:
-        fasta_records = parse_FASTA_files(fasta_files)
+        fasta_records = parse_FASTA_files(options, fasta_files)
         if not fasta_records:
             errors.append("No data found in the FASTA file(s) %s." % fasta_files_str)
     except Exception, e:
+        e = '\n'.join([l for l in traceback.format_exc(), str('e') if l.strip()])
         errors.append("Error parsing FASTA file(s) %s:\n%s" % (fasta_files_str, str(e)))
+
+    if not fasta_records:
+        return None, errors
 
     num_fasta_records = len(fasta_records)
 
