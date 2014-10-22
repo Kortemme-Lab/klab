@@ -28,16 +28,19 @@ class LoopsFile(object):
     '''A class to manipulate loops files. Note that the indices in these files are 1-indexed i.e. A start position of 5
         refers to the fifth residue of the sequence.'''
 
+
     @staticmethod
     def from_filepath(filepath, ignore_whitespace = True, ignore_errors = False):
         return LoopsFile(read_file(filepath), ignore_whitespace = ignore_whitespace, ignore_errors = ignore_errors)
 
+
     def __init__(self, contents, ignore_whitespace = True, ignore_errors = False):
-        self.data = self.parse_loops_file(contents, ignore_whitespace = ignore_whitespace, ignore_errors = ignore_errors)
+        self.data = []
+        self.parse_loops_file(contents, ignore_whitespace = ignore_whitespace, ignore_errors = ignore_errors)
+
 
     def parse_loops_file(self, contents, ignore_whitespace = True, ignore_errors = False):
         '''This parser is forgiving and allows leading whitespace.'''
-        records = []
         for l in contents.strip().split('\n'):
             try:
                 if ignore_whitespace:
@@ -46,46 +49,60 @@ class LoopsFile(object):
                 if len(tokens) < 3:
                     raise RosettaFileParsingException('Lines in a loops file must have at least three entries.')
                 if len(tokens) < 4:
-                    tokens.append(0) # add the default cut point residue number
-                if tokens[0] != 'LOOP':
-                    raise RosettaFileParsingException('Lines in a loops file must start with the keyword "LOOP".')
-                try:
-                    res_numbers = map(int, tokens[1:4])
-                    if min(res_numbers) < 0:
-                        raise RosettaFileParsingException('The cut point and start and end residues indices must be positive integers.')
-                    if not(((res_numbers[2] == 0) or res_numbers[0] <= res_numbers[2] <= res_numbers[1]) and (res_numbers[0] < res_numbers[1])):
-                        raise RosettaFileParsingException('The cut point must lie between the start and end residues and the start and end residues must differ.')
-                except:
-                    raise RosettaFileParsingException('Integers are expected in columns 2-4 of loops files.')
-
-                skip_rate = None
-                if len(tokens) > 4:
-                    try:
-                        skip_rate = float(tokens[4])
-                    except:
-                        raise RosettaFileParsingException('The skip rate in column 5 is expected to be a floating-point number.')
-
-                extend_loop = False
-                if len(tokens) > 5:
-                    extend_loop = tokens[5].lower() # allow some typos
-                    if extend_loop not in ['true', 'false']:
-                        raise RosettaFileParsingException('The extend loop argument in column 6 is expected to be "true" or "false".')
-                    extend_loop = extend_loop == 'true'
-
-                d = dict(
-                    start = res_numbers[0],
-                    end = res_numbers[1],
-                    cut_point = res_numbers[2],
-                    skip_rate = skip_rate,
-                    extend_loop = extend_loop
-                )
-                records.append(d)
+                    tokens.append(None)
+                self.data.append(self.parse_loop_line(tokens))
             except:
                 if ignore_errors:
                     continue
                 else:
                     raise
-        return records
+        return self.data
+
+
+    def parse_loop_line(self, tokens):
+        print(tokens)
+        if tokens[0] != 'LOOP':
+            raise RosettaFileParsingException('Lines in a loops file must start with the keyword "LOOP".')
+        try:
+            if tokens[3] == None:
+                tokens[3] = 0 # add the default cut point residue number
+            res_numbers = map(int, tokens[1:4])
+            if min(res_numbers) < 0:
+                raise RosettaFileParsingException('The cut point and start and end residues indices must be positive integers.')
+            if not(((res_numbers[2] == 0) or res_numbers[0] <= res_numbers[2] <= res_numbers[1]) and (res_numbers[0] < res_numbers[1])):
+                raise RosettaFileParsingException('The cut point must lie between the start and end residues and the start and end residues must differ.')
+        except:
+            raise RosettaFileParsingException('Integers are expected in columns 2-4 of loops files.')
+
+        skip_rate = None
+        if len(tokens) > 4 and tokens[4] != None:
+            try:
+                skip_rate = float(tokens[4])
+            except:
+                raise RosettaFileParsingException('The skip rate in column 5 is expected to be a floating-point number.')
+
+        extend_loop = False
+        if len(tokens) > 5 and tokens[5] != None:
+            extend_loop = tokens[5].lower() # allow some typos
+            if extend_loop not in ['true', 'false']:
+                raise RosettaFileParsingException('The extend loop argument in column 6 is expected to be "true" or "false".')
+            extend_loop = extend_loop == 'true'
+
+        d = dict(
+            start = res_numbers[0],
+            end = res_numbers[1],
+            cut_point = res_numbers[2],
+            skip_rate = skip_rate,
+            extend_loop = extend_loop
+        )
+        return d
+
+
+    def add(self, start, end, cut_point = None, skip_rate = None, extend_loop = None):
+        '''Add a new loop definition.'''
+        self.data.append(self.parse_loop_line(['LOOP', start, end, cut_point, skip_rate, extend_loop]))
+        assert(start < end)
+
 
     def get_distinct_segments_from_loops_file(self):
         '''Returns a list of segments (pairs of start and end positions) based on the loop definitions. The returned segments
