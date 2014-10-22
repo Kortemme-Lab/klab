@@ -158,23 +158,27 @@ def parse_FASTA_files(options, fasta_files):
     # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
     # shorter than the length of the total sequence e.g. in cases where the protein has @1000 residues but we only care about
     # 100 residues in particular loop regions.
-    # colortext.warning(options)
-    # sys.exit(0)
-    if options.loops_file:
-        colortext.warning(options.loops_file)
-        loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
+
+    # We need to sample all sequences around a loop i.e. if a sequence segment is 7 residues long at positions 13-19 and we
+    # require 9-mers, we must consider the segment from positions 5-27 so that all possible 9-mers are considered.
+    residue_offset = max(options.frag_sizes)
+
+    if options.loops_file or options.indices:
+        loops_definition = None
+        if options.loops_file:
+            loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
 
         # If the user supplied more ranges of residues, use those as well
         if options.indices:
+            loops_definition = LoopsFile('')
             for p in options.indices:
-                loops_definition.add(p[0], p[1])
+                if loops_definition:
+                    loops_definition.add(p[0], p[1])
 
-        segment_list = loops_definition.get_distinct_segments()
-        final_loops_residue = segment_list[-1][1]
+        segment_list = loops_definition.get_distinct_segments(residue_offset, residue_offset)
         for k, v in sorted(records.iteritems()):
             assert(v[0].startswith('>'))
             sequence = ''.join([s.strip() for s in v[1:]])
-            assert(1 <= final_loops_residue <= len(sequence)) # Make sure that the loops file is compatible with the sequence
             assert(sequenceLine.match(sequence) != None) # sanity check
             cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
