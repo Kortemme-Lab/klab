@@ -103,7 +103,7 @@ class LoopsFile(object):
         assert(start < end)
 
 
-    def get_distinct_segments_from_loops_file(self):
+    def get_distinct_segments(self, left_offset = 0, right_offset = 0):
         '''Returns a list of segments (pairs of start and end positions) based on the loop definitions. The returned segments
             merge overlapping loops e.g. if the loops file contains sections 32-40, 23-30, 28-33, and 43-46 then the returned
             segments will be [(23, 40), (43, 46)].
