@@ -5,7 +5,7 @@ import gzip
 import json
 import subprocess
 
-FUDGE_FACTOR = 81 #
+FUDGE_FACTOR = 81 # !!!
 
 def read_file(filepath, binary = False):
     if binary:
@@ -106,10 +106,9 @@ if __name__ == '__main__':
                         continue
                     mtchs = re.match('(.*?frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', f)
                     if mtchs:
-                        print(f)
                         assert(mtchs.group(2) == mtchs.group(4))
                         nmerage = int(mtchs.group(2))
-                        num_fragments = int(mtchs.group(2))
+                        num_fragments = int(mtchs.group(3))
                         old_filepath = mtchs.group(0)
                         # Kale wanted to change the filename for the scores so that it is easier to distinguish between score and fragments files using glob
 
@@ -119,54 +118,10 @@ if __name__ == '__main__':
                     else:
                         mtchs = re.match('(.*)[.](\d+)[.](\d+)mers[.]?(gz)?', f)
                         if mtchs:
-                            print(f)
-                            nmerage = int(mtchs.group(2))
-                            num_fragments = int(mtchs.group(3))
+                            nmerage = int(mtchs.group(3))
+                            num_fragments = int(mtchs.group(2))
                             old_filepath = mtchs.group(0)
                             backup_filepath= '%s.%s.%sbackup.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))
                             new_filepath= ('%s.%s.%sbackup.rewrite.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))).replace('.gz', '')
                             rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
 
-#2silA_frags.3.score.200.3mers.gz
-
-        import sys
-        sys.exit(0)
-
-        for dirpath, dirnames, filenames in os.walk('.'):
-            print(1)
-            print(dirpath, dirnames, filenames)
-        a='''
-            frags.9.score.200.9mers
-
-            for f in glob.glob(os.path.join(scratch_path, "*mers")) + [os.path.join(scratch_path, 'ss_blast')]:
-                pass
-
-/2silA_frags.9.score.200.9mers.gz
-
-position:            1 neighbors:          200
-position:            9 neighbors:          200
-
- 3fm3 A   220 G L -147.838  140.069  162.241   19.330  -15.590   29.710
- 3fm3 A   221 I L -106.823  125.308 -168.239   16.930  -16.440   32.500
-
-EKSVVFKGNTIVGSGSGGTTKYFRIPAMTSKG
-
-9-mers
-
-#query_pos  vall_pos  pdbid c ss  ProfileScoreL1 SecondarySimilarity SolventAccessibility RamaScore Phi Psi ProfileScoreStructL1  TOTAL  FRAG_ID
-          1        136  1gen A E           0.59                0.17                 0.14      0.00   0.07   0.36                 0.56    3.500   3743772
-          1         57  3m4w A E           0.66                0.16                 0.10      0.01   0.11   0.34                 0.56    3.535    343056
-...
-         24
-
-3-mers
-#query_pos  vall_pos  pdbid c ss  ProfileScoreL1 SecondarySimilarity SolventAccessibility RamaScore Phi Psi ProfileScoreStructL1  TOTAL  FRAG_ID
-          1        220  3fm3 A L           0.49                0.28                 0.13      0.00   0.03   0.08                 0.52    1.768   2266884
-          1        390  2acx A L           0.39                0.36                 0.13      0.00   0.02   0.03                 0.60    1.786   3077962
-...
-         30        138  2a9d A L           0.38                0.16                 0.15      0.00   0.11   0.11                 0.50    1.880   1324419
-
-whitespace important?
-index specifies *left* index of segment
-
-'''
