@@ -7,7 +7,7 @@ Simple parsers for Rosetta input file types.
 Created by Shane O'Connor 2014
 """
 
-from fs.fsio import read_file
+from ..fs.fsio import read_file
 
 class RosettaFileParsingException(Exception): pass
 

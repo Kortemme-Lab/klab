@@ -14,17 +14,12 @@ import time
 from datetime import datetime
 from optparse import OptionParser, OptionGroup, Option
 import glob
-import getpass
 import json
 from utils import LogFile, colorprinter, JobInitializationException
 
-# A really, really nasty hack in the interests of time. Say a prayer to your gods for the damned soul who added this line.
-if __name__ == '__main__':
-    sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '../..'))
-
-import colortext
-from rosetta.input_files import LoopsFile
-from fs.fsio import read_file
+from tools import colortext
+from tools.rosetta.input_files import LoopsFile
+from tools.fs.fsio import read_file
 
 #################
 #  Configuration
@@ -56,7 +51,9 @@ make_fragments_script = "make_fragments_RAP_cluster.pl"
 test_mode = False # set this to true for running quick tests on your cluster system (you will need to adapt the cluster/[engine].py code to use this argument
 logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
 cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster
-fasta_file_wildcards = ['*.fasta', '*.fasta.txt', '*.fa'] # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory in batch mode.
+fasta_file_wildcards = '*.fasta', '*.fasta.txt', '*.fa' # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory.
+pdb_file_wildcards = '*.pdb', '*.pdb.gz' # optional: set this to your preferred PDB file extensions. This is used for finding PDB files when specifying a directory.
+input_file_wildcards = fasta_file_wildcards + pdb_file_wildcards
 
 # The location of the text file containing the names of the configuration scripts
 configurationFilesLocation = "make_fragments_confs.txt" # "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
@@ -65,7 +62,6 @@ configurationFilesLocation = "make_fragments_confs.txt" # "/netapp/home/klabqb3b
 
 
 class FastaException(Exception): pass
-
 
 class OptionParserWithNewlines(OptionParser):
     '''Override the help section with a function which does not strip the newline characters.'''
@@ -96,178 +92,69 @@ class JobInput(object):
         self.chain = chain
 
 
-def get_username():
-    return getpass.getuser()
-    #return subprocess.Popen("whoami", stdout=subprocess.PIPE).communicate()[0].strip()
 
+def get_username():
+    import getpass
+    return getpass.getuser()
 
 def write_file(filepath, contents, ftype = 'w'):
     output_handle = open(filepath, ftype)
     output_handle.write(contents)
     output_handle.close()
 
-
-def parse_FASTA_files(options, fasta_files):
-    ''' This function iterates through each filepath in fasta_files and returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
-          - options is the usual OptionParser member.
-          - fasta_files is a list of paths to FASTA files.
-    '''
-    records = {}
-    reverse_mapping = {}
-    key_location = {}
-    sequenceLine = re.compile("^[ACDEFGHIKLMNPQRSTVWY]+\n?$")
-
-    for fasta_file in fasta_files:
-        record_count = 0
-        F = open(fasta_file, "r")
-        fasta = F.readlines()
-        F.close()
-
-        if not fasta:
-            raise Exception("Empty FASTA file.")
-
-        first_line = [line for line in fasta if line.strip()][0]
-        if first_line[0] != '>':
-            raise Exception("The FASTA file is not formatted properly - the first non-blank line is not a description line (does not start with '>').")
-
-        key = None
-        line_count = 0
-        for line in fasta:
-            line_count += 1
-            line = line.strip()
-            if line:
-                if line[0] == '>':
-                    record_count += 1
-                    tokens = [t.strip() for t in line[1:].split('|') if t.strip()]
-                    if len(tokens) < 2:
-                        raise Exception("The description line ('%s') of record %d of %s is invalid. It must contain both a protein description and a chain identifier, separated by a pipe ('|') symbol." % (line, record_count, fasta_file))
-                    if len(tokens[0]) < 4:
-                        raise Exception("The protein description in the description line ('%s') of record %d of %s is too short. It must be at least four characters long." % (line, record_count, fasta_file))
-                    if len(tokens[1]) != 1:
-                        raise Exception("The chain identifier in the description line ('%s') of record %d of %s is the wrong length. It must be exactky one character long." % (line, record_count, fasta_file))
-
-                    # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
-                    key = (tokens[0][0:4].lower(), tokens[1], fasta_file)
-                    if key in records:
-                        # todo: we include the fasta_file in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file as part of the check for a more stringent check?
-                        raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatentated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file))
-                    key_location[key] = fasta_file
-
-                    records[key] = [line]
-                else:
-                    mtchs = sequenceLine.match(line)
-                    if not mtchs:
-                        raise FastaException("Expected a record header or sequence line at line %d." % line_count)
-                    records[key].append(line)
-
-    # If a loops file was passed in, use that to cut up the sequences and concatenate these subsequences to generate a
-    # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
-    # shorter than the length of the total sequence e.g. in cases where the protein has @1000 residues but we only care about
-    # 100 residues in particular loop regions.
-
-    # We need to sample all sequences around a loop i.e. if a sequence segment is 7 residues long at positions 13-19 and we
-    # require 9-mers, we must consider the segment from positions 5-27 so that all possible 9-mers are considered.
-    residue_offset = max(options.frag_sizes)
-
-    if options.loops_file or options.indices:
-        loops_definition = None
-        if options.loops_file:
-            loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
-
-        # If the user supplied more ranges of residues, use those as well
-        if options.indices:
-            loops_definition = LoopsFile('')
-            for p in options.indices:
-                if loops_definition:
-                    loops_definition.add(p[0], p[1])
-
-        segment_list = loops_definition.get_distinct_segments(residue_offset, residue_offset)
-
-        # Create the reverse_mapping from the indices in the sequences defined by the segment_list to the indices in the original sequences.
-        # This will be used to rewrite the fragments files to make them compatible with the original sequences.
-        # Note that this mapping ignores the length of the sequences (which may vary in length) so it may be mapping residues indices
-        # which are outside of the length of some of the sequences.
-        assert(sorted(segment_list) == segment_list) # sanity check
-        count = 1
-        for x in range(len(segment_list)):
-            segment = segment_list[x]
-            if x < len(segment_list) - 1:
-                assert(segment[1] < segment_list[x+1][0]) # sanity check
-            for y in range(segment[0], segment[1] + 1):
-                reverse_mapping[count] = y
-                count += 1
-
-        for k, v in sorted(records.iteritems()):
-            assert(v[0].startswith('>'))
-            sequence = ''.join([s.strip() for s in v[1:]])
-            assert(sequenceLine.match(sequence) != None) # sanity check
-            cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
-            records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
-
-    return records, reverse_mapping
-
-
-def parseArgs():
+def parse_args():
     global errcode
     errors = []
     pdbpattern = re.compile("^\w{4}$")
-    description = ['\n']
-    description.append("*** Help ***\n")
-    description.append("The output of the computation will be saved in the output directory, along with")
-    description.append("the input FASTA file which is generated from the supplied FASTA file.")
-    description.append("A log of the output directories for cluster jobs is saved in")
-    description.append("%s in the current directory to admit queries." % logfile.getName())
-    description.append("")
-    description.append("The FASTA description lines must have the following format:")
-    description.append("'>protein_id|chain_letter', optionally followed by more text preceded by a '|'")
+    logfile_name = logfile.getName()
+    script_name = os.path.split(sys.argv[0])[1]
+    description = '\n' + """\
+*** Help ***
 
-    description.append('''There are a few caveats:
+The output of the computation will be saved in the output directory, along with 
+the input FASTA file which is generated from the supplied FASTA file.  To admit 
+queries, a log of the output directories for cluster jobs is saved in
+{logfile_name} in the current directory.
+
+The FASTA description lines must begin with '>protein_id|chain_letter'.  This 
+information may optionally be followed by a '|' and more text.
+
+There are a few caveats:
 
 1. The underlying Perl script requires a 5-character ID for the sequence 
-identifier which is typically a PDB ID followed by a chain ID e.g. "1a2pA". 
-For this reason, our script expects FASTA record headers to have a form like
- ">xxxx|y" where xxxx is a 4-letter identifier e.g. PDB ID and y is a chain
- identifier. protein_id identifier may be longer than 4 characters and 
-chain_letter must be a single character. However, only the first 4 characters 
-of the identifier are used by the script. Any information after the chain 
-identifier must be preceded by a '|' character.
+   identifier which is typically a PDB ID followed by a chain ID e.g. "1a2pA".  
+   For this reason, our script expects FASTA record headers to have a form like
+   ">xxxx|y" where xxxx is a 4-letter identifier e.g. PDB ID and y is a chain
+   identifier. protein_id identifier may be longer than 4 characters and 
+   chain_letter must be a single character. However, only the first 4 characters 
+   of the identifier are used by the script. Any information after the chain 
+   identifier must be preceded by a '|' character.
 
-For example, ">1A2P_001|A|some information" is a valid header but the 
-generated ID will be "1a2pA" (we convert PDB IDs to lowercase).
+   For example, ">1A2P_001|A|some information" is a valid header but the 
+   generated ID will be "1a2pA" (we convert PDB IDs to lowercase).
 
 2. If you are submitting a batch job, the list of 5-character IDs generated 
-from the FASTA files using the method above must be unique.
-
-For example, if you have two records ">1A2P_001|A|" and "">1A2P_002|A|" then 
-the job will fail.
-On the other hand, ">1A2P_001|A|" and "">1A2P_001|B|" is perfectly fine and 
-the script will output fragments for 1a2pA and 1a2pB.''')
+   from the FASTA files using the method above must be unique.  For example, if 
+   you have two records ">1A2P_001|A|" and "">1A2P_002|A|" then the job will 
+   fail.  On the other hand, ">1A2P_001|A|" and "">1A2P_001|B|" is perfectly 
+   fine and the script will output fragments for 1a2pA and 1a2pB.
     
-    script_name = os.path.split(sys.argv[0])[1]
-    description.append("\n*** Examples ***\n")
-    description.append("Single-sequence fragment generation:")
-    description.append("1: " + script_name + " -d results -f /path/to/1CYO.fasta.txt")
-    description.append("2: " + script_name + " -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA\n")
-    description.append("Multi-sequence fragment generation (batch job):")
-    description.append("1: " + script_name + " -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n")
-    description.append("2: " + script_name + " -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1\n\n")
-    
-    description = "\n".join(description)
+*** Examples ***
 
-    parser = OptionParserWithNewlines(usage="usage: %prog [options]", version="%prog 1.1A", option_class=MultiOption)
+Single-sequence fragment generation:
+1: {script_name} -d results -f /path/to/1CYO.fasta.txt
+2: {script_name} -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA
+
+Multi-sequence fragment generation (batch job):
+1: {script_name} -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n
+2: {script_name} -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1
+""".format(**locals())
+
+    parser = OptionParserWithNewlines(usage="usage: %prog [options] <inputs>...", version="%prog 1.1A", option_class=MultiOption)
     parser.epilog = description
 
-    group = OptionGroup(parser, "Single sequence options (for running fragment generation for just one sequence)")
-    group.add_option("-f", "--fasta", dest="fasta", help="The input FASTA file. This defaults to OUTPUT_DIRECTORY/PDBID.fasta.txt if the PDB ID is supplied.", metavar="FASTA")
-    group.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
-    group.add_option("-p", "--pdbid", dest="pdbid", help="The input PDB identifier. This is optional if the FASTA file is specified and only contains one PDB identifier.", metavar="PDBID")
-    parser.add_option_group(group)
-
-    group = OptionGroup(parser, "Multiple sequence options (fragment generation is run on all sequences). These options can be combined.")
-    group.add_option("-b", "--batch", action="extend", dest="batch", help="Batch mode. The argument to this option is a comma-separated (no spaces) list of: i) FASTA files; ii) wildcard strings e.g. '/path/to/%.fasta'; or iii) directories. Fragment generation will be performed for all sequences in the explicitly lists files, files matching the wildcard selection, and '.fasta' files in any directory listed. Note: The 5-character IDs (see above) must be unique for this mode. Also, note that '%' is used as a wildcard character rather than '*' to prevent shell wildcard-completion.", metavar="LIST OF FILES or DIRECTORY")
-    parser.add_option_group(group)
-
     group = OptionGroup(parser, "Fragment generation options")
+    group.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
     group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-s", "--frag_sizes", dest="frag_sizes", help="Optional. A list of fragment sizes e.g. -s 3,6,9 specifies that 3-mer, 6-mer, and 9-mer fragments are to be generated. The default is for 3-mer and 9-mer fragments to be generated.")
     group.add_option("-l", "--loops_file", dest="loops_file", help="Optional but recommended. A Rosetta loops file which will be used to select sections of the FASTA sequences from which fragments will be generated. This saves a lot of time on large sequences.")
@@ -320,8 +207,6 @@ the script will output fragments for 1a2pA and 1a2pB.''')
     (options, args) = parser.parse_args()
 
     username = get_username()
-    if len(args) >= 1:
-        errors.append("Unexpected arguments: %s." % join(args, ", "))
 
     # QUERY
     if options.query:
@@ -344,14 +229,6 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         errors.append("The amount of RAM requested must be at least 2 (GB).")
     if options.runtime < 8:
         errors.append("The requested runtime must be at least 8 (hours).")
-
-    # PDB ID
-    if options.pdbid:
-        if not pdbpattern.match(options.pdbid):
-            errors.append("Please enter a valid PDB identifier.")
-        else:
-            # Note: We stored the PDB ID as lower-case so that the user does not have to worry about case-sensitivity. Here, we convert the user's PDB ID argument to lower-case as well.
-            options.pdbid = options.pdbid.lower()
 
     # CHAIN
     if options.chain and not (len(options.chain) == 1):
@@ -448,60 +325,35 @@ the script will output fragments for 1a2pA and 1a2pB.''')
                     errors.append(str(e))
                     errors.append(traceback.format_exc())
 
-    # FASTA
-    if options.fasta:
-        if not os.path.isabs(options.fasta):
-            options.fasta = os.path.realpath(options.fasta)
-    if options.pdbid and not options.fasta:
-        options.fasta = os.path.join(outpath, "%s.fasta.txt" % options.pdbid)
-
-    # BATCH
+    # ARGUMENTS
     batch_files = []
-    if options.batch:
-        batch_params = options.batch
-        missing_files = []
+    missing_files = []
 
-        batch_files = []
-        for batch_file_selector in batch_params:
-            if batch_file_selector.find('%') != -1:
-                batch_file_selector = batch_file_selector.replace('%', '*')
-                batch_files.extend(map(os.path.abspath, glob.glob(batch_file_selector)))
-            elif batch_file_selector.find('?') != -1:
-                batch_files.extend(map(os.path.abspath, glob.glob(batch_file_selector)))
-            elif os.path.isdir(batch_file_selector):
-                for fasta_file_wildcard in fasta_file_wildcards:
-                    batch_files.extend(map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, fasta_file_wildcard))))
-            else:
-                if not os.path.exists(batch_file_selector):
-                    missing_files.append(batch_file_selector)
-                else:
-                    batch_files.append(os.path.abspath(batch_file_selector))
-        batch_files = list(set(batch_files))
+    for batch_file_selector in args:
+        if '%' in batch_file_selector or '?' in batch_file_selector:
+            batch_file_selector = batch_file_selector.replace('%', '*')
+            batch_files += map(os.path.abspath, glob.glob(batch_file_selector))
+        elif os.path.isdir(batch_file_selector):
+            for input_file_wildcard in input_file_wildcards:
+                batch_files += map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, input_file_wildcard)))
+        elif not os.path.exists(batch_file_selector):
+            missing_files.append(batch_file_selector)
+        else:
+            batch_files.append(os.path.abspath(batch_file_selector))
 
-        if len(missing_files) == 1:
-            errors.append("FASTA file %s does not exist." % (options.fasta or ''))
-        elif len(missing_files) > -0:
-            errors.append("FASTA files %s do not exist." % ', '.join(missing_files))
+    batch_files = list(set(batch_files))
 
-    if (not options.fasta) and (not batch_files):
-        if not validOptions:
-            print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS)
+    if len(missing_files) == 1:
+        errors.append("Input file %s does not exist." % (options.fasta or ''))
+    elif len(missing_files) > -0:
+        errors.append("Input files %s do not exist." % ', '.join(missing_files))
 
-    if (options.fasta) and (batch_files):
-        print_errors_and_exit(parser, ['\nError: You must either use single sequence mode or batch mode. Both were specified'], ERRCODE_ARGUMENTS)
+    if errors: print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS)
 
     job_inputs = []
-    if options.fasta:
-        if not os.path.exists(options.fasta):
-            errors.append("FASTA file %s does not exist." % (options.fasta or ''))
-        elif not errors:
-            job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, [options.fasta], False)
-    elif batch_files:
-        if not errors:
-            job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, batch_files, True)
+    job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, batch_files)
 
-    if errors:
-        print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
+    if errors: print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
 
     no_homologs = ""
     if options.nohoms:
@@ -520,15 +372,14 @@ the script will output fragments for 1a2pA and 1a2pB.''')
         memfree          = options.memfree,
         runtime          = options.runtime,
         frag_sizes       = options.frag_sizes,
-        n_frags           = options.n_frags,
+        n_frags          = options.n_frags,
         n_candidates     = options.n_candidates,
         add_vall_files   = options.add_vall_files,
         use_vall_files   = options.use_vall_files,
         add_pdbs_to_vall = options.add_pdbs_to_vall,
         has_segment_mapping = has_segment_mapping,
-        #"qstatstats"	: "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
+        #"qstatstats": "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
     )
-
 
 def print_errors_and_exit(parser, errors, errcode, print_help = True):
     if print_help:
@@ -543,37 +394,68 @@ def print_errors_and_exit(parser, errors, errcode, print_help = True):
     else:
         sys.exit(ERRCODE_ARGUMENTS)
 
-
-def setup_jobs(outpath, options, fasta_files, batch_mode):
+def setup_jobs(outpath, options, input_files):
     ''' This function sets up the jobs by creating the necessary input files as expected.
-          - outpath is where the output is to be stored, options is the usual OptionParser member.
-          - fasta_files is a list of paths to FASTA files.
-          - batch_mode is a boolean stating whether or not batch mode is being used.
+          - outpath is where the output is to be stored.
+          - options is the optparse options object.
+          - input_files is a list of paths to input files.
     '''
+    from fnmatch import fnmatch
+    from tools.bio.pdb import PDB
+
     job_inputs = None
     reverse_mapping = None
-    found_sequences, reverse_mapping, errors = get_sequences(options, fasta_files, batch_mode)
-    if found_sequences: # or batch_mode:
+    fasta_files = []
+
+    # Generate FASTA files for PDB inputs.
+    for input_file in input_files:
+        if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
+            pdb = PDB.from_filepath(input_file, strict=False)
+            pdb.pdb_id = os.path.basename(input_file).split('.')[0]
+            fasta_file = os.path.join(outpath, pdb.pdb_id + '.fasta.txt')
+            fasta_files.append(fasta_file)
+
+            with open(fasta_file, 'w') as file:
+                file.write(pdb.create_fasta())
+
+        else:
+            fasta_files.append(input_file)
+
+    print fasta_files
+
+    # Extract sequences from the input FASTA files.
+    found_sequences, reverse_mapping, errors = get_sequences(options, fasta_files)
+    if found_sequences:
         reformat(found_sequences)
-    if not errors:
-        job_inputs, errors = create_inputs(options, outpath, found_sequences)
-        if reverse_mapping:
-            segment_mapping_file = os.path.join(outpath, "segment_map.json")
-            colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
-            write_file(segment_mapping_file, json.dumps(reverse_mapping))
+    if errors:
+        return None, False, errors
+
+    # Discard sequences that are the wrong chain.
+    desired_sequences = {}
+    for key, sequence in found_sequences.iteritems():
+        pdb_id, chain, file_name = key
+        if options.chain is None or chain == options.chain:
+            desired_sequences[key] = sequence
+
+    # Create the input FASTA and script files.
+    job_inputs, errors = create_inputs(options, outpath, desired_sequences)
+    if reverse_mapping:
+        segment_mapping_file = os.path.join(outpath, "segment_map.json")
+        colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
+        write_file(segment_mapping_file, json.dumps(reverse_mapping))
 
     return job_inputs, reverse_mapping != None, errors
 
-def get_sequences(options, fasta_files, batch_mode):
+def get_sequences(options, fasta_files):
     ''' This function returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
           - options is the usual OptionParser member.
           - fasta_files is a list of paths to FASTA files.
-          - batch_mode is a boolean stating whether or not batch mode is being used.
     '''
     errors = []
     fasta_files_str = ", ".join(fasta_files)
     fasta_records = None
     reverse_mapping = {}
+
     try:
         fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_files)
         if not fasta_records:
@@ -585,60 +467,106 @@ def get_sequences(options, fasta_files, batch_mode):
     if not fasta_records:
         return None, {}, errors
 
-    num_fasta_records = len(fasta_records)
+    colorprinter.message('Found %d sequence(s).' % len(fasta_records))
+    return fasta_records, reverse_mapping, errors
 
-    colorprinter.message('Found %d sequence(s).' % num_fasta_records)
+def parse_FASTA_files(options, fasta_files):
+    ''' This function iterates through each filepath in fasta_files and returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
+          - options is the usual OptionParser member.
+          - fasta_files is a list of paths to FASTA files.
+    '''
+    records = {}
+    reverse_mapping = {}
+    key_location = {}
+    sequenceLine = re.compile("^[A-Z]+\n?$")
 
-    found_sequences = None
-    if num_fasta_records == 0:
-        errors.append("No sequences found in the FASTA file(s) %s." % fasta_files_str)
-    elif num_fasta_records == 1:
-        # One record - we will revert to a single task job below regardless of whether the script was called with batch mode or not
-        key = fasta_records.keys()[0]
-        (options.pdbid, options.chain, file_name) = key
-        found_sequences = fasta_records
-        colorprinter.message("One chain and PDB ID pair (%s, %s) found in %s. Using that pair as input." % (options.chain, options.pdbid, file_name))
-    elif batch_mode:
-        found_sequences = fasta_records
+    for fasta_file in fasta_files:
+        record_count = 0
+        with open(fasta_file, "r") as file:
+            fasta = file.readlines()
 
-    if not found_sequences:
-        # In single sequence mode - find the record we are looking for
+        if not fasta:
+            raise Exception("Empty FASTA file.")
 
-        # Check for ambiguity in the records (same PDB ID, chain)
-        record_frequency = {}
-        for record in fasta_records.keys():
-            k = (record[0], record[1])
-            record_frequency[k] = record_frequency.get(k, 0) + 1
-        multipledefinitions = ["\tPDB ID: %s, Chain %s" % (record[0], record[1]) for record, count in sorted(record_frequency.iteritems()) if count > 1]
+        first_line = [line for line in fasta if line.strip()][0]
+        if first_line[0] != '>':
+            raise Exception("The FASTA file is not formatted properly - the first non-blank line is not a description line (does not start with '>').")
 
-        chains_present = sorted([record[1] for record in fasta_records.keys()])
-        pdbids_present = sorted(list(set([record[0] for record in fasta_records.keys()])))
+        key = None
+        line_count = 0
+        for line in fasta:
+            line_count += 1
+            line = line.strip()
+            if line:
+                if line[0] == '>':
+                    record_count += 1
+                    tokens = [t.strip() for t in line[1:].split('|') if t.strip()]
+                    if len(tokens) < 2:
+                        raise Exception("The description line ('%s') of record %d of %s is invalid. It must contain both a protein description and a chain identifier, separated by a pipe ('|') symbol." % (line, record_count, fasta_file))
+                    if len(tokens[0]) < 4:
+                        raise Exception("The protein description in the description line ('%s') of record %d of %s is too short. It must be at least four characters long." % (line, record_count, fasta_file))
+                    if len(tokens[1]) != 1:
+                        raise Exception("The chain identifier in the description line ('%s') of record %d of %s is the wrong length. It must be exactky one character long." % (line, record_count, fasta_file))
 
-        if len(multipledefinitions) > 0:
-            errors.append("The FASTA file(s) %s contains multiple sequences for the following chains:\n%s.\nPlease edit the file and remove the unnecessary chains." % (fasta_files_str, join(multipledefinitions, "\n")))
-        else:
-            if not options.chain:
-                if len(chains_present) > 1:
-                    errors.append("Please enter a chain. Valid chains are: %s." % join(chains_present, ", "))
+                    # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
+                    key = (tokens[0][0:4].lower(), tokens[1], fasta_file)
+                    if key in records:
+                        # todo: we include the fasta_file in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file as part of the check for a more stringent check?
+                        raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatentated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file))
+                    key_location[key] = fasta_file
+
+                    records[key] = [line]
                 else:
-                    options.chain = chains_present[0]
-                    colorprinter.message("No chain specified. Using the only one present in the fasta file(s), %s." % options.chain)
-            if not options.pdbid:
-                if len(pdbids_present) > 1:
-                    errors.append("Please enter a PDB identifier. Valid IDs are: %s." % join(pdbids_present, ", "))
-                else:
-                    options.pdbid = pdbids_present[0].lower()
-                    colorprinter.message("No PDB ID specified. Using the only one present in the fasta file(s), %s." % options.pdbid)
-            if options.chain and options.pdbid:
-                for (pdbid, chain, file_name), sequence in sorted(fasta_records.iteritems()):
-                    if pdbid == options.pdbid and chain == options.chain:
-                        found_sequences = {(pdbid, chain, file_name) : sequence}
-                        break
-                if not found_sequences:
-                    errors.append('Could not find the sequence for PDB ID %s and chain %s in the file(s) %s.' % (options.pdbid, options.chain, fasta_files_str))
-    
-    return found_sequences, reverse_mapping, errors
+                    mtchs = sequenceLine.match(line)
+                    if not mtchs:
+                        raise FastaException("Expected a record header or sequence line at line %d." % line_count)
+                    records[key].append(line)
 
+    # If a loops file was passed in, use that to cut up the sequences and concatenate these subsequences to generate a
+    # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
+    # shorter than the length of the total sequence e.g. in cases where the protein has @1000 residues but we only care about
+    # 100 residues in particular loop regions.
+
+    # We need to sample all sequences around a loop i.e. if a sequence segment is 7 residues long at positions 13-19 and we
+    # require 9-mers, we must consider the segment from positions 5-27 so that all possible 9-mers are considered.
+    residue_offset = max(options.frag_sizes)
+
+    if options.loops_file or options.indices:
+        loops_definition = None
+        if options.loops_file:
+            loops_definition = LoopsFile.from_filepath(options.loops_file, ignore_whitespace = True, ignore_errors = False)
+
+        # If the user supplied more ranges of residues, use those as well
+        if options.indices:
+            loops_definition = LoopsFile('')
+            for p in options.indices:
+                if loops_definition:
+                    loops_definition.add(p[0], p[1])
+
+        segment_list = loops_definition.get_distinct_segments(residue_offset, residue_offset)
+
+        # Create the reverse_mapping from the indices in the sequences defined by the segment_list to the indices in the original sequences.
+        # This will be used to rewrite the fragments files to make them compatible with the original sequences.
+        # Note that this mapping ignores the length of the sequences (which may vary in length) so it may be mapping residues indices
+        # which are outside of the length of some of the sequences.
+        assert(sorted(segment_list) == segment_list) # sanity check
+        count = 1
+        for x in range(len(segment_list)):
+            segment = segment_list[x]
+            if x < len(segment_list) - 1:
+                assert(segment[1] < segment_list[x+1][0]) # sanity check
+            for y in range(segment[0], segment[1] + 1):
+                reverse_mapping[count] = y
+                count += 1
+
+        for k, v in sorted(records.iteritems()):
+            assert(v[0].startswith('>'))
+            sequence = ''.join([s.strip() for s in v[1:]])
+            assert(sequenceLine.match(sequence) != None) # sanity check
+            cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
+            records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
+
+    return records, reverse_mapping
 
 def reformat(found_sequences):
     '''Truncate the FASTA headers so that the first field is a 4-character ID.'''
@@ -650,12 +578,8 @@ def reformat(found_sequences):
         assert(len(tokens[0]) == 5)
         sequence[0] = "|".join(tokens)
 
-
 def create_inputs(options, outpath, found_sequences):
     errors = []
-    if len(found_sequences) == 1:
-        # In single sequence mode - find the record we are looking for
-        batch_mode = True
 
     # Create subdirectories
     job_inputs = []
@@ -697,8 +621,7 @@ def create_inputs(options, outpath, found_sequences):
 
     return job_inputs, errors
 
-
-def searchConfigurationFiles(findstr, replacestr = None):
+def search_configuration_files(findstr, replacestr = None):
     '''This function could be used to find and replace paths in the configuration files.
         At present, it only finds phrases.'''
 
@@ -728,11 +651,10 @@ def searchConfigurationFiles(findstr, replacestr = None):
                     alloutput[line] = output.split("\n")
     return alloutput, allerrors
 
-
-def checkConfigurationPaths():
+def check_configuration_paths():
     pathregex1 = re.compile('.*"(/netapp.*?)".*')
     pathregex2 = re.compile('.*".*(/netapp.*?)\\\\".*')
-    alloutput, allerrors = searchConfigurationFiles("netapp")
+    alloutput, allerrors = search_configuration_files("netapp")
     errors = []
     if allerrors:
         for flname, errs in sorted(allerrors.iteritems()):
@@ -758,7 +680,7 @@ if __name__ == "__main__":
     this_dir = os.path.dirname(os.path.realpath(__file__))
     make_fragments_script = os.path.join(this_dir, make_fragments_script)
 
-    errors = [] #checkConfigurationPaths()
+    errors = [] #check_configuration_paths()
     if errors:
         colorprinter.error("There is an error in the configuration files:")
         for e in errors:
@@ -770,8 +692,7 @@ if __name__ == "__main__":
                 colorprinter.error(e)
         sys.exit(ERRCODE_CONFIG)
 
-
-    options = parseArgs()
+    options = parse_args()
     if options["outpath"] and options['job_inputs']:
         try:
             if len(options['job_inputs']) > 1:
