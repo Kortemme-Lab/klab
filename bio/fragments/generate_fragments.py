@@ -583,7 +583,7 @@ def get_sequences(options, fasta_files, batch_mode):
         errors.append("Error parsing FASTA file(s) %s:\n%s" % (fasta_files_str, str(e)))
 
     if not fasta_records:
-        return None, errors
+        return None, {}, errors
 
     num_fasta_records = len(fasta_records)
 
