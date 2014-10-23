@@ -228,7 +228,7 @@ class MultipleTask(SingleTask):
         num_tasks = len(options['job_inputs'])
         no_homologs = options['no_homologs']
 
-        frag_sizes = '-frag_sizes %s' % ','.join(map,str(options['frag_sizes']))
+        frag_sizes = '-frag_sizes %s' % ','.join(map(str, options['frag_sizes']))
         n_frags = '-n_frags %d' % options['n_frags']
         n_candidates = '-n_candidates %d' % options['n_candidates']
 
