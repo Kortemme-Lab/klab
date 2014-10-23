@@ -153,6 +153,7 @@ if subp.errorcode != 0:
         pdb_id = options['job_inputs'][0].pdb_id
         chain = options['job_inputs'][0].chain
         fasta_file = options['job_inputs'][0].fasta_file
+        has_segment_mapping = options['has_segment_mapping']
 
         fasta_file_dir = os.path.split(fasta_file)[0]
         no_homologs = options['no_homologs']
@@ -227,6 +228,7 @@ class MultipleTask(SingleTask):
         job_inputs = options['job_inputs']
         num_tasks = len(options['job_inputs'])
         no_homologs = options['no_homologs']
+        has_segment_mapping = options['has_segment_mapping']
 
         frag_sizes = '-frag_sizes %s' % ','.join(map(str, options['frag_sizes']))
         n_frags = '-n_frags %d' % options['n_frags']
