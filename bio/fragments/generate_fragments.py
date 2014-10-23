@@ -17,7 +17,11 @@ import glob
 import getpass
 import json
 from utils import LogFile, colorprinter, JobInitializationException
-sys.path.insert(0, '../..')
+
+# A really, really nasty hack in the interests of time. Say a prayer to your gods for the damned soul who added this line.
+if __name__ == '__main__':
+    sys.path.insert(0, os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), '../..'))
+
 import colortext
 from rosetta.input_files import LoopsFile
 from fs.fsio import read_file
