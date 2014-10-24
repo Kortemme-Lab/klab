@@ -13,6 +13,7 @@ import traceback
 import time
 from datetime import datetime
 from optparse import OptionParser, OptionGroup, Option
+from fnmatch import fnmatch
 import glob
 import getpass
 import json
@@ -21,6 +22,7 @@ from utils import LogFile, colorprinter, JobInitializationException
 from tools import colortext
 from tools.rosetta.input_files import LoopsFile
 from tools.fs.fsio import read_file
+from tools.bio.pdb import PDB
 
 #################
 #  Configuration
@@ -407,29 +409,23 @@ def setup_jobs(outpath, options, input_files):
           - options is the optparse options object.
           - input_files is a list of paths to input files.
     '''
-    from fnmatch import fnmatch
-    from tools.bio.pdb import PDB
 
     job_inputs = None
     reverse_mapping = None
-    fasta_files = []
+    fasta_file_contents = {}
 
-    # Generate FASTA files for PDB inputs.
+    # Generate FASTA files for PDB inputs
     for input_file in input_files:
+        assert(not(fasta_file_contents.get(input_file)))
         if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
             pdb = PDB.from_filepath(input_file, strict=False)
             pdb.pdb_id = os.path.basename(input_file).split('.')[0]
-            fasta_file = os.path.join(outpath, pdb.pdb_id + '.fasta.txt')
-            fasta_files.append(fasta_file)
-
-            with open(fasta_file, 'w') as file:
-                file.write(pdb.create_fasta())
-
+            fasta_file_contents[input_file] = pdb.create_fasta()
         else:
-            fasta_files.append(input_file)
+            fasta_file_contents[input_file] = read_file(input_file)
 
     # Extract sequences from the input FASTA files.
-    found_sequences, reverse_mapping, errors = get_sequences(options, fasta_files)
+    found_sequences, reverse_mapping, errors = get_sequences(options, fasta_file_contents)
     if found_sequences:
         reformat(found_sequences)
     if errors:
@@ -444,25 +440,24 @@ def setup_jobs(outpath, options, input_files):
 
     # Create the input FASTA and script files.
     job_inputs, errors = create_inputs(options, outpath, desired_sequences)
-    if reverse_mapping:
-        segment_mapping_file = os.path.join(outpath, "segment_map.json")
-        colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
-        write_file(segment_mapping_file, json.dumps(reverse_mapping))
+    segment_mapping_file = os.path.join(outpath, "segment_map.json")
+    colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
+    write_file(segment_mapping_file, json.dumps(reverse_mapping))
 
     return job_inputs, reverse_mapping != None, errors
 
-def get_sequences(options, fasta_files):
-    ''' This function returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
-          - options is the usual OptionParser member.
-          - fasta_files is a list of paths to FASTA files.
+def get_sequences(options, fasta_file_contents):
+    ''' This function returns a dict mapping (pdbid, chain, file_name) tuples to sequences:
+          - options is the OptionParser member;
+          - fasta_file_contents is a map from input filenames to the associated FASTA file contents.
     '''
     errors = []
-    fasta_files_str = ", ".join(fasta_files)
+    fasta_files_str = ", ".join(fasta_file_contents.keys())
     fasta_records = None
     reverse_mapping = {}
 
     try:
-        fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_files)
+        fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_file_contents)
         if not fasta_records:
             errors.append("No data found in the FASTA file(s) %s." % fasta_files_str)
     except Exception, e:
@@ -475,21 +470,19 @@ def get_sequences(options, fasta_files):
     colorprinter.message('Found %d sequence(s).' % len(fasta_records))
     return fasta_records, reverse_mapping, errors
 
-def parse_FASTA_files(options, fasta_files):
-    ''' This function iterates through each filepath in fasta_files and returns a dict mapping (pdbid, chain, file_name) tuples to sequences.
-          - options is the usual OptionParser member.
-          - fasta_files is a list of paths to FASTA files.
+def parse_FASTA_files(options, fasta_file_contents):
+    ''' This function iterates through each filepath in fasta_file_contents and returns a dict mapping (pdbid, chain, file_name) tuples to sequences:
+          - options is the OptionParser member;
+          - fasta_file_contents is a map from input filenames to the associated FASTA file contents.
     '''
     records = {}
     reverse_mapping = {}
     key_location = {}
     sequenceLine = re.compile("^[A-Z]+\n?$")
 
-    for fasta_file in fasta_files:
+    for fasta_file_name, fasta in sorted(fasta_file_contents.iteritems()):
         record_count = 0
-        with open(fasta_file, "r") as file:
-            fasta = file.readlines()
-
+        fasta = fasta.strip().split('\n')
         if not fasta:
             raise Exception("Empty FASTA file.")
 
@@ -507,19 +500,18 @@ def parse_FASTA_files(options, fasta_files):
                     record_count += 1
                     tokens = [t.strip() for t in line[1:].split('|') if t.strip()]
                     if len(tokens) < 2:
-                        raise Exception("The description line ('%s') of record %d of %s is invalid. It must contain both a protein description and a chain identifier, separated by a pipe ('|') symbol." % (line, record_count, fasta_file))
+                        raise Exception("The description line ('%s') of record %d of %s is invalid. It must contain both a protein description and a chain identifier, separated by a pipe ('|') symbol." % (line, record_count, fasta_file_name))
                     if len(tokens[0]) < 4:
-                        raise Exception("The protein description in the description line ('%s') of record %d of %s is too short. It must be at least four characters long." % (line, record_count, fasta_file))
+                        raise Exception("The protein description in the description line ('%s') of record %d of %s is too short. It must be at least four characters long." % (line, record_count, fasta_file_name))
                     if len(tokens[1]) != 1:
-                        raise Exception("The chain identifier in the description line ('%s') of record %d of %s is the wrong length. It must be exactky one character long." % (line, record_count, fasta_file))
+                        raise Exception("The chain identifier in the description line ('%s') of record %d of %s is the wrong length. It must be exactky one character long." % (line, record_count, fasta_file_name))
 
                     # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
-                    key = (tokens[0][0:4].lower(), tokens[1], fasta_file)
+                    key = (tokens[0][0:4].lower(), tokens[1], fasta_file_name)
                     if key in records:
-                        # todo: we include the fasta_file in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file as part of the check for a more stringent check?
+                        # todo: we include the fasta_file_name in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file_name as part of the check for a more stringent check?
                         raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatentated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file))
-                    key_location[key] = fasta_file
-
+                    key_location[key] = fasta_file_name
                     records[key] = [line]
                 else:
                     mtchs = sequenceLine.match(line)
