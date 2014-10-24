@@ -331,26 +331,31 @@ Fragment generation for a specific chain:
     batch_files = []
     missing_files = []
 
-    for batch_file_selector in args:
-        if '%' in batch_file_selector or '?' in batch_file_selector:
-            batch_file_selector = batch_file_selector.replace('%', '*')
-            batch_files += map(os.path.abspath, glob.glob(batch_file_selector))
-        elif os.path.isdir(batch_file_selector):
-            for input_file_wildcard in input_file_wildcards:
-                batch_files += map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, input_file_wildcard)))
-        elif not os.path.exists(batch_file_selector):
-            missing_files.append(batch_file_selector)
-        else:
-            batch_files.append(os.path.abspath(batch_file_selector))
+    if len(args) == 0:
+        errors.append('No input files were specified.')
+    else:
+        for batch_file_selector in args:
+            if '*' in batch_file_selector or '?' in batch_file_selector:
+                batch_files += map(os.path.abspath, glob.glob(batch_file_selector))
+            elif os.path.isdir(batch_file_selector):
+                for input_file_wildcard in input_file_wildcards:
+                    batch_files += map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, input_file_wildcard)))
+            elif not os.path.exists(batch_file_selector):
+                missing_files.append(batch_file_selector)
+            else:
+                batch_files.append(os.path.abspath(batch_file_selector))
 
-    batch_files = list(set(batch_files))
+        batch_files = list(set(batch_files))
 
-    if len(missing_files) == 1:
-        errors.append("Input file %s does not exist." % (options.fasta or ''))
-    elif len(missing_files) > -0:
-        errors.append("Input files %s do not exist." % ', '.join(missing_files))
+        if len(missing_files) == 1:
+            errors.append("Input file %s does not exist." % (options.fasta or ''))
+        elif len(missing_files) > -0:
+            errors.append("Input files %s do not exist." % ', '.join(missing_files))
+        if len(batch_files) == 0:
+            errors.append('No input files could be found matching the arguments "%s".' % ', '.join(args))
 
-    if errors: print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS)
+    if errors:
+        print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS)
 
     job_inputs = []
     job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, batch_files)
