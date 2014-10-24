@@ -84,8 +84,8 @@ class LoopsFile(object):
         if len(tokens) > 5 and tokens[5] != None:
             extend_loop = tokens[5].lower() # allow some typos
             if extend_loop not in ['1', '0', 'true', 'false']:
-                raise RosettaFileParsingException('The extend loop argument in column 6 is expected to be "true" or "false".')
-            extend_loop = (extend_loop in ('1', 'true'))
+                raise RosettaFileParsingException('The extend loop argument in column 6 is expected to be "true", "false", "0", or "1".')
+            extend_loop = extend_loop == '1' or extend_loop == 'true'
 
         d = dict(
             start = res_numbers[0],
