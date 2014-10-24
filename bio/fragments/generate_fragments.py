@@ -142,21 +142,23 @@ There are a few caveats:
 *** Examples ***
 
 Single-sequence fragment generation:
-1: {script_name} -d results -f /path/to/1CYO.fasta.txt
-2: {script_name} -d results -f /path/to/1CYO.fasta.txt -p1CYO -cA
+1: {script_name} -d results /path/to/1CYO.fasta.txt
 
 Multi-sequence fragment generation (batch job):
-1: {script_name} -d results -b /path/to/fasta_file.1,...,/path/to/fasta_file.n
-2: {script_name} -d results -b /some/path/%.fa???,/some/other/path/,/path/to/fasta_file.1
+2: {script_name} -d results /some/path/*.fa??? /some/other/path/
+
+Fragment generation for a specific chain:
+3: {script_name} -d results /path/to/1CYO.fasta.txt -cA
+
 """.format(**locals())
 
     parser = OptionParserWithNewlines(usage="usage: %prog [options] <inputs>...", version="%prog 1.1A", option_class=MultiOption)
     parser.epilog = description
 
     group = OptionGroup(parser, "Fragment generation options")
-    group.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
     group.add_option("-N", "--nohoms", dest="nohoms", action="store_true", help="Optional. If this option is set then homologs are omitted from the search.")
     group.add_option("-s", "--frag_sizes", dest="frag_sizes", help="Optional. A list of fragment sizes e.g. -s 3,6,9 specifies that 3-mer, 6-mer, and 9-mer fragments are to be generated. The default is for 3-mer and 9-mer fragments to be generated.")
+    group.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
     group.add_option("-l", "--loops_file", dest="loops_file", help="Optional but recommended. A Rosetta loops file which will be used to select sections of the FASTA sequences from which fragments will be generated. This saves a lot of time on large sequences.")
     group.add_option("-i", "--indices", dest="indices", help="Optional. A comma-separated list of start and end index. There must be an even number of numbers in this list with each pair itself being in order. These indices will be used to select a part of the supplied sequences for fragment generation. Similarly to the loops_file option, this restriction may save a lot of computational resources. If this option is used in addition to the loops_file option then the sections defined by the indices are combined with those in the loops file.")
     group.add_option("--n_frags", dest="n_frags", help="Optional. The number of fragments to generate. This must be less than the number of candidates. The default value is 200.")
@@ -420,8 +422,6 @@ def setup_jobs(outpath, options, input_files):
 
         else:
             fasta_files.append(input_file)
-
-    print fasta_files
 
     # Extract sequences from the input FASTA files.
     found_sequences, reverse_mapping, errors = get_sequences(options, fasta_files)
