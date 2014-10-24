@@ -418,10 +418,9 @@ def setup_jobs(outpath, options, input_files):
     for input_file in input_files:
         assert(not(fasta_file_contents.get(input_file)))
         if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
-            pdb = PDB.from_filepath(input_file, strict=False)
+            pdb = PDB.from_filepath(input_file, strict=True)
             pdb.pdb_id = os.path.basename(input_file).split('.')[0]
             fasta_file_contents[input_file] = pdb.create_fasta()
-            print(pdb.chain_types)
         else:
             fasta_file_contents[input_file] = read_file(input_file)
 
@@ -460,7 +459,7 @@ def get_sequences(options, fasta_file_contents):
     try:
         fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_file_contents)
         if not fasta_records:
-            errors.append("No data found in the FASTA file(s) %s." % fasta_files_str)
+            errors.append("No protein sequences found in the FASTA file(s) %s." % fasta_files_str)
     except Exception, e:
         e = '\n'.join([l for l in traceback.format_exc(), str('e') if l.strip()])
         errors.append("Error parsing FASTA file(s) %s:\n%s" % (fasta_files_str, str(e)))
@@ -468,7 +467,7 @@ def get_sequences(options, fasta_file_contents):
     if not fasta_records:
         return None, {}, errors
 
-    colorprinter.message('Found %d sequence(s).' % len(fasta_records))
+    colorprinter.message('Found %d protein sequence(s).' % len(fasta_records))
     return fasta_records, reverse_mapping, errors
 
 def parse_FASTA_files(options, fasta_file_contents):
@@ -519,6 +518,17 @@ def parse_FASTA_files(options, fasta_file_contents):
                     if not mtchs:
                         raise FastaException("Expected a record header or sequence line at line %d." % line_count)
                     records[key].append(line)
+
+    non_protein_records = []
+    set_of_rna_dna_codes = set(('A', 'C', 'G', 'T', 'U', 'X', 'Z'))
+    for key, content_lines in records.iteritems():
+        mm_sequence = ''.join(content_lines[1:])
+        assert(re.match('^[A-Z]+$', mm_sequence)) # Allow X or Z because these may exist (X from the RCSB, Z from our input files)
+        if set(mm_sequence).union(set_of_rna_dna_codes) == set_of_rna_dna_codes:
+            non_protein_records.append(key)
+    for non_protein_record in non_protein_records:
+        del records[non_protein_record]
+
 
     # If a loops file was passed in, use that to cut up the sequences and concatenate these subsequences to generate a
     # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
