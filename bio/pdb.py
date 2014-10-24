@@ -1092,6 +1092,13 @@ class PDB:
             if ignore_HETATMs and line_types == 'HETATM':
                 continue
 
+            # Get the residues used by the residue lines. These can be used to determine the chain type if the header is missing.
+            full_code_map = {}
+            for y in range(len(residue_lines)):
+                l = residue_lines[y]
+                full_code_map[l[21]] = full_code_map.get(l[21], set())
+                full_code_map[l[21]].add(l[17:20].strip())
+
             for y in range(len(residue_lines)):
                 l = residue_lines[y]
                 residue_type = l[17:20].strip()
@@ -1118,8 +1125,15 @@ class PDB:
                     chain_type = self.chain_types[chain_id]
                 else:
                     # Otherwise assume this is protein
-                    chain_type = 'Protein'
-                
+                    if full_code_map.get(chain_id):
+                        # todo: this should probably be moved to where we determine self.chain_types
+                        if full_code_map[chain_id].union(dna_nucleotides) == dna_nucleotides:
+                            chain_type = 'DNA'
+                        elif full_code_map[chain_id].union(rna_nucleotides) == rna_nucleotides:
+                            chain_type = 'RNA'
+                        else:
+                            chain_type = 'Protein'
+
                 atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
 
                 residue_type = self.modified_residue_mapping_3.get(residue_type, residue_type)
