@@ -14,6 +14,7 @@ import time
 from datetime import datetime
 from optparse import OptionParser, OptionGroup, Option
 import glob
+import getpass
 import json
 from utils import LogFile, colorprinter, JobInitializationException
 
@@ -94,7 +95,6 @@ class JobInput(object):
 
 
 def get_username():
-    import getpass
     return getpass.getuser()
 
 def write_file(filepath, contents, ftype = 'w'):
