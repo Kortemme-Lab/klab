@@ -386,7 +386,6 @@ Fragment generation for a specific chain:
         use_vall_files   = options.use_vall_files,
         add_pdbs_to_vall = options.add_pdbs_to_vall,
         has_segment_mapping = has_segment_mapping,
-        #"qstatstats": "", # Override this with "qstat -xml -j $JOB_ID" to print statistics. WARNING: Only do this every, say, 100 runs to avoid spamming the queue master.
     )
 
 def print_errors_and_exit(parser, errors, errcode, print_help = True):
