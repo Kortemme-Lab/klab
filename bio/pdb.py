@@ -1040,8 +1040,6 @@ class PDB:
         for chain_id, sequence in sequences.iteritems():
             self.seqres_sequences[chain_id] = Sequence.from_sequence(chain_id, sequence, self.chain_types[chain_id])
 
-    def _set_chain_types(self):
-        pass
 
     def _get_ATOM_sequences(self):
         '''Creates the ATOM Sequences.'''
@@ -1057,6 +1055,7 @@ class PDB:
         model_index = 0
         residue_lines_by_chain.append([])
         structural_residue_IDs_set.append(set())
+        full_code_map = {}
         for l in self.structure_lines:
             if l.startswith("TER   "):
                 model_index += 1
@@ -1067,6 +1066,18 @@ class PDB:
                 if residue_id not in structural_residue_IDs_set[model_index]:
                     residue_lines_by_chain[model_index].append(l)
                     structural_residue_IDs_set[model_index].add(residue_id)
+                full_code_map[l[21]] = full_code_map.get(l[21], set())
+                full_code_map[l[21]].add(l[17:20].strip())
+
+        # Get the residues used by the residue lines. These can be used to determine the chain type if the header is missing.
+        for chain_id in self.atom_chain_order:
+            if full_code_map.get(chain_id):
+                if full_code_map[chain_id].union(dna_nucleotides) == dna_nucleotides:
+                    self.chain_types[chain_id] = 'DNA'
+                elif full_code_map[chain_id].union(rna_nucleotides) == rna_nucleotides:
+                    self.chain_types[chain_id] = 'RNA'
+                else:
+                    self.chain_types[chain_id] = 'Protein'
 
         line_types_by_chain = []
         chain_ids = []
@@ -1091,13 +1102,6 @@ class PDB:
             line_types = line_types_by_chain[x]
             if ignore_HETATMs and line_types == 'HETATM':
                 continue
-
-            # Get the residues used by the residue lines. These can be used to determine the chain type if the header is missing.
-            full_code_map = {}
-            for y in range(len(residue_lines)):
-                l = residue_lines[y]
-                full_code_map[l[21]] = full_code_map.get(l[21], set())
-                full_code_map[l[21]].add(l[17:20].strip())
 
             for y in range(len(residue_lines)):
                 l = residue_lines[y]
@@ -1125,14 +1129,7 @@ class PDB:
                     chain_type = self.chain_types[chain_id]
                 else:
                     # Otherwise assume this is protein
-                    if full_code_map.get(chain_id):
-                        # todo: this should probably be moved to where we determine self.chain_types
-                        if full_code_map[chain_id].union(dna_nucleotides) == dna_nucleotides:
-                            chain_type = 'DNA'
-                        elif full_code_map[chain_id].union(rna_nucleotides) == rna_nucleotides:
-                            chain_type = 'RNA'
-                        else:
-                            chain_type = 'Protein'
+                    chain_type = 'Protein'
 
                 atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
 
