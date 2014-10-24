@@ -350,7 +350,7 @@ Fragment generation for a specific chain:
         batch_files = list(set(batch_files))
 
         if len(missing_files) == 1:
-            errors.append("Input file %s does not exist." % (options.fasta or ''))
+            errors.append("Input file %s does not exist." % missing_files[0])
         elif len(missing_files) > -0:
             errors.append("Input files %s do not exist." % ', '.join(missing_files))
         if len(batch_files) == 0:
@@ -421,6 +421,7 @@ def setup_jobs(outpath, options, input_files):
             pdb = PDB.from_filepath(input_file, strict=False)
             pdb.pdb_id = os.path.basename(input_file).split('.')[0]
             fasta_file_contents[input_file] = pdb.create_fasta()
+            print(pdb.chain_types)
         else:
             fasta_file_contents[input_file] = read_file(input_file)
 
