@@ -360,7 +360,8 @@ Fragment generation for a specific chain:
     job_inputs = []
     job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, batch_files)
 
-    if errors: print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
+    if errors:
+        print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
 
     no_homologs = ""
     if options.nohoms:
