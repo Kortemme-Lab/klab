@@ -32,7 +32,6 @@ def Popen(outdir, args):
 
 
 def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
-    print('')
     lines = read_file(old_filepath).split('\n')
 
     must_zip_output = old_filepath.endswith('.gz')
@@ -50,10 +49,9 @@ def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nme
             new_lines.append('%s%s' % (str(mapping[str(residue_id)] + FUDGE_FACTOR).rjust(11), l[11:]))
             assert(len(new_lines[-1]) == len(l))
 
-    colortext.message('Rewriting fragments score file for %d-mers with %d fragments...' % (nmerage, num_fragments))
+    colortext.message('Rewriting fragments score file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
     os.rename(old_filepath, backup_filepath)
     write_file(new_filepath, '\n'.join(new_lines))
-    colortext.message(must_zip_output)
     if os.path.exists(new_filepath + '.gz'):
         os.remove(new_filepath + '.gz')
     if must_zip_output:
@@ -61,7 +59,6 @@ def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nme
         assert(errorcode == 0)
 
 def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
-    print('')
     lines = read_file(old_filepath).split('\n')
 
     must_zip_output = old_filepath.endswith('.gz')
@@ -81,10 +78,9 @@ def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping,
         else:
             new_lines.append(l)
 
-    colortext.message('Rewriting fragments file for %d-mers with %d fragments...' % (nmerage, num_fragments))
+    colortext.message('Rewriting fragments file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
     os.rename(old_filepath, backup_filepath)
     write_file(new_filepath, '\n'.join(new_lines))
-    colortext.message(must_zip_output)
     if os.path.exists(new_filepath + '.gz'):
         os.remove(new_filepath + '.gz')
     if must_zip_output:
@@ -97,9 +93,7 @@ if __name__ == '__main__':
     import colortext
     if os.path.exists('segment_map.json'):
         mapping = json.loads(open('segment_map.json').read())
-        print(mapping)
-        print('')
-        for d in os.listdir('.'):
+        for d in sorted(os.listdir('.')):
             if os.path.isdir(d):
                 for f in sorted(glob.glob(os.path.join(d, "*mers")) + glob.glob(os.path.join(d, "*mers.gz"))):
                     if f.find('backup') != -1 or f.find('rewrite') != -1:
@@ -112,7 +106,7 @@ if __name__ == '__main__':
                         old_filepath = mtchs.group(0)
                         # Kale wanted to change the filename for the scores so that it is easier to distinguish between score and fragments files using glob
 
-                        backup_filepath = '%s.%s.%sbackup.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))
+                        backup_filepath = '%s.%s.%smers.backup.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))
                         new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))).replace('.gz', '')
                         rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
                     else:
@@ -121,7 +115,7 @@ if __name__ == '__main__':
                             nmerage = int(mtchs.group(3))
                             num_fragments = int(mtchs.group(2))
                             old_filepath = mtchs.group(0)
-                            backup_filepath= '%s.%s.%sbackup.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))
-                            new_filepath= ('%s.%s.%sbackup.rewrite.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))).replace('.gz', '')
+                            backup_filepath= '%s.%s.%smers.backup.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))
+                            new_filepath= ('%s.%s.%smers.rewrite.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))).replace('.gz', '')
                             rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
 
