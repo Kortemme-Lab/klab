@@ -704,7 +704,7 @@ if __name__ == "__main__":
     if options["outpath"] and options['job_inputs']:
         try:
             if len(options['job_inputs']) > 1:
-                # Single sequence fragment generation
+                # Multiple sequence fragment generation
                 task = ClusterEngine.MultipleTask(make_fragments_script, options, test_mode = test_mode)
                 submission_script, scripts = task.get_scripts()
             else:

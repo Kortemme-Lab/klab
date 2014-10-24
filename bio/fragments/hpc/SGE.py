@@ -104,6 +104,15 @@ print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
 
+echo "<maxvmem>"
+if [ -n "${SGE_TASK_ID+x}" ]
+  then
+    qstat -j $JOB_ID | grep -E "usage +$SGE_TASK_ID" | sed "s/.*maxvmem=//"
+  else
+    echo "Need to write the case for when there are no tasks"
+fi
+echo "</maxvmem>"
+
 print("</make_fragments>")
 
 if subp.errorcode != 0:
