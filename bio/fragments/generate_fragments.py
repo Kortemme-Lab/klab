@@ -488,7 +488,7 @@ def parse_FASTA_files(options, fasta_file_contents):
 
         first_line = [line for line in fasta if line.strip()][0]
         if first_line[0] != '>':
-            raise Exception("The FASTA file is not formatted properly - the first non-blank line is not a description line (does not start with '>').")
+            raise Exception("The FASTA file %s is not formatted properly - the first non-blank line is not a description line (does not start with '>')." % fasta_file_name)
 
         key = None
         line_count = 0
@@ -552,6 +552,7 @@ def parse_FASTA_files(options, fasta_file_contents):
                     loops_definition.add(p[0], p[1])
 
         segment_list = loops_definition.get_distinct_segments(residue_offset, residue_offset)
+        original_segment_list = loops_definition.get_distinct_segments(1, 1) # We are looking for 1-mers so the offset is 1 rather than 0
 
         # Create the reverse_mapping from the indices in the sequences defined by the segment_list to the indices in the original sequences.
         # This will be used to rewrite the fragments files to make them compatible with the original sequences.
@@ -574,7 +575,7 @@ def parse_FASTA_files(options, fasta_file_contents):
             cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
 
-    return records, reverse_mapping
+    return records, dict(reverse_mapping = reverse_mapping, segment_list = original_segment_list)
 
 def reformat(found_sequences):
     '''Truncate the FASTA headers so that the first field is a 4-character ID.'''
