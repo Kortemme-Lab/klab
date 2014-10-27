@@ -58,6 +58,9 @@ import subprocess
 import tempfile
 import shutil
 import glob
+import re
+import shlex
+import traceback
 
 class ProcessOutput(object):
 
@@ -73,6 +76,11 @@ class ProcessOutput(object):
 
 def Popen(outdir, args):
     subp = subprocess.Popen([str(arg) for arg in args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir, env={'SPARKSXDIR' : '/netapp/home/klabqb3backrub/tools/sparks-x'})
+    output = subp.communicate()
+    return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
+
+def shell_execute(command_line):
+    subp = subprocess.Popen(shlex.split(command_line), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     output = subp.communicate()
     return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
 
@@ -97,6 +105,7 @@ print(platform.machine() + ', ' + platform.processor() + ', ' + platform.platfor
 print("</arch>")
 
 task_id = os.environ.get('SGE_TASK_ID')
+job_id = os.environ.get('JOB_ID')
 '''
 
     python_script_postamble = '''
@@ -104,14 +113,26 @@ print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
 
-echo "<maxvmem>"
-if [ -n "${SGE_TASK_ID+x}" ]
-  then
-    qstat -j $JOB_ID | grep -E "usage +$SGE_TASK_ID" | sed "s/.*maxvmem=//"
-  else
-    echo "Need to write the case for when there are no tasks"
-fi
-echo "</maxvmem>"
+task_usages = shell_execute('qstat -j %%d' %% job_id)
+if task_usages.errorcode == 0:
+  try:
+    mtchs = re.match('.*?usage\s*(\d+):(.*?)\\n.*', task_usages.stdout, re.DOTALL)
+    if mtchs and str(mtchs.group(1)) == str(task_id):
+      task_properties = [s.strip() for s in mtchs.group(2).strip().split(",")]
+      for tp in task_properties:
+         if tp:
+           prp=tp.split('=')[0]
+           v=tp.split('=')[1]
+           print('<task_%%s>%%s</task_%%s>' %% (prp, v, prp))
+  except Exception, e:
+    print('<qstat_parse_error>')
+    print(str(e))
+    print(traceback.format_exc())
+    print('</qstat_parse_error>')
+else:
+  print("<qstat_error>")
+  print(task_usages.stderr)
+  print("</qstat_error>")
 
 print("</make_fragments>")
 
