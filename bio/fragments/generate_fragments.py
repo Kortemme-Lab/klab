@@ -432,11 +432,12 @@ def setup_jobs(outpath, options, input_files):
 
     # Create the input FASTA and script files.
     job_inputs, errors = create_inputs(options, outpath, desired_sequences)
-    segment_mapping_file = os.path.join(outpath, "segment_map.json")
-    colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
-    write_file(segment_mapping_file, json.dumps(reverse_mapping))
-
+    if reverse_mapping:
+        segment_mapping_file = os.path.join(outpath, "segment_map.json")
+        colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
+        write_file(segment_mapping_file, json.dumps(reverse_mapping))
     return job_inputs, reverse_mapping != None, errors
+
 
 def get_sequences(options, fasta_file_contents):
     ''' This function returns a dict mapping (pdbid, chain, file_name) tuples to sequences:
@@ -469,6 +470,7 @@ def parse_FASTA_files(options, fasta_file_contents):
     '''
     records = {}
     reverse_mapping = {}
+    original_segment_list = []
     key_location = {}
     sequenceLine = re.compile("^[A-Z]+\n?$")
 
@@ -568,7 +570,10 @@ def parse_FASTA_files(options, fasta_file_contents):
             cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
 
-    return records, dict(reverse_mapping = reverse_mapping, segment_list = original_segment_list)
+    if reverse_mapping:
+        return records, dict(reverse_mapping = reverse_mapping, segment_list = original_segment_list)
+    else:
+        return records, None
 
 def reformat(found_sequences):
     '''Truncate the FASTA headers so that the first field is a 4-character ID.'''

@@ -72,7 +72,7 @@ def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping,
 
     reverse_mapping = mapping['reverse_mapping']
     return
-    
+
     must_zip_output = old_filepath.endswith('.gz')
     new_lines = []
     for l in lines:
