@@ -21,8 +21,9 @@ from utils import LogFile, colorprinter, JobInitializationException
 
 from tools import colortext
 from tools.rosetta.input_files import LoopsFile
-from tools.fs.fsio import read_file
+from tools.fs.fsio import read_file, write_temp_file
 from tools.bio.pdb import PDB
+from tools.bio.rcsb import retrieve_pdb
 from tools.general.strutil import parse_range_pairs
 
 #################
@@ -324,6 +325,7 @@ Fragment generation for a specific chain:
     # ARGUMENTS
     batch_files = []
     missing_files = []
+    temp_files = []
 
     if len(args) == 0:
         errors.append('No input files were specified.')
@@ -335,7 +337,27 @@ Fragment generation for a specific chain:
                 for input_file_wildcard in input_file_wildcards:
                     batch_files += map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, input_file_wildcard)))
             elif not os.path.exists(batch_file_selector):
-                missing_files.append(batch_file_selector)
+                if len(batch_file_selector) == 4 and batch_file_selector.isalnum():
+                    batch_file_selector = batch_file_selector.lower() # the files are named in lowercase on the cluster
+                    if not os.path.exists('/netapp/database'):
+                        # This script is not being run on the cluster - try to retrieve the file from the RCSB
+                        colortext.message('No file %s exists - assuming that this is a PDB ID and trying to retrieve the associated file from the RCSB.' % batch_file_selector)
+                        try:
+                            fname = write_temp_file('/tmp', retrieve_pdb(batch_file_selector), suffix = '.pdb', prefix = batch_file_selector)
+                            batch_files.append(os.path.abspath(fname))
+                            temp_files.append(os.path.abspath(fname))
+                        except:
+                            errors.append('An error occurred retrieving the PDB file "%s".' % batch_file_selector)
+                    else:
+                        # We are on the cluster so try to retrieve the stored file
+                        colortext.message('No file %s exists - assuming that this is a PDB ID and trying to retrieve the associated file from the cluster mirror of the PDB database.' % batch_file_selector)
+                        if os.path.exists('/netapp/database/pdb/remediated/uncompressed_files/pdb%s.ent' % batch_file_selector):
+                            batch_files += '/netapp/database/pdb/remediated/uncompressed_files/pdb%s.ent' % batch_file_selector
+                        elif os.path.exists('/netapp/database/pdb/pre-remediated/uncompressed_files/pdb%s.ent' % batch_file_selector):
+                            batch_files += '/netapp/database/pdb/pre-remediated/uncompressed_files/pdb%s.ent' % batch_file_selector
+                        else:
+                            errors.append('Could not find a PDB file for argument "%s".' % batch_file_selector)
+                            missing_files.append(batch_file_selector)
             else:
                 batch_files.append(os.path.abspath(batch_file_selector))
 
@@ -353,6 +375,11 @@ Fragment generation for a specific chain:
 
     job_inputs = []
     job_inputs, has_segment_mapping, errors = setup_jobs(outpath, options, batch_files)
+
+    # Remove any temporary files created
+    for tf in temp_files:
+        if os.path.exists(tf):
+            os.remove(tf)
 
     if errors:
         print_errors_and_exit(parser, errors, ERRCODE_ARGUMENTS, not errcode)
