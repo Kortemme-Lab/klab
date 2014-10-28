@@ -35,13 +35,13 @@ def write_file(filepath, contents, ftype = 'w'):
     output_handle.write(contents)
     output_handle.close()
 
-def open_temp_file(path, ftype = 'w'):
-    F, fname = tempfile.mkstemp(dir = path)
+def open_temp_file(path, ftype = 'w', suffix = '', prefix = ''):
+    F, fname = tempfile.mkstemp(dir = path, suffix = suffix, prefix = prefix)
     output_handle = os.fdopen(F, ftype)
     return output_handle, fname
 
-def write_temp_file(path, contents, ftype = 'w'):
-    output_handle, fname = open_temp_file(path, ftype = ftype)
+def write_temp_file(path, contents, ftype = 'w', suffix = '', prefix = ''):
+    output_handle, fname = open_temp_file(path, ftype = ftype, suffix = suffix, prefix = prefix)
     output_handle.write(contents)
     output_handle.close()
     return fname
