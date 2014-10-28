@@ -30,17 +30,17 @@ def Popen(outdir, args):
     output = subp.communicate()
     return output[0], output[1], subp.returncode # 0 is stdout, 1 is stderr
 
-def determine_pruned_range(mapping, nmerage):
-    print(nmerage, mapping)
+def is_valid_fragment(original_residue_id, mapping, nmerage):
+    for r in mapping['segment_list']:
+        r = sorted(r)
+        if r[0] - nmerage + 1 <= original_residue_id <= r[1] + nmerage - 1:
+            return True
+    return False
 
 def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
     lines = read_file(old_filepath).split('\n')
 
     reverse_mapping = mapping['reverse_mapping']
-    segment_list = mapping['segment_list']
-    determine_pruned_range(mapping, nmerage)
-    sys.exit(0)
-
     must_zip_output = old_filepath.endswith('.gz')
     new_lines = []
     for l in lines:
@@ -52,9 +52,11 @@ def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nme
             assert(l[:11].strip().isdigit())
             assert(l[11] == ' ')
             residue_id = int(l[:11])
-            assert(reverse_mapping.get(str(residue_id)))
-            new_lines.append('%s%s' % (str(reverse_mapping[str(residue_id)] + FUDGE_FACTOR).rjust(11), l[11:]))
-            assert(len(new_lines[-1]) == len(l))
+            original_residue_id = reverse_mapping.get(str(residue_id))
+            assert(original_residue_id != None)
+            if is_valid_fragment(original_residue_id, mapping, nmerage):
+                new_lines.append('%s%s' % (str(reverse_mapping[str(residue_id)] + FUDGE_FACTOR).rjust(11), l[11:]))
+                assert(len(new_lines[-1]) == len(l))
 
     colortext.message('Rewriting fragments score file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
     os.rename(old_filepath, backup_filepath)
@@ -69,10 +71,8 @@ def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping,
     lines = read_file(old_filepath).split('\n')
 
     reverse_mapping = mapping['reverse_mapping']
-    segment_list = mapping['segment_list']
-    determine_pruned_range(mapping, nmerage)
-    sys.exit(0)
-
+    return
+    
     must_zip_output = old_filepath.endswith('.gz')
     new_lines = []
     for l in lines:
