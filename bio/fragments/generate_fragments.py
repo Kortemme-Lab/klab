@@ -23,6 +23,7 @@ from tools import colortext
 from tools.rosetta.input_files import LoopsFile
 from tools.fs.fsio import read_file
 from tools.bio.pdb import PDB
+from tools.general.strutil import parse_range_pairs
 
 #################
 #  Configuration
@@ -162,7 +163,7 @@ Fragment generation for a specific chain:
     group.add_option("-s", "--frag_sizes", dest="frag_sizes", help="Optional. A list of fragment sizes e.g. -s 3,6,9 specifies that 3-mer, 6-mer, and 9-mer fragments are to be generated. The default is for 3-mer and 9-mer fragments to be generated.")
     group.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
     group.add_option("-l", "--loops_file", dest="loops_file", help="Optional but recommended. A Rosetta loops file which will be used to select sections of the FASTA sequences from which fragments will be generated. This saves a lot of time on large sequences.")
-    group.add_option("-i", "--indices", dest="indices", help="Optional. A comma-separated list of start and end index. There must be an even number of numbers in this list with each pair itself being in order. These indices will be used to select a part of the supplied sequences for fragment generation. Similarly to the loops_file option, this restriction may save a lot of computational resources. If this option is used in addition to the loops_file option then the sections defined by the indices are combined with those in the loops file.")
+    group.add_option("-i", "--indices", dest="indices", help="Optional. A comma-separated list of ranges. A range can be a single index or a hyphenated range. For example, '10-30,66,90-93' is a valid set of indices. The indices are used to pick out parts of the supplied sequences for fragment generation and start at 1 (1-indexed). Similarly to the loops_file option, this restriction may save a lot of computational resources. If this option is used in addition to the loops_file option then the sections defined by the indices are combined with those in the loops file.")
     group.add_option("--n_frags", dest="n_frags", help="Optional. The number of fragments to generate. This must be less than the number of candidates. The default value is 200.")
     group.add_option("--n_candidates", dest="n_candidates", help="Optional. The number of candidates to generate. The default value is 1000.")
     group.add_option("--add_vall_files", dest="add_vall_files", help="Optional and untested. This option allows extra Vall files to be added to the run. The files must be comma-separated.")
@@ -253,18 +254,9 @@ Fragment generation for a specific chain:
 
     if options.indices:
         try:
-            tokens = [s.strip() for s in options.indices.split(',') if s.strip()]
-            if len(tokens) % 2 ==0:
-                for x in range(0, len(tokens), 2):
-                    assert(tokens[x].isdigit() and tokens[x+1].isdigit())
-                tokens = map(int, tokens)
-                for x in range(0, len(tokens), 2):
-                    assert(tokens[x] < tokens[x+1])
-                options.indices = [tokens[i:i+2] for i in range(0, len(tokens), 2)]
-            else:
-                errors.append('An even number of indices must be specified.')
+            options.indices = parse_range_pairs(options.indices, range_separator = '-')
         except Exception, e:
-            errors.append('The indices must be an array of even length where the ith value is less than the i+1th values for even values of i i.e. it should be a list of start and end indices.')
+            errors.append('The indices argument must be a list of valid indices into the sequences for which fragments are to be generated.')
 
     # Fragment sizes
     if options.frag_sizes:
@@ -546,7 +538,8 @@ def parse_FASTA_files(options, fasta_file_contents):
 
         # If the user supplied more ranges of residues, use those as well
         if options.indices:
-            loops_definition = LoopsFile('')
+            if not loops_definition:
+                loops_definition = LoopsFile('')
             for p in options.indices:
                 if loops_definition:
                     loops_definition.add(p[0], p[1])

@@ -68,8 +68,8 @@ class LoopsFile(object):
             res_numbers = map(int, tokens[1:4])
             if min(res_numbers) < 0:
                 raise RosettaFileParsingException('The cut point and start and end residues indices must be positive integers.')
-            if not(((res_numbers[2] == 0) or res_numbers[0] <= res_numbers[2] <= res_numbers[1]) and (res_numbers[0] < res_numbers[1])):
-                raise RosettaFileParsingException('The cut point must lie between the start and end residues and the start and end residues must differ.')
+            if not((res_numbers[2] == 0) or res_numbers[0] <= res_numbers[2] <= res_numbers[1]):
+                raise RosettaFileParsingException('The cut point must lie between the start and end residues.')
         except:
             raise RosettaFileParsingException('Integers are expected in columns 2-4 of loops files.')
 
@@ -100,7 +100,7 @@ class LoopsFile(object):
     def add(self, start, end, cut_point = None, skip_rate = None, extend_loop = None):
         '''Add a new loop definition.'''
         self.data.append(self.parse_loop_line(['LOOP', start, end, cut_point, skip_rate, extend_loop]))
-        assert(start < end)
+        assert(start <= end)
 
 
     def get_distinct_segments(self, left_offset = 0, right_offset = 0, sequence_length = None):
@@ -117,7 +117,7 @@ class LoopsFile(object):
         # Create a unique, sorted list of all loop terminus positions
         positions = set()
         for l in self.data:
-            assert(l['start'] < l['end'])
+            assert(l['start'] <= l['end'])
             if sequence_length:
                 # If we know the sequence length then we can return valid positions
                 positions = positions.union(range(max(1, l['start'] - left_offset + 1), min(sequence_length + 1, l['end'] + 1 + right_offset - 1))) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
