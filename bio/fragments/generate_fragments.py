@@ -142,7 +142,14 @@ There are a few caveats:
    you have two records ">1A2P_001|A|" and "">1A2P_002|A|" then the job will 
    fail.  On the other hand, ">1A2P_001|A|" and "">1A2P_001|B|" is perfectly 
    fine and the script will output fragments for 1a2pA and 1a2pB.
-    
+
+3. By design, residue ID ranges are capped at chain boundaries. For example, if a
+   PDB has chains A (residues 1-50), B (residues 51-100), and chain C (residues 101-
+   150) and the user selects 9mers for the ranges 35-48 and 101-110 then, since none
+   of the ranges overlap with chain B - even though they will when 9mers are considered -
+   we will not generate any fragments for chain B. This behavior is chosen as it
+   seems the most intuitive/expected.
+
 *** Examples ***
 
 Single-sequence fragment generation:
@@ -154,6 +161,10 @@ Multi-sequence fragment generation (batch job):
 Fragment generation for a specific chain:
 3: {script_name} -d results /path/to/1CYO.fasta.txt -cA
 
+Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB identifier; c) a directory of FASTA/PDB files and a PDB ID, using the short/test queue:
+4a: {script_name} -d results -l input/loops_file input/fragments/0001.fasta
+4b: {script_name} -d results -l input/loops_file 4un3
+4c: {script_name} -d results -l input/loops_file -q short.q input/fragments 4un3
 """.format(**locals())
 
     parser = OptionParserWithNewlines(usage="usage: %prog [options] <inputs>...", version="%prog 1.1A", option_class=MultiOption)
