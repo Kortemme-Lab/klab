@@ -627,10 +627,12 @@ class PDB:
     ### FASTA functions ###
 
 
-    def create_fasta(self, length = 80):
+    def create_fasta(self, length = 80, prefer_seqres_order = True):
         fasta_string = ''
-        chain_order = self.seqres_chain_order or self.atom_chain_order
-        sequences = self.seqres_sequences or self.atom_sequences
+        if prefer_seqres_order:
+            chain_order, sequences = self.seqres_chain_order or self.atom_chain_order, self.seqres_sequences or self.atom_sequences
+        else:
+            chain_order, sequences = self.atom_chain_order or self.seqres_chain_order, self.atom_sequences or self.seqres_sequences
 
         for c in chain_order:
             if c not in sequences:
