@@ -671,6 +671,8 @@ def parse_FASTA_files(options, fasta_file_contents):
                 # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
                 for x in range(0, len(cropped_sequence)):
                     assert(cropped_sequence[x] == sequence[reverse_mapping['FASTA'][x + 1] - 1])
+            if not cropped_sequence:
+                raise Exception('The sequence for %s is empty. This is presumably an error in input so the job is being terminated.' % subkey)
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
 
     if reverse_mapping:
