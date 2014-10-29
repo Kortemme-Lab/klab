@@ -113,7 +113,7 @@ print("<end_time>")
 print(strftime("%%Y-%%m-%%d %%H:%%M:%%S"))
 print("</end_time>")
 
-task_usages = shell_execute('qstat -j %%d' %% job_id)
+task_usages = shell_execute('qstat -j %%s' %% job_id)
 if task_usages.errorcode == 0:
   try:
     mtchs = re.match('.*?usage\s*(\d+):(.*?)\\n.*', task_usages.stdout, re.DOTALL)
