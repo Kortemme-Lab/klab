@@ -57,7 +57,7 @@ test_mode = False # set this to true for running quick tests on your cluster sys
 logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
 cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster
 fasta_file_wildcards = '*.fasta', '*.fasta.txt', '*.fa' # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory.
-pdb_file_wildcards = '*.pdb', '*.pdb.gz' # optional: set this to your preferred PDB file extensions. This is used for finding PDB files when specifying a directory.
+pdb_file_wildcards = '*.pdb', '*.pdb.gz', '*.ent' # optional: set this to your preferred PDB file extensions. This is used for finding PDB files when specifying a directory.
 input_file_wildcards = fasta_file_wildcards + pdb_file_wildcards
 
 # The location of the text file containing the names of the configuration scripts
@@ -356,9 +356,9 @@ Fragment generation for a specific chain:
                         # We are on the cluster so try to retrieve the stored file
                         colortext.message('No file %s exists - assuming that this is a PDB ID and trying to retrieve the associated file from the cluster mirror of the PDB database.' % batch_file_selector)
                         if os.path.exists('/netapp/database/pdb/remediated/uncompressed_files/pdb%s.ent' % batch_file_selector):
-                            batch_files += '/netapp/database/pdb/remediated/uncompressed_files/pdb%s.ent' % batch_file_selector
+                            batch_files.append('/netapp/database/pdb/remediated/uncompressed_files/pdb%s.ent' % batch_file_selector)
                         elif os.path.exists('/netapp/database/pdb/pre-remediated/uncompressed_files/pdb%s.ent' % batch_file_selector):
-                            batch_files += '/netapp/database/pdb/pre-remediated/uncompressed_files/pdb%s.ent' % batch_file_selector
+                            batch_files.append('/netapp/database/pdb/pre-remediated/uncompressed_files/pdb%s.ent' % batch_file_selector)
                         else:
                             errors.append('Could not find a PDB file for argument "%s".' % batch_file_selector)
                             missing_files.append(batch_file_selector)
@@ -366,7 +366,6 @@ Fragment generation for a specific chain:
                 batch_files.append(os.path.abspath(batch_file_selector))
 
         batch_files = list(set(batch_files))
-
         if len(missing_files) == 1:
             errors.append("Input file %s does not exist." % missing_files[0])
         elif len(missing_files) > -0:
