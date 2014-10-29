@@ -1072,9 +1072,12 @@ class PDB:
         # Get the residues used by the residue lines. These can be used to determine the chain type if the header is missing.
         for chain_id in self.atom_chain_order:
             if full_code_map.get(chain_id):
-                if full_code_map[chain_id].union(dna_nucleotides) == dna_nucleotides:
+                # The chains may contain other molecules e.g. MG or HOH so before we decide their type based on residue types alone,
+                # we subtract out those non-canonicals
+                canonical_molecules = full_code_map[chain_id].intersection(dna_nucleotides.union(rna_nucleotides).union(residue_types_3))
+                if canonical_molecules.union(dna_nucleotides) == dna_nucleotides:
                     self.chain_types[chain_id] = 'DNA'
-                elif full_code_map[chain_id].union(rna_nucleotides) == rna_nucleotides:
+                elif canonical_molecules.union(rna_nucleotides) == rna_nucleotides:
                     self.chain_types[chain_id] = 'RNA'
                 else:
                     self.chain_types[chain_id] = 'Protein'
