@@ -434,14 +434,19 @@ def setup_jobs(outpath, options, input_files):
     fasta_file_contents = {}
 
     # Generate FASTA files for PDB inputs
+    # fasta_file_contents is a mapping from a file path to a pair (FASTA contents, file type). We remember the file type
+    # since we offset residue IDs depending on file type i.e. for FASTA files, we treat each sequence separately and do
+    # not renumber the fragments in postprocessing. For PDB files, however, we need to respect the order and length of
+    # sequences so that we renumber the fragments appropriately in postprocessing - we assume that if a PDB file is passed in
+    # then all chains (protein, RNA, or DNA) will be used in a Rosetta run.
     for input_file in input_files:
         assert(not(fasta_file_contents.get(input_file)))
         if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
             pdb = PDB.from_filepath(input_file, strict=True)
             pdb.pdb_id = os.path.basename(input_file).split('.')[0]
-            fasta_file_contents[input_file] = pdb.create_fasta()
+            fasta_file_contents[input_file] = (pdb.create_fasta(), 'PDB')
         else:
-            fasta_file_contents[input_file] = read_file(input_file)
+            fasta_file_contents[input_file] = (read_file(input_file), 'FASTA')
 
     # Extract sequences from the input FASTA files.
     found_sequences, reverse_mapping, errors = get_sequences(options, fasta_file_contents)
@@ -500,10 +505,14 @@ def parse_FASTA_files(options, fasta_file_contents):
     original_segment_list = []
     key_location = {}
     sequenceLine = re.compile("^[A-Z]+\n?$")
+    sequence_offsets = {}
 
-    for fasta_file_name, fasta in sorted(fasta_file_contents.iteritems()):
-        record_count = 0
-        fasta = fasta.strip().split('\n')
+    for fasta_file_name, tagged_fasta in sorted(fasta_file_contents.iteritems()):
+
+        # Check the tagged pair
+        fasta = tagged_fasta[0].strip().split('\n')
+        file_type = tagged_fasta[1]
+        assert(file_type == 'PDB' or file_type == 'FASTA')
         if not fasta:
             raise Exception("Empty FASTA file.")
 
@@ -513,6 +522,9 @@ def parse_FASTA_files(options, fasta_file_contents):
 
         key = None
         line_count = 0
+        record_count = 0
+        file_keys = []
+        unique_keys = {}
         for line in fasta:
             line_count += 1
             line = line.strip()
@@ -529,17 +541,28 @@ def parse_FASTA_files(options, fasta_file_contents):
 
                     # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
                     key = (tokens[0][0:4].lower(), tokens[1], fasta_file_name)
-                    if key in records:
-                        # todo: we include the fasta_file_name in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file_name as part of the check for a more stringent check?
-                        raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatentated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file))
+                    sub_key = (key[0], key[1]) # this is the part of the key that we expect to be unique (the actual key)
                     key_location[key] = fasta_file_name
+                    if sub_key in unique_keys:
+                        # todo: we include the fasta_file_name in the key - should we not be checking for uniqueness w.r.t. just tokens[0][0:4].lower() and tokens[1] i.e. omitting the fasta_file_name as part of the check for a more stringent check?
+                        raise Exception("Duplicate protein/chain identifier pair. The key %s was generated from both %s and %s. Remember that the first four characters of the protein description are concatenated with the chain letter to generate a 5-character ID which must be unique." % (key, key_location[key], fasta_file_name))
                     records[key] = [line]
+                    unique_keys[sub_key] = True
+                    file_keys.append(key)
                 else:
                     mtchs = sequenceLine.match(line)
                     if not mtchs:
                         raise FastaException("Expected a record header or sequence line at line %d." % line_count)
                     records[key].append(line)
 
+        offset = 0
+        if file_type == 'PDB':
+            for key in file_keys:
+                sequence_offsets[key[0] + key[1]] = offset
+                offset += len(''.join(records[key][1:]))
+
+    # We remove non-protein chains from fragment generation although we did consider them above when determining the offsets
+    # as we expect them to be used in predictions
     non_protein_records = []
     set_of_rna_dna_codes = set(('A', 'C', 'G', 'T', 'U', 'X', 'Z'))
     for key, content_lines in records.iteritems():
@@ -598,7 +621,7 @@ def parse_FASTA_files(options, fasta_file_contents):
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
 
     if reverse_mapping:
-        return records, dict(reverse_mapping = reverse_mapping, segment_list = original_segment_list)
+        return records, dict(reverse_mapping = reverse_mapping, segment_list = original_segment_list, sequence_offsets = sequence_offsets)
     else:
         return records, None
 
