@@ -558,8 +558,9 @@ def parse_FASTA_files(options, fasta_file_contents):
         offset = 0
         if file_type == 'PDB':
             for key in file_keys:
-                sequence_offsets[key[0] + key[1]] = offset
-                offset += len(''.join(records[key][1:]))
+                sequence_length = len(''.join(records[key][1:]))
+                sequence_offsets[key[0] + key[1]] = (offset, offset + 1, offset + sequence_length)
+                offset += sequence_length
 
     # We remove non-protein chains from fragment generation although we did consider them above when determining the offsets
     # as we expect them to be used in predictions
