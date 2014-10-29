@@ -444,7 +444,7 @@ def setup_jobs(outpath, options, input_files):
         if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
             pdb = PDB.from_filepath(input_file, strict=True)
             pdb.pdb_id = os.path.basename(input_file).split('.')[0]
-            fasta_file_contents[input_file] = (pdb.create_fasta(), 'PDB')
+            fasta_file_contents[input_file] = (pdb.create_fasta(prefer_seqres_order = False), 'PDB')
         else:
             fasta_file_contents[input_file] = (read_file(input_file), 'FASTA')
 
