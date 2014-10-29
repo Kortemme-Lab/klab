@@ -146,10 +146,15 @@ if subp.errorcode != 0:
         super(SingleTask, self).__init__(make_fragments_perl_script, options)
 
         # NOTE: This if/elif block is specific to the QB3 cluster system and is only included for the benefit of QB3 users. Delete this line or alter it to fit your SGE cluster queue names.
-        if options['queue'] not in ['long.q', 'lab.q', 'short.q']: 
-            raise JobInitializationException("The queue you specified (%s) is invalid. Please use either long.q, lab.q, or short.q." % options['queue'])
-        elif options['queue'] == 'short.q':
-            test_mode = True
+        allowed_queues = ['lab.q', 'long.q', 'short.q']
+        if options['queue']:
+            if 'short.q' in options['queue']:
+                if not len(options['queue']) == 1:
+                    raise JobInitializationException("The short queue cannot be specified if any other queue is specified.")
+                test_mode = True
+            for q in options['queue']:
+                if not (q in allowed_queues):
+                    raise JobInitializationException("The queue you specified (%s) is invalid. Please use either long.q, lab.q, and/or short.q." % options['queue'])
 
         self.test_mode = test_mode
         self.submission_script = self.__class__.submission_script
@@ -162,7 +167,8 @@ if subp.errorcode != 0:
             self.submission_script += '#$ -l h_rt=0:29:00\n'
         else:
             self.submission_script += '#$ -l h_rt=%d:00:00\n' % int(self.options['runtime'])
-        self.submission_script += '#$ -q %s\n' % self.options['queue']
+        if self.options['queue']:
+            self.submission_script += '#$ -q %s\n' % ','.join(self.options['queue'])
 
     def set_memory_and_scratch(self):
         if self.test_mode:

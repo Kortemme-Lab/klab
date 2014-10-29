@@ -181,13 +181,13 @@ Fragment generation for a specific chain:
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Cluster options")
+    group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q. By default, no queue is specified. This may be a single value or a comma-separated list of queues. The short.q is only allowed on its own for test runs.", metavar="QUEUE_NAME")
     group.add_option("-x", "--scratch", type="int", dest="scratch", help="Optional. Specifies the amount of /scratch space in GB to reserve for the job.")
     group.add_option("-m", "--memfree", type="int", dest="memfree", help="Optional. Specifies the amount of RAM in GB that the job will require on the cluster. This must be at least 2GB.")
     group.add_option("-r", "--runtime", type="int", dest="runtime", help="Optional. Specifies the runtime in hours that the job will require on the cluster. This must be at least 8 hours.")
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
-    group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q.", metavar="QUEUE_NAME")
     group.add_option("-K", "--check", dest="check", help="Optional, needs to be fixed for batch mode. Query whether or not a job is running. It if has finished, query %s and print whether the job was successful." % logfile.getName(), metavar="JOBID")
     group.add_option("-Q", "--query", dest="query", action="store_true", help="Optional, needs to be fixed for batch mode. Query the progress of the cluster job against %s and then quit." % logfile.getName())
     parser.add_option_group(group)
@@ -198,7 +198,7 @@ Fragment generation for a specific chain:
     parser.set_defaults(force = False)
     parser.set_defaults(query = False)
     parser.set_defaults(sendmail = False)
-    parser.set_defaults(queue = 'lab.q')
+    parser.set_defaults(queue = [])
     parser.set_defaults(nozip = False)
     parser.set_defaults(scratch = 1)
     parser.set_defaults(memfree = 2)
@@ -227,6 +227,10 @@ Fragment generation for a specific chain:
             errors.extend(ClusterEngine.check(logfile, jobID, cluster_job_name))
 
     validOptions = options.query or options.check
+
+    # Queue
+    if options.queue:
+        options.queue = sorted(set(options.queue.split(',')))
 
     # RAM / scratch
     if options.scratch < 1:
@@ -826,7 +830,7 @@ if __name__ == "__main__":
         if options['no_zip']:
             print("The --nozip option was selected.")
         if ClusterEngine.ClusterType == "SGE":
-            print("The jobs have been submitted using the %s queue." % options['queue'])
+            print("The jobs have been submitted using the %s queue(s)." % ', '.join(sorted(options['queue'])))
         print('')
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
