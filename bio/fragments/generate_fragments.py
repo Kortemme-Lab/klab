@@ -559,7 +559,7 @@ def parse_FASTA_files(options, fasta_file_contents):
         if file_type == 'PDB':
             for key in file_keys:
                 sequence_length = len(''.join(records[key][1:]))
-                sequence_offsets[key[0] + key[1]] = (offset, offset + 1, offset + sequence_length)
+                sequence_offsets[key[0] + key[1]] = (offset, offset + 1, offset + sequence_length) # storing the sequence start and end residue IDs here is redundant but simplifies code later on
                 offset += sequence_length
 
     # We remove non-protein chains from fragment generation although we did consider them above when determining the offsets
@@ -600,25 +600,63 @@ def parse_FASTA_files(options, fasta_file_contents):
         segment_list = loops_definition.get_distinct_segments(residue_offset, residue_offset)
         original_segment_list = loops_definition.get_distinct_segments(1, 1) # We are looking for 1-mers so the offset is 1 rather than 0
 
-        # Create the reverse_mapping from the indices in the sequences defined by the segment_list to the indices in the original sequences.
-        # This will be used to rewrite the fragments files to make them compatible with the original sequences.
-        # Note that this mapping ignores the length of the sequences (which may vary in length) so it may be mapping residues indices
-        # which are outside of the length of some of the sequences.
+        # Sanity checks
         assert(sorted(segment_list) == segment_list) # sanity check
-        count = 1
         for x in range(len(segment_list)):
             segment = segment_list[x]
             if x < len(segment_list) - 1:
                 assert(segment[1] < segment_list[x+1][0]) # sanity check
-            for y in range(segment[0], segment[1] + 1):
-                reverse_mapping[count] = y
-                count += 1
+
+        # Create the generic reverse_mapping from the indices in the sequences defined by the segment_list to the indices in the original sequences.
+        # This will be used in FASTA sequences to rewrite the fragments files to make them compatible with the original sequences.
+        # Note that this mapping ignores the length of the sequences (which may vary in length) so it may be mapping residues indices
+        # which are outside of the length of some of the sequences.
+        # Create a sorted list of residues of the chain that we will be including in the sequence for fragment generation
+        # then turn that into a 1-indexed mapping from the order of the residue in the sequence to the original residue ID in the PDB
+        residues_for_generation = []
+        for s in segment_list:
+            residues_for_generation += range(s[0], s[1] + 1)
+        reverse_mapping['FASTA'] = dict((key, value) for (key, value) in zip(range(1, len(residues_for_generation) + 1), residues_for_generation))
+
+        # Create the reverse_mappings from the indices in the PDB sequences defined by the segment_list to the indices in the original sequences.
+        # Membership in sequence_offsets implies a PDB sequence.
+        for k, v in sorted(sequence_offsets.iteritems()):
+            # For each PDB chain, we consider the set of segments (ignoring extra residues due to nmerage for now so that
+            # we do not include chains by accident e.g. if the user specified the first residues of chain C but none in chain B,
+            # they probably do not wish to generate fragments for chain B)
+            chain_residues = range(v[1], v[2] + 1)
+            residues_for_generation = []
+            for s in original_segment_list:
+                # If the original segment lists lie inside the chain residues then we extend the range w.r.t. the nmers
+                if (chain_residues[0] <= s[0] <= chain_residues[-1]) or (chain_residues[0] <= s[1] <= chain_residues[-1]):
+                    residues_for_generation += range(s[0] - residue_offset + 1, s[1] + residue_offset - 1 + 1)
+
+            # Create a sorted list of residues of the chain that we will be including in the sequence for fragment generation
+            # then turn that into a 1-indexed mapping from the order of the residue in the sequence to the original residue ID in the PDB
+            chain_residues_for_generation = sorted(set(chain_residues).intersection(set(residues_for_generation)))
+            reverse_mapping[k] = dict((key, value) for (key, value) in zip(range(1, len(chain_residues_for_generation) + 1), chain_residues_for_generation))
 
         for k, v in sorted(records.iteritems()):
             assert(v[0].startswith('>'))
+
+            subkey = k[0] + k[1]
             sequence = ''.join([s.strip() for s in v[1:]])
             assert(sequenceLine.match(sequence) != None) # sanity check
-            cropped_sequence = ''.join([sequence[segment[0]-1:segment[1]] for segment in segment_list])
+            cropped_sequence = None
+            if sequence_offsets.get(subkey):
+                # PDB chain case
+                first_residue_id = sequence_offsets[subkey][1]
+                cropped_sequence = ''.join([sequence[rmv - first_residue_id] for rmk, rmv in sorted(reverse_mapping[subkey].iteritems())])
+                # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
+                for x in range(0, len(cropped_sequence)):
+                    assert(cropped_sequence[x] == sequence[reverse_mapping[subkey][x + 1] - sequence_offsets[subkey][0] - 1])
+                records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
+            else:
+                # FASTA chain case
+                cropped_sequence = ''.join([sequence[rmv - 1] for rmk, rmv in sorted(reverse_mapping['FASTA'].iteritems()) if rmv <= len(sequence)])
+                # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
+                for x in range(0, len(cropped_sequence)):
+                    assert(cropped_sequence[x] == sequence[reverse_mapping['FASTA'][x + 1] - 1])
             records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
 
     if reverse_mapping:
