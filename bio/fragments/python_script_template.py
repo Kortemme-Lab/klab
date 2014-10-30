@@ -11,6 +11,9 @@ import re
 import shlex
 import traceback
 
+
+# Utility functions
+
 class ProcessOutput(object):
 
     def __init__(self, stdout, stderr, errorcode):
@@ -42,69 +45,63 @@ def create_scratch_path():
 def print_tag(tag_name, content):
     print('<%s>%s</%s>' % (tag_name, content, tag_name))
 
+def print_subprocess_output(subp):
+    '''Prints the stdout and stderr output.'''
+    if subp:
+        if subp.errorcode != 0:
+            print('<error errorcode="%s">' % str(subp.errorcode))
+            print(subp.stderr)
+            print("</error>")
+            print_tag('stdout', '\n%s\n' % subp.stdout)
+        else:
+            print_tag('success', '\n%s\n' % subp.stdout)
+            print_tag('warnings', '\n%s\n' % subp.stderr)
+
+
+# Job/task parameters
+
 task_id = os.environ.get('SGE_TASK_ID')
 job_id = os.environ.get('JOB_ID')
 array_idx = int(task_id) - 1
 job_root_dir = None
+subp = None
+errorcode = 0 # failed jobs should set errorcode
 
-print('<make_fragments job_id="%s" task_id="%s">' % (job_id, task_id))
 
+# Markup opener
+print('<${JOB_NAME} job_id="%s" task_id="%s">' % (job_id, task_id))
+
+
+# Standard task properties - start time, host, architecture
 print_tag("start_time", strftime("%Y-%m-%d %H:%M:%S"))
 print_tag("host", socket.gethostname())
-print_tag("arch", platform.machine() + ', ' + platform.processor() + ', ' + platform.platform())
+print_tag("architecture", platform.machine() + ', ' + platform.processor() + ', ' + platform.platform())
 
-# Set up scratch directory
+
+# Set up a scratch directory on the node
 scratch_path = create_scratch_path()
-
 print_tag("cwd", scratch_path)
 
-***
-# JOB-SPECIFIC SETUP
-chains = ['B', 'B']
-pdb_ids = ['0050', '4un3']
-fasta_files = ['/home/oconchus/dev/tools/bio/fragments/rpache_run/0050B/0050B.fasta', '/home/oconchus/dev/tools/bio/fragments/rpache_run/4un3B/4un3B.fasta']
 
-chain = chains[array_idx]
-pdb_id = pdb_ids[array_idx]
-fasta_file = fasta_files[array_idx]
-job_root_dir = os.path.split(fasta_file)[0]
-
-# Copy resources
-shutil.copy(fasta_file, scratch_path)
-
-print("<cmd>")
-cmd_args = [c for c in ['/home/oconchus/dev/tools/bio/fragments/make_fragments_RAP_cluster.pl', '-verbose', '-id', pdb_id + chain, '', '-frag_sizes 3,9', '-n_frags 200', '-n_candidates 1000', fasta_file] if c]
-print(' '.join(cmd_args))
-print("</cmd>")
-
-os.remove(fasta_file)
-***
-
+# Job setup. The job's root directory must be specified inside this block.
+${JOB_SETUP_COMMANDS}
 if not os.path.exists(job_root_dir):
     raise Exception("You must set the job's root directory so that the script can clean up the job.")
 
-print("<output>")
-***
-# JOB-SPECIFIC COMMANDS
-subp = Popen(scratch_path, cmd_args)
-sys.stdout.write(subp.stdout)
 
-if True:
-    print("<gzip>")
-    for f in glob.glob(os.path.join(scratch_path, "*mers")) + [os.path.join(scratch_path, 'ss_blast')]:
-        if os.path.exists(f):
-            subpzip = Popen(scratch_path, ['gzip', f])
-            print(f)
-    print("</gzip>")
-***
+# Job execution block. Note: failed jobs should set errorcode.
+print("<output>")
+${JOB_EXECUTION_COMMANDS}
 print("</output>")
 
-# Copy files from scratch back to /netapp
+
+# Post-processing. Copy files from scratch back to /netapp.
 os.rmdir(job_root_dir)
 shutil.copytree(scratch_path, job_root_dir)
 shutil.rmtree(scratch_path)
 
-# Get task run details
+
+# Print task run details
 task_usages = shell_execute('qstat -j %s' % job_id)
 if task_usages.errorcode == 0:
   try:
@@ -127,11 +124,13 @@ if task_usages.errorcode == 0:
     print('</qstat_parse_error>')
 else:
     print_tag('qstat_error', task_usages.stderr)
-    
+
+
+# Print the end walltime and close the outer tag
 print_tag("end_time", strftime("%Y-%m-%d %H:%M:%S"))
+print("</${JOB_NAME}>")
 
-print("</make_fragments>")
 
-if subp.errorcode != 0:
-    sys.stderr.write(subp.stderr)
+# Exit the job with the errorcode set in the execution block
+if errorcode != 0:
     sys.exit(subp.errorcode)
