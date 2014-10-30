@@ -457,7 +457,10 @@ def setup_jobs(outpath, options, input_files):
         assert(not(fasta_file_contents.get(input_file)))
         if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
             pdb = PDB.from_filepath(input_file, strict=True)
-            pdb.pdb_id = os.path.basename(input_file).split('.')[0]
+            pdb.pdb_id = os.path.basename(input_file).split('.')[0]            
+            if pdb.pdb_id.startswith('pdb') and len(pdb.pdb_id) >= 7:
+                # Hack to rename FASTA identifiers for pdb*.ent files which are present in mirrors of the PDB
+                pdb.pdb_id = pdb.pdb_id.replace('pdb', '')    
             fasta_file_contents[input_file] = (pdb.create_fasta(prefer_seqres_order = False), 'PDB')
         else:
             fasta_file_contents[input_file] = (read_file(input_file), 'FASTA')
