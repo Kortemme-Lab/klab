@@ -90,12 +90,15 @@ class FragmentsJob(object):
 
         # Create the setup commands
         self.job_setup_commands = '''
-from post_processing import post_process
-
 chain = chains[array_idx]
 pdb_id = pdb_ids[array_idx]
 fasta_file = fasta_files[array_idx]
 task_root_dir = os.path.split(fasta_file)[0]
+job_root_dir = os.path.split(task_root_dir)[0]
+print_tag('job_root_dir', job_root_dir)
+
+sys.path.insert(0, job_root_dir)
+from post_processing import post_process
 
 # Copy resources
 shutil.copy(fasta_file, scratch_path)
