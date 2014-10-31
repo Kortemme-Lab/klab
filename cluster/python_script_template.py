@@ -104,7 +104,7 @@ print("</output>")
 os.rmdir(task_root_dir)
 shutil.copytree(scratch_path, task_root_dir)
 shutil.rmtree(scratch_path)
-
+${JOB_POST_PROCESSING_COMMANDS}
 
 # Print task run details. The full path to qstat seems necessary on the QB3 cluster if you are not using a bash shell.
 task_usages = shell_execute('/usr/local/sge/bin/linux-x64/qstat -j %s' % job_id)

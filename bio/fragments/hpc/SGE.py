@@ -90,6 +90,8 @@ class FragmentsJob(object):
 
         # Create the setup commands
         self.job_setup_commands = '''
+from post_processing import post_process
+
 chain = chains[array_idx]
 pdb_id = pdb_ids[array_idx]
 fasta_file = fasta_files[array_idx]
@@ -125,8 +127,14 @@ if %(zip_files)s:
 os.remove(fasta_file)
 ''' % locals()
 
+        self.job_post_processing_commands = '''
+# Run post-processing script
+task_dirname = os.path.split(task_root_dir)[1]
+post_process(task_dirname)
+''' % locals()
+
         self.script = sge_interface.create_script(self.jobname, self.job_directory,
-                  job_data_arrays = self.job_data_arrays, job_setup_commands = self.job_setup_commands, job_execution_commands = self.job_execution_commands,
+                  job_data_arrays = self.job_data_arrays, job_setup_commands = self.job_setup_commands, job_execution_commands = self.job_execution_commands, job_post_processing_commands = self.job_post_processing_commands,
                   architecture = 'linux-x64', num_tasks = self.num_tasks, memory_in_GB = self.memory_in_GB, scratch_space_in_GB = self.scratch_space_in_GB,
                   runtime_string = self.runtime_string, queues = self.queues)
 

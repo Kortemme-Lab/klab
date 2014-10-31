@@ -5,8 +5,6 @@ import gzip
 import json
 import subprocess
 
-FUDGE_FACTOR = 81 # !!!
-
 def read_file(filepath, binary = False):
     if binary:
         output_handle = open(filepath, 'rb')
@@ -38,10 +36,10 @@ def is_valid_fragment(original_residue_id, mapping, nmerage):
             return True
     return False
 
-def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
+def rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
     lines = read_file(old_filepath).split('\n')
 
-    reverse_mapping = mapping['reverse_mapping']
+    reverse_mapping = mapping['reverse_mapping'].get(task_dir) or mapping['reverse_mapping']['FASTA']
     must_zip_output = old_filepath.endswith('.gz')
     new_lines = []
     for l in lines:
@@ -57,10 +55,10 @@ def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nme
             assert(original_residue_id != None)
             # Prune records which are not needed for these nmers
             if is_valid_fragment(original_residue_id, mapping, nmerage):
-                new_lines.append('%s%s' % (str(reverse_mapping[str(residue_id)] + FUDGE_FACTOR).rjust(11), l[11:]))
+                new_lines.append('%s%s' % (str(reverse_mapping[str(residue_id)]).rjust(11), l[11:]))
                 assert(len(new_lines[-1]) == len(l))
 
-    colortext.message('Rewriting fragments score file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
+    print('Rewriting fragments score file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
     os.rename(old_filepath, backup_filepath)
     write_file(new_filepath, '\n'.join(new_lines))
     if os.path.exists(new_filepath + '.gz'):
@@ -69,11 +67,10 @@ def rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nme
         stdout, stderr, errorcode = Popen(os.path.split(new_filepath)[0], ['gzip', os.path.split(new_filepath)[1]])
         assert(errorcode == 0)
 
-def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
+def rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments):
     lines = read_file(old_filepath).split('\n')
 
-    reverse_mapping = mapping['reverse_mapping']
-
+    reverse_mapping = mapping['reverse_mapping'].get(task_dir) or mapping['reverse_mapping']['FASTA']
     must_zip_output = old_filepath.endswith('.gz')
     new_lines = []
     for l in lines:
@@ -86,7 +83,7 @@ def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping,
             assert(l[22] == ' ')
             residue_id = int(l[9:22])
             assert(reverse_mapping.get(str(residue_id)))
-            new_lines.append('position:%s%s' % (str(reverse_mapping[str(residue_id)] + FUDGE_FACTOR).rjust(13), l[22:]))
+            new_lines.append('position:%s%s' % (str(reverse_mapping[str(residue_id)]).rjust(13), l[22:]))
             assert(len(new_lines[-1]) == len(l))
         else:
             new_lines.append(l)
@@ -98,11 +95,11 @@ def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping,
     for b in fragment_score_blocks:
         assert(b.startswith('position:'))
         residue_id = int(b.split('\n')[0][9:].split()[0])
-        if is_valid_fragment(residue_id - FUDGE_FACTOR, mapping, nmerage):
+        if is_valid_fragment(residue_id, mapping, nmerage):
             new_blocks.append(b)
     new_blocks = ''.join(new_blocks)
 
-    colortext.message('Rewriting fragments file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
+    print('Rewriting fragments file %s for %d-mers with %d fragments...' % (old_filepath, nmerage, num_fragments))
     os.rename(old_filepath, backup_filepath)
     write_file(new_filepath, new_blocks)
     if os.path.exists(new_filepath + '.gz'):
@@ -111,35 +108,30 @@ def rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping,
         stdout, stderr, errorcode = Popen(os.path.split(new_filepath)[0], ['gzip', os.path.split(new_filepath)[1]])
         assert(errorcode == 0)
 
-if __name__ == '__main__':
-    import sys
-    sys.path.insert(0, '../../../..')
-    import colortext
+def post_process(task_dir):
     if os.path.exists('segment_map.json'):
         mapping = json.loads(open('segment_map.json').read())
-        for d in sorted(os.listdir('.')):
-            if os.path.isdir(d):
-                for f in sorted(glob.glob(os.path.join(d, "*mers")) + glob.glob(os.path.join(d, "*mers.gz"))):
-                    if f.find('backup') != -1 or f.find('rewrite') != -1:
-                        continue
-                    mtchs = re.match('(.*?frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', f)
-                    if mtchs:
-                        assert(mtchs.group(2) == mtchs.group(4))
-                        nmerage = int(mtchs.group(2))
-                        num_fragments = int(mtchs.group(3))
-                        old_filepath = mtchs.group(0)
-                        # Kale wanted to change the filename for the scores so that it is easier to distinguish between score and fragments files using glob
+        for f in sorted(glob.glob(os.path.join(task_dir, "*mers")) + glob.glob(os.path.join(task_dir, "*mers.gz"))):
+            if f.find('backup') != -1 or f.find('rewrite') != -1:
+                continue
+            mtchs = re.match('(.*?frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', f)
+            if mtchs:
+                assert(mtchs.group(2) == mtchs.group(4))
+                nmerage = int(mtchs.group(2))
+                num_fragments = int(mtchs.group(3))
+                old_filepath = mtchs.group(0)
+                # Kale wanted to change the filename for the scores so that it is easier to distinguish between score and fragments files using glob
 
-                        backup_filepath = '%s.%s.%smers.backup.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))
-                        new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))).replace('.gz', '')
-                        rewrite_score_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
-                    else:
-                        mtchs = re.match('(.*)[.](\d+)[.](\d+)mers[.]?(gz)?', f)
-                        if mtchs:
-                            nmerage = int(mtchs.group(3))
-                            num_fragments = int(mtchs.group(2))
-                            old_filepath = mtchs.group(0)
-                            backup_filepath= '%s.%s.%smers.backup.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))
-                            new_filepath= ('%s.%s.%smers.rewrite.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))).replace('.gz', '')
-                            rewrite_fragments_file(old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
+                backup_filepath = '%s.%s.%smers.backup.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))
+                new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (mtchs.group(1), mtchs.group(3), mtchs.group(4), mtchs.group(5))).replace('.gz', '')
+                rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
+            else:
+                mtchs = re.match('(.*)[.](\d+)[.](\d+)mers[.]?(gz)?', f)
+                if mtchs:
+                    nmerage = int(mtchs.group(3))
+                    num_fragments = int(mtchs.group(2))
+                    old_filepath = mtchs.group(0)
+                    backup_filepath= '%s.%s.%smers.backup.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))
+                    new_filepath= ('%s.%s.%smers.rewrite.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))).replace('.gz', '')
+                    rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
 

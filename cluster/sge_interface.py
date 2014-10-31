@@ -12,7 +12,7 @@ available_queues = {
 }
 
 def create_script(job_name, job_directory,
-                  job_data_arrays = '', job_setup_commands = '', job_execution_commands = '',
+                  job_data_arrays = '', job_setup_commands = '', job_execution_commands = '', job_post_processing_commands = '',
                   architecture = 'linux-x64', num_tasks = 1, memory_in_GB = 2, scratch_space_in_GB = 1,
                   runtime_string = '24:00:00', queues = ['long.q'], cluster = 'QB3'):
     '''This function uses python_script_template to create a script that can execute on the cluster. The template has
@@ -79,6 +79,7 @@ def create_script(job_name, job_directory,
     template = template.replace('${JOB_DATA_ARRAYS}', '%s' % job_data_arrays.strip())
     template = template.replace('${JOB_SETUP_COMMANDS}', '%s' % job_setup_commands.strip())
     template = template.replace('${JOB_EXECUTION_COMMANDS}', '%s' % job_execution_commands.strip())
+    template = template.replace('${JOB_POST_PROCESSING_COMMANDS}', '%s' % job_post_processing_commands.strip())
     return '\n\n'.join(map(string.strip, [header, template]))
 
 
