@@ -36,7 +36,7 @@ def create_script(job_name, job_directory,
     try: assert(int(scratch_space_in_GB) > 0 and str(scratch_space_in_GB).isdigit())
     except: raise JobInitializationException('scratch_space_in_GB should be a non-zero integer.')
 
-    mtches = re.match('(\d{2}):(\d{2}):(\d{2})', runtime_string)
+    mtches = re.match('(\d{1,2}):(\d{1,2}):(\d{1,2})', runtime_string)
     try:
         assert(mtches != None)
         assert(int(mtches.group(2)) < 60)
