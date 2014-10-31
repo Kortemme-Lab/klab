@@ -8,6 +8,7 @@ Created by Shane O'Connor 2014
 """
 
 from ..fs.fsio import read_file
+from ..general.strutil import parse_range
 
 class RosettaFileParsingException(Exception): pass
 
@@ -27,7 +28,6 @@ class RosettaFileParsingException(Exception): pass
 class LoopsFile(object):
     '''A class to manipulate loops files. Note that the indices in these files are 1-indexed i.e. A start position of 5
         refers to the fifth residue of the sequence.'''
-
 
     @staticmethod
     def from_filepath(filepath, ignore_whitespace = True, ignore_errors = False):
@@ -56,7 +56,6 @@ class LoopsFile(object):
                     continue
                 else:
                     raise
-        return self.data
 
 
     def parse_loop_line(self, tokens):
@@ -146,7 +145,56 @@ class LoopsFile(object):
         return segments
 
 
+class SecondaryStructureDefinition(object):
+    '''A class to manipulate secondary structure assignment files. These files are not standard Rosetta files; we use them
+       for our fragment generation. For that reason, they may change over time until we fix on a flexible format. The
+       indices in these files are 1-indexed and use Rosetta numbering i.e. if the first chain has 90 residues and the second
+       has 40 residues, a position of 96 refers to the sixth residue of the second chain. The file format is whitespace-separated
+       columns. The first column is a residue ID or a residue range. The second column is a string consisting of characters
+       'H', 'E', and 'L', representing helix, sheet, and loop structure respectively.
+       Comments are allowed. Lines with comments must start with a '#' symbol.
+       Example file:
+         1339 HEL
+         # An expected helix
+         1354-1359 H
+         # Helix or sheet structure
+         1360,1370-1380 HE
+       '''
+
+    @staticmethod
+    def from_filepath(filepath, ignore_whitespace = True, ignore_errors = False):
+        return SecondaryStructureDefinition(read_file(filepath))
+
+
+    def __init__(self, contents):
+        self.data = {}
+        self.parse_ss_def_file(contents)
+
+
+    def parse_ss_def_file(self, contents):
+        '''This parser is forgiving and allows leading whitespace.'''
+        mapping = {}
+        for l in [l.strip() for l in contents.split('\n') if l.strip() and not(l.strip().startswith('#'))]:
+            tokens = l.split()
+            if len(tokens) != 2:
+                raise RosettaFileParsingException('Lines in a secondary structure definition file must have exactly two entries.')
+
+            positions = parse_range(tokens[0])
+            ss = sorted(set(tokens[1].upper()))
+            for p in positions:
+                if mapping.get(p) and mapping[p] != ss:
+                    raise RosettaFileParsingException('There are conflicting definitions for residue %d (%s and %s).' % (p, ''.join(mapping[p]), ''.join(ss)))
+                mapping[p] = ss
+        self.data = mapping
+
+
 if __name__ == '__main__':
+
+    # For testing, these lines need to be included at the top of the script:
+    # import sys
+    # sys.path.insert(0, '../..')
+    # from tools.fs.fsio import read_file
+    # from tools.general.strutil import parse_range
 
     p = LoopsFile('''
 LOOP 23 30
@@ -154,5 +202,20 @@ LOOP -1 30 26
 LOOP 26 23 27 4
 LOOP 23 30 26 2 TrUe
 ''',ignore_errors = True)
-    for r in p.data:
-        print(r)
+    #for r in p.data:
+    #    print(r)
+
+    ss = SecondaryStructureDefinition('''
+# Comments are allowed. A line has two columns: the first specifies the residue(s),
+# the second specifies the expected secondary structure using H(elix), E(xtended/sheet),
+# or L(oop). The second column is case-insensitive.
+#
+# A single residue, any structure
+1339 Hel
+# An expected helix
+1354-1359 H
+# A helical or sheet structure
+1360,1370-1380 HE
+        ''')
+    for p, ss_def in sorted(ss.data.iteritems()):
+        print('%s: %s' % (p, ''.join(ss_def)))

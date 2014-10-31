@@ -21,7 +21,7 @@ from utils import LogFile, colorprinter
 from tools.cluster.cluster_interface import JobInitializationException
 
 from tools import colortext
-from tools.rosetta.input_files import LoopsFile
+from tools.rosetta.input_files import LoopsFile, SecondaryStructureDefinition
 from tools.fs.fsio import read_file, write_temp_file
 from tools.bio.pdb import PDB
 from tools.bio.rcsb import retrieve_pdb
@@ -164,6 +164,20 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
 4a: {script_name} -d results -l input/loops_file input/fragments/0001.fasta
 4b: {script_name} -d results -l input/loops_file 4un3
 4c: {script_name} -d results -l input/loops_file -q short.q input/fragments 4un3
+
+*** Example secondary structure definition file***
+
+# Comments are allowed. A line has two columns: the first specifies the residue(s),
+# the second specifies the expected secondary structure using H(elix), E(xtended/sheet),
+# or L(oop). The second column is case-insensitive.
+#
+# A single residue, any structure
+1339 HEL
+# An expected helix
+1354-1359 H
+# A helical or sheet structure
+1360,1370-1380 HE
+
 """.format(**locals())
 
     parser = OptionParserWithNewlines(usage="usage: %prog [options] <inputs>...", version="%prog 1.1A", option_class=MultiOption)
@@ -175,6 +189,7 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     group.add_option("-c", "--chain", dest="chain", help="Chain used for the fragment. This is optional so long as the FASTA file only contains one chain.", metavar="CHAIN")
     group.add_option("-l", "--loops_file", dest="loops_file", help="Optional but recommended. A Rosetta loops file which will be used to select sections of the FASTA sequences from which fragments will be generated. This saves a lot of time on large sequences.")
     group.add_option("-i", "--indices", dest="indices", help="Optional. A comma-separated list of ranges. A range can be a single index or a hyphenated range. For example, '10-30,66,90-93' is a valid set of indices. The indices are used to pick out parts of the supplied sequences for fragment generation and start at 1 (1-indexed). Similarly to the loops_file option, this restriction may save a lot of computational resources. If this option is used in addition to the loops_file option then the sections defined by the indices are combined with those in the loops file.")
+    group.add_option("--ss", dest="secondary_structure_file", help="Optional. A secondary structure definition file. This is used in postprocessing to filter out fragments which do not match the requested secondary structure.")
     group.add_option("--n_frags", dest="n_frags", help="Optional. The number of fragments to generate. This must be less than the number of candidates. The default value is 200.")
     group.add_option("--n_candidates", dest="n_candidates", help="Optional. The number of candidates to generate. The default value is 1000.")
     group.add_option("--add_vall_files", dest="add_vall_files", help="Optional and untested. This option allows extra Vall files to be added to the run. The files must be comma-separated.")
@@ -272,6 +287,13 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
             options.indices = parse_range_pairs(options.indices, range_separator = '-')
         except Exception, e:
             errors.append('The indices argument must be a list of valid indices into the sequences for which fragments are to be generated.')
+
+    # Secondary structure file
+    if options.secondary_structure_file:
+        if not os.path.isabs(options.secondary_structure_file):
+            options.secondary_structure_file = os.path.realpath(options.secondary_structure_file)
+        if not(os.path.exists(options.secondary_structure_file)):
+            errors.append('The secondary structure definition file %s does not exist.' % options.secondary_structure_file)
 
     # Fragment sizes
     if options.frag_sizes:
@@ -480,12 +502,20 @@ def setup_jobs(outpath, options, input_files):
 
     # Create the input FASTA and script files.
     job_inputs, errors = create_inputs(options, outpath, desired_sequences)
+
+    # Create the reverse mapping file
     if reverse_mapping:
         segment_mapping_file = os.path.join(outpath, "segment_map.json")
         colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
         write_file(segment_mapping_file, json.dumps(reverse_mapping))
+
+    # Create the post-processing script file
     post_processing_script = read_file(os.path.join(os.path.split(os.path.realpath(__file__))[0], 'post_processing.py'))
     write_file(os.path.join(outpath, 'post_processing.py'), post_processing_script, 'w')
+
+    # Create the secondary structure filter file
+    if options.secondary_structure_file:
+        write_file(os.path.join(outpath, 'ss_filter.json'), json.dumps({'secondary_structure_filter' : SecondaryStructureDefinition.from_filepath(options.secondary_structure_file).data}), 'w')
 
     return job_inputs, reverse_mapping != None, errors
 
