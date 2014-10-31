@@ -202,8 +202,8 @@ LOOP -1 30 26
 LOOP 26 23 27 4
 LOOP 23 30 26 2 TrUe
 ''',ignore_errors = True)
-    #for r in p.data:
-    #    print(r)
+    for r in p.data:
+        print(r)
 
     ss = SecondaryStructureDefinition('''
 # Comments are allowed. A line has two columns: the first specifies the residue(s),
