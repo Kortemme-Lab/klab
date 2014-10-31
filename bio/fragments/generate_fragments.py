@@ -840,7 +840,7 @@ if __name__ == "__main__":
         if options['no_zip']:
             print("The --nozip option was selected.")
         if ClusterEngine.ClusterType == "SGE":
-            print("The jobs have been submitted using the %s queue(s)." % ', '.join(sorted(options['queue'])))
+            print("The jobs have been submitted using the %s queue(s)." % (', '.join(sorted(options['queue'])) or 'default'))
         print('')
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
