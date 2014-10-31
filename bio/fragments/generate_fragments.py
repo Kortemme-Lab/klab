@@ -17,7 +17,8 @@ from fnmatch import fnmatch
 import glob
 import getpass
 import json
-from utils import LogFile, colorprinter, JobInitializationException
+from utils import LogFile, colorprinter
+from tools.cluster.cluster_interface import JobInitializationException
 
 from tools import colortext
 from tools.rosetta.input_files import LoopsFile
@@ -50,19 +51,17 @@ errcode = 0
 
 
 #################
-#  Globals
-
+#  Fragment generation pipeline configuration
 make_fragments_script = "make_fragments_RAP_cluster.pl"
 test_mode = False # set this to true for running quick tests on your cluster system (you will need to adapt the cluster/[engine].py code to use this argument
 logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
 cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster
 fasta_file_wildcards = '*.fasta', '*.fasta.txt', '*.fa' # optional: set this to your preferred FASTA file extensions. This is used for finding FASTA files when specifying a directory.
-pdb_file_wildcards = '*.pdb', '*.pdb.gz', '*.ent' # optional: set this to your preferred PDB file extensions. This is used for finding PDB files when specifying a directory.
+pdb_file_wildcards = '*.pdb', '*.pdb.gz', '*.ent' # optional: set this to your preferred PDB file extensions. This is used for finding PDB files when specifying a directory. The .ent files are contained in mirrored versions of the PDB.
 input_file_wildcards = fasta_file_wildcards + pdb_file_wildcards
-
+#
 # The location of the text file containing the names of the configuration scripts
 configurationFilesLocation = "make_fragments_confs.txt" # "/netapp/home/klabqb3backrub/make_fragments/make_fragments_confs.txt"
-#
 #################
 
 
@@ -809,23 +808,16 @@ if __name__ == "__main__":
 
     options = parse_args()
     if options["outpath"] and options['job_inputs']:
+        job_script = None
         try:
-            if len(options['job_inputs']) > 1:
-                # Multiple sequence fragment generation
-                task = ClusterEngine.MultipleTask(make_fragments_script, options, test_mode = test_mode)
-                submission_script, scripts = task.get_scripts()
-            else:
-                # Single sequence fragment generation
-                task = ClusterEngine.SingleTask(make_fragments_script, options, test_mode = test_mode)
-                submission_script, scripts = task.get_scripts()
-        except JobInitializationException, e:            
+            cluster_job = ClusterEngine.FragmentsJob(make_fragments_script, options, test_mode = test_mode)
+            job_script = cluster_job.script
+        except JobInitializationException, e:
             colorprinter.error(str(e))
             sys.exit(ERRCODE_ARGUMENTS)
-        
-        for script_filename, script in scripts.iteritems():
-            write_file(os.path.join(options["outpath"], script_filename), script, 'w')
 
-        submission_script = os.path.join(options["outpath"], submission_script)
+        submission_script = os.path.join(options["outpath"], 'submission_script.py')
+        write_file(submission_script, job_script, 'w')
 
         try:
             send_mail = options['sendmail']

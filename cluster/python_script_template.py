@@ -62,14 +62,14 @@ def print_subprocess_output(subp):
 
 task_id = os.environ.get('SGE_TASK_ID')
 job_id = os.environ.get('JOB_ID')
-array_idx = int(task_id) - 1
-job_root_dir = None
+array_idx = int(task_id) - 1              # this can be used to index Python arrays (0-indexed) rather than task_id (based on 1-indexing)
+task_root_dir = None
 subp = None
 errorcode = 0 # failed jobs should set errorcode
 
 
 # Markup opener
-print('<${JOB_NAME} job_id="%s" task_id="%s">' % (job_id, task_id))
+print('<task type="${JOB_NAME}" job_id="%s" task_id="%s">' % (job_id, task_id))
 
 
 # Standard task properties - start time, host, architecture
@@ -83,10 +83,14 @@ scratch_path = create_scratch_path()
 print_tag("cwd", scratch_path)
 
 
+# Job data arrays. This section defines arrays that are used for tasks.
+${JOB_DATA_ARRAYS}
+
+
 # Job setup. The job's root directory must be specified inside this block.
 ${JOB_SETUP_COMMANDS}
-if not os.path.exists(job_root_dir):
-    raise Exception("You must set the job's root directory so that the script can clean up the job.")
+if not os.path.exists(task_root_dir):
+    raise Exception("You must set the task's root directory so that the script can clean up the job.")
 
 
 # Job execution block. Note: failed jobs should set errorcode.
@@ -96,8 +100,9 @@ print("</output>")
 
 
 # Post-processing. Copy files from scratch back to /netapp.
-os.rmdir(job_root_dir)
-shutil.copytree(scratch_path, job_root_dir)
+# Caveat: We assume here that task_root_dir should be empty.
+os.rmdir(task_root_dir)
+shutil.copytree(scratch_path, task_root_dir)
 shutil.rmtree(scratch_path)
 
 
@@ -128,7 +133,7 @@ else:
 
 # Print the end walltime and close the outer tag
 print_tag("end_time", strftime("%Y-%m-%d %H:%M:%S"))
-print("</${JOB_NAME}>")
+print("</task>")
 
 
 # Exit the job with the errorcode set in the execution block
