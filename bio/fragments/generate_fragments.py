@@ -484,6 +484,9 @@ def setup_jobs(outpath, options, input_files):
         segment_mapping_file = os.path.join(outpath, "segment_map.json")
         colorprinter.message("Creating a reverse mapping file %s." % segment_mapping_file)
         write_file(segment_mapping_file, json.dumps(reverse_mapping))
+    post_processing_script = read_file(os.path.join(os.path.split(os.path.realpath(__file__))[0], 'post_processing.py'))
+    write_file(os.path.join(outpath, 'post_processing.py'), post_processing_script, 'w')
+
     return job_inputs, reverse_mapping != None, errors
 
 
