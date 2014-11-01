@@ -72,6 +72,8 @@ def rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath
 
     reverse_mapping = mapping['reverse_mapping'].get(task_dir) or mapping['reverse_mapping']['FASTA']
     must_zip_output = old_filepath.endswith('.gz')
+
+    # Rewrite the position: lines i.e. renumber the fragments in the file
     new_lines = []
     for l in lines:
         if l.startswith('position:'):
@@ -108,7 +110,72 @@ def rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath
         stdout, stderr, errorcode = Popen(os.path.split(new_filepath)[0], ['gzip', os.path.split(new_filepath)[1]])
         assert(errorcode == 0)
 
+def filter_fragments_file_by_secondary_structure(fragments_filepath, new_filepath, mapping, nmerage):
+
+    stats = []
+    must_zip_output = fragments_filepath.endswith('.gz')
+
+    all_fragments = read_file(fragments_filepath) + '_grog_'
+    fragment_score_blocks = re.findall('(position:.*?)(?=position:|_grog_)', all_fragments, re.DOTALL)
+    new_blocks = []
+    for b in fragment_score_blocks:
+        # Iterate over the set of positions
+        assert(b.startswith('position:'))
+        header_line =  b.split('\n')[0]
+        header_tokens = header_line.split()
+        start_residue_id = int(header_tokens[1])
+        num_fragments = int(header_tokens[3])
+
+        new_block = []
+        position_fragments = [pf for pf in b.split('\n\n') if pf.strip()]
+        assert(len(position_fragments) == num_fragments + 1)
+        assert(position_fragments[0].find('position:') != -1)
+
+        for pf in position_fragments[1:]:
+            # Iterate over the set of fragments per position
+            passed_filter = True
+            pflines = [l for l in pf.split('\n') if l.strip()]
+            assert(len(pflines) == nmerage)
+            c = start_residue_id
+            for pfline in pflines:
+                if str(c) in mapping:
+                    expected_secondary_structure = mapping[str(c)]
+                    fragment_secondary_structure = pfline.strip().split()[4]
+                    if fragment_secondary_structure not in expected_secondary_structure:
+                        passed_filter = False
+                c += 1
+            if passed_filter:
+                new_block.append(pf)
+
+        new_num_neighbors = len(new_block)
+        if new_num_neighbors == 0:
+            sys.stderr.write('WARNING: The block starting at position %d has no fragments remaining aftering filtering by secondary structure.\n' % start_residue_id)
+
+        # Add the header by default
+        mtchs = re.match('^(position:\s+\d+\s+neighbors:)(\s+\d+)(\s)*$', header_line)
+        assert(mtchs)
+        new_header_line = '%s%s%s' % (mtchs.group(1), str(new_num_neighbors).rjust(len(mtchs.group(2))), mtchs.group(3) or '')
+        new_block.insert(0, new_header_line)
+        new_blocks.append('\n\n'.join(new_block))
+        stats.append(map(str, (start_residue_id, num_fragments, new_num_neighbors)))
+    new_blocks = '\n\n'.join(new_blocks)
+
+    s = 'Secondary structure filtering summary (%dmers)' % nmerage
+    print('\n%s\n%s' % (s, len(s) * '*'))
+    print('Residue ID     Number of fragments      Number of fragments after filtering')
+    for stat in stats:
+        print('%s%s%s' % (stat[0].ljust(15), stat[1].ljust(25), stat[2].ljust(0)))
+
+    print('\nRewriting fragments file %s as %s for %d-mers with %d fragments...\n' % (fragments_filepath, new_filepath, nmerage, num_fragments))
+    write_file(new_filepath, new_blocks)
+    if os.path.exists(new_filepath + '.gz'):
+        os.remove(new_filepath + '.gz')
+    if must_zip_output:
+        stdout, stderr, errorcode = Popen(os.path.split(new_filepath)[0], ['gzip', os.path.split(new_filepath)[1]])
+        assert(errorcode == 0)
+
 def post_process(task_dir):
+
     if os.path.exists('segment_map.json'):
         mapping = json.loads(open('segment_map.json').read())
         for f in sorted(glob.glob(os.path.join(task_dir, "*mers")) + glob.glob(os.path.join(task_dir, "*mers.gz"))):
@@ -134,4 +201,17 @@ def post_process(task_dir):
                     backup_filepath= '%s.%s.%smers.backup.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))
                     new_filepath= ('%s.%s.%smers.rewrite.%s' % (mtchs.group(1), mtchs.group(2), mtchs.group(3), mtchs.group(4))).replace('.gz', '')
                     rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, nmerage, num_fragments)
+
+    if os.path.exists('ss_filter.json'):
+        mapping = json.loads(open('ss_filter.json').read())['secondary_structure_filter']
+        for f in sorted(glob.glob(os.path.join(task_dir, "*mers.rewrite")) + glob.glob(os.path.join(task_dir, "*mers.rewrite.gz"))):
+            if f.find('rewrite') != -1:
+                mtchs = re.match('(.*)[.](\d+)[.](\d+)mers[.]?(gz)?', f)
+                assert(mtchs)
+                nmerage = int(mtchs.group(3))
+
+                mtchs = re.match('(.*?).rewrite(.*)', f)
+                new_filepath = ('%s.ssfilter%s' % (mtchs.group(1), mtchs.group(2))).replace('.gz', '')
+
+                filter_fragments_file_by_secondary_structure(f, new_filepath, mapping, nmerage)
 
