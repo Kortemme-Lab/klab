@@ -209,7 +209,7 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     group.add_option("-q", "--queue", dest="queue", help="Optional. Specify which cluster queue to use. Whether this option works and what this value should be will depend on your cluster architecture. Valid arguments for the QB3 SGE cluster are long.q, lab.q, and short.q. By default, no queue is specified. This may be a single value or a comma-separated list of queues. The short.q is only allowed on its own for test runs.", metavar="QUEUE_NAME")
     group.add_option("-x", "--scratch", type="int", dest="scratch", help="Optional. Specifies the amount of /scratch space in GB to reserve for the job.")
     group.add_option("-m", "--memfree", type="int", dest="memfree", help="Optional. Specifies the amount of RAM in GB that the job will require on the cluster. This must be at least 2GB.")
-    group.add_option("-r", "--runtime", type="int", dest="runtime", help="Optional. Specifies the runtime in hours that the job will require on the cluster. This must be at least 8 hours.")
+    group.add_option("-r", "--runtime", type="int", dest="runtime", help="Optional. Specifies the runtime in hours that the job will require on the cluster.")
     parser.add_option_group(group)
 
     group = OptionGroup(parser, "Querying options")
@@ -262,8 +262,6 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
         errors.append("The amount of scratch space requested must be at least 1 (GB).")
     if options.memfree < 2:
         errors.append("The amount of RAM requested must be at least 2 (GB).")
-    if options.runtime < 8:
-        errors.append("The requested runtime must be at least 8 (hours).")
 
     # CHAIN
     if options.chain and not (len(options.chain) == 1):
