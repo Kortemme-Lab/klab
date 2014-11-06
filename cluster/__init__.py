@@ -8,3 +8,17 @@ def require_chef():
     if not is_this_chef():
         raise SystemExit("This script must be run on chef.")
 
+def require_qsub():
+    import os, subprocess
+
+    try:
+        command = 'qsub', '-help'
+        devnull = open(os.devnull)
+        subprocess.Popen(command, stdout=devnull, stderr=devnull).communicate()
+    except OSError as e:
+        if e.errno == os.errno.ENOENT:
+            return False
+
+    return True
+
+    
