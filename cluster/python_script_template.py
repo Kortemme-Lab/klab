@@ -27,7 +27,7 @@ class ProcessOutput(object):
         return None
 
 def Popen(outdir, args):
-    subp = subprocess.Popen([str(arg) for arg in args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir, env={'SPARKSXDIR' : '/netapp/home/klabqb3backrub/tools/sparks-x'})
+    subp = subprocess.Popen(shlex.split(" ".join([str(arg) for arg in args])), stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir, env={'SPARKSXDIR' : '/netapp/home/klabqb3backrub/tools/sparks-x'})
     output = subp.communicate()
     return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
 
