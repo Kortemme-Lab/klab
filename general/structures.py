@@ -24,6 +24,10 @@ class Bunch(object):
     def get(self, item):
         return self.__dict__.get(item, None)
 
+    def pprint(self):
+        # todo: only works for one level at present
+        import pprint
+        return pprint.pformat(self.__dict__)
 
 class NestedBunch(Bunch):
     '''A class to turn a dict into an object with dot accessors e.g.

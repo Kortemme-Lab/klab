@@ -41,13 +41,16 @@ class OAuthCredentials(NestedBunch):
 
 class GoogleCalendar(object):
 
+
     @staticmethod
     def from_file(oauth_json_filepath, calendar_id):
         return GoogleCalendar(read_file(oauth_json_filepath), calendar_id)
 
+
     def __init__(self, oauth_json, calendar_ids):
         '''oauth_json is a JSON string which should contain login credentials for OAuth 2.0.
-           calendar_id is the name of the calendar to connect to and should be defined in oauth_json["calendars"]
+           calendar_ids is a list of calendar aliases to connect to and should be defined in oauth_json["calendars"].
+           We use calendar aliases e.g. "main" or "biosensor meetings" for convenience.
         '''
         oc = OAuthCredentials.from_JSON(oauth_json)
         configured_calendar_ids = NestedBunch.from_JSON(oauth_json).calendars
@@ -64,14 +67,18 @@ class GoogleCalendar(object):
         self.timezone = pytz.timezone('America/Los_Angeles')
         self.configured_calendar_ids = configured_calendar_ids
 
+
     def get_upcoming_events_in_the_next_month(self):
-        return self.get_upcoming_events(365)
+        return self.get_upcoming_events(31)
+
 
     def get_upcoming_events_in_the_next_week(self):
         return self.get_upcoming_events(7)
 
+
     def get_upcoming_events_for_today(self):
         return self.get_upcoming_events(1)
+
 
     def get_upcoming_events(self, days_to_look_ahead):
         '''Returns the events from the calendar for the next days_to_look_ahead days.'''
@@ -82,42 +89,53 @@ class GoogleCalendar(object):
         end_time = end_time.isoformat()
         return self.get_events(start_time, end_time)
 
+
     def get_events(self, start_time, end_time):
         '''Returns the events from the calendar within the specified times. Some of the interesting fields are:
                description, end, htmlLink, location, organizer, start, summary
         '''
-
         es = []
         for calendar_id in self.calendar_ids:
             now = datetime.now(tz = self.timezone)
             events = self.service.events().list(calendarId = self.configured_calendar_ids[calendar_id], timeMin = start_time, timeMax = end_time).execute()
-
-            for i in events['items']:
+            for event in events['items']:
                 dt = None
-                nb = DeepNonStrictNestedBunch(i)
+                nb = DeepNonStrictNestedBunch(event)
                 if nb.status != 'cancelled':
-                    #print(nb.recurrence)
-
                     # Ignore cancelled events
-                    if nb.start:
-                        if not nb.start.dateTime:
-                            if nb.start.date:
-                                for rc in nb.recurrence:
-                                    if rc.find('FREQ=YEARLY') != -1:
-                                        y = int(nb.start.date.split('-')[0])
-                                        if y != now.year:
-                                            nb.start.date = nb.start.date.replace(str(y), str(now.year), 1)
-                                        dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
-                                    else:
-                                        raise Exception('Need to handle other recurring events.')
-                        else:
-                            dt = dateutil.parser.parse(nb.start.dateTime)
+                    if nb.recurrence:
+                        # Retrieve all occurrences of the recurring event within the timeframe
+                        es += self.get_recurring_events(start_time, end_time, calendar_id, nb.id)
+                    else:
+                        dt = dateutil.parser.parse(nb.start.dateTime)
+
                     if dt:
                         nb.datetime_o = dt
                         nb.calendar_id = calendar_id
                         es.append(nb)
-
         es.sort(key=lambda x: x.datetime_o)
+        return es
+
+
+    def get_recurring_events(self, start_time, end_time, calendar_id, event_id):
+        '''Returns the list of recurring events for the given calendar alias within the specified timeframe.'''
+        es = []
+        page_token = None
+        while True:
+            events = self.service.events().instances(calendarId = self.configured_calendar_ids[calendar_id], eventId = event_id, pageToken=page_token, timeMin = start_time, timeMax = end_time).execute()
+            for event in events['items']:
+                dt = None
+                nb = DeepNonStrictNestedBunch(event)
+                if nb.start.date:
+                    dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
+                elif nb.start.dateTime:
+                    dt = dateutil.parser.parse(nb.start.dateTime)
+                nb.datetime_o = dt
+                nb.calendar_id = calendar_id
+                es.append(nb)
+            page_token = events.get('nextPageToken')
+            if not page_token:
+                break
         return es
 
 
