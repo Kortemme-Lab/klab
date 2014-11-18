@@ -9,6 +9,7 @@ Created by Shane O'Connor 2014
 
 import collections
 
+
 class Bunch(object):
     '''Common Python idiom.'''
     def __init__(self, **kwds):
@@ -17,11 +18,12 @@ class Bunch(object):
     def keys(self):
         return self.__dict__.keys()
 
-    def __getitem__(self, item):
-        return self.__dict__.__getitem__(item)
+    def __getitem__(self, key):
+        return self.__dict__.__getitem__(key)
 
     def get(self, item):
         return self.__dict__.get(item, None)
+
 
 class NestedBunch(Bunch):
     '''A class to turn a dict into an object with dot accessors e.g.
@@ -31,16 +33,33 @@ class NestedBunch(Bunch):
     '''
     def __init__(self, d):
         for k, v in d.iteritems():
-            if isinstance(v, dict): self.__dict__[k] = NestedBunch(v)
+            if isinstance(v, dict): self.__dict__[k] = self.__class__(v)
             else: self.__dict__[k] = v
 
-    @staticmethod
-    def from_JSON(json_string):
+    @classmethod
+    def from_JSON(cls, json_string):
         import json
-        return NestedBunch(json.loads(json_string))
+        return cls(json.loads(json_string))
 
     def __repr__(self):
         return str(self.__dict__)
+
+
+class NonStrictNestedBunch(NestedBunch):
+    '''Similar to a NestedBunch but we allow shallow lookups for elements which do not exist.'''
+
+    def __nonzero__(self):
+        return len(self.__dict__) != 0
+
+    def __getattr__(self, key):
+        return self.__dict__.get(key)
+
+class DeepNonStrictNestedBunch(NonStrictNestedBunch):
+    '''Similar to a NonStrictNestedBunch but we allow deep lookups for elements which do not exist.'''
+
+    def __getattr__(self, key):
+        return self.__dict__.get(key, NonStrictNestedBunch({}))
+
 
 
 class nested_dict(dict):

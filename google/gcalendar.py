@@ -23,9 +23,10 @@ import pytz
 from apiclient.discovery import build
 from oauth2client.client import SignedJwtAssertionCredentials
 
-from tools.general.structures import NestedBunch
+from tools.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
 from tools.fs.fsio import read_file
 from tools import colortext
+
 
 class OAuthCredentials(NestedBunch):
 
@@ -36,13 +37,6 @@ class OAuthCredentials(NestedBunch):
             auth_provider_x509_cert_url, auth_uri, token_uri.'''
         assert(type == "service" or type == "web")
         return NestedBunch(json.loads(oauth_json)[type])
-
-def date_key(a):
-    """
-    a: date as string
-    """
-    a = datetime.strptime(a, '%d.%m.%Y').date()
-    return a
 
 
 class GoogleCalendar(object):
@@ -66,7 +60,7 @@ class GoogleCalendar(object):
         http_auth = credentials.authorize(httplib2.Http())
 
         # Create a service object for the Google Calendar v3 API
-        self.service = build('calendar', 'v3', http=http_auth)
+        self.service = build('calendar', 'v3', http = http_auth)
         self.timezone = pytz.timezone('America/Los_Angeles')
         self.configured_calendar_ids = configured_calendar_ids
 
@@ -95,27 +89,29 @@ class GoogleCalendar(object):
 
         es = []
         for calendar_id in self.calendar_ids:
-            print(calendar_id)
-            now = datetime.now(tz=self.timezone)
-            events = self.service.events().list(calendarId=self.configured_calendar_ids[calendar_id], timeMin=start_time, timeMax=end_time).execute()
+            now = datetime.now(tz = self.timezone)
+            events = self.service.events().list(calendarId = self.configured_calendar_ids[calendar_id], timeMin = start_time, timeMax = end_time).execute()
 
             for i in events['items']:
                 dt = None
-                nb = NestedBunch(i)
+                nb = DeepNonStrictNestedBunch(i)
                 if nb.status != 'cancelled':
+                    #print(nb.recurrence)
+
                     # Ignore cancelled events
-                    if nb.start.get('dateTime') == None:
-                        if nb.start.get('date'):
-                            for rc in nb.recurrence:
-                                if rc.find('FREQ=YEARLY') != -1:
-                                    y = int(nb.start.date.split('-')[0])
-                                    if y != now.year:
-                                        nb.start.date = nb.start.date.replace(str(y), str(now.year), 1)
-                                    dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
-                                else:
-                                    raise Exception('Need to handle other recurring events.')
-                    else:
-                        dt = dateutil.parser.parse(nb.start.dateTime)
+                    if nb.start:
+                        if not nb.start.dateTime:
+                            if nb.start.date:
+                                for rc in nb.recurrence:
+                                    if rc.find('FREQ=YEARLY') != -1:
+                                        y = int(nb.start.date.split('-')[0])
+                                        if y != now.year:
+                                            nb.start.date = nb.start.date.replace(str(y), str(now.year), 1)
+                                        dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
+                                    else:
+                                        raise Exception('Need to handle other recurring events.')
+                        else:
+                            dt = dateutil.parser.parse(nb.start.dateTime)
                     if dt:
                         nb.datetime_o = dt
                         nb.calendar_id = calendar_id
