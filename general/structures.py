@@ -14,6 +14,14 @@ class Bunch(object):
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
 
+    def keys(self):
+        return self.__dict__.keys()
+
+    def __getitem__(self, item):
+        return self.__dict__.__getitem__(item)
+
+    def get(self, item):
+        return self.__dict__.get(item, None)
 
 class NestedBunch(Bunch):
     '''A class to turn a dict into an object with dot accessors e.g.
