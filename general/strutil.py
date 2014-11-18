@@ -3,6 +3,8 @@
 """
 strutil.py
 Utility functions for string manipulation.
+
+Created by Shane O'Connor 2014
 """
 
 def parse_range(s, range_separator = '-'):

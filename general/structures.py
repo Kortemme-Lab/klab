@@ -1,4 +1,39 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+structures.py
+Generic data structures.
+
+Created by Shane O'Connor 2014
+"""
+
 import collections
+
+class Bunch(object):
+    '''Common Python idiom.'''
+    def __init__(self, **kwds):
+        self.__dict__.update(kwds)
+
+
+class NestedBunch(Bunch):
+    '''A class to turn a dict into an object with dot accessors e.g.
+         nb = NestedBunch({'k1' : {'k2' : v}})
+         nb.k1.k2 # returns v
+       Handles simple data types and subclasses of dict which behave appropriately e.g. JSON.
+    '''
+    def __init__(self, d):
+        for k, v in d.iteritems():
+            if isinstance(v, dict): self.__dict__[k] = NestedBunch(v)
+            else: self.__dict__[k] = v
+
+    @staticmethod
+    def from_JSON(json_string):
+        import json
+        return NestedBunch(json.loads(json_string))
+
+    def __repr__(self):
+        return str(self.__dict__)
+
 
 class nested_dict(dict):
 
@@ -64,3 +99,9 @@ if __name__ == '__main__':
     a.update(b)
     import pprint
     pprint.pprint(a)
+
+    nb = NestedBunch({'web' : {'test' : {'inner_test' : 1}, 'flat' : 2}, 'sibling' : 3})
+    print(nb.web.test.inner_test)
+    print(nb.web.flat)
+    print(nb.sibling)
+
