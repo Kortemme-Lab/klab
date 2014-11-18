@@ -25,7 +25,7 @@ from oauth2client.client import SignedJwtAssertionCredentials
 
 from tools.general.structures import NestedBunch
 from tools.fs.fsio import read_file
-
+from tools import colortext
 
 class OAuthCredentials(NestedBunch):
 
@@ -51,14 +51,15 @@ class GoogleCalendar(object):
     def from_file(oauth_json_filepath, calendar_id):
         return GoogleCalendar(read_file(oauth_json_filepath), calendar_id)
 
-    def __init__(self, oauth_json, calendar_id):
+    def __init__(self, oauth_json, calendar_ids):
         '''oauth_json is a JSON string which should contain login credentials for OAuth 2.0.
            calendar_id is the name of the calendar to connect to and should be defined in oauth_json["calendars"]
         '''
         oc = OAuthCredentials.from_JSON(oauth_json)
-        calendar_ids = NestedBunch.from_JSON(oauth_json).calendars
-        assert(calendar_id in calendar_ids.keys())
-        self.calendar_id = calendar_ids[calendar_id]
+        configured_calendar_ids = NestedBunch.from_JSON(oauth_json).calendars
+        for calendar_id in calendar_ids:
+            assert(calendar_id in configured_calendar_ids.keys())
+        self.calendar_ids = calendar_ids
 
         # Request both read/write (calendar) and read-only access (calendar.readonly)
         credentials = SignedJwtAssertionCredentials(oc.client_email, oc.private_key, scope=['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/calendar.readonly'])
@@ -66,90 +67,67 @@ class GoogleCalendar(object):
 
         # Create a service object for the Google Calendar v3 API
         self.service = build('calendar', 'v3', http=http_auth)
+        self.timezone = pytz.timezone('America/Los_Angeles')
+        self.configured_calendar_ids = configured_calendar_ids
+
+    def get_upcoming_events_in_the_next_month(self):
+        return self.get_upcoming_events(365)
 
     def get_upcoming_events_in_the_next_week(self):
-        return self.get_upcoming_events(30)
+        return self.get_upcoming_events(7)
+
+    def get_upcoming_events_for_today(self):
+        return self.get_upcoming_events(1)
 
     def get_upcoming_events(self, days_to_look_ahead):
-        our_timezone = pytz.timezone('America/Los_Angeles')
-        now = datetime.now(tz=our_timezone) # timezone?
-        start_time = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute, second=now.second, tzinfo=our_timezone)
+        '''Returns the events from the calendar for the next days_to_look_ahead days.'''
+        now = datetime.now(tz=self.timezone) # timezone?
+        start_time = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute, second=now.second, tzinfo=self.timezone)
         end_time = start_time + timedelta(days = days_to_look_ahead)
         start_time = start_time.isoformat()
         end_time = end_time.isoformat()
         return self.get_events(start_time, end_time)
 
     def get_events(self, start_time, end_time):
-        # Print events from calendar for the next 3 days
-        events = self.service.events().list(calendarId=self.calendar_id, timeMin=start_time, timeMax=end_time).execute()
-        #pprint.pprint(events)
-
-        # u'recurrence': [u'RRULE:FREQ=YEARLY;UNTIL=20231218']
-
-        our_timezone = pytz.timezone('America/Los_Angeles')
-        now = datetime.now(tz=our_timezone) # timezone?
+        '''Returns the events from the calendar within the specified times. Some of the interesting fields are:
+               description, end, htmlLink, location, organizer, start, summary
+        '''
 
         es = []
-        for i in events['items']:
-            dt = None
-            nb = NestedBunch(i)
-            if nb.status != 'cancelled':
-                if nb.start.get('dateTime') == None:
-                    if nb.start.get('date'):
-                        print(nb.start)
-                        for rc in nb.recurrence:
-                            if rc.find('FREQ=YEARLY') != -1:
-                                y = int(nb.start.date.split('-')[0])
-                                if y != now.year:
-                                    nb.start.date = nb.start.date.replace(str(y), str(now.year), 1)
-                                dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
-                            else:
-                                raise Exception('Need to handle other recurring events.')
-                else:
-                    dt = dateutil.parser.parse(nb.start.dateTime)
-                if dt:
-                    nb.datetime_o = dt
-                    es.append(nb)
+        for calendar_id in self.calendar_ids:
+            print(calendar_id)
+            now = datetime.now(tz=self.timezone)
+            events = self.service.events().list(calendarId=self.configured_calendar_ids[calendar_id], timeMin=start_time, timeMax=end_time).execute()
+
+            for i in events['items']:
+                dt = None
+                nb = NestedBunch(i)
+                if nb.status != 'cancelled':
+                    # Ignore cancelled events
+                    if nb.start.get('dateTime') == None:
+                        if nb.start.get('date'):
+                            for rc in nb.recurrence:
+                                if rc.find('FREQ=YEARLY') != -1:
+                                    y = int(nb.start.date.split('-')[0])
+                                    if y != now.year:
+                                        nb.start.date = nb.start.date.replace(str(y), str(now.year), 1)
+                                    dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
+                                else:
+                                    raise Exception('Need to handle other recurring events.')
+                    else:
+                        dt = dateutil.parser.parse(nb.start.dateTime)
+                    if dt:
+                        nb.datetime_o = dt
+                        nb.calendar_id = calendar_id
+                        es.append(nb)
+
         es.sort(key=lambda x: x.datetime_o)
         return es
 
-        a='''    pprint.pprint(i)
-
-
-            description
-            end
-            htmlLink
-            location
-            organizer
-            start
-            summary'''
-
-        return es
-
-        # todo: This code is meant to enumerate the list of calendars but the list is returned as empty
-        print('***')
-        lists = calendar_admin.calendarList().list().execute()
-        page_token = None
-        while True:
-            calendar_list = calendar_admin.calendarList().list(pageToken=page_token).execute()
-            for calendar_list_entry in calendar_list['items']:
-                print calendar_list_entry['summary']
-            page_token = calendar_list.get('nextPageToken')
-            if not page_token:
-                break
-        pprint.pprint(lists)
-        print('***')
-
-        # Get events from the main calendar
-        #calendar_id= calendar_ids.main
-
-        # Print events from calendar for the next 3 days
-        #events = calendar_admin.events().list(calendarId=calendar_id, timeMin=start_time, timeMax=end_time).execute()
-        #pprint.pprint(events)
 
 if __name__ == '__main__':
-    gc = GoogleCalendar.from_file('test.json', 'main')
-    for evnt in gc.get_upcoming_events_in_the_next_week():
+    gc = GoogleCalendar.from_file('test.json', ['main', 'rosetta_dev'])
+    for evnt in gc.get_upcoming_events_in_the_next_month():
         print(evnt.datetime_o, evnt.description, evnt.location)
 
 
