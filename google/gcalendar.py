@@ -11,11 +11,8 @@ if __name__ == '__main__':
     import sys
     sys.path.insert(0, '../..')
 
-#from oauth2client.client import OAuth2WebServerFlow
-
 import json
 import httplib2
-import pprint
 from datetime import datetime, timedelta
 import dateutil.parser
 
@@ -43,8 +40,8 @@ class GoogleCalendar(object):
 
 
     @staticmethod
-    def from_file(oauth_json_filepath, calendar_id):
-        return GoogleCalendar(read_file(oauth_json_filepath), calendar_id)
+    def from_file(oauth_json_filepath, calendar_ids):
+        return GoogleCalendar(read_file(oauth_json_filepath), calendar_ids)
 
 
     def __init__(self, oauth_json, calendar_ids):
@@ -68,12 +65,77 @@ class GoogleCalendar(object):
         self.configured_calendar_ids = configured_calendar_ids
 
 
-    def get_upcoming_events_in_the_next_month(self):
-        return self.get_upcoming_events(31)
+    def get_events_within_a_given_month(self, year, month, day = 1, hour = 0, minute = 0, second = 0):
+        now = datetime.now(tz=self.timezone) # timezone?
+        start_time = datetime(year=year, month=month, day=day, hour=hour, minute=minute, second=second, tzinfo=self.timezone)
+        if start_time.month == 12:
+            end_time = datetime(year = start_time.year, month = 12, day = 31, hour=23, minute=59, second=59, tzinfo=self.timezone)
+        else:
+            end_time = datetime(year = start_time.year, month = start_time.month + 1, day = 1, hour=0, minute=0, second=0, tzinfo=self.timezone)
+            end_time = end_time - timedelta(seconds = 1)
+        start_time = start_time.isoformat()
+        end_time = end_time.isoformat()
+        return self.get_events(start_time, end_time)
 
 
-    def get_upcoming_events_in_the_next_week(self):
-        return self.get_upcoming_events(7)
+    def get_upcoming_events_within_the_current_month(self):
+        now = datetime.now(tz=self.timezone) # timezone?
+        return self.get_events_within_a_given_month(now.year, now.month, day = now.day, hour = now.hour, minute = now.minute, second = now.second)
+
+
+    def get_upcoming_event_lists_for_the_remainder_of_the_month(self, year = None, month = None):
+        '''Return the set of events as triple of (today's events, events for the remainder of the week, events for the remainder of the month).'''
+
+        events = []
+        if year == None and month == None:
+            now = datetime.now(tz=self.timezone) # timezone?
+        else:
+            now = datetime(year=year, month=month, day=1, hour=0, minute=0, second=0, tzinfo=self.timezone)
+
+        # Get today's events, including past events
+        start_time = datetime(year=now.year, month=now.month, day=now.day, hour=0, minute=0, second=0, tzinfo=self.timezone)
+        end_time = datetime(year = start_time.year, month = start_time.month, day = start_time.day, hour=23, minute=59, second=59, tzinfo=self.timezone)
+        events.append(self.get_events(start_time.isoformat(), end_time.isoformat()))
+
+        # Get this week's events
+        if now.weekday() < 6:
+            start_time = datetime(year=now.year, month=now.month, day=now.day + 1, hour=0, minute=0, second=0, tzinfo=self.timezone)
+            end_time = start_time + timedelta(days = 6 - now.weekday())
+            if end_time.month > now.month:
+                # We do not want to return events in the next month
+                end_time = end_time - timedelta(days = end_time.day)
+                end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day, hour=23, minute=59, second=59, tzinfo=self.timezone)
+            else:
+                end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day - 1, hour=23, minute=59, second=59, tzinfo=self.timezone)
+            events.append(self.get_events(start_time.isoformat(), end_time.isoformat()))
+        else:
+            events.append([])
+
+        # Get this remaining events in the month
+        start_time = end_time + timedelta(seconds = 1)
+        if start_time.month == now.month:
+            if now.month == 12:
+                end_time = datetime(year = start_time.year, month = 12, day = 31, hour=23, minute=59, second=59, tzinfo=self.timezone)
+            else:
+                end_time = datetime(year = start_time.year, month = start_time.month + 1, day = 1, hour=0, minute=0, second=0, tzinfo=self.timezone)
+                end_time = end_time - timedelta(seconds = 1)
+            events.append(self.get_events(start_time.isoformat(), end_time.isoformat()))
+        else:
+            events.append([])
+
+        return events
+
+
+    def get_upcoming_events_within_the_current_week(self):
+        '''Returns the events from the calendar for the next days_to_look_ahead days.'''
+        now = datetime.now(tz=self.timezone) # timezone?
+        start_time = datetime(year=now.year, month=now.month, day=now.day, hour=now.hour, minute=now.minute, second=now.second, tzinfo=self.timezone)
+        end_time = start_time + timedelta(days = 6 - now.weekday())
+        end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day, hour=23, minute=59, second=59, tzinfo=self.timezone)
+        assert(end_time.weekday() == 6)
+        start_time = start_time.isoformat()
+        end_time = end_time.isoformat()
+        return self.get_events(start_time, end_time)
 
 
     def get_upcoming_events_for_today(self):
@@ -141,9 +203,26 @@ class GoogleCalendar(object):
 
 if __name__ == '__main__':
     gc = GoogleCalendar.from_file('test.json', ['main', 'rosetta_dev'])
-    for evnt in gc.get_upcoming_events_in_the_next_month():
+    for evnt in gc.get_upcoming_events_within_the_current_month():
         print(evnt.datetime_o, evnt.description, evnt.location)
 
+    colortext.warning('***')
+    for evnt in gc.get_events_within_a_given_month(2014, 12):
+        print(evnt.datetime_o, evnt.description, evnt.location)
+
+    colortext.warning('***')
+
+    todays_events, this_weeks_events, this_months_events = gc.get_upcoming_event_lists_for_the_remainder_of_the_month(year = 2014, month = 12)
+
+    colortext.warning("*** Today's events ***")
+    for evnt in todays_events:
+        print(evnt.datetime_o, evnt.description, evnt.location)
+    colortext.warning("*** This week's events ***")
+    for evnt in this_weeks_events:
+        print(evnt.datetime_o, evnt.description, evnt.location)
+    colortext.warning("*** This month's events ***")
+    for evnt in this_months_events:
+        print(evnt.datetime_o, evnt.description, evnt.location)
 
 
 
