@@ -64,6 +64,28 @@ class GoogleCalendar(object):
         self.timezone = pytz.timezone('America/Los_Angeles')
         self.configured_calendar_ids = configured_calendar_ids
 
+    # ACL
+
+    def get_acl_list(self, calendar_id):
+        return self.service.acl().list(calendarId = self.configured_calendar_ids[calendar_id]).execute() # note: not using pagination here yet
+
+    def get_calendar_users(self, calendar_id):
+        users = {}
+        acl_list = self.get_acl_list(calendar_id)
+        if acl_list:
+            for item in acl_list['items']:
+                nb = DeepNonStrictNestedBunch(item)
+                users[nb.role]= users.get(nb.role, [])
+                if nb.scope.type == 'user':
+                    if nb.scope.value.find('@group.calendar.google.com') == -1 and nb.scope.value.find('@developer.gserviceaccount.com') == -1:
+                        users[nb.role].append(nb.scope.value)
+                users[nb.role] = sorted(users[nb.role])
+        nb = DeepNonStrictNestedBunch(users)
+        import pprint
+        pprint.pprint(users)
+
+
+    # EVENTS
 
     def get_events_within_a_given_month(self, year, month, day = 1, hour = 0, minute = 0, second = 0):
         now = datetime.now(tz=self.timezone) # timezone?
@@ -203,6 +225,11 @@ class GoogleCalendar(object):
 
 if __name__ == '__main__':
     gc = GoogleCalendar.from_file('test.json', ['main', 'rosetta_dev'])
+
+    gc.get_calendar_users('main')
+    sys.exit(0)
+
+    # Events
     for evnt in gc.get_upcoming_events_within_the_current_month():
         print(evnt.datetime_o, evnt.description, evnt.location)
 
