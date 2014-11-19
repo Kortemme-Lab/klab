@@ -155,12 +155,12 @@ class GoogleCalendar(object):
         if now.weekday() < 6:
             start_time = datetime(year=now.year, month=now.month, day=now.day + 1, hour=0, minute=0, second=0, tzinfo=self.timezone)
             end_time = start_time + timedelta(days = 6 - now.weekday())
-            if end_time.month > now.month:
-                # We do not want to return events in the next month
-                end_time = end_time - timedelta(days = end_time.day)
-                end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day, hour=23, minute=59, second=59, tzinfo=self.timezone)
-            else:
-                end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day - 1, hour=23, minute=59, second=59, tzinfo=self.timezone)
+            # We do still want to return events in the next month if they fall within this week. Otherwise
+            #if end_time.month != now.month:
+            #    end_time = end_time - timedelta(days = end_time.day)
+            #    end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day, hour=23, minute=59, second=59, tzinfo=self.timezone)
+            #else:
+            end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day - 1, hour=23, minute=59, second=59, tzinfo=self.timezone)
             events.append(self.get_events(start_time.isoformat(), end_time.isoformat()))
         else:
             events.append([])
