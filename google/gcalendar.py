@@ -206,33 +206,46 @@ class GoogleCalendar(object):
         return self.get_events(start_time, end_time)
 
 
-    def get_events(self, start_time, end_time):
+    def get_events(self, start_time, end_time, ignore_cancelled = True, get_recurring_events_as_instances = True):
         '''A wrapper for events().list. Returns the events from the calendar within the specified times. Some of the interesting fields are:
                 description, end, htmlLink, location, organizer, start, summary
 
                 Note: "Cancelled instances of recurring events (but not the underlying recurring event) will still be included if showDeleted and singleEvents are both False."
         '''
         es = []
+
         for calendar_id in self.calendar_ids:
             now = datetime.now(tz = self.timezone)
-            events = self.service.events().list(calendarId = self.configured_calendar_ids[calendar_id], timeMin = start_time, timeMax = end_time, showDeleted = False).execute()
-            for event in events['items']:
-                dt = None
-                nb = DeepNonStrictNestedBunch(event)
-                if nb.status != 'cancelled':
-                    # Ignore cancelled events
-                    if nb.recurrence:
-                        # Retrieve all occurrences of the recurring event within the timeframe
-                        es += self.get_recurring_events(calendar_id, nb.id, start_time, end_time)
-                    elif nb.start.dateTime:
-                        dt = dateutil.parser.parse(nb.start.dateTime)
-                    elif nb.start.date:
-                        dt = dateutil.parser.parse(nb.start.date)
-                        dt = datetime(year = dt.year, month = dt.month, day = dt.day, hour=0, minute=0, second=0, tzinfo=self.timezone)
-                    if dt:
-                        nb.datetime_o = dt
-                        nb.calendar_id = calendar_id
-                        es.append(nb)
+            events = []
+            page_token = None
+            while True:
+                events = self.service.events().list(pageToken=page_token, maxResults = 250, calendarId = self.configured_calendar_ids[calendar_id], timeMin = start_time, timeMax = end_time, showDeleted = False).execute()
+                for event in events['items']:
+                    dt = None
+                    nb = DeepNonStrictNestedBunch(event)
+                    assert(not(nb._event))
+                    nb._event = event # keep the original event as returned in case we want to reuse it e.g. insert it into another calendar
+                    if (not ignore_cancelled) or (nb.status != 'cancelled'):
+                        # Ignore cancelled events
+                        if nb.recurrence:
+                            if get_recurring_events_as_instances:
+                                # Retrieve all occurrences of the recurring event within the timeframe
+                                es += self.get_recurring_events(calendar_id, nb.id, start_time, end_time)
+                            else:
+                                es.append(nb)
+                        elif nb.start.dateTime:
+                            dt = dateutil.parser.parse(nb.start.dateTime)
+                        elif nb.start.date:
+                            dt = dateutil.parser.parse(nb.start.date)
+                            dt = datetime(year = dt.year, month = dt.month, day = dt.day, hour=0, minute=0, second=0, tzinfo=self.timezone)
+                        if dt:
+                            nb.datetime_o = dt
+                            nb.calendar_id = calendar_id
+                            es.append(nb)
+                page_token = events.get('nextPageToken')
+                if not page_token:
+                    break
+
         es.sort(key=lambda x: x.datetime_o)
         return es
 
@@ -246,6 +259,8 @@ class GoogleCalendar(object):
             for event in events['items']:
                 dt = None
                 nb = DeepNonStrictNestedBunch(event)
+                assert(not(nb._event))
+                nb._event = event # keep the original event as returned in case we want to reuse it e.g. insert it into another calendar
                 if nb.start.date:
                     dt = dateutil.parser.parse(nb.start.date + 'T00:00:00-08:00')
                 elif nb.start.dateTime:
@@ -261,8 +276,53 @@ class GoogleCalendar(object):
 
     # Administration
 
+
+    def add_company_quarter(self, company_name, quarter_name, dt, calendar_id = 'main'):
+        '''Adds a company_name quarter event to the calendar. dt should be a date object. Returns True if the date was added.'''
+
+        assert(calendar_id in self.configured_calendar_ids.keys())
+        calendarId = self.configured_calendar_ids[calendar_id]
+
+        quarter_name = quarter_name.title()
+        quarter_numbers = {
+            'Spring' : 1,
+            'Summer' : 2,
+            'Fall' : 3,
+            'Winter' : 4
+        }
+        assert(quarter_name in quarter_numbers.keys())
+
+        start_time = datetime(year=dt.year, month=dt.month, day=dt.day, hour=0, minute=0, second=0, tzinfo=self.timezone) + timedelta(days = -1)
+        end_time = start_time + timedelta(days = 3, seconds = -1)
+        summary = '%s %s Quarter begins' % (company_name, quarter_name)
+
+        # Do not add the quarter multiple times
+        events = self.get_events(start_time.isoformat(), end_time.isoformat(), ignore_cancelled = True)
+        for event in events:
+            if event.summary.find(summary) != -1:
+                return False
+
+        event_body = {
+            'summary' : summary,
+            'description' : summary,
+            'start' : {'date' : dt.isoformat(), 'timeZone' : self.timezone_string},
+            'end' : {'date' : dt.isoformat(), 'timeZone' : self.timezone_string},
+            'status' : 'confirmed',
+            'gadget' : {
+                'display' : 'icon',
+                'iconLink' : 'https://guybrush.ucsf.edu/images/Q%d_32.png' % quarter_numbers[quarter_name],
+                'title' : summary,
+            }
+        }
+        colortext.warning('\n%s\n' % pprint.pformat(event_body))
+        raise Exception('Test this. It should work...')
+        created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
+        return True
+
+
     def remove_all_events(self, calendar_id):
         '''Removes all events from a calendar. WARNING: Be very careful using this.'''
+        # todo: incomplete
 
         now = datetime.now(tz=self.timezone) # timezone?
         start_time = datetime(year=now.year - 1, month=now.month, day=now.day, hour=now.hour, minute=now.minute, second=now.second, tzinfo=self.timezone)
