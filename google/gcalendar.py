@@ -11,11 +11,13 @@ if __name__ == '__main__':
     import sys
     sys.path.insert(0, '../..')
 
+import pprint
+import copy
 import time
 import traceback
 import json
 import httplib2
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 import dateutil.parser
 
 import pytz
@@ -36,6 +38,87 @@ class OAuthCredentials(NestedBunch):
             auth_provider_x509_cert_url, auth_uri, token_uri.'''
         assert(type == "service" or type == "web")
         return NestedBunch(json.loads(oauth_json)[type])
+
+
+class BasicEvent(object):
+
+    def __init__(self, calendar_object, start_dt, end_dt, location, summary = None, description = None, visibility = 'default', email_map = {}, username_map = {}):
+        '''start_dt should be a datetime.date object for all-day events or a datetime.datetime object for ranged events. Similarly for end_dt.' \
+        '''
+        e = {}
+        self.timezone_string = calendar_object.timezone_string
+        assert(visibility == 'default' or visibility == 'public' or visibility == 'private' or visibility == 'confidential')
+        if isinstance(start_dt, date):
+            e['start'] = {'date' : start_dt.isoformat(), 'timeZone' : self.timezone_string}
+        else:
+            assert(isinstance(start_dt, datetime))
+            e['start'] = {'dateTime' : start_dt.isoformat(), 'timeZone' : self.timezone_string}
+        if isinstance(end_dt, date):
+            e['end'] = {'date' : end_dt.isoformat(), 'timeZone' : self.timezone_string}
+        else:
+            assert(isinstance(end_dt, datetime))
+            e['end'] = {'dateTime' : end_dt.isoformat(), 'timeZone' : self.timezone_string}
+        e['summary'] = summary
+        e['description'] = description or summary
+        e['location'] = location
+        e['status'] = 'confirmed'
+        self.email_map = email_map
+        self.username_map = username_map
+        self.event = e
+
+    def initialize_tagged_copy(self):
+        e = copy.deepcopy(self.event)
+        e['extendedProperties'] = e.get('extendedProperties', {})
+        e['extendedProperties']['shared'] = e['extendedProperties'].get('shared', {})
+        assert(not(e['extendedProperties']['shared'].get('event_type')))
+        return e
+
+
+    # Main calendar
+
+
+    def create_lab_meeting(self, presenters, foodie):
+        'Presenters can be a comma-separated list of presenters.'
+        e = self.initialize_tagged_copy()
+        e['extendedProperties']['shared']['event_type'] = 'Lab meeting'
+        e['extendedProperties']['shared']['Presenters'] = presenters
+        e['extendedProperties']['shared']['Food'] = foodie
+        print(presenters)
+        print([[p for p in presenters.split(',')] + [foodie]])
+        participants = [p.strip() for p in ([p for p in presenters.split(',')] + [foodie]) if p and p.strip()]
+        participants = [p for p in [self.email_map.get(p) for p in participants] if p]
+        participant_names = [self.username_map.get(p.strip(), p.strip()) for p in presenters.split(',') if p.strip()]
+        if participants:
+            e['extendedProperties']['shared']['ParticipantList'] = ','.join(participants)
+        if not e['summary']:
+            e['summary'] = 'Kortemme Lab meeting: %s' % (', '.join(participant_names))
+        e['description'] = e['description'] or e['summary']
+        return e
+
+
+    # Notices calendar
+
+
+    def create_birthday(self, celebrant, caker):
+        e = self.initialize_tagged_copy()
+        e['summary'] # overwrite summary
+        e['extendedProperties']['shared']['event_type'] = 'Birthday'
+        e['extendedProperties']['shared']['Celebrant'] = celebrant
+        e['extendedProperties']['shared']['Bringer Of CAKE!'] = caker
+        participants = [p for p in [self.email_map.get(celebrant), self.email_map.get(caker)] if p]
+        if participants:
+            e['extendedProperties']['shared']['ParticipantList'] = ','.join(participants)
+        e['summary'] = "%s's birthday" % self.username_map.get(celebrant, celebrant)
+        e['description'] = e['summary']
+        e['gadget'] = {
+            'display' : 'icon',
+            'iconLink' : 'https://guybrush.ucsf.edu/images/cake.png',
+            'title' : e['summary'],
+        }
+        return e
+
+
+
 
 
 class GoogleCalendar(object):
@@ -346,6 +429,20 @@ class GoogleCalendar(object):
                 print(nb.start)
 
 
+    # Meetings creation by type
+
+
+
+    def add_lab_meeting(self, calendar_id, start_dt, end_dt, location, presenters, foodie, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
+        e = BasicEvent(self, start_dt, end_dt, location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
+        event = e.create_lab_meeting(presenters, foodie)
+        colortext.warning(pprint.pformat(event))
+
+    def add_birthday(self, calendar_id, start_dt, end_dt, location, celebrant, caker, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
+        e = BasicEvent(self, start_dt, end_dt, location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
+        event = e.create_birthday(celebrant, caker)
+        colortext.warning(pprint.pformat(event))
+
     # Deprecated - remove these when we switch over to the new system
 
     # Getters, deleters
@@ -525,7 +622,55 @@ class GoogleCalendar(object):
                 colortext.error("Trying again.")
                 time.sleep(2)
 
+
+    ### Birthdays - rewrite these functions
+
+    def add_bidet(self):
+        raise Exception('update')
+        main_calendar = GoogleCalendar.from_file('/admin/calendars.json', ['main'])
+        notices_calendar = GoogleCalendar.from_file('/admin/calendars.json', ['notices'])
+        timezone = main_calendar.timezone
+        event_ids = set()
+        seen_notices = set()
+        for year in range(2014, 2017):
+        #for year in range(2014, 2015):
+            colortext.message('\n\nTagging events in %d:\n' % year)
+            extra_days = 0
+            if year % 4 == 0:
+                extra_days = 1
+            start_time = datetime(year=year, month=1, day=1, hour=0, minute=0, second=0, tzinfo=timezone)
+            end_time = start_time + timedelta(days = 730 + extra_days, seconds = -1)
+            start_time, end_time = start_time.isoformat(), end_time.isoformat()
+
+            #main_meetings = main_calendar.get_events(start_time, end_time, ignore_cancelled = True, get_recurring_events_as_instances = False)
+            #for m in main_meetings:
+            #    if m.extendedProperties.shared:
+            #        event_type = m.extendedProperties.shared['event_type']
+            #        if event_type == 'Birthday'
+
+            notices = notices_calendar.get_events(start_time, end_time, ignore_cancelled = True, get_recurring_events_as_instances = False)
+            for n in notices:
+                if n.id in seen_notices:
+                    continue
+                seen_notices.add(n.id)
+                if n.extendedProperties.shared and n.extendedProperties.shared.event_type:
+                    event_type = n.extendedProperties.shared['event_type']
+                    if event_type == 'Birthday':
+                        print(n.summary, n.id)
+                        print(n.start)
+                        event_body = main_calendar.service.events().get(calendarId = main_calendar.configured_calendar_ids["notices"], eventId=n.id).execute()
+                        event_body['gadget'] = {
+                            'display' : 'icon',
+                            'iconLink' : 'https://guybrush.ucsf.edu/images/cake.png',
+                            'title' : n.summary,
+                            #'type' : 'application/x-google-gadgets+xml',
+                        }
+                        created_event = main_calendar.service.events().update(calendarId = main_calendar.configured_calendar_ids["notices"], eventId = n.id, body = event_body).execute()
+
+
+
     def updateBirthdays(self, bdays):
+        raise Exception('update')
         eventstbl = self.getEventsTable("main")
         for dt, details in sorted(bdays.iteritems()):
             bdaykey = datetime(dt.year, dt.month, dt.day)
@@ -536,6 +681,7 @@ class GoogleCalendar(object):
             self.addBirthday(dt, details["title"], details["location"])
 
     def addBirthday(self, dt, title, location):
+        raise Exception('update')
         #if recurrence_data is None:
         #  recurrence_data = ('DTSTART;VALUE=DATE:20070501\r\n'
         #	+ 'DTEND;VALUE=DATE:20070502\r\n'
