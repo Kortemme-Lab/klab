@@ -42,7 +42,7 @@ class OAuthCredentials(NestedBunch):
 
 class BasicEvent(object):
 
-    def __init__(self, calendar_object, start_dt, end_dt, location, summary = None, description = None, visibility = 'default', email_map = {}, username_map = {}):
+    def __init__(self, calendar_object, start_dt, end_dt, location = None, summary = None, description = None, visibility = 'default', email_map = {}, username_map = {}):
         '''start_dt should be a datetime.date object for all-day events or a datetime.datetime object for ranged events. Similarly for end_dt.' \
         '''
         e = {}
@@ -77,12 +77,18 @@ class BasicEvent(object):
     # Main calendar
 
 
-    def create_lab_meeting(self, presenters, foodie):
+    def create_lab_meeting(self, event_type, presenters, foodie = None, locked = False):
         'Presenters can be a comma-separated list of presenters.'
         e = self.initialize_tagged_copy()
-        e['extendedProperties']['shared']['event_type'] = 'Lab meeting'
+        summary_texts = {
+            'Lab meeting' : 'Kortemme Lab meeting',
+            'Kortemme/DeGrado joint meeting' : 'DeGrado/Kortemme labs joint meeting'
+        }
+        assert(summary_texts.get(event_type))
+        e['extendedProperties']['shared']['event_type'] = event_type
         e['extendedProperties']['shared']['Presenters'] = presenters
         e['extendedProperties']['shared']['Food'] = foodie
+        e['extendedProperties']['shared']['Locked meeting'] = locked
         print(presenters)
         print([[p for p in presenters.split(',')] + [foodie]])
         participants = [p.strip() for p in ([p for p in presenters.split(',')] + [foodie]) if p and p.strip()]
@@ -91,7 +97,25 @@ class BasicEvent(object):
         if participants:
             e['extendedProperties']['shared']['ParticipantList'] = ','.join(participants)
         if not e['summary']:
-            e['summary'] = 'Kortemme Lab meeting: %s' % (', '.join(participant_names))
+            e['summary'] = '%s: %s' % (summary_texts[event_type], ', '.join(participant_names))
+        e['description'] = e['description'] or e['summary']
+        return e
+
+
+    def create_journal_club_meeting(self, presenters, food_vendor, paper = None):
+        'Presenters can be a comma-separated list of presenters.'
+        e = self.initialize_tagged_copy()
+        e['extendedProperties']['shared']['event_type'] = 'Journal club'
+        e['extendedProperties']['shared']['Presenters'] = presenters
+        e['extendedProperties']['shared']['Food vendor'] = food_vendor
+        e['extendedProperties']['shared']['Paper'] = paper
+        participants = [p.strip() for p in [p for p in presenters.split(',')] if p and p.strip()]
+        participants = [p for p in [self.email_map.get(p) for p in participants] if p]
+        participant_names = [self.username_map.get(p.strip(), p.strip()) for p in presenters.split(',') if p.strip()]
+        if participants:
+            e['extendedProperties']['shared']['ParticipantList'] = ','.join(participants)
+        if not e['summary']:
+            e['summary'] = 'Journal club: %s' % (', '.join(participant_names))
         e['description'] = e['description'] or e['summary']
         return e
 
@@ -358,10 +382,11 @@ class GoogleCalendar(object):
 
 
     # Administration
+    #### Quarters and holiday creation: main calendar
 
 
-    def add_company_quarter(self, company_name, quarter_name, dt, calendar_id = 'main'):
-        '''Adds a company_name quarter event to the calendar. dt should be a date object. Returns True if the date was added.'''
+    def add_company_quarter(self, company_name, quarter_name, dt, calendar_id = 'notices'):
+        '''Adds a company_name quarter event to the calendar. dt should be a date object. Returns True if the event was added.'''
 
         assert(calendar_id in self.configured_calendar_ids.keys())
         calendarId = self.configured_calendar_ids[calendar_id]
@@ -395,6 +420,12 @@ class GoogleCalendar(object):
                 'display' : 'icon',
                 'iconLink' : 'https://guybrush.ucsf.edu/images/Q%d_32.png' % quarter_numbers[quarter_name],
                 'title' : summary,
+            },
+            'extendedProperties' : {
+                'shared' : {
+                    'event_type' : '%s quarter' % company_name,
+                    'quarter_name' : quarter_name
+                }
             }
         }
         colortext.warning('\n%s\n' % pprint.pformat(event_body))
@@ -402,6 +433,41 @@ class GoogleCalendar(object):
         created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
         return True
 
+
+    def add_holiday(self, start_dt, holiday_name, end_dt = None, calendar_id = 'notices'):
+        '''Adds a holiday event to the calendar. start_dt and end_dt (if supplied) should be date objects. Returns True if the event was added.'''
+
+        assert(calendar_id in self.configured_calendar_ids.keys())
+        calendarId = self.configured_calendar_ids[calendar_id]
+
+        # Note: end_date is one day ahead e.g. for the New Years' holiday Dec 31-Jan 1st, we specify the end_date as Jan 2nd. This is what the calendar expects.
+        if not end_dt:
+            end_dt = start_dt
+        start_date = date(year=start_dt.year, month=start_dt.month, day=start_dt.day)#, tzinfo=self.timezone)
+        end_date = date(year=end_dt.year, month=end_dt.month, day=end_dt.day) + timedelta(days = 1) #, tzinfo=self.timezone)
+        start_time = datetime(year=start_dt.year, month=start_dt.month, day=start_dt.day, hour=0, minute=0, second=0, tzinfo=self.timezone) + timedelta(days = -1)
+        end_time = datetime(year=end_dt.year, month=end_dt.month, day=end_dt.day, hour=23, minute=59, second=59, tzinfo=self.timezone) + timedelta(days = 2)
+
+        # Do not add the quarter multiple times
+        events = self.get_events((start_time + timedelta(days = -1)).isoformat(), (end_time + timedelta(days = 1)).isoformat(), ignore_cancelled = True)
+        for event in events:
+            if event.summary.find(holiday_name) != -1:
+                return False
+
+        event_body = {
+            'summary' : holiday_name,
+            'description' : holiday_name,
+            'start' : {'date' : start_date.isoformat(), 'timeZone' : self.timezone_string},
+            'end' : {'date' : end_date.isoformat(), 'timeZone' : self.timezone_string},
+            'status' : 'confirmed',
+            'extendedProperties' : {
+                'shared' : {
+                    'event_type' : 'Holiday'
+                }
+            }
+        }
+        created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
+        return True
 
     def remove_all_events(self, calendar_id):
         '''Removes all events from a calendar. WARNING: Be very careful using this.'''
@@ -429,19 +495,55 @@ class GoogleCalendar(object):
                 print(nb.start)
 
 
-    # Meetings creation by type
+    #### Meetings creation: main calendar
+
+    # Tag events. This is all that is needed for the Rosetta development and regular meetings
+    def tag_event(self, calendar_id, event_id, extendedProperties):
+        '''Add extendedProperties to a meeting. Warning: extendedProperties must contain only shared and private dicts and
+           their contents will overwrite anything in the event's extendedProperties i.e. we do *not* deep-merge the dicts.
+        '''
+        event_body = self.service.events().get(calendarId = self.configured_calendar_ids[calendar_id], eventId=event_id).execute()
+        event_body['extendedProperties'] = event_body.get('extendedProperties', {})
+        event_body['extendedProperties']['shared'] = event_body['extendedProperties'].get('shared', {})
+        event_body['extendedProperties']['private'] = event_body['extendedProperties'].get('private', {})
+        assert(sorted(extendedProperties.keys().union(set(['shared', 'private']))) == ['private', 'shared'])
+        for k, v in extendedProperties['shared'].iteritems():
+            event_body['extendedProperties']['shared'][k] = v
+        for k, v in extendedProperties['private'].iteritems():
+            event_body['extendedProperties']['private'][k] = v
+        raise Exception('not tested yet')
+        updated_event = self.service.events().update(calendarId = self.configured_calendar_ids[calendar_id], eventId = event_id, body = event_body).execute()
 
 
-
+    # Lab meetings
     def add_lab_meeting(self, calendar_id, start_dt, end_dt, location, presenters, foodie, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
-        e = BasicEvent(self, start_dt, end_dt, location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
-        event = e.create_lab_meeting(presenters, foodie)
+        e = BasicEvent(self, start_dt, end_dt, location = location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
+        event = e.create_lab_meeting('Lab meeting', presenters, foodie)
         colortext.warning(pprint.pformat(event))
+
+
+    # Journal club meetings
+    def add_journal_club_meeting(self, calendar_id, start_dt, end_dt, location, presenters, food_vendor, paper = None, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
+        e = BasicEvent(self, start_dt, end_dt, location = location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
+        event = e.create_journal_club_meeting(presenters, food_vendor, paper = paper)
+        colortext.warning(pprint.pformat(event))
+
+
+    # Kortemme/DeGrado labs joint meetings
+    def add_kortemme_degrado_joint_meeting(self, calendar_id, start_dt, end_dt, location, presenters, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
+        e = BasicEvent(self, start_dt, end_dt, location = location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
+        event = e.create_lab_meeting('Kortemme/DeGrado joint meeting', presenters, locked = True)
+        colortext.warning(pprint.pformat(event))
+
+
+    #### Meetings creation: notices calendar
+
 
     def add_birthday(self, calendar_id, start_dt, end_dt, location, celebrant, caker, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
-        e = BasicEvent(self, start_dt, end_dt, location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
+        e = BasicEvent(self, start_dt, end_dt, location = location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
         event = e.create_birthday(celebrant, caker)
         colortext.warning(pprint.pformat(event))
+
 
     # Deprecated - remove these when we switch over to the new system
 
