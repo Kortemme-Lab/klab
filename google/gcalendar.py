@@ -267,7 +267,8 @@ class GoogleCalendar(object):
             #    end_time = end_time - timedelta(days = end_time.day)
             #    end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day, hour=23, minute=59, second=59, tzinfo=self.timezone)
             #else:
-            end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day - 1, hour=23, minute=59, second=59, tzinfo=self.timezone)
+            end_time = end_time + timedelta(seconds = -1)
+            #end_time = datetime(year = end_time.year, month = end_time.month, day = end_time.day - 1, hour=23, minute=59, second=59, tzinfo=self.timezone)
             events.append(self.get_events(start_time.isoformat(), end_time.isoformat()))
         else:
             events.append([])
