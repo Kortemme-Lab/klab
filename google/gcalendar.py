@@ -314,6 +314,21 @@ class GoogleCalendar(object):
         return self.get_events(start_time, end_time)
 
 
+    def get_event(self, calendar_id, event_id):
+        event = self.service.events().get(calendarId = self.configured_calendar_ids[calendar_id], eventId=event_id).execute()
+        nb = DeepNonStrictNestedBunch(event)
+        dt = None
+        if nb.start.dateTime:
+            dt = dateutil.parser.parse(nb.start.dateTime)
+        elif nb.start.date:
+            dt = dateutil.parser.parse(nb.start.date)
+            dt = datetime(year = dt.year, month = dt.month, day = dt.day, hour=0, minute=0, second=0, tzinfo=self.timezone)
+        if dt:
+            nb.datetime_o = dt
+            nb.calendar_id = calendar_id
+        return nb
+
+
     def get_events(self, start_time, end_time, ignore_cancelled = True, get_recurring_events_as_instances = True):
         '''A wrapper for events().list. Returns the events from the calendar within the specified times. Some of the interesting fields are:
                 description, end, htmlLink, location, organizer, start, summary
@@ -470,6 +485,7 @@ class GoogleCalendar(object):
         created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
         return True
 
+
     def remove_all_events(self, calendar_id):
         '''Removes all events from a calendar. WARNING: Be very careful using this.'''
         # todo: incomplete
@@ -507,7 +523,7 @@ class GoogleCalendar(object):
         event_body['extendedProperties'] = event_body.get('extendedProperties', {})
         event_body['extendedProperties']['shared'] = event_body['extendedProperties'].get('shared', {})
         event_body['extendedProperties']['private'] = event_body['extendedProperties'].get('private', {})
-        assert(sorted(extendedProperties.keys().union(set(['shared', 'private']))) == ['private', 'shared'])
+        assert(sorted(set(extendedProperties.keys()).union(set(['shared', 'private']))) == ['private', 'shared'])
         for k, v in extendedProperties['shared'].iteritems():
             event_body['extendedProperties']['shared'][k] = v
         for k, v in extendedProperties['private'].iteritems():
