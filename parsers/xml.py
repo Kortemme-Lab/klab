@@ -47,3 +47,20 @@ def parse_singular_string(t, tag_name):
     assert(len(pos.childNodes) == 1)
     return pos.childNodes[0].data
 
+def fast_iter(context, func, **kwargs):
+    # fast_iter is useful if you need to free memory while iterating through a
+    # very large XML file.
+    #
+    # http://www.ibm.com/developerworks/xml/library/x-hiperfparse/
+    # Author: Liza Daly
+    # Modifed by: Shane O'Connor (added func_data).
+    #
+    # context should be the result of a call to lxml.etree.iterparse.
+    # func is a reference to a function.
+    # See bio/pdbtm.py for an example use.
+    for event, elem in context:
+        func(elem, **kwargs)
+        elem.clear()
+        while elem.getprevious() is not None:
+            del elem.getparent()[0]
+    del context
