@@ -95,7 +95,6 @@ class DSSP(object):
     Usage:
        d = DSSP.from_RCSB('1HAG')
 
-
        # access the dict directly
        print(d.dssp['I']['  64 ']['exposure'])
        print(d.dssp['I']['  64 ']['is_buried'])
@@ -103,6 +102,12 @@ class DSSP(object):
        # use dot notation
        print(d.dsspb.I.get('  64 ').exposure)
        print(d.dsspb.I.get('  64 ').is_buried)
+
+       # iterate through the residues
+       for chain_id, mapping in d:
+           for residue_id, residue_details in sorted(mapping.iteritems()):
+               print(residue_id, residue_details['exposure'])
+
     '''
 
     @staticmethod
@@ -133,14 +138,28 @@ class DSSP(object):
         self.tmp_dir = tmp_dir
         self.residue_max_acc = residue_max_acc[acc_array]
         self.pdb = p.clone() # make a local copy in case this gets modified externally
+        self.chain_order = self.pdb.atom_chain_order
         self.dssp_output = {}
         self.dssp = {}
         for chain_id in [c for c in self.pdb.atom_sequences.keys() if self.pdb.chain_types[c] == 'Protein']:
             self.compute(chain_id)
+        self.chain_order = [c for c in self.chain_order if c in self.dssp]
         self.dsspb = NestedBunch(self.dssp)
 
+
     def __iter__(self):
-        pass
+        self._iter_keys = [c for c in self.chain_order]
+        self._iter_keys.reverse() # we pop from the list
+        return self
+
+
+    def next(self): # todo: This is __next__ in Python 3.x
+        try:
+            chain_id = self._iter_keys.pop()
+            return chain_id, self.dssp[chain_id]
+        except:
+            raise StopIteration
+
 
     def __repr__(self):
         return pprint.pformat(self.dssp)
