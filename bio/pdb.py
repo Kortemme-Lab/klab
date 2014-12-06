@@ -507,6 +507,10 @@ class PDB:
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
         return PDB("\n".join(self.lines), pdb_id = self.pdb_id, strict = self.strict)
 
+    def get_content(self):
+        '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
+        return '\n'.join(self.lines)
+
     def write(self, pdbpath, separator = '\n'):
         write_file(pdbpath, separator.join(self.lines))
 
@@ -592,14 +596,16 @@ class PDB:
     ### PDB mutating functions ###
 
     def strip_to_chains(self, chains):
-        '''Throw away all ATOM/HETATM lines for chains that are not in the chains list.'''
+        '''Throw away all ATOM/HETATM/ANISOU/TER lines for chains that are not in the chains list.'''
         if chains:
             chains = set(chains)
 
             # Remove any structure lines associated with the chains
-            self.lines = [l for l in self.lines if not(l.startswith('ATOM  ') or l.startswith('HETATM')) or l[21] in chains]
+            self.lines = [l for l in self.lines if not(l.startswith('ATOM  ') or l.startswith('HETATM') or l.startswith('ANISOU') or l.startswith('TER')) or l[21] in chains]
             self._update_structure_lines()
             # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
+        else:
+            raise Exception('The chains argument needs to be supplied.')
 
     def strip_HETATMs(self, only_strip_these_chains = []):
         '''Throw away all HETATM lines. If only_strip_these_chains is specified then only strip HETATMs lines for those chains.'''
