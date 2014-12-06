@@ -111,6 +111,35 @@ non_canonical_amino_acids = {
 }
 
 ###
+# Secondary structure
+###
+
+
+dssp_secondary_structure_types = dict(
+    G = '3-turn/310 helix',
+    H = '4-turn/α helix',
+    I = '5-turn/π helix',
+    T = 'hydrogen bonded turn',
+    E = 'β-sheet',
+    B = 'residue in isolated β-bridge',
+    S = 'bend',
+    C = 'coil',
+)
+
+# The text here is taken from Wikipedia
+dssp_secondary_structure_details = dict(
+    G = '3-turn helix (310 helix). Min length 3 residues',
+    H = '4-turn helix (α helix). Min length 4 residues',
+    I = '5-turn helix (π helix). Min length 5 residues',
+    T = 'hydrogen bonded turn (3, 4 or 5 turn)',
+    E = 'extended strand in parallel and/or anti-parallel β-sheet conformation. Min length 2 residues',
+    B = 'residue in isolated β-bridge (single pair β-sheet hydrogen bond formation)',
+    S = 'bend (the only non-hydrogen-bond based assignment)',
+    C = 'coil (residues which are not in any of the above conformations)',
+)
+
+
+###
 # DNA
 # I am unsure whether this is all correct. The code I inherited seems to leave out DI and DU for DNA and T and I for RNA which seems wrong.
 ###
