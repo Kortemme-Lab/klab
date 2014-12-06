@@ -62,9 +62,13 @@ residue_max_acc = dict(
 )
 
 
-class DSSP(object):
+class MonomerDSSP(object):
     '''
     A class wrapper for DSSP.
+
+    Note: This class strips a PDB file to each chain and computes the DSSP for that chain alone. If you want to run DSSP
+    on complexes, subclass this class and do not perform the stripping.
+
     Once initialized, the dssp element of the object should contain a mapping from protein chain IDs to dicts.
     The dict associated with a protein chain ID is a dict from PDB residue IDs to details about that residue.
     For example:
@@ -110,19 +114,19 @@ class DSSP(object):
 
     '''
 
-    @staticmethod
-    def from_pdb_contents(pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return DSSP(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    @classmethod
+    def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
 
 
-    @staticmethod
-    def from_pdb_filepath(pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return DSSP(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    @classmethod
+    def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
 
 
-    @staticmethod
-    def from_RCSB(pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return DSSP(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    @classmethod
+    def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
 
 
     def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
@@ -195,7 +199,8 @@ class DSSP(object):
         data_lines = [l for l in dssp_output[idx + len(header_line):].split('\n') if l.strip()]
         for dl in data_lines:
             l = self.parse_data_line(dl)
-            d[l['pdb_res_id']] = l
+            if l:
+                d[l['pdb_res_id']] = l
         return d
 
 
@@ -221,9 +226,12 @@ class DSSP(object):
             sheet_label = data_line[33],
             acc = data_line[34:38],
             )
-        self.check_line(d) # note: this function call has side-effects
-        self.compute_burial(d)
-        return d
+        if d['dssp_residue_aa'] != '!': # e.g. 1A22, chain A, between PDB residue IDs 129 and 136
+            self.check_line(d) # note: this function call has side-effects
+            self.compute_burial(d)
+            return d
+        else:
+            return None
 
 
     def check_line(self, d):
