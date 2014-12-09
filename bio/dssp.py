@@ -61,6 +61,8 @@ residue_max_acc = dict(
     },
 )
 
+class MissingAtomException(Exception): pass
+
 
 class MonomerDSSP(object):
     '''
@@ -178,9 +180,16 @@ class MonomerDSSP(object):
         try:
             p = _Popen('.', shlex.split('mkdssp -i {input_filepath} -o {output_filepath}'.format(**locals())))
             if p.errorcode:
-                raise Exception('An error occurred while calling DSSP:\n%s' % p.stderr)
+                if p.stderr.find('empty protein, or no valid complete residues') != -1:
+                    raise MissingAtomException(p.stdout)
+                else:
+                    raise Exception('An error occurred while calling DSSP:\n%s' % p.stderr)
             self.dssp_output[chain_id] = read_file(output_filepath)
             self.dssp[chain_id] = self.parse_output(chain_id)
+        except MissingAtomException, e:
+            os.remove(input_filepath)
+            os.remove(output_filepath)
+            raise
         except Exception, e:
             os.remove(input_filepath)
             os.remove(output_filepath)
