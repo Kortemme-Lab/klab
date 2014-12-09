@@ -138,6 +138,17 @@ dssp_secondary_structure_details = dict(
     C = 'coil (residues which are not in any of the above conformations)',
 )
 
+# A mapping from DSSP types to a squash set
+dssp_elision = dict(
+    G = 'H', # helix
+    H = 'H', # helix
+    I = 'H', # helix
+    T = 'O', # other. Note: I am classifying this as 'other' since it is so short.
+    E = 'S', # sheet
+    B = 'O', # other. Note: I am classifying this as 'other' since it is so short.
+    S = 'O', # other
+    C = 'O', # other
+)
 
 ###
 # DNA
