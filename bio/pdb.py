@@ -124,6 +124,10 @@ modified_residues_patch = {
     '1XY1' : {
         'MPT' : 'UNK',
     },
+    '1CVW' : { # Note: more recent versions of this file do not require this patch
+        'ANS' : 'UNK',
+        '0QE' : 'UNK',
+    },
 }
 
 ### Record types
@@ -407,8 +411,16 @@ class PDB:
             pdb_id = self.pdb_id.upper()
             if pdb_id == '2MBP':
                 newlines = []
+                added_COMPND = False
                 for l in self.lines:
-                    if l.startswith("ATOM  ") or l.startswith("HETATM") or l.startswith("TER"):
+                    if l.startswith('COMPND'):
+                        if not added_COMPND:
+                            newlines.append('COMPND    MOL_ID: 1;')
+                            newlines.append('COMPND   2 MOLECULE: MALTODEXTRIN-BINDING PROTEIN;')
+                            newlines.append('COMPND   3 CHAIN: A;')
+                            newlines.append('COMPND   4 ENGINEERED: YES')
+                            added_COMPND = True
+                    elif l.startswith("ATOM  ") or l.startswith("HETATM") or l.startswith("TER"):
                         newlines.append('%s%s%s' % (l[0:21], 'A', l[22:]))
                     elif l.startswith("SEQRES"):
                         newlines.append('%s%s%s' % (l[0:12], 'A', l[13:]))
@@ -824,15 +836,30 @@ class PDB:
                             'SYNONYM: PHOSPHATE SYSTEM CYCLIN PHO80, AMINOGLYCOSIDE ANTIBIOTIC SENSITIVITY PROTEIN 3;')
             # Hack for 1JRH
             MD = MD.replace('FAB FRAGMENT;PEPSIN DIGESTION OF INTACT ANTIBODY', 'FAB FRAGMENT,PEPSIN DIGESTION OF INTACT ANTIBODY')
+            # Hack for 1KJ1
+            MD = MD.replace('SYNONYM: MANNOSE-SPECIFIC AGGLUTININ; LECGNA ', 'SYNONYM: MANNOSE-SPECIFIC AGGLUTININ, LECGNA ')
+            # Hack for 1OCC - The Dean and I
+            MD = MD.replace('SYNONYM: FERROCYTOCHROME C\:OXYGEN OXIDOREDUCTASE', 'SYNONYM: FERROCYTOCHROME C, OXYGEN OXIDOREDUCTASE')
+            # Hack for 2AKY
+            MD = MD.replace('SYNONYM: ATP\:AMP PHOSPHOTRANSFERASE, MYOKINASE', 'SYNONYM: ATP, AMP PHOSPHOTRANSFERASE, MYOKINASE')
+            # Hack for 3BCI
+            MD = MD.replace('SYNONYM: THIOL:DISULFIDE OXIDOREDUCTASE DSBA', 'SYNONYM: THIOL, DISULFIDE OXIDOREDUCTASE DSBA')
+            # Hack for 3BCI
+            MD = MD.replace('SYNONYM: THIOL:DISULFIDE OXIDOREDUCTASE DSBA', 'SYNONYM: THIOL, DISULFIDE OXIDOREDUCTASE DSBA')
+            # Hack for 1ELV
+            MD = MD.replace('FRAGMENT: CCP2-SP CATALYTIC FRAGMENT: ASP363-ASP-673 SEGMENT PRECEDED BY AN ASP-LEU SEQUENCE ADDED AT THE N-TERMINAL END',
+                            'FRAGMENT: CCP2-SP CATALYTIC FRAGMENT; ASP363-ASP-673 SEGMENT PRECEDED BY AN ASP-LEU SEQUENCE ADDED AT THE N-TERMINAL END')
 
             MOL_fields = [s.strip() for s in MD.split(';') if s.strip()]
 
             molecule = {}
             for field in MOL_fields:
                 field = field.split(":")
-                field_name = COMPND_field_map[field[0].strip()]
-                field_data = field[1].strip()
-                molecule[field_name] = field_data
+                assert(1 <= len(field) <= 2)
+                if len(field) == 2: # Hack for 1MBG - missing field value
+                    field_name = COMPND_field_map[field[0].strip()]
+                    field_data = field[1].strip()
+                    molecule[field_name] = field_data
 
             ### Normalize and type the fields ###
 
