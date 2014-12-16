@@ -241,6 +241,9 @@ class Sequence(object):
     def __getitem__(self, item):
         return self.sequence[item]
 
+    def __len__(self):
+        return len(self.sequence)
+
     def ids(self):
         return self.sequence.keys()
 
