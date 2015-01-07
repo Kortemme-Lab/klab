@@ -281,6 +281,7 @@ def gammaCC(values_list1,values_list2):
 #Change saturation of hexadecimal color
 #input: hexadecimal color, saturation adjustment
 #output: saturation-adjusted hexadecimal color string
+# Added by Shane
 def saturateHexColor(hexcolor, adjustment = 1.0):
     assert(adjustment >= 0 and len(hexcolor) >= 1)
     prefix = ""
@@ -301,6 +302,7 @@ def saturateHexColor(hexcolor, adjustment = 1.0):
 #Get list of hexadecimal colors
 #input: number of colors needed (int), start value (optional), saturation adjustment (float; optional)
 #output: list of hexadecimal color strings
+# Added by Shane
 def gnuplotColorWheel(n, start = 15, saturation_adjustment = None):
     hues = range(start, start + 360, 360/n)
     rgbcolors = ['%x%x%x' % (255 * hlscol[0], 255 * hlscol[1], 255 * hlscol[2]) for hlscol in [colorsys.hls_to_rgb(float(h % 360) / 360.0, 0.65, 1.00) for h in hues]]
