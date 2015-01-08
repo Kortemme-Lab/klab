@@ -7,10 +7,7 @@ A place for miscellaneous statistical functions to live until there is a suitabl
 Created by Shane O'Connor 2014
 """
 
-from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
 from tools.unmerged.rpache.functions_lib import gammaCC
-import matplotlib.pyplot as plt
-import numpy
 
 
 def stability_classification_accuracy(experimental_values, predicted_values):
@@ -40,12 +37,14 @@ def fraction_correct(x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
 
 def mae(x_values, y_values):
     '''Mean absolute/unsigned error.'''
+    import numpy
     num_points = len(x_values)
     assert(num_points == len(y_values) and num_points > 0)
     return numpy.sum(numpy.apply_along_axis(numpy.abs, 0, numpy.subtract(x_values, y_values))) / float(num_points)
 
 
 def get_xy_dataset_correlations(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0):
+    from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
     assert(len(x_values) == len(y_values))
     return dict(
         pearsonr = pearsonr(x_values, y_values),
@@ -62,6 +61,7 @@ def get_xy_dataset_correlations(x_values, y_values, fcorrect_x_cutoff = 1.0, fco
 
 
 def histogram(values, out_filepath, num_bins = 50):
+    import matplotlib.pyplot as plt
     hist, bins = numpy.histogram(values, bins=num_bins)
     width = 0.7 * (bins[1] - bins[0])
     center = (bins[:-1] + bins[1:]) / 2
