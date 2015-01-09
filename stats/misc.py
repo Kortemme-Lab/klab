@@ -59,9 +59,6 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
         y = y_values[i]
 
         #N X P
-        xvec = [0, 0, 0]
-
-        xvec = numpy.dot([0.9, 0.1, 0.0], [0.9, 0.1, 0.0])
         if (x >= x_cutoff + x_fuzzy_range):
             xvec = [0, 0, 1]
         elif (x <= -x_cutoff - x_fuzzy_range):
