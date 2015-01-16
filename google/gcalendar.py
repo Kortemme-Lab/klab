@@ -27,18 +27,7 @@ from oauth2client.client import SignedJwtAssertionCredentials
 from tools.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
 from tools.fs.fsio import read_file
 from tools import colortext
-
-
-class OAuthCredentials(NestedBunch):
-
-    @staticmethod
-    def from_JSON(oauth_json, type = "service"):
-        '''At the time of writing, keys include:
-            client_secret, client_email, redirect_uris (list), client_x509_cert_url, client_id, javascript_origins (list)
-            auth_provider_x509_cert_url, auth_uri, token_uri.'''
-        assert(type == "service" or type == "web")
-        return NestedBunch(json.loads(oauth_json)[type])
-
+from gauth import OAuthCredentials
 
 class BasicEvent(object):
 
