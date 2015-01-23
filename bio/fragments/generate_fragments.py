@@ -532,7 +532,6 @@ def get_sequences(options, fasta_file_contents):
 
     try:
         fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_file_contents)
-        print(fasta_records, reverse_mapping)
         if not fasta_records:
             errors.append("No protein sequences found in the FASTA file(s) %s." % fasta_files_str)
     except Exception, e:
