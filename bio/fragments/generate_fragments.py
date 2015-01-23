@@ -532,6 +532,7 @@ def get_sequences(options, fasta_file_contents):
 
     try:
         fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_file_contents)
+        print(fasta_records, reverse_mapping)
         if not fasta_records:
             errors.append("No protein sequences found in the FASTA file(s) %s." % fasta_files_str)
     except Exception, e:
@@ -685,9 +686,9 @@ def parse_FASTA_files(options, fasta_file_contents):
             chain_residues_for_generation = sorted(set(chain_residues).intersection(set(residues_for_generation)))
             reverse_mapping[k] = dict((key, value) for (key, value) in zip(range(1, len(chain_residues_for_generation) + 1), chain_residues_for_generation))
 
+        found_at_least_one_sequence = False
         for k, v in sorted(records.iteritems()):
             assert(v[0].startswith('>'))
-
             subkey = k[0] + k[1]
             sequence = ''.join([s.strip() for s in v[1:]])
             assert(sequenceLine.match(sequence) != None) # sanity check
@@ -699,16 +700,22 @@ def parse_FASTA_files(options, fasta_file_contents):
                 # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
                 for x in range(0, len(cropped_sequence)):
                     assert(cropped_sequence[x] == sequence[reverse_mapping[subkey][x + 1] - sequence_offsets[subkey][0] - 1])
-                records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
+                records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)] # update the record to only use the truncated sequence
             else:
                 # FASTA chain case
                 cropped_sequence = ''.join([sequence[rmv - 1] for rmk, rmv in sorted(reverse_mapping['FASTA'].iteritems()) if rmv <= len(sequence)])
                 # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
                 for x in range(0, len(cropped_sequence)):
                     assert(cropped_sequence[x] == sequence[reverse_mapping['FASTA'][x + 1] - 1])
-            if not cropped_sequence:
-                raise Exception('The sequence for %s is empty. This is presumably an error in input so the job is being terminated.' % subkey)
-            records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
+
+            found_at_least_one_sequence = found_at_least_one_sequence or (not not cropped_sequence)
+            if cropped_sequence:
+                records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)]
+            else:
+                del records[k] # delete the chain. todo: test that this works
+
+        if not found_at_least_one_sequence:
+            raise Exception('No sequences were created from the loops/indices and the input sequences. This may be an input error so the job is being terminated.')
 
     if reverse_mapping:
         return records, dict(reverse_mapping = reverse_mapping, segment_list = original_segment_list, sequence_offsets = sequence_offsets)
