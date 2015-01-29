@@ -39,7 +39,7 @@ from basics import dssp_secondary_structure_types, residue_types_1, residue_type
 from tools.general.structures import NestedBunch
 
 
-secondary_structure_types = dssp_secondary_structure_types.keys() + [None]
+secondary_structure_types = dssp_secondary_structure_types.keys() 
 residue_types = [t for t in residue_types_1] + [ss_bridge_cysteine_code for ss_bridge_cysteine_code in string.ascii_lowercase]
 residue_type_1to3 = {}
 for k, v in residue_type_1to3_map.iteritems():
@@ -228,7 +228,7 @@ class MonomerDSSP(object):
             pdb_res_id = data_line[5:11], # this includes an insertion code e.g. run against 1HAG
             chain_id = data_line[11],
             dssp_residue_aa = data_line[13], # e.g. a-z can be used for SS-bridge cysteines
-            ss = data_line[16].strip() or None,
+            ss = data_line[16].strip() or ' ',
             ss_details = data_line[18:25],
             bp_1 = data_line[25:29],
             bp_2 = data_line[29:33],

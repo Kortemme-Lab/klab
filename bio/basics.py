@@ -125,6 +125,8 @@ dssp_secondary_structure_types = dict(
     S = 'bend',
     C = 'coil',
 )
+dssp_secondary_structure_types[' '] = 'loop or irregular'
+
 
 # The text here is taken from Wikipedia
 dssp_secondary_structure_details = dict(
@@ -137,18 +139,20 @@ dssp_secondary_structure_details = dict(
     S = 'bend (the only non-hydrogen-bond based assignment)',
     C = 'coil (residues which are not in any of the above conformations)',
 )
+dssp_secondary_structure_details[' '] = 'loop or irregular element'
 
 # A mapping from DSSP types to a squash set
-dssp_elision = dict(
-    G = 'H', # helix
-    H = 'H', # helix
-    I = 'H', # helix
-    T = 'O', # other. Note: I am classifying this as 'other' since it is so short.
-    E = 'S', # sheet
-    B = 'O', # other. Note: I am classifying this as 'other' since it is so short.
-    S = 'O', # other
-    C = 'O', # other
-)
+dssp_elision = {
+    'G' : 'H', # helix
+    'H' : 'H', # helix
+    'I' : 'H', # helix
+    'T' : 'O', # other. Note: I am classifying this as 'other' since it is so short.
+    'E' : 'S', # sheet
+    'B' : 'O', # other. Note: I am classifying this as 'other' since it is so short.
+    'S' : 'O', # other
+    'C' : 'O', # other
+    ' ' : 'O', # loop/irregular treated as other
+}
 
 ###
 # DNA
