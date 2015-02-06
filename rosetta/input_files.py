@@ -7,6 +7,7 @@ Simple parsers for Rosetta input file types.
 Created by Shane O'Connor 2014
 """
 
+import re
 from ..fs.fsio import read_file
 from ..general.strutil import parse_range
 
@@ -186,6 +187,52 @@ class SecondaryStructureDefinition(object):
                     raise RosettaFileParsingException('There are conflicting definitions for residue %d (%s and %s).' % (p, ''.join(mapping[p]), ''.join(ss)))
                 mapping[p] = ss
         self.data = mapping
+
+
+class Resfile (object):
+
+    def __init__(self, resfile):
+        index_pattern = '^(\d+)\s+'
+        range_pattern = '^(\d+)\s+[-]\s+(\d+)\s+'
+        command_pattern = '({}|{})[A-Z]\s+([A-Z]+)'.format(
+                index_pattern, range_pattern)
+
+        self.design = []
+        self.repack = []
+
+        with open(resfile) as file:
+            for line in file:
+                index_match = re.match(index_pattern, line)
+                range_match = re.match(range_pattern, line)
+                command_match = re.match(command_pattern, line)
+
+                if not command_match: continue
+                command = command_match.groups()[4].upper() 
+
+                if command == 'NATRO':
+                    continue
+                elif command == 'NATAA':
+                    residues = self.repack
+                else:
+                    residues = self.design
+
+                if range_match:
+                    start = int(range_match.group(1))
+                    end = int(range_match.group(2))
+                    residues += range(start, end + 1)
+
+                elif index_match:
+                    index = int(index_match.group(1))
+                    residues.append(index)
+
+    @property
+    def designable(self):
+        return self.design
+
+    @property
+    def packable(self):
+        return sorted(self.design + self.repack)
+
 
 
 if __name__ == '__main__':
