@@ -39,7 +39,7 @@ class DatabaseInterface(object):
         self.host = host or settings["SQLHost"]
         self.db = db or settings["SQLDatabase"]
         self.user = user or settings["SQLUser"]
-        self.passwd = passwd or settings["SQLPassword"]
+        self.passwd = passwd or settings.get("SQLPassword") or '' # allow for empty passwords e.g. for anonymous accounts with read-only access
         self.port = port or settings["SQLPort"]
         self.unix_socket = unix_socket or settings["SQLSocket"]
         if use_locking == True or use_locking == False:
