@@ -35,18 +35,31 @@ class SCOPeDatabase(DatabaseInterface):
             use_utf = use_utf)
 
         self.levels = self.get_SCOPe_levels()
+        level_names = [v for k, v in sorted(self.levels.iteritems()) if k != 1] # skip the root level
+        search_fields = ['SCOP_sources', 'SCOP_search_fields']
+        search_headers = ['SCOP sources', 'Search fields']
 
         # Set up CSV fields
-        self.csv_fields = [
+        self.pdb_csv_fields = [
             'pdb_id', 'chain', 'is_polypeptide', 'chain_description', 'resolution',
             'sunid', 'sccs', 'sid']
-        self.csv_headers = [
+        self.pdb_csv_headers = [
             'PDB id', 'Chain', 'Is polypeptide', 'Description', 'Resolution',
             'sunid', 'sccs', 'sid']
-        level_names = [v for k, v in sorted(self.levels.iteritems()) if k != 1] # skip the root level
-        self.csv_fields.extend(level_names)
-        self.csv_headers.extend(level_names)
-        assert(len(self.csv_fields) == len(self.csv_headers))
+        self.pdb_csv_fields += level_names + search_fields
+        self.pdb_csv_headers += level_names + search_headers
+
+        self.pfam_csv_fields = [
+            'pfam_accession', 'pfam_name', 'pfam_description', 'pfam_type_description', 'pfam_length',
+            'sunid', 'sccs', 'sid', 'SCOP_sources', 'SCOP_search_fields']
+        self.pfam_csv_headers = [
+            'Pfam accession', 'Name', 'Description', 'Type', 'Length',
+            'sunid', 'sccs', 'sid', 'SCOP sources', 'Search fields']
+        self.pfam_csv_fields += level_names[:4] + search_fields
+        self.pfam_csv_headers += level_names[:4] + search_headers
+
+        assert(len(self.pdb_csv_fields) == len(self.pdb_csv_headers))
+        assert(len(self.pfam_csv_fields) == len(self.pfam_csv_headers))
 
 
     def get_SCOPe_levels(self):
@@ -113,7 +126,9 @@ class SCOPeDatabase(DatabaseInterface):
                 sunid = details['sunid'],
                 sccs = details['sccs'],
                 sid = details['sid'],
-                scop_release_id = details['release_id']
+                scop_release_id = details['release_id'],
+                SCOP_sources = 'SCOP',
+                SCOP_search_fields = 'link_pdb.pdb_chain_id',
             )
 
             for k, v in sorted(self.levels.iteritems()):
@@ -154,110 +169,136 @@ class SCOPeDatabase(DatabaseInterface):
         s = []
         d = self.get_pdb_list_details(pdb_ids)
         if d:
-            s.append(self.csv_headers)
+            s.append(self.pdb_csv_headers)
             for pdb_id, pdb_details in sorted(d.iteritems()):
                 if pdb_details:
                     for chain_id, chain_details in sorted(pdb_details.iteritems()):
-                        s.append([str(chain_details[f]) for f in self.csv_fields])
+                        s.append([str(chain_details[f]) for f in self.pdb_csv_fields])
         return s
 
 
-    def get_pdb_list_details_as_csv(self, pdb_ids, field_separator = ',', line_separator = '\n'):
+    def get_pdb_list_details_as_csv(self, pdb_ids, field_separator = '\t', line_separator = '\n'):
         lst = self.get_pdb_list_details_as_table(pdb_ids)
         return line_separator.join([field_separator.join(l) for l in lst])
 
 
-    def get_pfam_details(self, pfam_id):
+    def get_pfam_details(self, pfam_accession):
         '''Returns a dict pdb_id -> chain(s) -> chain and SCOP details.'''
 
-        query = '''
-            SELECT DISTINCT scop_node.*, pdb_entry.code, pdb_chain.chain, pdb_chain.is_polypeptide, pdb_entry.description AS ChainDescription, pdb_release.resolution
-            FROM `link_pdb`
+        results = self.execute_select('''
+            SELECT DISTINCT scop_node.*, scop_node.release_id AS scop_node_release_id,
+            pfam.release_id AS pfam_release_id, pfam.name AS pfam_name, pfam.accession, pfam.description AS pfam_description, pfam.length AS pfam_length,
+            pfam_type.description AS pfam_type_description
+            FROM `link_pfam`
             INNER JOIN scop_node on node_id=scop_node.id
-            INNER JOIN pdb_chain ON pdb_chain_id = pdb_chain.id
-            INNER JOIN pdb_release ON pdb_release_id = pdb_release.id
-            INNER JOIN pdb_entry ON pdb_entry_id = pdb_entry.id
-            WHERE pdb_entry.code=%s'''
-        if chain:
-            query += ' AND pdb_chain.chain=%s'
-            parameters=(pdb_id, chain)
-        else:
-            parameters = (pdb_id, )
-        query += ' ORDER BY release_id DESC'
+            INNER JOIN pfam ON link_pfam.pfam_accession = pfam.accession
+            INNER JOIN pfam_type ON pfam.pfam_type_id = pfam_type.id
+            WHERE pfam.accession=%s ORDER BY scop_node.release_id DESC''', parameters = (pfam_accession,))
 
-        leaf_nodes = {}
-        results = self.execute_select(query, parameters = parameters)
         if not results:
             return None
 
-        # Only consider the most recent records
+        # Only consider the most recent Pfam releases and most recent SCOP records, giving priority to SCOP revisions over Pfam revisions
+        most_recent_record = None
         for r in results:
-            chain_id = r['chain']
-            if (not leaf_nodes.get(chain_id)) or (r['release_id'] > leaf_nodes[chain_id]['release_id']):
-                leaf_nodes[chain_id] = r
+            accession = r['accession']
+            if (not most_recent_record) or (r['scop_node_release_id'] > most_recent_record['scop_node_release_id']):
+                most_recent_record = r
+            elif r['pfam_release_id'] > most_recent_record['pfam_release_id']:
+                most_recent_record = r
 
-        d = {}
-        for chain_id, details in leaf_nodes.iteritems():
+        d = dict(
+            pfam_accession = most_recent_record['accession'],
+            pfam_name = most_recent_record['pfam_name'],
+            pfam_description = most_recent_record['pfam_description'],
+            pfam_type_description = most_recent_record['pfam_type_description'],
+            pfam_length = most_recent_record['pfam_length'],
+            pfam_release_id = most_recent_record['pfam_release_id'],
+            sunid = most_recent_record['sunid'],
+            sccs = most_recent_record['sccs'],
+            sid = most_recent_record['sid'],
+            scop_release_id = most_recent_record['scop_node_release_id'],
+            SCOP_sources = 'SCOP',
+            SCOP_search_fields = 'link_pfam.pfam_accession',
+        )
 
-            # Get the details for all chains
-            d[chain_id] = dict(
-                pdb_id = details['code'],
-                chain = details['chain'],
-                is_polypeptide = details['is_polypeptide'],
-                chain_description = details['ChainDescription'],
-                resolution = details['resolution'],
-                sunid = details['sunid'],
-                sccs = details['sccs'],
-                sid = details['sid'],
-                scop_release_id = details['release_id']
-            )
+        for k, v in sorted(self.levels.iteritems()):
+            d[v] = None
 
-            for k, v in sorted(self.levels.iteritems()):
-                d[chain_id][v] = None
+        level, parent_node_id = most_recent_record['level_id'], most_recent_record['parent_node_id']
 
-            level, parent_node_id = details['level_id'], details['parent_node_id']
+        # Store the top-level description
+        d[self.levels[level]] = most_recent_record['description']
 
-            # Store the top-level description
-            d[chain_id][self.levels[level]] = details['description']
+        # Wind up the level hierarchy and retrieve the descriptions
+        c = 0
+        while level > 0 :
+            parent_details = self.execute_select('SELECT * FROM scop_node WHERE id=%s', parameters = (parent_node_id,))
+            assert(len(parent_details) <= 1)
+            if parent_details:
+                parent_details = parent_details[0]
+                level, parent_node_id = parent_details['level_id'], parent_details['parent_node_id']
+                d[self.levels[level]] = parent_details['description']
+            else:
+                break
+            # This should never trigger but just in case...
+            c += 1
+            if c > 20:
+                raise Exception('There is a logical error in the script or database which may result in an infinite lookup loop.')
 
-            # Wind up the level hierarchy and retrieve the descriptions
-            c = 0
-            while level > 0 :
-                parent_details = self.execute_select('SELECT * FROM scop_node WHERE id=%s', parameters = (parent_node_id,))
-                assert(len(parent_details) <= 1)
-                if parent_details:
-                    parent_details = parent_details[0]
-                    level, parent_node_id = parent_details['level_id'], parent_details['parent_node_id']
-                    d[chain_id][self.levels[level]] = parent_details['description']
-                else:
-                    break
-                # This should never trigger but just in case...
-                c += 1
-                if c > 20:
-                    raise Exception('There is a logical error in the script or database which may result in an infinite lookup loop.')
+        assert(d['Protein'] == d['Species'] == d['PDB Entry Domain'] == None)
         return d
+
+
+    def get_pfam_list_details(self, pfam_accs):
+        d = {}
+        for pfam_accession in pfam_accs:
+            results = self.get_pfam_details(pfam_accession)
+            d[pfam_accession] = results
+        return d
+
+
+    def get_pfam_list_details_as_table(self, pfam_accs):
+        s = []
+        d = self.get_pfam_list_details(pfam_accs)
+        if d:
+            s.append(self.pfam_csv_headers)
+            for pfam_accession, pfam_details in sorted(d.iteritems()):
+                if pfam_details:
+                    s.append([str(pfam_details[f]) for f in self.pfam_csv_fields])
+        return s
+
+
+    def get_pfam_list_details_as_csv(self, pfam_accs, field_separator = '\t', line_separator = '\n'):
+        lst = self.get_pfam_list_details_as_table(pfam_accs)
+        return line_separator.join([field_separator.join(l) for l in lst])
+
 
 if __name__ == '__main__':
     scopdb = SCOPeDatabase()
 
-    if False:
-        colortext.message('\nGetting chain details for 2zxj, chain A')
-        colortext.warning(pprint.pformat(scopdb.get_chain_details('2zxj', 'A')))
+    colortext.message('\nGetting chain details for 2zxj, chain A')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('2zxj', 'A')))
 
-        colortext.message('\nGetting PDB details for 2zxj')
-        colortext.warning(pprint.pformat(scopdb.get_chain_details('2zXJ'))) # the lookup is not case-sensitive w.r.t. PDB ID
+    colortext.message('\nGetting PDB details for 2zxj')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('2zXJ'))) # the lookup is not case-sensitive w.r.t. PDB ID
 
-        colortext.message('\nGetting dicts for 1ki1 and 1a2c')
-        colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['1ki1', '1a2c'])))
+    colortext.message('\nGetting dicts for 1ki1 and 1a2c')
+    colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['1ki1', '1a2c'])))
 
-        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-        colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
+    colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
+    colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
 
-        colortext.message('\nGetting PFAM details for PF00013,  PF00708')
-        colortext.warning(scopdb.get_pfam_details('PF00013'))
+    colortext.message('\nGetting PFAM details for PF01035,  PF01833')
+    colortext.warning(pprint.pformat(scopdb.get_pfam_details('PF01035')))
 
-    colortext.message('\nGetting dicts for 107L and 160L')
-    colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['107L', '160L'])))
+    colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
+    colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
+
+    colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
+    colortext.warning(scopdb.get_pfam_list_details_as_csv(['PF01035', 'PF01833']))
+
+
 
     #get_pfam_details
     print('\n')
