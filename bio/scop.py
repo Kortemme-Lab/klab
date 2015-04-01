@@ -17,6 +17,7 @@ from tools import colortext
 
 
 installed_database = 'SCOPe205' # rename this to the new database name on updates
+installed_database_version = '2.05' # rename this to the new database version on updates
 
 class SCOPeDatabase(DatabaseInterface):
 
@@ -141,8 +142,9 @@ class SCOPeDatabase(DatabaseInterface):
         if d:
             s.append(self.csv_headers)
             for pdb_id, pdb_details in sorted(d.iteritems()):
-                for chain_id, chain_details in sorted(pdb_details.iteritems()):
-                    s.append([str(chain_details[f]) for f in self.csv_fields])
+                if pdb_details:
+                    for chain_id, chain_details in sorted(pdb_details.iteritems()):
+                        s.append([str(chain_details[f]) for f in self.csv_fields])
         return s
 
 
