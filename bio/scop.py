@@ -86,6 +86,21 @@ class SCOPeDatabase(DatabaseInterface):
             if (not leaf_nodes.get(chain_id)) or (r['release_id'] > leaf_nodes[chain_id]['release_id']):
                 leaf_nodes[chain_id] = r
 
+        # Older revisions of SCOP have blank chain IDs for some records while newer revisions have the chain ID
+        # The best solution to avoid redundant results seems to be to remove all blank chain records if at least one
+        # more recent named chain exists. There could be some nasty cases - we only keep the most recent unnamed chain
+        # but this may correspond to many chains if the PDB has multiple chains since we only look at the chain ID.
+        # I think that it should be *unlikely* that we will have much if any bad behavior though.
+        if leaf_nodes.get(' '):
+            release_id_of_blank_record = leaf_nodes[' ']['release_id']
+            for k, v in leaf_nodes.iteritems():
+                if k != ' ':
+                    assert(k.isalpha() and len(k) == 1)
+                    if v['release_id'] > release_id_of_blank_record:
+                        print('deleting blank node')
+                        del leaf_nodes[' '] # we are modifying a structure while iterating over it but we break immediately afterwards
+                        break
+
         d = {}
         for chain_id, details in leaf_nodes.iteritems():
 
