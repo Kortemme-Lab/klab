@@ -43,7 +43,7 @@ class SCOPeDatabase(DatabaseInterface):
         self.csv_headers = [
             'PDB id', 'Chain', 'Is polypeptide', 'Description', 'Resolution',
             'sunid', 'sccs', 'sid']
-        level_names = [v for k, v in sorted(self.levels.iteritems())]
+        level_names = [v for k, v in sorted(self.levels.iteritems()) if k != 1] # skip the root level
         self.csv_fields.extend(level_names)
         self.csv_headers.extend(level_names)
         assert(len(self.csv_fields) == len(self.csv_headers))
@@ -51,7 +51,7 @@ class SCOPeDatabase(DatabaseInterface):
 
     def get_SCOPe_levels(self):
         d = {}
-        results = self.execute_select('SELECT * FROM scop_level')
+        results = self.execute_select('SELECT * FROM scop_level ORDER BY id')
         for r in results:
             d[r['id']] = r['description']
         return d
@@ -97,7 +97,6 @@ class SCOPeDatabase(DatabaseInterface):
                 if k != ' ':
                     assert(k.isalpha() and len(k) == 1)
                     if v['release_id'] > release_id_of_blank_record:
-                        print('deleting blank node')
                         del leaf_nodes[' '] # we are modifying a structure while iterating over it but we break immediately afterwards
                         break
 
