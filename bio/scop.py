@@ -101,8 +101,61 @@ class SCOPeDatabase(DatabaseInterface):
         return self.pfam_api
 
 
-    def get_chain_details_by_pfam(self, pdb_id, chain = None):
-        '''Returns a dict pdb_id -> chain(s) -> chain and SCOP details.'''
+    def get_basic_pdb_chain_information(self, pdb_id, chain_id):
+        is_polypeptide, chain_description, resolution = None, None, None
+        results = self.execute_select('''
+            SELECT DISTINCT pdb_entry.code, pdb_chain.chain, pdb_chain.is_polypeptide, pdb_entry.description AS ChainDescription, pdb_release.resolution
+            FROM pdb_chain
+            INNER JOIN pdb_release ON pdb_release_id = pdb_release.id
+            INNER JOIN pdb_entry ON pdb_entry_id = pdb_entry.id
+            WHERE pdb_entry.code=%s AND pdb_chain.chain=%s
+            ORDER BY pdb_release.revision_date DESC''', parameters = (pdb_id, chain_id))
+        if results:
+            is_polypeptide = results[0]['is_polypeptide']
+            chain_description = results[0]['ChainDescription']
+            resolution = results[0]['resolution']
+        return dict(
+            pdb_id = pdb_id,
+            chain = chain_id,
+            is_polypeptide = is_polypeptide,
+            chain_description = chain_description,
+            resolution = resolution)
+
+
+    def get_chain_details_by_related_pdb_chains(self, pdb_id, chain_id, pfam_accs):
+        ''' Returns a dict of SCOP details using info
+            This returns Pfam-level information for a PDB chain i.e. no details on the protein, species, or domain will be returned.
+            If there are SCOPe entries for the associated Pfam accession numbers which agree then this function returns
+            pretty complete information.
+        '''
+
+        return None
+        d = self.get_basic_pdb_chain_information(pdb_id, chain_id)
+        #sunid = sunid
+        #sccs = sccs
+        #sid = sid
+        #scop_release_id = scop_release_id
+        SCOP_sources = 'Pfam + SCOP'
+        SCOP_search_fields = 'Pfam + link_pfam.pfam_accession'
+        d[chain_id].update(dict(
+            sunid = sunid,
+            sccs = sccs,
+            sid = sid,
+            scop_release_id = scop_release_id,
+            SCOP_sources = 'Pfam + SCOP',
+            SCOP_search_fields = 'Pfam + link_pdb.pdb_chain_id',
+            SCOP_trust_level = 3
+        ))
+
+        return d
+
+
+    def get_chain_details_by_pfam(self, pdb_id, chain = None, cascade_on_failures = True):
+        ''' Returns a dict pdb_id -> chain(s) -> chain and SCOP details.
+            This returns Pfam-level information for a PDB chain i.e. no details on the protein, species, or domain will be returned.
+            If there are SCOPe entries for the associated Pfam accession numbers which agree then this function returns
+            pretty complete information.
+        '''
         pfam_api = self.get_pfam_api()
         if chain:
             pfam_accs = pfam_api.get_pfam_accession_numbers_from_pdb_chain(pdb_id, chain)
@@ -112,6 +165,7 @@ class SCOPeDatabase(DatabaseInterface):
             pfam_accs = pfam_api.get_pfam_accession_numbers_from_pdb_id(pdb_id)
 
         if not pfam_accs:
+            # There were no associated Pfam accession numbers so we return
             return None
 
         d = {}
@@ -121,6 +175,14 @@ class SCOPeDatabase(DatabaseInterface):
                 family_details.append(self.get_pfam_details(pfam_accession))
 
             family_details = [f for f in family_details if f]
+            if not family_details:
+                if cascade_on_failures:
+                    # Fallback - There were no associated SCOPe entries with the associated Pfam accession numbers so we will
+                    #            search all PDB chains associated with those Pfam accession numbers instead
+                    d[chain_id] = self.get_chain_details_by_related_pdb_chains(pdb_id, chain_id, pfam_accs)
+                else:
+                    d[chain_id] = None
+                continue
 
             # Get the common SCOPe fields. For the sccs class, we take the longest common prefix
             sunid = set([f['sunid'] for f in family_details if f['sunid']]) or None
@@ -146,32 +208,16 @@ class SCOPeDatabase(DatabaseInterface):
                 else:
                     scop_release_id = scop_release_id.pop()
 
-            is_polypeptide, chain_description, resolution = None, None, None
-            results = self.execute_select('''
-                SELECT DISTINCT pdb_entry.code, pdb_chain.chain, pdb_chain.is_polypeptide, pdb_entry.description AS ChainDescription, pdb_release.resolution
-                FROM pdb_chain
-                INNER JOIN pdb_release ON pdb_release_id = pdb_release.id
-                INNER JOIN pdb_entry ON pdb_entry_id = pdb_entry.id
-                WHERE pdb_entry.code=%s AND pdb_chain.chain=%s
-                ORDER BY pdb_release.revision_date DESC''', parameters = (pdb_id, chain_id))
-            if results:
-                is_polypeptide = results[0]['is_polypeptide']
-                chain_description = results[0]['ChainDescription']
-                resolution = results[0]['resolution']
-
-            d[chain_id] = dict(
-                pdb_id = pdb_id,
-                chain = chain,
-                is_polypeptide = is_polypeptide,
-                chain_description = chain_description,
-                resolution = resolution,
+            d[chain_id] = self.get_basic_pdb_chain_information(pdb_id, chain_id)
+            d[chain_id].update(dict(
                 sunid = sunid,
                 sccs = sccs,
                 sid = sid,
                 scop_release_id = scop_release_id,
                 SCOP_sources = 'Pfam + SCOP',
                 SCOP_search_fields = 'Pfam + link_pfam.pfam_accession',
-            )
+                SCOP_trust_level = 2
+            ))
 
             for k, v in sorted(self.levels.iteritems()):
                 d[chain_id][v] = None
@@ -194,8 +240,11 @@ class SCOPeDatabase(DatabaseInterface):
         return d
 
 
-    def get_chain_details(self, pdb_id, chain = None):
-        '''Returns a dict pdb_id -> chain(s) -> chain and SCOP details.'''
+    def get_chain_details(self, pdb_id, chain = None, cascade_on_failures = True):
+        ''' Returns a dict pdb_id -> chain(s) -> chain and SCOP details.
+            This is the main function for getting details for a PDB chain. If there is an associated SCOPe entry for this
+            chain then this function returns the most information.
+        '''
 
         query = '''
             SELECT DISTINCT scop_node.*, pdb_entry.code, pdb_chain.chain, pdb_chain.is_polypeptide, pdb_entry.description AS ChainDescription, pdb_release.resolution
@@ -215,7 +264,12 @@ class SCOPeDatabase(DatabaseInterface):
         leaf_nodes = {}
         results = self.execute_select(query, parameters = parameters)
         if not results:
-            return self.get_chain_details_by_pfam(pdb_id, chain)
+            if cascade_on_failures:
+                # Fallback - use any Pfam accession numbers associated with the chain to get partial information
+                #            Note: this fallback has another fallback in case none of the Pfam entries exist in SCOPe
+                return self.get_chain_details_by_pfam(pdb_id, chain, cascade_on_failures = cascade_on_failures)
+            else:
+                return None
 
         # Only consider the most recent records
         for r in results:
@@ -252,6 +306,7 @@ class SCOPeDatabase(DatabaseInterface):
                 scop_release_id = details['release_id'],
                 SCOP_sources = 'SCOP',
                 SCOP_search_fields = 'link_pdb.pdb_chain_id',
+                SCOP_trust_level = 1
             )
 
             for k, v in sorted(self.levels.iteritems()):
@@ -348,6 +403,7 @@ class SCOPeDatabase(DatabaseInterface):
             scop_release_id = most_recent_record['scop_node_release_id'],
             SCOP_sources = 'SCOP',
             SCOP_search_fields = 'link_pfam.pfam_accession',
+            SCOP_trust_level = 1
         )
 
         for k, v in sorted(self.levels.iteritems()):
