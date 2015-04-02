@@ -36,11 +36,11 @@ class SCOPeTableCollection(object):
 
     def add_pdb_line(self, details):
         if details:
-            self.pdb_table.append([str(details[f]) for f in self.SCOPe_database.pdb_csv_fields])
+            self.pdb_table.append([str(details[f] or '') for f in self.SCOPe_database.pdb_csv_fields])
 
     def add_pfam_line(self, details):
         if details:
-            self.pfam_table.append([str(details[f]) for f in self.SCOPe_database.pfam_csv_fields])
+            self.pfam_table.append([str(details[f] or '') for f in self.SCOPe_database.pfam_csv_fields])
 
     def get_csv_tables(self, field_separator = '\t', line_separator = '\n'):
         d = dict.fromkeys(['PDB', 'Pfam'], None)
