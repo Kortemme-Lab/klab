@@ -28,11 +28,19 @@ class SCOPeTableCollection(object):
         self.pdb_table = []
         self.pfam_table = []
 
+    def __add__(self, other):
+        new_t = SCOPeTableCollection(self.SCOPe_database)
+        new_t.pdb_table = self.pdb_table + other.pdb_table
+        new_t.pfam_table = self.pfam_table + other.pfam_table
+        return new_t
+
     def add_pdb_line(self, details):
-        self.pdb_table.append([str(details[f]) for f in self.SCOPe_database.pdb_csv_fields])
+        if details:
+            self.pdb_table.append([str(details[f]) for f in self.SCOPe_database.pdb_csv_fields])
 
     def add_pfam_line(self, details):
-        self.pfam_table.append([str(details[f]) for f in self.SCOPe_database.pfam_csv_fields])
+        if details:
+            self.pfam_table.append([str(details[f]) for f in self.SCOPe_database.pfam_csv_fields])
 
     def get_csv_tables(self, field_separator = '\t', line_separator = '\n'):
         d = dict.fromkeys(['PDB', 'Pfam'], None)
@@ -42,11 +50,19 @@ class SCOPeTableCollection(object):
             d['PDB'] = line_separator.join([field_separator.join(l) for l in [self.SCOPe_database.pdb_csv_headers] + self.pdb_table])
         return d
 
+    def get_tables(self):
+        d = dict.fromkeys(['PDB', 'Pfam'], None)
+        if self.pfam_table:
+            d['Pfam'] = [self.SCOPe_database.pfam_csv_headers] + self.pfam_table
+        if self.pdb_table:
+            d['PDB'] = [self.SCOPe_database.pdb_csv_headers] + self.pdb_table
+        return d
+
 
 
 class SCOPeDatabase(DatabaseInterface):
 
-    def __init__(self, passwd = None, username = 'anonymous', use_utf=False):
+    def __init__(self, passwd = None, username = 'anonymous', use_utf=False, fallback_on_failures = True):
         super(SCOPeDatabase, self).__init__({},
             isInnoDB = True,
             numTries = 32,
@@ -58,10 +74,11 @@ class SCOPeDatabase(DatabaseInterface):
             unix_socket = "/var/lib/mysql/mysql.sock",
             use_utf = use_utf)
 
+        self.fallback_on_failures = fallback_on_failures
         self.levels = self.get_SCOPe_levels()
         level_names = [v for k, v in sorted(self.levels.iteritems()) if k != 1] # skip the root level
-        search_fields = ['SCOP_sources', 'SCOP_search_fields']
-        search_headers = ['SCOP sources', 'Search fields']
+        search_fields = ['SCOP_sources', 'SCOP_search_fields', 'SCOP_trust_level']
+        search_headers = ['SCOP sources', 'Search fields', 'Trustiness']
         self.pfam_api = None
 
         # Set up CSV fields
@@ -150,7 +167,7 @@ class SCOPeDatabase(DatabaseInterface):
         return d
 
 
-    def get_chain_details_by_pfam(self, pdb_id, chain = None, cascade_on_failures = True):
+    def get_chain_details_by_pfam(self, pdb_id, chain = None):
         ''' Returns a dict pdb_id -> chain(s) -> chain and SCOP details.
             This returns Pfam-level information for a PDB chain i.e. no details on the protein, species, or domain will be returned.
             If there are SCOPe entries for the associated Pfam accession numbers which agree then this function returns
@@ -176,7 +193,7 @@ class SCOPeDatabase(DatabaseInterface):
 
             family_details = [f for f in family_details if f]
             if not family_details:
-                if cascade_on_failures:
+                if self.fallback_on_failures:
                     # Fallback - There were no associated SCOPe entries with the associated Pfam accession numbers so we will
                     #            search all PDB chains associated with those Pfam accession numbers instead
                     d[chain_id] = self.get_chain_details_by_related_pdb_chains(pdb_id, chain_id, pfam_accs)
@@ -240,7 +257,7 @@ class SCOPeDatabase(DatabaseInterface):
         return d
 
 
-    def get_chain_details(self, pdb_id, chain = None, cascade_on_failures = True):
+    def get_chain_details(self, pdb_id, chain = None):
         ''' Returns a dict pdb_id -> chain(s) -> chain and SCOP details.
             This is the main function for getting details for a PDB chain. If there is an associated SCOPe entry for this
             chain then this function returns the most information.
@@ -264,10 +281,10 @@ class SCOPeDatabase(DatabaseInterface):
         leaf_nodes = {}
         results = self.execute_select(query, parameters = parameters)
         if not results:
-            if cascade_on_failures:
+            if self.fallback_on_failures:
                 # Fallback - use any Pfam accession numbers associated with the chain to get partial information
                 #            Note: this fallback has another fallback in case none of the Pfam entries exist in SCOPe
-                return self.get_chain_details_by_pfam(pdb_id, chain, cascade_on_failures = cascade_on_failures)
+                return self.get_chain_details_by_pfam(pdb_id, chain)
             else:
                 return None
 
@@ -482,11 +499,22 @@ if __name__ == '__main__':
         colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
         colortext.warning(scopdb.get_pfam_list_details_as_csv(['PF01035', 'PF01833'])['Pfam'])
 
-    # This case tests what happens when there is no PDB chain entry in SCOPe - we should find the Pfam entry instead and look that up
-    colortext.message('\nGetting chain details for 3GVA')
-    colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA')))
+        # get_chain_details_by_pfam cases
+        # This case tests what happens when there is no PDB chain entry in SCOPe - we should find the Pfam entry instead and look that up
+        colortext.message('\nGetting chain details for 3GVA')
+        colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA')))
 
-    colortext.message('\nGetting chain details for 3GVA, chain A')
-    colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA', 'A')))
+        colortext.message('\nGetting chain details for 3GVA, chain A')
+        colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA', 'A')))
+        assert(scopdb.get_chain_details('3GVA', 'A')['A']['SCOP_trust_level'] == 2)
+
+    # get_chain_details_by_related_pdb_chains cases
+    # This case tests what happens when there is no PDB chain entry in SCOPe and the associated Pfam entries also have no
+    # SCOPe entries but their associated PDB chains do
+    # 2EVB, 2PND, 2QLC, 3FYM
+    colortext.message('\nGetting chain details for 2EVB')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('2EVB')))
+    #assert(scopdb.get_chain_details('2EVB', 'A')['A']['SCOP_trust_level'] == 3)
+
 
     print('\n')
