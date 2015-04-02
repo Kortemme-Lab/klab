@@ -14,13 +14,37 @@ if __name__ == "__main__":
     sys.path.insert(0, "../../")
 from tools.db.mysql import DatabaseInterface
 from tools import colortext
+from tools.bio.pfam import Pfam
 
 
 installed_database = 'SCOPe205' # rename this to the new database name on updates
 installed_database_version = '2.05' # rename this to the new database version on updates
 
-class SCOPeDatabase(DatabaseInterface):
 
+class SCOPeTableCollection(object):
+
+    def __init__(self, SCOPe_database):
+        self.SCOPe_database = SCOPe_database
+        self.pdb_table = []
+        self.pfam_table = []
+
+    def add_pdb_line(self, details):
+        self.pdb_table.append([str(details[f]) for f in self.SCOPe_database.pdb_csv_fields])
+
+    def add_pfam_line(self, details):
+        self.pfam_table.append([str(details[f]) for f in self.SCOPe_database.pfam_csv_fields])
+
+    def get_csv_tables(self, field_separator = '\t', line_separator = '\n'):
+        d = dict.fromkeys(['PDB', 'Pfam'], None)
+        if self.pfam_table:
+            d['Pfam'] = line_separator.join([field_separator.join(l) for l in [self.SCOPe_database.pfam_csv_headers] + self.pfam_table])
+        if self.pdb_table:
+            d['PDB'] = line_separator.join([field_separator.join(l) for l in [self.SCOPe_database.pdb_csv_headers] + self.pdb_table])
+        return d
+
+
+
+class SCOPeDatabase(DatabaseInterface):
 
     def __init__(self, passwd = None, username = 'anonymous', use_utf=False):
         super(SCOPeDatabase, self).__init__({},
@@ -38,6 +62,7 @@ class SCOPeDatabase(DatabaseInterface):
         level_names = [v for k, v in sorted(self.levels.iteritems()) if k != 1] # skip the root level
         search_fields = ['SCOP_sources', 'SCOP_search_fields']
         search_headers = ['SCOP sources', 'Search fields']
+        self.pfam_api = None
 
         # Set up CSV fields
         self.pdb_csv_fields = [
@@ -70,6 +95,105 @@ class SCOPeDatabase(DatabaseInterface):
         return d
 
 
+    def get_pfam_api(self):
+        if not(self.pfam_api):
+            self.pfam_api = Pfam()
+        return self.pfam_api
+
+
+    def get_chain_details_by_pfam(self, pdb_id, chain = None):
+        '''Returns a dict pdb_id -> chain(s) -> chain and SCOP details.'''
+        pfam_api = self.get_pfam_api()
+        if chain:
+            pfam_accs = pfam_api.get_pfam_accession_numbers_from_pdb_chain(pdb_id, chain)
+            if pfam_accs:
+                pfam_accs = {chain : pfam_accs}
+        else:
+            pfam_accs = pfam_api.get_pfam_accession_numbers_from_pdb_id(pdb_id)
+
+        if not pfam_accs:
+            return None
+
+        d = {}
+        for chain_id, pfam_acc_set in pfam_accs.iteritems():
+            family_details = []
+            for pfam_accession in pfam_acc_set:
+                family_details.append(self.get_pfam_details(pfam_accession))
+
+            family_details = [f for f in family_details if f]
+
+            # Get the common SCOPe fields. For the sccs class, we take the longest common prefix
+            sunid = set([f['sunid'] for f in family_details if f['sunid']]) or None
+            sccs = set([f['sccs'] for f in family_details if f['sccs']]) or None
+            sid = set([f['sid'] for f in family_details if f['sid']]) or None
+            scop_release_id = set([f['scop_release_id'] for f in family_details if f['scop_release_id']]) or None
+            if sunid:
+                if len(sunid) > 1:
+                    sunid = None
+                else:
+                    sunid = sunid.pop()
+            if sccs:
+                # take the longest common prefix
+                sccs = os.path.commonprefix(sccs) or None
+            if sid:
+                if len(sid) > 1:
+                    sid = None
+                else:
+                    sid = sid.pop()
+            if scop_release_id:
+                if len(scop_release_id) > 1:
+                    scop_release_id = None
+                else:
+                    scop_release_id = scop_release_id.pop()
+
+            is_polypeptide, chain_description, resolution = None, None, None
+            results = self.execute_select('''
+                SELECT DISTINCT pdb_entry.code, pdb_chain.chain, pdb_chain.is_polypeptide, pdb_entry.description AS ChainDescription, pdb_release.resolution
+                FROM pdb_chain
+                INNER JOIN pdb_release ON pdb_release_id = pdb_release.id
+                INNER JOIN pdb_entry ON pdb_entry_id = pdb_entry.id
+                WHERE pdb_entry.code=%s AND pdb_chain.chain=%s
+                ORDER BY pdb_release.revision_date DESC''', parameters = (pdb_id, chain_id))
+            if results:
+                is_polypeptide = results[0]['is_polypeptide']
+                chain_description = results[0]['ChainDescription']
+                resolution = results[0]['resolution']
+
+            d[chain_id] = dict(
+                pdb_id = pdb_id,
+                chain = chain,
+                is_polypeptide = is_polypeptide,
+                chain_description = chain_description,
+                resolution = resolution,
+                sunid = sunid,
+                sccs = sccs,
+                sid = sid,
+                scop_release_id = scop_release_id,
+                SCOP_sources = 'Pfam + SCOP',
+                SCOP_search_fields = 'Pfam + link_pfam.pfam_accession',
+            )
+
+            for k, v in sorted(self.levels.iteritems()):
+                d[chain_id][v] = None
+
+            # Return the lowest common classification over all related Pfam families
+            level = 1
+            while level < 9:
+                classification_level = self.levels[level]
+                family_values = set([f[classification_level] for f in family_details]) # allow null fields - if we get a filled in field for one Pfam accession number and a null field for another then we should discount this field entirely and break out
+                if len(family_values) == 1:
+                    family_value = family_values.pop()
+                    if family_value == None:
+                        break
+                    else:
+                        d[chain_id][classification_level] = family_value
+                else:
+                    break
+                level += 1
+
+        return d
+
+
     def get_chain_details(self, pdb_id, chain = None):
         '''Returns a dict pdb_id -> chain(s) -> chain and SCOP details.'''
 
@@ -91,7 +215,7 @@ class SCOPeDatabase(DatabaseInterface):
         leaf_nodes = {}
         results = self.execute_select(query, parameters = parameters)
         if not results:
-            return None
+            return self.get_chain_details_by_pfam(pdb_id, chain)
 
         # Only consider the most recent records
         for r in results:
@@ -115,7 +239,6 @@ class SCOPeDatabase(DatabaseInterface):
 
         d = {}
         for chain_id, details in leaf_nodes.iteritems():
-
             # Get the details for all chains
             d[chain_id] = dict(
                 pdb_id = details['code'],
@@ -166,20 +289,25 @@ class SCOPeDatabase(DatabaseInterface):
 
 
     def get_pdb_list_details_as_table(self, pdb_ids):
-        s = []
-        d = self.get_pdb_list_details(pdb_ids)
+        t = SCOPeTableCollection(self)
+        d = self.get_pdb_list_details(list(set(pdb_ids)))
+        failed_pdb_ids = []
         if d:
-            s.append(self.pdb_csv_headers)
             for pdb_id, pdb_details in sorted(d.iteritems()):
                 if pdb_details:
                     for chain_id, chain_details in sorted(pdb_details.iteritems()):
-                        s.append([str(chain_details[f]) for f in self.pdb_csv_fields])
-        return s
+                        t.add_pdb_line(chain_details)
+                else:
+                    failed_pdb_ids.append(pdb_ids)
+        return t
 
 
     def get_pdb_list_details_as_csv(self, pdb_ids, field_separator = '\t', line_separator = '\n'):
-        lst = self.get_pdb_list_details_as_table(pdb_ids)
-        return line_separator.join([field_separator.join(l) for l in lst])
+        return self.get_details_as_csv(self.get_pdb_list_details_as_table(pdb_ids), field_separator = field_separator, line_separator = line_separator)
+
+
+    def get_details_as_csv(self, tbl, field_separator = '\t', line_separator = '\n'):
+        return tbl.get_csv_tables(field_separator, line_separator)
 
 
     def get_pfam_details(self, pfam_accession):
@@ -259,46 +387,50 @@ class SCOPeDatabase(DatabaseInterface):
 
 
     def get_pfam_list_details_as_table(self, pfam_accs):
-        s = []
+        t = SCOPeTableCollection(self)
         d = self.get_pfam_list_details(pfam_accs)
         if d:
-            s.append(self.pfam_csv_headers)
             for pfam_accession, pfam_details in sorted(d.iteritems()):
                 if pfam_details:
-                    s.append([str(pfam_details[f]) for f in self.pfam_csv_fields])
-        return s
+                    t.add_pfam_line(pfam_details)
+        return t
 
 
     def get_pfam_list_details_as_csv(self, pfam_accs, field_separator = '\t', line_separator = '\n'):
-        lst = self.get_pfam_list_details_as_table(pfam_accs)
-        return line_separator.join([field_separator.join(l) for l in lst])
+        #, field_separator = '\t', line_separator = '\n'):
+        return self.get_details_as_csv(self.get_pfam_list_details_as_table(pfam_accs), field_separator = field_separator, line_separator = line_separator)
 
 
 if __name__ == '__main__':
     scopdb = SCOPeDatabase()
 
-    colortext.message('\nGetting chain details for 2zxj, chain A')
-    colortext.warning(pprint.pformat(scopdb.get_chain_details('2zxj', 'A')))
+    if True:
+        colortext.message('\nGetting chain details for 2zxj, chain A')
+        colortext.warning(pprint.pformat(scopdb.get_chain_details('2zxj', 'A')))
 
-    colortext.message('\nGetting PDB details for 2zxj')
-    colortext.warning(pprint.pformat(scopdb.get_chain_details('2zXJ'))) # the lookup is not case-sensitive w.r.t. PDB ID
+        colortext.message('\nGetting PDB details for 2zxj')
+        colortext.warning(pprint.pformat(scopdb.get_chain_details('2zXJ'))) # the lookup is not case-sensitive w.r.t. PDB ID
 
-    colortext.message('\nGetting dicts for 1ki1 and 1a2c')
-    colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['1ki1', '1a2c'])))
+        colortext.message('\nGetting dicts for 1ki1 and 1a2c')
+        colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['1ki1', '1a2c'])))
 
-    colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-    colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
+        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
+        colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
 
-    colortext.message('\nGetting PFAM details for PF01035,  PF01833')
-    colortext.warning(pprint.pformat(scopdb.get_pfam_details('PF01035')))
+        colortext.message('\nGetting PFAM details for PF01035,  PF01833')
+        colortext.warning(pprint.pformat(scopdb.get_pfam_details('PF01035')))
 
-    colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-    colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
+        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
+        colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
 
-    colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-    colortext.warning(scopdb.get_pfam_list_details_as_csv(['PF01035', 'PF01833']))
+        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
+        colortext.warning(scopdb.get_pfam_list_details_as_csv(['PF01035', 'PF01833'])['Pfam'])
 
+    # This case tests what happens when there is no PDB chain entry in SCOPe - we should find the Pfam entry instead and look that up
+    colortext.message('\nGetting chain details for 3GVA')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA')))
 
+    colortext.message('\nGetting chain details for 3GVA, chain A')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA', 'A')))
 
-    #get_pfam_details
     print('\n')
