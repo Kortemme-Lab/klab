@@ -139,6 +139,58 @@ class SCOPeDatabase(DatabaseInterface):
             resolution = resolution)
 
 
+    def get_common_fields(self, family_details):
+        # Get the common SCOPe fields. For the sccs class, we take the longest common prefix
+        sunid = set([f['sunid'] for f in family_details if f['sunid']]) or None
+        sccs = set([f['sccs'] for f in family_details if f['sccs']]) or None
+        sid = set([f['sid'] for f in family_details if f['sid']]) or None
+        scop_release_id = set([f['scop_release_id'] for f in family_details if f['scop_release_id']]) or None
+        if sunid:
+            if len(sunid) > 1:
+                sunid = None
+            else:
+                sunid = sunid.pop()
+        if sccs:
+            # take the longest common prefix
+            sccs = os.path.commonprefix(sccs) or None
+            if sccs and sccs.endswith('.'):
+                sccs = sccs[:-1]
+        if sid:
+            if len(sid) > 1:
+                sid = None
+            else:
+                sid = sid.pop()
+        if scop_release_id:
+            if len(scop_release_id) > 1:
+                scop_release_id = None
+            else:
+                scop_release_id = scop_release_id.pop()
+        return dict(
+            sunid = sunid,
+            sccs = sccs,
+            sid = sid,
+            scop_release_id = scop_release_id,
+        )
+
+
+    def get_common_hierarchy(self, family_details):
+        d = {}
+        level = 1
+        while level < 9:
+            classification_level = self.levels[level]
+            family_values = set([f[classification_level] for f in family_details]) # allow null fields - if we get a filled in field for one Pfam accession number and a null field for another then we should discount this field entirely and break out
+            if len(family_values) == 1:
+                family_value = family_values.pop()
+                if family_value == None:
+                    break
+                else:
+                    d[classification_level] = family_value
+            else:
+                break
+            level += 1
+        return d
+
+
     def get_chain_details_by_related_pdb_chains(self, pdb_id, chain_id, pfam_accs):
         ''' Returns a dict of SCOP details using info
             This returns Pfam-level information for a PDB chain i.e. no details on the protein, species, or domain will be returned.
@@ -146,24 +198,41 @@ class SCOPeDatabase(DatabaseInterface):
             pretty complete information.
         '''
 
-        return None
+        if not pfam_accs:
+            return None
+
+        associated_pdb_chains = set()
+        pfam_api = self.get_pfam_api()
+        for pfam_acc in pfam_accs:
+            associated_pdb_chains = associated_pdb_chains.union(pfam_api.get_pdb_chains_from_pfam_accession_number(pfam_acc))
+
+        hits = []
+        #class_count = {}
+        for pdb_chain_pair in associated_pdb_chains:
+            ass_pdb_id, ass_chain_id = pdb_chain_pair[0], pdb_chain_pair[1]
+            hit = self.get_chain_details(ass_pdb_id, chain = ass_chain_id, internal_function_call = True)
+            if hit:
+                assert(len(hit) == 1)
+                hits.append(hit[ass_chain_id])
+                #for k, v in hit.iteritems():
+                    #class_count[v['sccs']] = class_count.get(v['sccs'], 0)
+                    #class_count[v['sccs']] += 1
+                    #print(' %s, %s: %s' % (v['pdb_id'], k, v['sccs']))
+        #pprint.pprint(class_count)
+        if not hits:
+            return None
+
         d = self.get_basic_pdb_chain_information(pdb_id, chain_id)
-        #sunid = sunid
-        #sccs = sccs
-        #sid = sid
-        #scop_release_id = scop_release_id
-        SCOP_sources = 'Pfam + SCOP'
-        SCOP_search_fields = 'Pfam + link_pfam.pfam_accession'
-        d[chain_id].update(dict(
-            sunid = sunid,
-            sccs = sccs,
-            sid = sid,
-            scop_release_id = scop_release_id,
+        d.update(self.get_common_fields(hits))
+        d.update(dict(
             SCOP_sources = 'Pfam + SCOP',
             SCOP_search_fields = 'Pfam + link_pdb.pdb_chain_id',
             SCOP_trust_level = 3
         ))
-
+        # Add the lowest common classification over all related Pfam families
+        for k, v in sorted(self.levels.iteritems()):
+            d[v] = None
+        d.update(dict(self.get_common_hierarchy(hits)))
         return d
 
 
@@ -196,71 +265,47 @@ class SCOPeDatabase(DatabaseInterface):
                 if self.fallback_on_failures:
                     # Fallback - There were no associated SCOPe entries with the associated Pfam accession numbers so we will
                     #            search all PDB chains associated with those Pfam accession numbers instead
-                    d[chain_id] = self.get_chain_details_by_related_pdb_chains(pdb_id, chain_id, pfam_accs)
+                    d[chain_id] = self.get_chain_details_by_related_pdb_chains(pdb_id, chain_id, pfam_accs.get(chain_id))
                 else:
                     d[chain_id] = None
                 continue
 
             # Get the common SCOPe fields. For the sccs class, we take the longest common prefix
-            sunid = set([f['sunid'] for f in family_details if f['sunid']]) or None
-            sccs = set([f['sccs'] for f in family_details if f['sccs']]) or None
-            sid = set([f['sid'] for f in family_details if f['sid']]) or None
-            scop_release_id = set([f['scop_release_id'] for f in family_details if f['scop_release_id']]) or None
-            if sunid:
-                if len(sunid) > 1:
-                    sunid = None
-                else:
-                    sunid = sunid.pop()
-            if sccs:
-                # take the longest common prefix
-                sccs = os.path.commonprefix(sccs) or None
-            if sid:
-                if len(sid) > 1:
-                    sid = None
-                else:
-                    sid = sid.pop()
-            if scop_release_id:
-                if len(scop_release_id) > 1:
-                    scop_release_id = None
-                else:
-                    scop_release_id = scop_release_id.pop()
+
 
             d[chain_id] = self.get_basic_pdb_chain_information(pdb_id, chain_id)
+            d[chain_id].update(self.get_common_fields(family_details))
             d[chain_id].update(dict(
-                sunid = sunid,
-                sccs = sccs,
-                sid = sid,
-                scop_release_id = scop_release_id,
                 SCOP_sources = 'Pfam + SCOP',
                 SCOP_search_fields = 'Pfam + link_pfam.pfam_accession',
                 SCOP_trust_level = 2
             ))
-
+            # Add the lowest common classification over all related Pfam families
             for k, v in sorted(self.levels.iteritems()):
                 d[chain_id][v] = None
-
-            # Return the lowest common classification over all related Pfam families
-            level = 1
-            while level < 9:
-                classification_level = self.levels[level]
-                family_values = set([f[classification_level] for f in family_details]) # allow null fields - if we get a filled in field for one Pfam accession number and a null field for another then we should discount this field entirely and break out
-                if len(family_values) == 1:
-                    family_value = family_values.pop()
-                    if family_value == None:
-                        break
-                    else:
-                        d[chain_id][classification_level] = family_value
-                else:
-                    break
-                level += 1
-
+            d[chain_id].update(dict(self.get_common_hierarchy(family_details)))
         return d
 
 
-    def get_chain_details(self, pdb_id, chain = None):
+    def get_list_of_pdb_chains(self, pdb_id):
+        results = self.execute_select('''
+            SELECT DISTINCT pdb_chain.chain, pdb_release.id as release_id
+            FROM pdb_chain
+            INNER JOIN pdb_release ON pdb_release_id = pdb_release.id
+            INNER JOIN pdb_entry ON pdb_entry_id = pdb_entry.id
+            WHERE pdb_entry.code=%s''', parameters = (pdb_id,))
+        if results:
+            max_release_id = max([r['release_id'] for r in results])
+            return set([r['chain'] for r in results if r['release_id'] == max_release_id])
+        return None
+
+
+
+    def get_chain_details(self, pdb_id, chain = None, internal_function_call = False):
         ''' Returns a dict pdb_id -> chain(s) -> chain and SCOP details.
             This is the main function for getting details for a PDB chain. If there is an associated SCOPe entry for this
             chain then this function returns the most information.
+            internal_function_call is used to prevent potential infinite loops
         '''
 
         query = '''
@@ -278,13 +323,23 @@ class SCOPeDatabase(DatabaseInterface):
             parameters = (pdb_id, )
         query += ' ORDER BY release_id DESC'
 
-        leaf_nodes = {}
         results = self.execute_select(query, parameters = parameters)
         if not results:
-            if self.fallback_on_failures:
+            if self.fallback_on_failures and not internal_function_call:
                 # Fallback - use any Pfam accession numbers associated with the chain to get partial information
                 #            Note: this fallback has another fallback in case none of the Pfam entries exist in SCOPe
+                searched_deeper = True
                 return self.get_chain_details_by_pfam(pdb_id, chain)
+            else:
+                return None
+
+        searched_deeper = False
+        if pdb_id and chain:
+            leaf_nodes = dict(chain = None)
+        else:
+            pdb_chain_ids = self.get_list_of_pdb_chains(pdb_id)
+            if pdb_chain_ids:
+                leaf_nodes = dict.fromkeys(pdb_chain_ids, None)
             else:
                 return None
 
@@ -311,44 +366,50 @@ class SCOPeDatabase(DatabaseInterface):
         d = {}
         for chain_id, details in leaf_nodes.iteritems():
             # Get the details for all chains
-            d[chain_id] = dict(
-                pdb_id = details['code'],
-                chain = details['chain'],
-                is_polypeptide = details['is_polypeptide'],
-                chain_description = details['ChainDescription'],
-                resolution = details['resolution'],
-                sunid = details['sunid'],
-                sccs = details['sccs'],
-                sid = details['sid'],
-                scop_release_id = details['release_id'],
-                SCOP_sources = 'SCOP',
-                SCOP_search_fields = 'link_pdb.pdb_chain_id',
-                SCOP_trust_level = 1
-            )
+            if details:
+                d[chain_id] = dict(
+                    pdb_id = details['code'],
+                    chain = details['chain'],
+                    is_polypeptide = details['is_polypeptide'],
+                    chain_description = details['ChainDescription'],
+                    resolution = details['resolution'],
+                    sunid = details['sunid'],
+                    sccs = details['sccs'],
+                    sid = details['sid'],
+                    scop_release_id = details['release_id'],
+                    SCOP_sources = 'SCOP',
+                    SCOP_search_fields = 'link_pdb.pdb_chain_id',
+                    SCOP_trust_level = 1
+                )
 
-            for k, v in sorted(self.levels.iteritems()):
-                d[chain_id][v] = None
+                for k, v in sorted(self.levels.iteritems()):
+                    d[chain_id][v] = None
 
-            level, parent_node_id = details['level_id'], details['parent_node_id']
+                level, parent_node_id = details['level_id'], details['parent_node_id']
 
-            # Store the top-level description
-            d[chain_id][self.levels[level]] = details['description']
+                # Store the top-level description
+                d[chain_id][self.levels[level]] = details['description']
 
-            # Wind up the level hierarchy and retrieve the descriptions
-            c = 0
-            while level > 0 :
-                parent_details = self.execute_select('SELECT * FROM scop_node WHERE id=%s', parameters = (parent_node_id,))
-                assert(len(parent_details) <= 1)
-                if parent_details:
-                    parent_details = parent_details[0]
-                    level, parent_node_id = parent_details['level_id'], parent_details['parent_node_id']
-                    d[chain_id][self.levels[level]] = parent_details['description']
-                else:
-                    break
-                # This should never trigger but just in case...
-                c += 1
-                if c > 20:
-                    raise Exception('There is a logical error in the script or database which may result in an infinite lookup loop.')
+                # Wind up the level hierarchy and retrieve the descriptions
+                c = 0
+                while level > 0 :
+                    parent_details = self.execute_select('SELECT * FROM scop_node WHERE id=%s', parameters = (parent_node_id,))
+                    assert(len(parent_details) <= 1)
+                    if parent_details:
+                        parent_details = parent_details[0]
+                        level, parent_node_id = parent_details['level_id'], parent_details['parent_node_id']
+                        d[chain_id][self.levels[level]] = parent_details['description']
+                    else:
+                        break
+                    # This should never trigger but just in case...
+                    c += 1
+                    if c > 20:
+                        raise Exception('There is a logical error in the script or database which may result in an infinite lookup loop.')
+            else:
+                if self.fallback_on_failures and not(internal_function_call) and not(searched_deeper):
+                    fallback_results = self.get_chain_details_by_pfam(pdb_id, chain_id)
+                    if fallback_results and fallback_results.get(chain_id):
+                        d[chain_id] = fallback_results[chain_id]
         return d
 
 
@@ -474,47 +535,80 @@ class SCOPeDatabase(DatabaseInterface):
         return self.get_details_as_csv(self.get_pfam_list_details_as_table(pfam_accs), field_separator = field_separator, line_separator = line_separator)
 
 
-if __name__ == '__main__':
+
+def __test():
     scopdb = SCOPeDatabase()
 
-    if True:
-        colortext.message('\nGetting chain details for 2zxj, chain A')
-        colortext.warning(pprint.pformat(scopdb.get_chain_details('2zxj', 'A')))
+    # Outstanding issue 1
+    # For 3FYM, the mapping between PDB chains and Pfam accession numbers I am using (SIFTS) only has the mapping:
+    # 3fym A -> PF13413 whereas the RCSB PDB website reports two other domains, PF12844 (a.35.1.3) and
+    # PF01381 (a.35.1 or a.4.14.1). I need to use more information than just relying on SIFTS to be complete.
+    colortext.message('\nGetting PDB details for PF13413')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details_by_related_pdb_chains('3FYM', 'A', set(['PF13413']))))
+    colortext.message('\nGetting PDB details for PF12844')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details_by_related_pdb_chains('3FYM', 'A', set(['PF12844']))))
+    colortext.message('\nGetting PDB details for PF01381')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details_by_related_pdb_chains('3FYM', 'A', set(['PF01381']))))
 
-        colortext.message('\nGetting PDB details for 2zxj')
-        colortext.warning(pprint.pformat(scopdb.get_chain_details('2zXJ'))) # the lookup is not case-sensitive w.r.t. PDB ID
+    # Outstanding issue 2
+    # PDB chains with multiple domains: only one domain returned.
+    # 1AQT chain A has a b.93.1.1 domain (residues 2-86) and a a.2.10.1 domain (residues 87-136). I only return the a.2.10.1 at present.
+    colortext.message('\nGetting PDB details for 1AQT, chain A')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('1AQT', 'A')))
 
-        colortext.message('\nGetting dicts for 1ki1 and 1a2c')
-        colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['1ki1', '1a2c'])))
+    return
 
-        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-        colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
+    colortext.message('\nGetting chain details for 2zxj, chain A')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('2zxj', 'A')))
 
-        colortext.message('\nGetting PFAM details for PF01035,  PF01833')
-        colortext.warning(pprint.pformat(scopdb.get_pfam_details('PF01035')))
+    colortext.message('\nGetting PDB details for 2zxj')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('2zXJ'))) # the lookup is not case-sensitive w.r.t. PDB ID
 
-        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-        colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2c']))
+    colortext.message('\nGetting dicts for 1ki1 and 1a2p')
+    colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['1ki1', '1a2p'])))
 
-        colortext.message('\nGetting details as CSV for 1ki1 and 1a2c')
-        colortext.warning(scopdb.get_pfam_list_details_as_csv(['PF01035', 'PF01833'])['Pfam'])
+    colortext.message('\nGetting details as CSV for 1ki1 and 1a2p')
+    colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2p']))
 
-        # get_chain_details_by_pfam cases
-        # This case tests what happens when there is no PDB chain entry in SCOPe - we should find the Pfam entry instead and look that up
-        colortext.message('\nGetting chain details for 3GVA')
-        colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA')))
+    colortext.message('\nGetting PFAM details for PF01035,  PF01833')
+    colortext.warning(pprint.pformat(scopdb.get_pfam_details('PF01035')))
 
-        colortext.message('\nGetting chain details for 3GVA, chain A')
-        colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA', 'A')))
-        assert(scopdb.get_chain_details('3GVA', 'A')['A']['SCOP_trust_level'] == 2)
+    colortext.message('\nGetting details as CSV for 1ki1 and 1a2p')
+    colortext.warning(scopdb.get_pdb_list_details_as_csv(['1ki1', '1a2p']))
+
+    colortext.message('\nGetting details as CSV for 1ki1 and 1a2p')
+    colortext.warning(scopdb.get_pfam_list_details_as_csv(['PF01035', 'PF01833'])['Pfam'])
+
+    # get_chain_details_by_pfam cases
+    # This case tests what happens when there is no PDB chain entry in SCOPe - we should find the Pfam entry instead and look that up
+    colortext.message('\nGetting chain details for 3GVA')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA')))
+
+    colortext.message('\nGetting chain details for 3GVA, chain A')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('3GVA', 'A')))
+    assert(scopdb.get_chain_details('3GVA', 'A')['A']['SCOP_trust_level'] == 2)
 
     # get_chain_details_by_related_pdb_chains cases
     # This case tests what happens when there is no PDB chain entry in SCOPe and the associated Pfam entries also have no
-    # SCOPe entries but their associated PDB chains do
-    # 2EVB, 2PND, 2QLC, 3FYM
-    colortext.message('\nGetting chain details for 2EVB')
-    colortext.warning(pprint.pformat(scopdb.get_chain_details('2EVB')))
-    #assert(scopdb.get_chain_details('2EVB', 'A')['A']['SCOP_trust_level'] == 3)
+    # SCOPe entries but their associated PDB chains do. In these cases, there is not enough common information e.g. 2EVB
+    # resolves to b.84.1.1, b.84.1.0, and a.9.1.0 which have no common root whereas 2PND resolves to b.1.1.2, b.1.1.1,
+    # b.1.1.0, and i.6.1.1.
+    colortext.message('\nGetting chain details for 2EVB, 2PND, 2QLC, 3FYM')
+    colortext.warning(pprint.pformat(scopdb.get_pdb_list_details(['2EVB', '2PND', '2QLC', '3FYM'])))
+    assert(scopdb.get_chain_details('2EVB', 'A')['A']['SCOP_trust_level'] == 3)
+    assert(scopdb.get_chain_details('2PND', 'A')['A']['SCOP_trust_level'] == 3)
 
+    # However, 1a2c tests get_chain_details_by_related_pdb_chains since chain I needs to drop down to this level in order
+    # to get results
+    colortext.message('\nGetting chain details for 1a2c')
+    colortext.warning(pprint.pformat(scopdb.get_chain_details('1a2c')))
+    assert(scopdb.get_chain_details('1a2c', 'H')['H']['SCOP_trust_level'] == 1)
+    assert(scopdb.get_chain_details('1a2c', 'I')['I']['SCOP_trust_level'] == 3)
 
     print('\n')
+
+
+
+
+if __name__ == '__main__':
+    __test()
