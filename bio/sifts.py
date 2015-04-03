@@ -2,7 +2,9 @@
 # encoding: utf-8
 """
 sifts.py
-Basic parsing for the SIFTS XML format. This is currently used to map PDB ATOM residues to indices within the UniParc sequence.
+Basic parsing for the SIFTS XML format.
+This is currently used to map PDB ATOM residues to indices within the UniParc sequence.
+We also extract the region maps for each chain i.e. the mappings from parts of the chain to Pfam and SCOP domains etc.
 
 Created by Shane O'Connor 2013
 """
@@ -11,11 +13,21 @@ import os
 import xml
 from xml.sax import parse as parse_xml
 
+if __name__ == '__main__':
+    import sys
+    sys.path.insert(0, '../..')
+
 from tools.fs.fsio import read_file, write_file, safe_gz_unzip
 from tools.comms.ftp import get_insecure_resource, FTPException550
 from tools import colortext
+from tools.general.strutil import merge_range_pairs
 import rcsb
-from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
+
+if __name__ == '__main__':
+    from tools.bio.pdb import PDB#, cases_with_ACE_residues_we_can_ignore
+else:
+    from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
+
 from basics import Sequence, SequenceMap, PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
 from uniprot import uniprot_map, UniParcEntry
 
@@ -131,7 +143,9 @@ class SIFTSResidue(object):
         return '\n'.join([('%s : %s' % (f.ljust(23), self.__dict__[f])) for f in self.__class__.fields if self.__dict__[f] != None])
 
 
+
 class SIFTS(xml.sax.handler.ContentHandler):
+
 
     def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
@@ -147,6 +161,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.uniparc_sequences = {}
         self.uniparc_objects = {}
         self.pdb_chain_to_uniparc_id_map = {}
+        self.region_mapping = {}
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -158,6 +173,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         assert(0 <= acceptable_sequence_percentage_match <= 100)
         assert(xml_contents.find("encoding='UTF-8'") != -1)
+
 
     def get_pdb_chain_to_uniparc_id_map(self):
         if self.pdb_chain_to_uniparc_id_map:
@@ -238,6 +254,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         xml.sax.parseString(xml_contents, handler)
         return handler
 
+
     def stack_push(self, lvl, data):
         if lvl == 0:
             assert(not(self._STACK))
@@ -248,6 +265,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         self._STACK.append((lvl, data))
 
+
     def stack_pop(self, lvl):
         num_levels = lvl + 1
         assert(self._STACK and (len(self._STACK) == num_levels))
@@ -257,25 +275,55 @@ class SIFTS(xml.sax.handler.ContentHandler):
         if lvl == 0:
             assert(not(self._STACK))
 
+
     def check_stack(self, lvl):
         assert(self._STACK and (len(self._STACK) == lvl))
         for x in range(lvl):
             assert(self._STACK[x][0] == x)
 
-    def start_document(self): pass
+
+    def start_document(self):
+        '''"The SAX parser will invoke this method only once, before any other methods in this interface or in DTDHandler (except for setDocumentLocator())."'''
+        pass
+
+    a='''
+<entity type="protein" entityId="A">
+    <segment segId="1aqt_A_1_2" start="1" end="2">
+      <listResidue>
+
+<listMapRegion>
+        <mapRegion start="3" end="138">
+          <db dbSource="PDB" dbCoordSys="PDBresnum" dbAccessionId="1aqt" dbChainId="A" start="3" end="138"/>
+        </mapRegion>'''
+
+
+
+    def add_region_mapping(self, attributes):
+        chain_id = (self._get_current_PDBe_chain())
+        mapRegion_attributes = self._STACK[3][1]
+        segment_range = (int(mapRegion_attributes['start']), int(mapRegion_attributes['end']))
+        dbSource = attributes['dbSource']
+        dbAccessionId = attributes['dbAccessionId']
+        self.region_mapping[chain_id] = self.region_mapping.get(chain_id, {})
+        self.region_mapping[chain_id][dbSource] = self.region_mapping[chain_id].get(dbSource, {})
+        self.region_mapping[chain_id][dbSource][dbAccessionId] = self.region_mapping[chain_id][dbSource].get(dbAccessionId, [])
+        self.region_mapping[chain_id][dbSource][dbAccessionId].append(segment_range)
+
 
     def start_element(self, name, attributes):
         self.tag_data = ''
+
+        # Residue details and mappings
 
         if name == 'crossRefDb':
             self.start_crossRefDb(attributes)
 
         elif name == 'residueDetail':
-            self.stack_push(3, None)
+            self.stack_push(4, None)
             self.start_residueDetail(attributes)
 
         elif name == 'residue':
-            self.stack_push(2, None)
+            self.stack_push(3, None)
             assert(attributes.get('dbSource'))
             assert(attributes.get('dbCoordSys'))
             assert(attributes.get('dbResNum'))
@@ -285,7 +333,31 @@ class SIFTS(xml.sax.handler.ContentHandler):
             self.current_residue = SIFTSResidue(self._get_current_PDBe_chain(), attributes['dbResNum'], attributes['dbResName'])
 
         elif name == 'listResidue':
-            self.stack_push(1, None)
+            self.stack_push(2, None)
+
+        # Region mappings
+
+        elif name == 'db':
+            if len(self._STACK) == 4 and self._STACK[3][1].get('nodeType') == 'mapRegion':
+                assert(attributes.get('dbSource'))
+                assert(attributes.get('dbAccessionId'))
+                self.add_region_mapping(attributes)
+
+        elif name == 'mapRegion':
+            assert(attributes.get('start'))
+            assert(attributes.get('end'))
+            self.stack_push(3, dict(start=attributes['start'], end=attributes['end'], nodeType = 'mapRegion'))
+
+        elif name == 'listMapRegion':
+            self.stack_push(2, None)
+
+        # Entities and segments
+
+        elif name == 'segment':
+            assert(attributes.get('segId'))
+            assert(attributes.get('start'))
+            assert(attributes.get('end'))
+            self.stack_push(1, dict(segId=attributes['segId'], start=attributes['start'], end=attributes['end']))
 
         elif name == 'entity':
             assert(attributes.get('type'))
@@ -298,14 +370,16 @@ class SIFTS(xml.sax.handler.ContentHandler):
             self.counters['entry'] = self.counters.get('entry', 0) + 1
             self.parse_header(attributes)
 
+
     def parse_header(self, attributes):
         if attributes.get('dbAccessionId'):
             self.pdb_id = attributes.get('dbAccessionId').upper()
         else:
             raise Exception('Could not verify the PDB ID from the <entry> tag.')
 
+
     def start_residueDetail(self, attributes):
-        self.check_stack(4)
+        self.check_stack(5)
         self.reading_unobserved_property = False
         dbSource = attributes.get('dbSource')
         assert(dbSource)
@@ -314,8 +388,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
             if residue_detail_property and residue_detail_property == 'Annotation':
                 self.reading_unobserved_property = True
 
+
     def start_crossRefDb(self, attributes):
-        self.check_stack(3)
+        self.check_stack(4)
         dbSource = attributes.get('dbSource')
         assert(dbSource)
 
@@ -341,20 +416,28 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 assert(dbCoordSys and dbAccessionId and dbResNum and dbResName)
                 current_residue.add_uniprot_residue(dbAccessionId, dbResNum, dbResName)
 
+
     def _get_current_PDBe_chain(self):
         return self._STACK[0][1]
+
+
+    def _get_current_segment_range(self):
+        return (self._STACK[1][1]['start'], self._STACK[1][1]['end'])
+
 
     def end_element(self, name):
         tag_content = self.tag_data
 
+        # Residue details and mappings
+
         if name == 'residueDetail':
-            self.stack_pop(3)
+            self.stack_pop(4)
             if self.reading_unobserved_property and (tag_content == 'Not_Observed'):
                 self.current_residue.WasNotObserved = True
             self.reading_unobserved_property = False
 
         elif name == 'residue':
-            self.stack_pop(2)
+            self.stack_pop(3)
             if self.current_residue.has_pdb_to_uniprot_mapping():
                 current_residue = self.current_residue
                 assert(self._get_current_PDBe_chain() == current_residue.PDBChainID)
@@ -362,10 +445,24 @@ class SIFTS(xml.sax.handler.ContentHandler):
             self.current_residue = None
 
         elif name == 'listResidue':
+            self.stack_pop(2)
+
+        # Region mappings
+
+        elif name == 'mapRegion':
+            self.stack_pop(3)
+
+        elif name == 'listMapRegion':
+            self.stack_pop(2)
+
+        # Entities and segments
+
+        elif name == 'segment':
             self.stack_pop(1)
 
         elif name == 'entity':
             self.stack_pop(0)
+
 
     def end_document(self):
         assert(self.counters['entry'] == 1)
@@ -450,7 +547,15 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 else:
                     raise Exception('Expected %.2f%% sequence match on matched residues but the SIFTS results only gave us %.2f%%.' % (self.acceptable_sequence_percentage_match, percentage_matched))
 
+        # Merge the ranges for the region mappings i.e. so [1-3],[3-86] becomes [1-86]
+        region_mapping = self.region_mapping
+        for chain_id, chain_details in region_mapping.iteritems():
+            for dbSource, source_details in chain_details.iteritems():
+                for dbAccessionId, range_list in source_details.iteritems():
+                    source_details[dbAccessionId] = merge_range_pairs(range_list)
+
         self._validate()
+
 
     def _validate(self):
         '''Tests that the maps agree through composition.'''
@@ -462,8 +567,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 uparc_id_2 = self.atom_to_uniparc_sequence_maps[c].map[k]
                 assert(uparc_id_1 == uparc_id_2)
 
+
     def characters(self, chrs):
         self.tag_data += chrs
+
 
     startDocument = start_document
     endDocument = end_document
@@ -472,3 +579,6 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
 
 
+if __name__ == '__main__':
+    s = SIFTS.retrieve('1AQT', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
+    print(s)
