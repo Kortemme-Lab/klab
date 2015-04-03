@@ -26,6 +26,26 @@ def parse_range_pairs(s, range_separator = '-', convert_to_tuple = True):
         return tuple(map(tuple, result))
     return result
 
+
+def merge_range_pairs(prs):
+    '''Takes in a list of pairs specifying ranges and returns a sorted list of merged, sorted ranges.'''
+    new_prs = []
+    sprs = [sorted(p) for p in prs]
+    sprs = sorted(sprs)
+    merged = False
+    x = 0
+    while x < len(sprs):
+        newx = x + 1
+        new_pair = list(sprs[x])
+        for y in range(x + 1, len(sprs)):
+            if new_pair[0] <= sprs[y][0] - 1 <= new_pair[1]:
+                new_pair[0] = min(new_pair[0], sprs[y][0])
+                new_pair[1] = max(new_pair[1], sprs[y][1])
+                newx = y + 1
+        new_prs.append(new_pair)
+        x = newx
+    return new_prs
+
 if __name__ == '__main__':
     class BadException(Exception): pass
     assert(parse_range('5,12..15,17', range_separator = '..') == [5] + range(12,16) + [17])
@@ -40,3 +60,8 @@ if __name__ == '__main__':
     assert(parse_range_pairs('3,5-15,17') == ((3, 3), (5, 15), (17, 17)))
     assert(parse_range_pairs('3,15-5,17') == ((3, 3), (5, 15), (17, 17)))
     assert(parse_range_pairs('3,15-5,17', convert_to_tuple = False) == [[3, 3], [5, 15], [17, 17]])
+
+    assert(merge_range_pairs([(2,2), (3,86)]) == [[2, 86]])
+    assert(merge_range_pairs([(2,2), (3,86), (89,100)]) == [[2, 86], [89, 100]])
+    assert(merge_range_pairs([(2,2), (3,86), (5,7), (81,88)]) == [[2, 88]])
+    assert(merge_range_pairs([(2,2), (-7, -9), (-10,-7), (-1, 4), (3, 10)]) == [[-10, -7], [-1,10]])

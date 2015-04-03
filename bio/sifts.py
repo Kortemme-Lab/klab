@@ -162,6 +162,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.uniparc_objects = {}
         self.pdb_chain_to_uniparc_id_map = {}
         self.region_mapping = {}
+        self.region_map_coordinate_systems = {}
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -308,6 +309,11 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.region_mapping[chain_id][dbSource] = self.region_mapping[chain_id].get(dbSource, {})
         self.region_mapping[chain_id][dbSource][dbAccessionId] = self.region_mapping[chain_id][dbSource].get(dbAccessionId, [])
         self.region_mapping[chain_id][dbSource][dbAccessionId].append(segment_range)
+
+        # Note: I do not currently store the coordinate system type on a range level since I am assuming that each mapping uses one coordinate system
+        if attributes.get('dbCoordSys'):
+            self.region_map_coordinate_systems[dbSource] = self.region_map_coordinate_systems.get(dbSource, set())
+            self.region_map_coordinate_systems[dbSource].add(attributes['dbCoordSys'])
 
 
     def start_element(self, name, attributes):
@@ -580,5 +586,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
 
 if __name__ == '__main__':
+    import pprint
     s = SIFTS.retrieve('1AQT', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
-    print(s)
+    colortext.warning(pprint.pformat(s.region_mapping))
+    colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
