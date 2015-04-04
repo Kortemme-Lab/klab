@@ -412,7 +412,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 dbChainId = attributes.get('dbChainId')
                 assert(dbCoordSys == "PDBresnum")
                 assert(dbAccessionId.upper() == self.pdb_id.upper())
-                assert(dbChainId == self._STACK[0][1])
+                #assert(dbChainId == self._STACK[0][1]) # this is not always true e.g. 1lmb has entityId="C" but dbChainId="3"
                 assert(dbCoordSys and dbAccessionId and dbResNum and dbResName and dbChainId )
                 current_residue.add_pdb_residue(dbChainId, dbResNum, dbResName)
 
@@ -446,7 +446,8 @@ class SIFTS(xml.sax.handler.ContentHandler):
             self.stack_pop(3)
             if self.current_residue.has_pdb_to_uniprot_mapping():
                 current_residue = self.current_residue
-                assert(self._get_current_PDBe_chain() == current_residue.PDBChainID)
+                #assert(self._get_current_PDBe_chain() == current_residue.PDBChainID) # this is not always true e.g. 1lmb has entityId="C" but dbChainId="3"
+
                 self.residues.append(current_residue)
             self.current_residue = None
 
@@ -588,5 +589,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
 if __name__ == '__main__':
     import pprint
     s = SIFTS.retrieve('1AQT', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
+    colortext.warning(pprint.pformat(s.region_mapping))
+    colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
+
+    s = SIFTS.retrieve('1lmb', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
     colortext.warning(pprint.pformat(s.region_mapping))
     colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
