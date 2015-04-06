@@ -46,6 +46,39 @@ def merge_range_pairs(prs):
         x = newx
     return new_prs
 
+
+def split_pdb_residue(s):
+    '''Splits a PDB residue into the numeric and insertion code components.'''
+    if s.isdigit():
+        return (int(s), ' ')
+    else:
+        assert(s[:-1].isdigit())
+        return ((s[:-1], s[-1]))
+
+
+def merge_pdb_range_pairs(prs):
+    '''Takes in a list of PDB residue IDs (including insertion codes) specifying ranges and returns a sorted list of merged, sorted ranges.
+       This works as above but we have to split the residues into pairs as  "1A" > "19".
+    '''
+    new_prs = []
+    sprs = [sorted((split_pdb_residue(p[0]), split_pdb_residue(p[1]))) for p in prs]
+    sprs = sorted(sprs)
+    merged = False
+    x = 0
+    from tools import colortext
+    while x < len(sprs):
+        newx = x + 1
+        new_pair = list(sprs[x])
+        for y in range(x + 1, len(sprs)):
+            if new_pair[0] <= (sprs[y][0][0] - 1, sprs[y][0][1]) <= new_pair[1]:
+                new_pair[0] = min(new_pair[0], sprs[y][0])
+                new_pair[1] = max(new_pair[1], sprs[y][1])
+                newx = y + 1
+        new_prs.append(new_pair)
+        x = newx
+    return new_prs
+
+
 if __name__ == '__main__':
     class BadException(Exception): pass
     assert(parse_range('5,12..15,17', range_separator = '..') == [5] + range(12,16) + [17])
