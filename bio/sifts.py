@@ -20,7 +20,7 @@ if __name__ == '__main__':
 from tools.fs.fsio import read_file, write_file, safe_gz_unzip
 from tools.comms.ftp import get_insecure_resource, FTPException550
 from tools import colortext
-from tools.general.strutil import merge_range_pairs
+from tools.general.strutil import merge_pdb_range_pairs, parse_range
 import rcsb
 
 if __name__ == '__main__':
@@ -41,6 +41,19 @@ NoSIFTSPDBUniParcMappingCases = set([
     '2IMM',
 ])
 
+expected_residue_numbering_schemes = {
+    'PDB'          : u'PDBresnum',
+    'CATH'         : u'PDBresnum',
+    'SCOP'         : u'PDBresnum',
+    'UniProt'      : u'UniProt',
+    'GO'           : u'UniProt',
+    'InterPro'     : u'UniProt',
+    'Pfam'         : u'UniProt',
+    'SCOP/UniProt' : u'UniProt', # This is my addition. It is the SCOP numbering mapped to UniProt numbering so that we can determine a fuzzy mapping between Pfam and SCOP domains based on residue ranges
+}
+
+
+
 # Methods
 
 def retrieve_file_from_EBI(resource, silent = True):
@@ -56,6 +69,38 @@ def retrieve_xml(pdb_id, silent = True):
 class MissingSIFTSRecord(Exception): pass
 class BadSIFTSMapping(Exception): pass
 class NoSIFTSPDBUniParcMapping(Exception): pass
+
+
+
+class DomainMatch(object):
+
+    def __init__(self, domain_accession, domain_type):
+        self.domain_accession = domain_accession
+        self.domain_type = domain_type
+        self.matches = {}
+
+
+    def add(self, domain_accession, domain_type, match_quality):
+        '''match_quality should be a value between 0 and 1.'''
+        self.matches[domain_type] = self.matches.get(domain_type, {})
+        self.matches[domain_type][domain_accession] = match_quality
+
+
+    def get_matches(self, domain_type):
+        return set(self.matches.get(domain_type, {}).keys())
+
+
+    def __repr__(self):
+        s = ''
+        for other_domain_type, v in sorted(self.matches.iteritems()):
+            s += '%s -> %s\n' % (self.domain_type, other_domain_type)
+            for domain_accession, match_quality in sorted(v.iteritems()):
+                s += '  %s -> %s: matched at %0.2f\n' % (self.domain_accession, domain_accession, match_quality)
+        return s
+
+
+
+
 
 class SIFTSResidue(object):
     # Same as AtomSite but no x, y, z data
@@ -147,7 +192,7 @@ class SIFTSResidue(object):
 class SIFTS(xml.sax.handler.ContentHandler):
 
 
-    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None):
+    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
 
         self.atom_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(PDB ResidueID -> (UniParc ID, UniParc sequence index)) where the UniParc sequence index is 1-based (first element has index 1)
@@ -163,6 +208,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.pdb_chain_to_uniparc_id_map = {}
         self.region_mapping = {}
         self.region_map_coordinate_systems = {}
+        self.domain_overlap_cutoff = domain_overlap_cutoff # the percentage (measured in the range [0, 1.0]) at which we consider two domains to be the same e.g. if a Pfam domain of length 60 overlaps with a SCOP domain on 54 residues then the overlap would be 54/60 = 0.9
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -302,7 +348,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
     def add_region_mapping(self, attributes):
         chain_id = (self._get_current_PDBe_chain())
         mapRegion_attributes = self._STACK[3][1]
-        segment_range = (int(mapRegion_attributes['start']), int(mapRegion_attributes['end']))
+        segment_range = (mapRegion_attributes['start'], mapRegion_attributes['end'])
         dbSource = attributes['dbSource']
         dbAccessionId = attributes['dbAccessionId']
         self.region_mapping[chain_id] = self.region_mapping.get(chain_id, {})
@@ -413,6 +459,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 assert(dbCoordSys == "PDBresnum")
                 assert(dbAccessionId.upper() == self.pdb_id.upper())
                 #assert(dbChainId == self._STACK[0][1]) # this is not always true e.g. 1lmb has entityId="C" but dbChainId="3"
+                if not dbChainId == self._STACK[0][1]: # use the dbChainId chain ID since that is what is used in the logic later on. Note: this may introduce bugs if the dbChainIds differ amongst themselves
+                    self._STACK[0] = (0, dbChainId)
+
                 assert(dbCoordSys and dbAccessionId and dbResNum and dbResName and dbChainId )
                 current_residue.add_pdb_residue(dbChainId, dbResNum, dbResName)
 
@@ -447,8 +496,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
             if self.current_residue.has_pdb_to_uniprot_mapping():
                 current_residue = self.current_residue
                 #assert(self._get_current_PDBe_chain() == current_residue.PDBChainID) # this is not always true e.g. 1lmb has entityId="C" but dbChainId="3"
-
                 self.residues.append(current_residue)
+            #else:
+            #    colortext.warning('Skipping %s' % str(self.current_residue))
+
             self.current_residue = None
 
         elif name == 'listResidue':
@@ -494,7 +545,6 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         map_chains = set()
         for r in self.residues:
-
             if not(r.PDBResidueID.isalnum() and int(r.PDBResidueID.isalnum()) < 0):
                 # These are not valid PDB residue IDs - the SIFTS XML convention sometimes assigns negative residue IDs to unobserved residues before the first ATOM record
                 # (only if the first residue ID is 1?)
@@ -559,7 +609,91 @@ class SIFTS(xml.sax.handler.ContentHandler):
         for chain_id, chain_details in region_mapping.iteritems():
             for dbSource, source_details in chain_details.iteritems():
                 for dbAccessionId, range_list in source_details.iteritems():
-                    source_details[dbAccessionId] = merge_range_pairs(range_list)
+                    source_details[dbAccessionId] = merge_pdb_range_pairs(range_list)
+
+        pdb_res_str = PDB.ChainResidueID2String
+        for chain_id, chain_details in region_mapping.iteritems():
+            d = {}
+
+            atom_to_uniparc_mapping = self.atom_to_uniparc_sequence_maps[chain_id]
+            for dbSource, source_details in chain_details.iteritems():
+                if dbSource == 'SCOP':
+                    for dbAccessionId, range_lists in source_details.iteritems():
+                        new_list = []
+                        for l in range_lists:
+                            pdb_start_resnum, pdb_end_resnum = None, None
+
+                            uniprot_start_resnum = None
+                            c = 0
+                            residue_integer_part = l[0][0]
+                            residue_to_map_from = ''.join(map(str, l[0]))
+                            while not uniprot_start_resnum and c < 20:
+                                uniprot_start_resnum = atom_to_uniparc_mapping[pdb_res_str(chain_id, residue_to_map_from)]
+                                pdb_start_resnum = uniprot_start_resnum
+                                residue_integer_part += 1
+                                residue_to_map_from = str(residue_integer_part) # after the first miss, just consider residues with no insertion codes
+                                c += 1
+                            if uniprot_start_resnum: uniprot_start_resnum = uniprot_start_resnum[1]
+
+                            uniprot_end_resnum = None
+                            c = 0
+                            residue_integer_part = l[1][0]
+                            residue_to_map_from = ''.join(map(str, l[1]))
+                            while not uniprot_end_resnum and c < 20:
+                                uniprot_end_resnum = atom_to_uniparc_mapping[pdb_res_str(chain_id, residue_to_map_from)]
+                                pdb_end_resnum = uniprot_end_resnum
+                                residue_integer_part += 1
+                                residue_to_map_from = str(residue_integer_part) # after the first miss, just consider residues with no insertion codes
+                                c += 1
+                            if uniprot_end_resnum: uniprot_end_resnum = uniprot_end_resnum[1]
+
+                            new_list.append((uniprot_start_resnum, uniprot_end_resnum))
+
+                        if new_list:
+                            d[dbAccessionId] = new_list
+                        #region_mapping[chain_id]['SCOP/UniProt'][dbAccessionId]
+                        #source_details[dbAccessionId] = merge_pdb_range_pairs(range_list)
+            if d:
+                region_mapping[chain_id][u'SCOP/UniProt'] = d
+
+        # Check to see if the expected numbering schemes hold
+        for k, v in expected_residue_numbering_schemes.iteritems():
+            if self.region_map_coordinate_systems.get(k):
+                assert(self.region_map_coordinate_systems[k] == set([v]))
+
+        # Convert ranges for non-PDB schemes back from pairs of strings into integers
+        for chain_id, chain_details in region_mapping.iteritems():
+            for dbSource, source_details in chain_details.iteritems():
+                if dbSource != 'SCOP/UniProt': # I already use the correct ranges above
+                    if expected_residue_numbering_schemes.get(dbSource) == u'UniProt':
+                        for dbAccessionId, range_lists in source_details.iteritems():
+                            flattened_lists = []
+                            for ri in range_lists:
+                                assert(ri[0][1] == ' ' and ri[1][1] == ' ')
+                                flattened_lists.append((ri[0][0], ri[1][0]))
+                            source_details[dbAccessionId] = flattened_lists
+
+
+        pfam_scop_mapping = {}
+        scop_pfam_mapping = {}
+        for chain_id, chain_details in region_mapping.iteritems():
+            if chain_details.get('Pfam') and chain_details.get('SCOP/UniProt'):
+                for pfamAccessionId, pfam_range_lists in chain_details['Pfam'].iteritems():
+                    pfam_residues = parse_range(','.join(['%d-%d' % (r[0], r[1]) for r in pfam_range_lists]))
+                    for scopAccessionId, scop_range_lists in chain_details['SCOP/UniProt'].iteritems():
+                        scop_residues = parse_range(','.join(['%d-%d' % (r[0], r[1]) for r in scop_range_lists]))
+                        num_same_residues = len(set(pfam_residues).intersection(set(scop_residues)))
+                        if num_same_residues > 10:
+                            Pfam_match_quality = float(num_same_residues) / float(len(pfam_residues))
+                            SCOP_match_quality = float(num_same_residues) / float(len(scop_residues))
+                            if (Pfam_match_quality >= self.domain_overlap_cutoff) or (SCOP_match >= self.domain_overlap_cutoff):
+                                pfam_scop_mapping[pfamAccessionId] = pfam_scop_mapping.get(pfamAccessionId, DomainMatch(pfamAccessionId, 'Pfam'))
+                                pfam_scop_mapping[pfamAccessionId].add(scopAccessionId, 'SCOP', SCOP_match_quality)
+                                scop_pfam_mapping[scopAccessionId] = scop_pfam_mapping.get(scopAccessionId, DomainMatch(scopAccessionId, 'SCOP'))
+                                scop_pfam_mapping[scopAccessionId].add(pfamAccessionId, 'Pfam', Pfam_match_quality)
+
+        self.pfam_scop_mapping = pfam_scop_mapping
+        self.scop_pfam_mapping = scop_pfam_mapping
 
         self._validate()
 
@@ -588,10 +722,18 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
 if __name__ == '__main__':
     import pprint
+
+    print('\n')
     s = SIFTS.retrieve('1AQT', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
     colortext.warning(pprint.pformat(s.region_mapping))
     colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
+    colortext.warning(pprint.pformat(s.pfam_scop_mapping))
+    colortext.warning(pprint.pformat(s.scop_pfam_mapping))
+    print('\n\n')
 
     s = SIFTS.retrieve('1lmb', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
     colortext.warning(pprint.pformat(s.region_mapping))
     colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
+    colortext.warning(pprint.pformat(s.pfam_scop_mapping))
+    colortext.warning(pprint.pformat(s.scop_pfam_mapping))
+    print('\n\n')
