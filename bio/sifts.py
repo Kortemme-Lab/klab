@@ -737,3 +737,11 @@ if __name__ == '__main__':
     colortext.warning(pprint.pformat(s.pfam_scop_mapping))
     colortext.warning(pprint.pformat(s.scop_pfam_mapping))
     print('\n\n')
+
+    s = SIFTS.retrieve('1utx', cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
+    colortext.warning(pprint.pformat(s.region_mapping))
+    colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
+    colortext.warning(pprint.pformat(s.pfam_scop_mapping))
+    colortext.warning(pprint.pformat(s.scop_pfam_mapping))
+
+    print('\n\n')
