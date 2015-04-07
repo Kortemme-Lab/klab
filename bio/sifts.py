@@ -89,6 +89,15 @@ class DomainMatch(object):
         return set(self.matches.get(domain_type, {}).keys())
 
 
+    def to_dict(self):
+        d = {}
+        for other_domain_type, v in sorted(self.matches.iteritems()):
+            for domain_accession, match_quality in sorted(v.iteritems()):
+                d[other_domain_type] = d.get(other_domain_type, set())
+                d[other_domain_type].add(domain_accession)
+        return {self.domain_accession : d}
+
+
     def __repr__(self):
         s = ''
         for other_domain_type, v in sorted(self.matches.iteritems()):
@@ -96,9 +105,6 @@ class DomainMatch(object):
             for domain_accession, match_quality in sorted(v.iteritems()):
                 s += '  %s -> %s: matched at %0.2f\n' % (self.domain_accession, domain_accession, match_quality)
         return s
-
-
-
 
 
 class SIFTSResidue(object):
@@ -195,7 +201,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
 
         self.atom_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(PDB ResidueID -> (UniParc ID, UniParc sequence index)) where the UniParc sequence index is 1-based (first element has index 1)
+
+        # Note: These maps map from PDB residue IDs to PDBe residue IDs
         self.atom_to_seqres_sequence_maps = {} # PDB Chain -> SequenceMap(PDB ResidueID -> SEQRES sequence index) where the SEQRES sequence index is 1-based (first element has index 1)
+
         self.seqres_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(SEQRES index -> (UniParc ID, UniParc sequence index)) where the SEQRES index and UniParc sequence index is 1-based (first element has index 1)
         self.counters = {}
         self.pdb_id = None
@@ -617,7 +626,6 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         pfam_scop_mapping = {}
         scop_pfam_mapping = {}
-        colortext.warning(pprint.pformat(region_mapping))
         for chain_id, chain_details in region_mapping.iteritems():
             if chain_details.get('Pfam') and chain_details.get('SCOP'):
                 for pfamAccessionId, pfam_range_lists in chain_details['Pfam'].iteritems():
@@ -628,7 +636,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
                         if num_same_residues > 10:
                             Pfam_match_quality = float(num_same_residues) / float(len(pfam_residues))
                             SCOP_match_quality = float(num_same_residues) / float(len(scop_residues))
-                            if (Pfam_match_quality >= self.domain_overlap_cutoff) or (SCOP_match >= self.domain_overlap_cutoff):
+                            if (Pfam_match_quality >= self.domain_overlap_cutoff) or (SCOP_match_quality >= self.domain_overlap_cutoff):
                                 pfam_scop_mapping[pfamAccessionId] = pfam_scop_mapping.get(pfamAccessionId, DomainMatch(pfamAccessionId, 'Pfam'))
                                 pfam_scop_mapping[pfamAccessionId].add(scopAccessionId, 'SCOP', SCOP_match_quality)
                                 scop_pfam_mapping[scopAccessionId] = scop_pfam_mapping.get(scopAccessionId, DomainMatch(scopAccessionId, 'SCOP'))
@@ -665,8 +673,8 @@ class SIFTS(xml.sax.handler.ContentHandler):
 if __name__ == '__main__':
     import pprint
 
-    #for pdb_id in ['1AQT', '1lmb', '1utx', '2gzu']:
-    for pdb_id in ['1utx']:
+    #for pdb_id in ['1AQT', '1lmb', '1utx', '2gzu', '2pnr', '1y8p', '2q8i', '1y8n', '1y8o', '1oax', '3dvn', '1mnu', '1mcl', '2p4a', '1s78', '1i8k']:
+    for pdb_id in ['2pnr']:
         print('\n')
         colortext.message(pdb_id)
         s = SIFTS.retrieve(pdb_id, cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
