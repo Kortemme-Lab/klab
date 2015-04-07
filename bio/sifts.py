@@ -197,8 +197,11 @@ class SIFTSResidue(object):
 class SIFTS(xml.sax.handler.ContentHandler):
 
 
-    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88):
-        '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
+    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88, require_uniprot_residue_mapping = True):
+        ''' The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.
+            If require_uniprot_residue_mapping is set and there is no PDB residue -> UniProt sequence index mapping (e.g. 2IMM at the time of writing) then we raise an exception.
+            Otherwise, we store the information we can which can still be useful e.g. SCOP domain data.
+        '''
 
         self.atom_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(PDB ResidueID -> (UniParc ID, UniParc sequence index)) where the UniParc sequence index is 1-based (first element has index 1)
 
@@ -217,6 +220,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.region_mapping = {}
         self.region_map_coordinate_systems = {}
         self.domain_overlap_cutoff = domain_overlap_cutoff # the percentage (measured in the range [0, 1.0]) at which we consider two domains to be the same e.g. if a Pfam domain of length 60 overlaps with a SCOP domain on 54 residues then the overlap would be 54/60 = 0.9
+        self.require_uniprot_residue_mapping = require_uniprot_residue_mapping
 
         self.modified_residues = PDB(pdb_contents).modified_residues
 
@@ -265,7 +269,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0):
+    def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = True):
         '''Creates a PDBML object by using a cached copy of the files if they exists or by retrieving the files from the RCSB.'''
 
         pdb_contents = None
@@ -305,7 +309,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         xml_contents = safe_gz_unzip(xml_contents)
 
         # Return the object
-        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir)
+        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir, require_uniprot_residue_mapping = require_uniprot_residue_mapping)
         xml.sax.parseString(xml_contents, handler)
         return handler
 
@@ -501,13 +505,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         elif name == 'residue':
             self.stack_pop(3)
-            if self.current_residue.has_pdb_to_uniprot_mapping():
-                current_residue = self.current_residue
-                #assert(self._get_current_PDBe_chain() == current_residue.PDBChainID) # this is not always true e.g. 1lmb has entityId="C" but dbChainId="3"
-                self.residues.append(current_residue)
-            #else:
-            #    colortext.warning('Skipping %s' % str(self.current_residue))
-
+            current_residue = self.current_residue
+            #assert(self._get_current_PDBe_chain() == current_residue.PDBChainID) # this is not always true e.g. 1lmb has entityId="C" but dbChainId="3"
+            self.residues.append(current_residue)
             self.current_residue = None
 
         elif name == 'listResidue':
@@ -542,14 +542,14 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         UniProtACs = set()
         for r in self.residues:
-            UniProtACs.add(r.UniProtAC)
-        #print(UniProtACs)
+            if r.UniProtAC:
+                UniProtACs.add(r.UniProtAC)
+
         ACC_to_UPARC_mapping = uniprot_map('ACC', 'UPARC', list(UniProtACs), cache_dir = self.cache_dir)
         assert(sorted(ACC_to_UPARC_mapping.keys()) == sorted(list(UniProtACs)))
         for k, v in ACC_to_UPARC_mapping.iteritems():
             assert(len(v) == 1)
             ACC_to_UPARC_mapping[k] = v[0]
-        #print(ACC_to_UPARC_mapping)
 
         map_chains = set()
         for r in self.residues:
@@ -559,12 +559,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 pass
 
             # Store the PDB->UniProt mapping
-            UniProtAC = r.UniProtAC
-            UniParcID = ACC_to_UPARC_mapping[UniProtAC]
-            #colortext.message('%s %d (%s)' % (r.PDBeChainID, r.PDBeResidueID, r.PDBeResidue3AA))
-            #print(r)
-
-            self.uniparc_ids.add(UniParcID)
+            if r.has_pdb_to_uniprot_mapping():
+                UniProtAC = r.UniProtAC
+                UniParcID = ACC_to_UPARC_mapping[UniProtAC]
+                self.uniparc_ids.add(UniParcID)
 
             full_pdb_residue_ID = r.get_pdb_residue_id()
             PDBChainID = r.PDBChainID
@@ -572,14 +570,16 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
             if not r.WasNotObserved:
                 # Do not add ATOM mappings when the ATOM data does not exist
-                atom_to_uniparc_residue_map[PDBChainID] = atom_to_uniparc_residue_map.get(PDBChainID, {})
-                atom_to_uniparc_residue_map[PDBChainID][full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
+                if r.has_pdb_to_uniprot_mapping():
+                    atom_to_uniparc_residue_map[PDBChainID] = atom_to_uniparc_residue_map.get(PDBChainID, {})
+                    atom_to_uniparc_residue_map[PDBChainID][full_pdb_residue_ID] = (UniParcID, r.UniProtResidueIndex)
 
                 atom_to_seqres_residue_map[PDBChainID] = atom_to_seqres_residue_map.get(PDBChainID, {})
                 atom_to_seqres_residue_map[PDBChainID][full_pdb_residue_ID] = r.PDBeResidueID
 
-            seqres_to_uniparc_residue_map[PDBChainID] = seqres_to_uniparc_residue_map.get(PDBChainID, {})
-            seqres_to_uniparc_residue_map[PDBChainID][r.PDBeResidueID] = (UniParcID, r.UniProtResidueIndex)
+            if r.has_pdb_to_uniprot_mapping():
+                seqres_to_uniparc_residue_map[PDBChainID] = seqres_to_uniparc_residue_map.get(PDBChainID, {})
+                seqres_to_uniparc_residue_map[PDBChainID][r.PDBeResidueID] = (UniParcID, r.UniProtResidueIndex)
 
             # Make sure we only have at most one match per PDB residue
             assert(full_pdb_residue_ID not in residues_encountered)
@@ -588,22 +588,30 @@ class SIFTS(xml.sax.handler.ContentHandler):
             # Count the number of exact sequence matches
             PDBResidue3AA = r.PDBResidue3AA
             pdb_residue_type = residue_type_3to1_map.get(PDBResidue3AA) or self.modified_residues.get(PDBResidue3AA) or protonated_residue_type_3to1_map.get(PDBResidue3AA) or non_canonical_amino_acids.get(PDBResidue3AA)
-            if pdb_residue_type == r.UniProtResidue1AA:
-                residues_matched += 1
+            if r.has_pdb_to_uniprot_mapping():
+                if pdb_residue_type == r.UniProtResidue1AA:
+                    residues_matched += 1
             residue_count += 1
 
         # Create the SequenceMaps
         for c in map_chains:
-            self.atom_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(atom_to_uniparc_residue_map[c])
+            if residues_matched > 0:
+                self.atom_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(atom_to_uniparc_residue_map[c])
+                self.seqres_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(seqres_to_uniparc_residue_map[c])
             self.atom_to_seqres_sequence_maps[c] = SequenceMap.from_dict(atom_to_seqres_residue_map[c])
-            self.seqres_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(seqres_to_uniparc_residue_map[c])
 
         # Check the match percentage
-        if residue_count == 0:
+        if residues_matched == 0:
             if self.pdb_id and self.pdb_id in NoSIFTSPDBUniParcMappingCases:
-                raise NoSIFTSPDBUniParcMapping('The PDB file %s has a known bad SIFTS mapping at the time of writing.' % self.pdb_id)
+                if self.require_uniprot_residue_mapping:
+                    raise NoSIFTSPDBUniParcMapping('The PDB file %s has a bad or missing SIFTS mapping at the time of writing.' % self.pdb_id)
+                else:
+                    colortext.error('Warning: The PDB file %s has a a bad or missing SIFTS mapping at the time of writing so there is no PDB -> UniProt residue mapping.' % self.pdb_id)
             else:
-                raise Exception('No residue information matching PDB residues to UniProt residues was found.')
+                if self.require_uniprot_residue_mapping:
+                    raise Exception('No residue information matching PDB residues to UniProt residues was found.')
+                else:
+                    colortext.error('Warning: No residue information matching PDB residues to UniProt residues was found.')
         else:
             percentage_matched = float(residues_matched)*100.0/float(residue_count)
             if percentage_matched < self.acceptable_sequence_percentage_match:
@@ -650,13 +658,14 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
     def _validate(self):
         '''Tests that the maps agree through composition.'''
-        assert(self.atom_to_uniparc_sequence_maps.keys() == self.atom_to_seqres_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys())
+        assert((self.atom_to_uniparc_sequence_maps.keys() == self.atom_to_seqres_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys()) or (self.atom_to_uniparc_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys() == []))
         for c, m in self.atom_to_seqres_sequence_maps.iteritems():
-            assert(self.atom_to_uniparc_sequence_maps[c].keys() == self.atom_to_seqres_sequence_maps[c].keys())
-            for k, v in m.map.iteritems():
-                uparc_id_1 = self.seqres_to_uniparc_sequence_maps[c].map[v]
-                uparc_id_2 = self.atom_to_uniparc_sequence_maps[c].map[k]
-                assert(uparc_id_1 == uparc_id_2)
+            if self.seqres_to_uniparc_sequence_maps.keys():
+                assert(self.atom_to_uniparc_sequence_maps[c].keys() == self.atom_to_seqres_sequence_maps[c].keys())
+                for k, v in m.map.iteritems():
+                    uparc_id_1 = self.seqres_to_uniparc_sequence_maps[c].map[v]
+                    uparc_id_2 = self.atom_to_uniparc_sequence_maps[c].map[k]
+                    assert(uparc_id_1 == uparc_id_2)
 
 
     def characters(self, chrs):
