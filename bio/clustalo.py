@@ -72,6 +72,7 @@ alignment_line_regex = re.compile('Sequences [(](\d+):(\d+)[)] Aligned. Score:\s
 class NoPDBUniParcMappingExists(Exception): pass
 class MalformedSequenceException(Exception): pass
 
+
 class SequenceAligner(object):
     ''' This class is used to align sequences. To use it, first add sequences using the add_sequence function. Next, call the align function to perform
         the alignment. Alignment results are stored in the following object variables:
@@ -764,3 +765,43 @@ class PDBUniParcSequenceAligner(object):
             for c_2 in related_chains:
                 if self.seqres_to_uniparc_sequence_maps.get(c_1):
                     self.seqres_to_uniparc_sequence_maps[c_2] = self.seqres_to_uniparc_sequence_maps[c_1]
+
+
+
+class PDBChainSequenceAligner(object):
+    '''This is a useful utility class which allows you to quickly figure out when sequences are identical on their overlap or what the mutations are.
+       I used this in the DDG project to investigate PDB files to determine overlap between the binding affinity datasets.
+       Example usage:
+            pcsa = PDBChainSequenceAligner(initial_chains = [('2GOO', 'A'), ('2GOO', 'D'), ('2H62', 'A'), ('2H62', 'B')], cache_dir = '/tmp')
+            output, best_matches = pcsa.align()
+            colortext.warning(pprint.pformat(best_matches)).
+    '''
+
+    def __init__(self, initial_chains = [], cache_dir = None):
+        '''initial_chains should be a list of (pdb_id, chain_id) tuples/lists.'''
+        self.cache_dir = cache_dir
+        self.pdb_chains = []
+        for ic in initial_chains:
+            self.add(ic[0], ic[1])
+
+
+    def add(self, pdb_id, chain_id):
+        assert(len(pdb_id) == 4)
+        assert(len(chain_id) == 1)
+        f = FASTA.retrieve(pdb_id, cache_dir = self.cache_dir)
+        print(f[pdb_id][chain_id])
+        self.pdb_chains.append(dict(
+            pdb_id = pdb_id,
+            chain_id = chain_id,
+            sequence = f[pdb_id][chain_id],
+        ))
+
+    def align(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2):
+        if len(self.pdb_chains) > 1:
+            sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
+            for pdb_chain in self.pdb_chains:
+                sa.add_sequence('%s_%s' % (pdb_chain['pdb_id'], pdb_chain['chain_id']), pdb_chain['sequence'])
+            best_matches = sa.align()
+            return sa.alignment_output, best_matches
+        else:
+            raise Exception('Cannot align sequences - less than two chains were specified.')
