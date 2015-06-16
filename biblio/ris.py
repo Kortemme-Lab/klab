@@ -93,6 +93,12 @@ taglist = [
     u'Y1', # Used for date
     u'JF', # Used for journal
     u'JA', # Used for journal
+    # Canonical?
+    u'U1', # Used custom field results
+    u'U2', # Used custom field results
+    u'U3', # Used custom field results
+    u'U4', # Used custom field results
+    u'U5', # Used custom field results
 ]
 
 tag_map = {
