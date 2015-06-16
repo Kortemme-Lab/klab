@@ -37,6 +37,29 @@ def fraction_correct(x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
     return correct / float(num_points)
 
 
+def fraction_correct_fuzzy_linear_create_vector(z, z_cutoff, z_fuzzy_range):
+    '''Helper function for fraction_correct_fuzzy_linear.'''
+    import numpy
+    assert(z_fuzzy_range * 2 < z_cutoff)
+    if (z >= z_cutoff + z_fuzzy_range): # positive e.g. z >= 1.1
+        return [0, 0, 1]
+    elif (z <= -z_cutoff - z_fuzzy_range):  # negative e.g. z <= -1.1
+        return [1, 0, 0]
+    elif (-z_cutoff + z_fuzzy_range <= z <= z_cutoff - z_fuzzy_range): # neutral e.g. -0.9 <= z <= 0.9
+        return [0, 1, 0]
+    elif (-z_cutoff - z_fuzzy_range < z < -z_cutoff + z_fuzzy_range): # negative/neutral e.g. -1.1 < z < 0.9
+        neutrality = (z + z_cutoff + z_fuzzy_range) / (z_fuzzy_range * 2)
+        zvec = [1 - neutrality, neutrality, 0]
+    elif (z_cutoff - z_fuzzy_range < z < z_cutoff + z_fuzzy_range): # neutral/positive e.g. 0.9 < z < 1.1
+        positivity = (z - z_cutoff + z_fuzzy_range) / (z_fuzzy_range * 2)
+        zvec = [0, 1 - positivity, positivity]
+    else:
+        raise Exception('Logical error.')
+    # normalize the vector
+    length = math.sqrt(numpy.dot(zvec, zvec))
+    return numpy.divide(zvec, length)
+
+
 def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
     '''A version of fraction_correct which is more forgiving at the boundary positions.
        In fraction_correct, if the x value is 1.01 and the y value is 0.99 (with cutoffs of 1.0) then that pair evaluates
@@ -57,50 +80,11 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
     for i in range(num_points):
         x = x_values[i]
         y = y_values[i]
-
-        #N X P
-        if (x >= x_cutoff + x_fuzzy_range):
-            xvec = [0, 0, 1]
-        elif (x <= -x_cutoff - x_fuzzy_range):
-            xvec = [1, 0, 0]
-        elif (-x_cutoff - x_fuzzy_range <= x <= x_cutoff - x_fuzzy_range):
-            xvec = [0, 1, 0]
-        elif (-x_cutoff - x_fuzzy_range > x > -x_cutoff + x_fuzzy_range):
-            neutral_value = x - (-x_cutoff - x_fuzzy_range) / (x_fuzzy_range * 2)
-            xvec = [1 - neutral_value, neutral_value, 0]
-            # normalize the vector
-            length = math.sqrt(numpy.dot(xvec, xvec))
-            xvec = numpy.divide(xvec, length)
-        elif (x_cutoff - x_fuzzy_range < x < x_cutoff + x_fuzzy_range):
-            positive_value = x - (x_cutoff - x_fuzzy_range) / (x_fuzzy_range * 2)
-            xvec = [0, 1 - positive_value, positive_value]
-            # normalize the vector
-            length = math.sqrt(numpy.dot(xvec, xvec))
-            xvec = numpy.divide(xvec, length)
-
         y_cutoff = x_cutoff * y_scalar
         y_fuzzy_range = x_fuzzy_range * y_scalar
-        if (y >= y_cutoff + y_fuzzy_range):
-            yvec = [0, 0, 1]
-        elif (y <= -y_cutoff - y_fuzzy_range):
-            yvec = [1, 0, 0]
-        elif (-y_cutoff - y_fuzzy_range <= y <= y_cutoff - y_fuzzy_range):
-            yvec = [0, 1, 0]
-        elif (-y_cutoff - y_fuzzy_range > y > -y_cutoff + y_fuzzy_range):
-            neutral_value = y - (-y_cutoff - y_fuzzy_range) / (y_fuzzy_range * 2)
-            yvec = [1 - neutral_value, neutral_value, 0]
-            # normalize the vector
-            length = math.sqrt(numpy.dot(yvec, yvec))
-            yvec = numpy.divide(yvec, length)
-        elif (y_cutoff - y_fuzzy_range < y < y_cutoff + y_fuzzy_range):
-            positive_value = y - (y_cutoff - y_fuzzy_range) / (y_fuzzy_range * 2)
-            yvec = [0, 1 - positive_value, positive_value]
-            # normalize the vector
-            length = math.sqrt(numpy.dot(yvec, yvec))
-            yvec = numpy.divide(yvec, length)
-
+        xvec = fraction_correct_fuzzy_linear_create_vector(x, x_cutoff, x_fuzzy_range)
+        yvec = fraction_correct_fuzzy_linear_create_vector(y, y_cutoff, y_fuzzy_range)
         correct += numpy.dot(xvec, yvec)
-
     return correct / float(num_points)
 
 
