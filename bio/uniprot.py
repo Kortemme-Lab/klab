@@ -37,7 +37,10 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
         an intermediary format like ACC (UniProtKB AC) or ID (UniProtKB ID).
         This function returns a dict mapping the IDs in from_scheme to a list of sorted IDs in to_scheme.
     '''
-
+    try:
+        assert(hasattr(list_of_from_ids, '__iter__'))
+    except:
+        raise Exception('The list_of_from_ids argument should be an iterable type (e.g. list).')
     full_mapping = {}
     cached_mapping_file = None
     if cache_dir:
@@ -293,6 +296,7 @@ class UniProtACEntry(object):
         'NMR'   : 'nuclear magnetic resonance',
         'X-ray' : 'X-ray crystallography',
         'Neutron'   : 'neutron diffraction',
+        'Other'     : 'other'
     }
 
     def __init__(self, UniProtAC, XML = None, cache_dir = None, silent = True):
@@ -430,8 +434,9 @@ class UniProtACEntry(object):
                     if pdb_id not in PDBs_marked_as_XRay_with_no_resolution:
                         assert(resolution)
                         mapping[pdb_id] = {'method' : method, 'resolution' : resolution, 'chains' : {}}
+                        import pprint
                         for chain in chains:
-                            assert(chain[0]not in mapping[pdb_id]['chains'])
+                            #assert(chain[0] not in mapping[pdb_id]['chains']) # todo: I disabled this when calling get_common_PDB_IDs as it hit the assertion while looking up 1REW with 4N1D. Is this assertion necessary?
                             mapping[pdb_id]['chains'][chain[0]] = (chain[1], chain[2])
 
         if False:
@@ -750,7 +755,7 @@ class UniParcEntry(object):
                         s.append(" (short names: %s)" % ",".join(tpl[0]['Short names']))
                     if tpl[0]['EC numbers']:
                         s.append(" (EC numbers: %s)" % ",".join(tpl[0]['EC numbers']))
-            raise UniParcEntryStandardizationException("".join(s))
+            #raise UniParcEntryStandardizationException("".join(s))
         elif len(recommended_names) > 1:
             s = ["UniParcID %s has multiple recommended names: " % UniParcID]
             for tpl in sorted(recommended_names, key=lambda x:-x[1]):
@@ -761,9 +766,11 @@ class UniParcEntry(object):
                     s.append(" (EC numbers: %s)" % ",".join(tpl[0]['EC numbers']))
             raise UniParcEntryStandardizationException("".join(s))
 
-        assert(len(recommended_names) == 1)
+        #assert(len(recommended_names) == 1) # todo: this is not always available
         #print(recommended_names)
-        self.recommended_name = recommended_names[0][0]
+        self.recommended_name = None
+        if len(recommended_names) == 1:
+            self.recommended_name = recommended_names[0][0]
         self.get_organisms()
 
     def _get_XML(self):
@@ -858,3 +865,30 @@ class UniParcEntry(object):
                 a.append(colortext.make("%s\n" % str(v), 'silver'))
         return "".join(a)
         #, '        return simplejson.dumps(self.to_dict())
+
+
+
+def get_common_PDB_IDs(pdb_id, cache_dir = None, exception_on_failure = True):
+    '''This function takes a PDB ID, maps it to UniProt ACCs, then returns the common set of PDB IDs related to those ACCs.
+       The purpose is to find any PDB files related to pdb_id, particularly for complexes, such that the other PDB files
+       contain identical sequences or mutant complexes.'''
+    m = pdb_to_uniparc([pdb_id], cache_dir = cache_dir)
+    UniProtACs = []
+    if pdb_id in m:
+        for entry in m[pdb_id]:
+            if entry.UniProtACs:
+                UniProtACs.extend(entry.UniProtACs)
+            elif exception_on_failure:
+                raise Exception('No UniProtAC for one entry.Lookup failed.')
+    elif exception_on_failure:
+        raise Exception('Lookup failed.')
+
+    if not UniProtACs:
+        if exception_on_failure:
+            raise Exception('Lookup failed.')
+        else:
+            return None
+    common_set = set(uniprot_map('ACC', 'PDB_ID', [UniProtACs[0]], cache_dir = cache_dir).get(UniProtACs[0], []))
+    for acc in UniProtACs[1:]:
+         common_set = common_set.intersection(set(uniprot_map('ACC', 'PDB_ID', [acc], cache_dir = cache_dir).get(acc, [])))
+    return sorted(common_set)
