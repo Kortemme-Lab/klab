@@ -71,7 +71,7 @@ class DatabaseInterface(object):
         tablenames = self.TableNames
         for tbl in tablenames:
             setattr(self.FieldNames, tbl, _FieldNames(tbl))
-            fieldDescriptions = self.execute("SHOW COLUMNS FROM %s" % tbl)
+            fieldDescriptions = self.execute("SHOW COLUMNS FROM `%s`" % tbl)
             for field in fieldDescriptions:
                 fieldname = field["Field"]
                 setattr(getattr(self.FieldNames, tbl), fieldname, fieldname)
