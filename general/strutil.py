@@ -7,11 +7,17 @@ Utility functions for string manipulation.
 Created by Shane O'Connor 2014
 """
 
+
+def remove_trailing_line_whitespace(content):
+    return ('\n'.join([l.strip() for l in content.split('\n')])).strip()
+
+
 def parse_range(s, range_separator = '-'):
     ''' Parses the string s which contains indices and ranges and returns the explicit list of integers defined by s.
         Written by Laurens Kraal 2014.
     '''
     return reduce(lambda x,y: x+y, (map(lambda r: (range(int(r.split(range_separator)[0]), int(r.split(range_separator)[1])+1)) if range_separator in r else [int(r)], s.split(','))))
+
 
 def parse_range_pairs(s, range_separator = '-', convert_to_tuple = True):
     ''' Based on parse_range but instead returns a list of lists with the ranges. A single index n is returned as a range (n, n)
