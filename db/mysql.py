@@ -516,8 +516,11 @@ class DatabaseInterface(object):
             wherestr = []
             PKvalues = []
             for PKfield in PKfields:
-                wherestr.append("%s=%%s" % PKfield)
-                PKvalues.append(d[PKfield])
+                if d[PKfield] == None:
+                    wherestr.append("%s IS NULL" % PKfield)
+                else:
+                    wherestr.append("%s=%%s" % PKfield)
+                    PKvalues.append(d[PKfield])
             PKfields = join(PKfields, ",")
             wherestr = join(wherestr, " AND ")
             existingRecord = self.locked_execute("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr,
