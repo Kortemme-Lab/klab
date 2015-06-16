@@ -273,3 +273,134 @@ class MonomerDSSP(object):
                 d['is_buried'] = False
 
 
+
+
+class ComplexDSSP(MonomerDSSP):
+    '''
+    A class wrapper for DSSP.
+
+    Note: This class does *not* strip the PDB file.
+
+    Once initialized, the dssp element of the object should contain a mapping from protein chain IDs to dicts.
+    The dict associated with a protein chain ID is a dict from PDB residue IDs to details about that residue.
+    For example:
+       dssp -> 'A' -> '  64 ' -> {
+                                  '3LC': 'LEU',
+                                  'acc': 171,
+                                  'bp_1': 0,
+                                  'bp_2': 0,
+                                  'chain_id': 'I',
+                                  'dssp_res_id': 10,
+                                  'dssp_residue_aa': 'L',
+                                  'exposure': 0.95,
+                                  'is_buried': False,
+                                  'pdb_res_id': '  64 ',
+                                  'residue_aa': 'L',
+                                  'sheet_label': ' ',
+                                  'ss': None,
+                                  'ss_details': '<      '}
+
+    Description of the fields:
+      - residue_aa and 3LC contain the residue 1-letter and 3-letter codes respectively;
+      - acc is the number of water molecules in contact with this residue (according to DSSP);
+      - exposure is a normalized measure of exposure where 0.0 denotes total burial and 1.0 denotes total exposure;
+        - exposure is calculated by dividing the number of water molecules in contact with this residue (according to DSSP) by the residue_max_acc value from the appropriate value table;
+      - is_buried is either None (could not be determined), True if exposure < cut_off, or False if exposure >= cut_off;
+      - ss is the assigned secondary structure type, using the DSSP secondary structure types (see basics.py/dssp_secondary_structure_types). This value may be None if no secondary structure was assigned.
+
+    Usage:
+       d = DSSP.from_RCSB('1HAG')
+
+       # access the dict directly
+       print(d.dssp['I']['  64 ']['exposure'])
+       print(d.dssp['I']['  64 ']['is_buried'])
+
+       # use dot notation
+       print(d.dsspb.I.get('  64 ').exposure)
+       print(d.dsspb.I.get('  64 ').is_buried)
+
+       # iterate through the residues
+       for chain_id, mapping in d:
+           for residue_id, residue_details in sorted(mapping.iteritems()):
+               print(residue_id, residue_details['exposure'])
+
+    '''
+
+    @classmethod
+    def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+
+
+    @classmethod
+    def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+
+
+    @classmethod
+    def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+
+
+    def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+        '''This function strips a PDB file to one chain and then runs DSSP on this new file.
+           p should be a PDB object (see pdb.py).
+        '''
+        try:
+            _Popen('.', shlex.split('mkdssp --version'))
+        except Exception, e:
+            raise colortext.Exception('mkdssp does not seem to be installed in a location declared in the environment path.')
+
+        self.cut_off = cut_off
+        self.tmp_dir = tmp_dir
+        self.residue_max_acc = residue_max_acc[acc_array]
+        self.pdb = p.clone() # make a local copy in case this gets modified externally
+        self.chain_order = self.pdb.atom_chain_order
+        self.dssp_output = None
+        self.dssp = {}
+        self.compute()
+        self.chain_order = [c for c in self.chain_order if c in self.dssp]
+        self.dsspb = NestedBunch(self.dssp)
+
+
+    def compute(self):
+        tmp_dir = self.tmp_dir
+        p = self.pdb.clone()
+        input_filepath = write_temp_file(tmp_dir, p.get_content(), ftype = 'w', prefix = 'dssp_')
+        output_filepath = write_temp_file(tmp_dir, '', ftype = 'w', prefix = 'dssp_')
+        try:
+            p = _Popen('.', shlex.split('mkdssp -i {input_filepath} -o {output_filepath}'.format(**locals())))
+            if p.errorcode:
+                if p.stderr.find('empty protein, or no valid complete residues') != -1:
+                    raise MissingAtomException(p.stdout)
+                else:
+                    raise Exception('An error occurred while calling DSSP:\n%s' % p.stderr)
+
+            self.dssp_output = read_file(output_filepath)
+            self.dssp = self.parse_output()
+        except MissingAtomException, e:
+            os.remove(input_filepath)
+            os.remove(output_filepath)
+            raise
+        except Exception, e:
+            os.remove(input_filepath)
+            os.remove(output_filepath)
+            raise colortext.Exception('%s\n%s' % (str(e), traceback.format_exc()))
+        os.remove(input_filepath)
+        os.remove(output_filepath)
+
+
+    def parse_output(self):
+        d = {}
+        dssp_output = self.dssp_output
+        assert(dssp_output.startswith('===='))
+        header_line = '  #  RESIDUE AA STRUCTURE BP1 BP2  ACC     N-H-->O    O-->H-N    N-H-->O    O-->H-N    TCO  KAPPA ALPHA  PHI   PSI    X-CA   Y-CA   Z-CA'
+        idx = dssp_output.find(header_line)
+        assert(idx != -1)
+        data_lines = [l for l in dssp_output[idx + len(header_line):].split('\n') if l.strip()]
+        for dl in data_lines:
+            l = self.parse_data_line(dl)
+            if l:
+                d[l['chain_id']] = d.get(l['chain_id'], {})
+                d[l['chain_id']][l['pdb_res_id']] = l
+        return d
+
