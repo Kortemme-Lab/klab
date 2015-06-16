@@ -110,6 +110,16 @@ def rainbowprint(s, bgcolor = None, suffix = "\n", effect = None, rainbow = rain
 def rastaprint(s, bgcolor = None, suffix = "\n", effect = None):
     rainbowprint(s, bgcolor = bgcolor, suffix = suffix, effect = effect, rainbow = rasta_)
 
+# I added these functions to make it easier to print with different colors
+# The are shorthand for the write, printf, and make functions above
+# e.g. colortext.pcyan('test') prints in cyan, colortext.wlightpurple('test') writes in light purple, colortext.mblue('test') returns a blue string
+# Note: Python does not close the scope in for-loops so the closure definition looks odd - we need to explicitly capture the state of the c variable ("c=c")
+for c in colors:
+    setattr(sys.modules[__name__], 'w'  + c, lambda s, c=c : write(s, color = c))
+    setattr(sys.modules[__name__], 'p'  + c, lambda s, c=c : printf(s, color = c))
+    setattr(sys.modules[__name__], 'm'  + c, lambda s, c=c : make(s, color = c))
+
+
 class Exception(Exception): 	
     def __init__(self, msg):
         self.message = make_error(msg)
