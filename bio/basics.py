@@ -701,6 +701,16 @@ class ChainMutation(Mutation):
             return Exception('The two residues have the same chain and residue ID but different wildtypes so they are incomparable.')
         return True
 
+class SKEMPIMutation(ChainMutation):
+    '''Adds a Location member to the ChainMutation class.'''
+
+    def __init__(self, WildTypeAA, ResidueID, MutantAA, Location, Chain = None):
+        super(SKEMPIMutation, self).__init__(WildTypeAA, ResidueID, MutantAA, Chain = Chain, SecondaryStructurePosition = None, AccessibleSurfaceArea = None)
+        self.Location = Location
+
+    def __repr__(self):
+        return "%s:%s %s->%s in %s" % (self.Chain, self.WildTypeAA, str(self.ResidueID), self.MutantAA, self.Location)
+
 
 def mutation_combinations(mutations):
     '''A generator which returns all non-empty combinations of ChainMutation objects, respecting residue position i.e. if two residues
