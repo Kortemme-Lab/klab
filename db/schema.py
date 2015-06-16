@@ -16,11 +16,15 @@ import re
 import subprocess
 import getpass
 import time
+import shlex
 sys.path.insert(0, '../..')
 
 import tools.colortext as colortext
 from mysql import DatabaseInterface as MySQLDatabaseInterface
 from tools.fs.fsio import read_file, write_file, open_temp_file
+
+
+class EmptyDiagramException(Exception): pass
 
 class MySQLSchema(object):
 
@@ -43,31 +47,86 @@ class MySQLSchema(object):
 
         # Get the DB schema, normalizing for sqlt-diagram
         db_schema = []
-        for t in sorted(dbinterface.TableNames):
-            creation_string = dbinterface.execute_select('SHOW CREATE TABLE %s' % t)
-            assert(len(creation_string) == 1)
-            creation_string = '%s;' % creation_string[0]['Create Table'].strip()
-            self.original_schema.append(creation_string)
+        self.num_tables = 0
+        try:
+            for t in sorted(dbinterface.TableNames):
+              creation_string = dbinterface.execute_select('SHOW CREATE TABLE `%s`' % t)
+              assert(len(creation_string) == 1)
+              if creation_string[0].get('Create Table') == None: # e.g. for views
+                  continue
+              self.num_tables += 1
+              creation_string = '%s;' % creation_string[0]['Create Table'].strip()
+              self.original_schema.append(creation_string)
 
-            # Fix input for sqlt-diagram (it is fussy)
-            creation_string = creation_string.replace("default ''", "")
-            creation_string = creation_string.replace("DEFERRABLE INITIALLY DEFERRED", "") # sqlt-diagram doesn't like this syntax for MySQL
-            creation_string = creation_string.replace("AUTOINCREMENT", "") # sqlt-diagram doesn't like this syntax for MySQL
-            creation_string = creation_string.replace("auto_increment", "") # sqlt-diagram doesn't like this syntax for MySQL
-            creation_string = re.sub("COMMENT.*'.*'", "", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
-            creation_string = re.sub("CONSTRAINT.*?CHECK.*?,", "", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
-            creation_string = re.sub("CONSTRAINT.*?CHECK.*?[)][)]", ")", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
-            creation_string = re.sub(" AUTO_INCREMENT=\d+", "", creation_string, re.DOTALL)
-            creation_string = creation_string.replace("''", "")
-            creation_string = creation_string.replace('tg_', 'auth_')
-            db_schema.append(creation_string)
+              # Fix input for sqlt-diagram (it is fussy)
+              creation_string = creation_string.replace("default ''", "")
+              creation_string = creation_string.replace("DEFAULT ''", "")
+              creation_string = creation_string.replace("DEFERRABLE INITIALLY DEFERRED", "") # sqlt-diagram doesn't like this syntax for MySQL
+              creation_string = creation_string.replace("AUTOINCREMENT", "") # sqlt-diagram doesn't like this syntax for MySQL
+              creation_string = creation_string.replace("auto_increment", "") # sqlt-diagram doesn't like this syntax for MySQL
+              creation_string = re.sub("COMMENT.*'.*'", "", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
+              creation_string = re.sub("CONSTRAINT.*?CHECK.*?,", "", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
+              creation_string = re.sub("CONSTRAINT.*?CHECK.*?[)][)]", ")", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
+              creation_string = re.sub(" AUTO_INCREMENT=\d+", "", creation_string, re.DOTALL)
+              creation_string = creation_string.replace("''", "")
+              creation_string = creation_string.replace('tg_', 'auth_')
+              db_schema.append(creation_string)
+        except: raise
         db_schema = '\n\n'.join(db_schema)
         self.db_schema = db_schema
+        self.mysqldump_schema = self.get_schema(host, user, passwd, db)
+
+
+    def print_schema(self):
+        c = 1
+        for x in self.sanitize_schema().split('\n'):
+            colortext.warning('%04d: %s' % (c, x))
+            c += 1
+   
+
+    def sanitize_schema(self):      
+        # Fix input for sqlt-diagram (it is fussy)
+        creation_string = self.mysqldump_schema
+        creation_string = creation_string.replace("default ''", "")
+        creation_string = creation_string.replace("DEFAULT ''", "")
+        creation_string = creation_string.replace("DEFERRABLE INITIALLY DEFERRED", "") # sqlt-diagram doesn't like this syntax for MySQL
+        creation_string = creation_string.replace("AUTOINCREMENT", "") # sqlt-diagram doesn't like this syntax for MySQL
+        creation_string = creation_string.replace("auto_increment", "") # sqlt-diagram doesn't like this syntax for MySQL
+        creation_string = re.sub("COMMENT.*'.*'", "", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
+        creation_string = re.sub("CONSTRAINT.*?CHECK.*?,", "", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
+        creation_string = re.sub("CONSTRAINT.*?CHECK.*?[)][)]", ")", creation_string, re.DOTALL) # sqlt-diagram doesn't like this syntax for MySQL
+        creation_string = re.sub(" AUTO_INCREMENT=\d+", "", creation_string, re.DOTALL)
+        creation_string = creation_string.replace("''' ,", "' ,")
+        creation_string = creation_string.replace("''',", "',")
+        creation_string = creation_string.replace("'' ,", "")
+        creation_string = creation_string.replace("'',", "")
+        creation_string = creation_string.replace("''", "")
+        #write_file('/tmp/failed_schema.sql', creation_string)
+        return creation_string
+
+
+    def get_schema(self, host, username, passwd, database_name):
+        try:
+            outfile, outfilename = open_temp_file('/tmp', "w")
+            p = subprocess.Popen(shlex.split("mysqldump -h %s -u %s -p%s --skip-add-drop-table --no-data %s" % (host, username, passwd, database_name)), stdout=outfile)
+            p.wait()
+            outfile.close()
+            contents = read_file(outfilename)
+            os.remove(outfilename)
+            return contents
+        except Exception, e:
+            if os.path.exists(outfilename):
+                os.remove(outfilename)
+            raise
+
 
     def get_full_schema(self):
+        # todo: rename this to get_definition as this is more appropriate
         return '\n\n'.join(self.original_schema)
 
     def generate_schema_diagram(self, output_filepath = None, show_fk_only = False):
+        if self.num_tables == 0:
+            raise EmptyDiagramException('No tables in schema.')
         tempfiles = self._generate_schema_diagram(show_fk_only)
         self.schema_diagram = read_file(tempfiles[1])
         for fname in tempfiles:
@@ -82,7 +141,8 @@ class MySQLSchema(object):
         output_handle, sql_schema_filepath = open_temp_file('/tmp', ftype = 'w')
         tempfiles.append(sql_schema_filepath)
         try:
-            output_handle.write('%s\n\n' % self.db_schema)
+            #output_handle.write('%s\n\n' % self.db_schema)
+            output_handle.write('%s\n\n' % self.sanitize_schema())#mysqldump_schema)
             output_handle.close()
         except:
             output_handle.close()
