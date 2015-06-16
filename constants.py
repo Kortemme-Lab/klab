@@ -26,6 +26,8 @@ rosetta_weights = {
 	"lk_costheta"                                       	:	(None, None, []),
 	"lk_polar"                                          	:	(None, None, []),
 	"lk_nonpolar"                                       	:	(None, None, []),
+	"fa_elec"                                         	:	(None, None, []),
+	"dslf_fa13"                                         	:	(None, None, []),
 	"hack_elec"                                         	:	(None, None, []),
 	"hack_elec_bb_bb"                                   	:	(None, None, []),
 	"hack_elec_bb_sc"                                   	:	(None, None, []),
