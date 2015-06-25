@@ -68,7 +68,7 @@ ROSETTA_HACKS_residues_to_remove = {
 
 }
 
-# For use with get_pdb_contents_to_pose_residue_map e.g. {'1A2P' : '-ignore_zero_occupancy false', ... }
+# For use with get_pdb_contents_to_pose_residue_map e.g. {'1A2P' : ('-ignore_zero_occupancy false',), ... }
 HACKS_pdb_specific_hacks = {
 }
 
@@ -1328,10 +1328,12 @@ class PDB:
         return seqres_to_atom_maps, atom_to_seqres_maps
 
 
-    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path):
+    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, extra_command_flags = None):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
             Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
+
+            The extra_command_flags parameter expects a string e.g. "-ignore_zero_occupancy false".
         '''
 
         ## Create a mapping from Rosetta-numbered residues to PDB ATOM residues
@@ -1347,7 +1349,7 @@ class PDB:
 
         # Get the residue mapping using the features database
         pdb_file_contents = "\n".join(self.structure_lines)
-        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path, pdb_id = self.pdb_id, extra_flags = specific_flag_hacks or '')
+        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path, pdb_id = self.pdb_id, extra_flags = ((specific_flag_hacks or '') + ' ' + (extra_command_flags or '')).strip())
         if not success:
             raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
 
@@ -1396,6 +1398,28 @@ class PDB:
 
         self.rosetta_to_atom_sequence_maps = rosetta_to_atom_sequence_maps
         self.rosetta_sequences = rosetta_sequences
+
+
+    def map_pdb_residues_to_rosetta_residues(self, mutations):
+        '''This function takes a list of Mutation objects and uses the PDB to Rosetta mapping to return the list of mutations
+           using Rosetta numbering.
+           e.g.
+              p = PDB(...)
+              p.construct_pdb_to_rosetta_residue_map()
+              rosetta_mutations = p.map_pdb_residues_to_rosetta_residues(pdb_mutations)
+        '''
+        if not self.rosetta_to_atom_sequence_maps and self.rosetta_sequences:
+            raise Exception('The PDB to Rosetta mapping has not been determined. Please call construct_pdb_to_rosetta_residue_map first.')
+        import pprint
+        pprint.pprint(self.rosetta_to_atom_sequence_maps)
+        raise Exception('Here.')
+
+
+    def assert_wildtype_matches(self, mutation):
+        '''Check that the wildtype of the Mutation object matches the PDB sequence.'''
+        readwt = self.getAminoAcid(self.getAtomLine(mutation.Chain, mutation.ResidueID))
+        assert(mutation.WildTypeAA == residue_type_3to1_map[readwt])
+
 
     ### END OF REFACTORED CODE
 
@@ -1639,6 +1663,8 @@ class PDB:
            mutations based on the ddGResmap (which must be previously instantiated).
            This function checks that the mutated positions exist and that the wild-type matches the PDB.
         '''
+        raise Exception('This code is deprecated. Please use map_pdb_residues_to_rosetta_residues instead.')
+
         remappedMutations = []
         ddGResmap = self.get_ddGResmap()
 
@@ -1662,6 +1688,8 @@ class PDB:
            Unoccupied ATOM lines are discarded.
            This function also builds maps from PDB numbering to Rosetta numbering and vice versa.
            '''
+        raise Exception('This code is deprecated.')
+
         from Bio.PDB import PDBParser
         resmap = {}
         iresmap = {}
