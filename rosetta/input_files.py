@@ -7,9 +7,20 @@ Simple parsers for Rosetta input file types.
 Created by Shane O'Connor 2014
 """
 
+import pprint
 import re
-from ..fs.fsio import read_file
-from ..general.strutil import parse_range
+
+if __name__ == '__main__':
+    import sys
+    sys.path.insert(0, '../..')
+    from tools.fs.fsio import read_file
+    from tools.bio.basics import SimpleMutation
+    from tools.general.strutil import parse_range
+else:
+    from ..fs.fsio import read_file
+    from ..bio.basics import SimpleMutation
+    from ..general.strutil import parse_range
+
 
 class RosettaFileParsingException(Exception): pass
 
@@ -23,8 +34,6 @@ class RosettaFileParsingException(Exception): pass
 # column4  "integer":  Cut point residue number, >=startRes, <=endRes. Default or 0: let LoopRebuild choose cutpoint randomly.
 # column5  "float":    Skip rate. default - never skip
 # column6  "boolean":  Extend loop. Default false
-
-class RosettaFileParsingException(Exception): pass
 
 class LoopsFile(object):
     '''A class to manipulate loops files. Note that the indices in these files are 1-indexed i.e. A start position of 5
@@ -234,6 +243,109 @@ class Resfile (object):
         return sorted(self.design + self.repack)
 
 
+class Mutfile (object):
+    '''Note: This class behaves differently to Resfile. It stores mutation information using the SimpleMutation class.
+
+       Rosetta mutfiles are text files split into sections where each section contains a number of mutations i.e. each
+       section defines one mutagenesis.
+       Mutfile objects represent the contents of these files by storing the mutations as a list of SimpleMutation lists.
+    '''
+
+    header_pattern = '^total\s+(\d+)\s*(?:#.*)?$'
+    mutation_group_header_pattern = '^\s*(\d+)\s*(?:#.*)?$'
+    mutation_pattern = '^\s*([A-Z])\s+(\d+)\s+([A-Z])\s*(?:#.*)?$'
+
+
+    @staticmethod
+    def from_file(filepath):
+        return Mutfile(open(filepath).read())
+
+
+    @staticmethod
+    def from_mutagenesis(mutations):
+        '''This is a special case (the common case) of from_mutations where there is only one mutagenesis/mutation group.'''
+        return Mutfile.from_mutations([mutations])
+
+
+    @staticmethod
+    def from_mutageneses(mutation_groups):
+        '''mutation_groups is expected to be a list containing lists of SimpleMutation objects.'''
+        mf = Mutfile()
+        mf.mutation_groups = mutation_groups
+        return mf
+
+
+    def to_file(self):
+        '''Creates a mutfile from the set of mutation groups.'''
+        s = []
+
+        # Header
+        total_number_of_mutations = sum([len(mg) for mg in self.mutation_groups])
+        s.append('total %d' % total_number_of_mutations)
+
+        # Mutation groups
+        for mg in self.mutation_groups:
+            assert(len(mg) > 0)
+            s.append('%d' % len(mg))
+            # Mutation list
+            for m in mg:
+                s.append('%(WildTypeAA)s %(ResidueID)d %(MutantAA)s' % m.__dict__)
+
+        s.append('')
+        return '\n'.join(s)
+
+
+    def __init__(self, mutfile_content = None):
+
+        self.mutation_groups = []
+        if mutfile_content:
+            # Parse the file header
+            mutfile_content = mutfile_content.strip()
+            data_lines = [l for l in mutfile_content.split('\n') if l.strip()]
+            try:
+                num_mutations = int(re.match(Mutfile.header_pattern, data_lines[0]).group(1))
+            except:
+                raise RosettaFileParsingException('The mutfile has a bad header (expected "total n" where n is an integer).')
+
+            line_counter, mutation_groups = 1, []
+            while True:
+                if line_counter >= len(data_lines):
+                    break
+
+                mutation_group_number = len(mutation_groups) + 1
+
+                # Parse the group header
+                try:
+                    group_header = data_lines[line_counter]
+                    line_counter += 1
+                    num_mutations_in_group = int(re.match(Mutfile.mutation_group_header_pattern, group_header).group(1))
+                    if num_mutations_in_group < 1:
+                        raise RosettaFileParsingException('The mutfile has a record in mutation group %d: the number of reported mutations must be an integer greater than zero.' % mutation_group_number)
+                except:
+                    raise RosettaFileParsingException('The mutfile has a bad header for mutation group %d.' % mutation_group_number)
+
+                # Parse the mutations in the group
+                try:
+                    mutations = []
+                    for mutation_line in data_lines[line_counter: line_counter + num_mutations_in_group]:
+                        mtch = re.match(Mutfile.mutation_pattern, mutation_line)
+                        mutations.append(SimpleMutation(mtch.group(1), int(mtch.group(2)), mtch.group(3)))
+                    mutation_groups.append(mutations)
+                    line_counter += num_mutations_in_group
+                except:
+                    raise RosettaFileParsingException('An exception occurred while parsing the mutations for mutation group %d.' % mutation_group_number)
+
+            if sum([len(mg) for mg in mutation_groups]) != num_mutations:
+                raise RosettaFileParsingException('A total of %d mutations were expected from the file header but the file contained %d mutations.' % (num_mutations, sum([len(mg) for mg in mutation_groups])))
+
+            self.mutation_groups = mutation_groups
+
+
+    def get_total_mutation_count(self):
+        return sum([len(mg) for mg in self.mutation_groups])
+
+
+
 
 if __name__ == '__main__':
 
@@ -266,3 +378,19 @@ LOOP 23 30 26 2 TrUe
         ''')
     for p, ss_def in sorted(ss.data.iteritems()):
         print('%s: %s' % (p, ''.join(ss_def)))
+
+
+    mf = Mutfile('''
+total 3 #this is the total number of mutations being made.
+2 # the number of mutations made
+G 1 A # the wild-type aa, the residue number, and the mutant aa
+W 6 Y # the wild-type aa, the residue number, and the mutant aa
+1 #the number of mutations
+F 10 Y # the wild-type aa, the residue number, and the mutant aa''')
+    pprint.pprint(mf.mutation_groups)
+    normalized_content = mf.to_file()
+    print(normalized_content)
+    mf = Mutfile(normalized_content)
+    pprint.pprint(mf.mutation_groups)
+    normalized_content_2 = mf.to_file()
+    assert(normalized_content_2 == normalized_content) # fixed-point check
