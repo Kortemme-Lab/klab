@@ -349,12 +349,6 @@ class Mutfile (object):
 
 if __name__ == '__main__':
 
-    # For testing, these lines need to be included at the top of the script:
-    # import sys
-    # sys.path.insert(0, '../..')
-    # from tools.fs.fsio import read_file
-    # from tools.general.strutil import parse_range
-
     p = LoopsFile('''
 LOOP 23 30
 LOOP -1 30 26
