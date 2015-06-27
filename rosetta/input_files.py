@@ -264,7 +264,7 @@ class Mutfile (object):
     @staticmethod
     def from_mutagenesis(mutations):
         '''This is a special case (the common case) of from_mutations where there is only one mutagenesis/mutation group.'''
-        return Mutfile.from_mutations([mutations])
+        return Mutfile.from_mutageneses([mutations])
 
 
     @staticmethod
@@ -275,7 +275,7 @@ class Mutfile (object):
         return mf
 
 
-    def to_file(self):
+    def __repr__(self):
         '''Creates a mutfile from the set of mutation groups.'''
         s = []
 
@@ -382,9 +382,9 @@ W 6 Y # the wild-type aa, the residue number, and the mutant aa
 1 #the number of mutations
 F 10 Y # the wild-type aa, the residue number, and the mutant aa''')
     pprint.pprint(mf.mutation_groups)
-    normalized_content = mf.to_file()
+    normalized_content = str(mf)
     print(normalized_content)
     mf = Mutfile(normalized_content)
     pprint.pprint(mf.mutation_groups)
-    normalized_content_2 = mf.to_file()
+    normalized_content_2 = str(mf)
     assert(normalized_content_2 == normalized_content) # fixed-point check
