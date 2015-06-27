@@ -8,7 +8,7 @@ import types
 import string
 import types
 
-from .basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation
+from .basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
 from .basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from .. import colortext
 from ..fs.fsio import read_file, write_file
@@ -378,6 +378,7 @@ class PDB:
 
         self.rosetta_to_atom_sequence_maps = {}
         self.rosetta_residues = []
+        self.residue_types = set()                      # the set of 3-letter residue types present in the file (useful for checking against e.g. CSE, MSE)
 
         self.fix_pdb()
         self._split_lines()
@@ -519,6 +520,7 @@ class PDB:
             linetype = line[0:6]
             if linetype == 'ATOM  ' or linetype == 'HETATM' or linetype == 'TER   ':
                 chain_id = line[21]
+                self.residue_types.add(line[17:20].strip())
                 if missing_chain_ids.get(self.pdb_id):
                     chain_id = missing_chain_ids[self.pdb_id]
                 structure_lines.append(line)
@@ -1400,9 +1402,59 @@ class PDB:
         self.rosetta_sequences = rosetta_sequences
 
 
+    def get_atom_sequence_to_rosetta_map(self):
+        '''Uses the Rosetta->ATOM injective map to construct an injective mapping from ATOM->Rosetta.
+           We do not extend the injection to include ATOM residues which have no corresponding Rosetta residue.
+             e.g. atom_sequence_to_rosetta_mapping[c].map.get('A  45 ') will return None if there is no corresponding Rosetta residue
+           those residues to None.
+           Likewise, if a PDB chain c is not present in the Rosetta model then atom_sequence_to_rosetta_mapping[c].map.get(s) returns None.
+        '''
+        if not self.rosetta_to_atom_sequence_maps and self.rosetta_sequences:
+            raise Exception('The PDB to Rosetta mapping has not been determined. Please call construct_pdb_to_rosetta_residue_map first.')
+
+        atom_sequence_to_rosetta_mapping = {}
+        for chain_id, mapping in self.rosetta_to_atom_sequence_maps.iteritems():
+            chain_mapping = {}
+            for k in mapping:
+                chain_mapping[k[1]] = k[0]
+            atom_sequence_to_rosetta_mapping[chain_id] = SequenceMap.from_dict(chain_mapping)
+
+        # Add empty maps for missing chains
+        for chain_id, sequence in self.atom_sequences.iteritems():
+            if not atom_sequence_to_rosetta_mapping.get(chain_id):
+                atom_sequence_to_rosetta_mapping[chain_id] = SequenceMap()
+
+        return atom_sequence_to_rosetta_mapping
+
+
+    def get_atom_sequence_to_rosetta_json_map(self):
+        '''Returns the mapping from PDB ATOM residue IDs to Rosetta residue IDs in JSON format.'''
+        import json
+        d = {}
+        atom_sequence_to_rosetta_mapping = self.get_atom_sequence_to_rosetta_map()
+        for c, sm in atom_sequence_to_rosetta_mapping.iteritems():
+            for k, v in sm.map.iteritems():
+                d[k] = v
+        return json.dumps(d, sort_keys = True)
+
+
+    def get_rosetta_sequence_to_atom_json_map(self):
+        '''Returns the mapping from Rosetta residue IDs to PDB ATOM residue IDs in JSON format.'''
+        import json
+        if not self.rosetta_to_atom_sequence_maps and self.rosetta_sequences:
+            raise Exception('The PDB to Rosetta mapping has not been determined. Please call construct_pdb_to_rosetta_residue_map first.')
+
+        d = {}
+        for c, sm in self.rosetta_to_atom_sequence_maps.iteritems():
+            for k, v in sm.map.iteritems():
+                d[k] = v
+            #d[c] = sm.map
+        return json.dumps(d, sort_keys = True)
+
+
     def map_pdb_residues_to_rosetta_residues(self, mutations):
-        '''This function takes a list of Mutation objects and uses the PDB to Rosetta mapping to return the list of mutations
-           using Rosetta numbering.
+        '''This function takes a list of ChainMutation objects and uses the PDB to Rosetta mapping to return the corresponding
+           list of SimpleMutation objects using Rosetta numbering.
            e.g.
               p = PDB(...)
               p.construct_pdb_to_rosetta_residue_map()
@@ -1410,9 +1462,13 @@ class PDB:
         '''
         if not self.rosetta_to_atom_sequence_maps and self.rosetta_sequences:
             raise Exception('The PDB to Rosetta mapping has not been determined. Please call construct_pdb_to_rosetta_residue_map first.')
-        import pprint
-        pprint.pprint(self.rosetta_to_atom_sequence_maps)
-        raise Exception('Here.')
+
+        rosetta_mutations = []
+        atom_sequence_to_rosetta_mapping = self.get_atom_sequence_to_rosetta_map()
+        for m in mutations:
+            rosetta_residue_id = atom_sequence_to_rosetta_mapping[m.Chain].get('%s%s' % (m.Chain, m.ResidueID))
+            rosetta_mutations.append(SimpleMutation(m.WildTypeAA, rosetta_residue_id, m.MutantAA))
+        return rosetta_mutations
 
 
     def assert_wildtype_matches(self, mutation):
@@ -1425,11 +1481,13 @@ class PDB:
 
 
     def GetATOMSequences(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
+        raise Exception('This code looks to be deprecated.')
         sequences, residue_map = self.GetRosettaResidueMap(ConvertMSEToAtom = ConvertMSEToAtom, RemoveIncompleteFinalResidues = RemoveIncompleteFinalResidues, RemoveIncompleteResidues = RemoveIncompleteResidues)
         return sequences
 
     def GetRosettaResidueMap(self, ConvertMSEToAtom = False, RemoveIncompleteFinalResidues = False, RemoveIncompleteResidues = False):
         '''Note: This function ignores any DNA.'''
+        raise Exception('This code looks to be deprecated. Use construct_pdb_to_rosetta_residue_map instead.')
         chain = None
         sequences = {}
         residue_map = {}
