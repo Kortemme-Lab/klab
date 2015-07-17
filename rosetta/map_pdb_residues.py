@@ -39,7 +39,7 @@ script = '''<ROSETTASCRIPTS>
 </ROSETTASCRIPTS>'''
 
 
-def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path, pdb_id = None, extra_flags = ''):
+def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path = None, pdb_id = None, extra_flags = ''):
     '''Takes a string containing a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.
 
@@ -51,7 +51,7 @@ def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path
     return success, mapping
 
 
-def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path, pdb_id = None, extra_flags = ''):
+def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database_path = None, pdb_id = None, extra_flags = ''):
     '''Takes a path to a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.
 
@@ -68,8 +68,11 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
         db_path = script_path + ".db3"
         script_handle.write(script % db_path)
         script_handle.close()
-        command_line = '%s -database %s -constant_seed -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, rosetta_database_path, pdb_path, script_path, extra_flags)
-
+        if rosetta_database_path:
+            command_line = '%s -database %s -constant_seed -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, rosetta_database_path, pdb_path, script_path, extra_flags)
+        else:
+            command_line = '%s -constant_seed -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, pdb_path, script_path, extra_flags)
+            
         exit_code, stdout = commands.getstatusoutput(command_line)
         if exit_code != 0:
             errors.append("An error occured during execution. The exit code was %d. The output was:\n\n%s" % (exit_code, stdout))

@@ -1330,7 +1330,7 @@ class PDB:
         return seqres_to_atom_maps, atom_to_seqres_maps
 
 
-    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, extra_command_flags = None):
+    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path = None, extra_command_flags = None):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
             Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
