@@ -606,7 +606,7 @@ class DatabaseInterface(object):
             raise Exception("Error occurred during database insertion: '%s'. %s" % (str(e), traceback.format_exc()))
 
 
-    def create_insert_dict_string(self, tblname, d, PKfields, fields=None):
+    def create_insert_dict_string(self, tblname, d, PKfields=[], fields=None):
         '''The main function of the insert_dict functions.
            This creates and returns the SQL query and parameters used by the other functions but does not insert any data into the database.
 
