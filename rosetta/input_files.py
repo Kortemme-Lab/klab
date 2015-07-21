@@ -17,9 +17,9 @@ if __name__ == '__main__':
     from tools.bio.basics import SimpleMutation
     from tools.general.strutil import parse_range
 else:
-    from ..fs.fsio import read_file
-    from ..bio.basics import SimpleMutation
-    from ..general.strutil import parse_range
+    from fs.fsio import read_file
+    from bio.basics import SimpleMutation
+    from general.strutil import parse_range
 
 
 class RosettaFileParsingException(Exception): pass
