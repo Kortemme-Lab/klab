@@ -199,49 +199,163 @@ class SecondaryStructureDefinition(object):
 
 
 class Resfile (object):
+    # Contains no support for noncanonical commands
+    # Contains no support for insertion codes
 
-    def __init__(self, resfile):
+    def __init__(self, input_resfile = None, input_mutageneses = None):
+        self.allaa = 'ACDEFGHIKLMNPQRSTVWY'
+        self.allaa_set = set()
+        for aa in self.allaa:
+            self.allaa_set.add(aa)
+            
+        self.polar = 'DEHHKNQRST'
+        self.polar_set = set()
+        for aa in self.polar:
+            self.polar_set.add(aa)
+            
+        self.apolar = 'ACFGILMPVWY'
+        self.apolar_set = set()
+        for aa in self.apolar:
+            self.apolar_set.add(aa)
+        
+        self.design = {}
+        self.repack = {}
+        self.global_commands = []
+        
+        if input_resfile:
+            self.__init_from_file(input_resfile)
+        elif input_mutageneses:
+            raise Exception("Not yet implemented")
+        else:
+            raise Exception("The Resfile __init__ function needs either an input resfile argument or mutageneses")
+
+    def __init_from_file(self, filename):
         index_pattern = '^(\d+)\s+'
         range_pattern = '^(\d+)\s+[-]\s+(\d+)\s+'
-        command_pattern = '({}|{})[A-Z]\s+([A-Z]+)'.format(
-                index_pattern, range_pattern)
+        wildcard_pattern = '^[*]\s+'
+        command_pattern = '({}|{}|{})([A-Z])\s+([A-Z]+)\s*([A-Z]*)'.format(
+            index_pattern, range_pattern, wildcard_pattern)
 
-        self.design = []
-        self.repack = []
-
-        with open(resfile) as file:
+        before_start = True
+        with open(filename) as file:
             for line in file:
-                index_match = re.match(index_pattern, line)
-                range_match = re.match(range_pattern, line)
-                command_match = re.match(command_pattern, line)
-
-                if not command_match: continue
-                command = command_match.groups()[4].upper() 
-
-                if command == 'NATRO':
-                    continue
-                elif command == 'NATAA':
-                    residues = self.repack
+                if before_start:
+                    if line.lower().startswith('start'):
+                        before_start = False
+                    else:
+                        self.global_commands.append( line.strip() )
                 else:
-                    residues = self.design
+                    index_match = re.match(index_pattern, line)
+                    range_match = re.match(range_pattern, line)
+                    wildcard_match = re.match(wildcard_pattern, line)
+                    command_match = re.match(command_pattern, line)
 
-                if range_match:
-                    start = int(range_match.group(1))
-                    end = int(range_match.group(2))
-                    residues += range(start, end + 1)
+                    if not command_match: continue
 
-                elif index_match:
-                    index = int(index_match.group(1))
-                    residues.append(index)
+                    command = command_match.groups()[5].upper()
+                    chain = command_match.groups()[4].upper()
 
+                    if command_match.groups()[2]:
+                        range_start = int(command_match.groups()[2])
+                    else:
+                        range_start = None
+
+                    if command_match.groups()[3]:
+                        range_end = int(command_match.groups()[3])
+                    else:
+                        range_end = None
+
+                    if command_match.groups()[1]:
+                        range_singleton = int(command_match.groups()[1])
+                    else:
+                        range_singleton = None
+
+                    # Process chain/residue range
+                    new_residues = []
+
+                    if range_start and range_end:
+                        new_residues.extend( range(range_start, range_end+1) )
+                    elif range_singleton:
+                        new_residues.append( range_singleton )
+                    elif wildcard_match:
+                        new_residues.append( '*' )
+                    else:
+                        raise Exception('No reference to residue number or range found')
+
+                    if command == 'NATRO':
+                        # Useless do-nothing command
+                        continue
+                    elif command == 'NATAA':
+                        # Repack only command
+                        if chain not in self.repack:
+                            self.repack[chain] = []
+                        self.repack[chain].extend( new_residues )
+                    else:
+                        # Design command
+                        if chain not in self.design:
+                            self.design[chain] = {}
+                        for resnum in new_residues:
+                            if command == 'ALLAA':
+                                self.design[chain][resnum] = self.allaa_set
+                            elif command == 'PIKAA':
+                                allowed_restypes = set()
+                                for restype in command_match.groups()[6].upper():
+                                    allowed_restypes.add(restype)
+                                self.design[chain][resnum] = allowed_restypes
+                            elif command == 'NOTAA':
+                                allowed_restypes = set(self.allaa_set)
+                                for restype in command_match.groups()[6].upper():
+                                    allowed_restypes.remove(restype)
+                                self.design[chain][resnum] = allowed_restypes
+                            elif command == 'POLAR':
+                                self.design[chain][resnum] = self.polar_set
+                            elif command == 'APOLAR':
+                                self.design[chain][resnum] = self.apolar_set
+                            else:
+                                raise Exception("Error: command %s not recognized" % command)
+    
     @property
     def designable(self):
-        return self.design
+        # This method only returns residue numbers, and nothing to do with chains
+        # Any wild card chain commands will be ignored by this function
+        return_list = []
+        for chain in self.design:
+            for residue in self.design[chain]:
+                if residue != '*':
+                    return_list.append(residue)
+        return sorted(return_list)
 
     @property
     def packable(self):
-        return sorted(self.design + self.repack)
+        # This method only returns residue numbers, and nothing to do with chains
+        # Any wild card chain commands will be ignored by this function
+        return_list = []
+        for chain in self.repack:
+            for residue in self.repack[chain]:
+                if residue != '*':
+                    return_list.append(residue)
+        return sorted(return_list + self.designable)
 
+    @property
+    def design_positions(self):
+        return_dict = {}
+        for chain in self.design:
+            return_dict[chain] = sorted(self.design[chain].keys())
+        return return_dict
+
+    @property
+    def repack_positions(self):
+        return self.repack
+    
+    @staticmethod
+    def from_mutagenesis(mutations):
+        '''This is a special case (the common case) of from_mutations where there is only one mutagenesis/mutation group.'''
+        return Resfile.from_mutageneses([mutations])
+
+    @staticmethod
+    def from_mutageneses(mutation_groups):
+        '''mutation_groups is expected to be a list containing lists of SimpleMutation objects.'''
+        return Resfile(input_mutageneses = mutation_groups)
 
 class Mutfile (object):
     '''Note: This class behaves differently to Resfile. It stores mutation information using the SimpleMutation class.
