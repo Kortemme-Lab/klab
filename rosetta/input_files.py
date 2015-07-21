@@ -220,14 +220,37 @@ class Resfile (object):
 
         self.design = {}
         self.repack = {}
+        self.wild_type_residues = {} # Maps residue number ot their wild type identity, for sanity checking
         self.global_commands = []
 
         if input_resfile:
             self.__init_from_file(input_resfile)
         elif input_mutageneses:
-            raise Exception("Not yet implemented")
+            self.__init_from_mutageneses(input_mutageneses)
         else:
             raise Exception("The Resfile __init__ function needs either an input resfile argument or mutageneses")
+
+    def __init_from_mutageneses(self, input_mutageneses):
+        self.global_commands.append('NATRO')
+
+        for simple_mutation in input_mutageneses:
+            assert( simple_mutation.Chain != None )
+            chain = simple_mutation.Chain
+            wt = simple_mutation.WildTypeAA
+            mut = simple_mutation.MutantAA
+            resnum = int(simple_mutation.ResidueID)
+
+            if chain not in self.design:
+                self.design[chain] = {}
+            if resnum not in self.design[chain]:
+                self.design[chain][resnum] = set()
+
+            self.design[chain][resnum].add( mut )
+
+            if resnum in self.wild_type_residues:
+                assert( self.wild_type_residues[resnum] == wt )
+            else:
+                self.wild_type_residues[resnum] = wt
 
     def __init_from_file(self, filename):
         index_pattern = '^(\d+)\s+'
@@ -337,6 +360,28 @@ class Resfile (object):
         return sorted(return_list + self.designable)
 
     @property
+    def chains(self):
+        # Returns a list of all chains
+        return_set = set()
+        for chain in self.design:
+            return_set.add(chain)
+        for chain in self.repack:
+            return_set.add(chain)
+        return sorted(list(return_set))
+
+    @property
+    def residues(self):
+        # Returns a list of all residues
+        return_list = []
+        for chain in self.design:
+            for resnum in self.design[chain].keys():
+                return_list.append(resnum)
+        for chain in self.repack:
+            for resnum in self.repack[chain]:
+                return_list.append(resnum)
+        return sorted(return_list)
+
+    @property
     def design_positions(self):
         return_dict = {}
         for chain in self.design:
@@ -347,6 +392,41 @@ class Resfile (object):
     def repack_positions(self):
         return self.repack
 
+    @property
+    def design_or_repack_dict(self):
+        # Returns a tuple
+        # First value is list of residue numbers
+        # Second value is vector of booleans. True if positions is designable, False if position is only repackable
+        res_nums = []
+        designable_booleans = []
+
+        design_positions = self.design_positions
+        repack_positions = self.repack_positions
+
+        def add_repack_position():
+            res_nums.append(repack_positions.pop(0))
+            designable_booleans.append(False)
+        def add_design_position():
+            res_nums.append(design_positions.pop(0))
+            designable_booleans.append(True)
+
+        while len(design_positions) > 0 or len(repack_positions) > 0:
+            print design_positions, repack_positions
+            if len(design_positions) == 0:
+                add_repack_position()
+            elif len(repack_positions) == 0:
+                add_design_position()
+            elif design_positions[0] > repack_positions[0]:
+                add_repack_position()
+            elif design_positions[0] < repack_positions[0]:
+                add_design_position()
+            elif design_positions[0] == repack_positions[0]:
+                raise Exception("Can't have duplicate resnums, now can we?")
+            else:
+                raise Exception("Someone broke this if block")
+
+        return (res_nums, designable_booleans)
+
     @staticmethod
     def from_mutagenesis(mutations):
         '''This is a special case (the common case) of from_mutations where there is only one mutagenesis/mutation group.'''
@@ -356,6 +436,28 @@ class Resfile (object):
     def from_mutageneses(mutation_groups):
         '''mutation_groups is expected to be a list containing lists of SimpleMutation objects.'''
         return Resfile(input_mutageneses = mutation_groups)
+
+    def __repr__(self):
+        return_string = ''
+        for command in self.global_commands:
+            return_string += command + '\n'
+        return_string += 'start\n'
+        residues = self.residues
+
+        for chain in self.chains:
+            for residue in self.residues:
+                if chain in self.design and residue in self.design[chain]:
+                    all_design_aas = ''
+                    for aa in sorted(list(self.design[chain][residue])):
+                        all_design_aas += aa
+                    return_string += '%s %s PIKAA %s\n' % (str(residue), chain, all_design_aas)
+                if chain in self.repack and residue in self.repack[chain]:
+                    return_string += '%s %s NATAA\n' % (str(residue), chain)
+
+        return return_string
+
+    def __eq__(self, other):
+        return self.__dict__ == other.__dict__
 
 class Mutfile (object):
     '''Note: This class behaves differently to Resfile. It stores mutation information using the SimpleMutation class.
