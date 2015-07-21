@@ -207,21 +207,21 @@ class Resfile (object):
         self.allaa_set = set()
         for aa in self.allaa:
             self.allaa_set.add(aa)
-            
+
         self.polar = 'DEHHKNQRST'
         self.polar_set = set()
         for aa in self.polar:
             self.polar_set.add(aa)
-            
+
         self.apolar = 'ACFGILMPVWY'
         self.apolar_set = set()
         for aa in self.apolar:
             self.apolar_set.add(aa)
-        
+
         self.design = {}
         self.repack = {}
         self.global_commands = []
-        
+
         if input_resfile:
             self.__init_from_file(input_resfile)
         elif input_mutageneses:
@@ -313,7 +313,7 @@ class Resfile (object):
                                 self.design[chain][resnum] = self.apolar_set
                             else:
                                 raise Exception("Error: command %s not recognized" % command)
-    
+
     @property
     def designable(self):
         # This method only returns residue numbers, and nothing to do with chains
@@ -346,7 +346,7 @@ class Resfile (object):
     @property
     def repack_positions(self):
         return self.repack
-    
+
     @staticmethod
     def from_mutagenesis(mutations):
         '''This is a special case (the common case) of from_mutations where there is only one mutagenesis/mutation group.'''
