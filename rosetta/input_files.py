@@ -17,9 +17,9 @@ if __name__ == '__main__':
     from tools.bio.basics import SimpleMutation
     from tools.general.strutil import parse_range
 else:
-    from fs.fsio import read_file
-    from bio.basics import SimpleMutation
-    from general.strutil import parse_range
+    from ..fs.fsio import read_file
+    from ..bio.basics import SimpleMutation
+    from ..general.strutil import parse_range
 
 
 class RosettaFileParsingException(Exception): pass
@@ -238,7 +238,7 @@ class Resfile (object):
             chain = simple_mutation.Chain
             wt = simple_mutation.WildTypeAA
             mut = simple_mutation.MutantAA
-            resnum = int(simple_mutation.ResidueID)
+            resnum = simple_mutation.ResidueID
 
             if chain not in self.design:
                 self.design[chain] = {}
@@ -253,8 +253,8 @@ class Resfile (object):
                 self.wild_type_residues[resnum] = wt
 
     def __init_from_file(self, filename):
-        index_pattern = '^(\d+)\s+'
-        range_pattern = '^(\d+)\s+[-]\s+(\d+)\s+'
+        index_pattern = '^(\d+[a-zA-Z]*)\s+'
+        range_pattern = '^(\d+[a-zA-Z]*)\s+[-]\s+(\d+[a-zA-Z]*)\s+'
         wildcard_pattern = '^[*]\s+'
         command_pattern = '({}|{}|{})([A-Z])\s+([A-Z]+)\s*([A-Z]*)'.format(
             index_pattern, range_pattern, wildcard_pattern)
@@ -279,17 +279,17 @@ class Resfile (object):
                     chain = command_match.groups()[4].upper()
 
                     if command_match.groups()[2]:
-                        range_start = int(command_match.groups()[2])
+                        range_start = command_match.groups()[2]
                     else:
                         range_start = None
 
                     if command_match.groups()[3]:
-                        range_end = int(command_match.groups()[3])
+                        range_end = command_match.groups()[3]
                     else:
                         range_end = None
 
                     if command_match.groups()[1]:
-                        range_singleton = int(command_match.groups()[1])
+                        range_singleton = command_match.groups()[1]
                     else:
                         range_singleton = None
 
@@ -297,7 +297,13 @@ class Resfile (object):
                     new_residues = []
 
                     if range_start and range_end:
-                        new_residues.extend( range(range_start, range_end+1) )
+                        range_start_num = int(filter(lambda x: x.isdigit(), range_start)) + 1
+                        range_end_num = int(filter(lambda x: x.isdigit(), range_end))
+
+                        new_residues.append( range_start )
+                        if range_start_num < range_end_num:
+                            new_residues.extend( [str(x) for x in xrange(range_start_num, range_end_num+1)] )
+                        new_residues.append( range_end )
                     elif range_singleton:
                         new_residues.append( range_singleton )
                     elif wildcard_match:
@@ -391,41 +397,6 @@ class Resfile (object):
     @property
     def repack_positions(self):
         return self.repack
-
-    @property
-    def design_or_repack_dict(self):
-        # Returns a tuple
-        # First value is list of residue numbers
-        # Second value is vector of booleans. True if positions is designable, False if position is only repackable
-        res_nums = []
-        designable_booleans = []
-
-        design_positions = self.design_positions
-        repack_positions = self.repack_positions
-
-        def add_repack_position():
-            res_nums.append(repack_positions.pop(0))
-            designable_booleans.append(False)
-        def add_design_position():
-            res_nums.append(design_positions.pop(0))
-            designable_booleans.append(True)
-
-        while len(design_positions) > 0 or len(repack_positions) > 0:
-            print design_positions, repack_positions
-            if len(design_positions) == 0:
-                add_repack_position()
-            elif len(repack_positions) == 0:
-                add_design_position()
-            elif design_positions[0] > repack_positions[0]:
-                add_repack_position()
-            elif design_positions[0] < repack_positions[0]:
-                add_design_position()
-            elif design_positions[0] == repack_positions[0]:
-                raise Exception("Can't have duplicate resnums, now can we?")
-            else:
-                raise Exception("Someone broke this if block")
-
-        return (res_nums, designable_booleans)
 
     @staticmethod
     def from_mutagenesis(mutations):
