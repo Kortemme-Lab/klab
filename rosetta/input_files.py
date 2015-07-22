@@ -238,7 +238,7 @@ class Resfile (object):
             chain = simple_mutation.Chain
             wt = simple_mutation.WildTypeAA
             mut = simple_mutation.MutantAA
-            resnum = simple_mutation.ResidueID
+            resnum = str(simple_mutation.ResidueID).strip()
 
             if chain not in self.design:
                 self.design[chain] = {}
@@ -247,10 +247,12 @@ class Resfile (object):
 
             self.design[chain][resnum].add( mut )
 
-            if resnum in self.wild_type_residues:
-                assert( self.wild_type_residues[resnum] == wt )
+            if chain in self.wild_type_residues and resnum in self.wild_type_residues[chain]:
+                assert( self.wild_type_residues[chain][resnum] == wt )
             else:
-                self.wild_type_residues[resnum] = wt
+                if chain not in self.wild_type_residues:
+                    self.wild_type_residues[chain] = {}
+                self.wild_type_residues[chain][resnum] = wt
 
     def __init_from_file(self, filename):
         index_pattern = '^(\d+[a-zA-Z]*)\s+'
