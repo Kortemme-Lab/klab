@@ -101,6 +101,10 @@ def process(data_dict, database_run = False):
     if not os.path.isdir(data_dict['output_dir']):
         os.makedirs(data_dict['output_dir'])
 
+    # Check for invalid script name
+    if data_dict['scriptname'][0].isdigit():
+        data_dict['scriptname'] = 'run_' + data_dict['scriptname']
+        
     formatted_data_dict = {}
     for arg in data_dict:
         new_arg = '#$#%s#$#' % arg

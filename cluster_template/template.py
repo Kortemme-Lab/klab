@@ -148,12 +148,13 @@ class Reporter:
 
 def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
     # Add ddglib and tools to path
-    if os.path.lexists('tools'):
-        os.remove('tools')
-    os.symlink( os.path.expanduser('~/gits/tools'), 'tools' )
-    if os.path.lexists('ddglib'):
-        os.remove('ddglib')
-    os.symlink( os.path.expanduser('~/gits/ddg/ddglib'), 'ddglib')
+    if not os.path.lexists('tools'):
+        os.symlink( os.path.expanduser('~/gits/tools'), 'tools' )
+    if not os.path.lexists('ddglib'):
+        os.symlink( os.path.expanduser('~/gits/ddg/ddglib'), 'ddglib')
+    cwd = os.path.abspath( os.getcwd() )
+    if cwd not in sys.path:
+        sys.path.append(cwd)
     from ddglib.ppi_api import get_interface_with_config_file
 
     # These next two lines are specific to the ppi_api, but could be generalized
