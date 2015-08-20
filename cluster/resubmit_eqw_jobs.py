@@ -1,10 +1,10 @@
 #!/usr/bin/python
 # encoding: utf-8
 """
-resubmit_qwe_jobs.py
+resubmit_eqw_jobs.py
 
 Created by Shane O'Connor 2015.
-Simple script to resubmit any SGE jobs with qwe status.
+Simple script to resubmit any SGE jobs with Eqw status.
 If your jobs failed for no good reason (run "qstat -explain c -j <job_id>" to see why they failed) then this script can be used to resubmit them.
 
 Note: While writing this, I found out that there is an XML output option from qstat. This should be the direction to take instead.
@@ -93,7 +93,7 @@ class qmod(object):
             subprocess.call(args, shell=False)
 
 
-def resubmit_qwe_jobs():
+def resubmit_eqw_jobs():
     p = subprocess.Popen('qstat', stdout=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
@@ -102,10 +102,10 @@ def resubmit_qwe_jobs():
     stdout = stdout.strip()
     try:
         jobs = get_jobs_by_state(stdout)
-        qwe_jobs = []
+        eqw_jobs = []
         for j in jobs.get('Eqw'):
-            qwe_jobs.append(j['id'])
-        qmod.cj(qwe_jobs)
+            eqw_jobs.append(j['id'])
+        qmod.cj(eqw_jobs)
     except Exception, e:
         print('An exception occurred in the parsing function. It probably needs to be fixed or updated.')
         print(str(e))
@@ -114,6 +114,6 @@ def resubmit_qwe_jobs():
 
 
 if __name__ == '__main__':
-    resubmit_qwe_jobs()
+    resubmit_eqw_jobs()
 
 
