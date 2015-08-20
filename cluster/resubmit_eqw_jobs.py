@@ -103,8 +103,10 @@ def resubmit_eqw_jobs():
     try:
         jobs = get_jobs_by_state(stdout)
         eqw_jobs = []
-        for j in jobs.get('Eqw'):
+        for j in jobs.get('Eqw', []):
             eqw_jobs.append(j['id'])
+        if not eqw_jobs:
+            print('No jobs with Eqw state were found.')
         qmod.cj(eqw_jobs)
     except Exception, e:
         print('An exception occurred in the parsing function. It probably needs to be fixed or updated.')
