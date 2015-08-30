@@ -5,12 +5,13 @@ import os
 import sys
 import inspect
 import math
+import cPickle as pickle
 
 path_to_this_module = os.path.abspath( os.path.dirname( inspect.getsourcefile(sys.modules[__name__]) ) )
 
 template_file = os.path.join(path_to_this_module, 'template.py')
 
-def process(data_dict, database_run = False):
+def process(data_dict, database_run = False, job_dict = None):
     if database_run:
         required_arguments = [
             'numjobs', 'scriptname', 'mem_free',
@@ -123,3 +124,11 @@ def process(data_dict, database_run = False):
         for line in new_lines:
             f.write(line)
 
+    output_data_dir = os.path.join(data_dict['output_dir'], 'data')
+    
+    if not os.path.isdir(output_data_dir):
+        os.makedirs(output_data_dir)
+
+    if job_dict != None:
+        with open(os.path.join(output_data_dir, 'job_dict.pickle'), 'w') as f:
+            pickle.dump(job_dict, f)
