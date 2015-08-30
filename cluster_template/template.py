@@ -162,7 +162,7 @@ def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, sc
     prediction_set_id = '#$#db_id#$#'
     ppi_api = get_interface_with_config_file()
     prediction_ids = sorted( ppi_api.get_prediction_ids(prediction_set_id) )
-        
+
     prediction_id = prediction_ids[task_id]
     job_details = ppi_api.get_job_details(prediction_id)
     if not job_details['DevelopmentProtocolID']:
@@ -200,7 +200,7 @@ def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, sc
         with open(new_file_location, 'w') as f:
             f.write(file_contents)
         files_dict[file_name] = new_file_location
-            
+
     args=[
         os.path.join(rosetta_bin, app_name + rosetta_binary_type),
     ]
@@ -269,7 +269,7 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
 
     if verbosity>=1:
         print 'Rosetta return code:', return_code, '\n'
-        
+
     if zip_rosetta_output and os.path.isfile(outfile_path):
         zip_file(outfile_path)
 
@@ -291,18 +291,18 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
                 shutil.copy(x, copy_to_dir)
                 os.remove(x)
             elif os.path.isdir(x):
-                new_copy_to_dir = os.path.join(copy_to_dir, x) 
+                new_copy_to_dir = os.path.join(copy_to_dir, x)
                 if not os.path.isdir( new_copy_to_dir ):
                     os.makedirs(new_copy_to_dir)
                 move_file_helper( os.path.join(d, x), new_copy_to_dir )
 
     move_file_helper(tmp_output_dir, job_dir_path)
-            
+
     # Delete temporary directories
     shutil.rmtree(tmp_output_dir)
     shutil.rmtree(tmp_data_dir)
 
-    # Check if on SGE to move special output files and calculate RAM usage                                                             
+    # Check if on SGE to move special output files and calculate RAM usage
     ram_usage = None
     ram_usage_type = None
     if run_on_sge and move_output_files:
@@ -333,7 +333,7 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
             print 'Max virtual memory usage: %.1f%s' % (ram_usage, ram_usage_type)
 
     return time_end
-        
+
 def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
     if os.path.isfile(job_pickle_file):
         p = open(job_pickle_file,'r')
@@ -341,7 +341,7 @@ def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_di
         p.close()
 
     job_dirs = sorted(job_dict.keys())
-    
+
     job_dir = job_dirs[task_id]
 
     if verbosity >= 1:
@@ -541,7 +541,7 @@ if __name__=='__main__':
         run_func = run_single_from_db
     else:
         run_func = run_single
-        
+
     if run_locally:
         run_local(run_func)
     else:
