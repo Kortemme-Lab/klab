@@ -219,7 +219,7 @@ def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, sc
                 else:
                     flag = flag.replace(match_str, substitution_parameters[match_str])
 
-                    # Check if argument is a file
+        # Check if argument is a file
         if flag in files_dict:
             flag = files_dict[flag]
 
