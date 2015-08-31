@@ -434,7 +434,6 @@ class GoogleCalendar(object):
             }
         }
         colortext.warning('\n%s\n' % pprint.pformat(event_body))
-        raise Exception('Test this. It should work...')
         created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
         return True
 
@@ -471,6 +470,11 @@ class GoogleCalendar(object):
                 }
             }
         }
+        if abs((end_date - start_date).days) > 7:
+            raise Exception('The range of dates from {0} to {1} is greater than expected. Please check to make sure that the dates are correct.'.format(start_date, end_date))
+        elif end_date < start_date:
+            raise Exception('Error: The end date {1} occurs before the start date ({0}).'.format(start_date, end_date))
+
         created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
         return True
 
