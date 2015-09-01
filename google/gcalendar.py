@@ -318,15 +318,15 @@ class GoogleCalendar(object):
         return nb
 
 
-    def get_events(self, start_time, end_time, ignore_cancelled = True, get_recurring_events_as_instances = True):
+    def get_events(self, start_time, end_time, ignore_cancelled = True, get_recurring_events_as_instances = True, restrict_to_calendars = []):
         '''A wrapper for events().list. Returns the events from the calendar within the specified times. Some of the interesting fields are:
                 description, end, htmlLink, location, organizer, start, summary
 
                 Note: "Cancelled instances of recurring events (but not the underlying recurring event) will still be included if showDeleted and singleEvents are both False."
         '''
         es = []
-
-        for calendar_id in self.calendar_ids:
+        calendar_ids = restrict_to_calendars or self.calendar_ids
+        for calendar_id in calendar_ids:
             now = datetime.now(tz = self.timezone)
             events = []
             page_token = None
@@ -549,11 +549,11 @@ class GoogleCalendar(object):
     #### Meetings creation: notices calendar
 
 
-    def add_birthday(self, calendar_id, start_dt, end_dt, location, celebrant, caker, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}):
+    def add_birthday(self, start_dt, end_dt, location, celebrant, caker, summary = None, description = None, visibility = 'default', username_map = {}, email_map = {}, calendar_id = 'notices'):
         e = BasicEvent(self, start_dt, end_dt, location = location, summary = summary, description = description, visibility = visibility, username_map = username_map, email_map = email_map)
-        event = e.create_birthday(celebrant, caker)
-        colortext.warning(pprint.pformat(event))
-
+        event_body = e.create_birthday(celebrant, caker)
+        created_event = self.service.events().insert(calendarId = self.configured_calendar_ids[calendar_id], body = event_body).execute()
+        return created_event
 
     # Deprecated - remove these when we switch over to the new system
 
