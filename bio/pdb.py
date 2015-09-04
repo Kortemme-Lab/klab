@@ -151,7 +151,6 @@ modified_residues_patch = {
     '2FTL' : {
         'IAS' : 'ASP', # Beta-L-aspartic acid/L-isoaspartate. Mismatch to asparagine - "the expected l-Asn residue had been replaced with a non-standard amino acid" (10.1016/j.jmb.2006.11.003).
     },
-
 }
 
 ### Record types
@@ -364,7 +363,7 @@ class PDB:
         self.modified_residue_mapping_3 = {}
         self.pdb_id = None
         self.strict = strict
-        
+
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
@@ -638,15 +637,26 @@ class PDB:
 
     ### PDB mutating functions ###
 
-    def strip_to_chains(self, chains):
+    def strip_to_chains(self, chains, break_at_endmdl = True):
         '''Throw away all ATOM/HETATM/ANISOU/TER lines for chains that are not in the chains list.'''
         if chains:
             chains = set(chains)
 
-            # Remove any structure lines associated with the chains
+            # Remove any structure lines not associated with the chains
             self.lines = [l for l in self.lines if not(l.startswith('ATOM  ') or l.startswith('HETATM') or l.startswith('ANISOU') or l.startswith('TER')) or l[21] in chains]
+
+            # For some Rosetta protocols, only one NMR model should be kept
+            if break_at_endmdl:
+                new_lines = []
+                for l in self.lines:
+                    if l.startswith('ENDMDL'):
+                        new_lines.append(l)
+                        break
+                    new_lines.append(l)
+                self.lines = new_lines
+
             self._update_structure_lines()
-            # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
+            # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update or clear those elements here
         else:
             raise Exception('The chains argument needs to be supplied.')
 
@@ -686,7 +696,7 @@ class PDB:
         for c in chain_order:
             if c not in sequences:
                 continue
-            
+
             fasta_string += '>%s|%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
             seq = str(sequences[c])
             for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
