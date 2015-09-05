@@ -64,9 +64,8 @@ def process(data_dict, database_run = False, job_dict = None):
         data_dict['add_extra_ld_path'] = 'False'
         data_dict['extra_ld_path'] = ''
 
-    if database_run:
-        data_dict['rosetta_args_list'] = []
-    else:
+    data_dict['rosetta_args_list'] = ''
+    if not database_run:
         # Handle if general rosetta args are a list instead of a string
         if not isinstance(data_dict['rosetta_args_list'], basestring):
             rosetta_args = ""
