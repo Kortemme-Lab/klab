@@ -358,7 +358,7 @@ def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_di
         print 'Temporary output dir:', tmp_output_dir
 
     args=[
-        os.path.join(rosetta_bin, app_name),
+        os.path.join(rosetta_bin, app_name + rosetta_binary_type),
     ]
 
     # Append specific Rosetta database path if this argument is included
