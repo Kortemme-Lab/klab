@@ -27,6 +27,7 @@ def process(data_dict, database_run = False, job_dict = None):
             'numclusterjobs',
             'appname', 'rosetta_args_list',
             'rosetta_binary_type',
+            'run_from_database',
         ]
     else:
         required_arguments = [
@@ -41,6 +42,7 @@ def process(data_dict, database_run = False, job_dict = None):
         unrequired_arguments = [
             'add_extra_ld_path',
             'numclusterjobs',
+            'run_from_database',
             'db_id',
         ]
 
@@ -56,6 +58,9 @@ def process(data_dict, database_run = False, job_dict = None):
 
     if database_run:
         data_dict['appname'] = ''
+        data_dict['run_from_database'] = 'True'
+    else:
+        data_dict['run_from_database'] = 'False'
             
     # Handle LD paths
     if 'extra_ld_path' in data_dict:
@@ -78,9 +83,6 @@ def process(data_dict, database_run = False, job_dict = None):
             data_dict['rosetta_args_list'] = rosetta_args
 
     # Handle other options
-    if 'run_from_database' not in data_dict:
-        data_dict['run_from_database'] = False
-
     if 'db_id' not in data_dict:
         data_dict['db_id'] = ''
     
