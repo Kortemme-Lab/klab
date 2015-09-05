@@ -295,14 +295,18 @@ class Bonzai(object):
                         num_atoms += len(atom_bins[x][y][z])
             assert(num_atoms == len(self.atoms))
 
+        # Snip empty sections (saves a little space after garbage collection - space savings increase with the number of empty arrays in the matrix)
+        blank_section = ()
+        for x in range(int(atom_bin_dimensions[0])):
+            for y in range(int(atom_bin_dimensions[1])):
+                for z in range(int(atom_bin_dimensions[2])):
+                    if not atom_bins[x][y][z]:
+                        atom_bins[x][y][z] = blank_section
+
         self.atom_bins = atom_bins
 
 
-    def find_heavy_atoms_near_atom(self, source_atom, search_radius):
-        non_heavy_atoms = self.get_atom_names_by_group(set('H', 'D', 'T'))
-        print(non_heavy_atoms)
-        sys.exit(0)
-        return self.find_atoms_near_atom(source_atom, search_radius, atom_names_to_exclude = non_heavy_atoms)
+    ### Queries
 
 
     def get_atom_names_by_group(self, groups):
@@ -314,18 +318,38 @@ class Bonzai(object):
         return names
 
 
-    def find_atoms_near_atom(self, source_atom, search_radius, atom_names_to_include = set(), atom_names_to_exclude = set()):
+    ### Main functionality
 
-        atom_names_to_keep = set()
+
+    def remove_side_chains_within_radius_of_residues(self, source_residue_ids, search_radius):
+        #for residue in all residues:
+        #    for all heavy atoms in residue
+        #        find all heavy atoms within radius which are within residues (ATOM records)
+        #             return the residue ID
+        #for all found residues
+        #    identify all non-backbone_atoms
+        #    split the Bonzai by these atoms
+        pass
+
+
+
+    def find_heavy_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set()):
+        '''atom_hit_cache is a set of atom serial numbers which have already been tested. We keep track of these to avoid recalculating the distance.
+        '''
+        #todo: Benchmark atom_hit_cache to see if it actually speeds up the search
+
+        non_heavy_atoms = self.get_atom_names_by_group(set(['H', 'D', 'T']))
+        return self.find_atoms_near_atom(source_atom, search_radius, atom_names_to_exclude = non_heavy_atoms, atom_hit_cache = atom_hit_cache)
+
+
+    def find_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set(), atom_names_to_include = set(), atom_names_to_exclude = set()):
+
         if len(atom_names_to_include) > 0 and len(atom_names_to_exclude) > 0:
             raise Exception('Error: either one of the set of atoms types to include or the set of atom types to exclude can be set but not both.')
+
+        atom_names_to_exclude = set(atom_names_to_exclude)
         if atom_names_to_include:
-            atom_names_to_keep = set(atom_names_to_include)
-        else:
-            atom_names_to_keep = set(self.atom_name_to_group.keys())
-            atom_names_to_exclude = set(atom_names_to_exclude)
-            atom_names_to_keep = atom_names_to_keep.difference(atom_names_to_exclude)
-        print(atom_names_to_keep)
+            atom_names_to_exclude = set(self.atom_name_to_group.keys()).difference(atom_names_to_include)
 
         radius = float(search_radius) + self.buffer # add buffer to account for edge cases in searching
         bin_size = self.bin_size
@@ -340,12 +364,7 @@ class Bonzai(object):
                 for y in yrange:
                     for z in zrange:
                         for atom in atom_bins[x][y][z]:
-                            if source_atom - atom <= search_radius:
-                                if atom.name not in atom_names_to_keep:
-                                    print(atom)
-                                hits.append(atom)
-                            continue
-                            if (source_atom - atom <= search_radius) and (atom.name in atom_names_to_keep):
+                            if (source_atom - atom <= search_radius) and (atom.name not in atom_names_to_exclude):
                                 hits.append(atom)
             return hits
 
@@ -380,6 +399,12 @@ class Bonzai(object):
         pass
 
 
+    @staticmethod
+    def convert_to_pse(bonzai, cutting):
+        '''Returns a PyMOL session containing the two parts of the PDB file split using prune.'''
+        pass
+
+
     ### Safety checks
 
 
@@ -398,27 +423,31 @@ class Bonzai(object):
 
 
 
-
 if __name__ == '__main__':
 
     # 1a8d is an example from the loops benchmark
     # 1lfa contains hydrogens
-
-    #b = Bonzai.retrieve('1a8d', cache_dir='/tmp')
-
     b = Bonzai.retrieve('1lfa', cache_dir='/tmp')
+    b = Bonzai.retrieve('1a8d', cache_dir='/tmp')
     search_radius = 10.0
     atom_of_interest = b.get_atom(1095)
-    print(atom_of_interest)
     nearby_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius)
     for na in nearby_atoms:
         assert(na - atom_of_interest <= search_radius)
-    print(len(nearby_atoms))
-    sys.exit(0)
-
-    print(nearby_atoms)
     for fa in b.get_atom_set_complement(nearby_atoms):
         assert(fa - atom_of_interest > search_radius)
-    nearby_atoms = b.find_heavy_atoms_near_atom(atom_of_interest, search_radius)
+
+    # Get all heavy atoms within the radius (including HETATM)
+    nearby_heavy_atoms = b.find_heavy_atoms_near_atom(atom_of_interest, search_radius)
+
+    # Get all C-alpha atoms within the radius
     nearby_ca_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius, atom_names_to_include = ['CA'])
+
+    # Get all carbon atoms within the radius
+    nearby_c_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius, atom_names_to_include = b.get_atom_names_by_group(['C']))
+
+    # implement remove_side_chains_within_radius_of_residues
+    # implement prune
+    # implement convert_to_pse
+
 
