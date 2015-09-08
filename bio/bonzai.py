@@ -112,7 +112,7 @@ class Bin(object):
         return self.items.__iter__()
 
 
-class Bonzai(object):
+class Bonsai(object):
 
 
     ### Constructors
@@ -150,13 +150,13 @@ class Bonzai(object):
     def from_filepath(filepath):
         '''A function to replace the old constructor call where a filename was passed in.'''
         assert(os.path.exists(filepath))
-        return Bonzai(read_file(filepath))
+        return Bonsai(read_file(filepath))
 
 
     @staticmethod
     def from_lines(pdb_file_lines):
         '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
-        return Bonzai("\n".join(pdb_file_lines))
+        return Bonsai("\n".join(pdb_file_lines))
 
 
     @staticmethod
@@ -168,7 +168,7 @@ class Bonzai(object):
         if cache_dir:
             filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
             if os.path.exists(filename):
-                return Bonzai(read_file(filename))
+                return Bonsai(read_file(filename))
 
         # Get a copy from the RCSB
         contents = rcsb.retrieve_pdb(pdb_id)
@@ -178,7 +178,7 @@ class Bonzai(object):
             write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), contents)
 
         # Return the object
-        return Bonzai(contents)
+        return Bonsai(contents)
 
 
     ### Initialization
@@ -328,7 +328,7 @@ class Bonzai(object):
         #             return the residue ID
         #for all found residues
         #    identify all non-backbone_atoms
-        #    split the Bonzai by these atoms
+        #    split the Bonsai by these atoms
         pass
 
 
@@ -427,8 +427,8 @@ if __name__ == '__main__':
 
     # 1a8d is an example from the loops benchmark
     # 1lfa contains hydrogens
-    b = Bonzai.retrieve('1lfa', cache_dir='/tmp')
-    b = Bonzai.retrieve('1a8d', cache_dir='/tmp')
+    b = Bonsai.retrieve('1lfa', cache_dir='/tmp')
+    b = Bonsai.retrieve('1a8d', cache_dir='/tmp')
     search_radius = 10.0
     atom_of_interest = b.get_atom(1095)
     nearby_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius)
