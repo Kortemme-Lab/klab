@@ -593,6 +593,7 @@ class Bonsai(object):
 
 
 def prepare_structures_for_loops_benchmark():
+    # todo: move this into the loops benchmark
     import glob
     search_radius = 10.0
     for pdb_file in sorted(glob.glob('/home/oconchus/t14benchmarking/loop_modeling/input/structures/*.pdb')):
