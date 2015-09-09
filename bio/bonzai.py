@@ -461,7 +461,6 @@ class Bonsai(object):
         # Extract the list of Residues defined in the loops file
         loop_residues = []
         for loop in lf.data:
-
             # Identify the Residues corresponding to the loops file definition
             start_id = str(loop['start'])
             end_id = str(loop['end'])
@@ -593,13 +592,34 @@ class Bonsai(object):
                             raise Exception('{0} occurrences of atom type {1} for record type {2} occur in residue {3} in chain {4}.'.format(count, atom_type, record_type, residue_id.strip(), chain))
 
 
+def prepare_structures_for_loops_benchmark():
+    import glob
+    search_radius = 10.0
+    for pdb_file in sorted(glob.glob('/home/oconchus/t14benchmarking/loop_modeling/input/structures/*.pdb')):
+        if pdb_file in ['/home/oconchus/t14benchmarking/loop_modeling/input/structures/1t1d.pdb',
+                        '/home/oconchus/t14benchmarking/loop_modeling/input/structures/1my7.pdb']:
+            continue
+        pdb_prefix = os.path.splitext(os.path.split(pdb_file)[1])[0]
+        loop_file = os.path.splitext(pdb_file)[0] + '.loop'
+        assert(os.path.exists(loop_file))
+        loop_def = read_file(loop_file).strip()
+        assert(len(loop_def.split('\n')) == 1)
+        loop_def = 'LOOP ' + loop_def
+        b = Bonsai(read_file(pdb_file))
+        bonsai, cutting, PSE_file, PSE_script = b.prune_structure_according_to_loops_file(loop_def, search_radius, expected_loop_length = 12, generate_pymol_session = True)
+        write_file(os.path.join('loop_modeling', '{0}.pse'.format(pdb_prefix)), PSE_file)
+        write_file(os.path.join('loop_modeling', '{0}_missing_native.pdb'.format(pdb_prefix)), bonsai)
+        write_file(os.path.join('loop_modeling', '{0}_loop.pdb'.format(pdb_prefix), cutting)
+        sys.stdout.write('.')
+        sys.stdout.flush()
+    print('')
+
 
 if __name__ == '__main__':
 
     # 1a8d is an example from the loops benchmark
     # 1lfa contains hydrogens
     b = Bonsai.retrieve('1lfa', cache_dir='/tmp')
-
     search_radius = 10.0
 
     atom_of_interest = b.get_atom(1095)
@@ -618,11 +638,6 @@ if __name__ == '__main__':
     # Get all carbon atoms within the radius
     nearby_c_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius, atom_names_to_include = b.get_atom_names_by_group(['C']))
 
-    b = Bonsai.retrieve('1a8d', cache_dir='/tmp')
-    bonsai, cutting, PSE_file, PSE_script = b.prune_structure_according_to_loops_file('LOOP 155 166 166 0 1', search_radius, expected_loop_length = 12, generate_pymol_session = True)
-    #write_file('1a8d.pse', PSE_file)
-    #write_file('1a8d_without_loop.pdb', bonsai)
-    #write_file('1a8d_loop.pdb', cutting)
-
-
+    # todo: remove this call
+    prepare_structures_for_loops_benchmark()
 
