@@ -23,6 +23,7 @@ import numpy
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join('..', '..'))
 
+import rcsb
 from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
@@ -30,8 +31,16 @@ from tools.fs.fsio import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
 from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-import rcsb
 from tools.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
+from tools.rosetta.input_files import LoopsFile
+
+pymol_load_failed = False
+try:
+    from tools.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
+    from tools.bio.pymolmod.loop_removal import LoopRemovalBuilder
+except Exception, e:
+    pymol_load_failed = True
+
 
 
 backbone_atoms = set(['N', 'CA', 'C', 'O'])
@@ -40,7 +49,9 @@ backbone_atoms = set(['N', 'CA', 'C', 'O'])
 class Residue(object):
 
 
-    def __init__(self):
+    def __init__(self, chain, resid):
+        self.chain = chain
+        self.residue_id = resid
         self.records = dict(ATOM = [], HETATM = [], ANISOU = [])
 
 
@@ -50,6 +61,10 @@ class Residue(object):
 
     def get(self, record_type):
         return self.records[record_type]
+
+
+    def id(self):
+        return self.chain, self.residue_id
 
 
     def __repr__(self):
@@ -228,7 +243,7 @@ class Bonsai(object):
                                 break
 
                 residues[chain] = residues.get(chain, {})
-                residues[chain][resid] = residues[chain].get(resid, Residue())
+                residues[chain][resid] = residues[chain].get(resid, Residue(chain, resid))
                 new_atom = Atom(residues[chain][resid], atom_name, atom_group, serial_number)
                 residues[chain][resid].add(record_type.strip(), new_atom)
 
@@ -318,19 +333,7 @@ class Bonsai(object):
         return names
 
 
-    ### Main functionality
-
-
-    def remove_side_chains_within_radius_of_residues(self, source_residue_ids, search_radius):
-        #for residue in all residues:
-        #    for all heavy atoms in residue
-        #        find all heavy atoms within radius which are within residues (ATOM records)
-        #             return the residue ID
-        #for all found residues
-        #    identify all non-backbone_atoms
-        #    split the Bonsai by these atoms
-        pass
-
+    ### Base functionality
 
 
     def find_heavy_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set()):
@@ -343,6 +346,12 @@ class Bonsai(object):
 
 
     def find_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set(), atom_names_to_include = set(), atom_names_to_exclude = set()):
+        '''It is advisable to set up and use an atom hit cache object. This reduces the number of distance calculations and gives better performance.
+           See find_sidechain_atoms_within_radius_of_residue_objects for an example of how to set this up e.g.
+               atom_hit_cache = set()
+               for x in some_loop:
+                   this_object.find_atoms_near_atom(source_atom, search_radius, atom_hit_cache = atom_hit_cache)
+        '''
 
         if len(atom_names_to_include) > 0 and len(atom_names_to_exclude) > 0:
             raise Exception('Error: either one of the set of atoms types to include or the set of atom types to exclude can be set but not both.')
@@ -354,7 +363,6 @@ class Bonsai(object):
         radius = float(search_radius) + self.buffer # add buffer to account for edge cases in searching
         bin_size = self.bin_size
         atom_bins = self.atom_bins
-        hits = []
         if source_atom:
             bin_radius = int(math.ceil(radius / bin_size)) # search this many bins in all directions
             xrange = range(max(0, source_atom.bin.x - bin_radius), min(self.atom_bin_dimensions[0], source_atom.bin.x + bin_radius) + 1)
@@ -364,9 +372,11 @@ class Bonsai(object):
                 for y in yrange:
                     for z in zrange:
                         for atom in atom_bins[x][y][z]:
-                            if (source_atom - atom <= search_radius) and (atom.name not in atom_names_to_exclude):
-                                hits.append(atom)
-            return hits
+                            if atom not in atom_hit_cache:
+                                if (source_atom - atom <= search_radius) and (atom.name not in atom_names_to_exclude):
+                                    atom_hit_cache.add(atom)
+
+            return atom_hit_cache
 
 
     def get_atom(self, atom_serial_number):
@@ -386,17 +396,178 @@ class Bonsai(object):
         return complement
 
 
-    def prune(self, atoms):
-        '''Returns two PDB objects.
-           The first object is missing the ATOM (and any related ANISOU) and HETATM records identified by atoms.
-           The second object only contains ATOM, ANISOU, and HETATM records which are identified by atoms.
-           Both PDB objects contain all records from the original PDB which are not ATOM, ANISOU, or HETATM records.'''
+    ### Main functionality
 
-#(None, 'REMARK 280  (PH 7.0). LARGE CRYSTALS (0.2 X 0.2 X 0.5 MM) WERE GROWN BY         ')
-#('ATOM', 3212, 'ATOM   3212  CB  ASP A 397      47.343  47.896  35.182  1.00 31.31           C  ', CB 3212 at (47.343, 47.896, 35.182))
-#('HETATM', 4082, 'HETATM 4082  O   HOH A1422      59.725  49.320  51.258  1.00 68.31           O  ', O 4082 at (59.725, 49.32, 51.258))
-#('ANISOU', 4082, 'ANISOU 4082  O   HOH A1422     8865   8777   8311    969   1113   -375       O  ')
+
+    def find_sidechain_atoms_within_radius_of_residues(self, source_residue_ids, search_radius):
+        #for residue in all residues:
+        #    for all heavy atoms in residue
+        #        find all heavy atoms within radius which are within residues (ATOM records)
+        #             return the residue ID
+        #for all found residues
+        #    identify all non-backbone_atoms
+        #    split the Bonsai by these atoms
         pass
+
+
+    def find_sidechain_atoms_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
+        '''for residue in source_residues:
+             for all heavy atoms in residue
+               find all heavy atoms within radius which are within residues (ATOM records)
+           for all heavy atoms found
+             determing the associated residue
+           for all found residues not in source_residues
+             identify all non-backbone atoms
+           return the non-backbone atoms'''
+
+        atom_hit_cache = set()
+        for residue in source_residues:
+            if find_ATOM_atoms:
+                for aatom in residue.get('ATOM'):
+                    self.find_heavy_atoms_near_atom(aatom, search_radius, atom_hit_cache = atom_hit_cache)
+            if find_HETATM_atoms:
+                for hatom in residue.get('HETATM'):
+                    self.find_heavy_atoms_near_atom(hatom, search_radius, atom_hit_cache = atom_hit_cache)
+
+        # Get the list of source_residues
+        loop_residue_ids = set()
+        for sres in source_residues:
+            loop_residue_ids.add(sres.id())
+
+        # Get the list of atoms to be removed (all sidechain atoms - including non-heavy atoms - of the found residues which are not in source_residues)
+        sidechain_atom_serial_numbers = set()
+        nearby_residues = set()
+        nearby_residue_ids = set()
+        for a in atom_hit_cache:
+            residue_id = a.residue.id()
+            if residue_id not in loop_residue_ids:
+                nearby_residues.add(a.residue)
+                nearby_residue_ids.add(residue_id)
+        for nearby_residue in nearby_residues:
+            for aatom in nearby_residue.get('ATOM'):
+                if aatom.name not in backbone_atoms:
+                    sidechain_atom_serial_numbers.add(aatom.serial_number)
+        assert(len(nearby_residue_ids.intersection(loop_residue_ids)) == 0)
+        return sidechain_atom_serial_numbers
+
+
+    ### Higher-level functionality
+
+
+    def prune_structure_according_to_loops_file(self, loops_file_content, search_radius, expected_loop_length = None, generate_pymol_session = True):
+        lf = LoopsFile(loops_file_content)
+        assert(len(lf.data) == 1) # todo: remove
+
+        # Extract the list of Residues defined in the loops file
+        loop_residues = []
+        for loop in lf.data:
+
+            # Identify the Residues corresponding to the loops file definition
+            start_id = str(loop['start'])
+            end_id = str(loop['end'])
+            start = []
+            end = []
+            for chain, chain_residues in self.residues.iteritems():
+                for res, residue_object in chain_residues.iteritems():
+                    if res.strip() == start_id:
+                        start.append((chain, res, residue_object))
+                    if res.strip() == end_id:
+                        end.append((chain, res, residue_object))
+            if len(start) != len(end) != 1:
+                raise Exception('The PDB is ambiguous with respect to the loops file i.e. more than one PDB residue corresponds to the start or end residue defined in the loops file.')
+            start, end = start[0], end[0]
+
+            # We assume that the loops file identifies a range in document order
+            loop_start = False
+            for l in self.indexed_lines:
+                if l[0] == 'ATOM' or l[0] == 'HETATM':
+                    atom_residue = l[3].residue
+                    if not loop_start:
+                        if atom_residue == start[2]:
+                            loop_start = True
+                            if atom_residue not in loop_residues:
+                                loop_residues.append(atom_residue)
+                    else:
+                        if atom_residue not in loop_residues:
+                            loop_residues.append(atom_residue)
+                        if atom_residue == end[2]:
+                            break
+        if expected_loop_length != None and expected_loop_length != len(loop_residues):
+            raise Exception('Expected to identify {0} residues but {1} were identified.'.format(expected_loop_length, len(loop_residues)))
+
+        # Determine the sidechain atoms to be removed
+        sidechain_atom_serial_numbers = self.find_sidechain_atoms_within_radius_of_residue_objects(loop_residues, search_radius)
+
+        # Determine the loop residue atoms to be removed
+        loop_residues_ids = set()
+        loop_atom_serial_numbers = set()
+        for loop_residue in loop_residues:
+            for aatom in loop_residue.get('ATOM'):
+                loop_atom_serial_numbers.add(aatom.serial_number)
+        assert(len(sidechain_atom_serial_numbers.intersection(loop_atom_serial_numbers)) == 0)
+
+        return self.prune(loop_atom_serial_numbers, sidechain_atom_serial_numbers, generate_pymol_session = generate_pymol_session)
+
+
+    def prune(self, arbitrary_atom_serial_numbers, sidechain_atom_serial_numbers = set(), keep_CA_in_cutting = True, generate_pymol_session = True, bonsai_label = 'Bonsai', cutting_label = 'Cutting', pymol_executable = 'pymol'):
+        '''Returns the content of two PDB files.
+           The first object is missing the ATOM (and any related ANISOU) and HETATM records identified by atom_serial_numbers.
+           The second object only contains ATOM, ANISOU, and HETATM records which are identified by atom_serial_numbers.
+           Both PDB objects contain all records from the original PDB which are not ATOM, ANISOU, or HETATM records.'''
+        bonsai = []
+        cutting = []
+
+        sidechain_residues = set()
+        if sidechain_atom_serial_numbers:
+            for line in self.indexed_lines:
+                if line[0] == 'ATOM' and line[1] in sidechain_atom_serial_numbers:
+                    residue_id = line[3].residue.id()
+                    sidechain_residues.add(residue_id[0] + residue_id[1])
+
+        atom_serial_numbers_to_remove = arbitrary_atom_serial_numbers.union(sidechain_atom_serial_numbers)
+        for line in self.indexed_lines:
+            if line[0]: # record type
+                PDB_line = line[2]
+                if line[1] in atom_serial_numbers_to_remove:
+                    cutting.append(PDB_line)
+                else:
+                    if keep_CA_in_cutting and PDB_line[21:27] in sidechain_residues and PDB_line[12:16] == ' CA ':
+                        cutting.append(PDB_line)
+                    bonsai.append(PDB_line)
+            else:
+                bonsai.append(line[1])
+                cutting.append(line[1])
+        bonsai_pdb_content = '\n'.join(bonsai)
+        cutting_pdb_content = '\n'.join(cutting)
+        PSE_file, PSE_script = None, None
+        try:
+            PSE_file, PSE_script = self.generate_pymol_session(bonsai_pdb_content, cutting_pdb_content, bonsai_label = bonsai_label, cutting_label = cutting_label, pymol_executable = pymol_executable, settings = {})
+        except Exception, e:
+            colortext.error('Failed to generate the PyMOL session: "{0}"'.format(e))
+
+        return bonsai_pdb_content, cutting_pdb_content, PSE_file, PSE_script
+
+
+    def generate_pymol_session(self, bonsai_pdb_content, cutting_pdb_content, bonsai_label = 'Bonsai', cutting_label = 'Cutting', pymol_executable = 'pymol', settings = {}):
+        ''' Generates the PyMOL session for the scaffold, model, and design structures.
+            Returns this session and the script which generated it.'''
+        if not pymol_load_failed:
+            b = BatchBuilder(pymol_executable = pymol_executable)
+
+            loop_residues = set()
+            for l in cutting_pdb_content.split('\n'):
+                if l.startswith('ATOM  ') and l[12:16] == ' C  ':
+                    loop_residues.add(l[21:27])
+            loop_residues = sorted(loop_residues)
+
+            structures_list = [
+                (bonsai_label, bonsai_pdb_content, set()),
+                (cutting_label, cutting_pdb_content, loop_residues),
+            ]
+            settings['Main'] = bonsai_label
+            settings['Loop'] = cutting_label
+            PSE_files = b.run(LoopRemovalBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
+            return PSE_files[0], b.PSE_scripts[0]
 
 
     @staticmethod
@@ -428,8 +599,9 @@ if __name__ == '__main__':
     # 1a8d is an example from the loops benchmark
     # 1lfa contains hydrogens
     b = Bonsai.retrieve('1lfa', cache_dir='/tmp')
-    b = Bonsai.retrieve('1a8d', cache_dir='/tmp')
+
     search_radius = 10.0
+
     atom_of_interest = b.get_atom(1095)
     nearby_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius)
     for na in nearby_atoms:
@@ -446,8 +618,11 @@ if __name__ == '__main__':
     # Get all carbon atoms within the radius
     nearby_c_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius, atom_names_to_include = b.get_atom_names_by_group(['C']))
 
-    # implement remove_side_chains_within_radius_of_residues
-    # implement prune
-    # implement convert_to_pse
+    b = Bonsai.retrieve('1a8d', cache_dir='/tmp')
+    bonsai, cutting, PSE_file, PSE_script = b.prune_structure_according_to_loops_file('LOOP 155 166 166 0 1', search_radius, expected_loop_length = 12, generate_pymol_session = True)
+    #write_file('1a8d.pse', PSE_file)
+    #write_file('1a8d_without_loop.pdb', bonsai)
+    #write_file('1a8d_loop.pdb', cutting)
+
 
 
