@@ -17,6 +17,8 @@ from tools import process as tprocess
 from colors import ColorScheme
 
 def create_pymol_selection_from_PDB_residue_ids(residue_list):
+    '''Elements of residue_list should be strings extracted from PDB lines from position 21-26 inclusive (zero-indexing)
+       i.e. the chain letter concatenated by the 5-character (including insertion code) residue ID.'''
     residues_by_chain = {}
     for residue_id in residue_list:
         chain_id = residue_id[0]
