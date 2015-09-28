@@ -56,6 +56,9 @@ def process(data_dict, database_run = False, job_dict = None):
             print 'ERROR: Data dictionary cannot contain argument', arg
             sys.exit(1)
 
+    if 'job_dict_name' not in data_dict:
+        data_dict['job_dict_name'] = 'job_dict.pickle'        
+            
     if database_run:
         data_dict['appname'] = ''
         data_dict['run_from_database'] = 'True'
@@ -69,7 +72,6 @@ def process(data_dict, database_run = False, job_dict = None):
         data_dict['add_extra_ld_path'] = 'False'
         data_dict['extra_ld_path'] = ''
 
-    data_dict['rosetta_args_list'] = ''
     if not database_run:
         # Handle if general rosetta args are a list instead of a string
         if not isinstance(data_dict['rosetta_args_list'], basestring):
@@ -81,6 +83,8 @@ def process(data_dict, database_run = False, job_dict = None):
                     rosetta_args += "'%s', " % arg
                 rosetta_args += "'%s'" % data_dict['rosetta_args_list'][-1]
             data_dict['rosetta_args_list'] = rosetta_args
+    else:
+        data_dict['rosetta_args_list'] = ''
 
     # Handle other options
     if 'db_id' not in data_dict:
@@ -131,5 +135,5 @@ def process(data_dict, database_run = False, job_dict = None):
         os.makedirs(output_data_dir)
 
     if job_dict != None:
-        with open(os.path.join(output_data_dir, 'job_dict.pickle'), 'w') as f:
+        with open(os.path.join(output_data_dir, data_dict['job_dict_name']), 'w') as f:
             pickle.dump(job_dict, f)

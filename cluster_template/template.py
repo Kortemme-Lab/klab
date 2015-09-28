@@ -50,7 +50,7 @@ local_rosetta_bin = '#$#local_rosetta_bin#$#'
 local_rosetta_db = '#$#local_rosetta_db#$#'
 local_scratch_dir = '/tmp'
 
-job_pickle_file = 'data/job_dict.pickle'
+job_pickle_file = 'data/#$#job_dict_name#$#'
 
 app_name = '#$#appname#$#'
 
