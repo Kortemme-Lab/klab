@@ -49,9 +49,10 @@ class FASTA(dict):
 
     fasta_chain_header_ = "|PDBID|CHAIN|SEQUENCE"
 
-    def __init__(self, fasta_contents, *args, **kw):
+    def __init__(self, fasta_contents, strict = True, *args, **kw):
         super(FASTA,self).__init__(*args, **kw)
         self.fasta_contents = fasta_contents
+        self.strict = strict
         self.itemlist = super(FASTA,self).keys()
         self.unique_sequences = {}
         self.sequences = []
@@ -117,9 +118,20 @@ class FASTA(dict):
         sequences = []
         chains = [c for c in fasta_contents.split(">") if c]
         for c in chains:
-            assert(c[4:5] == ":")
-            assert(c[6:].startswith(FASTA.fasta_chain_header_))
-            self._add_sequence(c[0:4], c[5:6], c[6 + len(FASTA.fasta_chain_header_):].replace("\n","").strip())
+            if self.strict:
+                assert(c[4:5] == ":")
+                assert(c[6:].startswith(FASTA.fasta_chain_header_))
+                self._add_sequence(c[0:4], c[5:6], c[6 + len(FASTA.fasta_chain_header_):].replace("\n","").strip())
+            else:
+                lines = c.split('\n')
+                header = lines[0]
+                sequence = ''.join(lines[1:]).replace("\n","").strip()
+                tokens = header.split('|')
+                pdbID, chain = tokens[0], ' '
+                if len(tokens) > 1 and len(tokens[1]) == 1:
+                    chain = tokens[1]
+                self._add_sequence(pdbID, chain, sequence)
+
 
     def _add_sequence(self, pdbID, chainID, sequence):
         '''This is a 'private' function. If you call it directly, call _find_identical_sequences() afterwards to update identical_sequences.'''
