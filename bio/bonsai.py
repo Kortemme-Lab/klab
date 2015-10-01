@@ -27,6 +27,7 @@ import rcsb
 from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from tools import colortext
+from tools.bio.pdb import PDB
 from tools.fs.fsio import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
 from tools.pymath.cartesian import spatialhash
@@ -46,12 +47,36 @@ except Exception, e:
 backbone_atoms = set(['N', 'CA', 'C', 'O'])
 
 
+class PDBSection(object):
+
+
+    def __init__(self, Chain, StartResidueID, EndResidueID, Sequence = None):
+        '''StartResidueID and EndResidueID are expected to be PDB identifiers (resSeq + iCode, columns 23-27).'''
+        assert(len(StartResidueID) == len(EndResidueID) == 5)
+        self.Chain = Chain
+        self.StartResidueID = StartResidueID
+        self.EndResidueID = EndResidueID
+        self.Sequence = Sequence
+
+
+    @staticmethod
+    def from_non_aligned_residue_IDs(Chain, StartResidueID, EndResidueID, Sequence = None):
+        '''A more forgiving method that does not care about the padding of the residue IDs.'''
+        return PDBSection(Chain, PDB.ResidueID2String(StartResidueID), PDB.ResidueID2String(EndResidueID), Sequence = Sequence)
+
+    def __repr__(self):
+        seq = ''
+        if self.Sequence: seq = ' ({0})'.format(self.Sequence)
+        return 'Chain {0}, residues {1}-{2}{3}'.format(self.Chain, self.StartResidueID.strip(), self.EndResidueID.strip(), seq)
+
+
 class Residue(object):
 
 
-    def __init__(self, chain, resid):
+    def __init__(self, chain, resid, amino_acid):
         self.chain = chain
         self.residue_id = resid
+        self.amino_acid = amino_acid
         self.records = dict(ATOM = [], HETATM = [], ANISOU = [])
 
 
@@ -61,6 +86,10 @@ class Residue(object):
 
     def get(self, record_type):
         return self.records[record_type]
+
+
+    def get_amino_acid_code(self):
+        return residue_type_3to1_map.get(self.amino_acid) or protonated_residue_type_3to1_map.get(self.amino_acid) or non_canonical_amino_acids.get(self.amino_acid, 'X')
 
 
     def id(self):
@@ -75,7 +104,7 @@ class Residue(object):
 class Atom(object):
 
 
-    def __init__(self, residue, name, group, serial_number):
+    def __init__(self, residue, name, group, serial_number, conformation):
         self.residue = residue
         self.x, self.y, self.z = None, None, None
         self.point = None
@@ -84,6 +113,7 @@ class Atom(object):
         self.group = group
         self.bin = None
         self.record_type = None
+        self.conformation = conformation
 
 
     def place(self, x, y, z, record_type = None):
@@ -127,7 +157,7 @@ class Bin(object):
         return self.items.__iter__()
 
 
-class Bonsai(object):
+class ResidueIndexedPDBFile(object):
 
 
     ### Constructors
@@ -144,7 +174,6 @@ class Bonsai(object):
                ANISOU records correspond to a triple (record_type, serial_number, line)
                Other lines correspond to a double (None, line)
         '''
-
         self.pdb_content = pdb_content
         self.lines = pdb_content.split("\n")
         self.min_x, self.min_y, self.min_z, self.max_x, self.max_y, self.max_z, self.max_dimension = None, None, None, None, None, None, None
@@ -161,21 +190,21 @@ class Bonsai(object):
             self.check_residues()
 
 
-    @staticmethod
-    def from_filepath(filepath):
+    @classmethod
+    def from_filepath(cls, filepath):
         '''A function to replace the old constructor call where a filename was passed in.'''
         assert(os.path.exists(filepath))
-        return Bonsai(read_file(filepath))
+        return cls(read_file(filepath))
 
 
-    @staticmethod
-    def from_lines(pdb_file_lines):
+    @classmethod
+    def from_lines(cls, pdb_file_lines):
         '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
-        return Bonsai("\n".join(pdb_file_lines))
+        return cls("\n".join(pdb_file_lines))
 
 
-    @staticmethod
-    def retrieve(pdb_id, cache_dir = None):
+    @classmethod
+    def retrieve(cls, pdb_id, cache_dir = None):
         '''Creates a PDB object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
 
         # Check to see whether we have a cached copy
@@ -183,7 +212,7 @@ class Bonsai(object):
         if cache_dir:
             filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
             if os.path.exists(filename):
-                return Bonsai(read_file(filename))
+                return cls(read_file(filename))
 
         # Get a copy from the RCSB
         contents = rcsb.retrieve_pdb(pdb_id)
@@ -193,7 +222,7 @@ class Bonsai(object):
             write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), contents)
 
         # Return the object
-        return Bonsai(contents)
+        return cls(contents)
 
 
     ### Initialization
@@ -243,8 +272,8 @@ class Bonsai(object):
                                 break
 
                 residues[chain] = residues.get(chain, {})
-                residues[chain][resid] = residues[chain].get(resid, Residue(chain, resid))
-                new_atom = Atom(residues[chain][resid], atom_name, atom_group, serial_number)
+                residues[chain][resid] = residues[chain].get(resid, Residue(chain, resid, line[17:20]))
+                new_atom = Atom(residues[chain][resid], atom_name, atom_group, serial_number, line[16])
                 residues[chain][resid].add(record_type.strip(), new_atom)
 
                 if record_type in removable_xyz_records_types_with_atom_serial_numbers:
@@ -319,6 +348,54 @@ class Bonsai(object):
                         atom_bins[x][y][z] = blank_section
 
         self.atom_bins = atom_bins
+
+
+    ### Safety checks
+
+
+    def check_residues(self):
+        '''Checks to make sure that each atom type is unique per residue.'''
+        for chain, residue_ids in self.residues.iteritems():
+            for residue_id, residue in residue_ids.iteritems():
+                for record_type, atoms in residue.records.iteritems():
+                    freq = {}
+                    for atom in atoms:
+                        rec_id = atom.name + atom.conformation
+                        freq[rec_id] = freq.get(rec_id, 0)
+                        freq[rec_id] += 1
+                    for atom_type, count in freq.items():
+                        if count > 1:
+                            raise Exception('{0} occurrences of atom type {1} for record type {2} occur in residue {3} in chain {4}.'.format(count, atom_type, record_type, residue_id.strip(), chain))
+
+
+    ### API functions
+
+
+    def get_atom_serial_numbers_from_pdb_residue_ids(self, pdb_residue_ids, ignore_these_atoms = [], ignore_these_conformations = []):
+        '''Checks to make sure that each atom type is unique per residue.'''
+        atom_list = []
+        for pdb_residue_id in pdb_residue_ids:
+            chain = pdb_residue_id[0]
+            residue_id = pdb_residue_id[1:]
+            if chain in self.residues and residue_id in self.residues[chain]:
+                residue = self.residues[chain][residue_id]
+                for record_type, atoms in residue.records.iteritems():
+                    freq = {}
+                    for atom in atoms:
+                        if atom.name not in ignore_these_atoms and atom.conformation not in ignore_these_conformations:
+                            atom_list.append(atom.serial_number)
+        return atom_list
+
+
+class Bonsai(ResidueIndexedPDBFile):
+
+
+    ### Constructors
+
+    def __init__(self, pdb_content, buffer = 0.05, bin_size = 5.1, safe_mode = True, FASTA_line_length = 80):
+
+        super(Bonsai, self).__init__(pdb_content, buffer = buffer, bin_size = bin_size, safe_mode = safe_mode)
+        self.FASTA_line_length = FASTA_line_length
 
 
     ### Queries
@@ -454,7 +531,112 @@ class Bonsai(object):
     ### Higher-level functionality
 
 
+    def prune_loop_for_kic(self, loops_segments, search_radius, expected_loop_length = None, generate_pymol_session = False):
+        '''A wrapper for prune_structure_according_to_loop_definitions suitable for the Rosetta kinematic closure (KIC) loop modeling method.'''
+        return self.prune_structure_according_to_loop_definitions(loops_segments, search_radius, expected_loop_length = expected_loop_length, generate_pymol_session = generate_pymol_session, check_sequence = True, keep_Ca_buttress_atoms = True)
+
+
+    def prune_structure_according_to_loop_definitions(self, loops_segments, search_radius, expected_loop_length = None, generate_pymol_session = True, check_sequence = False, keep_Ca_buttress_atoms = True):
+        '''Removes the loop residues identified by the residues in loops_segments and all sidechains with heavy atoms
+           within 10A of any heavy atom of the loop.
+           If keep_Ca_buttress_atoms is set then the N and Ca backbone atoms of the first loop residue are kept and the
+             Ca and C backbone atoms of the last loop residue are kept. This is a useful option to use for Rosetta as
+             discarding those atoms can negatively affect some of the loop modeling protocols.
+        '''
+
+        # Extract the list of Residues defined in the loops definitions
+        loop_residues = []
+        loop_N_terminii = []
+        loop_C_terminii = []
+        parsed_sequences = []
+        for loop in loops_segments:
+
+            # Identify the Residues corresponding to the loops file definition
+            start_id = loop.StartResidueID
+            end_id = loop.EndResidueID
+            chain_id = loop.Chain
+            start_residue, end_residue = None, None
+
+            try:
+                start_residue = self.residues[chain_id][loop.StartResidueID]
+                end_residue = self.residues[chain_id][loop.EndResidueID]
+            except Exception, e:
+                raise Exception('Could not find the start or end residue in the chain.')
+
+            if start_residue in loop_residues or end_residue in loop_residues:
+                raise Exception('Error: The loops segments overlap.')
+
+            # We assume that the loops file identifies a range in document order
+            loop_residue_ids = []
+            loop_start = False
+            for l in self.indexed_lines:
+                if l[0] == 'ATOM' or l[0] == 'HETATM':
+                    atom_residue = l[3].residue
+                    if not loop_start:
+                        if atom_residue == start_residue:
+                            loop_start = True
+                            if atom_residue not in loop_residues:
+                                if atom_residue.residue_id not in loop_residue_ids:
+                                    loop_residue_ids.append(atom_residue.residue_id)
+                                loop_residues.append(atom_residue)
+                    else:
+                        if atom_residue not in loop_residues:
+                            if atom_residue.residue_id not in loop_residue_ids:
+                                loop_residue_ids.append(atom_residue.residue_id)
+                            loop_residues.append(atom_residue)
+                        if atom_residue == end_residue:
+                            break
+
+            parsed_sequence = ''.join([loop_residue.get_amino_acid_code() for loop_residue in loop_residues])
+            if check_sequence:
+                if not parsed_sequence == loop.Sequence:
+                    raise Exception('Expected to find sequence {0} but found sequence {1}.'.format(loop.Sequence, parsed_sequence))
+            parsed_sequences.append((parsed_sequence, ';'.join([chain_id + lrid.strip() for lrid in loop_residue_ids])))
+
+            if expected_loop_length != None and ((expected_loop_length != len(loop_residues)) or (expected_loop_length != len(loop_residue_ids))):
+                # This parameter currently only makes sense for a single loop
+                raise Exception('Expected to identify {0} residues but {1} were identified.'.format(expected_loop_length, len(loop_residues)))
+
+            # Keep track of the loop terminii
+            loop_N_terminii.append(start_residue)
+            loop_C_terminii.append(end_residue)
+
+        # Determine the sidechain atoms to be removed
+        sidechain_atom_serial_numbers = self.find_sidechain_atoms_within_radius_of_residue_objects(loop_residues, search_radius)
+
+        # Determine the loop residue atoms to be removed
+        loop_residues_ids = set()
+        loop_atom_serial_numbers = set()
+        atoms_serial_numbers_to_keep_in_cutting = set()
+        for loop_residue in loop_residues:
+            for aatom in loop_residue.get('ATOM'):
+                if keep_Ca_buttress_atoms:
+                    # Keep the N and CA atoms of the N-terminus side and the CA and C atoms of the C-terminus side
+                    if (loop_residue in loop_N_terminii) and (aatom.name == 'N' or aatom.name == 'CA'):
+                        atoms_serial_numbers_to_keep_in_cutting.add(aatom.serial_number)
+                        continue
+                    elif (loop_residue in loop_C_terminii) and (aatom.name == 'CA' or aatom.name == 'C'):
+                        atoms_serial_numbers_to_keep_in_cutting.add(aatom.serial_number)
+                        continue
+                loop_atom_serial_numbers.add(aatom.serial_number)
+        assert(len(sidechain_atom_serial_numbers.intersection(loop_atom_serial_numbers)) == 0)
+
+        # Create a FASTA file with the loops' sequences
+        FASTA = []
+        FASTA_line_length = self.FASTA_line_length
+        for x in range(len(parsed_sequences)):
+            parsed_sequence = parsed_sequences[x][0]
+            FASTA.append('>loop_{0}|Residues {1}'.format(x + 1, parsed_sequences[x][1].strip()))
+            for idx in range(0, len(parsed_sequence), FASTA_line_length):
+                FASTA.append(parsed_sequence[idx:idx + FASTA_line_length])
+        FASTA_file = '\n'.join(FASTA)
+
+        bonsai_pdb_content, cutting_pdb_content, PSE_file, PSE_script = self.prune(loop_atom_serial_numbers, sidechain_atom_serial_numbers, atoms_serial_numbers_to_keep_in_cutting = atoms_serial_numbers_to_keep_in_cutting, generate_pymol_session = generate_pymol_session)
+        return bonsai_pdb_content, cutting_pdb_content, PSE_file, PSE_script, FASTA_file
+
+
     def prune_structure_according_to_loops_file(self, loops_file_content, search_radius, expected_loop_length = None, generate_pymol_session = True):
+        '''todo: this needs to be rewritten to include the logic in prune_structure_according_to_loop_definitions.'''
         lf = LoopsFile(loops_file_content)
         assert(len(lf.data) == 1) # todo: remove
 
@@ -508,16 +690,22 @@ class Bonsai(object):
         return self.prune(loop_atom_serial_numbers, sidechain_atom_serial_numbers, generate_pymol_session = generate_pymol_session)
 
 
-    def prune(self, arbitrary_atom_serial_numbers, sidechain_atom_serial_numbers = set(), keep_CA_in_cutting = True, generate_pymol_session = True, bonsai_label = 'Bonsai', cutting_label = 'Cutting', pymol_executable = 'pymol'):
-        '''Returns the content of two PDB files.
-           The first object is missing the ATOM (and any related ANISOU) and HETATM records identified by atom_serial_numbers.
-           The second object only contains ATOM, ANISOU, and HETATM records which are identified by atom_serial_numbers.
-           Both PDB objects contain all records from the original PDB which are not ATOM, ANISOU, or HETATM records.'''
+    def prune(self, arbitrary_atom_serial_numbers, sidechain_atom_serial_numbers = set(), atoms_serial_numbers_to_keep_in_cutting = set(), keep_CA_in_cutting = True, generate_pymol_session = True, bonsai_label = 'Bonsai', cutting_label = 'Cutting', pymol_executable = 'pymol'):
+        '''Returns the content of two PDB files and (optionally) a PyMOL session and associated script.
+           The first returned PDB file ("bonsai") is missing the ATOM (and any related ANISOU) and HETATM records identified by atom_serial_numbers.
+           The second returned PDB file ("cutting") only contains ATOM, ANISOU, and HETATM records which are identified by atom_serial_numbers.
+           Both PDB objects contain all records from the original PDB which are not ATOM, ANISOU, or HETATM records.
+
+           If keep_CA_in_cutting is set, the cutting will also contain the associated Calpha atoms. This is useful purely
+           to visualize the cutting in the PyMOL session. If a PyMOL session is not to be generated, this option should
+           be set to False.
+           '''
         bonsai = []
         cutting = []
 
+        # Determine the set of sidechain residues in case keep_CA_in_cutting is True and we wish to keep those atoms in the cutting
         sidechain_residues = set()
-        if sidechain_atom_serial_numbers:
+        if keep_CA_in_cutting and sidechain_atom_serial_numbers:
             for line in self.indexed_lines:
                 if line[0] == 'ATOM' and line[1] in sidechain_atom_serial_numbers:
                     residue_id = line[3].residue.id()
@@ -530,7 +718,9 @@ class Bonsai(object):
                 if line[1] in atom_serial_numbers_to_remove:
                     cutting.append(PDB_line)
                 else:
-                    if keep_CA_in_cutting and PDB_line[21:27] in sidechain_residues and PDB_line[12:16] == ' CA ':
+                    if atoms_serial_numbers_to_keep_in_cutting and int(PDB_line[6:11]) in atoms_serial_numbers_to_keep_in_cutting:
+                        cutting.append(PDB_line)
+                    elif keep_CA_in_cutting and PDB_line[21:27] in sidechain_residues and PDB_line[12:16] == ' CA ':
                         cutting.append(PDB_line)
                     bonsai.append(PDB_line)
             else:
@@ -543,7 +733,6 @@ class Bonsai(object):
             PSE_file, PSE_script = self.generate_pymol_session(bonsai_pdb_content, cutting_pdb_content, bonsai_label = bonsai_label, cutting_label = cutting_label, pymol_executable = pymol_executable, settings = {})
         except Exception, e:
             colortext.error('Failed to generate the PyMOL session: "{0}"'.format(e))
-
         return bonsai_pdb_content, cutting_pdb_content, PSE_file, PSE_script
 
 
@@ -575,48 +764,11 @@ class Bonsai(object):
         pass
 
 
-    ### Safety checks
 
 
-    def check_residues(self):
-        '''Checks to make sure that each atom type is unique per residue.'''
-        for chain, residue_ids in self.residues.iteritems():
-            for residue_id, residue in residue_ids.iteritems():
-                for record_type, atoms in residue.records.iteritems():
-                    freq = {}
-                    for atom in atoms:
-                        freq[atom.name] = freq.get(atom.name, 0)
-                        freq[atom.name] += 1
-                    for atom_type, count in freq.items():
-                        if count > 1:
-                            raise Exception('{0} occurrences of atom type {1} for record type {2} occur in residue {3} in chain {4}.'.format(count, atom_type, record_type, residue_id.strip(), chain))
 
-
-def prepare_structures_for_loops_benchmark():
-    # todo: move this into the loops benchmark
-    import glob
-    search_radius = 10.0
-    for pdb_file in sorted(glob.glob('/home/oconchus/t14benchmarking/loop_modeling/input/structures/*.pdb')):
-        if pdb_file in ['/home/oconchus/t14benchmarking/loop_modeling/input/structures/1t1d.pdb',
-                        '/home/oconchus/t14benchmarking/loop_modeling/input/structures/1my7.pdb']:
-            continue
-        pdb_prefix = os.path.splitext(os.path.split(pdb_file)[1])[0]
-        loop_file = os.path.splitext(pdb_file)[0] + '.loop'
-        assert(os.path.exists(loop_file))
-        loop_def = read_file(loop_file).strip()
-        assert(len(loop_def.split('\n')) == 1)
-        loop_def = 'LOOP ' + loop_def
-        b = Bonsai(read_file(pdb_file))
-        bonsai, cutting, PSE_file, PSE_script = b.prune_structure_according_to_loops_file(loop_def, search_radius, expected_loop_length = 12, generate_pymol_session = True)
-        write_file(os.path.join('loop_modeling', '{0}.pse'.format(pdb_prefix)), PSE_file)
-        write_file(os.path.join('loop_modeling', '{0}_missing_native.pdb'.format(pdb_prefix)), bonsai)
-        write_file(os.path.join('loop_modeling', '{0}_loop.pdb'.format(pdb_prefix), cutting)
-        sys.stdout.write('.')
-        sys.stdout.flush()
-    print('')
-
-
-if __name__ == '__main__':
+def example():
+    '''This section gives examples of how to use the module.'''
 
     # 1a8d is an example from the loops benchmark
     # 1lfa contains hydrogens
@@ -638,7 +790,4 @@ if __name__ == '__main__':
 
     # Get all carbon atoms within the radius
     nearby_c_atoms = b.find_atoms_near_atom(atom_of_interest, search_radius, atom_names_to_include = b.get_atom_names_by_group(['C']))
-
-    # todo: remove this call
-    prepare_structures_for_loops_benchmark()
 
