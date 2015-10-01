@@ -553,6 +553,7 @@ class Residue(object):
     def get_residue_id(self):
         return self.ResidueID
 
+
 class PDBResidue(Residue):
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type, Residue3AA = None):
         '''Residue3AA has to be used when matching non-canonical residues/HETATMs to the SEQRES record e.g. 34H in 1A2C.'''
@@ -569,6 +570,7 @@ class PDBResidue(Residue):
 
     def get_residue_id(self):
         return "%s%s" % (self.Chain, self.ResidueID)
+
 
 class IdentifyingPDBResidue(PDBResidue):
     '''A sortable subclass.'''
