@@ -8,15 +8,18 @@ import types
 import string
 import types
 
-from .basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
-from .basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
-from .. import colortext
-from ..fs.fsio import read_file, write_file
-from ..pymath.stats import get_mean_and_standard_deviation
-from ..pymath.cartesian import spatialhash
-from ..rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-from . import rcsb
-from ..general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
+if __name__ == '__main__':
+    sys.path.insert(0, os.path.join('..', '..'))
+
+from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
+from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools import colortext
+from tools.fs.fsio import read_file, write_file
+from tools.pymath.stats import get_mean_and_standard_deviation
+from tools.pymath.cartesian import spatialhash
+from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
+from tools.bio import rcsb
+from tools.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
 
 # todo: related packages will need to be fixed since my refactoring
 # The PDB constructor has now changed
@@ -1340,7 +1343,7 @@ class PDB:
         return seqres_to_atom_maps, atom_to_seqres_maps
 
 
-    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path = None, extra_command_flags = None):
+    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, extra_command_flags = None):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
             Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
