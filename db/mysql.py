@@ -606,7 +606,7 @@ class DatabaseInterface(object):
             raise Exception("Error occurred during database insertion: '%s'. %s" % (str(e), traceback.format_exc()))
 
 
-    def create_insert_dict_string(self, tblname, d, PKfields=[], fields=None):
+    def create_insert_dict_string(self, tblname, d, PKfields=[], fields=None, check_existing = False):
         '''The main function of the insert_dict functions.
            This creates and returns the SQL query and parameters used by the other functions but does not insert any data into the database.
 
@@ -634,10 +634,15 @@ class DatabaseInterface(object):
                     PKvalues.append(d[PKfield])
             PKfields = join(PKfields, ",")
             wherestr = join(wherestr, " AND ")
+
+            record_exists = None
+            if check_existing:
+                record_exists = not(not(self.execute_select("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr, parameters=tuple(PKvalues), locked = True)))
+
             SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (
             tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
             values = tuple([d[k] for k in fields])
-            return SQL, values
+            return SQL, values, record_exists
         except Exception, e:
             raise Exception("Error occurred during database insertion: '%s'. %s" % (str(e), traceback.format_exc()))
 
