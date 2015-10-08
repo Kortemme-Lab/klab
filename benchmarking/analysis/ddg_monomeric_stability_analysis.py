@@ -21,7 +21,15 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
+'''
+This module contains one main class.
 
+The BenchmarkRun class creates a dataframe containing the raw data used for DDG analysis. This dataframe is then used to
+performs analysis for the particular run or between another runs.
+
+This class should not be specific to a particular computational method so it can be reusable for generic monomeric stability
+DDG analysis.
+'''
 
 import os
 import shutil
@@ -42,13 +50,6 @@ from tools.gfx.color_definitions import rgb_colors as plot_colors
 from tools.stats import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
 from tools.benchmarking.analysis.plot import plot_pandas
 from tools.plot.rtools import RInterface
-
-# This module contains one main class.
-#
-# The BenchmarkRun class creates a dataframe containing the raw data used for analysis. This dataframe is then used to
-# performs analysis for the particular run or between another runs.
-#
-# This class should not be specific to a particular computational method so it can be reusable for generic analysis.
 
 
 class BenchmarkRun(ReportingObject):
@@ -205,8 +206,6 @@ class BenchmarkRun(ReportingObject):
 
         analysis_data = self.analysis_data
         dataset_cases = self.dataset_cases
-        amino_acid_details, CAA, PAA, HAA = self.amino_acid_details, self.CAA, self.PAA, self.HAA
-        burial_cutoff, stability_classication_x_cutoff, stability_classication_y_cutoff = self.burial_cutoff, self.stability_classication_x_cutoff, self.stability_classication_y_cutoff\
 
         # Create XY data
         self.log('Creating the analysis input file %s and human-readable CSV and JSON versions %s and %s.' % (self.analysis_pandas_input_filepath, self.analysis_csv_input_filepath, self.analysis_json_input_filepath))
@@ -250,157 +249,12 @@ class BenchmarkRun(ReportingObject):
 
         # Create the dataframe
         for record_id, predicted_data in sorted(analysis_data.iteritems()):
-
-            record = dataset_cases[record_id]
-
-            # Ignore derived mutations if appropriate
-            if record['DerivedMutation'] and not self.include_derived_mutations:
-                continue
-
-            # Initialize variables. For ambiguous cases where the set of distinct values has multiple values, we default to None
-            residue_charge, residue_charges = None, set()
-            exposure, exposures = None, set()
-            volume_change, volume_changes = None, set()
-            record_wtaa, wtaas = None, set()
-            record_mutaa, mutaas = None, set()
-            DSSPSimpleSSType, DSSPSimpleSSTypes = None, set()
-            DSSPType, DSSPTypes = None, set()
-            DSSPExposure, DSSPExposures = None, set()
-            scops = set()
-            pdb_chains = set()
-            mutation_string = []
-            num_derivative_errors = predicted_data.get('Errors', {}).get('Derivative error count', 0)
-
-            mutations = record['Mutations']
-            for m in mutations:
-
-                wtaa = m['WildTypeAA']
-                mutaa = m['MutantAA']
-                mutation_string.append('{0} {1}{2}{3}'.format(m['Chain'], m['WildTypeAA'], m['ResidueID'], m['MutantAA']))
-
-                # Residue types and chain
-                wtaas.add(wtaa)
-                mutaas.add(mutaa)
-                pdb_chains.add(m['Chain'])
-                scops.add(m['SCOP class'])
-                DSSPSimpleSSTypes.add(m['DSSPSimpleSSType'])
-                DSSPTypes.add(m['DSSPType'])
-                DSSPExposures.add(m['DSSPExposure'])
-
-                # Burial
-                if m['DSSPExposure'] != None:
-                    if m['DSSPExposure'] > burial_cutoff:
-                        exposures.add('E')
-                    else:
-                        exposures.add('B')
-                else:
-                    exposures.add(None)
-
-                # Volume
-                if amino_acid_details[wtaa]['van der Waals volume'] < amino_acid_details[mutaa]['van der Waals volume']:
-                    volume_changes.add('SL')
-                elif amino_acid_details[wtaa]['van der Waals volume'] > amino_acid_details[mutaa]['van der Waals volume']:
-                    volume_changes.add('LS')
-                elif amino_acid_details[wtaa]['van der Waals volume'] == amino_acid_details[mutaa]['van der Waals volume']:
-                    volume_changes.add('XX')
-
-                # Charge
-                if ((wtaa in CAA or wtaa in PAA) and (mutaa in HAA)) or ((mutaa in CAA or mutaa in PAA) and (wtaa in HAA)):
-                    residue_charges.add('Change')
-                elif (wtaa in CAA or wtaa in PAA) and (mutaa in CAA or mutaa in PAA):
-                    residue_charges.add('Polar/Charged')
-                elif (wtaa in HAA) and (mutaa in HAA):
-                    residue_charges.add('Hydrophobic/Non-polar')
-                else:
-                     raise colortext.Exception('Should not reach here.')
-
-            # Create a string representing the mutations (useful for labeling rather than analysis)
-            mutation_string = '; '.join(mutation_string)
-
-            # Taking unique values, determine the residue charges of the wildtype and mutant residues, the wildtype residue exposure, and the relative change in van der Waals volume
-            if len(residue_charges) == 1: residue_charge = residue_charges.pop()
-            if len(exposures) == 1: exposure = exposures.pop()
-            if len(volume_changes) == 1: volume_change = volume_changes.pop()
-
-            # Taking unique values, determine the wildtype and mutant residue types
-            all_residues = wtaas.union(mutaas)
-            if len(wtaas) == 1: record_wtaa = wtaas.pop()
-            if len(mutaas) == 1: record_mutaa = mutaas.pop()
-            assert(len(pdb_chains) == 1) # we expect monomeric cases
-            pdb_chain = pdb_chains.pop()
-
-            # Taking unique values, determine the secondary structure and residue exposures from the DSSP data in the dataset
-            if len(DSSPSimpleSSTypes) == 1: DSSPSimpleSSType = DSSPSimpleSSTypes.pop()
-            if len(DSSPTypes) == 1: DSSPType = DSSPTypes.pop()
-            if len(DSSPExposures) == 1: DSSPExposure = DSSPExposures.pop()
-
-            # Determine the SCOP classification from the SCOPe data in the dataset
-            full_scop_classification, scop_class, scop_fold = None, None, None
-            if len(scops) > 1:
-                self.log('Warning: There is more than one SCOPe class for record {0}.'.format(record_id), colortext.warning)
-            else:
-                full_scop_classification = scops.pop()
-                scop_tokens = full_scop_classification.split('.')
-                scop_class = scop_tokens[0]
-                if len(scop_tokens) > 1:
-                    scop_fold = '.'.join(scop_tokens[0:2])
-
-            # Calculate the stability classification and absolute_error for this case
-            stability_classification = fraction_correct([record['DDG']], [predicted_data[self.ddg_analysis_type]], x_cutoff = stability_classication_x_cutoff, y_cutoff = stability_classication_y_cutoff)
-            assert(stability_classification == 0 or stability_classification == 1)
-            #stability_classification = int(stability_classification)
-            absolute_error = abs(record['DDG'] - predicted_data[self.ddg_analysis_type])
-
-            # Partition the data by PDB resolution with bins: N/A, <1.5, 1.5-<2.0, 2.0-<2.5, >=2.5
-            pdb_record = pdb_data.get(record['PDBFileID'].upper())
-            pdb_resolution_bin = None
-            pdb_resolution = pdb_record.get('Resolution')
-            if pdb_resolution != None:
-                if pdb_resolution < 1.5:
-                    pdb_resolution_bin = '<1.5'
-                elif pdb_resolution < 2.0:
-                    pdb_resolution_bin = '1.5-2.0'
-                elif pdb_resolution < 2.5:
-                    pdb_resolution_bin = '2.0-2.5'
-                else:
-                    pdb_resolution_bin = '>=2.5'
-            pdb_resolution_bin = pdb_resolution_bin or 'N/A'
-
-            # Mark mutations involving glycine or proline
-            has_gp_mutation = 'G' in all_residues or 'P' in all_residues
-
-            # Create the data matrix
-            dataframe_record = dict(
-                DatasetID = record_id,
-                PDBFileID = record['PDBFileID'],
-                Mutations = mutation_string,
-                NumberOfMutations = len(mutations),
-                Experimental = record['DDG'],
-                Predicted = predicted_data[self.ddg_analysis_type],
-                AbsoluteError = absolute_error,
-                StabilityClassification = stability_classification,
-                ResidueCharges = residue_charge,
-                VolumeChange = volume_change,
-                HasGPMutation = int(has_gp_mutation),
-                WildTypeDSSPType = DSSPType,
-                WildTypeDSSPSimpleSSType = DSSPSimpleSSType,
-                WildTypeDSSPExposure = DSSPExposure,
-                WildTypeSCOPClass = scop_class,
-                WildTypeSCOPFold = scop_fold,
-                WildTypeSCOPClassification = full_scop_classification,
-                WildTypeExposure = exposure,
-                WildTypeAA = record_wtaa,
-                MutantAA = record_mutaa,
-                PDBResolution = pdb_record.get('Resolution'),
-                PDBResolutionBin = pdb_resolution_bin,
-                MonomerLength = len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', '')) or None,
-                NumberOfDerivativeErrors = num_derivative_errors,
-                )
-
-            for h in csv_headers:
-                assert(',' not in str(dataframe_record[h]))
-            csv_file.append(','.join([str(dataframe_record[h]) for h in csv_headers]))
-            assert(sorted(csv_headers) == sorted(dataframe_record.keys()))
+            dataframe_record = self.get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
+            if dataframe_record:
+                for h in csv_headers:
+                    assert(',' not in str(dataframe_record[h]))
+                csv_file.append(','.join([str(dataframe_record[h]) for h in csv_headers]))
+                assert(sorted(csv_headers) == sorted(dataframe_record.keys()))
 
         # Create the CSV file in memory (we are not done added data just yet) and pass it to pandas
         dataframe = pandas.read_csv(StringIO.StringIO('\n'.join(csv_file)), sep=',', header=0, skip_blank_lines=True, index_col = 0)
@@ -419,7 +273,7 @@ class BenchmarkRun(ReportingObject):
         # Add new columns derived from the adjusted values
         dataframe['Predicted_adj'] = dataframe['Predicted'] / self.scalar_adjustment
         dataframe['AbsoluteError_adj'] = (dataframe['Experimental'] - dataframe['Predicted_adj']).abs()
-        add_fraction_correct_values_to_dataframe(dataframe, 'Experimental', 'Predicted_adj', 'StabilityClassification_adj',  x_cutoff = stability_classication_x_cutoff, y_cutoff = stability_classication_y_cutoff)
+        add_fraction_correct_values_to_dataframe(dataframe, 'Experimental', 'Predicted_adj', 'StabilityClassification_adj',  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff)
 
         # Write the dataframe out to CSV
         dataframe.to_csv(self.analysis_csv_input_filepath, sep = ',', header = True)
@@ -445,6 +299,159 @@ class BenchmarkRun(ReportingObject):
         store['ddg_analysis_type'] = pandas.Series(dict(ddg_analysis_type = self.ddg_analysis_type))
         store['ddg_analysis_type_description'] = pandas.Series(dict(ddg_analysis_type_description = self.ddg_analysis_type_description))
         store.close()
+
+
+    def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id):
+        '''Create a dataframe row for a prediction.'''
+
+        # Ignore derived mutations if appropriate
+        record = dataset_cases[record_id]
+        if record['DerivedMutation'] and not self.include_derived_mutations:
+            return None
+
+        amino_acid_details, CAA, PAA, HAA = self.amino_acid_details, self.CAA, self.PAA, self.HAA
+        burial_cutoff, stability_classication_x_cutoff, stability_classication_y_cutoff = self.burial_cutoff, self.stability_classication_x_cutoff, self.stability_classication_y_cutoff\
+
+        # Initialize variables. For ambiguous cases where the set of distinct values has multiple values, we default to None
+        residue_charge, residue_charges = None, set()
+        exposure, exposures = None, set()
+        volume_change, volume_changes = None, set()
+        record_wtaa, wtaas = None, set()
+        record_mutaa, mutaas = None, set()
+        DSSPSimpleSSType, DSSPSimpleSSTypes = None, set()
+        DSSPType, DSSPTypes = None, set()
+        DSSPExposure, DSSPExposures = None, set()
+        scops = set()
+        pdb_chains = set()
+        mutation_string = []
+        num_derivative_errors = predicted_data.get('Errors', {}).get('Derivative error count', 0)
+
+        mutations = record['Mutations']
+        for m in mutations:
+
+            wtaa = m['WildTypeAA']
+            mutaa = m['MutantAA']
+            mutation_string.append('{0} {1}{2}{3}'.format(m['Chain'], m['WildTypeAA'], m['ResidueID'], m['MutantAA']))
+
+            # Residue types and chain
+            wtaas.add(wtaa)
+            mutaas.add(mutaa)
+            pdb_chains.add(m['Chain'])
+            scops.add(m['SCOP class'])
+            DSSPSimpleSSTypes.add(m['DSSPSimpleSSType'])
+            DSSPTypes.add(m['DSSPType'])
+            DSSPExposures.add(m['DSSPExposure'])
+
+            # Burial
+            if m['DSSPExposure'] != None:
+                if m['DSSPExposure'] > burial_cutoff:
+                    exposures.add('E')
+                else:
+                    exposures.add('B')
+            else:
+                exposures.add(None)
+
+            # Volume
+            if amino_acid_details[wtaa]['van der Waals volume'] < amino_acid_details[mutaa]['van der Waals volume']:
+                volume_changes.add('SL')
+            elif amino_acid_details[wtaa]['van der Waals volume'] > amino_acid_details[mutaa]['van der Waals volume']:
+                volume_changes.add('LS')
+            elif amino_acid_details[wtaa]['van der Waals volume'] == amino_acid_details[mutaa]['van der Waals volume']:
+                volume_changes.add('XX')
+
+            # Charge
+            if ((wtaa in CAA or wtaa in PAA) and (mutaa in HAA)) or ((mutaa in CAA or mutaa in PAA) and (wtaa in HAA)):
+                residue_charges.add('Change')
+            elif (wtaa in CAA or wtaa in PAA) and (mutaa in CAA or mutaa in PAA):
+                residue_charges.add('Polar/Charged')
+            elif (wtaa in HAA) and (mutaa in HAA):
+                residue_charges.add('Hydrophobic/Non-polar')
+            else:
+                 raise colortext.Exception('Should not reach here.')
+
+        # Create a string representing the mutations (useful for labeling rather than analysis)
+        mutation_string = '; '.join(mutation_string)
+
+        # Taking unique values, determine the residue charges of the wildtype and mutant residues, the wildtype residue exposure, and the relative change in van der Waals volume
+        if len(residue_charges) == 1: residue_charge = residue_charges.pop()
+        if len(exposures) == 1: exposure = exposures.pop()
+        if len(volume_changes) == 1: volume_change = volume_changes.pop()
+
+        # Taking unique values, determine the wildtype and mutant residue types
+        all_residues = wtaas.union(mutaas)
+        if len(wtaas) == 1: record_wtaa = wtaas.pop()
+        if len(mutaas) == 1: record_mutaa = mutaas.pop()
+        assert(len(pdb_chains) == 1) # we expect monomeric cases
+        pdb_chain = pdb_chains.pop()
+
+        # Taking unique values, determine the secondary structure and residue exposures from the DSSP data in the dataset
+        if len(DSSPSimpleSSTypes) == 1: DSSPSimpleSSType = DSSPSimpleSSTypes.pop()
+        if len(DSSPTypes) == 1: DSSPType = DSSPTypes.pop()
+        if len(DSSPExposures) == 1: DSSPExposure = DSSPExposures.pop()
+
+        # Determine the SCOP classification from the SCOPe data in the dataset
+        full_scop_classification, scop_class, scop_fold = None, None, None
+        if len(scops) > 1:
+            self.log('Warning: There is more than one SCOPe class for record {0}.'.format(record_id), colortext.warning)
+        else:
+            full_scop_classification = scops.pop()
+            scop_tokens = full_scop_classification.split('.')
+            scop_class = scop_tokens[0]
+            if len(scop_tokens) > 1:
+                scop_fold = '.'.join(scop_tokens[0:2])
+
+        # Calculate the stability classification and absolute_error for this case
+        stability_classification = fraction_correct([record['DDG']], [predicted_data[self.ddg_analysis_type]], x_cutoff = stability_classication_x_cutoff, y_cutoff = stability_classication_y_cutoff)
+        assert(stability_classification == 0 or stability_classification == 1)
+        #stability_classification = int(stability_classification)
+        absolute_error = abs(record['DDG'] - predicted_data[self.ddg_analysis_type])
+
+        # Partition the data by PDB resolution with bins: N/A, <1.5, 1.5-<2.0, 2.0-<2.5, >=2.5
+        pdb_record = pdb_data.get(record['PDBFileID'].upper())
+        pdb_resolution_bin = None
+        pdb_resolution = pdb_record.get('Resolution')
+        if pdb_resolution != None:
+            if pdb_resolution < 1.5:
+                pdb_resolution_bin = '<1.5'
+            elif pdb_resolution < 2.0:
+                pdb_resolution_bin = '1.5-2.0'
+            elif pdb_resolution < 2.5:
+                pdb_resolution_bin = '2.0-2.5'
+            else:
+                pdb_resolution_bin = '>=2.5'
+        pdb_resolution_bin = pdb_resolution_bin or 'N/A'
+
+        # Mark mutations involving glycine or proline
+        has_gp_mutation = 'G' in all_residues or 'P' in all_residues
+
+        # Create the data matrix
+        dataframe_record = dict(
+            DatasetID = record_id,
+            PDBFileID = record['PDBFileID'],
+            Mutations = mutation_string,
+            NumberOfMutations = len(mutations),
+            Experimental = record['DDG'],
+            Predicted = predicted_data[self.ddg_analysis_type],
+            AbsoluteError = absolute_error,
+            StabilityClassification = stability_classification,
+            ResidueCharges = residue_charge,
+            VolumeChange = volume_change,
+            HasGPMutation = int(has_gp_mutation),
+            WildTypeDSSPType = DSSPType,
+            WildTypeDSSPSimpleSSType = DSSPSimpleSSType,
+            WildTypeDSSPExposure = DSSPExposure,
+            WildTypeSCOPClass = scop_class,
+            WildTypeSCOPFold = scop_fold,
+            WildTypeSCOPClassification = full_scop_classification,
+            WildTypeExposure = exposure,
+            WildTypeAA = record_wtaa,
+            MutantAA = record_mutaa,
+            PDBResolution = pdb_record.get('Resolution'),
+            PDBResolutionBin = pdb_resolution_bin,
+            MonomerLength = len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', '')) or None,
+            NumberOfDerivativeErrors = num_derivative_errors,
+            )
+        return dataframe_record
 
 
     def analyze(self):
@@ -1224,3 +1231,4 @@ plot_scale <- scale_color_manual(
     )''' % plot_colors
         extra_commands ='\n    scale_colour_gradient(low="yellow", high="#880000") +'
         return self.scatterplot_color_by_series(colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands)
+
