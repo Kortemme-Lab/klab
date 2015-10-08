@@ -24,18 +24,18 @@
 '''
 This module contains one main class.
 
-The BindingAffinityBenchmarkRun class extends the generic DDG BenchmarkRun class to add columns particular to binding
+The BenchmarkRun class extends the generic DDG BenchmarkRun class to add columns particular to binding
 affinity predictions.
 '''
 
-from tools.benchmarking.analysis.ddg_monomeric_stability_analysis import BenchmarkRun
+from tools.benchmarking.analysis.ddg_monomeric_stability_analysis import BenchmarkRun as GenericBenchmarkRun
 
 
-class BindingAffinityBenchmarkRun(BenchmarkRun):
+class BenchmarkRun(GenericBenchmarkRun):
 
     def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id):
         '''Create a dataframe row for a prediction.'''
 
-        dataframe_record = super(BindingAffinityBenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
+        dataframe_record = super(BenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
         # add columns
         return dataframe_record
