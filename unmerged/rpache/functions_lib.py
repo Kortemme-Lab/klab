@@ -1,3 +1,28 @@
+#!/usr/bin/env python2
+# encoding: utf-8
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2011, 2012 Roland A. Pache, Ph.D.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
 #This file was developed and written by Roland A. Pache, Ph.D., Copyright (C) 2011, 2012.
 
 import os
@@ -146,7 +171,7 @@ def cumulativeProbabilitiesMap(values,sort_reverse):
 #Histogram
 #input: list of values (floats/ints), number of bins (int)
 #output: list of pairs (bin,abundance) ready for gnuplot
-def histogram(values,num_bins):
+def histogram_values(values,num_bins):
     cleaned_values=[]
     for value in values:
         if value!='n/a':
@@ -209,104 +234,73 @@ def rawHistogram(values):
     return bins_list
 
 
-#converts raw values into ranks for rank correlation coefficients
-#input: list of values (int/float)
-#output: map: value -> rank
-def getRanks(values):
-    ranks={}
-    sorted_values=sorted(values)
+def get_ranks(values):
+    '''
+    Converts raw values into ranks for rank correlation coefficients
+    :param values: list of values (int/float)
+    :return: a dict mapping value -> rank
+    '''
+    ranks = {}
+    sorted_values = sorted(values)
     for i in range(len(sorted_values)):
-        value=sorted_values[i]
+        value = sorted_values[i]
         if value not in ranks:
-            ranks[value]=i+1
-    #--
+            ranks[value] = i + 1
     return ranks
 
 
-#Goodman and Kruskal's gamma correlation coefficient
-#input: 2 lists of ranks (ints) of same length with corresponding entries
-#output: Gamma correlation coefficient (rank correlation ignoring ties)
 def gamma(ranks_list1,ranks_list2):
-    num_concordant_pairs=0
-    num_discordant_pairs=0
-    num_tied_x=0
-    num_tied_y=0
-    num_tied_xy=0
-    num_items=len(ranks_list1)
+    '''
+    Goodman and Kruskal's gamma correlation coefficient
+    :param ranks_list1: a list of ranks (integers)
+    :param ranks_list2: a second list of ranks (integers) of equal length with corresponding entries
+    :return: Gamma correlation coefficient (rank correlation ignoring ties)
+    '''
+    num_concordant_pairs = 0
+    num_discordant_pairs = 0
+    num_tied_x = 0
+    num_tied_y = 0
+    num_tied_xy = 0
+    num_items = len(ranks_list1)
     for i in range(num_items):
-        rank_1=ranks_list1[i]
-        rank_2=ranks_list2[i]
-        for j in range(i+1,num_items):
-            diff1=ranks_list1[j]-rank_1
-            diff2=ranks_list2[j]-rank_2
-            if (diff1>0 and diff2>0) or (diff1<0 and diff2<0):
-                num_concordant_pairs+=1
-            elif (diff1>0 and diff2<0) or (diff1<0 and diff2>0):
-                num_discordant_pairs+=1
-            elif diff1==0 and diff2==0:
-                num_tied_xy+=1
-            elif diff1==0:
-                num_tied_x+=1
-            elif diff2==0:
-                num_tied_y+=1
-    #---
+        rank_1 = ranks_list1[i]
+        rank_2 = ranks_list2[i]
+        for j in range(i + 1, num_items):
+            diff1 = ranks_list1[j] - rank_1
+            diff2 = ranks_list2[j] - rank_2
+            if (diff1 > 0 and diff2 > 0) or (diff1 < 0 and diff2 < 0):
+                num_concordant_pairs += 1
+            elif (diff1 > 0 and diff2 < 0) or (diff1 < 0 and diff2 > 0):
+                num_discordant_pairs += 1
+            elif diff1 == 0 and diff2 == 0:
+                num_tied_xy += 1
+            elif diff1 == 0:
+                num_tied_x += 1
+            elif diff2 == 0:
+                num_tied_y += 1
     try:
-        gamma_corr_coeff=float(num_concordant_pairs-num_discordant_pairs)/float(num_concordant_pairs+num_discordant_pairs)
+        gamma_corr_coeff = float(num_concordant_pairs - num_discordant_pairs)/float(num_concordant_pairs + num_discordant_pairs)
     except:
-        gamma_corr_coeff='n/a'
-    #-
-    return [num_tied_x,num_tied_y,num_tied_xy,gamma_corr_coeff]
+        gamma_corr_coeff = 'n/a'
+    return [num_tied_x, num_tied_y, num_tied_xy, gamma_corr_coeff]
 
 
-#Goodman and Kruskal's gamma correlation coefficient wrapper
-#input: 2 lists of values of same length with corresponding entries
-#output: Gamma correlation coefficient (rank correlation ignoring ties)
-def gammaCC(values_list1,values_list2):
-    ranks1=getRanks(values_list1)
-    ranks_list1=[]
+def gamma_CC(values_list1, values_list2):
+    '''
+    Goodman and Kruskal's gamma correlation coefficient wrapper
+    :param values_list1: a list of values
+    :param values_list2: a second list of values of equal length with corresponding entries
+    :return: Gamma correlation coefficient (rank correlation ignoring ties)
+    '''
+    ranks1 = get_ranks(values_list1)
+    ranks_list1 = []
     for value in values_list1:
-        rank=ranks1[value]
+        rank = ranks1[value]
         ranks_list1.append(rank)
-    #-
-    ranks2=getRanks(values_list2)
-    ranks_list2=[]
+    ranks2 = get_ranks(values_list2)
+    ranks_list2 = []
     for value in values_list2:
-        rank=ranks2[value]
+        rank = ranks2[value]
         ranks_list2.append(rank)
-    #-
-    gcc=round(gamma(ranks_list1,ranks_list2)[3],2)
-    return gcc
+    return gamma(ranks_list1, ranks_list2)[3]
 
-
-#Change saturation of hexadecimal color
-#input: hexadecimal color, saturation adjustment
-#output: saturation-adjusted hexadecimal color string
-# Added by Shane
-def saturateHexColor(hexcolor, adjustment = 1.0):
-    assert(adjustment >= 0 and len(hexcolor) >= 1)
-    prefix = ""
-    if hexcolor[0] == '#':
-        hexcolor = hexcolor[1:]
-        prefix = "#"
-    #-
-    assert(len(hexcolor) == 6)
-    if adjustment == 1.0:
-        return "%s%s" % (prefix, hexcolor)
-    else:
-        hsvColor = list(colorsys.rgb_to_hsv(int(hexcolor[0:2], 16)/255.0, int(hexcolor[2:4], 16)/255.0, int(hexcolor[4:6], 16)/255.0))
-        hsvColor[1] = min(1.0, hsvColor[1] * adjustment)
-        rgbColor = [min(255, 255 * v) for v in colorsys.hsv_to_rgb(hsvColor[0], hsvColor[1], hsvColor[2])]
-        return "%s%.2x%.2x%.2x" % (prefix, rgbColor[0], rgbColor[1], rgbColor[2])
-
-
-#Get list of hexadecimal colors
-#input: number of colors needed (int), start value (optional), saturation adjustment (float; optional)
-#output: list of hexadecimal color strings
-# Added by Shane
-def gnuplotColorWheel(n, start = 15, saturation_adjustment = None):
-    hues = range(start, start + 360, 360/n)
-    rgbcolors = ['%x%x%x' % (255 * hlscol[0], 255 * hlscol[1], 255 * hlscol[2]) for hlscol in [colorsys.hls_to_rgb(float(h % 360) / 360.0, 0.65, 1.00) for h in hues]]
-    if saturation_adjustment:
-        return [saturateHexColor(rgbcol, saturation_adjustment) for rgbcol in rgbcolors]
-    else:
-        return rgbcolors

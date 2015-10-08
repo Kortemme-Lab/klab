@@ -1,4 +1,27 @@
-#!/usr/bin/python2.4
+#!/usr/bin/env python2
+# encoding: utf-8
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2010-2015 Shane O'Connor, Florian Lauck, Colin A. Smith
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 
 
 import re
@@ -7,9 +30,6 @@ import os
 import types
 import string
 import types
-
-if __name__ == '__main__':
-    sys.path.insert(0, os.path.join('..', '..'))
 
 from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
 from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
@@ -54,9 +74,9 @@ from tools.general.strutil import remove_trailing_line_whitespace as normalize_p
 allowed_PDB_residues_types = protonated_residues_types_3.union(residue_types_3)
 allowed_PDB_residues_and_nucleotides = allowed_PDB_residues_types.union(dna_nucleotides).union(rna_nucleotides)
 
-### Rosetta hacks
+### Rosetta patches
 
-# Rosetta fails on some edge cases with certain residues. Since we rely on a lot of logic associated with this module (mappings between residues), it seems best to fix those here.
+# Some Rosetta versions fails on some edge cases with certain residues. Since we rely on a lot of logic associated with this module (mappings between residues), it seems best to fix those here.
 ROSETTA_HACKS_residues_to_remove = {
     '1A2P' : set(['B   3 ']), # terminal residue B 3 gets removed which triggers an exception "( anchor_rsd.is_polymer() && !anchor_rsd.is_upper_terminus() ) && ( new_rsd.is_polymer() && !new_rsd.is_lower_terminus() ), Exit from: src/core/conformation/Conformation.cc line: 449". This seems like a Rosetta deficiency.
     '1BAO' : set(['B   3 ']), # similar

@@ -1,5 +1,27 @@
-#!/usr/bin/python
+#!/usr/bin/env python2
 # encoding: utf-8
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 Shane O'Connor
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
 """
 input_files.py
 Simple parsers for Rosetta input file types.
@@ -10,16 +32,9 @@ Created by Shane O'Connor 2014
 import pprint
 import re
 
-if __name__ == '__main__':
-    import sys
-    sys.path.insert(0, '../..')
-    from tools.fs.fsio import read_file
-    from tools.bio.basics import SimpleMutation
-    from tools.general.strutil import parse_range
-else:
-    from ..fs.fsio import read_file
-    from ..bio.basics import SimpleMutation
-    from ..general.strutil import parse_range
+from tools.fs.fsio import read_file
+from tools.bio.basics import SimpleMutation
+from tools.general.strutil import parse_range
 
 
 class RosettaFileParsingException(Exception): pass
@@ -533,6 +548,35 @@ class Mutfile (object):
     def get_total_mutation_count(self):
         return sum([len(mg) for mg in self.mutation_groups])
 
+
+
+
+def create_mutfile(pdb, mutations):
+    '''@todo: This should be removed and callers should use the Mutfile class above.
+              This function was used by the DDG benchmark capture but is no longer.
+        The mutations here are in the original PDB numbering. The PDB file will use Rosetta numbering.
+        We use the mapping from PDB numbering to Rosetta numbering to generate the mutfile.
+    '''
+    from tools.bio.pdb import PDB
+    from tools.bio.basics import residue_type_3to1_map
+
+    mutfile = []
+    for mutation in mutations:
+        chain = mutation.Chain
+        resid = PDB.ResidueID2String(mutation.ResidueID)
+        wt = mutation.WildTypeAA
+        mt = mutation.MutantAA
+
+        # Check that the expected wildtype exists in the PDB
+        readwt = pdb.getAminoAcid(pdb.getAtomLine(chain, resid))
+        assert(wt == residue_type_3to1_map[readwt])
+        resid = resid.strip()
+        mutfile.append("%(wt)s %(resid)s %(mt)s" % vars())
+    if mutfile:
+        mutfile = ["total %d" % len(mutations), "%d" % len(mutations)] + mutfile
+        return '\n'.join(mutfile)
+    else:
+        raise Exception("An error occurred creating the mutfile.")
 
 
 

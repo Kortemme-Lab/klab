@@ -33,12 +33,36 @@ Created by Shane O'Connor 2014
 import math
 import numpy
 import scipy
+from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
 
-from tools.unmerged.rpache.functions_lib import gammaCC
+from tools.unmerged.rpache.functions_lib import gamma_CC
 from tools.fs.fsio import write_temp_file
+
 
 def stability_classification_accuracy(experimental_values, predicted_values):
     pass
+
+
+def fraction_correct_values(indices, x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
+    '''
+    An approximation to the metric used in the Kellogg et al. paper: "The fraction correct is defined as the number of mutations categorized correctly divided by the total number of mutations in the benchmark set."
+    '''
+    num_points = len(indices)
+    assert(num_points == len(x_values) == len(y_values))
+    correct = []
+    for i in range(num_points):
+        index = indices[i]
+        x = x_values[i]
+        y = y_values[i]
+        if (x >= x_cutoff) and (y >= y_cutoff): # both positive
+            correct.append(1.0)
+        elif (x <= -x_cutoff) and (y <= -y_cutoff): # both negative
+            correct.append(1.0)
+        elif (-x_cutoff < x < x_cutoff) and (-y_cutoff < y < y_cutoff): # both neutral
+            correct.append(1.0)
+        else:
+            correct.append(0.0)
+    return correct
 
 
 def fraction_correct(x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
@@ -62,9 +86,19 @@ def fraction_correct(x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
     return correct / float(num_points)
 
 
+def fraction_correct_pandas(dataframe, x_series, y_series, x_cutoff = 1.0, y_cutoff = 1.0):
+    '''A little (<6%) slower than fraction_correct due to the data extraction overhead.'''
+    return fraction_correct(dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff)
+
+
+def add_fraction_correct_values_to_dataframe(dataframe, x_series, y_series, new_label, x_cutoff = 1.0, y_cutoff = 1.0):
+    '''Adds a new column (new_label) to the dataframe with the fraction correct computed over X and Y values.'''
+    new_series_values = fraction_correct_values(dataframe.index.values.tolist(), dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff)
+    dataframe.insert(len(dataframe.columns), new_label, new_series_values)
+
+
 def fraction_correct_fuzzy_linear_create_vector(z, z_cutoff, z_fuzzy_range):
-    '''Helper function for fraction_correct_fuzzy_linear.'''
-    import numpy
+    '''A helper function for fraction_correct_fuzzy_linear.'''
     assert(z_fuzzy_range * 2 < z_cutoff)
     if (z >= z_cutoff + z_fuzzy_range): # positive e.g. z >= 1.1
         return [0, 0, 1]
@@ -91,7 +125,7 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
        to zero despite the results being very close to each other.
        This function corrects for the boundary by overlapping the ranges and attenuating the endpoints.
        This version of the function uses a linear approach - a classification (positive, negative, neutral resp. P, N, X)
-       is 1 for some range of values, 0 for a separate range, and between 0 and 1 for the in between range i.e.
+       is 1 for some range of values, 0 for a separate range, and between 0 and 1 for the in-between range i.e.
            N       X        P
           ----\  /----\  /-----
                \/      \/
@@ -115,10 +149,10 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
 
 def mae(x_values, y_values):
     '''Mean absolute/unsigned error.'''
-    import numpy
     num_points = len(x_values)
     assert(num_points == len(y_values) and num_points > 0)
     return numpy.sum(numpy.apply_along_axis(numpy.abs, 0, numpy.subtract(x_values, y_values))) / float(num_points)
+
 
 # this was renamed from get_xy_dataset_correlations to match the DDG benchmark capture repository
 def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
@@ -133,12 +167,11 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
     :param y_scalar: See get_xy_dataset_statistics.
     :return: A table of statistics.
     '''
-    from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
     assert(len(x_values) == len(y_values))
     return dict(
         pearsonr = pearsonr(x_values, y_values),
         spearmanr = spearmanr(x_values, y_values),
-        gamma_CC = gammaCC(x_values, y_values),
+        gamma_CC = gamma_CC(x_values, y_values),
         MAE = mae(x_values, y_values),
         normaltestx = normaltest(x_values),
         normaltesty = normaltest(y_values),
@@ -163,6 +196,24 @@ def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_
 
     x_values = [record['Experimental'] for record in analysis_table]
     y_values = [record['Predicted'] for record in analysis_table]
+    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar)
+
+
+def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+    '''
+    A version of _get_xy_dataset_statistics which accepts a pandas dataframe rather than X- and Y-value lists.
+    :param dataframe: A pandas dataframe
+    :param x_series: The column name of the X-axis series
+    :param y_series: The column name of the Y-axis series
+    :param fcorrect_x_cutoff: The X-axis cutoff value for the fraction correct metric.
+    :param fcorrect_y_cutoff: The Y-axis cutoff value for the fraction correct metric.
+    :param x_fuzzy_range: The X-axis fuzzy range value for the fuzzy fraction correct metric.
+    :param y_scalar: The Y-axis scalar multiplier for the fuzzy fraction correct metric (used to calculate y_cutoff and y_fuzzy_range in that metric)
+    :return: A table of statistics.
+    '''
+
+    x_values = dataframe[x_series].tolist()
+    y_values = dataframe[y_series].tolist()
     return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar)
 
 
@@ -206,12 +257,4 @@ def format_stats_for_printing(stats):
     return '\n'.join(s)
 
 
-def histogram(values, out_filepath, num_bins = 50):
-    import matplotlib.pyplot as plt
-    hist, bins = numpy.histogram(values, bins=num_bins)
-    width = 0.7 * (bins[1] - bins[0])
-    center = (bins[:-1] + bins[1:]) / 2
-    plt.bar(center, hist, align='center', width=width)
-    fig, ax = plt.subplots()
-    ax.bar(center, hist, align='center', width=width)
-    fig.savefig(out_filepath)
+

@@ -29,17 +29,19 @@ import numpy
 import pprint
 import subprocess
 import shlex
-import pandas
 import StringIO
 try: import json
 except: import simplejson as json
 
-from tools import colortext
-from tools.gfx.color_definitions import rgb_colors as plot_colors
-from tools.fs.fsio import read_file, write_file
-from ddg_capture.analysis.tools.stats import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing, RInterface, plot_pandas
-from ddg_capture.analysis.tools.loggers import ReportingObject
+import pandas
 
+from tools import colortext
+from tools.fs.fsio import read_file, write_file
+from tools.loggers.simple import ReportingObject
+from tools.gfx.color_definitions import rgb_colors as plot_colors
+from tools.stats import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
+from tools.benchmarking.analysis.plot import plot_pandas
+from tools.plot.rtools import RInterface
 
 # This module contains one main class.
 #

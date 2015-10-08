@@ -1,8 +1,10 @@
 import os
 import traceback
 
-from tools.fs.fsio import write_temp_file
+import matplotlib.pyplot as plt
+import numpy
 
+from tools.fs.fsio import write_temp_file
 
 def create_csv(analysis_table):
     contents = '\n'.join(['DatasetID,Experimental,Predicted'] + ['%s,%s,%s' % (str(l['DatasetID']), str(l['Experimental']), str(l['Predicted'])) for l in analysis_table])
@@ -51,3 +53,13 @@ def plot_pandas(dataframe, x_series, y_series, output_filename, RFunction, title
             print(traceback.format_exc())
             raise Exception(e)
     return output_filename
+
+
+def histogram(values, out_filepath, num_bins = 50):
+    hist, bins = numpy.histogram(values, bins=num_bins)
+    width = 0.7 * (bins[1] - bins[0])
+    center = (bins[:-1] + bins[1:]) / 2
+    plt.bar(center, hist, align='center', width=width)
+    fig, ax = plt.subplots()
+    ax.bar(center, hist, align='center', width=width)
+    fig.savefig(out_filepath)
