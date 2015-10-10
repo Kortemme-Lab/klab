@@ -43,7 +43,7 @@ def stability_classification_accuracy(experimental_values, predicted_values):
     pass
 
 
-def fraction_correct_values(indices, x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
+def fraction_correct_values(indices, x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0, ignore_null_values = False):
     '''
     An approximation to the metric used in the Kellogg et al. paper: "The fraction correct is defined as the number of mutations categorized correctly divided by the total number of mutations in the benchmark set."
     '''
@@ -54,7 +54,9 @@ def fraction_correct_values(indices, x_values, y_values, x_cutoff = 1.0, y_cutof
         index = indices[i]
         x = x_values[i]
         y = y_values[i]
-        if (x >= x_cutoff) and (y >= y_cutoff): # both positive
+        if (x == None or y == None or numpy.isnan(x) or numpy.isnan(y)) and ignore_null_values: # If we are missing values then we either discount the case or consider it as incorrect depending on ignore_null_values
+            correct.append(numpy.nan)
+        elif (x >= x_cutoff) and (y >= y_cutoff): # both positive
             correct.append(1.0)
         elif (x <= -x_cutoff) and (y <= -y_cutoff): # both negative
             correct.append(1.0)
@@ -65,35 +67,42 @@ def fraction_correct_values(indices, x_values, y_values, x_cutoff = 1.0, y_cutof
     return correct
 
 
-def fraction_correct(x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0):
+def fraction_correct(x_values, y_values, x_cutoff = 1.0, y_cutoff = 1.0, ignore_null_values = False):
     '''My version of the metric used in the Kellogg et al. paper.
        "Role of conformational sampling in computing mutation-induced changes in protein structure and stability", Proteins, Volume 79, Issue 3, pages 830–838, March 2011.
        http://dx.doi.org/10.1002/prot.22921
        Description: "The fraction correct is defined as the number of mutations categorized correctly divided by the total number of mutations in the benchmark set."
     '''
+
+    expected_types, xtypes, ytypes = set([type(None), type(1.0), numpy.float64]), set(map(type, x_values)), set(map(type, x_values))
+    assert(not(xtypes.difference(expected_types)) and not(ytypes.difference(expected_types)))
+
     num_points = len(x_values)
+    considered_points = num_points
     assert(num_points == len(y_values))
     correct = 0.0
     for i in range(num_points):
         x = x_values[i]
         y = y_values[i]
-        if (x >= x_cutoff) and (y >= y_cutoff): # both positive
+        if (x == None or y == None or numpy.isnan(x) or numpy.isnan(y)) and ignore_null_values: # If we are missing values then we either discount the case or consider it as incorrect depending on ignore_null_values
+            considered_points -= 1
+        elif (x >= x_cutoff) and (y >= y_cutoff): # both positive
             correct += 1.0
         elif (x <= -x_cutoff) and (y <= -y_cutoff): # both negative
             correct += 1.0
         elif (-x_cutoff < x < x_cutoff) and (-y_cutoff < y < y_cutoff): # both neutral
             correct += 1.0
-    return correct / float(num_points)
+    return correct / float(considered_points)
 
 
-def fraction_correct_pandas(dataframe, x_series, y_series, x_cutoff = 1.0, y_cutoff = 1.0):
+def fraction_correct_pandas(dataframe, x_series, y_series, x_cutoff = 1.0, y_cutoff = 1.0, ignore_null_values = False):
     '''A little (<6%) slower than fraction_correct due to the data extraction overhead.'''
-    return fraction_correct(dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff)
+    return fraction_correct(dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff, ignore_null_values = ignore_null_values)
 
 
-def add_fraction_correct_values_to_dataframe(dataframe, x_series, y_series, new_label, x_cutoff = 1.0, y_cutoff = 1.0):
+def add_fraction_correct_values_to_dataframe(dataframe, x_series, y_series, new_label, x_cutoff = 1.0, y_cutoff = 1.0, ignore_null_values = False):
     '''Adds a new column (new_label) to the dataframe with the fraction correct computed over X and Y values.'''
-    new_series_values = fraction_correct_values(dataframe.index.values.tolist(), dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff)
+    new_series_values = fraction_correct_values(dataframe.index.values.tolist(), dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff, ignore_null_values = ignore_null_values)
     dataframe.insert(len(dataframe.columns), new_label, new_series_values)
 
 
@@ -155,7 +164,7 @@ def mae(x_values, y_values):
 
 
 # this was renamed from get_xy_dataset_correlations to match the DDG benchmark capture repository
-def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
     '''
     A function which takes two lists of values of equal length with corresponding entries and returns a dict containing
     a variety of metrics.
@@ -178,12 +187,12 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
         kstestx = kstest(x_values, 'norm'),
         kstesty = kstest(y_values, 'norm'),
         ks_2samp = ks_2samp(x_values, y_values),
-        fraction_correct = fraction_correct(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff),
+        fraction_correct = fraction_correct(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff, ignore_null_values = ignore_null_values),
         fraction_correct_fuzzy_linear = fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = fcorrect_x_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar),
     )
 
 
-def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
     '''
     A version of _get_xy_dataset_statistics which accepts a list of dicts rather than X- and Y-value lists.
     :param analysis_table: A list of dict where each dict has Experimental and Predicted float elements
@@ -196,10 +205,10 @@ def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_
 
     x_values = [record['Experimental'] for record in analysis_table]
     y_values = [record['Predicted'] for record in analysis_table]
-    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar)
+    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar, ignore_null_values = ignore_null_values)
 
 
-def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
     '''
     A version of _get_xy_dataset_statistics which accepts a pandas dataframe rather than X- and Y-value lists.
     :param dataframe: A pandas dataframe
@@ -214,7 +223,7 @@ def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_c
 
     x_values = dataframe[x_series].tolist()
     y_values = dataframe[y_series].tolist()
-    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar)
+    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar, ignore_null_values = ignore_null_values)
 
 
 keymap = dict(
