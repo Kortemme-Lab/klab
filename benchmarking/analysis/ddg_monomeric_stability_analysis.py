@@ -84,18 +84,6 @@ class BenchmarkRun(ReportingObject):
 
         self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
         self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
-        self.csv_types = dict(
-            DatasetID = numpy.int32,
-            NumberOfMutations = numpy.int32,
-            StabilityClassification = numpy.int32,
-            HasGPMutation = numpy.int32,
-            NumberOfResidues = numpy.int32,
-            NumberOfDerivativeErrors = numpy.int32,
-            Experimental = numpy.float64,
-            Predicted = numpy.float64,
-            AbsoluteError = numpy.float64,
-            PDBResolution = numpy.float64,
-        )
         self.amino_acid_details, self.CAA, self.PAA, self.HAA = BenchmarkRun.get_amino_acid_details()
         self.benchmark_run_name = benchmark_run_name
         self.benchmark_run_directory = benchmark_run_directory
@@ -326,6 +314,7 @@ class BenchmarkRun(ReportingObject):
         # Create the dataframe
         res = pandas.DataFrame(columns=(self.csv_headers))
 
+        # Create the dataframe
         dataframe_table = {}
         indices = []
         for record_id, predicted_data in sorted(analysis_data.iteritems()):
@@ -335,19 +324,9 @@ class BenchmarkRun(ReportingObject):
                 for h in self.csv_headers:
                     dataframe_table[h] = dataframe_table.get(h, [])
                     dataframe_table[h].append(dataframe_record[h])
-                #dataframe_rows.append([dataframe_record[h] for h in self.csv_headers])
-                #for h in self.csv_headers:
-                #    assert(',' not in str(dataframe_record[h]))
-                #csv_file.append(','.join([str(dataframe_record[h]) for h in self.csv_headers]))
                 assert(sorted(self.csv_headers) == sorted(dataframe_record.keys()))
-        #csv_file = [','.join(self.csv_headers)] + csv_file
-
         dataframe = pandas.DataFrame(dataframe_table, index = indices)
-
-        # Create the CSV file in memory (we are not done added data just yet) and pass it to pandas
-        #dataframe = pandas.read_csv(StringIO.StringIO('\n'.join(csv_file)), sep=',', header=0, skip_blank_lines=True, index_col = 0)
         self.dataframe = dataframe
-        #dataframe = pandas.read_csv(StringIO.StringIO('\n'.join(csv_file)), sep=',', header=0, skip_blank_lines=True, index_col = 0, dtype = self.csv_types)
 
         # Report the SCOPe classification counts
         SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
@@ -1436,8 +1415,6 @@ class DBBenchmarkRun(BenchmarkRun):
         try:
             idx = self.csv_headers.index('Experimental')
             self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
-            for new_idx in new_idxs:
-                self.csv_types[new_idx] = numpy.float64
         except ValueError, e: pass
 
 
@@ -1465,8 +1442,6 @@ class DBBenchmarkRun(BenchmarkRun):
         try:
             idx = self.csv_headers.index('StabilityClassification')
             self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
-            for new_idx in new_idxs:
-                self.csv_types[new_idx] = numpy.float64
         except ValueError, e: pass
 
 
@@ -1489,8 +1464,6 @@ class DBBenchmarkRun(BenchmarkRun):
         try:
             idx = self.csv_headers.index('AbsoluteError')
             self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
-            for new_idx in new_idxs:
-                self.csv_types[new_idx] = numpy.float64
         except ValueError, e: pass
 
 
