@@ -43,7 +43,8 @@ def open_temp_file(path, ftype = 'w', suffix = '', prefix = ''):
 
 def write_temp_file(path, contents, ftype = 'w', suffix = '', prefix = ''):
     output_handle, fname = open_temp_file(path, ftype = ftype, suffix = suffix, prefix = prefix)
-    output_handle.write(contents)
+    if contents:
+        output_handle.write(contents)
     output_handle.close()
     return fname
 
