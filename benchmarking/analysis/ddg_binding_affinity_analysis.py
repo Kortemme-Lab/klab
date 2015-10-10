@@ -28,14 +28,25 @@ The BenchmarkRun class extends the generic DDG BenchmarkRun class to add columns
 affinity predictions.
 '''
 
-from tools.benchmarking.analysis.ddg_monomeric_stability_analysis import BenchmarkRun as GenericBenchmarkRun
+
+from tools.bio.basics import dssp_elision
+from tools.benchmarking.analysis.ddg_monomeric_stability_analysis import DBBenchmarkRun as GenericDBBenchmarkRun
 
 
-class BenchmarkRun(GenericBenchmarkRun):
+
+class DBBenchmarkRun(GenericDBBenchmarkRun):
 
     def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id):
         '''Create a dataframe row for a prediction.'''
 
+        record = dataset_cases[record_id]
+        for m in record['PDBMutations']:
+            assert('DSSPSimpleSSType' not in m)
+            m['DSSPSimpleSSType'] = dssp_elision[m['ComplexDSSP']]
+            m['DSSPType'] = m['ComplexDSSP']
+            m['DSSPExposure'] = m['ComplexExposure']
+
         dataframe_record = super(BenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
         # add columns
         return dataframe_record
+
