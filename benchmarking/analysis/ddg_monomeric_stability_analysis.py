@@ -37,17 +37,19 @@ import numpy
 import pprint
 import subprocess
 import shlex
+import copy
 import StringIO
+import gzip
 try: import json
 except: import simplejson as json
 
 import pandas
 
 from tools import colortext
-from tools.fs.fsio import read_file, write_file
+from tools.fs.fsio import read_file, write_file, write_temp_file
 from tools.loggers.simple import ReportingObject
 from tools.gfx.color_definitions import rgb_colors as plot_colors
-from tools.stats import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
+from tools.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
 from tools.benchmarking.analysis.plot import plot_pandas
 from tools.plot.rtools import RInterface
 
@@ -67,15 +69,39 @@ class BenchmarkRun(ReportingObject):
         XX = 'no change in volume',
     )
 
+    csv_headers = [
+        'DatasetID', 'PDBFileID', 'Mutations', 'NumberOfMutations', 'Experimental', 'Predicted', 'AbsoluteError', 'StabilityClassification',
+        'ResidueCharges', 'VolumeChange',
+        'WildTypeDSSPType', 'WildTypeDSSPSimpleSSType', 'WildTypeDSSPExposure',
+        'WildTypeSCOPClass', 'WildTypeSCOPFold', 'WildTypeSCOPClassification',
+        'WildTypeExposure', 'WildTypeAA', 'MutantAA', 'HasGPMutation',
+        'PDBResolution', 'PDBResolutionBin', 'NumberOfResidues', 'NumberOfDerivativeErrors',
+    ]
 
-    def __init__(self, benchmark_run_name, benchmark_run_directory, analysis_directory, dataset_cases, analysis_data, use_single_reported_value = False,
+    def __init__(self, benchmark_run_name, dataset_cases, analysis_data, benchmark_run_directory = None, analysis_directory = None, use_single_reported_value = False,
                  description = None, dataset_description = None, credit = None, take_lowest = 3, generate_plots = True, report_analysis = True, include_derived_mutations = False, recreate_graphs = False, silent = False, burial_cutoff = 0.25,
-                 stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False):
+                 stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False, store_data_on_disk = True, misc_dataframe_attributes = {}):
+
+        self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
+        self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
+        self.csv_types = dict(
+            DatasetID = numpy.int32,
+            NumberOfMutations = numpy.int32,
+            StabilityClassification = numpy.int32,
+            HasGPMutation = numpy.int32,
+            NumberOfResidues = numpy.int32,
+            NumberOfDerivativeErrors = numpy.int32,
+            Experimental = numpy.float64,
+            Predicted = numpy.float64,
+            AbsoluteError = numpy.float64,
+            PDBResolution = numpy.float64,
+        )
         self.amino_acid_details, self.CAA, self.PAA, self.HAA = BenchmarkRun.get_amino_acid_details()
         self.benchmark_run_name = benchmark_run_name
         self.benchmark_run_directory = benchmark_run_directory
         self.dataset_cases = dataset_cases
         self.analysis_data = analysis_data
+        assert(analysis_directory) # require this for now; todo: add in-memory graph generation
         self.analysis_directory = analysis_directory
         self.subplot_directory = os.path.join(self.analysis_directory, self.benchmark_run_name + '_subplots')
         self.analysis_file_prefix = os.path.join(self.analysis_directory, self.benchmark_run_name + '_subplots', self.benchmark_run_name + '_')
@@ -92,19 +118,33 @@ class BenchmarkRun(ReportingObject):
         self.recreate_graphs = recreate_graphs
         self.stability_classication_x_cutoff = stability_classication_x_cutoff
         self.stability_classication_y_cutoff = stability_classication_y_cutoff
-        self.scalar_adjustment = None
-        self.analysis_csv_input_filepath = os.path.join(self.benchmark_run_directory, 'analysis_input.csv')
-        self.analysis_json_input_filepath = os.path.join(self.benchmark_run_directory, 'analysis_input.json')
-        self.analysis_raw_data_input_filepath = os.path.join(self.benchmark_run_directory, 'benchmark_data.json')
-        self.analysis_pandas_input_filepath = os.path.join(self.benchmark_run_directory, 'analysis_input.pandas')
+        self.scalar_adjustments = {}
+        self.store_data_on_disk = store_data_on_disk
+        self.misc_dataframe_attributes = misc_dataframe_attributes
+        if self.store_data_on_disk:
+            # This may be False in some cases e.g. when interfacing with a database
+            self.analysis_csv_input_filepath = os.path.join(self.benchmark_run_directory, 'analysis_input.csv')
+            self.analysis_json_input_filepath = os.path.join(self.benchmark_run_directory, 'analysis_input.json')
+            self.analysis_raw_data_input_filepath = os.path.join(self.benchmark_run_directory, 'benchmark_data.json')
+            self.analysis_pandas_input_filepath = os.path.join(self.benchmark_run_directory, 'analysis_input.pandas')
+            assert(os.path.exists(self.analysis_csv_input_filepath))
+            assert(os.path.exists(self.analysis_json_input_filepath))
+            assert(os.path.exists(self.analysis_raw_data_input_filepath))
+        else:
+            self.analysis_csv_input_filepath, self.analysis_json_input_filepath, self.analysis_raw_data_input_filepath, self.analysis_pandas_input_filepath = None, None, None, None
         self.metrics_filepath = os.path.join(self.analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
         self.use_existing_benchmark_data = use_existing_benchmark_data
         self.ddg_analysis_type_description = None
-        assert(os.path.exists(self.analysis_csv_input_filepath))
-        assert(os.path.exists(self.analysis_json_input_filepath))
-        assert(os.path.exists(self.analysis_raw_data_input_filepath))
         if self.generate_plots:
             self.create_subplot_directory() # Create a directory for plots
+
+
+    @staticmethod
+    def get_analysis_set_fieldname(prefix, analysis_set):
+        if analysis_set:
+            return '{0}_{1}'.format(prefix, analysis_set)
+        else:
+            return prefix
 
 
     @staticmethod
@@ -185,30 +225,74 @@ class BenchmarkRun(ReportingObject):
                 raise colortext.Exception('An exception occurred creating the subplot directory %s.' % self.subplot_directory)
 
 
-    def create_dataframe(self):
+    def read_dataframe_from_content(self, hdfstore_blob):
+        fname = write_temp_file('/tmp', hdfstore_blob, ftype = 'wb')
+        try:
+            self.read_dataframe(fname)
+            os.remove(fname)
+        except:
+            os.remove(fname)
+            raise
+
+
+    def read_dataframe(self, analysis_pandas_input_filepath):
+        remove_file = False
+        if len(os.path.splitext(analysis_pandas_input_filepath)) > 1 and os.path.splitext(analysis_pandas_input_filepath)[1] == '.gz':
+            content = read_file(analysis_pandas_input_filepath)
+            analysis_pandas_input_filepath = write_temp_file('/tmp', content, ftype = 'wb')
+            remove_file = True
+
+        # We do not use "self.dataframe = store['dataframe']" as we used append in write_dataframe
+        self.dataframe = pandas.read_hdf(analysis_pandas_input_filepath, 'dataframe')
+
+        store = pandas.HDFStore(analysis_pandas_input_filepath)
+        self.scalar_adjustments = store['scalar_adjustments'].to_dict()
+        self.ddg_analysis_type = store['ddg_analysis_type'].to_dict()['ddg_analysis_type']
+        self.ddg_analysis_type_description = store['ddg_analysis_type_description'].to_dict()['ddg_analysis_type_description']
+        self.misc_dataframe_attributes = store['misc_dataframe_attributes'].to_dict()
+        store.close()
+        if remove_file:
+            os.remove(analysis_pandas_input_filepath)
+
+
+    def write_dataframe(self, analysis_pandas_input_filepath):
+        store = pandas.HDFStore(analysis_pandas_input_filepath)
+
+        # Using "store['dataframe'] = self.dataframe" throws a warning since some String columns contain null values i.e. mixed content
+        # To get around this, we use the append function (see https://github.com/pydata/pandas/issues/4415)
+        store.append('dataframe', self.dataframe)
+
+        store['scalar_adjustments'] = pandas.Series(self.scalar_adjustments)
+        store['ddg_analysis_type'] = pandas.Series(dict(ddg_analysis_type = self.ddg_analysis_type))
+        store['ddg_analysis_type_description'] = pandas.Series(dict(ddg_analysis_type_description = self.ddg_analysis_type_description))
+        store['misc_dataframe_attributes'] = pandas.Series(self.misc_dataframe_attributes)
+        store.close()
+        with gzip.open(analysis_pandas_input_filepath + '.gz', 'wb') as f:
+            f.write(read_file(analysis_pandas_input_filepath, binary = True))
+        os.remove(analysis_pandas_input_filepath)
+        return analysis_pandas_input_filepath + '.gz'
+
+
+    def create_dataframe(self, pdb_data = {}):
         '''This function creates a dataframe (a matrix with one row per dataset record and one column for fields of interest)
            from the benchmark run and the dataset data.
            For rows with multiple mutations, there may be multiple values for some fields e.g. wildtype residue exposure.
            We take the approach of marking these records as None (to be read as: N/A).
            Another approach is to take averages of continuous and binary values.
-           This function also determines a scalar_adjustment used to scale the predictions to try to improve the fraction
+           This function also determines scalar_adjustments used to scale the predictions to try to improve the fraction
            correct score and the MAE.
         '''
 
-        if self.use_existing_benchmark_data and os.path.exists(self.analysis_pandas_input_filepath):
-            store = pandas.HDFStore(self.analysis_pandas_input_filepath)
-            self.dataframe = store['dataframe']
-            self.scalar_adjustment = store['scalar_adjustment'].to_dict()['scalar_adjustment']
-            self.ddg_analysis_type = store['ddg_analysis_type'].to_dict()['ddg_analysis_type']
-            self.ddg_analysis_type_description = store['ddg_analysis_type_description'].to_dict()['ddg_analysis_type_description']
-            store.close()
+        if self.use_existing_benchmark_data and self.store_data_on_disk and os.path.exists(self.analysis_pandas_input_filepath):
+            self.read_dataframe(self.analysis_pandas_input_filepath)
             return
 
         analysis_data = self.analysis_data
         dataset_cases = self.dataset_cases
 
         # Create XY data
-        self.log('Creating the analysis input file %s and human-readable CSV and JSON versions %s and %s.' % (self.analysis_pandas_input_filepath, self.analysis_csv_input_filepath, self.analysis_json_input_filepath))
+        if self.store_data_on_disk:
+            self.log('Creating the analysis input file %s and human-readable CSV and JSON versions %s and %s.' % (self.analysis_pandas_input_filepath, self.analysis_csv_input_filepath, self.analysis_json_input_filepath))
         if len(analysis_data) > len(dataset_cases):
             raise colortext.Exception('ERROR: There seems to be an error - there are more predictions than cases in the dataset. Exiting.')
         elif len(analysis_data) < len(dataset_cases):
@@ -228,37 +312,42 @@ class BenchmarkRun(ReportingObject):
         self.log(self.ddg_analysis_type_description)
 
         # Initialize the data structures
-        csv_headers=[
-            'DatasetID', 'PDBFileID', 'Mutations', 'NumberOfMutations', 'Experimental', 'Predicted', 'AbsoluteError', 'StabilityClassification',
-            'ResidueCharges', 'VolumeChange',
-            'WildTypeDSSPType', 'WildTypeDSSPSimpleSSType', 'WildTypeDSSPExposure',
-            'WildTypeSCOPClass', 'WildTypeSCOPFold', 'WildTypeSCOPClassification',
-            'WildTypeExposure', 'WildTypeAA', 'MutantAA', 'HasGPMutation',
-            'PDBResolution', 'PDBResolutionBin', 'MonomerLength', 'NumberOfDerivativeErrors',
-        ]
-        csv_file = [','.join(csv_headers)]
+        #csv_file = []
 
         # Set the PDB input path
-        pdb_data = {}
-        try:
-            pdb_data_ = json.loads(read_file('../../input/json/pdbs.json'))
-            for k, v in pdb_data_.iteritems():
-                pdb_data[k.upper()] = v
-        except Exception, e:
-            self.log('input/json/pdbs.json could not be found - PDB-specific analysis cannot be performed.', colortext.error)
+        if not pdb_data:
+            try:
+                pdb_data_ = json.loads(read_file('../../input/json/pdbs.json'))
+                for k, v in pdb_data_.iteritems():
+                    pdb_data[k.upper()] = v
+            except Exception, e:
+                self.log('input/json/pdbs.json could not be found - PDB-specific analysis cannot be performed.', colortext.error)
 
         # Create the dataframe
+        res = pandas.DataFrame(columns=(self.csv_headers))
+
+        dataframe_table = {}
+        indices = []
         for record_id, predicted_data in sorted(analysis_data.iteritems()):
             dataframe_record = self.get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
             if dataframe_record:
-                for h in csv_headers:
-                    assert(',' not in str(dataframe_record[h]))
-                csv_file.append(','.join([str(dataframe_record[h]) for h in csv_headers]))
-                assert(sorted(csv_headers) == sorted(dataframe_record.keys()))
+                indices.append(dataframe_record['DatasetID'])
+                for h in self.csv_headers:
+                    dataframe_table[h] = dataframe_table.get(h, [])
+                    dataframe_table[h].append(dataframe_record[h])
+                #dataframe_rows.append([dataframe_record[h] for h in self.csv_headers])
+                #for h in self.csv_headers:
+                #    assert(',' not in str(dataframe_record[h]))
+                #csv_file.append(','.join([str(dataframe_record[h]) for h in self.csv_headers]))
+                assert(sorted(self.csv_headers) == sorted(dataframe_record.keys()))
+        #csv_file = [','.join(self.csv_headers)] + csv_file
+
+        dataframe = pandas.DataFrame(dataframe_table, index = indices)
 
         # Create the CSV file in memory (we are not done added data just yet) and pass it to pandas
-        dataframe = pandas.read_csv(StringIO.StringIO('\n'.join(csv_file)), sep=',', header=0, skip_blank_lines=True, index_col = 0)
+        #dataframe = pandas.read_csv(StringIO.StringIO('\n'.join(csv_file)), sep=',', header=0, skip_blank_lines=True, index_col = 0)
         self.dataframe = dataframe
+        #dataframe = pandas.read_csv(StringIO.StringIO('\n'.join(csv_file)), sep=',', header=0, skip_blank_lines=True, index_col = 0, dtype = self.csv_types)
 
         # Report the SCOPe classification counts
         SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
@@ -267,16 +356,19 @@ class BenchmarkRun(ReportingObject):
         self.log('The mutated residues span {0} unique SCOP(e) classifications in {1} unique SCOP(e) folds and {2} unique SCOP(e) classes.'.format(len(SCOP_classifications), len(SCOP_folds), len(SCOP_classes)), colortext.message)
 
         # Plot the optimum y-cutoff over a range of x-cutoffs for the fraction correct metric. Include the user's cutoff in the range
-        self.log('Determining a scalar adjustment with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
-        self.scalar_adjustment, plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True)
+        self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
+        for analysis_set in self.analysis_sets:
+            self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True)
 
         # Add new columns derived from the adjusted values
-        dataframe['Predicted_adj'] = dataframe['Predicted'] / self.scalar_adjustment
-        dataframe['AbsoluteError_adj'] = (dataframe['Experimental'] - dataframe['Predicted_adj']).abs()
-        add_fraction_correct_values_to_dataframe(dataframe, 'Experimental', 'Predicted_adj', 'StabilityClassification_adj',  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff)
+        for analysis_set in self.analysis_sets:
+            dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)] = dataframe['Predicted'] / self.scalar_adjustments[analysis_set]
+            dataframe[BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)] = (dataframe[BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)] - dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)]).abs()
+            add_fraction_correct_values_to_dataframe(dataframe, BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set), BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), BenchmarkRun.get_analysis_set_fieldname('StabilityClassification_adj', analysis_set),  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)
 
         # Write the dataframe out to CSV
-        dataframe.to_csv(self.analysis_csv_input_filepath, sep = ',', header = True)
+        if self.store_data_on_disk:
+            dataframe.to_csv(self.analysis_csv_input_filepath, sep = ',', header = True)
 
         # Write the dataframe out to JSON
         # Note: I rolled my own as dataframe.to_dict(orient = 'records') gives us the correct format but discards the DatasetID (index) field
@@ -288,17 +380,70 @@ class BenchmarkRun(ReportingObject):
             for i, v in v.iteritems():
                 assert(k not in json_records[i])
                 json_records[i][k] = v
-        write_file(self.analysis_json_input_filepath, json.dumps(json_records, indent = 4, sort_keys=True))
+        if self.analysis_json_input_filepath and self.store_data_on_disk:
+            write_file(self.analysis_json_input_filepath, json.dumps(json_records, indent = 4, sort_keys=True))
 
         # Write the values computed in this function out to disk
-        if os.path.exists(self.analysis_pandas_input_filepath):
-            os.remove(self.analysis_pandas_input_filepath)
-        store = pandas.HDFStore(self.analysis_pandas_input_filepath)
-        store['dataframe'] = dataframe
-        store['scalar_adjustment'] = pandas.Series(dict(scalar_adjustment = self.scalar_adjustment))
-        store['ddg_analysis_type'] = pandas.Series(dict(ddg_analysis_type = self.ddg_analysis_type))
-        store['ddg_analysis_type_description'] = pandas.Series(dict(ddg_analysis_type_description = self.ddg_analysis_type_description))
-        store.close()
+        analysis_pandas_input_filepath = self.analysis_pandas_input_filepath
+        if self.store_data_on_disk:
+            if os.path.exists(analysis_pandas_input_filepath):
+                os.remove(analysis_pandas_input_filepath)
+        else:
+            analysis_pandas_input_filepath = write_temp_file('/tmp', '', ftype = 'wb')
+        try:
+            analysis_pandas_input_filepath = self.write_dataframe(analysis_pandas_input_filepath)
+            dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
+            if not self.store_data_on_disk:
+                os.remove(analysis_pandas_input_filepath)
+        except Exception, e:
+            if not self.store_data_on_disk:
+                os.remove(analysis_pandas_input_filepath)
+            raise
+        return dataframe_blob
+
+
+    def is_this_record_a_derived_mutation(self, record):
+        '''Different callers to this class store this information differently so we make it class-dependent and subclass.'''
+        if record['DerivedMutation']:
+            return True
+
+
+    def get_record_mutations(self, record):
+        '''Different callers should use the same name here but they currently do not.'''
+        return record['Mutations']
+
+
+    def get_experimental_ddg_values(self, record, dataframe_record):
+        dataframe_record['Experimental'] = record['DDG']
+
+
+    def compute_stability_classification(self, predicted_data, record, dataframe_record):
+        '''Calculate the stability classification for this case.'''
+        stability_classification, stability_classication_x_cutoff, stability_classication_y_cutoff = None, self.stability_classication_x_cutoff, self.stability_classication_y_cutoff
+        if record['DDG'] != None:
+            stability_classification = fraction_correct([record['DDG']], [predicted_data[self.ddg_analysis_type]], x_cutoff = stability_classication_x_cutoff, y_cutoff = stability_classication_y_cutoff)
+            stability_classification = int(stability_classification)
+            assert(stability_classification == 0 or stability_classification == 1)
+        dataframe_record['StabilityClassification'] = stability_classification
+
+
+    def compute_absolute_error(self, predicted_data, record, dataframe_record):
+        '''Calculate the absolute error for this case.'''
+        absolute_error = abs(record['DDG'] - predicted_data[self.ddg_analysis_type])
+        dataframe_record['AbsoluteError'] = absolute_error
+
+
+    def get_record_pdb_file_id(self, record):
+        return record['PDBFileID']
+
+
+    def count_residues(self, record, pdb_record):
+        '''Count the number of residues in the chains for the case.'''
+        mutations = self.get_record_mutations(record)
+        pdb_chains = set([m['Chain'] for m in mutations])
+        assert(len(pdb_chains) == 1) # we expect monomeric cases
+        pdb_chain = pdb_chains.pop()
+        return len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
 
 
     def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id):
@@ -306,11 +451,11 @@ class BenchmarkRun(ReportingObject):
 
         # Ignore derived mutations if appropriate
         record = dataset_cases[record_id]
-        if record['DerivedMutation'] and not self.include_derived_mutations:
+        if self.is_this_record_a_derived_mutation(record) and not self.include_derived_mutations:
             return None
 
         amino_acid_details, CAA, PAA, HAA = self.amino_acid_details, self.CAA, self.PAA, self.HAA
-        burial_cutoff, stability_classication_x_cutoff, stability_classication_y_cutoff = self.burial_cutoff, self.stability_classication_x_cutoff, self.stability_classication_y_cutoff\
+        burial_cutoff = self.burial_cutoff
 
         # Initialize variables. For ambiguous cases where the set of distinct values has multiple values, we default to None
         residue_charge, residue_charges = None, set()
@@ -322,11 +467,10 @@ class BenchmarkRun(ReportingObject):
         DSSPType, DSSPTypes = None, set()
         DSSPExposure, DSSPExposures = None, set()
         scops = set()
-        pdb_chains = set()
         mutation_string = []
         num_derivative_errors = predicted_data.get('Errors', {}).get('Derivative error count', 0)
 
-        mutations = record['Mutations']
+        mutations = self.get_record_mutations(record)
         for m in mutations:
 
             wtaa = m['WildTypeAA']
@@ -336,8 +480,8 @@ class BenchmarkRun(ReportingObject):
             # Residue types and chain
             wtaas.add(wtaa)
             mutaas.add(mutaa)
-            pdb_chains.add(m['Chain'])
-            scops.add(m['SCOP class'])
+            if m.get('SCOP class'):
+                scops.add(m['SCOP class'])
             DSSPSimpleSSTypes.add(m['DSSPSimpleSSType'])
             DSSPTypes.add(m['DSSPType'])
             DSSPExposures.add(m['DSSPExposure'])
@@ -381,8 +525,6 @@ class BenchmarkRun(ReportingObject):
         all_residues = wtaas.union(mutaas)
         if len(wtaas) == 1: record_wtaa = wtaas.pop()
         if len(mutaas) == 1: record_mutaa = mutaas.pop()
-        assert(len(pdb_chains) == 1) # we expect monomeric cases
-        pdb_chain = pdb_chains.pop()
 
         # Taking unique values, determine the secondary structure and residue exposures from the DSSP data in the dataset
         if len(DSSPSimpleSSTypes) == 1: DSSPSimpleSSType = DSSPSimpleSSTypes.pop()
@@ -393,21 +535,15 @@ class BenchmarkRun(ReportingObject):
         full_scop_classification, scop_class, scop_fold = None, None, None
         if len(scops) > 1:
             self.log('Warning: There is more than one SCOPe class for record {0}.'.format(record_id), colortext.warning)
-        else:
+        elif len(scops) == 1:
             full_scop_classification = scops.pop()
             scop_tokens = full_scop_classification.split('.')
             scop_class = scop_tokens[0]
             if len(scop_tokens) > 1:
                 scop_fold = '.'.join(scop_tokens[0:2])
 
-        # Calculate the stability classification and absolute_error for this case
-        stability_classification = fraction_correct([record['DDG']], [predicted_data[self.ddg_analysis_type]], x_cutoff = stability_classication_x_cutoff, y_cutoff = stability_classication_y_cutoff)
-        assert(stability_classification == 0 or stability_classification == 1)
-        #stability_classification = int(stability_classification)
-        absolute_error = abs(record['DDG'] - predicted_data[self.ddg_analysis_type])
-
         # Partition the data by PDB resolution with bins: N/A, <1.5, 1.5-<2.0, 2.0-<2.5, >=2.5
-        pdb_record = pdb_data.get(record['PDBFileID'].upper())
+        pdb_record = pdb_data.get(self.get_record_pdb_file_id(record).upper())
         pdb_resolution_bin = None
         pdb_resolution = pdb_record.get('Resolution')
         if pdb_resolution != None:
@@ -427,13 +563,10 @@ class BenchmarkRun(ReportingObject):
         # Create the data matrix
         dataframe_record = dict(
             DatasetID = record_id,
-            PDBFileID = record['PDBFileID'],
+            PDBFileID = self.get_record_pdb_file_id(record),
             Mutations = mutation_string,
             NumberOfMutations = len(mutations),
-            Experimental = record['DDG'],
             Predicted = predicted_data[self.ddg_analysis_type],
-            AbsoluteError = absolute_error,
-            StabilityClassification = stability_classification,
             ResidueCharges = residue_charge,
             VolumeChange = volume_change,
             HasGPMutation = int(has_gp_mutation),
@@ -448,23 +581,28 @@ class BenchmarkRun(ReportingObject):
             MutantAA = record_mutaa,
             PDBResolution = pdb_record.get('Resolution'),
             PDBResolutionBin = pdb_resolution_bin,
-            MonomerLength = len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', '')) or None,
+            NumberOfResidues = self.count_residues(record, pdb_record) or None,
             NumberOfDerivativeErrors = num_derivative_errors,
             )
+        self.get_experimental_ddg_values(record, dataframe_record)
+        self.compute_stability_classification(predicted_data, record, dataframe_record)
+        self.compute_absolute_error(predicted_data, record, dataframe_record)
+
         return dataframe_record
 
 
-    def analyze(self):
+    def analyze(self, analysis_set = ''):
         '''This function runs the analysis and creates the plots and summary file.'''
-        self.calculate_metrics()
-        self.plot()
+        self.calculate_metrics(analysis_set)
+        self.plot(analysis_set)
 
 
-    def calculate_metrics(self):
+    def calculate_metrics(self, analysis_set = ''):
         '''Calculates the main metrics for the benchmark run and writes them to file.'''
 
         dataframe = self.dataframe
-        scalar_adjustment = self.scalar_adjustment
+        scalar_adjustment = self.scalar_adjustments[analysis_set]
+        experimental_field = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
         metrics_textfile = [self.ddg_analysis_type_description]
 
@@ -491,18 +629,21 @@ class BenchmarkRun(ReportingObject):
         for subcase in ('XX', 'SL', 'LS'):
             subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
             metrics_textfile.append('\n' + '*'*10 + (' Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))) +'*'*10)
-            metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, 'Experimental', 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff)))
+            if len(subcase_dataframe) >= 8:
+                metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
+            else:
+                metrics_textfile.append('Not enough data for analysis (at least 8 cases are required).')
             self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
 
         metrics_textfile.append('\n\nSection 2. Separating out mutations involving glycine or proline.')
         metrics_textfile.append('This cases may involve changes to secondary structure so we separate them out here.')
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 1]
         metrics_textfile.append('\n' + '*'*10 + (' Statistics - cases with G or P (%d cases)' % (len(subcase_dataframe))) +'*'*10)
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, 'Experimental', 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff)))
+        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
         self.report('\n'.join(metrics_textfile[-4:]), fn = colortext.sprint)
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 0]
         metrics_textfile.append('\n' + '*'*10 + (' Statistics - cases without G or P (%d cases)' % (len(subcase_dataframe))) +'*'*10)
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, 'Experimental', 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff)))
+        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
         self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
 
 
@@ -512,7 +653,7 @@ class BenchmarkRun(ReportingObject):
         self.report(metrics_textfile[-1], fn = colortext.warning)
         metrics_textfile.append('\n' + '*'*10 + (' Statistics - complete dataset (%d cases)' % len(dataframe)) +'*'*10)
         # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(dataframe, 'Experimental', 'Predicted_adj', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff)))
+        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(dataframe, experimental_field, BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True)))
         self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
 
         metrics_textfile.append('\n\nSection 4. Entire dataset.')
@@ -520,7 +661,7 @@ class BenchmarkRun(ReportingObject):
         metrics_textfile.append('Overall statistics')
         self.report(metrics_textfile[-1], fn = colortext.message)
         metrics_textfile.append('\n' + '*'*10 + (' Statistics - complete dataset (%d cases)' % len(dataframe)) +'*'*10)
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(dataframe, 'Experimental', 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff)))
+        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
         self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
 
         # There is probably a better way of writing the pandas code here
@@ -532,10 +673,11 @@ class BenchmarkRun(ReportingObject):
             self.report(metrics_textfile[-1], fn = colortext.warning)
 
         # Write the analysis to file
-        write_file(self.metrics_filepath, '\n'.join(metrics_textfile))
+        if self.store_data_on_disk:
+            write_file(self.metrics_filepath, '\n'.join(metrics_textfile))
 
 
-    def plot(self):
+    def plot(self, analysis_set = ''):
 
         if not self.generate_plots:
             return
@@ -630,9 +772,12 @@ class BenchmarkRun(ReportingObject):
             assert(os.path.exists(os.path.join(self.analysis_directory, rp)))
 
         # Copy the analysis input files into the analysis directory - these files are duplicated but it makes it easier to share data
-        shutil.copyfile(self.analysis_csv_input_filepath, os.path.join(self.analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_csv_input_filepath)[1]))
-        shutil.copyfile(self.analysis_json_input_filepath, os.path.join(self.analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_json_input_filepath)[1]))
-        shutil.copyfile(self.analysis_raw_data_input_filepath, os.path.join(self.analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_raw_data_input_filepath)[1]))
+        if self.analysis_csv_input_filepath:
+            shutil.copyfile(self.analysis_csv_input_filepath, os.path.join(self.analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_csv_input_filepath)[1]))
+        if self.analysis_json_input_filepath:
+            shutil.copyfile(self.analysis_json_input_filepath, os.path.join(self.analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_json_input_filepath)[1]))
+        if self.analysis_raw_data_input_filepath:
+            shutil.copyfile(self.analysis_raw_data_input_filepath, os.path.join(self.analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_raw_data_input_filepath)[1]))
 
         # Combine the plots into a PDF file
         plot_file = os.path.join(self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name))
@@ -654,7 +799,7 @@ class BenchmarkRun(ReportingObject):
         #todo implement this
 
 
-    def determine_optimum_fraction_correct_cutoffs(self, dataframe, stability_classication_x_cutoff):
+    def determine_optimum_fraction_correct_cutoffs(self, analysis_set, dataframe, stability_classication_x_cutoff):
         '''Determines the value of stability_classication_y_cutoff which approximately maximizes the fraction correct
            measurement w.r.t. a fixed stability_classication_x_cutoff. This function uses discrete sampling and so it
            may miss the actual maximum. We use two rounds of sampling: i) a coarse-grained sampling (0.1 energy unit
@@ -665,11 +810,12 @@ class BenchmarkRun(ReportingObject):
         # maximum fraction-correct value
 
         fraction_correct_range = []
+        experimental_field = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
         # Round 1 : Coarse sampling. Test 0.5 -> 8.0 in 0.1 increments
         for z in range(5, 80):
             w = float(z) / 10.0
-            fraction_correct_range.append((w, fraction_correct_pandas(dataframe, 'Experimental', 'Predicted', x_cutoff = stability_classication_x_cutoff, y_cutoff = w)))
+            fraction_correct_range.append((w, fraction_correct_pandas(dataframe, experimental_field, 'Predicted', x_cutoff = stability_classication_x_cutoff, y_cutoff = w, ignore_null_values = True)))
 
         max_value_cutoff, max_value = fraction_correct_range[0][0], fraction_correct_range[0][1]
         for p in fraction_correct_range:
@@ -679,7 +825,7 @@ class BenchmarkRun(ReportingObject):
         # Round 2 : Finer sampling. Test max_value_cutoff - 0.1 -> max_value_cutoff + 0.1 in 0.01 increments
         for z in range(int((max_value_cutoff - 0.1) * 100), int((max_value_cutoff + 0.1) * 100)):
             w = float(z) / 100.0
-            fraction_correct_range.append((w, fraction_correct_pandas(dataframe, 'Experimental', 'Predicted', x_cutoff = stability_classication_x_cutoff, y_cutoff = w)))
+            fraction_correct_range.append((w, fraction_correct_pandas(dataframe, experimental_field, 'Predicted', x_cutoff = stability_classication_x_cutoff, y_cutoff = w, ignore_null_values = True)))
         fraction_correct_range = sorted(set(fraction_correct_range)) # sort so that we find the lowest cutoff value in case of duplicate fraction correct values
         max_value_cutoff, max_value = fraction_correct_range[0][0], fraction_correct_range[0][1]
         for p in fraction_correct_range:
@@ -744,6 +890,7 @@ dev.off()'''
     def plot_optimum_prediction_fraction_correct_cutoffs(self, stability_classication_x_cutoff):
 
         # Determine the optimal values
+        kere()
         max_value_cutoff, max_value, fraction_correct_range = self.determine_optimum_fraction_correct_cutoffs(self.dataframe, stability_classication_x_cutoff)
 
         # Filenames
@@ -797,12 +944,15 @@ dev.off()'''
             return plot_filename
 
 
-    def plot_optimum_prediction_fraction_correct_cutoffs_over_range(self, min_stability_classication_x_cutoff, max_stability_classication_x_cutoff, suppress_plot = False):
+    def plot_optimum_prediction_fraction_correct_cutoffs_over_range(self, analysis_set, min_stability_classication_x_cutoff, max_stability_classication_x_cutoff, suppress_plot = False):
         '''Plots the optimum cutoff for the predictions to maximize the fraction correct metric over a range of experimental cutoffs.
            Returns the average scalar corresponding to the best value of fraction correct over a range of cutoff values for the experimental cutoffs.'''
 
         # Filenames
-        output_filename_prefix = '{0}optimum_fraction_correct_at_varying_kcal_mol'.format(self.analysis_file_prefix)
+        analysis_set_prefix = ''
+        if analysis_set:
+            analysis_set_prefix = '_{0}'.format(analysis_set)
+        output_filename_prefix = '{0}{1}optimum_fraction_correct_at_varying_kcal_mol'.format(self.analysis_file_prefix, analysis_set_prefix)
         plot_filename = None
         if not suppress_plot:
             plot_filename = output_filename_prefix + '.png'
@@ -817,7 +967,7 @@ dev.off()'''
         avg_scale = 0
         plot_graph = self.generate_plots and not(suppress_plot)
         while x_cutoff < max_stability_classication_x_cutoff + 0.1:
-            max_value_cutoff, max_value, fraction_correct_range = self.determine_optimum_fraction_correct_cutoffs(self.dataframe, x_cutoff)
+            max_value_cutoff, max_value, fraction_correct_range = self.determine_optimum_fraction_correct_cutoffs(analysis_set, self.dataframe, x_cutoff)
             if plot_graph:
                 lines.append(','.join(map(str, (x_cutoff, max_value_cutoff))))
             x_values.append(x_cutoff)
@@ -844,6 +994,8 @@ dev.off()'''
                 self.log('Saving plot of approximate optimal fraction correct cutoffs over varying experimental cutoffs to %s.' % plot_filename)
 
                 title = 'Optimum cutoff for fraction correct metric at varying experimental cutoffs'
+                if analysis_set:
+                    title += ' for {0}'.format(analysis_set)
                 r_script = '''library(ggplot2)
 library(gridExtra)
 library(scales)
@@ -1219,7 +1371,7 @@ plot_scale <- scale_color_manual(
 
         # Create CSV input
         new_dataframe = self.dataframe.copy()
-        new_dataframe = new_dataframe[['Experimental', 'Predicted', 'MonomerLength']]
+        new_dataframe = new_dataframe[['Experimental', 'Predicted', 'NumberOfResidues']]
         new_dataframe['Opacity'] = 0.4
         new_dataframe.columns = ['Experimental', 'Predicted', 'Residues', 'Opacity'] # rename the monomer length column
         new_dataframe.to_csv(csv_filename, sep = ',', header = True)
@@ -1232,3 +1384,124 @@ plot_scale <- scale_color_manual(
         extra_commands ='\n    scale_colour_gradient(low="yellow", high="#880000") +'
         return self.scatterplot_color_by_series(colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands)
 
+
+class DBBenchmarkRun(BenchmarkRun):
+    '''Our database storage has a different (more detailed) data structure than the JSON dump so we need to override some classes.'''
+
+    csv_headers = [
+        'DatasetID', 'PDBFileID', 'Mutations', 'NumberOfMutations', 'Experimental', 'Predicted', 'AbsoluteError', 'StabilityClassification',
+        'ResidueCharges', 'VolumeChange',
+        'WildTypeDSSPType', 'WildTypeDSSPSimpleSSType', 'WildTypeDSSPExposure',
+        'WildTypeSCOPClass', 'WildTypeSCOPFold', 'WildTypeSCOPClassification',
+        'WildTypeExposure', 'WildTypeAA', 'MutantAA', 'HasGPMutation',
+        'PDBResolution', 'PDBResolutionBin', 'NumberOfResidues', 'NumberOfDerivativeErrors',
+    ]
+
+
+    def __init__(self, *args, **kwargs):
+        super(DBBenchmarkRun, self).__init__(*args, **kwargs)
+        self.analysis_sets = []
+
+
+    def get_analysis_sets(self, record):
+        if not self.analysis_sets:
+            self.analysis_sets = sorted(record['DDG'].keys())
+        return self.analysis_sets
+
+
+    def is_this_record_a_derived_mutation(self, record):
+        for analysis_set in self.get_analysis_sets(record):
+            ddg_details = record['DDG'][analysis_set]
+            if ddg_details and ddg_details['IsDerivedValue']:
+                return True
+        return False
+
+
+    def get_record_mutations(self, record):
+        return record['PDBMutations']
+
+
+    def get_experimental_ddg_values(self, record, dataframe_record):
+
+        new_idxs = []
+        for analysis_set in self.get_analysis_sets(record):
+            ddg_details = record['DDG'][analysis_set]
+            exp_ddg_fieldname = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
+            new_idxs.append(exp_ddg_fieldname)
+            dataframe_record[exp_ddg_fieldname] = None
+            if ddg_details:
+                dataframe_record[exp_ddg_fieldname] = ddg_details['MeanDDG']
+
+        # Update the CSV headers
+        try:
+            idx = self.csv_headers.index('Experimental')
+            self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
+            for new_idx in new_idxs:
+                self.csv_types[new_idx] = numpy.float64
+        except ValueError, e: pass
+
+
+    def compute_stability_classification(self, predicted_data, record, dataframe_record):
+        '''Calculate the stability classification for the analysis cases. Must be called after get_experimental_ddg_values.'''
+
+        new_idxs = []
+        stability_classication_x_cutoff, stability_classication_y_cutoff = self.stability_classication_x_cutoff, self.stability_classication_y_cutoff
+        for analysis_set in self.get_analysis_sets(record):
+            ddg_details = record['DDG'][analysis_set]
+            exp_ddg_fieldname = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
+            stability_classification_fieldname = BenchmarkRun.get_analysis_set_fieldname('StabilityClassification', analysis_set)
+            new_idxs.append(stability_classification_fieldname)
+            dataframe_record[stability_classification_fieldname] = None
+
+            if ddg_details:
+                stability_classification = None
+                if dataframe_record[exp_ddg_fieldname] != None:
+                    stability_classification = fraction_correct([dataframe_record[exp_ddg_fieldname]], [predicted_data[self.ddg_analysis_type]], x_cutoff = stability_classication_x_cutoff, y_cutoff = stability_classication_y_cutoff)
+                    stability_classification = int(stability_classification)
+                    assert(stability_classification == 0 or stability_classification == 1)
+                dataframe_record[stability_classification_fieldname] = stability_classification
+
+        # Update the CSV headers
+        try:
+            idx = self.csv_headers.index('StabilityClassification')
+            self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
+            for new_idx in new_idxs:
+                self.csv_types[new_idx] = numpy.float64
+        except ValueError, e: pass
+
+
+    def compute_absolute_error(self, predicted_data, record, dataframe_record):
+        '''Calculate the absolute error for the analysis cases. Must be called after get_experimental_ddg_values.'''
+
+        new_idxs = []
+        for analysis_set in self.get_analysis_sets(record):
+            ddg_details = record['DDG'][analysis_set]
+            exp_ddg_fieldname = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
+            absolute_error_fieldname = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
+            new_idxs.append(absolute_error_fieldname)
+            dataframe_record[absolute_error_fieldname] = None
+
+            if ddg_details:
+                absolute_error = abs(dataframe_record[exp_ddg_fieldname] - predicted_data[self.ddg_analysis_type])
+                dataframe_record[absolute_error_fieldname] = absolute_error
+
+        # Update the CSV headers
+        try:
+            idx = self.csv_headers.index('AbsoluteError')
+            self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
+            for new_idx in new_idxs:
+                self.csv_types[new_idx] = numpy.float64
+        except ValueError, e: pass
+
+
+    def get_record_pdb_file_id(self, record):
+        return record['Structure']['PDBFileID']
+
+
+    def count_residues(self, record, pdb_record):
+        NumberOfResidues = 0
+        pdb_chains = set(record['Structure']['Partners']['L'] + record['Structure']['Partners']['R'])
+        assert(len(pdb_chains) > 1) # we expect non-monomeric cases
+        for pdb_chain in pdb_chains:
+            NumberOfResidues += len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
+        return NumberOfResidues
