@@ -109,7 +109,10 @@ def add_fraction_correct_values_to_dataframe(dataframe, x_series, y_series, new_
 def fraction_correct_fuzzy_linear_create_vector(z, z_cutoff, z_fuzzy_range):
     '''A helper function for fraction_correct_fuzzy_linear.'''
     assert(z_fuzzy_range * 2 < z_cutoff)
-    if (z >= z_cutoff + z_fuzzy_range): # positive e.g. z >= 1.1
+
+    if (z == None or numpy.isnan(z)): # todo: and ignore_null_values: # If we are missing values then we either discount the case or consider it as incorrect depending on ignore_null_values
+        return None
+    elif (z >= z_cutoff + z_fuzzy_range): # positive e.g. z >= 1.1
         return [0, 0, 1]
     elif (z <= -z_cutoff - z_fuzzy_range):  # negative e.g. z <= -1.1
         return [1, 0, 0]
@@ -145,6 +148,7 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
     num_points = len(x_values)
     assert(num_points == len(y_values))
     correct = 0.0
+    considered_points = 0
     for i in range(num_points):
         x = x_values[i]
         y = y_values[i]
@@ -152,8 +156,10 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
         y_fuzzy_range = x_fuzzy_range * y_scalar
         xvec = fraction_correct_fuzzy_linear_create_vector(x, x_cutoff, x_fuzzy_range)
         yvec = fraction_correct_fuzzy_linear_create_vector(y, y_cutoff, y_fuzzy_range)
-        correct += numpy.dot(xvec, yvec)
-    return correct / float(num_points)
+        if xvec != None and yvec != None:
+            correct += numpy.dot(xvec, yvec)
+            considered_points += 1
+    return correct / float(considered_points)
 
 
 def mae(x_values, y_values):
