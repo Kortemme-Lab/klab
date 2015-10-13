@@ -1,9 +1,10 @@
+import sys
+import os
 import inspect
 import subprocess
 import time
-import os
 
-from tools.fs.fsio import write_temp_file
+from tools.fs.fsio import read_file, write_temp_file
 
 class RInterface(object):
 
@@ -38,6 +39,6 @@ class RInterface(object):
            Filename: ggplot_pearsons.R
            Priority: 1
            '''
-        script_path = os.path.abspath(os.path.dirname( inspect.getsourcefile(sys.modules[__name__]) ) )
+        script_path = os.path.abspath(os.path.dirname(inspect.getsourcefile(sys.modules[__name__])))
         RScript = read_file(os.path.join(script_path, "ggplot_pearsons.R")) % vars()
         return RInterface._runRScript(RScript)
