@@ -46,7 +46,7 @@ class DBBenchmarkRun(GenericDBBenchmarkRun):
             m['DSSPType'] = m['ComplexDSSP']
             m['DSSPExposure'] = m['ComplexExposure']
 
-        dataframe_record = super(BenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
+        dataframe_record = super(DBBenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
         # add columns
         return dataframe_record
 
