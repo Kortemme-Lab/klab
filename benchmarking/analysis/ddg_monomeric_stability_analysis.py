@@ -198,15 +198,10 @@ class BenchmarkRun(ReportingObject):
 
     def create_subplot_directory(self, analysis_directory):
         # Create subplot directory
-        if not os.path.exists(analysis_directory):
-            try:
-                os.mkdir(analysis_directory)
-            except Exception, e:
-                raise colortext.Exception('An exception occurred creating the analysis directory %s.' % analysis_directory)
         subplot_directory = os.path.join(analysis_directory, self.benchmark_run_name + '_subplots')
         if not(os.path.exists(subplot_directory)):
             try:
-                os.mkdir(subplot_directory)
+                os.makedirs(subplot_directory)
                 assert(os.path.exists(subplot_directory))
             except Exception, e:
                 raise colortext.Exception('An exception occurred creating the subplot directory %s.' % subplot_directory)
