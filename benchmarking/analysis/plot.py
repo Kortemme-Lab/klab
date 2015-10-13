@@ -34,7 +34,8 @@ def plot(analysis_table, output_filename, RFunction, title = ''):
 
 def plot_pandas(dataframe, x_series, y_series, output_filename, RFunction, title = ''):
     new_dataframe = dataframe[[x_series, y_series]]
-    new_dataframe.columns = ['Experimental', 'Predicted'] # todo: this is hacky - make the inner function more general
+    new_dataframe.columns = ['Experimental', 'Predicted']
+    new_dataframe = new_dataframe.dropna(subset = ['Experimental', 'Predicted']) # todo: using 'Experimental' and 'Predicted' is hacky - make the inner function more general
 
     csv_filename = os.path.splitext(output_filename)[0] + '.txt'
     filetype = os.path.splitext(output_filename)[1].lower()
