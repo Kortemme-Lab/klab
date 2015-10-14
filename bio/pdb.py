@@ -2494,7 +2494,7 @@ class PDB:
 
 
     @staticmethod
-    def extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = None, stop_pdb_residue_id = None, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None):
+    def extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = None, stop_pdb_residue_id = None, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, break_on_chain_end = True):
         '''Creates a pandas dataframe of X, Y, Z coordinates for the residues identified in the range from
            start_pdb_residue_id to stop_pdb_residue_id inclusive. The dataframe is indexed by a string identifying the
            PDB residue and atom type.
@@ -2516,8 +2516,8 @@ class PDB:
             res_id = None
             atom_type = None
 
-            if l.strip() == 'TER' or l.startswith('MODEL'):
-                # Do not cross over into other chains or models
+            if (break_on_chain_end and l.strip() == 'TER') or l.startswith('MODEL'):
+                # Do not cross over into other chains (unless specified) or models
                 break
 
             if l.startswith('ATOM  '):
