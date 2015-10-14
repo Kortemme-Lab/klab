@@ -2431,7 +2431,15 @@ class PDB:
 
 
     @staticmethod
-    def extract_xyz_matrix_from_pdb(pdb_lines, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None):
+    def extract_xyz_matrix_from_pdb(pdb_lines, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, fail_on_model_records = True):
+        '''Returns a pandas dataframe of X, Y, Z coordinates for all chains in the PDB.
+           Note: This function is not intended to handle structures with MODELs e.g. from NMR although the fail_on_model_records
+           check is optional for convenience in case the first model is to be parsed.
+           Otherwise, the file should be split apart and passed into this function model by model.'''
+
+        if fail_on_model_records and [l for l in pdb_lines if l.startswith('MODEL')]:
+            raise Exception('This function does not handle files with MODEL records. Please split those file by model first.')
+
         chain_ids = set([l[21] for l in pdb_lines if l.startswith('ATOM  ')])
         dataframes = []
         for chain_id in chain_ids:
@@ -2440,7 +2448,14 @@ class PDB:
 
 
     @staticmethod
-    def extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None):
+    def extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, fail_on_model_records = True):
+        '''Returns a pandas dataframe of X, Y, Z coordinates for the PDB chain.
+           Note: This function is not intended to handle structures with MODELs e.g. from NMR although the fail_on_model_records
+           check is optional for convenience in case the chain of the first model is to be parsed.'''
+
+        if fail_on_model_records and [l for l in pdb_lines if l.startswith('MODEL')]:
+            raise Exception('This function does not handle files with MODEL records. Please split those file by model first.')
+
         new_pdb_lines = []
         found_chain = False
         for l in pdb_lines:
