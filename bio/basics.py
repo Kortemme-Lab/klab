@@ -207,6 +207,12 @@ all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
 
 nucleotide_types_1 = set(dna_nucleotides_2to1_map.values()) # for use in SEQRES sequences
 
+
+# Atoms
+
+backbone_atoms = set(['N', 'CA', 'C', 'O'])
+
+
 ###
 # Substitution matrices
 # Create full matrices to make the lookup logic simpler

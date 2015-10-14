@@ -31,8 +31,14 @@ import types
 import string
 import types
 
+# Only certain functions rely on the pandas library
+try:
+    import pandas
+except:
+    pass
+
 from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
-from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
 from tools import colortext
 from tools.fs.fsio import read_file, write_file
 from tools.pymath.stats import get_mean_and_standard_deviation
@@ -2422,6 +2428,92 @@ class PDB:
             return errors, None
 
         return True, warnings
+
+
+    @staticmethod
+    def extract_xyz_matrix_from_loop_json(pdb_lines, parsed_loop_json_contents, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, allow_overlaps = False):
+        '''A utility wrapper to extract_xyz_matrix_from_pdb_residue_range.
+           This accepts PDB file lines and a loop.json file (a defined Rosetta format) and returns a pandas dataframe of
+           the X, Y, Z coordinates for the requested atom types for all residues in all loops defined by the loop.json
+           file. The dataframe is indexed by a string identifying the PDB residue and atom type.
+
+           loop_json_contents should be a Python dict read in from a loop.json file e.g. json.loads(file_contents).'''
+
+        # Create one dataframe per loop segment
+        dataframes = []
+        for loop_set in parsed_loop_json_contents['LoopSet']:
+            start_pdb_residue_id = PDB.ChainResidueID2String(loop_set['start']['chainID'], str(loop_set['start']['resSeq']) + loop_set['start']['iCode'])
+            stop_pdb_residue_id = PDB.ChainResidueID2String(loop_set['stop']['chainID'], str(loop_set['stop']['resSeq']) + loop_set['stop']['iCode'])
+            dataframes.append(PDB.extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = start_pdb_residue_id, stop_pdb_residue_id = stop_pdb_residue_id, atoms_of_interest = atoms_of_interest, expected_num_residues = None, expected_num_residue_atoms = expected_num_residue_atoms))
+
+        # Concatenate the dataframes
+        dataframe = pandas.concat(dataframes, verify_integrity = (allow_overlaps == False)) # note: the pandas documentation notes that verify_integrity is relatively expensive
+        if expected_num_residues != None and expected_num_residue_atoms != None:
+            assert(dataframe.shape[0] == expected_num_residues * expected_num_residue_atoms)
+        return dataframe
+
+
+    @staticmethod
+    def extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = None, stop_pdb_residue_id = None, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None):
+        '''Creates a pandas dataframe of X, Y, Z coordinates for the residues identified in the range from
+           start_pdb_residue_id to stop_pdb_residue_id inclusive. The dataframe is indexed by a string identifying the
+           PDB residue and atom type.
+
+           pdb_lines should be an array of lines from a PDB file (only ATOM lines are currently considered).
+           The residue IDs should be 6-character strings correspond to columns 22-27 (inclusive where columns are 1-indexed)
+           of the PDB file. The start and stop residues are both optional - omitting either removes the lower and upper
+           bound of the residue range respectively.
+           The returned coordinates will be restricted to atoms_of_interest.
+           expected_num_residues can be set if the number of residues is known in advance and the user wishes to assert this.
+           If expected_num_residue_atoms is set then each residue will be checked to ensure that this number of atoms was read.
+
+           This method does not handle MODELs e.g. from PDB files determined via NMR. To handle those files, an intermediate
+           function should be written which identifies the lines for one MODEL and then calls this function.'''
+        atoms = {}
+        found_start, found_end = start_pdb_residue_id == None, None
+        res_id_list, x_list, y_list, z_list = [], [], [], []
+        for l in pdb_lines:
+            res_id = None
+            atom_type = None
+
+            if l.strip() == 'TER' or l.startswith('MODEL'):
+                # Do not cross over into other chains or models
+                break
+
+            if l.startswith('ATOM  '):
+                res_id = l[21:27]
+                atom_type = l[12:16].strip()
+                if res_id == start_pdb_residue_id:
+                    # Saw the first residue - enter parsing
+                    found_start = True
+                if (stop_pdb_residue_id != None) and (res_id == stop_pdb_residue_id):
+                    assert(found_start)
+                    found_end = True
+
+            if found_end and res_id != stop_pdb_residue_id:
+                # Passed the last residue - exit parsing
+                break
+
+            if found_start and l.startswith('ATOM  ') and (not(atoms_of_interest) or (atom_type in atoms_of_interest)):
+                if expected_num_residues or expected_num_residue_atoms:
+                    # Only build the atoms dict if the assertions are turned on
+                    assert(res_id and atom_type and not(atoms.get(res_id, {}).get(atom_type)))
+                    atoms[res_id] = atoms.get(res_id, {})
+                    atoms[res_id][atom_type] = True
+                # Add the dataframe elements
+                res_id_list.append('{0}_{1}'.format(res_id.strip(), atom_type))
+                x_list.append(float(l[30:38]))
+                y_list.append(float(l[38:46]))
+                z_list.append(float(l[46:54]))
+        assert(found_start and ((stop_pdb_residue_id == None) or found_end))
+
+        if expected_num_residues != None:
+            assert(len(atoms) == expected_num_residues)
+        if expected_num_residue_atoms != None:
+            for res_id, atom_details in atoms.iteritems():
+                assert(len(atom_details) == expected_num_residue_atoms)
+
+        return pandas.DataFrame(dict(X = x_list, Y = y_list, Z = z_list), index = res_id_list)
 
 
 if __name__ == "__main__":
