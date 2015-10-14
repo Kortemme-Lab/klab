@@ -2431,6 +2431,31 @@ class PDB:
 
 
     @staticmethod
+    def extract_xyz_matrix_from_pdb(pdb_lines, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None):
+        chain_ids = set([l[21] for l in pdb_lines if l.startswith('ATOM  ')])
+        dataframes = []
+        for chain_id in chain_ids:
+            dataframes.append(PDB.extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = atoms_of_interest, expected_num_residues = expected_num_residues, expected_num_residue_atoms = expected_num_residue_atoms))
+        return(pandas.concat(dataframes, verify_integrity = True))
+
+
+    @staticmethod
+    def extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None):
+        new_pdb_lines = []
+        found_chain = False
+        for l in pdb_lines:
+            if l.startswith('ATOM  '):
+                if l[21] == chain_id:
+                    found_chain = True
+                    if found_chain:
+                        new_pdb_lines.append(l)
+            if found_chain and (l.strip() == 'TER' or l.startswith('MODEL') or (len(l) > 21 and l[21] != chain_id)):
+                # Do not cross over into other chains or models
+                break
+        return PDB.extract_xyz_matrix_from_pdb_residue_range(new_pdb_lines, atoms_of_interest = atoms_of_interest, expected_num_residues = expected_num_residues, expected_num_residue_atoms = expected_num_residue_atoms)
+
+
+    @staticmethod
     def extract_xyz_matrix_from_loop_json(pdb_lines, parsed_loop_json_contents, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, allow_overlaps = False):
         '''A utility wrapper to extract_xyz_matrix_from_pdb_residue_range.
            This accepts PDB file lines and a loop.json file (a defined Rosetta format) and returns a pandas dataframe of
