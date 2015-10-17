@@ -2,8 +2,8 @@
 # The tuples are of the form (English description, comments from ScoreType.hh - not necessarily meaningful, and the corresponding weights file)
 
 score_types = {
-	"fa_atr"                                            	:	("Lennard-Jones attractive", "enumeration starts at 1 for indexing utility::vector1", ['standard_weights']),
-	"fa_rep"                                            	:	("Lennard-Jones repulsive", None, ['standard_weights']),
+	"fa_atr"                                            	:	("Lennard-Jones attractive between atoms in different residues", "enumeration starts at 1 for indexing utility::vector1", ['standard_weights']),
+	"fa_rep"                                            	:	("Lennard-Jones repulsive between atoms in different residues", None, ['standard_weights']),
 	"fa_sol"                                            	:	("Lazaridis-Jarplus solvation energy", None, ['standard_weights']),
 	"fa_intra_atr"                                      	:	(None, None, []),
 	"fa_intra_rep"                                      	:	("Lennard-Jones repulsive between atoms in the same residue", None, ['standard_weights']),
@@ -20,12 +20,16 @@ score_types = {
 	"mm_lj_inter_rep"                                   	:	(None, None, []),
 	"mm_lj_inter_atr"                                   	:	(None, None, []),
 	"mm_twist"                                          	:	(None, "could be lr 2benergy and not in energy graph", []),
-	"mm_bend"                                           	:	(None, "could be lr 2benergy and not in energy graph", []),
+	"mm_bend"                                           	:	("Deviation of bond angles from the mean", "could be lr 2benergy and not in energy graph", []),
 	"mm_stretch"                                        	:	(None, "could be lr 2benergy and not in energy graph", []),
 	"lk_costheta"                                       	:	(None, None, []),
 	"lk_polar"                                          	:	(None, None, []),
-	"lk_nonpolar"                                       	:	(None, None, []),
+	"lk_nonpolar"                                       	:	(None, "Lazaridis-Karplus solvation energy, over nonpolar atoms", []),
 	"hack_elec"                                         	:	(None, None, []),
+
+    "fa_elec"                                               :	("Coulombic electrostatic potential with a distance-dependant dielectric", None, []),
+	"dslf_fa13"                                             :	("Disulfide geometry potential", None, []),
+
 	"hack_elec_bb_bb"                                   	:	(None, None, []),
 	"hack_elec_bb_sc"                                   	:	(None, None, []),
 	"hack_elec_sc_sc"                                   	:	(None, None, []),
@@ -43,7 +47,7 @@ score_types = {
 	"pddf_score"                                        	:	(None, "score based on pairwise distance distribution function", []),
 	"fa_mbenv"                                          	:	(None, "depth dependent reference term", []),
 	"fa_mbsolv"                                         	:	(None, "burial+depth dependent term", []),
-	"hack_elec_rna_phos_phos"                           	:	(None, None, []),
+	"hack_elec_rna_phos_phos"                           	:	(None, "Simple electrostatic repulsion term between phosphates", []),
 	"hack_elec_rna_phos_sugr"                           	:	(None, None, []),
 	"hack_elec_rna_phos_base"                           	:	(None, None, []),
 	"hack_elec_rna_sugr_sugr"                           	:	(None, None, []),
@@ -55,7 +59,7 @@ score_types = {
 	"rna_fa_atr_base"                                   	:	(None, None, []),
 	"rna_fa_rep_base"                                   	:	(None, None, []),
 	"rna_data_backbone"                                 	:	(None, "Using chemical accessibility data for RNA.", []),
-	"ch_bond"                                           	:	(None, None, []),
+	"ch_bond"                                           	:	(None, "Carbon hydrogen bonds", []),
 	"ch_bond_bb_bb"                                     	:	(None, None, []),
 	"ch_bond_sc_sc"                                     	:	(None, None, []),
 	"ch_bond_bb_sc"                                     	:	(None, None, []),
@@ -104,7 +108,7 @@ score_types = {
 	"PyRosettaTwoBodyContextIndepenedentEnergy_last"    	:	(None, None, []),
 	"python"                                            	:	(None, "<-- Deprecated use PyRosettaEnergie* instead", []),
 	"n_ci_2b_score_types"                               	:	(None, "/ keep this guy at the end of the ci2b scores", []),
-	"fa_pair"                                           	:	("Statistics based pair term, favors salt bridges", "/ == fa_pair_pol_pol", ['standard_weights']),
+	"fa_pair"                                           	:	("Statistics-based pair term, favors salt bridges (replaced by fa_elec in Talaris2013)", "/ == fa_pair_pol_pol", ['standard_weights']),
 	"fa_pair_aro_aro"                                   	:	(None, None, []),
 	"fa_pair_aro_pol"                                   	:	(None, None, []),
 	"fa_pair_pol_pol"                                   	:	(None, None, []),
@@ -118,7 +122,7 @@ score_types = {
 	"PyRosettaTwoBodyContextDependentEnergy_first"      	:	(None, None, []),
 	"PyRosettaTwoBodyContextDependentEnergy_last"       	:	(None, None, []),
 	"interface_dd_pair"                                 	:	(None, None, []),
-	"geom_sol"                                          	:	(None, None, []),
+	"geom_sol"                                          	:	(None, "Geometric Solvation energy for polar atoms", []),
 	"occ_sol_fitted"                                    	:	(None, None, []),
 	"occ_sol_fitted_onebody"                            	:	(None, None, []),
 	"occ_sol_exact"                                     	:	(None, None, []),
@@ -131,10 +135,10 @@ score_types = {
 	"interchain_vdw"                                    	:	(None, None, []),
 	"n_shortranged_2b_score_types"                      	:	(None, "keep this guy at the end of the sr ci/cd 2b scores", []),
 	"gb_elec"                                           	:	(None, None, []),
-	"dslf_ss_dst"                                       	:	("Distance score in current disulfide", None, ['standard_weights']),
-	"dslf_cs_ang"                                       	:	("CSangles score in current disulfide", None, ['standard_weights']),
-	"dslf_ss_dih"                                       	:	("Dihedral score in current disulfide", None, ['standard_weights']),
-	"dslf_ca_dih"                                       	:	("Ca dihedral score in current disulfide", None, ['standard_weights']),
+	"dslf_ss_dst"                                       	:	("Distance score in current disulfide (replaced by dslf_fa13 in Talaris2013)", None, ['standard_weights']),
+	"dslf_cs_ang"                                       	:	("CSangles score in current disulfide (replaced by dslf_fa13 in Talaris2013)", None, ['standard_weights']),
+	"dslf_ss_dih"                                       	:	("Dihedral score in current disulfide (replaced by dslf_fa13 in Talaris2013)", None, ['standard_weights']),
+	"dslf_ca_dih"                                       	:	("Ca dihedral score in current disulfide (replaced by dslf_fa13 in Talaris2013)", None, ['standard_weights']),
 	"dslf_cbs_ds"                                       	:	(None, None, []),
 	"dslfc_cen_dst"                                     	:	(None, None, []),
 	"dslfc_cb_dst"                                      	:	(None, None, []),
@@ -144,7 +148,7 @@ score_types = {
 	"dslfc_rot"                                         	:	(None, None, []),
 	"dslfc_trans"                                       	:	(None, None, []),
 	"dslfc_RT"                                          	:	(None, None, []),
-	"atom_pair_constraint"                              	:	(None, None, []),
+	"atom_pair_constraint"                              	:	(None, "Harmonic constraints between atoms involved in Watson-Crick base pairs specified by the user in the params file", []),
 	"constant_constraint"                               	:	(None, None, []),
 	"coordinate_constraint"                             	:	(None, None, []),
 	"angle_constraint"                                  	:	(None, None, []),
@@ -156,7 +160,7 @@ score_types = {
 	"rama"                                              	:	("Ramachandran preferences", None, ['score12_wts_patch']),
 	"omega"                                             	:	("Omega dihedral in the backbone", None, ['score12_wts_patch']),
 	"fa_dun"                                            	:	("Internal energy of sidechain rotamers as derived from Dunbrack's statistics", None, ['standard_weights']),
-	"p_aa_pp"                                           	:	("Probability of amino acid at phipsi", None, ['standard_weights']),
+	"p_aa_pp"                                           	:	("Probability of amino acid at phi/psi", None, ['standard_weights']),
 	"yhh_planarity"                                     	:	(None, None, []),
 	"h2o_intra"                                         	:	(None, None, []),
 	"ref"                                               	:	("Reference energy for each amino acid", None, ['standard_weights']),
@@ -216,7 +220,8 @@ score_types = {
 	"symE_bonus"                                        	:	(None, None, []),
 	"sym_lig"                                           	:	(None, None, []),
 	"pack_stat"                                         	:	(None, None, []),
-	"rms"                                               	:	(None, None, []),
+	"rms"                                               	:	(None, "All-heavy-atom RMSD to the native structure", []),
+    "rms_stem"                                              :	(None, "All-heavy-atom RMSD to helical segments in the native structure, defined by 'STEM' entries in the parameters file", []),
 	"res_type_constraint"                               	:	(None, None, []),
 	"res_type_linking_constraint"                       	:	(None, None, []),
 	"pocket_constraint"                                 	:	(None, None, []),
@@ -237,4 +242,100 @@ score_types = {
 	"total_score"                                       	:	(None, None, []),
 	"n_score_types"                                     	:	(None, None, []),
 	"end_of_score_type_enumeration"                     	:	(None, None, []),
+    "N_WC"                                                  :	(None, "Number of Watson-Crick base pairs", []),
+    "N_NWC"                                             	:	(None, "Number of non-Watson-Crick base pairs", []),
+    "N_BS"                                             	    :	(None, "Number of base stacks", []),
+    "f_natWC"                                               :	(None, "fraction of native Watson-Crick base pairs recovered", []),
+    "f_natNWC"                                              :	(None, "fraction of native non-Watson-Crick base pairs recovered", []),
+    "f_natBP"                                               :	(None, "fraction of base pairs recovered", []),
 }
+
+class ScoreGroup(object):
+
+    def __init__(self, comment):
+        self.comment = comment
+        self.score_terms = []
+
+    def add(self, score_term, comment = None):
+        self.score_terms.append(dict(name = score_term, comment = comment))
+
+    def __len__(self):
+        return len(self.score_terms)
+
+
+from fs.fsio import read_file
+import colortext
+
+def parseScoreType(score_type_header_file):
+    contents = read_file(score_type_header_file)
+    left_idx = contents.find('enum ScoreType {')
+    contents = contents[left_idx+16:]
+    right_idx = contents.find('}')
+    contents = contents[:right_idx].strip()
+    assert(contents.find('{') == -1)
+    assert(contents.find('/*') == -1)
+
+    groups = []
+    group_comment = None
+    current_group = None
+    lines = [l.strip() for l in contents.split('\n') if l.strip()]
+    x = 0
+    while x < len(lines):
+        l = lines[x]
+        if l.startswith('//'):
+            if current_group != None:
+                groups.append(current_group)
+            group_comment = l[2:]
+            for y in range(x + 1, len(lines)):
+                l2 = lines[y]
+                if l2.startswith('//'):
+                    group_comment += ' %s' % l2
+                else:
+                    x = y - 1
+                    break
+            group_comment = group_comment.replace('/', '').replace('  ', ' ').strip()
+            current_group = ScoreGroup(group_comment)
+        else:
+            assert(current_group != None)
+            comment = None
+            score_term = l[:l.find(',')].strip()
+            if l.find('//') != - 1:
+                comment = l[l.find('//') + 2:].replace('/', '').replace('  ', ' ').strip()
+            current_group.add(score_term, comment = comment)
+        x += 1
+    if current_group != None:
+        groups.append(current_group)
+
+    print(len(groups))
+    for g in groups:
+        #colortext.warning(g.comment)
+        #colortext.warning('-' * len(g.comment))
+        print(g.comment)
+        print('-' * len(g.comment))
+        print('\n```')
+        for st in g.score_terms:
+            comments = [(st['comment'] or '').strip()]
+            term = st['name'].strip().replace(' = 1', '')
+            if score_types.get(term):
+                if score_types[term][0] and score_types[term][0].replace('  ', ' ').strip() not in comments:
+                    comments.append(score_types[term][0].replace('  ', ' ').strip())
+                if score_types[term][1] and score_types[term][1].replace('  ', ' ').strip() not in comments:
+                    comments.append(score_types[term][1].replace('  ', ' ').strip())
+            comments = [c[0].capitalize()+c[1:] for c in comments if c.strip()]
+            for x in range(len(comments)):
+                if comments[x].endswith('.'):
+                    comments[x] = comments[x][:-1]
+            if comments:
+                if len(comments) > 1:
+                    print(st['name'].ljust(43))
+                    print('    %s' % ('\n    ').join(comments))
+                else:
+                    print('%s%s' % (st['name'].ljust(43), comments[0]))
+            else:
+                print(st['name'])
+        print('```\n')
+
+    #enum ScoreType {
+
+if __name__ == '__main__':
+    parseScoreType('/home/rosetta/trunk/master/source/src/core/scoring/ScoreType.hh')
