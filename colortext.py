@@ -1,3 +1,27 @@
+#!/usr/bin/env python2
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2015 Shane O'Connor
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
 import sys
 
 COLOR_OFF = '\033[0m'
@@ -114,29 +138,31 @@ def rastaprint(s, bgcolor = None, suffix = "\n", effect = None):
 # The are shorthand for the write, printf, and make functions above
 # e.g. colortext.pcyan('test') prints in cyan, colortext.wlightpurple('test') writes in light purple, colortext.mblue('test') returns a blue string
 # Note: Python does not close the scope in for-loops so the closure definition looks odd - we need to explicitly capture the state of the c variable ("c=c")
+# Note: we should handle kwargs here in the future
+def sprint(str): print(str)
+def xprint(*args): print(args)
+def xjoin(*args): return ''.join(map(str, args))
 for c in colors:
-    setattr(sys.modules[__name__], 'w'  + c, lambda s, c=c : write(s, color = c))
-    setattr(sys.modules[__name__], 'p'  + c, lambda s, c=c : printf(s, color = c))
-    setattr(sys.modules[__name__], 'm'  + c, lambda s, c=c : make(s, color = c))
+    allow_colors = False
+    try:
+        from sys import platform as _platform
+        if _platform == "linux" or _platform == "linux2" or _platform == "darwin":
+            allow_colors = True
+    except: pass
+    if allow_colors:
+        setattr(sys.modules[__name__], 'w'  + c, lambda s, c=c : write(s, color = c, flush = True))
+        setattr(sys.modules[__name__], 'p'  + c, lambda s, c=c : printf(s, color = c))
+        setattr(sys.modules[__name__], 'm'  + c, lambda s, c=c : make(s, color = c))
+    else:
+        setattr(sys.modules[__name__], 'w'  + c, lambda s, c=c : sys.stdout(s))
+        setattr(sys.modules[__name__], 'p'  + c, lambda s, c=c : xprint(s))
+        setattr(sys.modules[__name__], 'm'  + c, lambda s, c=c : xjoin(s))
 
 
-class Exception(Exception): 	
+class Exception(Exception):
     def __init__(self, msg):
         self.message = make_error(msg)
     def __str__(self):
         return self.message
 
-if __name__ == "__main__":
-    # Test
-    chars = 'A'
-    count = 0
-    for name, data in colors.iteritems():
-        write(name, name)
-        for effect in EFFECTS_:
-            write(name, color = name, bgcolor = 'lightblue', effect = effect)
-        print("")
-    rainbowprint("Rainbow test")
-    printf("\ntest1", color = 'red')
-    printf("test2")
-    bar('blue', 9, suffix = "\n")
 

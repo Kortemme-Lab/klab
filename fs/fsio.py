@@ -18,17 +18,19 @@ permissions755SGID = stat.S_ISGID | stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |
 
 def read_file(filepath, binary = False):
     if binary:
-        output_handle = open(filepath, 'rb')
+        with open(filepath, 'rb') as f: contents = f.read()
     elif filepath.endswith('.gz'):
-        output_handle = gzip.open(filepath, 'r')
+        with gzip.open(filepath, 'r') as f: contents = f.read()
     else:
-        output_handle = open(filepath, 'r')
-    contents = output_handle.read()
-    output_handle.close()
+        with open(filepath, 'r') as f: contents = f.read()
     return contents
 
 def get_file_lines(filepath):
     return read_file(filepath, binary = False).splitlines()
+
+def read_file_lines(filepath, binary = False):
+    # todo: deprecated. Replace this with get_file_lines
+    return read_file(filepath, binary = binary).split('\n')
 
 def write_file(filepath, contents, ftype = 'w'):
     output_handle = open(filepath, ftype)
