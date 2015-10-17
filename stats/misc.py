@@ -95,13 +95,25 @@ def mae(x_values, y_values):
     assert(num_points == len(y_values) and num_points > 0)
     return numpy.sum(numpy.apply_along_axis(numpy.abs, 0, numpy.subtract(x_values, y_values))) / float(num_points)
 
-
-def get_xy_dataset_correlations(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+# this was renamed from get_xy_dataset_correlations to match the DDG benchmark capture repository
+def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+    '''
+    A function which takes two lists of values of equal length with corresponding entries and returns a dict containing
+    a variety of metrics.
+    :param x_values: A list of values for the X-axis (experimental values).
+    :param y_values: A list of values for the X-axis (predicted values).
+    :param fcorrect_x_cutoff: See get_xy_dataset_statistics.
+    :param fcorrect_y_cutoff: See get_xy_dataset_statistics.
+    :param x_fuzzy_range: See get_xy_dataset_statistics.
+    :param y_scalar: See get_xy_dataset_statistics.
+    :return: A table of statistics.
+    '''
+    from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
     assert(len(x_values) == len(y_values))
     return dict(
         pearsonr = pearsonr(x_values, y_values),
         spearmanr = spearmanr(x_values, y_values),
-        gammaCC = gammaCC(x_values, y_values),
+        gamma_CC = gammaCC(x_values, y_values),
         MAE = mae(x_values, y_values),
         normaltestx = normaltest(x_values),
         normaltesty = normaltest(y_values),
@@ -111,6 +123,62 @@ def get_xy_dataset_correlations(x_values, y_values, fcorrect_x_cutoff = 1.0, fco
         fraction_correct = fraction_correct(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff),
         fraction_correct_fuzzy_linear = fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = fcorrect_x_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar),
     )
+
+
+def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+    '''
+    A version of _get_xy_dataset_statistics which accepts a list of dicts rather than X- and Y-value lists.
+    :param analysis_table: A list of dict where each dict has Experimental and Predicted float elements
+    :param fcorrect_x_cutoff: The X-axis cutoff value for the fraction correct metric.
+    :param fcorrect_y_cutoff: The Y-axis cutoff value for the fraction correct metric.
+    :param x_fuzzy_range: The X-axis fuzzy range value for the fuzzy fraction correct metric.
+    :param y_scalar: The Y-axis scalar multiplier for the fuzzy fraction correct metric (used to calculate y_cutoff and y_fuzzy_range in that metric)
+    :return: A table of statistics.
+    '''
+
+    x_values = [record['Experimental'] for record in analysis_table]
+    y_values = [record['Predicted'] for record in analysis_table]
+    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar)
+
+
+keymap = dict(
+    pearsonr = "Pearson's R",
+    spearmanr = "Spearman's R",
+    gamma_CC = "Gamma correlation coef.",
+    fraction_correct = "Fraction correct",
+    fraction_correct_fuzzy_linear = "Fraction correct (fuzzy)",
+    ks_2samp = "Kolmogorov-Smirnov test (XY)",
+    kstestx = "X-axis Kolmogorov-Smirnov test",
+    kstesty = "Y-axis Kolmogorov-Smirnov test",
+    normaltestx = "X-axis normality test",
+    normaltesty = "Y-axis normality test",
+)
+
+
+def format_stats_for_printing(stats):
+    s = []
+    newstats = {}
+    for k, v in stats.iteritems():
+        key = keymap.get(k, k)
+        if k == 'ks_2samp':
+            newstats[key] = '%0.3f (2-tailed p-value=%s)' % (v[0], str(v[1]))
+        elif k == 'kstestx':
+            newstats[key] = '%0.3f (p-value=%s)' % (v[0], str(v[1]))
+        elif k == 'kstesty':
+            newstats[key] = '%0.3f (p-value=%s)' % (v[0], str(v[1]))
+        elif k == 'normaltestx':
+            newstats[key] = '%0.3f (2-sided chi^2 p-value=%s)' % (v[0], str(v[1]))
+        elif k == 'normaltesty':
+            newstats[key] = '%0.3f (2-sided chi^2 p-value=%s)' % (v[0], str(v[1]))
+        elif k == 'pearsonr':
+            newstats[key] = '%0.3f (2-tailed p-value=%s)' % (v[0], str(v[1]))
+        elif k == 'spearmanr':
+            newstats[key] = '%0.3f (2-tailed p-value=%s)' % (v[0], str(v[1]))
+        else:
+            newstats[key] = '%0.3f' % v
+    for k, v in sorted(newstats.iteritems()):
+        s.append('%s: %s' % (str(k).ljust(32), str(v)))
+    return '\n'.join(s)
 
 
 def histogram(values, out_filepath, num_bins = 50):
