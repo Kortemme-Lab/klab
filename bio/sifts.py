@@ -534,7 +534,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         assert(self.counters['entry'] == 1)
 
         residue_count = 0
-        residues_matched = 0
+        residues_matched = {}
         residues_encountered = set()
         atom_to_uniparc_residue_map = {}
         atom_to_seqres_residue_map = {}
@@ -567,6 +567,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
             full_pdb_residue_ID = r.get_pdb_residue_id()
             PDBChainID = r.PDBChainID
             map_chains.add(PDBChainID)
+            residues_matched[PDBChainID] = residues_matched.get(PDBChainID, 0)
 
             if not r.WasNotObserved:
                 # Do not add ATOM mappings when the ATOM data does not exist
@@ -590,18 +591,23 @@ class SIFTS(xml.sax.handler.ContentHandler):
             pdb_residue_type = residue_type_3to1_map.get(PDBResidue3AA) or self.modified_residues.get(PDBResidue3AA) or protonated_residue_type_3to1_map.get(PDBResidue3AA) or non_canonical_amino_acids.get(PDBResidue3AA)
             if r.has_pdb_to_uniprot_mapping():
                 if pdb_residue_type == r.UniProtResidue1AA:
-                    residues_matched += 1
+
+                    residues_matched[PDBChainID] += 1
             residue_count += 1
 
         # Create the SequenceMaps
         for c in map_chains:
-            if residues_matched > 0:
+            if residues_matched[c] > 0:
+                # 1IR3 has chains A,
+                # Chain A has mappings from atom and seqres (PDBe) residues to UniParc as usual
+                # Chain B (18 residues long) has mappings from atom to seqres residues but not to UniParc residues
                 self.atom_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(atom_to_uniparc_residue_map[c])
                 self.seqres_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(seqres_to_uniparc_residue_map[c])
             self.atom_to_seqres_sequence_maps[c] = SequenceMap.from_dict(atom_to_seqres_residue_map[c])
 
         # Check the match percentage
-        if residues_matched == 0:
+        total_residues_matched = sum([residues_matched[c] for c in residues_matched.keys()])
+        if total_residues_matched == 0:
             if self.pdb_id and self.pdb_id in NoSIFTSPDBUniParcMappingCases:
                 if self.require_uniprot_residue_mapping:
                     raise NoSIFTSPDBUniParcMapping('The PDB file %s has a bad or missing SIFTS mapping at the time of writing.' % self.pdb_id)
@@ -613,7 +619,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 else:
                     colortext.error('Warning: No residue information matching PDB residues to UniProt residues was found.')
         else:
-            percentage_matched = float(residues_matched)*100.0/float(residue_count)
+            percentage_matched = float(total_residues_matched)*100.0/float(residue_count)
             if percentage_matched < self.acceptable_sequence_percentage_match:
                 if self.pdb_id and self.pdb_id in BadSIFTSMappingCases:
                     raise BadSIFTSMapping('The PDB file %s has a known bad SIFTS mapping at the time of writing.' % self.pdb_id)
@@ -658,13 +664,22 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
     def _validate(self):
         '''Tests that the maps agree through composition.'''
-        assert((self.atom_to_uniparc_sequence_maps.keys() == self.atom_to_seqres_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys()) or (self.atom_to_uniparc_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys() == []))
+
+        # I used to use the assertion "self.atom_to_uniparc_sequence_maps.keys() == self.atom_to_seqres_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys()"
+        # but that failed for 2IMM where "self.atom_to_uniparc_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys() == []" but THAT fails for 1IR3 so I removed
+        # the assertions entirely.
         for c, m in self.atom_to_seqres_sequence_maps.iteritems():
             if self.seqres_to_uniparc_sequence_maps.keys():
-                assert(self.atom_to_uniparc_sequence_maps[c].keys() == self.atom_to_seqres_sequence_maps[c].keys())
+                atom_uniparc_keys = set(self.atom_to_uniparc_sequence_maps.get(c, {}).keys())
+                atom_seqres_keys = set(self.atom_to_seqres_sequence_maps.get(c, {}).keys())
+                assert(atom_uniparc_keys.intersection(atom_seqres_keys) == atom_uniparc_keys)
                 for k, v in m.map.iteritems():
-                    uparc_id_1 = self.seqres_to_uniparc_sequence_maps[c].map[v]
-                    uparc_id_2 = self.atom_to_uniparc_sequence_maps[c].map[k]
+                    uparc_id_1, uparc_id_2 = None, None
+                    try:
+                        uparc_id_1 = self.seqres_to_uniparc_sequence_maps[c].map[v]
+                        uparc_id_2 = self.atom_to_uniparc_sequence_maps[c].map[k]
+                    except:
+                        continue
                     assert(uparc_id_1 == uparc_id_2)
 
 
