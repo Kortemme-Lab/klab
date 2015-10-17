@@ -1,3 +1,4 @@
+import os
 import subprocess
 import sys, os, time, atexit
 from signal import SIGTERM
@@ -18,7 +19,6 @@ def Popen(outdir, args):
     subp = subprocess.Popen([str(arg) for arg in args], stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir)
     output = subp.communicate()
     return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
-
 
 def tee(*popenargs, **kwargs):
     """
@@ -238,3 +238,8 @@ class Daemon(object):
         You should override this method when you subclass Daemon. It will be called after the process has been
         daemonized by start() or restart().
         """
+
+def Popen_raw(cmd, outdir = os.getcwd()):
+    subp = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=outdir)
+    output = subp.communicate()
+    return ProcessOutput(output[0], output[1], subp.returncode) # 0 is stdout, 1 is stderr
