@@ -531,12 +531,12 @@ class Bonsai(ResidueIndexedPDBFile):
     ### Higher-level functionality
 
 
-    def prune_loop_for_kic(self, loops_segments, search_radius, expected_loop_length = None, generate_pymol_session = False):
+    def prune_loop_for_kic(self, loops_segments, search_radius, expected_min_loop_length = None, expected_max_loop_length = None, generate_pymol_session = False):
         '''A wrapper for prune_structure_according_to_loop_definitions suitable for the Rosetta kinematic closure (KIC) loop modeling method.'''
-        return self.prune_structure_according_to_loop_definitions(loops_segments, search_radius, expected_loop_length = expected_loop_length, generate_pymol_session = generate_pymol_session, check_sequence = True, keep_Ca_buttress_atoms = True)
+        return self.prune_structure_according_to_loop_definitions(loops_segments, search_radius, expected_min_loop_length = expected_min_loop_length, expected_max_loop_length = expected_max_loop_length, generate_pymol_session = generate_pymol_session, check_sequence = True, keep_Ca_buttress_atoms = True)
 
 
-    def prune_structure_according_to_loop_definitions(self, loops_segments, search_radius, expected_loop_length = None, generate_pymol_session = True, check_sequence = False, keep_Ca_buttress_atoms = True):
+    def prune_structure_according_to_loop_definitions(self, loops_segments, search_radius, expected_min_loop_length = None, expected_max_loop_length = None, generate_pymol_session = True, check_sequence = False, keep_Ca_buttress_atoms = True):
         '''Removes the loop residues identified by the residues in loops_segments and all sidechains with heavy atoms
            within 10A of any heavy atom of the loop.
            If keep_Ca_buttress_atoms is set then the N and Ca backbone atoms of the first loop residue are kept and the
@@ -593,9 +593,11 @@ class Bonsai(ResidueIndexedPDBFile):
                     raise Exception('Expected to find sequence {0} but found sequence {1}.'.format(loop.Sequence, parsed_sequence))
             parsed_sequences.append((parsed_sequence, ';'.join([chain_id + lrid.strip() for lrid in loop_residue_ids])))
 
-            if expected_loop_length != None and ((expected_loop_length != len(loop_residues)) or (expected_loop_length != len(loop_residue_ids))):
-                # This parameter currently only makes sense for a single loop
-                raise Exception('Expected to identify {0} residues but {1} were identified.'.format(expected_loop_length, len(loop_residues)))
+            # These parameters currently only makes sense for a single loop
+            if expected_min_loop_length != None and ((expected_min_loop_length > len(loop_residues)) or (expected_min_loop_length > len(loop_residue_ids))):
+                raise Exception('Expected to identify at least {0} residues but {1} were identified.'.format(expected_min_loop_length, len(loop_residues)))
+            if expected_max_loop_length != None and ((expected_max_loop_length < len(loop_residues)) or (expected_max_loop_length < len(loop_residue_ids))):
+                raise Exception('Expected to identify at most {0} residues but {1} were identified.'.format(expected_max_loop_length, len(loop_residues)))
 
             # Keep track of the loop terminii
             loop_N_terminii.append(start_residue)
