@@ -15,7 +15,7 @@ if __name__ == "__main__":
     sys.path.insert(0, "../../")
 from tools.db.mysql import DatabaseInterface
 from tools import colortext
-from tools.fs.fsio import read_file
+from tools.fs.fsio import read_file, write_file
 from tools.bio.pfam import Pfam
 from tools.bio.sifts import SIFTS
 from tools.bio.pdb import PDB
@@ -118,12 +118,12 @@ class SCOPeDatabase(DatabaseInterface):
         return d
 
 
-    def get_sifts(self, pdb_id, fail_on_error = False):
+    def get_sifts(self, pdb_id, fail_on_error = False, require_uniprot_residue_mapping = False):
         try:
             pdb_id = pdb_id.lower()
             if self.SIFTS.get(pdb_id):
                 return self.SIFTS[pdb_id]
-            self.SIFTS[pdb_id] = SIFTS.retrieve(pdb_id, cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
+            self.SIFTS[pdb_id] = SIFTS.retrieve(pdb_id, cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = require_uniprot_residue_mapping)
             return self.SIFTS[pdb_id]
         except Exception, e:
             colortext.error('An exception happened retrieving the SIFTS file for %s: "%s". Ignoring this exception and continuing on...' % (pdb_id, str(e)))
@@ -658,7 +658,7 @@ class SCOPeDatabase(DatabaseInterface):
 
 
     def determine_SCOPe_class_of_pdb_residue(self, pdb_id, pdb_chain_id, pdb_residue_id):
-        sifts_object = self.get_sifts(pdb_id, fail_on_error = True)
+        sifts_object = self.get_sifts(pdb_id, fail_on_error = True, require_uniprot_residue_mapping = False)
         scop_class = None
         if sifts_object:
             PDBeResidueID = sifts_object.atom_to_seqres_sequence_maps.get(pdb_chain_id, {}).get(PDB.ChainResidueID2String(pdb_chain_id, pdb_residue_id))
@@ -681,7 +681,7 @@ class SCOPeDatabase(DatabaseInterface):
 
 
     def determine_Pfam_class_of_pdb_residue(self, pdb_id, pdb_chain_id, pdb_residue_id):
-        sifts_object = self.get_sifts(pdb_id, fail_on_error = True)
+        sifts_object = self.get_sifts(pdb_id, fail_on_error = True, require_uniprot_residue_mapping = False)
         pfam_accs = []
         if sifts_object:
             PDBeResidueID = sifts_object.atom_to_seqres_sequence_maps.get(pdb_chain_id, {}).get(PDB.ChainResidueID2String(pdb_chain_id, pdb_residue_id))
@@ -701,10 +701,12 @@ class SCOPeDatabase(DatabaseInterface):
 
 
 
-def __test():
-    scopdb = SCOPeDatabase()
 
+def __pick_cases_for_manual_inspection():
     import json
+    import random
+
+    scopdb = SCOPeDatabase()
     datasets = [
       '/kortemmelab/shared/benchmarks/ddg/input/json/potapov.json',
       '/kortemmelab/shared/benchmarks/ddg/input/json/kellogg.json',
@@ -712,33 +714,19 @@ def __test():
       '/kortemmelab/shared/benchmarks/ddg/input/json/curatedprotherm.json',
       '/kortemmelab/shared/benchmarks/ddg/input/json/guerois.json'
     ]
-
-    sccs = scopdb.determine_SCOPe_class_of_pdb_residue('1A2P', 'A', '103')
-    pfam_accs = scopdb.determine_Pfam_class_of_pdb_residue('1A2P', 'A', '103')
-
-    import random
-
     for dataset in datasets:
         data = json.loads(read_file(dataset))['data']
         c = 1
-        skipped = 0
-
-        print(len(data))
 
         random.seed(1357986420)
         random_checks = [random.randint(0, len(data) - 1) for i in range(5)]
-        print(random_checks)
-
         for n in random_checks:
             d = data[n]
-        #for d in data:
             for m in d['Mutations']:
                 if dataset == '/kortemmelab/shared/benchmarks/ddg/input/json/curatedprotherm.json':
                     if c in [2338, 2339, 2385, 2435, 2436, 2795, 2796, 2812, 2813, 2814]:
-                        skipped += 1
                         continue
                     if d['PDBFileID'] == '2IMM':
-                        skipped += 1
                         continue
                 s = 'Mutation #%d: %s, chain %s, residue %s - ' % (c, d['PDBFileID'], m['Chain'], m['ResidueID'])
                 try:
@@ -758,10 +746,106 @@ def __test():
                     colortext.error(str(e))
                     colortext.error(traceback.format_exc())
             c += 1
-        print('skipped', skipped)
+
+
+def __generate_benchmark_data():
+    import json
+
+    headers = 'Pfam ID,Pfam Name,Total # of sequences,PDB ID,Amino acid length,SCOP class'.split(',')
+    lines = [l for l in read_file('/kortemmelab/shared/benchmarks/covariation/input/domains.csv').split('\n') if l.strip() and not(l.startswith('#'))]
+    dataset_json = {
+        "information": "\nThis dataset was taken from Table 1 in the Ollikainen and Kortemme paper [1], doi: 10.1371/journal.pcbi.1003313.",
+        "references": {
+            "1": "PMID:24244128"
+        },
+        "version": "This dataset was last updated on 2015-04-07.",
+        "domains": []
+    }
+    for l in lines:
+        tokens = l.split(',')
+        assert(len(tokens) == len(headers))
+        d = {}
+        for x in range(len(headers)):
+            d[headers[x]] = tokens[x]
+        dataset_json["domains"].append(d)
+
+    print(json.dumps(dataset_json, indent=4, sort_keys=True))
+
+
+    data = write_file('/kortemmelab/shared/benchmarks/covariation/input/domains.json', json.dumps(dataset_json, indent=4, sort_keys=True))
 
     sys.exit(0)
 
+    scopdb = SCOPeDatabase()
+    datasets = [
+      '/kortemmelab/shared/benchmarks/ddg/input/json/potapov.json',
+      '/kortemmelab/shared/benchmarks/ddg/input/json/kellogg.json',
+      '/kortemmelab/shared/benchmarks/ddg/input/json/alascan-gpk.json',
+      '/kortemmelab/shared/benchmarks/ddg/input/json/curatedprotherm.json',
+      '/kortemmelab/shared/benchmarks/ddg/input/json/guerois.json'
+    ]
+    for dataset in datasets:
+        dataset_json = json.loads(read_file(dataset))
+        data = dataset_json['data']
+        c = 1
+        skipped = 0
+
+        scss_breakdown = dict(
+            a = ['All alpha proteins', 0],
+            b = ['All beta proteins', 0],
+            c = ['Alpha and beta proteins (a/b)', 0],
+            d = ['Alpha and beta proteins (a+b)', 0],
+            e = ['Multi-domain proteins (alpha and beta)', 0],
+            f = ['Membrane and cell surface proteins and peptides', 0],
+            g = ['Small proteins', 0],
+            h = ['Coiled-coil proteins', 0],
+            i = ['Low resolution protein structures', 0],
+            j = ['Peptides', 0],
+            k = ['Designed proteins', 0]
+        )
+        for d in data:
+            for m in d['Mutations']:
+                s = 'Mutation #%d: %s, chain %s, residue %s - ' % (c, d['PDBFileID'], m['Chain'], m['ResidueID'])
+                try:
+                    sys.stdout.flush()
+                    sccs = scopdb.determine_SCOPe_class_of_pdb_residue(d['PDBFileID'], m['Chain'], m['ResidueID'])
+                    pfam_accs = scopdb.determine_Pfam_class_of_pdb_residue(d['PDBFileID'], m['Chain'], m['ResidueID'])
+                    if sccs:
+                        s += colortext.make(' - %s' % sccs, 'cyan')
+                        top_class = sccs.split('.')[0]
+                        scss_breakdown[top_class][1] += 1
+                    else:
+                        s += colortext.make(' - %s' % sccs, 'yellow')
+                    if pfam_accs:
+                        s += colortext.make(', %s' % ', '.join(pfam_accs), 'green')
+                    m[u'SCOP class'] = sccs
+                    if pfam_accs:
+                        m[u'Pfam domains'] = ', '.join(pfam_accs)
+                    else:
+                        m[u'Pfam domains'] = None
+                    print(s)
+                except Exception, e:
+                    print(s)
+                    colortext.error(str(e))
+                    colortext.error(traceback.format_exc())
+                    raise
+            c += 1
+        print(len(data))
+        keys_to_delete = [k for k in scss_breakdown.keys() if scss_breakdown[k][1] == 0]
+        total_count = sum([scss_breakdown[k][1] for k in scss_breakdown.keys()])
+        print(total_count)
+        for k in keys_to_delete:
+            del scss_breakdown[k]
+        colortext.warning(pprint.pformat(scss_breakdown))
+        print('skipped', skipped)
+
+        data = write_file(dataset + '.new', json.dumps(dataset_json, indent=4, sort_keys=True))
+
+
+
+def __test():
+
+    scopdb = SCOPeDatabase()
     if False:
 
         # Outstanding issue 1
@@ -844,4 +928,5 @@ def __test():
 
 
 if __name__ == '__main__':
-    __test()
+    #__test()
+    __generate_benchmark_data()
