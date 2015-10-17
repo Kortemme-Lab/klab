@@ -3,6 +3,7 @@ from string import join
 import process
 import deprecated.rosettahelper as rosettahelper
 
+
 def breakCommandLine(commandLine, length = 80):
 	commandLine = commandLine.replace("%(", "[").replace(")s", "]").replace(")d", "]").replace('{', '(').replace('}', ')')
 	tokens = commandLine.split(" ")
