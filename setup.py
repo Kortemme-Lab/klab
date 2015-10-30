@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 
 import distutils.core
 import subprocess, shlex
@@ -9,10 +9,10 @@ import subprocess, shlex
 # $ python setup.py register -r pypi
 #
 # Every version bump:
-# $ git tag <version>; git push
+# $ git tag <version>; git push --tags
 # $ python setup.py sdist upload -r pypi
 
-version = '0.1'
+version = '0.1.2'
 distutils.core.setup(
     name='klab',
     version=version,
