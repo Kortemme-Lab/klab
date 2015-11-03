@@ -10,9 +10,9 @@ Created by Shane O'Connor 2013
 if __name__ == '__main__':
     import sys
     sys.path.insert(0, "../..")
-from tools.fs.fsio import read_file
-from tools.comms.ftp import get_insecure_resource, FTPException550
-from tools import colortext
+from klab.fs.fsio import read_file
+from klab.comms.ftp import get_insecure_resource, FTPException550
+from klab import colortext
 from xml.dom.minidom import parseString
 
 def pdbechem_parse(download = False, filename = '/kortemmelab/shared/mirror/PDBeChem/chem_comp.xml'):

@@ -32,9 +32,9 @@ Created by Shane O'Connor 2014
 import pprint
 import re
 
-from tools.fs.fsio import read_file
-from tools.bio.basics import SimpleMutation
-from tools.general.strutil import parse_range
+from klab.fs.fsio import read_file
+from klab.bio.basics import SimpleMutation
+from klab.general.strutil import parse_range
 
 
 class RosettaFileParsingException(Exception): pass
@@ -557,8 +557,8 @@ def create_mutfile(pdb, mutations):
         The mutations here are in the original PDB numbering. The PDB file will use Rosetta numbering.
         We use the mapping from PDB numbering to Rosetta numbering to generate the mutfile.
     '''
-    from tools.bio.pdb import PDB
-    from tools.bio.basics import residue_type_3to1_map
+    from klab.bio.pdb import PDB
+    from klab.bio.basics import residue_type_3to1_map
 
     mutfile = []
     for mutation in mutations:

@@ -16,7 +16,7 @@ import traceback
 import urllib2
 
 from publication import PublicationInterface, publication_abbreviations
-from tools import colortext
+from klab import colortext
 
 lsttype = type([])
 strtype = type("")

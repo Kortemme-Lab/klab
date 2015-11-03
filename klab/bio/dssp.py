@@ -30,13 +30,13 @@ import traceback
 import string
 import pprint
 
-from tools.fs.fsio import open_temp_file, read_file, write_temp_file
-from tools.process import Popen as _Popen
-from tools import colortext
+from klab.fs.fsio import open_temp_file, read_file, write_temp_file
+from klab.process import Popen as _Popen
+from klab import colortext
 from pdb import PDB
 from rcsb import retrieve_pdb
 from basics import dssp_secondary_structure_types, residue_types_1, residue_type_1to3_map, residue_type_3to1_map
-from tools.general.structures import NestedBunch
+from klab.general.structures import NestedBunch
 
 
 secondary_structure_types = dssp_secondary_structure_types.keys() 

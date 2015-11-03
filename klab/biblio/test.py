@@ -3508,7 +3508,7 @@ if __name__ == '__main__':
     import traceback
     sys.path.insert(0, '../..')
 
-    from tools import colortext
+    from klab import colortext
     from doi import DOI, RecordTypeParsingNotImplementedException, CrossRefException
     from ris import RISEntry
 

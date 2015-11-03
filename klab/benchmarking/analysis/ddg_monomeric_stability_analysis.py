@@ -45,13 +45,13 @@ except: import simplejson as json
 
 import pandas
 
-from tools import colortext
-from tools.fs.fsio import read_file, write_file, write_temp_file
-from tools.loggers.simple import ReportingObject
-from tools.gfx.color_definitions import rgb_colors as plot_colors
-from tools.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
-from tools.benchmarking.analysis.plot import plot_pandas
-from tools.plot.rtools import RInterface
+from klab import colortext
+from klab.fs.fsio import read_file, write_file, write_temp_file
+from klab.loggers.simple import ReportingObject
+from klab.gfx.color_definitions import rgb_colors as plot_colors
+from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
+from klab.benchmarking.analysis.plot import plot_pandas
+from klab.plot.rtools import RInterface
 
 
 class BenchmarkRun(ReportingObject):

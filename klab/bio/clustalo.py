@@ -16,9 +16,9 @@ import re
 import commands
 import platform
 
-from tools.fs.fsio import open_temp_file, read_file
-from tools.process import Popen as _Popen
-from tools import colortext
+from klab.fs.fsio import open_temp_file, read_file
+from klab.process import Popen as _Popen
+from klab import colortext
 from uniprot import pdb_to_uniparc, uniprot_map, UniProtACEntry, UniParcEntry
 from fasta import FASTA
 from pdb import PDB

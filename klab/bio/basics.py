@@ -43,7 +43,7 @@ Created by Shane O'Connor 2013
 import types
 import itertools
 
-import tools.colortext as colortext
+import klab.colortext as colortext
 
 ###
 # Residue maps and sets.

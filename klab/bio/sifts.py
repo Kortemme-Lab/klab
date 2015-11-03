@@ -17,14 +17,14 @@ if __name__ == '__main__':
     import sys
     sys.path.insert(0, '../..')
 
-from tools.fs.fsio import read_file, write_file, safe_gz_unzip
-from tools.comms.ftp import get_insecure_resource, FTPException550
-from tools import colortext
-from tools.general.strutil import parse_range, merge_range_pairs
+from klab.fs.fsio import read_file, write_file, safe_gz_unzip
+from klab.comms.ftp import get_insecure_resource, FTPException550
+from klab import colortext
+from klab.general.strutil import parse_range, merge_range_pairs
 import rcsb
 
 if __name__ == '__main__':
-    from tools.bio.pdb import PDB#, cases_with_ACE_residues_we_can_ignore
+    from klab.bio.pdb import PDB#, cases_with_ACE_residues_we_can_ignore
 else:
     from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
 

@@ -25,8 +25,8 @@ import json
 from xml.dom.minidom import parse, parseString
 
 from publication import PublicationInterface, publication_abbreviations
-from tools.comms.http import get_resource
-from tools import colortext
+from klab.comms.http import get_resource
+from klab import colortext
 
 class DOIRetrievalException(Exception): pass
 class RecordTypeParsingNotImplementedException(Exception): pass

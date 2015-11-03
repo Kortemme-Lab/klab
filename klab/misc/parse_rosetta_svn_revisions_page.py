@@ -14,9 +14,9 @@ sys.path.insert(0, '../..')
 import datetime
 import re
 import pprint
-from tools.fs.fsio import read_file
-from tools import colortext
-from tools.db.mysql import DatabaseInterface
+from klab.fs.fsio import read_file
+from klab import colortext
+from klab.db.mysql import DatabaseInterface
 
 write_to_db = False
 SVN_pages = [

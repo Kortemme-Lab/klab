@@ -37,15 +37,15 @@ try:
 except:
     pass
 
-from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
-from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
-from tools import colortext
-from tools.fs.fsio import read_file, write_file
-from tools.pymath.stats import get_mean_and_standard_deviation
-from tools.pymath.cartesian import spatialhash
-from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-from tools.bio import rcsb
-from tools.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
+from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
+from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
+from klab import colortext
+from klab.fs.fsio import read_file, write_file
+from klab.pymath.stats import get_mean_and_standard_deviation
+from klab.pymath.cartesian import spatialhash
+from klab.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
+from klab.bio import rcsb
+from klab.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
 
 # todo: related packages will need to be fixed since my refactoring
 # The PDB constructor has now changed
@@ -1340,7 +1340,7 @@ class PDB:
            If the SEQRES sequence does not exist for a chain, the mappings are None.
            Note: The ResidueRelatrix is better equipped for this job since it can use the SIFTS mappings. This function
            is provided for cases where it is not possible to use the ResidueRelatrix.'''
-        from tools.bio.clustalo import SequenceAligner
+        from klab.bio.clustalo import SequenceAligner
 
         seqres_to_atom_maps = {}
         atom_to_seqres_maps = {}

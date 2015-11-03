@@ -14,8 +14,8 @@ if __name__ == '__main__':
     import sys
     sys.path.insert(0, '../..')
 
-from tools.comms.mail import MailServer
-from tools.fs.fsio import write_file
+from klab.comms.mail import MailServer
+from klab.fs.fsio import write_file
 
 df_conversions = {
     'MB': float(2 ** 10),

@@ -18,9 +18,9 @@ from xml.sax import parse as parse_xml
 from basics import IdentifyingPDBResidue, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
 from pdb import PDB, cases_with_ACE_residues_we_can_ignore
 import rcsb
-from tools.fs.fsio import read_file, write_file
-from tools.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_alphabetic_character, parse_singular_string
-from tools.debug.profile import ProfileTimer
+from klab.fs.fsio import read_file, write_file
+from klab.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_alphabetic_character, parse_singular_string
+from klab.debug.profile import ProfileTimer
 
 int_type = types.IntType
 

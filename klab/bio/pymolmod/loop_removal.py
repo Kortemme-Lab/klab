@@ -8,8 +8,8 @@ Created by Shane O'Connor 2015.
 """
 
 import copy
-from tools.fs.fsio import write_file
-from tools import colortext
+from klab.fs.fsio import write_file
+from klab import colortext
 from psebuilder import PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
 from colors import ColorScheme
 

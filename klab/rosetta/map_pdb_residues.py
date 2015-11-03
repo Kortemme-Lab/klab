@@ -41,7 +41,7 @@ import commands
 import traceback
 from optparse import OptionParser # todo: deprecated since Python 2.7
 
-from tools.fs.fsio import write_temp_file
+from klab.fs.fsio import write_temp_file
 
 
 script = '''<ROSETTASCRIPTS>

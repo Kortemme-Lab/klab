@@ -13,7 +13,7 @@ import smtplib
 from email.MIMEMultipart import MIMEMultipart
 from email.MIMEText import MIMEText
 
-from tools.fs.fsio import read_file
+from klab.fs.fsio import read_file
 
 class MailServer(object):
 

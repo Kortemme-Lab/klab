@@ -8,7 +8,7 @@ import socket
 if __name__ == '__main__':
     sys.path.insert(0, '/netapp/home/klabqb3backrub/pythonlibs/')
 
-from tools.process import Popen_raw
+from klab.process import Popen_raw
 
 
 def make_simple_xml_open_tag(tagname, attributes = {}):

@@ -19,9 +19,9 @@ import time
 import shlex
 sys.path.insert(0, '../..')
 
-import tools.colortext as colortext
+import klab.colortext as colortext
 from mysql import DatabaseInterface as MySQLDatabaseInterface
-from tools.fs.fsio import read_file, write_file, open_temp_file
+from klab.fs.fsio import read_file, write_file, open_temp_file
 
 
 class EmptyDiagramException(Exception): pass

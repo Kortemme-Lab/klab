@@ -11,9 +11,9 @@ import os
 import shutil
 import string
 
-from tools.fs.fsio import read_file, create_temp_755_path, write_file
-from tools import colortext
-from tools import process as tprocess
+from klab.fs.fsio import read_file, create_temp_755_path, write_file
+from klab import colortext
+from klab import process as tprocess
 from colors import ColorScheme
 
 def create_pymol_selection_from_PDB_residue_ids(residue_list):

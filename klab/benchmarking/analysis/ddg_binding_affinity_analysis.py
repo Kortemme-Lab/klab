@@ -29,8 +29,8 @@ affinity predictions.
 '''
 
 
-from tools.bio.basics import dssp_elision
-from tools.benchmarking.analysis.ddg_monomeric_stability_analysis import DBBenchmarkRun as GenericDBBenchmarkRun
+from klab.bio.basics import dssp_elision
+from klab.benchmarking.analysis.ddg_monomeric_stability_analysis import DBBenchmarkRun as GenericDBBenchmarkRun
 
 
 

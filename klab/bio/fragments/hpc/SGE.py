@@ -20,8 +20,8 @@ import subprocess
 
 sys.path.insert(0, "..")
 from utils import colorprinter
-from tools.cluster import sge_interface
-import tools.cluster.sge_interface
+from klab.cluster import sge_interface
+import klab.cluster.sge_interface
 
 
 # todo: move these into a common file e.g. utils.py

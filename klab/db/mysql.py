@@ -9,7 +9,7 @@ import getpass
 from datetime import datetime
 from string import join
 
-from tools.fs.fsio import read_file
+from klab.fs.fsio import read_file
 
 # Database import functions
 # Use oursql if available; it's more up to date

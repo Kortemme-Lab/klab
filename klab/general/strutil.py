@@ -72,7 +72,7 @@ def merge_pdb_range_pairs(prs):
     sprs = sorted(sprs)
     merged = False
     x = 0
-    from tools import colortext
+    from klab import colortext
     while x < len(sprs):
         newx = x + 1
         new_pair = list(sprs[x])

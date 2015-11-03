@@ -1,5 +1,5 @@
 import hashlib
-from tools.general.strutil import remove_trailing_line_whitespace
+from klab.general.strutil import remove_trailing_line_whitespace
 
 def get_hexdigest(content, rm_trailing_line_whitespace = False):
     if rm_trailing_line_whitespace:

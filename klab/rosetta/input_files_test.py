@@ -1,4 +1,4 @@
-# Run from main tools directory like:
+# Run from main klab directory like:
 # python -m unittest rosetta.input_files_test
 
 import input_files

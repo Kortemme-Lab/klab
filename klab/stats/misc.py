@@ -35,8 +35,8 @@ import numpy
 import scipy
 from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
 
-from tools.unmerged.rpache.functions_lib import gamma_CC
-from tools.fs.fsio import write_temp_file
+from klab.unmerged.rpache.functions_lib import gamma_CC
+from klab.fs.fsio import write_temp_file
 
 
 def stability_classification_accuracy(experimental_values, predicted_values):

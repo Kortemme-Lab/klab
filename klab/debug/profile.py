@@ -6,7 +6,7 @@ For profiling functions
 """
 
 import time
-from tools import colortext
+from klab import colortext
 
 class ProfileTimer(object):
     '''A dumb profiler. Cheap and cheerful.'''

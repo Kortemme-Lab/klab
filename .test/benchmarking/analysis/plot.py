@@ -1,7 +1,7 @@
 import random
 
-from tools.benchmarking.analysis.plot import plot
-from tools.plot.rtools import RInterface
+from klab.benchmarking.analysis.plot import plot
+from klab.plot.rtools import RInterface
 
 # Create a random dataset that is skewed towards correlation
 test_table = []

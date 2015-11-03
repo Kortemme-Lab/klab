@@ -26,19 +26,19 @@ if __name__ == '__main__':
 import rcsb
 from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
 from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
-from tools import colortext
-from tools.bio.pdb import PDB
-from tools.fs.fsio import read_file, write_file
-from tools.pymath.stats import get_mean_and_standard_deviation
-from tools.pymath.cartesian import spatialhash
-from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
-from tools.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
-from tools.rosetta.input_files import LoopsFile
+from klab import colortext
+from klab.bio.pdb import PDB
+from klab.fs.fsio import read_file, write_file
+from klab.pymath.stats import get_mean_and_standard_deviation
+from klab.pymath.cartesian import spatialhash
+from klab.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
+from klab.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
+from klab.rosetta.input_files import LoopsFile
 
 pymol_load_failed = False
 try:
-    from tools.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
-    from tools.bio.pymolmod.loop_removal import LoopRemovalBuilder
+    from klab.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
+    from klab.bio.pymolmod.loop_removal import LoopRemovalBuilder
 except Exception, e:
     pymol_load_failed = True
 

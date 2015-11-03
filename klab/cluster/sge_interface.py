@@ -3,8 +3,8 @@ import string
 import re
 import subprocess
 
-from tools.fs.fsio import read_file
-from tools import colortext
+from klab.fs.fsio import read_file
+from klab import colortext
 from cluster_interface import JobInitializationException
 
 available_queues = {

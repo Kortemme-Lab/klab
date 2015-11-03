@@ -8,9 +8,9 @@ Created by Shane O'Connor 2011/2012
 """
 
 import os
-from tools.comms.http import get_resource
+from klab.comms.http import get_resource
 
-from tools import colortext
+from klab import colortext
 
 def retrieve_file_from_RCSB(resource, silent = True):
     '''Retrieve a file from the RCSB.'''

@@ -11,7 +11,7 @@ Created by Shane O'Connor 2014
 # We use xml.etree.ElementTree at present which runs slowly compared to xml.sax but the code is quicker to read/write.
 import io
 from lxml import etree
-from tools.parsers.xml import fast_iter
+from klab.parsers.xml import fast_iter
 
 import re
 class record_iterator(object):

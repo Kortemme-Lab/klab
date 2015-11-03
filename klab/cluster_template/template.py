@@ -147,9 +147,9 @@ class Reporter:
             return time.time() - self.start
 
 def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
-    # Add ddglib and tools to path
-    if not os.path.lexists('tools'):
-        os.symlink( os.path.expanduser('~/gits/tools'), 'tools' )
+    # Add ddglib and klab to path
+    if not os.path.lexists('klab'):
+        os.symlink( os.path.expanduser('~/gits/klab'), 'klab' )
     if not os.path.lexists('ddglib'):
         os.symlink( os.path.expanduser('~/gits/ddg/ddglib'), 'ddglib')
     cwd = os.path.abspath( os.getcwd() )

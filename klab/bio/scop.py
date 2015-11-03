@@ -13,12 +13,12 @@ import traceback
 
 if __name__ == "__main__":
     sys.path.insert(0, "../../")
-from tools.db.mysql import DatabaseInterface
-from tools import colortext
-from tools.fs.fsio import read_file, write_file
-from tools.bio.pfam import Pfam
-from tools.bio.sifts import SIFTS
-from tools.bio.pdb import PDB
+from klab.db.mysql import DatabaseInterface
+from klab import colortext
+from klab.fs.fsio import read_file, write_file
+from klab.bio.pfam import Pfam
+from klab.bio.sifts import SIFTS
+from klab.bio.pdb import PDB
 
 installed_database = 'SCOPe205' # rename this to the new database name on updates
 installed_database_version = '2.05' # rename this to the new database version on updates

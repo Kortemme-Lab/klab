@@ -14,7 +14,7 @@ from fasta import FASTA
 from pdb import PDB, PDBMissingMainchainAtomsException, ROSETTA_HACKS_residues_to_remove
 from pdbml import PDBML
 from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
-from tools import colortext
+from klab import colortext
 from basics import Sequence, SequenceMap, UniParcPDBSequenceMap
 from sifts import SIFTS, MissingSIFTSRecord, BadSIFTSMapping, NoSIFTSPDBUniParcMapping
 

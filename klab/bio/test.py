@@ -4,9 +4,9 @@ import traceback
 import commands
 import gc
 
-from tools.bio.pdb import PDB
-from tools.fs.fsio import read_file
-from tools import colortext
+from klab.bio.pdb import PDB
+from klab.fs.fsio import read_file
+from klab import colortext
 
 from pdbml import PDBML, PDBML_slow
 from uniprot import pdb_to_uniparc

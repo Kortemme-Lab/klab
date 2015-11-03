@@ -1,4 +1,4 @@
-from tools import colortext
+from klab import colortext
 
 # Test
 chars = 'A'

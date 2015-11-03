@@ -16,9 +16,9 @@ import shlex
 if __name__ == '__main__':
     sys.path.insert(0, '../..')
 
-from tools import colortext
-from tools.fs.fsio import open_temp_file, read_file
-from tools.process import Popen as _Popen
+from klab import colortext
+from klab.fs.fsio import open_temp_file, read_file
+from klab.process import Popen as _Popen
 
 
 

@@ -19,11 +19,11 @@ from xml.dom.minidom import parse, parseString
 
 if __name__ == '__main__':
     sys.path.insert(0, "../..")
-from tools.comms.http import get as http_get
-from tools import colortext
-from tools.hash import CRC64
-from tools.fs.fsio import read_file, write_file
-from tools.bio.uniprot_patches import * # UniParcMergedSubmittedNamesRemap, UniParcMergedRecommendedNamesRemap, clashing_subsections_for_removal, subsections_for_addition, AC_entries_where_we_ignore_the_subsections, overlapping_subsections_for_removal, PDBs_marked_as_XRay_with_no_resolution
+from klab.comms.http import get as http_get
+from klab import colortext
+from klab.hash import CRC64
+from klab.fs.fsio import read_file, write_file
+from klab.bio.uniprot_patches import * # UniParcMergedSubmittedNamesRemap, UniParcMergedRecommendedNamesRemap, clashing_subsections_for_removal, subsections_for_addition, AC_entries_where_we_ignore_the_subsections, overlapping_subsections_for_removal, PDBs_marked_as_XRay_with_no_resolution
 
 class ProteinSubsectionOverlapException(colortext.Exception): pass
 class UniParcEntryStandardizationException(colortext.Exception): pass

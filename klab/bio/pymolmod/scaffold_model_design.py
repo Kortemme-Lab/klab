@@ -8,8 +8,8 @@ Created by Shane O'Connor 2014.
 The PyMOL commands are adapted from scripts developed and written by Roland A. Pache, Ph.D., Copyright (C) 2012, 2013.
 """
 
-from tools.fs.fsio import write_file
-from tools import colortext
+from klab.fs.fsio import write_file
+from klab import colortext
 from psebuilder import PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
 
 # Notes:

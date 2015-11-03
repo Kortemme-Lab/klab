@@ -18,14 +18,14 @@ import glob
 import getpass
 import json
 from utils import LogFile, colorprinter
-from tools.cluster.cluster_interface import JobInitializationException
+from klab.cluster.cluster_interface import JobInitializationException
 
-from tools import colortext
-from tools.rosetta.input_files import LoopsFile, SecondaryStructureDefinition
-from tools.fs.fsio import read_file, write_temp_file
-from tools.bio.pdb import PDB
-from tools.bio.rcsb import retrieve_pdb
-from tools.general.strutil import parse_range_pairs
+from klab import colortext
+from klab.rosetta.input_files import LoopsFile, SecondaryStructureDefinition
+from klab.fs.fsio import read_file, write_temp_file
+from klab.bio.pdb import PDB
+from klab.bio.rcsb import retrieve_pdb
+from klab.general.strutil import parse_range_pairs
 
 #################
 #  Configuration

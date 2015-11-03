@@ -8,7 +8,7 @@ Created by Shane O'Connor 2015
 """
 
 import json
-from tools.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
+from klab.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
 
 class OAuthCredentials(NestedBunch):
 

@@ -23,8 +23,8 @@ import urllib2
 from xml.dom.minidom import parse, parseString
 
 from doi import DOI
-from tools.comms.http import get_resource
-from tools import colortext
+from klab.comms.http import get_resource
+from klab import colortext
 
 converter_types = ['pmcid', 'pmid', 'mid', 'doi']
 

@@ -24,9 +24,9 @@ import pytz
 from apiclient.discovery import build
 from oauth2client.client import SignedJwtAssertionCredentials
 
-from tools.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
-from tools.fs.fsio import read_file
-from tools import colortext
+from klab.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
+from klab.fs.fsio import read_file
+from klab import colortext
 from gauth import OAuthCredentials
 
 class BasicEvent(object):

@@ -20,19 +20,19 @@ import math
 import numpy
 import json
 
-from tools import colortext
-from tools.bio import rcsb
-from tools.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_1to3_map, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
-from tools.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
-from tools.bio.pdb import PDB
-from tools.bio.fasta import FASTA
-from tools.bio.bonsai import Bonsai
-from tools.fs.fsio import read_file, write_file
-from tools.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
-from tools.pymath.stats import get_mean_and_standard_deviation
-from tools.pymath.cartesian import spatialhash
-from tools.rosetta.input_files import LoopsFile
-from tools.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
+from klab import colortext
+from klab.bio import rcsb
+from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_1to3_map, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
+from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from klab.bio.pdb import PDB
+from klab.bio.fasta import FASTA
+from klab.bio.bonsai import Bonsai
+from klab.fs.fsio import read_file, write_file
+from klab.general.strutil import remove_trailing_line_whitespace as normalize_pdb_file
+from klab.pymath.stats import get_mean_and_standard_deviation
+from klab.pymath.cartesian import spatialhash
+from klab.rosetta.input_files import LoopsFile
+from klab.rosetta.map_pdb_residues import get_pdb_contents_to_pose_residue_map
 
 
 class Spackler(Bonsai):

@@ -4,7 +4,7 @@ import inspect
 import subprocess
 import time
 
-from tools.fs.fsio import read_file, write_temp_file
+from klab.fs.fsio import read_file, write_temp_file
 
 class RInterface(object):
 

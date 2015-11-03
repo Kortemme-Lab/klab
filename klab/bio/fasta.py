@@ -14,8 +14,8 @@ if __name__ == '__main__':
     import sys
     sys.path.insert(0, '../..')
 
-from tools import colortext
-from tools.fs.fsio import read_file, write_file
+from klab import colortext
+from klab.fs.fsio import read_file, write_file
 import rcsb
 from basics import Sequence
 

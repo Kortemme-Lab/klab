@@ -16,14 +16,14 @@ sys.path.insert(0, '../../..')
 if __name__ == '__main__':
     sys.path.insert(0, '../..')
 
-from tools import colortext
-from tools.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
-from tools.bio.pymolmod.scaffold_model_design import ScaffoldModelDesignBuilder
-from tools.bio.pdb import PDB
-from tools.bio.clustalo import SequenceAligner
-from tools.bio.basics import residue_type_1to3_map
-from tools.fs.fsio import write_file
-from tools.bio.pdb import PDBParsingException, NonCanonicalResidueException, PDBValidationException
+from klab import colortext
+from klab.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
+from klab.bio.pymolmod.scaffold_model_design import ScaffoldModelDesignBuilder
+from klab.bio.pdb import PDB
+from klab.bio.clustalo import SequenceAligner
+from klab.bio.basics import residue_type_1to3_map
+from klab.fs.fsio import write_file
+from klab.bio.pdb import PDBParsingException, NonCanonicalResidueException, PDBValidationException
 
 class ChainMatchingException(Exception): pass
 
@@ -995,7 +995,7 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
 
 
 if __name__ == '__main__':
-    from tools.fs.fsio import read_file
+    from klab.fs.fsio import read_file
 
     from rcsb import retrieve_pdb
 

@@ -12,9 +12,9 @@ import pprint
 
 if __name__ == "__main__":
     sys.path.insert(0, "../../")
-from tools.db.mysql import DatabaseInterface
-from tools import colortext
-from tools.fs.fsio import read_file
+from klab.db.mysql import DatabaseInterface
+from klab import colortext
+from klab.fs.fsio import read_file
 
 
 pdb_to_pfam_mapping_file = '/kortemmelab/shared/mirror/SIFTS/pdb_chain_pfam.tsv.gz'
