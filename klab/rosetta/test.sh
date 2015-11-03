@@ -2,7 +2,7 @@
 
 # Script to compile and run all tests for two specified Rosetta revisions
 # This script expects to live in your "Rosetta" directory, at the same level
-#   as main, tools, demos, etc.
+#   as main, klab, demos, etc.
 # Symlink this version controlled version into your Rosetta directory to
 #  keep it always up to date
 # Two arguments:
