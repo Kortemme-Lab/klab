@@ -43,7 +43,7 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
        with 76% identity. If chain_id1_in_pdb2 is the best match and multiple_match_error_margin >= 2, chain_id2_in_pdb2 will
        also be returned.
 
-       Parameters: pdb1 and pdb2 are PDB objects from tools.bio.pdb. pdb1_name and pdb2_name are strings describing the
+       Parameters: pdb1 and pdb2 are PDB objects from klab.bio.pdb. pdb1_name and pdb2_name are strings describing the
         structures e.g. 'Model' and 'Scaffold'. cut_off is used in the matching to discard low-matching chains.
 
        If use_seqres_sequences_if_possible is set, we will use the SEQRES sequences for the mapping when those sequences
