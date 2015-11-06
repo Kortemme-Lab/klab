@@ -29,6 +29,7 @@ import sys
 import os
 import types
 import string
+import pprint
 import types
 
 # Only certain functions rely on the pandas library
@@ -215,7 +216,7 @@ allowed_record_types = set([
 'CAVEAT', #     Severe error indicator.
 'COMPND', #     Description of macromolecular contents of the entry.
 'EXPDTA', #     Experimental technique used for the structure determination.
-'MDLTYP', #     Contains additional annotation  pertinent to the coordinates presented  in the entry.
+'MDLTYP', #     Contains additional annotation pertinent to the coordinates presented in the entry.
 'KEYWDS', #     List of keywords describing the macromolecule.
 'OBSLTE', #     Statement that the entry has been removed from distribution and list of the ID code(s) which replaced it.
 'SOURCE', #     Biological source of macromolecules in the entry.
@@ -252,6 +253,10 @@ allowed_record_types = set([
 'JRNL  ', #     Literature citation that defines the coordinate set.
 'REMARK', #     General remarks; they can be structured or free form.
 ])
+
+coordinate_record_types = ['HETATM', 'ATOM', 'ANISOU']
+chain_record_types = coordinate_record_types + ['TER']
+non_header_records = set(['ATOM', 'ANISOU', 'TER', 'HETATM', 'MODEL', 'ENDMDL'])
 
 # This set is probably safer to use to allow backwards compatibility
 all_record_types = allowed_record_types.union(set(order_of_records))
@@ -488,6 +493,36 @@ class PDB:
 
     ### Class functions ###
 
+
+    @staticmethod
+    def replace_headers(source_pdb_content, target_pdb_content):
+        '''Takes the headers from source_pdb_content and adds them to target_pdb_content, removing any headers that
+           target_pdb_content had.
+           Only the content up to the first structural line are taken from source_pdb_content and only the content from
+           the first structural line in target_pdb_content are taken.
+           '''
+        s = PDB(source_pdb_content)
+        t = PDB(target_pdb_content)
+
+        source_headers = []
+        for l in s.lines:
+            if l[:6].strip() in non_header_records:
+                break
+            else:
+                source_headers.append(l)
+
+        target_body = []
+        in_header = True
+        for l in t.lines:
+            if l[:6].strip() in non_header_records:
+                in_header = False
+            if not in_header:
+                target_body.append(l)
+
+        return '\n'.join(source_headers + target_body)
+
+
+
     @staticmethod
     def from_filepath(filepath, strict = True):
         '''A function to replace the old constructor call where a filename was passed in.'''
@@ -689,6 +724,7 @@ class PDB:
         else:
             raise Exception('The chains argument needs to be supplied.')
 
+
     def strip_HETATMs(self, only_strip_these_chains = []):
         '''Throw away all HETATM lines. If only_strip_these_chains is specified then only strip HETATMs lines for those chains.'''
         if only_strip_these_chains:
@@ -697,6 +733,7 @@ class PDB:
             self.lines = [l for l in self.lines if not(l.startswith('HETATM'))]
         self._update_structure_lines()
         # todo: this logic should be fine if no other member elements rely on these lines e.g. residue mappings otherwise we need to update those elements here
+
 
     def generate_all_point_mutations_for_chain(self, chain_id):
         mutations = []
@@ -711,6 +748,68 @@ class PDB:
                     if mut_aa != r.ResidueAA:
                         mutations.append(ChainMutation(r.ResidueAA, r.ResidueID, mut_aa, Chain = chain_id))
         return mutations
+
+
+    def generate_all_paired_mutations_for_position(self, chain_ids, residue_ids_to_ignore = [], typed_residue_ids_to_ignore = [], silent = True):
+        '''Generates a set of mutations for the chains in chain_ids where each set corresponds to the same residue ID in
+           both chains and where the wildtype residues match.
+             e.g. if chain A and B both have K19 then the set of mutations K19A, ... K19I, K19L, K19Y will be included in
+                  in the returned results unless 19 is in residue_ids_to_ignore or typed_residue_ids_to_ignore.
+           residue_ids_to_ignore should be a list/set of residue IDs.
+           typed_residue_ids_to_ignore should be a dict residue ID -> residue AA. It is used similarly to residue_ids_to_ignore
+           but we also assert that the residue types match the sequences in the chains.
+
+           This function is useful in certain cases e.g. generating a set of mutations where we make the same mutation in
+           both chains of a homodimer or a quasi-homodimer (where we only mutate the positions which agree).
+           '''
+
+        residue_ids_to_ignore = set([str(r).strip() for r in residue_ids_to_ignore])
+        for k, v in typed_residue_ids_to_ignore.iteritems():
+            typed_residue_ids_to_ignore[k] = v.strip()
+
+        # todo: there seems to be a bug with negative residue IDs - see 3NOB, chain A
+        #       the order element has A  -1 but the sequence element is missing this residue
+
+        assert(len(chain_ids) > 0)
+        mutations = []
+        if sorted(set(self.atom_sequences.keys()).intersection(set(chain_ids))) == sorted(chain_ids):
+            aas = sorted(residue_type_3to1_map.values())
+            aas.remove('X')
+            sequence = self.atom_sequences[chain_ids[0]]
+            for res_id in sequence.order:
+                sres_id = str(res_id)[1:].strip()
+                skip = sres_id in residue_ids_to_ignore
+                if not skip and sres_id in typed_residue_ids_to_ignore:
+                    for c in chain_ids:
+                        chain_res_id = c + res_id[1:]
+                        if chain_res_id in self.atom_sequences[c].sequence:
+                            if not typed_residue_ids_to_ignore[sres_id] == self.atom_sequences[c][chain_res_id].ResidueAA:
+                                raise Exception('Expected to find {0} at residue {1} but found {2} in chain {3} at this position.'.format(typed_residue_ids_to_ignore[sres_id], sres_id, self.atom_sequences[c][chain_res_id].ResidueAA, c))
+                            skip = True
+                if skip:
+                    if not silent:
+                        print('Skipping residue {0} as requested.'.format(res_id))
+                    continue
+
+                for c in chain_ids:
+                    if (c + res_id[1:]) not in self.atom_sequences[c].sequence:
+                        if not silent:
+                            print('Skipping residue {0} as it is missing from chain {1}.'.format(res_id, c))
+                            skip = True
+                if skip:
+                    continue
+
+                chain_res_aas = set([self.atom_sequences[c][c + res_id[1:]].ResidueAA for c in chain_ids if (c + res_id[1:]) in self.atom_sequences[c].sequence])
+                if len(chain_res_aas) > 1:
+                    if not silent:
+                        colortext.warning('Skipping residue {0} as the amino acid type differs between the specified chains.'.format(res_id))
+                    continue
+                wt_aa = chain_res_aas.pop()
+                for mut_aa in aas:
+                    if mut_aa != wt_aa:
+                        mutations.append([ChainMutation(wt_aa, sres_id, mut_aa, Chain = c) for c in chain_ids])
+        return mutations
+
 
     ### FASTA functions ###
 
