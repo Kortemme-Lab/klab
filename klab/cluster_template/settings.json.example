@@ -1,0 +1,6 @@
+{
+    "local_rosetta_installation_path"   : "/home/me/rosetta",
+    "cluster_rosetta_installation_path" : "/cluster/home/me/rosetta",
+    "local_rosetta_binary_type"               : ".linuxgccrelease"
+    "cluster_rosetta_binary_type"               : ".linuxgccrelease"
+}

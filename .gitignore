@@ -4,3 +4,4 @@ pw
 *.pyc
 dbpwd
 dist/*
+klab.egg-info
