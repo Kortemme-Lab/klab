@@ -152,15 +152,6 @@ class DatabaseInterface(object):
         return self.execute(sql, parameters=parameters, quiet=quiet, locked=True, do_commit=True)
 
 
-    #def transaction_insert_dict(self, transaction_cursor, tblname, d, unique_id_fields = [], id_field = 'ID', fields = None, check_existing = False):
-        #id_string = d[id_field]
-        #sql, params, record_exists = self.create_insert_dict_string(tblname, d, PKfields=unique_id_fields, fields=fields, check_existing = check_existing)
-        #if not record_exists:
-        #    transaction_cursor.execute(sql, params)
-        #print('transaction_cursor.lastrowid', type(transaction_cursor.lastrowid))
-        #return self.get_unique_record('SELECT ID FROM {0} WHERE {1}=%s'.format(tblname, id_field), parameters=(id_string,))[id_field]
-
-
     def transaction_insert_dict_auto_inc(self, transaction_cursor, tblname, d, unique_id_fields = [], fields = None, check_existing = False, id_field = 'ID'):
         '''A transaction wrapper for inserting dicts into fields with an autoincrementing ID. Insert the record and return the associated ID (long).'''
         sql, params, record_exists = self.create_insert_dict_string(tblname, d, PKfields=unique_id_fields, fields=fields, check_existing = check_existing)
