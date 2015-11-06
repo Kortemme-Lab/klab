@@ -152,15 +152,45 @@ class DatabaseInterface(object):
         return self.execute(sql, parameters=parameters, quiet=quiet, locked=True, do_commit=True)
 
 
-    def execute_select(self, sql, parameters=None, quiet=False, locked=False):
+    #def transaction_insert_dict(self, transaction_cursor, tblname, d, unique_id_fields = [], id_field = 'ID', fields = None, check_existing = False):
+        #id_string = d[id_field]
+        #sql, params, record_exists = self.create_insert_dict_string(tblname, d, PKfields=unique_id_fields, fields=fields, check_existing = check_existing)
+        #if not record_exists:
+        #    transaction_cursor.execute(sql, params)
+        #print('transaction_cursor.lastrowid', type(transaction_cursor.lastrowid))
+        #return self.get_unique_record('SELECT ID FROM {0} WHERE {1}=%s'.format(tblname, id_field), parameters=(id_string,))[id_field]
+
+
+    def transaction_insert_dict_auto_inc(self, transaction_cursor, tblname, d, unique_id_fields = [], fields = None, check_existing = False, id_field = 'ID'):
+        '''A transaction wrapper for inserting dicts into fields with an autoincrementing ID. Insert the record and return the associated ID (long).'''
+        sql, params, record_exists = self.create_insert_dict_string(tblname, d, PKfields=unique_id_fields, fields=fields, check_existing = check_existing)
+        if not record_exists:
+            transaction_cursor.execute(sql, params)
+        id = transaction_cursor.lastrowid
+        if id == None:
+            id = self.get_unique_record('SELECT * FROM {0} WHERE {1}'.format(tblname, ' AND '.join([f + '=%s' for f in unique_id_fields])), parameters = tuple([d[f] for f in unique_id_fields]))[id_field]
+        assert(id)
+        return id
+
+
+    def get_unique_record(self, sql, parameters = None, quiet = False, locked = False):
+        '''I use this pattern a lot. Return the single record corresponding to the query.'''
+        results = self.execute_select(sql, parameters = parameters, quiet = quiet, locked = locked)
+        assert(len(results) == 1)
+        return results[0]
+
+
+    def execute_select(self, sql, parameters = None, quiet = False, locked = False):
         return self.execute(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
 
 
     def execute_select_StdCursor(self, sql, parameters=None, quiet=False, locked=False):
         return self.execute_StdCursor(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
 
+
     def execute_select_SSDictCursor(self, sql, parameters=None, quiet=False, locked=False):
         return self.execute_SSDictCursor(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
+
 
     def execute_SSDictCursor(self, sql, parameters=None, quiet=False, locked=False, do_commit=True):
         """Execute SQL query. This uses DictCursor by default."""
