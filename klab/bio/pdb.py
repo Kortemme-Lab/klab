@@ -773,9 +773,6 @@ class PDB(object):
         for k, v in typed_residue_ids_to_ignore.iteritems():
             typed_residue_ids_to_ignore[k] = v.strip()
 
-        # todo: there seems to be a bug with negative residue IDs - see 3NOB, chain A
-        #       the order element has A  -1 but the sequence element is missing this residue
-
         assert(len(chain_ids) > 0)
         first_chain = chain_ids[0]
         mutations = []
