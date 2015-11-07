@@ -373,7 +373,7 @@ class JRNL(object):
             self.d["DOI"] = None
 
 
-class PDB:
+class PDB(object):
     """A class to store and manipulate PDB data"""
 
     ### Constructor ###
@@ -750,14 +750,20 @@ class PDB:
         return mutations
 
 
-    def generate_all_paired_mutations_for_position(self, chain_ids, residue_ids_to_ignore = [], typed_residue_ids_to_ignore = [], silent = True):
-        '''Generates a set of mutations for the chains in chain_ids where each set corresponds to the same residue ID in
-           both chains and where the wildtype residues match.
+    def generate_all_paired_mutations_for_position(self, chain_ids, chain_sequence_mappings = {}, residue_ids_to_ignore = [], typed_residue_ids_to_ignore = [], silent = True):
+        '''Generates a set of mutations for the chains in chain_ids where each set corresponds to the "same" residue (see
+           below) in both chains and where the wildtype residues match.
              e.g. if chain A and B both have K19 then the set of mutations K19A, ... K19I, K19L, K19Y will be included in
                   in the returned results unless 19 is in residue_ids_to_ignore or typed_residue_ids_to_ignore.
            residue_ids_to_ignore should be a list/set of residue IDs.
            typed_residue_ids_to_ignore should be a dict residue ID -> residue AA. It is used similarly to residue_ids_to_ignore
            but we also assert that the residue types match the sequences in the chains.
+
+           By default, "same residue" is inferred by residue ID i.e. the generation assumes that a residue with some ID
+           in one chain corresponds to the residue with the same ID in another chain. If this is not true then a mapping
+           between chain residues is necessary and should be provided using the chain_sequence_mappings parameter.
+           chain_sequence_mappings should be a dict from pairs of chain IDs to SequenceMap objects. As all sequences are
+           compared with the first chain in chain_ids, only mappings from that first chain to any other chain are used.
 
            This function is useful in certain cases e.g. generating a set of mutations where we make the same mutation in
            both chains of a homodimer or a quasi-homodimer (where we only mutate the positions which agree).
@@ -771,19 +777,26 @@ class PDB:
         #       the order element has A  -1 but the sequence element is missing this residue
 
         assert(len(chain_ids) > 0)
+        first_chain = chain_ids[0]
         mutations = []
         if sorted(set(self.atom_sequences.keys()).intersection(set(chain_ids))) == sorted(chain_ids):
             aas = sorted(residue_type_3to1_map.values())
             aas.remove('X')
-            sequence = self.atom_sequences[chain_ids[0]]
+            sequence = self.atom_sequences[first_chain]
             for res_id in sequence.order:
+                chain_res_ids = {}
+                for c in chain_ids:
+                    chain_res_ids[c] = c + res_id[1:]
+                    if c != first_chain and chain_sequence_mappings.get((first_chain, c)):
+                        chain_res_ids[c] = chain_sequence_mappings[(first_chain, c)][res_id]
+
                 sres_id = str(res_id)[1:].strip()
                 skip = sres_id in residue_ids_to_ignore
+
                 if not skip and sres_id in typed_residue_ids_to_ignore:
                     for c in chain_ids:
-                        chain_res_id = c + res_id[1:]
-                        if chain_res_id in self.atom_sequences[c].sequence:
-                            if not typed_residue_ids_to_ignore[sres_id] == self.atom_sequences[c][chain_res_id].ResidueAA:
+                        if chain_res_ids[c] in self.atom_sequences[c].sequence:
+                            if not typed_residue_ids_to_ignore[sres_id] == self.atom_sequences[c][chain_res_ids[c]].ResidueAA:
                                 raise Exception('Expected to find {0} at residue {1} but found {2} in chain {3} at this position.'.format(typed_residue_ids_to_ignore[sres_id], sres_id, self.atom_sequences[c][chain_res_id].ResidueAA, c))
                             skip = True
                 if skip:
@@ -792,14 +805,14 @@ class PDB:
                     continue
 
                 for c in chain_ids:
-                    if (c + res_id[1:]) not in self.atom_sequences[c].sequence:
+                    if (chain_res_ids[c]) not in self.atom_sequences[c].sequence:
                         if not silent:
                             print('Skipping residue {0} as it is missing from chain {1}.'.format(res_id, c))
                             skip = True
                 if skip:
                     continue
 
-                chain_res_aas = set([self.atom_sequences[c][c + res_id[1:]].ResidueAA for c in chain_ids if (c + res_id[1:]) in self.atom_sequences[c].sequence])
+                chain_res_aas = set([self.atom_sequences[c][chain_res_ids[c]].ResidueAA for c in chain_ids if chain_res_ids[c] in self.atom_sequences[c].sequence])
                 if len(chain_res_aas) > 1:
                     if not silent:
                         colortext.warning('Skipping residue {0} as the amino acid type differs between the specified chains.'.format(res_id))
@@ -807,8 +820,10 @@ class PDB:
                 wt_aa = chain_res_aas.pop()
                 for mut_aa in aas:
                     if mut_aa != wt_aa:
-                        mutations.append([ChainMutation(wt_aa, sres_id, mut_aa, Chain = c) for c in chain_ids])
-        return mutations
+                        mutations.append([ChainMutation(wt_aa, str(chain_res_ids[c])[1:].strip(), mut_aa, Chain = c) for c in chain_ids])
+            return mutations
+        else:
+            raise Exception('Chain(s) {0} could not be found in the PDB file.'.format(', '.join(sorted(set(chain_ids).difference(set(self.atom_sequences.keys()))))))
 
 
     ### FASTA functions ###
