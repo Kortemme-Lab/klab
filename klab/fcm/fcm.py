@@ -296,5 +296,65 @@ def mean_confidence_interval(data, confidence=0.95):
     h = se * scipy.stats.t._ppf((1+confidence)/2., n-1)
     return m, m-h, m+h
 
+def make_gating_fig(plate_list, gate_val, gate_name, fig_dir):
+    gating_fig = plt.figure(figsize=(len(plate_list)*9, 11), dpi=600)
+    gated_plates_for_return = []
+    gating_axes = []
+    mean_diffs = {}
+    for plate_num, exp in enumerate(plate_list):
+        nonblank_samples = list(exp.all_position_set)
+        if len(gating_axes) >= 1:
+            ax = gating_fig.add_subplot(1, len(plate_list), plate_num+1, sharey=gating_axes[0])
+        else:
+            ax = gating_fig.add_subplot(1, len(plate_list), plate_num+1)
+        gating_axes.append(ax)
+        ax.set_title(exp.name)
+
+        if gate_name.startswith('fsc'):
+            gate = ThresholdGate(gate_val, 'FSC-A', region='above')
+        elif gate_name.startswith('poly'):
+            all_exp_data_fsc = []
+            all_exp_data_ssc = []
+            for i, nonblank_sample in enumerate(nonblank_samples):
+                if not fast_run:
+                    exp.samples[nonblank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color=np.random.rand(3,1), s=1, alpha=0.1, ax=ax)
+                all_exp_data_fsc.append( exp.samples[nonblank_sample].data['FSC-A'] )
+                all_exp_data_ssc.append( exp.samples[nonblank_sample].data['SSC-A'] )
+
+            gate_m, gate_b = fcm.find_perpendicular_gating_line( np.concatenate(all_exp_data_fsc), np.concatenate(all_exp_data_ssc), gate_val)
+
+            fsc_ssc_axis_limits = (-50000, 100000)
+
+            x_max = np.amax(np.concatenate(all_exp_data_fsc))
+            x_min = np.amin(np.concatenate(all_exp_data_fsc))
+            y_max = np.amax(np.concatenate(all_exp_data_ssc))
+            y_min = np.amin(np.concatenate(all_exp_data_ssc))
+            ax.set_ylim(fsc_ssc_axis_limits)
+            ax.set_xlim(fsc_ssc_axis_limits)
+            fudge = 1.0
+            polygon_xs = [x_min-fudge, x_min-fudge, (y_min-gate_b)/float(gate_m), x_max+fudge, x_max+fudge]
+            polygon_ys = [y_max+fudge, gate_m*x_min+gate_b, y_min-fudge, y_min-fudge, y_max+fudge]
+            gate = PolyGate(np.array([[x,y] for x, y in zip(polygon_xs, polygon_ys)]), ['FSC-A', 'SSC-A'], region='in', name='polygate')
+
+        for i, blank_sample in enumerate(blank_samples):
+            if i == 0:
+                exp.samples[blank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color='red', s=2, alpha=1.0/float(len(blank_samples)), gates=[gate], label='Blank media', ax=ax)
+            else:
+                if not fast_run:
+                    exp.samples[blank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color='red', s=2, alpha=1.0/float(len(blank_samples)), gates=[gate], ax=ax)
+        exp.gate(gate)
+        gated_plates_for_return.append(exp)
+
+        ax.grid(True)
+        if len(blank_samples) > 0:
+            ax.legend()
+
+    gating_fig.savefig(os.path.join(fig_dir, 'gates.png'))
+    gating_fig.clf()
+    plt.close(gating_fig)
+    del gating_fig
+
+    return gated_plates_for_return
+
 if __name__ == '__main__':
     output_medians_and_sums()
