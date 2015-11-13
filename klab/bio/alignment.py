@@ -856,13 +856,18 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
 
 class ScaffoldModelChainMapper(PipelinePDBChainMapper):
     '''A convenience class for the special case where we are mapping specifically from a model structure to a scaffold structure and a design structure.'''
-    def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
+
+
+    def __init__(self, scaffold_pdb, model_pdb, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True, structure_1_name = None, structure_2_name = None):
         self.scaffold_pdb = scaffold_pdb
         self.model_pdb = model_pdb
-        super(ScaffoldModelChainMapper, self).__init__([scaffold_pdb, model_pdb], ['Scaffold', 'Model'], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
+        self.structure_1_name = structure_1_name or 'Scaffold'
+        self.structure_2_name = structure_2_name or 'Model'
+        super(ScaffoldModelChainMapper, self).__init__([scaffold_pdb, model_pdb], [self.structure_1_name, self.structure_2_name], cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
+
 
     @staticmethod
-    def from_file_paths(scaffold_pdb_path, model_pdb_path, cut_off = 60.0, strict = True):
+    def from_file_paths(scaffold_pdb_path, model_pdb_path, cut_off = 60.0, strict = True, structure_1_name = None, structure_2_name = None):
         try:
             stage = 'scaffold'
             scaffold_pdb = PDB.from_filepath(scaffold_pdb_path, strict = strict)
@@ -871,10 +876,11 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
             raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
-        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict)
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict, structure_1_name = structure_1_name, structure_2_name = structure_2_name)
+
 
     @staticmethod
-    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0, strict = True):
+    def from_file_contents(scaffold_pdb_contents, model_pdb_contents, cut_off = 60.0, strict = True, structure_1_name = None, structure_2_name = None):
         try:
             stage = 'scaffold'
             scaffold_pdb = PDB(scaffold_pdb_contents, strict = strict)
@@ -883,13 +889,14 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
         except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
             raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
 
-        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict)
+        return ScaffoldModelChainMapper(scaffold_pdb, model_pdb, cut_off = cut_off, strict = strict, structure_1_name = structure_1_name, structure_2_name = structure_2_name)
+
 
     def get_differing_model_residue_ids(self):
-        return self.get_differing_atom_residue_ids('Model', ['Scaffold'])
+        return self.get_differing_atom_residue_ids(self.structure_2_name, [self.structure_1_name])
 
     def get_differing_scaffold_residue_ids(self):
-        return self.get_differing_atom_residue_ids('Scaffold', ['Model'])
+        return self.get_differing_atom_residue_ids(self.structure_1_name, [self.structure_2_name])
 
     def generate_pymol_session(self, pymol_executable = 'pymol', settings = {}):
         ''' Generates the PyMOL session for the scaffold, model, and design structures.
@@ -897,8 +904,8 @@ class ScaffoldModelChainMapper(PipelinePDBChainMapper):
         b = BatchBuilder(pymol_executable = pymol_executable)
 
         structures_list = [
-            ('Scaffold', self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
-            ('Model', self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
+            (self.structure_1_name, self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
+            (self.structure_2_name, self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
         ]
 
         PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
