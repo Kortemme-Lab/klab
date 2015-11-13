@@ -286,7 +286,7 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
                 continue
             x=os.path.abspath(os.path.join(d, x))
             if os.path.isfile(x):
-                if x.endswith('.pdb'):
+                if x.endswith('.pdb') or x.endswith('score.sc') or x.endswith('.db3'):
                     x=zip_file(x)
                 shutil.copy(x, copy_to_dir)
                 os.remove(x)
