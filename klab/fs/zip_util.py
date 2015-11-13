@@ -21,3 +21,14 @@ def zip_file_with_gzip(file_path):
     zipped_path = file_path + '.gz'
     assert( os.path.isfile(zipped_path) )
     return zipped_path
+
+def unzip_file(file_path):
+    if os.path.isfile(file_path) and file_path.endswith('.gz'):
+        f_in = gzip.open(file_path,'rb')
+        f_out_name = file_path[:-3]
+        f_out = open(f_out_name, 'wb')
+        f_out.writelines(f_in)
+        f_out.close()
+        f_in.close()
+        os.remove(file_path)
+        return f_out_name
