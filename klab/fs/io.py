@@ -10,6 +10,10 @@ import gzip
 
 # Note: I should use the same convention for all methods here but read_file differs. We should really support the whole fopen cstdio spec.
 
+def sanitize_filename(filename):
+    valid_chars = '-_.abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+    return ''.join(c for c in filename if c in valid_chars)
+
 def read_file(filepath, binary = False):
     print filepath
     if binary:
