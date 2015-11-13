@@ -36,9 +36,8 @@ from klab.benchmarking.analysis.ddg_monomeric_stability_analysis import DBBenchm
 
 class DBBenchmarkRun(GenericDBBenchmarkRun):
 
-    def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id):
+    def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id, additional_prediction_data_columns):
         '''Create a dataframe row for a prediction.'''
-
         record = dataset_cases[record_id]
         for m in record['PDBMutations']:
             assert('DSSPSimpleSSType' not in m)
@@ -46,7 +45,7 @@ class DBBenchmarkRun(GenericDBBenchmarkRun):
             m['DSSPType'] = m['ComplexDSSP']
             m['DSSPExposure'] = m['ComplexExposure']
 
-        dataframe_record = super(DBBenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
+        dataframe_record = super(DBBenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id, additional_prediction_data_columns)
         # add columns
         return dataframe_record
 

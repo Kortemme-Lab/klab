@@ -80,7 +80,8 @@ class BenchmarkRun(ReportingObject):
 
     def __init__(self, benchmark_run_name, dataset_cases, analysis_data, contains_experimental_data = True, benchmark_run_directory = None, use_single_reported_value = False,
                  description = None, dataset_description = None, credit = None, take_lowest = 3, generate_plots = True, report_analysis = True, include_derived_mutations = False, recreate_graphs = False, silent = False, burial_cutoff = 0.25,
-                 stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False, store_data_on_disk = True, misc_dataframe_attributes = {}):
+                 stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False, store_data_on_disk = True, misc_dataframe_attributes = {},
+                 terminal_width = 200):
 
         self.contains_experimental_data = contains_experimental_data
         self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
@@ -91,6 +92,7 @@ class BenchmarkRun(ReportingObject):
             self.csv_headers.remove('AbsoluteError')
             self.csv_headers.remove('StabilityClassification')
 
+        self.terminal_width = terminal_width # Used for printing the dataframe to a terminal. Set this to be less than the width of your terminal in columns.
         self.amino_acid_details, self.CAA, self.PAA, self.HAA = BenchmarkRun.get_amino_acid_details()
         self.benchmark_run_name = benchmark_run_name
         self.benchmark_run_directory = benchmark_run_directory
@@ -128,6 +130,12 @@ class BenchmarkRun(ReportingObject):
             self.analysis_csv_input_filepath, self.analysis_json_input_filepath, self.analysis_raw_data_input_filepath, self.analysis_pandas_input_filepath = None, None, None, None
         self.use_existing_benchmark_data = use_existing_benchmark_data
         self.ddg_analysis_type_description = None
+
+
+    def __repr__(self):
+        '''Simple printer - we print the dataframe.'''
+        with pandas.option_context('display.max_rows', None, 'display.max_columns', None, 'display.width', self.terminal_width):
+            return '{0}'.format(self.dataframe)
 
 
     @staticmethod
@@ -335,20 +343,31 @@ class BenchmarkRun(ReportingObject):
             except Exception, e:
                 self.log('input/json/pdbs.json could not be found - PDB-specific analysis cannot be performed.', colortext.error)
 
-        # Create the dataframe
-        res = pandas.DataFrame(columns=(self.csv_headers))
+        # Determine columns specific to the prediction data to be added
+        additional_prediction_data_columns = set()
+        for adv in analysis_data.values():
+            additional_prediction_data_columns = additional_prediction_data_columns.union(set(adv.keys()))
+        assert(len(additional_prediction_data_columns.intersection(set(self.csv_headers))) == 0)
+        assert(self.ddg_analysis_type in additional_prediction_data_columns)
+        additional_prediction_data_columns.remove(self.ddg_analysis_type)
+        additional_prediction_data_columns = sorted(additional_prediction_data_columns)
+
+        # Initialize the dataframe
+        res = pandas.DataFrame(columns=(self.csv_headers + additional_prediction_data_columns))
+        dataframe_columns = self.csv_headers + additional_prediction_data_columns
+        additional_prediction_data_columns = tuple(additional_prediction_data_columns)
 
         # Create the dataframe
         dataframe_table = {}
         indices = []
         for record_id, predicted_data in sorted(analysis_data.iteritems()):
-            dataframe_record = self.get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id)
+            dataframe_record = self.get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id, additional_prediction_data_columns)
             if dataframe_record:
                 indices.append(dataframe_record['DatasetID'])
-                for h in self.csv_headers:
+                for h in dataframe_columns:
                     dataframe_table[h] = dataframe_table.get(h, [])
                     dataframe_table[h].append(dataframe_record[h])
-                assert(sorted(self.csv_headers) == sorted(dataframe_record.keys()))
+                assert(sorted(dataframe_columns) == sorted(dataframe_record.keys()))
         dataframe = pandas.DataFrame(dataframe_table, index = indices)
         self.dataframe = dataframe
 
@@ -396,7 +415,6 @@ class BenchmarkRun(ReportingObject):
         else:
             analysis_pandas_input_filepath = write_temp_file('/tmp', '', ftype = 'wb')
         try:
-            print(self.dataframe)
             analysis_pandas_input_filepath = self.write_dataframe(analysis_pandas_input_filepath)
             dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
             if not self.store_data_on_disk:
@@ -452,7 +470,7 @@ class BenchmarkRun(ReportingObject):
         return len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
 
 
-    def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id):
+    def get_dataframe_row(self, dataset_cases, predicted_data, pdb_data, record_id, additional_prediction_data_columns):
         '''Create a dataframe row for a prediction.'''
 
         # Ignore derived mutations if appropriate
@@ -590,6 +608,8 @@ class BenchmarkRun(ReportingObject):
             NumberOfResidues = self.count_residues(record, pdb_record) or None,
             NumberOfDerivativeErrors = num_derivative_errors,
             )
+        for c in additional_prediction_data_columns:
+            dataframe_record[c] = predicted_data.get(c)
 
         if self.contains_experimental_data:
             # These fields are particular to dataframes containing experimental values e.g. for benchmarking runs or for
