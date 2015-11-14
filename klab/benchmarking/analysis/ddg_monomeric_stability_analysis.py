@@ -342,6 +342,13 @@ class BenchmarkRun(ReportingObject):
                     pdb_data[k.upper()] = v
             except Exception, e:
                 self.log('input/json/pdbs.json could not be found - PDB-specific analysis cannot be performed.', colortext.error)
+        else:
+            # Normalize to upper case to avoid matching problems later
+            new_pdb_data = {}
+            for k, v in pdb_data.iteritems():
+                assert(k.upper() not in new_pdb_data)
+                new_pdb_data[k.upper()] = v
+            pdb_data = new_pdb_data
 
         # Determine columns specific to the prediction data to be added
         additional_prediction_data_columns = set()
