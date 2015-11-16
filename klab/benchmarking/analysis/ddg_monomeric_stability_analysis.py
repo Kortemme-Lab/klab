@@ -1608,8 +1608,10 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def count_residues(self, record, pdb_record):
         NumberOfResidues = 0
-        pdb_chains = set(record['Structure']['Partners']['L'] + record['Structure']['Partners']['R'])
-        assert(len(pdb_chains) > 1) # we expect non-monomeric cases
-        for pdb_chain in pdb_chains:
-            NumberOfResidues += len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
+        try:
+            pdb_chains = set(record['Structure']['Partners']['L'] + record['Structure']['Partners']['R'])
+            assert(len(pdb_chains) > 1) # we expect non-monomeric cases
+            for pdb_chain in pdb_chains:
+                NumberOfResidues += len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
+        except: pass
         return NumberOfResidues
