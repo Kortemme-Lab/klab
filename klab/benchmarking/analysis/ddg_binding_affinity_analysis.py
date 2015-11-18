@@ -41,9 +41,9 @@ class DBBenchmarkRun(GenericDBBenchmarkRun):
         record = dataset_cases[record_id]
         for m in record['PDBMutations']:
             assert('DSSPSimpleSSType' not in m)
-            m['DSSPSimpleSSType'] = dssp_elision[m['ComplexDSSP']]
-            m['DSSPType'] = m['ComplexDSSP']
-            m['DSSPExposure'] = m['ComplexExposure']
+            m['DSSPSimpleSSType'] = dssp_elision.get(m['ComplexDSSP']) or dssp_elision.get(m['MonomericDSSP'])
+            m['DSSPType'] = m.get('ComplexDSSP') or m.get('MonomericDSSP')
+            m['DSSPExposure'] = m.get('ComplexExposure') or m.get('MonomericExposure')
 
         dataframe_record = super(DBBenchmarkRun, self).get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id, additional_prediction_data_columns)
         # add columns

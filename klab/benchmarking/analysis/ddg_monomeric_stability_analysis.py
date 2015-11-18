@@ -342,6 +342,13 @@ class BenchmarkRun(ReportingObject):
                     pdb_data[k.upper()] = v
             except Exception, e:
                 self.log('input/json/pdbs.json could not be found - PDB-specific analysis cannot be performed.', colortext.error)
+        else:
+            # Normalize to upper case to avoid matching problems later
+            new_pdb_data = {}
+            for k, v in pdb_data.iteritems():
+                assert(k.upper() not in new_pdb_data)
+                new_pdb_data[k.upper()] = v
+            pdb_data = new_pdb_data
 
         # Determine columns specific to the prediction data to be added
         additional_prediction_data_columns = set()
@@ -1601,8 +1608,10 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def count_residues(self, record, pdb_record):
         NumberOfResidues = 0
-        pdb_chains = set(record['Structure']['Partners']['L'] + record['Structure']['Partners']['R'])
-        assert(len(pdb_chains) > 1) # we expect non-monomeric cases
-        for pdb_chain in pdb_chains:
-            NumberOfResidues += len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
+        try:
+            pdb_chains = set(record['Structure']['Partners']['L'] + record['Structure']['Partners']['R'])
+            assert(len(pdb_chains) > 1) # we expect non-monomeric cases
+            for pdb_chain in pdb_chains:
+                NumberOfResidues += len(pdb_record.get('Chains', {}).get(pdb_chain, {}).get('Sequence', ''))
+        except: pass
         return NumberOfResidues
