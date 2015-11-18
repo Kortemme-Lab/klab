@@ -38,6 +38,8 @@ class Reporter:
 
     def increment_report(self):
         self.report(self.n + 1)
+    def increment_report_callback(self, cb_value):
+        self.increment_report()
     def decrement_report(self):
         self.report(self.n - 1)
     def add_to_report(self, x):

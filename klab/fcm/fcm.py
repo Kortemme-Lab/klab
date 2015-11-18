@@ -7,8 +7,10 @@ sample_directory = '/home/kyleb/Dropbox/UCSF/cas9/FCS/150916-3.1/kyleb/150916-rf
 rows_in_plate = 'ABCDEFGH'
 cols_in_plate = range(1, 13)
 
-from FlowCytometryTools import FCMeasurement, ThresholdGate
-from FlowCytometryTools.core.gates import CompositeGate
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from FlowCytometryTools import FCMeasurement, PolyGate, ThresholdGate
 import os, FlowCytometryTools
 import pylab as P
 import numpy as np
@@ -147,6 +149,11 @@ class Plate:
         else:
             return self.info_dict[parameter_name][parameter_value].position_set
 
+    def single_well_from_set(self, well_set):
+        well_list = list(well_set)
+        assert( len(well_list) == 1 )
+        return self.samples[well_list[0]]
+    
     @property
     def experimental_parameters(self):
         experimental_parameters = []
@@ -296,7 +303,7 @@ def mean_confidence_interval(data, confidence=0.95):
     h = se * scipy.stats.t._ppf((1+confidence)/2., n-1)
     return m, m-h, m+h
 
-def make_gating_fig(plate_list, gate_val, gate_name, fig_dir):
+def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, blank_samples=[]):
     gating_fig = plt.figure(figsize=(len(plate_list)*9, 11), dpi=600)
     gated_plates_for_return = []
     gating_axes = []
@@ -321,7 +328,7 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir):
                 all_exp_data_fsc.append( exp.samples[nonblank_sample].data['FSC-A'] )
                 all_exp_data_ssc.append( exp.samples[nonblank_sample].data['SSC-A'] )
 
-            gate_m, gate_b = fcm.find_perpendicular_gating_line( np.concatenate(all_exp_data_fsc), np.concatenate(all_exp_data_ssc), gate_val)
+            gate_m, gate_b = find_perpendicular_gating_line( np.concatenate(all_exp_data_fsc), np.concatenate(all_exp_data_ssc), gate_val)
 
             fsc_ssc_axis_limits = (-50000, 100000)
 
