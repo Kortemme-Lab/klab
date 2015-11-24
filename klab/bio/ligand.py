@@ -17,11 +17,12 @@ from klab.fs.fsio import read_file, write_file
 from klab import colortext
 
 
+
 class Ligand(object):
 
-    def __init__(self, ligand_id):
-        self.PDBCode = ligand_id
-        self.LigandName = None
+    def __init__(self, ligand_code):
+        self.PDBCode = ligand_code
+        self.LigandCode = None
         self.Formula = None
         self.MolecularWeight = None
         self.LigandType = None
@@ -44,10 +45,13 @@ class Ligand(object):
 
         self.descriptors = []
         self.identifiers = []
+        self.synonyms = []
 
 
     def __repr__(self):
-        s =  'Ligand      : {0}, {1}, {2}\n'.format(self.PDBCode, self.LigandName, self.Formula)
+        s =  'Ligand      : {0}, {1}, {2}\n'.format(self.PDBCode, self.LigandCode, self.Formula)
+        if self.synonyms:
+            s += '              AKA {0}\n'.format(', '.join(self.synonyms))
         s += 'Type        : {0}\n'.format(self.LigandType)
         s += 'Weight      : {0} g/mol\n'.format(self.MolecularWeight)
         s += 'InChI       : {0} ({1})\n'.format(self.InChI, self.InChIKey)
@@ -64,11 +68,13 @@ class Ligand(object):
             img = Image.open(file)
             w, h = img.size
             s += 'Diagram     : {0}x{1}'.format(w,h)
+        if self.pdb_id:
+            s += '\nAss. PDB    : {0}'.format(self.pdb_id)
         return s
 
 
     @classmethod
-    def retrieve_data_from_rcsb(cls, ligand_id, pdb_id = None, silent = True, cached_dir = None):
+    def retrieve_data_from_rcsb(cls, ligand_code, pdb_id = None, silent = True, cached_dir = None):
         '''Retrieve a file from the RCSB.'''
         if not silent:
             colortext.printf("Retrieving data from RCSB")
@@ -76,28 +82,28 @@ class Ligand(object):
             assert(os.path.exists(cached_dir))
 
         ligand_info, pdb_ligand_info, pdb_ligand_info_path = None, None, None
-        ligand_info_path = os.path.join(cached_dir, '{0}.cif'.format(ligand_id))
+        ligand_info_path = os.path.join(cached_dir, '{0}.cif'.format(ligand_code))
         if cached_dir:
             if os.path.exists(ligand_info_path):
                 ligand_info = read_file(ligand_info_path)
         if not ligand_info:
-            ligand_info = retrieve_ligand_cif(ligand_id)
+            ligand_info = retrieve_ligand_cif(ligand_code)
             if cached_dir:
                 write_file(ligand_info_path, ligand_info)
 
         # Parse .cif
-        l = Ligand(ligand_id)
+        l = cls(ligand_code)
         l.parse_cif(ligand_info)
-        pdb_id = pdb_id or l.pdb_id
+        l.pdb_id = pdb_id or l.pdb_id
 
         # Parse PDB XML
-        if pdb_id:
-            pdb_ligand_info_path = os.path.join(cached_dir, '{0}.pdb.ligandinfo'.format(pdb_id.lower()))
+        if l.pdb_id:
+            pdb_ligand_info_path = os.path.join(cached_dir, '{0}.pdb.ligandinfo'.format(l.pdb_id.lower()))
             if cached_dir:
                 if os.path.exists(pdb_ligand_info_path):
                     pdb_ligand_info = read_file(pdb_ligand_info_path)
-        if pdb_id:
-            pdb_ligand_info = retrieve_pdb_ligand_info(pdb_id)
+        if l.pdb_id:
+            pdb_ligand_info = retrieve_pdb_ligand_info(l.pdb_id)
             if cached_dir:
                 write_file(pdb_ligand_info_path, pdb_ligand_info)
         if pdb_ligand_info:
@@ -146,7 +152,7 @@ class Ligand(object):
             header[k] = v
         assert(self.PDBCode.upper() == header['_chem_comp.id'])
 
-        self.LigandName = header['_chem_comp.name'].replace('"', '')
+        self.LigandCode = header['_chem_comp.name'].replace('"', '')
         self.Formula = header['_chem_comp.formula'].replace('"', '')
         self.MolecularWeight = header['_chem_comp.formula_weight']
         self.LigandType = header['_chem_comp.type'].replace('"', '')
@@ -155,7 +161,7 @@ class Ligand(object):
         if not header['_chem_comp.id'] == header['_chem_comp.three_letter_code']:
             raise Exception('Handle this case.')
         if header.get('_chem_comp.pdbx_synonyms') != '?':
-            raise Exception('Handle this case.')
+            self.synonyms = [s.strip() for s in header['_chem_comp.pdbx_synonyms'].replace('"', '').split(';')]
 
 
     @staticmethod
@@ -269,3 +275,34 @@ class Ligand(object):
         '''
         self.Diagram = retrieve_ligand_diagram(self.PDBCode)
 
+
+
+class PDBLigand(Ligand):
+
+
+    def __init__(self, ligand_code, chain_id = None, sequence_id = None, pdb_ligand_code = None):
+        super(PDBLigand, self).__init__(ligand_code)
+        if sequence_id:
+            assert(len(sequence_id) == 5)
+        self.Chain = chain_id
+        self.SequenceID = sequence_id
+        self.PDBLigandCode = pdb_ligand_code or ligand_code
+
+
+    def __repr__(self):
+        s = super(PDBLigand, self).__repr__()
+        if self.Chain and self.SequenceID:
+            s += '\nSequence ID : {0}{1}'.format(self.Chain, self.SequenceID)
+        if self.PDBLigandCode and self.PDBLigandCode != self.LigandCode:
+            s += '\nPDB code    : {0}'.format(self.PDBLigandCode)
+        return s
+
+
+    @classmethod
+    def retrieve_data_from_rcsb(cls, ligand_code, pdb_id, chain_id, sequence_id, pdb_ligand_code = None, silent = True, cached_dir = None):
+        l = super(PDBLigand, cls).retrieve_data_from_rcsb(ligand_code, pdb_id = pdb_id, silent = silent, cached_dir = cached_dir)
+        l.pdb_id = pdb_id
+        l.Chain = chain_id
+        l.SequenceID = sequence_id
+        l.PDBLigandCode = pdb_ligand_code or l.LigandCode
+        return l
