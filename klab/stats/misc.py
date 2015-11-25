@@ -39,6 +39,16 @@ from klab.unmerged.rpache.functions_lib import gamma_CC
 from klab.fs.fsio import write_temp_file
 
 
+class FrequencyCounter(object):
+
+    def __init__(self):
+        self.items = {}
+
+    def add(self, item):
+        self.items[item] = self.items.get(item, 0)
+        self.items[item] += 1
+
+
 def stability_classification_accuracy(experimental_values, predicted_values):
     pass
 
