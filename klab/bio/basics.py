@@ -44,6 +44,7 @@ import types
 import itertools
 
 import klab.colortext as colortext
+from klab.stats.misc import FrequencyCounter
 
 ###
 # Residue maps and sets.
@@ -262,7 +263,7 @@ class Sequence(object):
         self.sequence_type = sequence_type
 
         if sequence_type:
-            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton')
+            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton' or sequence_type == 'Unknown')
 
         self.special_insertion_count = 1
 
@@ -554,6 +555,74 @@ class SubstitutionScore(object):
 
     def __repr__(self):
         return "(%s, b%d, p%d)" % (SubstitutionScore.clustal_symbols[self.clustal], self.blosum62, self.pam250)
+
+
+###
+# Ligands
+#
+
+class ElementCounter(FrequencyCounter):
+    '''This class can be used to collect atoms and then print them in Hill notation e.g.
+
+        e = ElementCounter()
+        e.add('C')
+        e.add('C')
+        e.add('O')
+        e.add('H')
+        print(e) # prints "C2 H O".
+    '''
+
+    def __repr__(self):
+        '''Return the Hill notation.'''
+        return self.to_str()
+
+
+    def get_order(self):
+        order = []
+        element_frequencies = self.items
+        carbon_exists = 'C' in element_frequencies
+        if carbon_exists:
+            order.append(('C', element_frequencies['C']))
+            if 'H' in element_frequencies:
+                order.append(('H', element_frequencies['H']))
+            for element_name, freq in sorted(element_frequencies.iteritems()):
+                if (element_name != 'C' and element_name != 'H'):
+                    order.append((element_name, freq))
+        else:
+            for element_name, freq in sorted(element_frequencies.iteritems()):
+                order.append((element_name, freq))
+        return order
+
+
+    def merge(self, other):
+        '''Merge two element counters. For all elements, we take the max count from both counters.'''
+        our_element_frequencies = self.items
+        their_element_frequencies = other.items
+        import pprint
+        pprint.pprint(self.items)
+        pprint.pprint(other.items)
+        for element_name, freq in sorted(our_element_frequencies.iteritems()):
+            our_element_frequencies[element_name] = max(our_element_frequencies.get(element_name, 0), their_element_frequencies.get(element_name, 0))
+        for element_name, freq in sorted(their_element_frequencies.iteritems()):
+            if element_name not in our_element_frequencies:
+                our_element_frequencies[element_name] = their_element_frequencies[element_name]
+
+    def to_str(self, sep = ' ', olelem = '', orelem = '', iblelem = '', ibrelem = ''):
+        order = self.get_order()
+        t = []
+        for o in order:
+            if o[1] > 1:
+                t.append('{2}{0}{4}{1}{5}{3}'.format(o[0], o[1], olelem, orelem, iblelem, ibrelem))
+            else:
+                t.append('{1}{0}{2}'.format(o[0], olelem, orelem)) # do not print 1
+        return sep.join(t) #['{0}{1}'.format(*o) for o in order])
+
+
+    def to_html(self, oelem = 'span'):
+        return self.to_str(olelem = '<{0}>'.format(oelem), orelem = '</{0}>'.format(oelem), iblelem = '<sub>', ibrelem = '</sub>')
+
+
+
 ###
 # Residues
 #
@@ -564,6 +633,8 @@ class Residue(object):
         if residue_type:
             if residue_type == 'Protein' or residue_type == 'Protein skeleton':
                 assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X') or (ResidueAA == 'B'))
+            elif residue_type == 'Unknown':
+                assert(ResidueAA == 'X')
             else:
                 assert(ResidueAA in nucleotide_types_1)
         self.Chain = Chain
