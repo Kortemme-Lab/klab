@@ -348,7 +348,7 @@ class SimplePDBLigand():
 
 
     def __repr__(self):
-        s = ['{0}{1}: {2}'.format(self.Chain or ' ', self.SequenceID, self.ID)]
+        s = ['{0}{1}: {2}'.format(self.Chain or ' ', self.SequenceID, self.PDBCode)]
         if self.Formula:
             s.append(self.Formula)
         if self.Description:
