@@ -213,7 +213,7 @@ if __name__ == '__main__':
     elif not(os.path.exists(rosetta_scripts_path)):
         if os.path.exists(os.path.join(os.getcwd(), rosetta_scripts_path)):
             rosetta_scripts_path = "./%s" % os.path.join(os.getcwd(), rosetta_scripts_path)
-    else:
+    if not os.path.exists(rosetta_scripts_path):
         print("\nError: The path '%s' does not exist.\n" % rosetta_scripts_path)
         sys.exit(1)
     rosetta_scripts_path = os.path.abspath(rosetta_scripts_path)
