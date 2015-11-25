@@ -10,6 +10,7 @@ Created by Shane O'Connor 2015
 import os
 from io import BytesIO
 import re
+import copy
 from PIL import Image
 
 from klab.bio.rcsb import retrieve_ligand_cif, retrieve_pdb_ligand_info, retrieve_ligand_diagram
@@ -19,6 +20,9 @@ from klab import colortext
 
 
 class Ligand(object):
+
+    '''A class used to store ligand information from the RCSB. The most useful way to use this class is to call
+       Ligand.retrieve_data_from_rcsb to lookup the RCSB for the ligand data.'''
 
     def __init__(self, ligand_code):
         self.PDBCode = ligand_code
@@ -32,7 +36,7 @@ class Ligand(object):
         self.InChIKey = None
         self.pdb_id = None
 
-        # These fields are not filled in automatically
+         # These fields are not filled in automatically
         self.Solubility = None
         self.CellPermeability = None
         self.AssaysToDetermineConcentrationInCells = None
@@ -279,14 +283,26 @@ class Ligand(object):
 
 class PDBLigand(Ligand):
 
+    '''A subclass of Ligand used to represent instances of ligands in a PDB file.
+       To save time processing the same ligand code multiple times per PDB, a Ligand object can be created and then instances
+       formed using the instantiate_from_ligand function.
+    '''
 
     def __init__(self, ligand_code, chain_id = None, sequence_id = None, pdb_ligand_code = None):
         super(PDBLigand, self).__init__(ligand_code)
-        if sequence_id:
-            assert(len(sequence_id) == 5)
-        self.Chain = chain_id
-        self.SequenceID = sequence_id
         self.PDBLigandCode = pdb_ligand_code or ligand_code
+        self.Chain = None
+        self.SequenceID = None
+        self.set_id(chain_id, sequence_id)
+
+
+    def set_id(self, chain_id, sequence_id):
+        if sequence_id:
+            assert(len(sequence_id) == 5 and sequence_id[:4].strip().isdigit())
+            self.SequenceID = sequence_id
+        if sequence_id:
+            assert(len(chain_id) == 1)
+            self.Chain = chain_id
 
 
     def __repr__(self):
@@ -299,10 +315,44 @@ class PDBLigand(Ligand):
 
 
     @classmethod
+    def instantiate_from_ligand(cls, ligand, chain_id, sequence_id, pdb_ligand_code = None):
+        l = cls(ligand.LigandCode)
+        l.__dict__ = copy.deepcopy(ligand.__dict__)
+        l.PDBLigandCode = pdb_ligand_code or l.LigandCode
+        l.set_id(chain_id, sequence_id)
+        return l
+
+
+    @classmethod
     def retrieve_data_from_rcsb(cls, ligand_code, pdb_id, chain_id, sequence_id, pdb_ligand_code = None, silent = True, cached_dir = None):
         l = super(PDBLigand, cls).retrieve_data_from_rcsb(ligand_code, pdb_id = pdb_id, silent = silent, cached_dir = cached_dir)
         l.pdb_id = pdb_id
-        l.Chain = chain_id
-        l.SequenceID = sequence_id
         l.PDBLigandCode = pdb_ligand_code or l.LigandCode
+        l.set_id(chain_id, sequence_id)
         return l
+
+
+
+class SimplePDBLigand():
+    '''A simple container class for the basic ligand properties described in PDB files. The Ligand and PDBLigand classes
+       have more features.'''
+
+    def __init__(self, ligand_code, sequence_id, description = None, chain_id = None, names = [], formula = None):
+        assert(len(sequence_id) == 5)
+        self.PDBCode = ligand_code
+        self.Chain = chain_id
+        self.SequenceID = sequence_id
+        self.Description = description
+        self.Names = names
+        self.Formula = formula
+
+
+    def __repr__(self):
+        s = ['{0}{1}: {2}'.format(self.Chain or ' ', self.SequenceID, self.ID)]
+        if self.Formula:
+            s.append(self.Formula)
+        if self.Description:
+            s.append(self.Description)
+        if self.Names:
+            s.append('(' + ', '.join([n for n in self.Names]) + ')')
+        return ', '.join(s)

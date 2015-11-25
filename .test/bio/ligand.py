@@ -10,5 +10,9 @@ l = Ligand.retrieve_data_from_rcsb('NAG', pdb_id = '1WCO', silent = True, cached
 colortext.warning(l)
 l = Ligand.retrieve_data_from_rcsb('GDP', silent = True, cached_dir = '/tmp')
 colortext.pcyan(l)
+
+l = PDBLigand.instantiate_from_ligand(l, 'A', ' 124B')
+colortext.porange(l)
+
 l = PDBLigand.retrieve_data_from_rcsb('GOL', '1BXO', 'A', '  12B', pdb_ligand_code='TST', silent = True, cached_dir = '/tmp')
 colortext.ppurple(l)
