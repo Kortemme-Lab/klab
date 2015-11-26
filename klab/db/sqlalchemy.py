@@ -18,18 +18,33 @@ import re
 import traceback
 if __name__ == '__main__':
     sys.path.insert(0, '..')
-import colortext
+from klab import colortext
 from mysql import DatabaseInterface
+
+
+# @todo. This module saves time creating SQLAlchemy class definitions. It is still very basic however (and hacked together).
+#        The next improvement should be to handle foreign key constraint definitions e.g. turn
+#             CONSTRAINT `PDBResidue_ibfk_1` FOREIGN KEY (`PDBFileID`, `Chain`) REFERENCES `PDBChain` (`PDBFileID`, `Chain`)
+#        into
+#             PDBFileID = Column(..., ForeignKey('PDBChain.PDBFileID'))
+#        Depending on the schema, a field may be involved in multiple foreign key constraints.
+#        It may make more sense to use relationships here instead e.g.
+#             pdb_chain = relationship("PDBChain", foreign_keys=[PDBFileID, Chain])
+#        but I need to read the documentation.
+
 
 class IntermediateField(object):
 
-    def __init__(self, field_name, field_type, not_null = False, default_type = None, default_value = None, comment = None):
+
+    def __init__(self, field_name, field_type, not_null = False, default_type = None, default_value = None, comment = None, is_primary_key = False):
         self.field_name = field_name
         self.field_type = field_type
         self.not_null = not_null
         self.default_type = default_type
         self.default_value = default_value
         self.comment = comment
+        self.is_primary_key = is_primary_key
+
 
     def to_sql_alchemy(self, typedefs):
         s = ''
@@ -99,6 +114,9 @@ class IntermediateField(object):
         else:
             s += ', nullable=True'
 
+        if self.is_primary_key:
+            s += ', primary_key=True'
+
         if self.default_type != None:
             if self.default_type == 'string':
                 if is_string_type:
@@ -127,47 +145,47 @@ class MySQLSchemaConverter(object):
         self.tables = self.db_interface.TableNames
         self._parse_schema()
 
+
     def _parse_schema(self):
         for tbl in self.tables:
             self._create_intermediate_schema(tbl)
 
-    def get_sqlalchemy_schema(self):
-        colortext.warning(' *** SQLAlchemy schema ***')
+
+    def get_sqlalchemy_schema(self, restrict_to_tables = []):
+        colortext.warning(' *** MySQL schema ***')
         schema = []
-        print(self.intermediate_schema)
+        #print(self.intermediate_schema)
 
         typedefs = {'sqlalchemy.types' : set(), 'sqlalchemy.dialects.mysql' : set()}
 
-
         for tbl in self.tables:
+            if (not restrict_to_tables) or (tbl in restrict_to_tables):
+                colortext.message(tbl)
 
-            colortext.message(tbl)
+                print(self.db_interface.execute("SHOW CREATE TABLE %s" % tbl))[0]['Create Table']
+                print('')
+                code = []
+                code.append("class %s(DeclarativeBase):" % tbl)
+                code.append("    __tablename__ = '%s'\n" % tbl)
+                #print('\n'.join(code))
 
-            print(self.db_interface.execute("SHOW CREATE TABLE %s" % tbl))[0]['Create Table']
-            print('')
-            code = []
-            code.append("class %s(DeclarativeBase):" % tbl)
-            code.append("__tablename__ = '%s'\n" % tbl)
-            print('\n'.join(code))
-
-            intermediate_table = self.intermediate_schema[tbl]
-            for field in intermediate_table:
-                s = field.to_sql_alchemy(typedefs)
-                code.append(s)
-                print(s)
-            code.append('')
-            print('')
-            schema.extend(code)
+                intermediate_table = self.intermediate_schema[tbl]
+                for field in intermediate_table:
+                    s = field.to_sql_alchemy(typedefs)
+                    code.append('    {0}'.format(s))
+                    #print(s)
+                code.append('\n')
+                #print('')
+                schema.extend(code)
 
         imports = []
         for module, types in sorted(typedefs.iteritems()):
-            print(len(schema))
             imports.append('from %s import %s' % (module, ', '.join(sorted(types))))
-            print(len(schema))
         schema = imports + [''] + schema
 
-        colortext.message('*** SQLAlchemy schema ***')
+        colortext.warning('*** SQLAlchemy class definitions ***')
         print('\n'.join(schema))
+
 
     def _create_intermediate_schema(self, tbl):
         code = (self.db_interface.execute("SHOW CREATE TABLE %s" % tbl))
@@ -176,7 +194,15 @@ class MySQLSchemaConverter(object):
         #colortext.message(tbl)
 
         #print(schema)
+
+        #print(schema)
         fields = [f for f in map(string.strip, schema[schema.find('(') + 1:schema.find('PRIMARY KEY')].strip().split('\n')) if f.strip()]
+
+        pk_fields = re.match('.*PRIMARY\s+KEY\s*[(](.*?)[)]\s*[,)].*', schema, re.DOTALL)
+        assert(pk_fields)
+        pk_fields = [s.strip() for s in pk_fields.group(1).replace('`', '').split(',') if s.strip()]
+
+
         #colortext.warning(fields)
         for f in fields:
             #print('')
@@ -185,7 +211,6 @@ class MySQLSchemaConverter(object):
                 f = f[:-1]
 
             field_name = f.split()[0].replace('`', '')
-
             if f.split()[1].startswith('enum('):
                 mtchs = re.match(".* (enum[(].*?[)])(.*)", f)
                 assert(mtchs)
@@ -204,7 +229,11 @@ class MySQLSchemaConverter(object):
             default = False
             default_type = None
             default_value = None
-            if remaining_description.find('default NULL') != -1:
+            if remaining_description.find('default CURRENT_TIMESTAMP') != -1:
+                default_type = 'TIMESTAMP'
+                default_value = None
+                remaining_description = remaining_description.replace('default CURRENT_TIMESTAMP', '')
+            elif remaining_description.find('default NULL') != -1:
                 default_type = 'null'
                 default_value = None
                 remaining_description = remaining_description.replace('default NULL', '')
@@ -216,7 +245,7 @@ class MySQLSchemaConverter(object):
                     default_value = mtchs.group(1)
                     remaining_description = remaining_description.replace("default '%s'" % default_value, "")
                 else:
-                    colortext.error('Unexpected default value string.')
+                    colortext.error('Unexpected default value string: "{0}".'.format(remaining_description))
                     pass
                     #mtchs = re.match(".*default (.*?)(\s.*)*$", remaining_description)
                     #if mtchs:
@@ -235,7 +264,7 @@ class MySQLSchemaConverter(object):
             remaining_description = remaining_description.strip()
 
             self.intermediate_schema[tbl] = self.intermediate_schema.get(tbl, [])
-            self.intermediate_schema[tbl].append(IntermediateField(field_name, field_type, not_null = not_null, default_type = default_type, default_value = default_value, comment = comment))
+            self.intermediate_schema[tbl].append(IntermediateField(field_name, field_type, not_null = not_null, default_type = default_type, default_value = default_value, comment = comment, is_primary_key = field_name in pk_fields))
 
             #print('field_name : %s' % field_name)
             #print('field_type : %s' % field_type)
@@ -249,6 +278,7 @@ class MySQLSchemaConverter(object):
                 #colortext.error('remaining_description : %s' % remaining_description)
                 pass
         #print('\n')
+
 
 if __name__ == '__main__':
     script_name = sys.argv[0]
