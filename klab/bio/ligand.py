@@ -124,7 +124,20 @@ class Ligand(object):
         found_cif_header = False
         found_cif_descriptors = False
         found_cif_identifiers = False
-        for block in cif.split('#'):
+
+        blocks = []
+        blocklines = []
+        for l in cif.split('\n'):
+            if l.strip() == '#':
+                if blocklines:
+                    blocks.append('\n'.join(blocklines))
+                    blocklines = []
+            else:
+                blocklines.append(l)
+        if blocklines:
+            blocks.append('\n'.join(blocklines))
+
+        for block in blocks:
             if block.find('_chem_comp.id') != -1:
                 assert(not found_cif_header)
                 self.parse_cif_header(block)
@@ -148,12 +161,26 @@ class Ligand(object):
 
 
     def parse_cif_header(self, b):
+
+        b = b.strip()
+        assert(b[0] == '_')
+        lines = b.split('\n_')
+
         header = {}
-        for l in [l.strip() for l in b.split('\n') if l.strip()]:
+        for l in lines:
+            l = l.strip().replace('\n', '').replace('"', '')
+            if l[0] != '_':
+                l = '_' + l
+            assert(l.startswith('_chem'))
             idx = l.find(' ')
             k = l[:idx]
             v = l[idx:].strip()
             header[k] = v
+        assert(self.PDBCode.upper() == header['_chem_comp.id'])
+
+        for k in header.keys():
+            assert(k and k[0] == '_')
+            assert(header[k].strip())
         assert(self.PDBCode.upper() == header['_chem_comp.id'])
 
         self.LigandCode = header['_chem_comp.name'].replace('"', '')
@@ -165,7 +192,7 @@ class Ligand(object):
         if not header['_chem_comp.id'] == header['_chem_comp.three_letter_code']:
             raise Exception('Handle this case.')
         if header.get('_chem_comp.pdbx_synonyms') != '?':
-            self.synonyms = [s.strip() for s in header['_chem_comp.pdbx_synonyms'].replace('"', '').split(';')]
+            self.synonyms = [s for s in [s.strip() for s in header['_chem_comp.pdbx_synonyms'].replace('"', '').split(';')] if s.strip()]
 
 
     @staticmethod
@@ -174,6 +201,7 @@ class Ligand(object):
         descriptors = []
         lines = [l.strip() for l in b.split('\n') if l.strip()]
         assert(lines[0] == 'loop_')
+        ligand_id = None
         for l in lines[1:]:
             if l[0] == '_':
                 assert(len(l.split()) == 1)
@@ -184,7 +212,16 @@ class Ligand(object):
                 if descriptors[-1][-1] != ' ':
                     descriptors[-1] += ' '
                 descriptors[-1] += '"' + l[1:]
+            elif ligand_id and not(l.startswith(ligand_id)):
+                # This does not seem to be a valid case but it does occur e.g. the .cif entry for 0Z6 has a newline in the InChI record
+                assert(len(descriptors) > 0)
+                if descriptors[-1][-1] != ' ':
+                    descriptors[-1] += ' '
+                descriptors[-1] += '' + l
             else:
+                if ligand_id == None:
+                    ligand_id = l.split()[0]
+                assert(l.startswith(ligand_id))
                 descriptors.append(l)
         if expected_headers:
             assert(columns == expected_headers)
@@ -213,6 +250,7 @@ class Ligand(object):
                     current_token += c
             if current_token:
                 tokens.append(current_token.strip())
+
             assert(len(columns) == len(tokens))
             dct = {}
             for x in range(len(columns)):
@@ -233,11 +271,12 @@ class Ligand(object):
                                 })
 
         inchi_record = [d for d in descriptors if d['DescriptorType'] == 'InChI']
-        assert(len(inchi_record) == 1)
-        inchi_key_record = [d for d in descriptors if d['DescriptorType'] == 'InChIKey']
-        assert(len(inchi_key_record) == 1)
-        self.InChI = inchi_record[0]['Descriptor']
-        self.InChIKey = inchi_key_record[0]['Descriptor']
+        if self.PDBCode != 'UNX':
+            assert(len(inchi_record) == 1)
+            inchi_key_record = [d for d in descriptors if d['DescriptorType'] == 'InChIKey']
+            assert(len(inchi_key_record) == 1)
+            self.InChI = inchi_record[0]['Descriptor']
+            self.InChIKey = inchi_key_record[0]['Descriptor']
         for d in descriptors:
             assert(d['PDBCode'] == self.PDBCode)
         self.descriptors = descriptors
