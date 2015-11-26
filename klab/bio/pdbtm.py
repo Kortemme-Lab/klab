@@ -40,7 +40,11 @@ class PDBTM(object):
     transmembrane_tmtypes = set(['Tm_Alpha', 'Tm_Beta', 'Tm_Coil', 'Tm_Ca'])
 
     def __init__(self, xml_contents, restrict_to_transmembrane_proteins = True):
-        self.xml_contents = xml_contents
+        self.xml_contents = xml_contents.strip()
+
+        # At some point, this tag crept into the PDBTM XML which the parser below cannot handle
+        self.xml_contents = self.xml_contents.replace('''<?xml version="1.0"?>''', '')
+
         self.restrict_to_transmembrane_proteins = restrict_to_transmembrane_proteins
 
 
