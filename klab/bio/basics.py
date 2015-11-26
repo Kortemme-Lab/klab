@@ -211,7 +211,18 @@ nucleotide_types_1 = set(dna_nucleotides_2to1_map.values()) # for use in SEQRES 
 
 # Atoms
 
+
 backbone_atoms = set(['N', 'CA', 'C', 'O'])
+
+
+def pdb_atom_name_to_element(s):
+    '''s should be a string taken from columns 12-15 (zero-indexed) inclusive of a PDB coordinate line.'''
+    assert(len(s) == 4)
+    if len(s.strip()) == 4:
+        assert(s[0] == 'H' or s[0] == 'C' or s[0] == 'O') # "If the name of a hydrogen has four characters, it is left-justified starting in column 13; if it has fewer than four characters, it is left-justified starting in column 14. If the name of a hydrogen has four characters, it is left-justified starting in column 13; if it has fewer than four characters, it is left-justified starting in column 14."
+        return s[0] # I think this works for hydrogen - I do not know if it is generally correct for carbon and oxygen but something like this is necessary - see CE11 in 1DAN. The correct approach is described somewhere in the  IUPAC recommendations (Pure Appl Chem 70:117 (1998), http://www.iupac.org/publications/pac/1998/pdf/7001x0117.pdf.
+    else:
+        return s[:2].strip() # see the ATOM section of PDB format documentation. The element name is stored in these positions, right-justified.
 
 
 ###
@@ -561,6 +572,7 @@ class SubstitutionScore(object):
 # Ligands
 #
 
+
 class ElementCounter(FrequencyCounter):
     '''This class can be used to collect atoms and then print them in Hill notation e.g.
 
@@ -579,7 +591,14 @@ class ElementCounter(FrequencyCounter):
 
     def get_order(self):
         order = []
-        element_frequencies = self.items
+
+        # Convert the atom names to element names
+        element_frequencies = {}
+        for k, ct in self.items.iteritems():
+            a = pdb_atom_name_to_element(k)
+            element_frequencies[a] = element_frequencies.get(a, 0)
+            element_frequencies[a] += 1
+
         carbon_exists = 'C' in element_frequencies
         if carbon_exists:
             order.append(('C', element_frequencies['C']))
@@ -598,9 +617,6 @@ class ElementCounter(FrequencyCounter):
         '''Merge two element counters. For all elements, we take the max count from both counters.'''
         our_element_frequencies = self.items
         their_element_frequencies = other.items
-        import pprint
-        pprint.pprint(self.items)
-        pprint.pprint(other.items)
         for element_name, freq in sorted(our_element_frequencies.iteritems()):
             our_element_frequencies[element_name] = max(our_element_frequencies.get(element_name, 0), their_element_frequencies.get(element_name, 0))
         for element_name, freq in sorted(their_element_frequencies.iteritems()):
