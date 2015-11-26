@@ -38,8 +38,9 @@ try:
 except:
     pass
 
-from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
+from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter
 from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
+from klab.bio.ligand import SimplePDBLigand
 from klab import colortext
 from klab.fs.fsio import read_file, write_file
 from klab.pymath.stats import get_mean_and_standard_deviation
@@ -403,6 +404,7 @@ class PDB(object):
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
         self.atom_sequences = {}                        # A dict mapping chain IDs to ATOM Sequence objects
         self.chain_atoms = {}                           # A dict mapping chain IDs to a set of ATOM types. This is useful to test whether some chains only have CA entries e.g. in 1LRP, 1AIN, 1C53, 1HIO, 1XAS, 2TMA
+        self.ligands = {}                               # A dict mapping chain IDs to ligands
 
         # PDB deprecation fields
         self.deprecation_date = None
@@ -425,6 +427,8 @@ class PDB(object):
             self._update_structure_lines()
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
+        self.hetatm_formulae = PDB.convert_hetatms_to_Hill_notation(self.parsed_lines['HETATM'])
+        self._get_ligands()
 
 
     def fix_pdb(self):
@@ -491,6 +495,7 @@ class PDB(object):
 
         self._split_lines()
 
+
     ### Class functions ###
 
 
@@ -533,6 +538,7 @@ class PDB(object):
         '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
         return PDB("\n".join(pdb_file_lines), strict = strict)
 
+
     @staticmethod
     def retrieve(pdb_id, cache_dir = None, strict = True):
         '''Creates a PDB object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
@@ -553,6 +559,7 @@ class PDB(object):
 
         # Return the object
         return PDB(contents, strict = strict)
+
 
     ### Private functions ###
 
@@ -1186,6 +1193,10 @@ class PDB(object):
         sequences = {}
         self.chain_types = {}
 
+        canonical_acid_types = set(residue_type_3to1_map.keys())
+        canonical_acid_types.remove('UNK')
+        assert(len(canonical_acid_types) == 20)
+
         for chain_id, tokens in chain_tokens.iteritems():
 
             # Determine whether the chain is DNA, RNA, or a protein chain
@@ -1198,12 +1209,18 @@ class PDB(object):
 
             chain_type = None
             set_of_tokens = set(tokens)
-            if (set(tokens).union(all_recognized_dna) == all_recognized_dna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+            if (set_of_tokens.union(all_recognized_dna) == all_recognized_dna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
                 chain_type = 'DNA'
-            elif (set(tokens).union(all_recognized_rna) == all_recognized_rna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+            elif (set_of_tokens.union(all_recognized_rna) == all_recognized_rna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
                 chain_type = 'RNA'
+            elif len(set_of_tokens) == 1 and 'UNK' in set_of_tokens:
+                chain_type = 'Unknown'
+            elif not(set_of_tokens.intersection(canonical_acid_types)):
+                # Zero canonical residues may imply a ligand
+                chain_type = 'Ligand'
             else:
                 assert(len(set(tokens).intersection(dna_nucleotides)) == 0)
+                assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
                 assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
                 chain_type = 'Protein'
                 if not self.chain_atoms.get(chain_id):
@@ -1288,10 +1305,17 @@ class PDB(object):
         residue_lines_by_chain = []
         structural_residue_IDs_set = []
 
+        present_chain_ids = {}
+        for l in self.structure_lines:
+            if len(l) > 21:
+                present_chain_ids[l[21]] = present_chain_ids.get(l[21], set())
+                present_chain_ids[l[21]].add(l[:6])
+
         model_index = 0
         residue_lines_by_chain.append([])
         structural_residue_IDs_set.append(set())
         full_code_map = {}
+        full_atom_map = {}
         for l in self.structure_lines:
             if l.startswith("TER   "):
                 model_index += 1
@@ -1302,8 +1326,15 @@ class PDB(object):
                 if residue_id not in structural_residue_IDs_set[model_index]:
                     residue_lines_by_chain[model_index].append(l)
                     structural_residue_IDs_set[model_index].add(residue_id)
-                full_code_map[l[21]] = full_code_map.get(l[21], set())
-                full_code_map[l[21]].add(l[17:20].strip())
+                if l.startswith('ATOM'):
+                    chain_id = l[21]
+                    # Only use ATOM records to build the code map as chains can have ligands HETATMs
+                    full_code_map[chain_id] = full_code_map.get(chain_id, set())
+                    full_code_map[chain_id].add(l[17:20].strip())
+
+                    # Only use ATOM records to build the atom map as CA-only chains can have ligands described in full as HETATMs
+                    full_atom_map[chain_id] = full_atom_map.get(chain_id, set())
+                    full_atom_map[chain_id].add(l[12:16].strip())
 
         # Get the residues used by the residue lines. These can be used to determine the chain type if the header is missing.
         for chain_id in self.atom_chain_order:
@@ -1311,12 +1342,26 @@ class PDB(object):
                 # The chains may contain other molecules e.g. MG or HOH so before we decide their type based on residue types alone,
                 # we subtract out those non-canonicals
                 canonical_molecules = full_code_map[chain_id].intersection(dna_nucleotides.union(rna_nucleotides).union(residue_types_3))
+
+                determined_chain_type = None
                 if canonical_molecules.union(dna_nucleotides) == dna_nucleotides:
-                    self.chain_types[chain_id] = 'DNA'
+                    determined_chain_type = 'DNA'
                 elif canonical_molecules.union(rna_nucleotides) == rna_nucleotides:
-                    self.chain_types[chain_id] = 'RNA'
+                    determined_chain_type = 'RNA'
+                elif len(full_code_map[chain_id]) == 1 and 'UNK' in full_code_map[chain_id]:
+                    determined_chain_type = 'Unknown'
+                elif canonical_molecules:
+                    if len(full_atom_map[chain_id]) == 1 and 'CA' in full_atom_map[chain_id]:
+                        determined_chain_type = 'Protein skeleton'
+                    else:
+                        determined_chain_type = 'Protein'
                 else:
-                    self.chain_types[chain_id] = 'Protein'
+                    determined_chain_type = 'Ligand'
+
+                if self.chain_types.get(chain_id):
+                    assert(self.chain_types[chain_id] == determined_chain_type)
+                else:
+                    self.chain_types[chain_id] = determined_chain_type
 
         line_types_by_chain = []
         chain_ids = []
@@ -1377,6 +1422,8 @@ class PDB(object):
                 short_residue_type = None
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
+                elif chain_type == 'Unknown':
+                    assert(False) # we should not reach here - Unknown chains should only contain UNK records
                 elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
                     short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type) or non_canonical_amino_acids.get(residue_type)
                 elif chain_type == 'DNA':
@@ -1400,7 +1447,14 @@ class PDB(object):
                     for char in short_residue_type:
                         atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], char, chain_type))
 
+        # Assign "Ligand" to all HETATM-only chains
+        for c in present_chain_ids.keys():
+            if c not in self.chain_types:
+                assert('ATOM' not in present_chain_ids[c])
+                self.chain_types[c] = 'Ligand'
+
         self.atom_sequences = atom_sequences
+
 
     def _get_ATOM_sequences_2(self):
         '''Creates the ATOM Sequences.'''
@@ -1428,6 +1482,8 @@ class PDB(object):
                 short_residue_type = None
                 if residue_type == 'UNK':
                     short_residue_type = 'X'
+                elif chain_type == 'Unknown':
+                    assert(False) # we should not reach here - Unknown chains should only contain UNK records
                 elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
                     short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type)
                 elif chain_type == 'DNA':
@@ -1625,6 +1681,148 @@ class PDB(object):
         '''Check that the wildtype of the Mutation object matches the PDB sequence.'''
         readwt = self.getAminoAcid(self.getAtomLine(mutation.Chain, mutation.ResidueID))
         assert(mutation.WildTypeAA == residue_type_3to1_map[readwt])
+
+
+    ### Ligand functions ###
+
+
+    def get_ligand_formulae_as_html(self, oelem = 'span'):
+        html_list = {}
+        for k, v in self.ligand_formulae.iteritems():
+            html_list[k] = v.to_html(oelem = oelem)
+        return html_list
+
+
+    @staticmethod
+    def convert_hetatms_to_Hill_notation(lines, ignore_list = ['HOH']):
+        '''From the PDB site:
+           The elements of the chemical formula are given in the order following Hill ordering. The order of elements depends
+           on whether carbon is present or not. If carbon is present, the order should be: C, then H, then the other elements
+           in alphabetical order of their symbol. If carbon is not present, the elements are listed purely in alphabetic order
+           of their symbol. This is the 'Hill' system used by Chemical Abstracts.
+
+           WARNING: This assumes that all atoms are in the PDB. This is not usually the case so the formulae will be missing
+                    atoms in those cases. To account for some missing data, we merge the element counters to use the most
+                    amount of information we can.
+                    In general, the FORMUL lines should be used. This function can be used in files with missing headers.
+           '''
+
+        ignore_list = set(ignore_list)
+        hetatms = {}
+        for l in lines:
+            if l.startswith('HETATM'):
+                het_id = l[17:20].strip()
+                if het_id in ignore_list:
+                    continue
+                res_id = l[21:27]
+                atom_name = l[12:16]
+                alt_loc = l[16]
+                hetatms[het_id] = hetatms.get(het_id, {})
+                hetatms[het_id][res_id] = hetatms[het_id].get(res_id, {})
+                hetatms[het_id][res_id][alt_loc] = hetatms[het_id][res_id].get(alt_loc, ElementCounter())
+                hetatms[het_id][res_id][alt_loc].add(atom_name)
+
+        for het_id, res_atoms in hetatms.iteritems():
+            res_ids = res_atoms.keys()
+            for res_id in res_ids:
+                ecs = hetatms[het_id][res_id].values()
+                for x in range(1, len(ecs)):
+                    ecs[0].merge(ecs[x])
+                hetatms[het_id][res_id] = ecs[0]
+
+        str_mapping = {}
+        mapping = {}
+        for het_id, res_atoms in hetatms.iteritems():
+            res_ids = res_atoms.keys()
+            for res_id in res_ids:
+                Hill_notation = hetatms[het_id][res_id]
+                if str_mapping.get(het_id):
+                    if not str_mapping[het_id] == str(Hill_notation):
+                        mapping[het_id].merge(Hill_notation)
+                        str_mapping[het_id] = str(mapping[het_id])
+                else:
+                    str_mapping[het_id] = str(Hill_notation)
+                    mapping[het_id] = Hill_notation
+        return mapping
+
+
+    def get_ligand_codes(self):
+        ligand_codes = set()
+        for c, cligands in self.ligands.iteritems():
+            for seq_id, l in cligands.iteritems():
+                ligand_codes.add(l.PDBCode)
+        return sorted(ligand_codes)
+
+
+    def _get_ligands(self):
+        het_ids = set()
+
+        # Parse HETATM names
+        het_names = {}
+        for hetname_line in self.parsed_lines.get('HETNAM', []):
+            continuation = hetname_line[8:10].strip()
+            het_id = hetname_line[11:14].strip()
+            het_ids.add(het_id)
+            description = hetname_line[15:]
+            if continuation:
+                assert(het_id in het_names)
+                het_names[het_id] += description.rstrip() # keep leading space
+            else:
+                assert(het_id not in het_names)
+                het_names[het_id] = description.strip()
+
+        # Parse HETSYN names
+        het_synonyms = {}
+        for hetsyn_line in self.parsed_lines.get('HETSYN', []):
+            continuation = hetsyn_line[8:10].strip()
+            het_id = hetsyn_line[11:14].strip()
+            het_ids.add(het_id)
+            description = hetsyn_line[15:]
+            if continuation:
+                assert(het_id in het_synonyms)
+                het_synonyms[het_id] += description.rstrip() # keep leading space
+            else:
+                assert(het_id not in het_synonyms)
+                het_synonyms[het_id] = description.strip()
+        for het_id, synonymns_str in het_synonyms.iteritems():
+            het_synonyms[het_id] = [s.strip() for s in synonymns_str.split(';')]
+
+        for het_id in het_ids:
+            if het_names.get(het_id):
+                het_names[het_id] = [het_names[het_id]] + het_synonyms.get(het_id, [])
+            else:
+                het_names[het_id] = het_synonyms[het_id]
+
+        # Parse FORMUL names
+        het_formulae = {}
+        for formul_line in self.parsed_lines.get('FORMUL', []):
+            component_number = formul_line[8:10].strip()
+            het_id = formul_line[12:15].strip()
+            continuation = formul_line[16:18].strip()
+            asterisk = formul_line[18].strip()
+            if asterisk:
+                assert(het_id == 'HOH') # ignore waters
+                continue
+            formula = formul_line[19:]
+            if continuation:
+                assert(het_id in het_formulae)
+                het_formulae[het_id] += formula.rstrip() # keep leading space
+            else:
+                assert(het_id not in het_formulae)
+                het_formulae[het_id] = formula.strip()
+
+        for het_line in self.parsed_lines.get('HET   ', []):
+            # 0:3 = "HET", 7:10 = hetID, 12 = ChainID, 13:17 = seqNum, 17 = iCode, 20:25 = numHetAtoms, 30:70 = description
+            het_id = het_line[7:10].strip()
+            chain_id = het_line[12]
+            het_seq_id = het_line[13:18] # similar to 5-character residue ID
+            description = het_line[30:].strip() or None
+            numHetAtoms = int(het_line[20:25].strip())
+            assert(het_id != 'HOH')
+            lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
+            self.ligands[chain_id] = self.ligands.get(chain_id, {})
+            assert(chain_id == ' ' or het_seq_id not in self.ligands[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
+            self.ligands[chain_id][het_seq_id] = lig
 
 
     ### END OF REFACTORED CODE
@@ -2541,8 +2739,15 @@ class PDB(object):
         return True, warnings
 
 
+    def extract_xyz_matrix_from_chain(self, chain_id, atoms_of_interest = []):
+        '''Create a pandas coordinates dataframe from the lines in the specified chain.'''
+        chains = [l[21] for l in self.structure_lines if len(l) > 21]
+        chain_lines = [l for l in self.structure_lines if len(l) > 21 and l[21] == chain_id]
+        return PDB.extract_xyz_matrix_from_pdb(chain_lines, atoms_of_interest = atoms_of_interest, include_all_columns = True)
+
+
     @staticmethod
-    def extract_xyz_matrix_from_pdb(pdb_lines, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, fail_on_model_records = True):
+    def extract_xyz_matrix_from_pdb(pdb_lines, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, fail_on_model_records = True, include_all_columns = False):
         '''Returns a pandas dataframe of X, Y, Z coordinates for all chains in the PDB.
            Note: This function is not intended to handle structures with MODELs e.g. from NMR although the fail_on_model_records
            check is optional for convenience in case the first model is to be parsed.
@@ -2554,12 +2759,15 @@ class PDB(object):
         chain_ids = set([l[21] for l in pdb_lines if l.startswith('ATOM  ')])
         dataframes = []
         for chain_id in chain_ids:
-            dataframes.append(PDB.extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = atoms_of_interest, expected_num_residues = expected_num_residues, expected_num_residue_atoms = expected_num_residue_atoms))
-        return(pandas.concat(dataframes, verify_integrity = True))
+            dataframes.append(PDB.extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = atoms_of_interest, expected_num_residues = expected_num_residues, expected_num_residue_atoms = expected_num_residue_atoms, include_all_columns = include_all_columns))
+        if dataframes:
+            return(pandas.concat(dataframes, verify_integrity = True))
+        else:
+            return None
 
 
     @staticmethod
-    def extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, fail_on_model_records = True):
+    def extract_xyz_matrix_from_pdb_chain(pdb_lines, chain_id, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, fail_on_model_records = True, include_all_columns = False):
         '''Returns a pandas dataframe of X, Y, Z coordinates for the PDB chain.
            Note: This function is not intended to handle structures with MODELs e.g. from NMR although the fail_on_model_records
            check is optional for convenience in case the chain of the first model is to be parsed.'''
@@ -2578,11 +2786,11 @@ class PDB(object):
             if found_chain and (l.strip() == 'TER' or l.startswith('MODEL') or (len(l) > 21 and l[21] != chain_id)):
                 # Do not cross over into other chains or models
                 break
-        return PDB.extract_xyz_matrix_from_pdb_residue_range(new_pdb_lines, atoms_of_interest = atoms_of_interest, expected_num_residues = expected_num_residues, expected_num_residue_atoms = expected_num_residue_atoms)
+        return PDB.extract_xyz_matrix_from_pdb_residue_range(new_pdb_lines, atoms_of_interest = atoms_of_interest, expected_num_residues = expected_num_residues, expected_num_residue_atoms = expected_num_residue_atoms, include_all_columns = include_all_columns)
 
 
     @staticmethod
-    def extract_xyz_matrix_from_loop_json(pdb_lines, parsed_loop_json_contents, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, allow_overlaps = False):
+    def extract_xyz_matrix_from_loop_json(pdb_lines, parsed_loop_json_contents, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, allow_overlaps = False, include_all_columns = False):
         '''A utility wrapper to extract_xyz_matrix_from_pdb_residue_range.
            This accepts PDB file lines and a loop.json file (a defined Rosetta format) and returns a pandas dataframe of
            the X, Y, Z coordinates for the requested atom types for all residues in all loops defined by the loop.json
@@ -2595,7 +2803,7 @@ class PDB(object):
         for loop_set in parsed_loop_json_contents['LoopSet']:
             start_pdb_residue_id = PDB.ChainResidueID2String(loop_set['start']['chainID'], str(loop_set['start']['resSeq']) + loop_set['start']['iCode'])
             stop_pdb_residue_id = PDB.ChainResidueID2String(loop_set['stop']['chainID'], str(loop_set['stop']['resSeq']) + loop_set['stop']['iCode'])
-            dataframes.append(PDB.extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = start_pdb_residue_id, stop_pdb_residue_id = stop_pdb_residue_id, atoms_of_interest = atoms_of_interest, expected_num_residues = None, expected_num_residue_atoms = expected_num_residue_atoms))
+            dataframes.append(PDB.extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = start_pdb_residue_id, stop_pdb_residue_id = stop_pdb_residue_id, atoms_of_interest = atoms_of_interest, expected_num_residues = None, expected_num_residue_atoms = expected_num_residue_atoms, include_all_columns = include_all_columns))
 
         # Concatenate the dataframes
         dataframe = pandas.concat(dataframes, verify_integrity = (allow_overlaps == False)) # note: the pandas documentation notes that verify_integrity is relatively expensive
@@ -2605,7 +2813,7 @@ class PDB(object):
 
 
     @staticmethod
-    def extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = None, stop_pdb_residue_id = None, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, break_on_chain_end = True):
+    def extract_xyz_matrix_from_pdb_residue_range(pdb_lines, start_pdb_residue_id = None, stop_pdb_residue_id = None, atoms_of_interest = backbone_atoms, expected_num_residues = None, expected_num_residue_atoms = None, break_on_chain_end = True, include_all_columns = False):
         '''Creates a pandas dataframe of X, Y, Z coordinates for the residues identified in the range from
            start_pdb_residue_id to stop_pdb_residue_id inclusive. The dataframe is indexed by a string identifying the
            PDB residue and atom type.
@@ -2623,9 +2831,12 @@ class PDB(object):
         atoms = {}
         found_start, found_end = start_pdb_residue_id == None, None
         res_id_list, x_list, y_list, z_list = [], [], [], []
+        if include_all_columns:
+            chain_id_list, plain_res_id_list, atom_type_list, loc_list, residue_aa_list = [], [], [], [], []
         for l in pdb_lines:
             res_id = None
             atom_type = None
+            alt_loc = None
 
             if (break_on_chain_end and l.strip() == 'TER') or l.startswith('MODEL'):
                 # Do not cross over into other chains (unless specified) or models
@@ -2634,6 +2845,7 @@ class PDB(object):
             if l.startswith('ATOM  '):
                 res_id = l[21:27]
                 atom_type = l[12:16].strip()
+                alt_loc = l[16]
                 if res_id == start_pdb_residue_id:
                     # Saw the first residue - enter parsing
                     found_start = True
@@ -2651,11 +2863,19 @@ class PDB(object):
                     assert(res_id and atom_type and not(atoms.get(res_id, {}).get(atom_type)))
                     atoms[res_id] = atoms.get(res_id, {})
                     atoms[res_id][atom_type] = True
+
                 # Add the dataframe elements
-                res_id_list.append('{0}_{1}'.format(res_id.strip(), atom_type))
+                res_id_list.append('{0}_{1}_{2}'.format(res_id.strip(), atom_type, alt_loc))
                 x_list.append(float(l[30:38]))
                 y_list.append(float(l[38:46]))
                 z_list.append(float(l[46:54]))
+                if include_all_columns:
+                    chain_id_list.append(l[21])
+                    plain_res_id_list.append(l[22:27])
+                    atom_type_list.append(l[12:16])
+                    loc_list.append(l[16])
+                    residue_aa_list.append(l[17:20])
+
         assert(found_start and ((stop_pdb_residue_id == None) or found_end))
 
         if expected_num_residues != None:
@@ -2664,7 +2884,10 @@ class PDB(object):
             for res_id, atom_details in atoms.iteritems():
                 assert(len(atom_details) == expected_num_residue_atoms)
 
-        return pandas.DataFrame(dict(X = x_list, Y = y_list, Z = z_list), index = res_id_list)
+        if include_all_columns:
+            return pandas.DataFrame(dict(chain = chain_id_list, res_id = plain_res_id_list, atom = atom_type_list, altloc = loc_list, AA = residue_aa_list, X = x_list, Y = y_list, Z = z_list), index = res_id_list)
+        else:
+            return pandas.DataFrame(dict(X = x_list, Y = y_list, Z = z_list), index = res_id_list)
 
 
 if __name__ == "__main__":
