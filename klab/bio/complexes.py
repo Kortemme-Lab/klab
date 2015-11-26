@@ -62,7 +62,7 @@ class ProteinProteinComplex(object):
         # Partner 2
         self.rname = rname
         self.rshortname = rshortname
-        self.rhtmlname = lshortname
+        self.rhtmlname = rhtmlname
 
         # Classification
         self.functional_class_id = functional_class_id             # Generic
