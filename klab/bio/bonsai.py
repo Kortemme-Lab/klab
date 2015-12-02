@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # encoding: utf-8
 """
-bonzai.py
+bonsai.py
 Functions to help remove particular side-chains or atoms from a PDB structure
 
 Created by Shane O'Connor 2015.
@@ -260,20 +260,18 @@ class ResidueIndexedPDBFile(object):
                 chain = line[21]
                 resid = line[22:27] # residue ID + insertion code
                 serial_number = int(line[6:11])
-                atom_group = None
+                element_name = None
                 if record_type == 'ATOM':
-                    atom_group = atom_name_to_group.get(atom_name)
-                    if not atom_group:
-                        # The convention seems to be that the first alphabetic character is the group
-                        for c in atom_name:
-                            if c.isalpha():
-                                atom_name_to_group[atom_name] = c
-                                atom_group = c
-                                break
+                    element_name = line[12:14].strip() # see the ATOM section of PDB format documentation. The element name is stored in these positions, right-justified.
+                    element_name = ''.join([w for w in element_name if w.isalpha()]) # e.g. 1
+                    if atom_name not in atom_name_to_group:
+                        atom_name_to_group[atom_name] = element_name
+                    else:
+                        assert(atom_name_to_group[atom_name] == element_name)
 
                 residues[chain] = residues.get(chain, {})
                 residues[chain][resid] = residues[chain].get(resid, Residue(chain, resid, line[17:20]))
-                new_atom = Atom(residues[chain][resid], atom_name, atom_group, serial_number, line[16])
+                new_atom = Atom(residues[chain][resid], atom_name, element_name, serial_number, line[16])
                 residues[chain][resid].add(record_type.strip(), new_atom)
 
                 if record_type in removable_xyz_records_types_with_atom_serial_numbers:
@@ -485,6 +483,21 @@ class Bonsai(ResidueIndexedPDBFile):
         #    identify all non-backbone_atoms
         #    split the Bonsai by these atoms
         pass
+
+
+    def find_residues_within_radius_of_residue_id(self, chain_id, residue_id, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
+        r = Residue(chain_id, PDB.ResidueID2String(residue_id), 'X')
+        return self.find_residues_within_radius_of_residue_objects([r], search_radius, find_ATOM_atoms = find_ATOM_atoms, find_HETATM_atoms = find_HETATM_atoms)
+
+
+    def find_residues_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
+        found_residues = set()
+        for source_residue in source_residues:
+            r = self.residues[source_residue.chain][source_residue.residue_id]
+            sidechain_atom_serial_numbers = self.find_sidechain_atoms_within_radius_of_residue_objects([r], search_radius, find_ATOM_atoms = find_ATOM_atoms, find_HETATM_atoms = find_HETATM_atoms)
+            for serial_no in sidechain_atom_serial_numbers:
+                found_residues.add(self.atoms[serial_no].residue)
+        return sorted(found_residues)
 
 
     def find_sidechain_atoms_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
