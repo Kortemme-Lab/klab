@@ -9,6 +9,16 @@ This package can be installed via:
   pip install klab
 
 To install via pip and allow git push/pulling, use:
+
+In a virtualenv:
 ::
   pip install -e git+ssh://git@github.com/Kortemme-Lab/klab.git#egg=Package
 
+In your user-directory:
+::
+  pip install --user -e git+ssh://git@github.com/Kortemme-Lab/klab.git#egg=Package
+
+In your user-directory, without using SSH:
+::
+  pip install --user -e git+https://github.com/Kortemme-Lab/klab.git#egg=Package
+  
