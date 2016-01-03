@@ -419,7 +419,6 @@ def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = Fal
         if gate_name.startswith('fsc'):
             gate = ThresholdGate(gate_val, 'FSC-A', region='above')
         elif gate_name.startswith('poly'):
-            print exp.name, nonblank_sample
             fsc_data = exp.samples[nonblank_sample].data['FSC-A']
             ssc_data = exp.samples[nonblank_sample].data['SSC-A']
             gate_m, gate_b = find_perpendicular_gating_line( exp.samples[nonblank_sample].data['FSC-A'], exp.samples[nonblank_sample].data['SSC-A'], gate_val)
@@ -436,8 +435,6 @@ def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = Fal
             polygon_xs = [x_min-fudge, x_min-fudge, (y_min-gate_b)/float(gate_m), x_max+fudge, x_max+fudge]
             polygon_ys = [y_max+fudge, gate_m*x_min+gate_b, y_min-fudge, y_min-fudge, y_max+fudge]
             gate = PolyGate(np.array([[x,y] for x, y in zip(polygon_xs, polygon_ys)]), ['FSC-A', 'SSC-A'], region='in', name='polygate')
-            print zip(polygon_xs, polygon_ys)
-            print
         if not fast_run:
             exp.samples[nonblank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color=(0.0, 0.0, 1.0), s=1, alpha=0.05, ax=ax, gates=[gate])
 
