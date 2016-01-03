@@ -156,7 +156,7 @@ class Plate:
         well_list = list(well_set)
         assert( len(well_list) == 1 )
         return self.samples[well_list[0]]
-    
+
     @property
     def experimental_parameters(self):
         experimental_parameters = []
@@ -365,7 +365,7 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
 
         if plot_one_sample and len(nonblank_samples) > 0:
             exp.samples[nonblank_samples[0]].plot(['FSC-A', 'SSC-A'], kind='scatter', color='green', s=1, alpha=0.1, ax=ax, gates=[gate])
-            
+
         for i, blank_sample in enumerate(blank_samples):
             if i == 0:
                 exp.samples[blank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color='red', s=2, alpha=1.0/float(len(blank_samples)), gates=[gate], label='Blank media', ax=ax)
@@ -389,7 +389,7 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
 def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = False):
     gated_plates_for_return = []
     row_axes = []
-    
+
     mean_diffs = {}
     nonblank_samples = sorted(list(exp.all_position_set))
 
