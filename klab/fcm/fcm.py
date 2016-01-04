@@ -386,31 +386,37 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
 
     return gated_plates_for_return
 
-def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = False):
+def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = False, florescence_channel = None, title=None):
     gated_plates_for_return = []
-    row_axes = []
 
     mean_diffs = {}
     nonblank_samples = sorted(list(exp.all_position_set))
 
-    figs_per_row = 4
-    num_fig_rows = min(figs_per_row, len(nonblank_samples))
-    num_fig_cols = 1 + ( len(nonblank_samples) - 1 ) / figs_per_row
-    gating_fig = plt.figure(figsize=(num_fig_rows*9, 11*num_fig_cols), dpi=600)
+    samples_per_row = 3
+    if florescence_channel:
+        plots_per_sample = 2
+    else:
+        plots_per_sample = 1
+
+    figs_per_row = samples_per_row * plots_per_sample
+    num_fig_rows = 1 + ( len(nonblank_samples) - 1 ) / samples_per_row
+    num_fig_cols = min(samples_per_row * plots_per_sample, len(nonblank_samples) * plots_per_sample)
+    gating_fig = plt.figure(figsize=(8.2*num_fig_cols, num_fig_rows*5.5), dpi=600)
+
+    if title:
+        plt.title('%s - %s' % (title, exp.name), fontsize=20)
+    else:
+        plt.title(exp.name, fontsize=20)
 
     current_fig_row = 1
     current_fig_col = 1
     current_fig_count = 1
     for sample_num, nonblank_sample in enumerate(nonblank_samples):
-        if len(row_axes) >= 1:
-            ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count, sharey=row_axes[0])
-        else:
-            ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
-        row_axes.append(ax)
+        #### FSC/SSC plot ####
+        ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
         if current_fig_col >= figs_per_row:
             current_fig_col = 1
             current_fig_row += 1
-            row_axes = []
         else:
             current_fig_col += 1
         current_fig_count += 1
@@ -438,10 +444,28 @@ def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = Fal
         if not fast_run:
             exp.samples[nonblank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color=(0.0, 0.0, 1.0), s=1, alpha=0.05, ax=ax, gates=[gate])
 
-        exp.gate_sample(gate, nonblank_sample)
-
         ax.grid(True)
 
+        #### Gate sample ####
+        exp.gate_sample(gate, nonblank_sample)
+
+        #### Florescence/Time plot ####
+        if florescence_channel:
+            ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
+            current_fig_count += 1
+            ax.set_title(str(nonblank_sample))
+
+            exp.samples[nonblank_sample].plot(['Time', florescence_channel], kind='scatter', color=(1.0, 0.0, 0.0), s=1, alpha=0.05, ax=ax,)
+
+        # #### Singlet plot ####
+        # ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
+        # current_fig_count += 1
+        # ax.set_title(str(nonblank_sample))
+
+        # print exp.samples[nonblank_sample].channel_names
+        # exp.samples[nonblank_sample].plot(['FSC-H', 'FSC-W'], kind='scatter', color=(0.0, 0.0, 1.0), s=1, alpha=0.05, ax=ax,)
+
+    gating_fig.tight_layout()
     gating_fig.savefig(os.path.join(fig_dir, 'gates-%s.png' % exp.name))
     gating_fig.clf()
     plt.close(gating_fig)
