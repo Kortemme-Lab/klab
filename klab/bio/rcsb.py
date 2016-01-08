@@ -76,17 +76,6 @@ def retrieve_pdb_ligand_info(pdb_id, silent = True):
     return retrieve_file_from_RCSB("http://www.rcsb.org/pdb/rest/ligandInfo?structureId={0}".format(pdb_id), silent = silent)
 
 
-def retrieve_pdb_ligand_info2(pdb_id, silent = True):
-    # todo: This is a nasty, platform-specific hack. Look into why retrieve_file_from_RCSB and urllib2 are not passing through the REST interface
-    # update: this seemed to be because my old code opened a new HTTPConnection each time. I now use the new http.Connection class.
-    tmp_filename = '/tmp/{0}.ligandinfo'.format(pdb_id.lower())
-    p = Popen('/tmp', shlex.split('wget http://www.rcsb.org/pdb/rest/ligandInfo?structureId={0} -O {1}'.format(pdb_id, tmp_filename)))
-    assert(p.errorcode == 0)
-    contents = read_file(tmp_filename)
-    os.remove(tmp_filename)
-    return contents
-
-
 def retrieve_ligand_diagram(pdb_ligand_code):
     file = BytesIO(urllib.urlopen('http://www.rcsb.org/pdb/images/{0}_600.gif'.format(pdb_ligand_code)).read())
     img = Image.open(file)
