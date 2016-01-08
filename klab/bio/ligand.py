@@ -324,7 +324,14 @@ class PDBLigand(Ligand):
 
     '''A subclass of Ligand used to represent instances of ligands in a PDB file.
        To save time processing the same ligand code multiple times per PDB, a Ligand object can be created and then instances
-       formed using the instantiate_from_ligand function.
+       formed using the instantiate_from_ligand function e.g.:
+
+       gtpl = PDBLigand('GTP')
+       for seq_id in ('A 123 ', 'A 149A'):
+           l = PDBLigand.instantiate_from_ligand(gtpl, seq_id[0], seq_id[1:])
+       for seq_id in (('A 152 ', 'GTP'),): # e.g. if the ligand was renamed ' X ' in the PDB file for some reason but was known to be GTP
+           l = PDBLigand.instantiate_from_ligand(gtpl, seq_id[0][0], seq_id[0][1:], pdb_ligand_code = seq_id[1])
+
     '''
 
     def __init__(self, ligand_code, chain_id = None, sequence_id = None, pdb_ligand_code = None):
@@ -337,9 +344,9 @@ class PDBLigand(Ligand):
 
     def set_id(self, chain_id, sequence_id):
         if sequence_id:
+            # Require all five columns from the PDB file.'''
             assert(len(sequence_id) == 5 and sequence_id[:4].strip().isdigit())
             self.SequenceID = sequence_id
-        if sequence_id:
             assert(len(chain_id) == 1)
             self.Chain = chain_id
 
