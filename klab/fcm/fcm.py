@@ -15,6 +15,9 @@ import os, FlowCytometryTools
 import pylab as P
 import numpy as np
 import scipy
+use_multiprocessing = True
+if use_multiprocessing:
+    import multiprocessing as mp
 
 class PlatePos:
     def __init__ (self, plate_position_str):
@@ -153,7 +156,7 @@ class Plate:
         well_list = list(well_set)
         assert( len(well_list) == 1 )
         return self.samples[well_list[0]]
-    
+
     @property
     def experimental_parameters(self):
         experimental_parameters = []
@@ -164,8 +167,22 @@ class Plate:
         return experimental_parameters
 
     def gate(self, gate):
-        for pos in self.samples:
-            self.samples[pos] = self.samples[pos].gate(gate)
+        if use_multiprocessing:
+            pool = mp.Pool()
+            for pos in self.samples:
+                pool.apply_async(gate_data, (pos, self.samples[pos], gate), callback=self.set_gate)
+            pool.close()
+            pool.join()
+        else:
+            for pos in self.samples:
+                self.samples[pos] = self.samples[pos].gate(gate)
+
+    def gate_sample(self, gate, pos):
+        self.samples[pos] = self.samples[pos].gate(gate)
+
+    def set_gate(self, tup):
+        pos, fcs_data = tup
+        self.samples[pos] = fcs_data
 
     def load_fcs_dir(self, sample_directory, verbose=False):
         fcs_files = find_fcs_files(sample_directory)
@@ -174,6 +191,9 @@ class Plate:
             self.samples[plate_pos] = FCMeasurement(ID=str(plate_pos), datafile=filepath)
         if verbose:
             print 'Loaded %d FCS files from directory %s' % (len(fcs_files), sample_directory)
+
+def gate_data(pos, fcs_data, gate):
+    return (pos, fcs_data.gate(gate))
 
 class FCSFile:
     def __init__ (self, filepath, plate_position_str):
@@ -287,7 +307,7 @@ def find_perpendicular_gating_line(x_data, y_data, threshold):
     # y = mx + b
     m, b, r, p, stderr = scipy.stats.linregress(x_data, y_data)
     inv_m = -1.0 / m
-    inv_b = y_max
+    inv_b = np.median( y_data )
     percent_above_line = points_above_line(x_data, y_data, inv_m, inv_b) / float(len(x_data))
     desired_points_above_line = int(threshold * len(x_data))
     def obj_helper(calc_b):
@@ -303,7 +323,7 @@ def mean_confidence_interval(data, confidence=0.95):
     h = se * scipy.stats.t._ppf((1+confidence)/2., n-1)
     return m, m-h, m+h
 
-def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, blank_samples=[]):
+def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, blank_samples=[], plot_one_sample=False):
     gating_fig = plt.figure(figsize=(len(plate_list)*9, 11), dpi=600)
     gated_plates_for_return = []
     gating_axes = []
@@ -323,10 +343,10 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
             all_exp_data_fsc = []
             all_exp_data_ssc = []
             for i, nonblank_sample in enumerate(nonblank_samples):
-                if not fast_run:
-                    exp.samples[nonblank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color=np.random.rand(3,1), s=1, alpha=0.1, ax=ax)
                 all_exp_data_fsc.append( exp.samples[nonblank_sample].data['FSC-A'] )
                 all_exp_data_ssc.append( exp.samples[nonblank_sample].data['SSC-A'] )
+                if not fast_run:
+                    exp.samples[nonblank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color=np.random.rand(3,1), s=1, alpha=0.1, ax=ax)
 
             gate_m, gate_b = find_perpendicular_gating_line( np.concatenate(all_exp_data_fsc), np.concatenate(all_exp_data_ssc), gate_val)
 
@@ -342,6 +362,9 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
             polygon_xs = [x_min-fudge, x_min-fudge, (y_min-gate_b)/float(gate_m), x_max+fudge, x_max+fudge]
             polygon_ys = [y_max+fudge, gate_m*x_min+gate_b, y_min-fudge, y_min-fudge, y_max+fudge]
             gate = PolyGate(np.array([[x,y] for x, y in zip(polygon_xs, polygon_ys)]), ['FSC-A', 'SSC-A'], region='in', name='polygate')
+
+        if plot_one_sample and len(nonblank_samples) > 0:
+            exp.samples[nonblank_samples[0]].plot(['FSC-A', 'SSC-A'], kind='scatter', color='green', s=1, alpha=0.1, ax=ax, gates=[gate])
 
         for i, blank_sample in enumerate(blank_samples):
             if i == 0:
@@ -362,6 +385,93 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
     del gating_fig
 
     return gated_plates_for_return
+
+def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = False, florescence_channel = None, title=None):
+    gated_plates_for_return = []
+
+    mean_diffs = {}
+    nonblank_samples = sorted(list(exp.all_position_set))
+
+    samples_per_row = 3
+    if florescence_channel:
+        plots_per_sample = 2
+    else:
+        plots_per_sample = 1
+
+    figs_per_row = samples_per_row * plots_per_sample
+    num_fig_rows = 1 + ( len(nonblank_samples) - 1 ) / samples_per_row
+    num_fig_cols = min(samples_per_row * plots_per_sample, len(nonblank_samples) * plots_per_sample)
+    gating_fig = plt.figure(figsize=(8.2*num_fig_cols, num_fig_rows*5.5), dpi=600)
+
+    if title:
+        plt.title('%s - %s' % (title, exp.name), fontsize=20)
+    else:
+        plt.title(exp.name, fontsize=20)
+
+    current_fig_row = 1
+    current_fig_col = 1
+    current_fig_count = 1
+    for sample_num, nonblank_sample in enumerate(nonblank_samples):
+        #### FSC/SSC plot ####
+        ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
+        if current_fig_col >= figs_per_row:
+            current_fig_col = 1
+            current_fig_row += 1
+        else:
+            current_fig_col += 1
+        current_fig_count += 1
+        ax.set_title(str(nonblank_sample))
+
+        if gate_name.startswith('fsc'):
+            gate = ThresholdGate(gate_val, 'FSC-A', region='above')
+        elif gate_name.startswith('poly'):
+            fsc_data = exp.samples[nonblank_sample].data['FSC-A']
+            ssc_data = exp.samples[nonblank_sample].data['SSC-A']
+            gate_m, gate_b = find_perpendicular_gating_line( exp.samples[nonblank_sample].data['FSC-A'], exp.samples[nonblank_sample].data['SSC-A'], gate_val)
+
+            fsc_ssc_axis_limits = (-50000, 100000)
+
+            x_max = np.amax(fsc_data)
+            x_min = np.amin(fsc_data)
+            y_max = np.amax(ssc_data)
+            y_min = np.amin(ssc_data)
+            ax.set_ylim(fsc_ssc_axis_limits)
+            ax.set_xlim(fsc_ssc_axis_limits)
+            fudge = 1.0
+            polygon_xs = [x_min-fudge, x_min-fudge, (y_min-gate_b)/float(gate_m), x_max+fudge, x_max+fudge]
+            polygon_ys = [y_max+fudge, gate_m*x_min+gate_b, y_min-fudge, y_min-fudge, y_max+fudge]
+            gate = PolyGate(np.array([[x,y] for x, y in zip(polygon_xs, polygon_ys)]), ['FSC-A', 'SSC-A'], region='in', name='polygate')
+        if not fast_run:
+            exp.samples[nonblank_sample].plot(['FSC-A', 'SSC-A'], kind='scatter', color=(0.0, 0.0, 1.0), s=1, alpha=0.05, ax=ax, gates=[gate])
+
+        ax.grid(True)
+
+        #### Gate sample ####
+        exp.gate_sample(gate, nonblank_sample)
+
+        #### Florescence/Time plot ####
+        if florescence_channel:
+            ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
+            current_fig_count += 1
+            ax.set_title(str(nonblank_sample))
+
+            exp.samples[nonblank_sample].plot(['Time', florescence_channel], kind='scatter', color=(1.0, 0.0, 0.0), s=1, alpha=0.05, ax=ax,)
+
+        # #### Singlet plot ####
+        # ax = gating_fig.add_subplot(num_fig_rows, num_fig_cols, current_fig_count)
+        # current_fig_count += 1
+        # ax.set_title(str(nonblank_sample))
+
+        # print exp.samples[nonblank_sample].channel_names
+        # exp.samples[nonblank_sample].plot(['FSC-H', 'FSC-W'], kind='scatter', color=(0.0, 0.0, 1.0), s=1, alpha=0.05, ax=ax,)
+
+    gating_fig.tight_layout()
+    gating_fig.savefig(os.path.join(fig_dir, 'gates-%s.png' % exp.name))
+    gating_fig.clf()
+    plt.close(gating_fig)
+    del gating_fig
+
+    return exp
 
 if __name__ == '__main__':
     output_medians_and_sums()
