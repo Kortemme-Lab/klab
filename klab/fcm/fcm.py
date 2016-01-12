@@ -386,7 +386,7 @@ def make_gating_fig(plate_list, gate_val, gate_name, fig_dir, fast_run = False, 
 
     return gated_plates_for_return
 
-def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = False, florescence_channel = None, title=None):
+def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = False, florescence_channel = None, title=None, tight_layout = True):
     gated_plates_for_return = []
 
     mean_diffs = {}
@@ -465,7 +465,8 @@ def make_individual_gating_fig(exp, gate_val, gate_name, fig_dir, fast_run = Fal
         # print exp.samples[nonblank_sample].channel_names
         # exp.samples[nonblank_sample].plot(['FSC-H', 'FSC-W'], kind='scatter', color=(0.0, 0.0, 1.0), s=1, alpha=0.05, ax=ax,)
 
-    gating_fig.tight_layout()
+    if tight_layout:
+        gating_fig.tight_layout()
     gating_fig.savefig(os.path.join(fig_dir, 'gates-%s.png' % exp.name))
     gating_fig.clf()
     plt.close(gating_fig)
