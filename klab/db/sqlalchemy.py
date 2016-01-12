@@ -33,6 +33,52 @@ from mysql import DatabaseInterface
 #        but I need to read the documentation.
 
 
+
+def get_single_record_from_query(result_set):
+    '''Helper function to return the single result from a query. We assume that either a result does not exist or exactly
+       one exists. Returns None in the former case and the result in the latter case.'''
+    assert(result_set.count() <= 1)
+    if result_set.count() == 1:
+        return result_set[0]
+
+
+def get_or_create_in_transaction(tsession, model, values, missing_columns = []):
+    '''
+    Uses the SQLAlchemy model to retrieve an existing record based on the supplied field values or, if there is no
+    existing record, to create a new database record.
+    :param tsession: An SQLAlchemy transactioned session
+    :param model: The name of the SQLAlchemy class representing the table
+    :param values: A dict of values which will be used to populate the fields of the model
+    :param missing_columns: Elements of missing_columns are expected to be fields in the model but are left blank regardless of whether they exist in values. This is useful for auto_increment fields.
+    :return:
+    '''
+
+    values = copy.deepcopy(values) # todo: this does not seem to be necessary since we do not seem to be writing
+
+    fieldnames = [c.name for c in list(sqlalchemy_inspect(model).columns)]
+    for c in missing_columns:
+        fieldnames.remove(c)
+
+    pruned_values = {}
+    for k in set(values.keys()).intersection(set(fieldnames)):
+        v = values[k]
+        pruned_values[k] = v
+    assert(sorted(pruned_values.keys()) == sorted(fieldnames))
+
+    instance = tsession.query(model).filter_by(**pruned_values)
+    if instance.count() > 1:
+        raise Exception('Multiple records were found with the search criteria.')
+    instance = instance.first()
+
+    if instance:
+        return instance
+    else:
+        instance = model(**pruned_values)
+        tsession.add(instance)
+        tsession.flush()
+        return instance
+
+
 class IntermediateField(object):
 
 
