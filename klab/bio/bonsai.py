@@ -411,23 +411,22 @@ class Bonsai(ResidueIndexedPDBFile):
     ### Base functionality
 
 
-    def find_heavy_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set()):
+    def find_heavy_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set(), restrict_to_CA = False):
         '''atom_hit_cache is a set of atom serial numbers which have already been tested. We keep track of these to avoid recalculating the distance.
         '''
         #todo: Benchmark atom_hit_cache to see if it actually speeds up the search
 
         non_heavy_atoms = self.get_atom_names_by_group(set(['H', 'D', 'T']))
-        return self.find_atoms_near_atom(source_atom, search_radius, atom_names_to_exclude = non_heavy_atoms, atom_hit_cache = atom_hit_cache)
+        return self.find_atoms_near_atom(source_atom, search_radius, atom_names_to_exclude = non_heavy_atoms, atom_hit_cache = atom_hit_cache, restrict_to_CA = restrict_to_CA)
 
 
-    def find_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set(), atom_names_to_include = set(), atom_names_to_exclude = set()):
+    def find_atoms_near_atom(self, source_atom, search_radius, atom_hit_cache = set(), atom_names_to_include = set(), atom_names_to_exclude = set(), restrict_to_CA = False):
         '''It is advisable to set up and use an atom hit cache object. This reduces the number of distance calculations and gives better performance.
            See find_sidechain_atoms_within_radius_of_residue_objects for an example of how to set this up e.g.
                atom_hit_cache = set()
                for x in some_loop:
                    this_object.find_atoms_near_atom(source_atom, search_radius, atom_hit_cache = atom_hit_cache)
         '''
-
         if len(atom_names_to_include) > 0 and len(atom_names_to_exclude) > 0:
             raise Exception('Error: either one of the set of atoms types to include or the set of atom types to exclude can be set but not both.')
 
@@ -448,8 +447,12 @@ class Bonsai(ResidueIndexedPDBFile):
                     for z in zrange:
                         for atom in atom_bins[x][y][z]:
                             if atom not in atom_hit_cache:
-                                if (source_atom - atom <= search_radius) and (atom.name not in atom_names_to_exclude):
-                                    atom_hit_cache.add(atom)
+                                if restrict_to_CA:
+                                    if atom.name == 'CA' and (source_atom - atom <= search_radius):
+                                        atom_hit_cache.add(atom)
+                                else:
+                                    if (source_atom - atom <= search_radius) and (atom.name not in atom_names_to_exclude):
+                                        atom_hit_cache.add(atom)
 
             return atom_hit_cache
 
@@ -485,22 +488,22 @@ class Bonsai(ResidueIndexedPDBFile):
         pass
 
 
-    def find_residues_within_radius_of_residue_id(self, chain_id, residue_id, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
+    def find_residues_within_radius_of_residue_id(self, chain_id, residue_id, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False, restrict_to_CA = False):
         r = Residue(chain_id, PDB.ResidueID2String(residue_id), 'X')
-        return self.find_residues_within_radius_of_residue_objects([r], search_radius, find_ATOM_atoms = find_ATOM_atoms, find_HETATM_atoms = find_HETATM_atoms)
+        return self.find_residues_within_radius_of_residue_objects([r], search_radius, find_ATOM_atoms = find_ATOM_atoms, find_HETATM_atoms = find_HETATM_atoms, restrict_to_CA = restrict_to_CA)
 
 
-    def find_residues_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
+    def find_residues_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False, restrict_to_CA = False):
         found_residues = set()
         for source_residue in source_residues:
             r = self.residues[source_residue.chain][source_residue.residue_id]
-            sidechain_atom_serial_numbers = self.find_sidechain_atoms_within_radius_of_residue_objects([r], search_radius, find_ATOM_atoms = find_ATOM_atoms, find_HETATM_atoms = find_HETATM_atoms)
+            sidechain_atom_serial_numbers = self.find_sidechain_atoms_within_radius_of_residue_objects([r], search_radius, find_ATOM_atoms = find_ATOM_atoms, find_HETATM_atoms = find_HETATM_atoms, restrict_to_CA = restrict_to_CA)
             for serial_no in sidechain_atom_serial_numbers:
                 found_residues.add(self.atoms[serial_no].residue)
         return sorted(found_residues)
 
 
-    def find_sidechain_atoms_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False):
+    def find_sidechain_atoms_within_radius_of_residue_objects(self, source_residues, search_radius, find_ATOM_atoms = True, find_HETATM_atoms = False, restrict_to_CA = False):
         '''for residue in source_residues:
              for all heavy atoms in residue
                find all heavy atoms within radius which are within residues (ATOM records)
@@ -514,10 +517,10 @@ class Bonsai(ResidueIndexedPDBFile):
         for residue in source_residues:
             if find_ATOM_atoms:
                 for aatom in residue.get('ATOM'):
-                    self.find_heavy_atoms_near_atom(aatom, search_radius, atom_hit_cache = atom_hit_cache)
+                    self.find_heavy_atoms_near_atom(aatom, search_radius, atom_hit_cache = atom_hit_cache, restrict_to_CA = restrict_to_CA)
             if find_HETATM_atoms:
                 for hatom in residue.get('HETATM'):
-                    self.find_heavy_atoms_near_atom(hatom, search_radius, atom_hit_cache = atom_hit_cache)
+                    self.find_heavy_atoms_near_atom(hatom, search_radius, atom_hit_cache = atom_hit_cache, restrict_to_CA = restrict_to_CA)
 
         # Get the list of source_residues
         loop_residue_ids = set()

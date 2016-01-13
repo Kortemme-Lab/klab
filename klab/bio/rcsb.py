@@ -14,17 +14,28 @@ from PIL import Image
 import urllib
 import shlex
 
-from klab.comms.http import get_resource
+from klab.comms.http import Connection
 from klab.fs.fsio import read_file, write_file
 from klab import colortext
 from klab.process import Popen
 
 
+rcsb_connection = None
+
+
+def get_rcsb_connection():
+    global rcsb_connection
+    if not rcsb_connection:
+        rcsb_connection = Connection('www.rcsb.org')
+    return rcsb_connection
+
+
 def retrieve_file_from_RCSB(resource, silent = True):
     '''Retrieve a file from the RCSB.'''
+    get_rcsb_connection()
     if not silent:
         colortext.printf("Retrieving %s from RCSB" % os.path.split(resource)[1], color = "aqua")
-    return get_resource("www.rcsb.org", resource)
+    return rcsb_connection.get(resource)
 
 
 def download_pdb(pdb_id, dest_dir, silent = True, filename = None):
@@ -62,13 +73,7 @@ def retrieve_ligand_cif(ligand_id, silent = True):
 
 
 def retrieve_pdb_ligand_info(pdb_id, silent = True):
-    # todo: This is a nasty, platform-specific hack. Look into why retrieve_file_from_RCSB and urllib2 are not passing through the REST interface
-    tmp_filename = '/tmp/{0}.ligandinfo'.format(pdb_id.lower())
-    p = Popen('/tmp', shlex.split('wget http://www.rcsb.org/pdb/rest/ligandInfo?structureId={0} -O {1}'.format(pdb_id, tmp_filename)))
-    assert(p.errorcode == 0)
-    contents = read_file(tmp_filename)
-    os.remove(tmp_filename)
-    return contents
+    return retrieve_file_from_RCSB("http://www.rcsb.org/pdb/rest/ligandInfo?structureId={0}".format(pdb_id), silent = silent)
 
 
 def retrieve_ligand_diagram(pdb_ligand_code):

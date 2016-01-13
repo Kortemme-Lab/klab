@@ -273,6 +273,7 @@ class NonCanonicalResidueException(Exception): pass
 class PDBValidationException(Exception): pass
 class PDBMissingMainchainAtomsException(Exception): pass
 
+
 class JRNL(object):
 
     def __init__(self, lines):
@@ -284,8 +285,10 @@ class JRNL(object):
         self.parse_REFN()
         self.parse_DOI()
 
+
     def get_info(self):
         return self.d
+
 
     def parse_REF(self):
         lines = [line for line in self.d["lines"] if line.startswith("JRNL        REF ")]
@@ -339,6 +342,7 @@ class JRNL(object):
             self.d["REF"] = {}
             self.d["published"] = False
 
+
     def parse_REFN(self):
         PRELUDE = "JRNL        REFN"
         if not self.d.get("published"):
@@ -361,6 +365,7 @@ class JRNL(object):
                 self.d["REFN"] = {"type" : type, "ID" : ID}
         else:
             assert(line.strip() == PRELUDE)
+
 
     def parse_DOI(self):
         lines = [line for line in self.d["lines"] if line.startswith("JRNL        DOI ")]
@@ -1147,6 +1152,7 @@ class PDB(object):
 
         return [v for k, v in sorted(molecules.iteritems())]
 
+
     def get_journal(self):
         if self.parsed_lines["JRNL  "]:
             if not self.journal:
@@ -1154,7 +1160,9 @@ class PDB(object):
             return self.journal.get_info()
         return None
 
+
     ### Sequence-related functions ###
+
 
     def _get_SEQRES_sequences(self):
         '''Creates the SEQRES Sequences and stores the chains in order of their appearance in the SEQRES records. This order of chains
@@ -1231,6 +1239,7 @@ class PDB(object):
 
             # Get the sequence, mapping non-canonicals to the appropriate letter
             self.chain_types[chain_id] = chain_type
+
             sequence = []
             if chain_type == 'DNA':
                 for r in tokens:
@@ -1307,7 +1316,7 @@ class PDB(object):
 
         present_chain_ids = {}
         for l in self.structure_lines:
-            if len(l) > 21:
+            if len(l) > 21 and l[:3] != 'TER':
                 present_chain_ids[l[21]] = present_chain_ids.get(l[21], set())
                 present_chain_ids[l[21]].add(l[:6])
 
