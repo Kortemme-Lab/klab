@@ -402,3 +402,8 @@ class SimplePDBLigand():
         if self.Names:
             s.append('(' + ', '.join([n for n in self.Names]) + ')')
         return ', '.join(s)
+
+
+class PDBIon(SimplePDBLigand):
+    '''A simple container class for the basic ion properties described in PDB files.'''
+    pass
