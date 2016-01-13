@@ -39,7 +39,7 @@ try:
 except:
     pass
 
-from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_molecule_descriptions
+from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_solutions, common_solution_ids
 from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
 from klab.bio.ligand import SimplePDBLigand, PDBIon
 from klab import colortext
@@ -1232,11 +1232,7 @@ class PDB(object):
                 chain_type = 'Unknown'
             elif not(set_of_tokens.intersection(canonical_acid_types)):
                 # Zero canonical residues may imply a ligand or a heterogen chain
-                canonical_molecules_id_lengths = set(map(len, set_of_tokens))
-                if len(canonical_molecules_id_lengths) == 1 and 3 in canonical_molecules_id_lengths:
-                    chain_type = 'Ligand'
-                else:
-                    chain_type = 'Heterogen'
+                chain_type = PDB._determine_heterogen_chain_type(set_of_tokens)
             else:
                 assert(len(set(tokens).intersection(dna_nucleotides)) == 0)
                 assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
@@ -1382,11 +1378,7 @@ class PDB(object):
                     else:
                         determined_chain_type = 'Protein'
                 else:
-                    canonical_molecules_id_lengths = set(map(len, canonical_molecules))
-                    if len(canonical_molecules_id_lengths) == 1 and 3 in canonical_molecules_id_lengths:
-                        determined_chain_type = 'Ligand'
-                    else:
-                        determined_chain_type = 'Heterogen'
+                    determined_chain_type = PDB._determine_heterogen_chain_type(canonical_molecules)
 
                 if self.chain_types.get(chain_id):
                     assert(self.chain_types[chain_id] == determined_chain_type)
@@ -1477,17 +1469,11 @@ class PDB(object):
                     for char in short_residue_type:
                         atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], char, chain_type))
 
-        # Assign 'Ligand' to all HETATM-only chains
-        for c in present_chain_ids.keys():
-            if c not in self.chain_types:
-                assert('ATOM' not in present_chain_ids[c])
-                molecules_id_lengths = set(map(len, hetatm_map.get(c, [])))
-                if len(molecules_id_lengths) == 1:
-                    if 3 in molecules_id_lengths:
-                        self.chain_types[c] = 'Ligand'
-                    else:
-                        self.chain_types[c] = 'Heterogen'
-
+        # Assign 'Ligand' or 'Heterogen' to all HETATM-only chains
+        for chain_id in present_chain_ids.keys():
+            if chain_id not in self.chain_types:
+                assert('ATOM  ' not in present_chain_ids[chain_id])
+                self.chain_types[chain_id] = PDB._determine_heterogen_chain_type(hetatm_map.get(chain_id, set()))
         self.atom_sequences = atom_sequences
 
 
@@ -1718,6 +1704,24 @@ class PDB(object):
         assert(mutation.WildTypeAA == residue_type_3to1_map[readwt])
 
 
+    ### Chain type determination ###
+
+
+    @staticmethod
+    def _determine_heterogen_chain_type(residue_types):
+        '''We distinguish three types of heterogen chain: i) all solution; ii) all ligand; or iii) other (a mix of solution, ligand, and/or ions).
+           residue_types should be a Set of sequence identifers e.g. GTP, ZN, HOH.
+        '''
+        residue_type_id_lengths = set(map(len, residue_types))
+        if (len(residue_types) > 0):
+            if len(residue_types.difference(common_solution_ids)) == 0:
+                return 'Solution'
+            elif (len(residue_type_id_lengths) == 1) and (3 in residue_type_id_lengths) and (len(residue_types.difference(common_solution_ids)) > 0):
+                # The last expression discounts chains which only contain solution molecules e.g. HOH
+                return 'Ligand'
+        return 'Heterogen'
+
+
     ### Ligand functions ###
 
 
@@ -1860,7 +1864,7 @@ class PDB(object):
             continuation = formul_line[16:18].strip()
             asterisk = formul_line[18].strip()
             if asterisk:
-                assert(het_id in common_molecule_descriptions) # ignore waters: "PDB entries do not have HET records for water molecules, deuterated water, or methanol (when used as solvent)"
+                assert(het_id in common_solutions) # ignore waters: "PDB entries do not have HET records for water molecules, deuterated water, or methanol (when used as solvent)"
             formula = formul_line[19:]
             if continuation:
                 assert(het_id in het_formulae)
@@ -1876,7 +1880,7 @@ class PDB(object):
             het_seq_id = het_line[13:18] # similar to 5-character residue ID
             description = het_line[30:].strip() or None
             numHetAtoms = int(het_line[20:25].strip())
-            assert(het_id not in common_molecule_descriptions)
+            assert(het_id not in common_solutions)
             if len(het_id) == 3:
                 lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
                 self.ligands[chain_id] = self.ligands.get(chain_id, {})
@@ -1914,9 +1918,9 @@ class PDB(object):
             for het_seq_id, tpl in sorted(seq_ids.iteritems()):
                 het_id = tpl[0]
                 numHetAtoms  = tpl[1]
-                description = common_molecule_descriptions.get(het_id, het_id)
+                description = common_solutions.get(het_id, het_id)
                 formula = None
-                if het_id in common_molecule_descriptions:
+                if het_id in common_solutions:
                     formula = het_id
                     assert(1 <= numHetAtoms <= 3)
                     self.solution[chain_id] = self.solution.get(chain_id, {})

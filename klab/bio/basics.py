@@ -134,11 +134,12 @@ non_canonical_amino_acids = {
 }
 
 
-common_molecule_descriptions = {
+common_solutions = {
     'HOH'   : 'Water',
     'DOD'   : 'Deuterated water',
     # methanol as solvent is?
 }
+common_solution_ids = set(common_solutions.keys())
 
 
 ###
