@@ -146,7 +146,7 @@ class Reporter:
         else:
             return time.time() - self.start
 
-def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
+def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
     # Add ddglib and klab to path
     if not os.path.lexists('klab'):
         os.symlink( os.path.expanduser('~/gits/klab'), 'klab' )
@@ -227,7 +227,7 @@ def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, sc
 
     return finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=verbosity, move_output_files=move_output_files)
 
-def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=False):
+def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=True):
     time_start = roundTime()
 
     if verbosity >= 1:
@@ -305,13 +305,14 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
     # Check if on SGE to move special output files and calculate RAM usage
     ram_usage = None
     ram_usage_type = None
-    if run_on_sge and move_output_files:
-        try:
-            # Encase this in try block in case script_name is wrong
-            shutil.move("%s.o%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
-            shutil.move("%s.e%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
-        except IOError:
-            print 'Failed moving script files, check stored name'
+    if run_on_sge:
+        if move_output_files:
+            try:
+                # Encase this in try block in case script_name is wrong
+                shutil.move("%s.o%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
+                shutil.move("%s.e%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
+            except IOError:
+                print 'Failed moving script files, check script name'
 
         qstat_p = subprocess.Popen(['/usr/local/sge/bin/linux-x64/qstat', '-j', '%d' % job_id],
                                    stdout=subprocess.PIPE)
@@ -334,7 +335,7 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
 
     return time_end
 
-def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
+def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
     if os.path.isfile(job_pickle_file):
         p = open(job_pickle_file,'r')
         job_dict = pickle.load(p)
