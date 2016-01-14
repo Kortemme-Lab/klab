@@ -31,6 +31,7 @@ import types
 import string
 import pprint
 import types
+import copy
 
 # Only certain functions rely on the pandas library
 try:
@@ -38,9 +39,9 @@ try:
 except:
     pass
 
-from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter
+from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_solutions, common_solution_ids
 from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
-from klab.bio.ligand import SimplePDBLigand
+from klab.bio.ligand import SimplePDBLigand, PDBIon
 from klab import colortext
 from klab.fs.fsio import read_file, write_file
 from klab.pymath.stats import get_mean_and_standard_deviation
@@ -410,6 +411,8 @@ class PDB(object):
         self.atom_sequences = {}                        # A dict mapping chain IDs to ATOM Sequence objects
         self.chain_atoms = {}                           # A dict mapping chain IDs to a set of ATOM types. This is useful to test whether some chains only have CA entries e.g. in 1LRP, 1AIN, 1C53, 1HIO, 1XAS, 2TMA
         self.ligands = {}                               # A dict mapping chain IDs to ligands
+        self.ions = {}                                  # A dict mapping chain IDs to ions
+        self.solution = {}                              # A dict mapping chain IDs to solution molecules (typically water)
 
         # PDB deprecation fields
         self.deprecation_date = None
@@ -433,7 +436,11 @@ class PDB(object):
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
         self.hetatm_formulae = PDB.convert_hetatms_to_Hill_notation(self.parsed_lines['HETATM'])
-        self._get_ligands()
+        self._get_heterogens()
+
+
+    def __repr__(self):
+        return '\n'.join(self.lines)
 
 
     def fix_pdb(self):
@@ -1224,8 +1231,8 @@ class PDB(object):
             elif len(set_of_tokens) == 1 and 'UNK' in set_of_tokens:
                 chain_type = 'Unknown'
             elif not(set_of_tokens.intersection(canonical_acid_types)):
-                # Zero canonical residues may imply a ligand
-                chain_type = 'Ligand'
+                # Zero canonical residues may imply a ligand or a heterogen chain
+                chain_type = PDB._determine_heterogen_chain_type(set_of_tokens)
             else:
                 assert(len(set(tokens).intersection(dna_nucleotides)) == 0)
                 assert(len(set(tokens).intersection(rna_nucleotides)) == 0)
@@ -1324,8 +1331,10 @@ class PDB(object):
         residue_lines_by_chain.append([])
         structural_residue_IDs_set.append(set())
         full_code_map = {}
+        hetatm_map = {}
         full_atom_map = {}
         for l in self.structure_lines:
+            chain_id = None
             if l.startswith("TER   "):
                 model_index += 1
                 residue_lines_by_chain.append([])
@@ -1344,6 +1353,10 @@ class PDB(object):
                     # Only use ATOM records to build the atom map as CA-only chains can have ligands described in full as HETATMs
                     full_atom_map[chain_id] = full_atom_map.get(chain_id, set())
                     full_atom_map[chain_id].add(l[12:16].strip())
+                elif l.startswith('HETATM'):
+                    chain_id = l[21]
+                    hetatm_map[chain_id] = hetatm_map.get(chain_id, set())
+                    hetatm_map[chain_id].add(l[17:20].strip())
 
         # Get the residues used by the residue lines. These can be used to determine the chain type if the header is missing.
         for chain_id in self.atom_chain_order:
@@ -1365,7 +1378,7 @@ class PDB(object):
                     else:
                         determined_chain_type = 'Protein'
                 else:
-                    determined_chain_type = 'Ligand'
+                    determined_chain_type = PDB._determine_heterogen_chain_type(canonical_molecules)
 
                 if self.chain_types.get(chain_id):
                     assert(self.chain_types[chain_id] == determined_chain_type)
@@ -1456,12 +1469,11 @@ class PDB(object):
                     for char in short_residue_type:
                         atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], char, chain_type))
 
-        # Assign "Ligand" to all HETATM-only chains
-        for c in present_chain_ids.keys():
-            if c not in self.chain_types:
-                assert('ATOM' not in present_chain_ids[c])
-                self.chain_types[c] = 'Ligand'
-
+        # Assign 'Ligand' or 'Heterogen' to all HETATM-only chains
+        for chain_id in present_chain_ids.keys():
+            if chain_id not in self.chain_types:
+                assert('ATOM  ' not in present_chain_ids[chain_id])
+                self.chain_types[chain_id] = PDB._determine_heterogen_chain_type(hetatm_map.get(chain_id, set()))
         self.atom_sequences = atom_sequences
 
 
@@ -1692,6 +1704,24 @@ class PDB(object):
         assert(mutation.WildTypeAA == residue_type_3to1_map[readwt])
 
 
+    ### Chain type determination ###
+
+
+    @staticmethod
+    def _determine_heterogen_chain_type(residue_types):
+        '''We distinguish three types of heterogen chain: i) all solution; ii) all ligand; or iii) other (a mix of solution, ligand, and/or ions).
+           residue_types should be a Set of sequence identifers e.g. GTP, ZN, HOH.
+        '''
+        residue_type_id_lengths = set(map(len, residue_types))
+        if (len(residue_types) > 0):
+            if len(residue_types.difference(common_solution_ids)) == 0:
+                return 'Solution'
+            elif (len(residue_type_id_lengths) == 1) and (3 in residue_type_id_lengths) and (len(residue_types.difference(common_solution_ids)) > 0):
+                # The last expression discounts chains which only contain solution molecules e.g. HOH
+                return 'Ligand'
+        return 'Heterogen'
+
+
     ### Ligand functions ###
 
 
@@ -1703,7 +1733,7 @@ class PDB(object):
 
 
     @staticmethod
-    def convert_hetatms_to_Hill_notation(lines, ignore_list = ['HOH']):
+    def convert_hetatms_to_Hill_notation(lines, ignore_list = []):#['HOH']):
         '''From the PDB site:
            The elements of the chemical formula are given in the order following Hill ordering. The order of elements depends
            on whether carbon is present or not. If carbon is present, the order should be: C, then H, then the other elements
@@ -1763,7 +1793,31 @@ class PDB(object):
         return sorted(ligand_codes)
 
 
-    def _get_ligands(self):
+    def get_ion_codes(self):
+        ion_codes = set()
+        for c, cions in self.ions.iteritems():
+            for seq_id, i in cions.iteritems():
+                ion_codes.add(i.PDBCode)
+        return sorted(ion_codes)
+
+
+    def get_solution_residue_ids(self, chain_id = None, solution_id = None):
+        if chain_id:
+            solution = self.solution.get(chain_id, {})
+            if solution_id:
+                return self.solution.get(chain_id, {}).get(solution_id, [])
+            return self.solution.get(chain_id, {})
+        else:
+            if solution_id:
+                d = {}
+                for chain_id, solution_residue_ids in self.solution.iteritems():
+                    d[chain_id] = copy.deepcopy(self.solution[chain_id].get(solution_id, []))
+                return d
+            else:
+                return self.solution
+
+
+    def _get_heterogens(self):
         het_ids = set()
 
         # Parse HETATM names
@@ -1810,8 +1864,7 @@ class PDB(object):
             continuation = formul_line[16:18].strip()
             asterisk = formul_line[18].strip()
             if asterisk:
-                assert(het_id == 'HOH') # ignore waters
-                continue
+                assert(het_id in common_solutions) # ignore waters: "PDB entries do not have HET records for water molecules, deuterated water, or methanol (when used as solvent)"
             formula = formul_line[19:]
             if continuation:
                 assert(het_id in het_formulae)
@@ -1827,11 +1880,64 @@ class PDB(object):
             het_seq_id = het_line[13:18] # similar to 5-character residue ID
             description = het_line[30:].strip() or None
             numHetAtoms = int(het_line[20:25].strip())
-            assert(het_id != 'HOH')
-            lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
-            self.ligands[chain_id] = self.ligands.get(chain_id, {})
-            assert(chain_id == ' ' or het_seq_id not in self.ligands[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
-            self.ligands[chain_id][het_seq_id] = lig
+            assert(het_id not in common_solutions)
+            if len(het_id) == 3:
+                lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
+                self.ligands[chain_id] = self.ligands.get(chain_id, {})
+                assert(chain_id == ' ' or het_seq_id not in self.ligands[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
+                self.ligands[chain_id][het_seq_id] = lig
+            else:
+                assert(1 <= len(het_id) <= 2)
+                ion = PDBIon(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
+                self.ions[chain_id] = self.ions.get(chain_id, {})
+                assert(chain_id == ' ' or het_seq_id not in self.ions[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
+                self.ions[chain_id][het_seq_id] = ion
+
+        # Some output files (e.g. from Rosetta) may contain HETATM records with no corresponding HET records due to
+        # preprocessing of the PDB file.
+        # We have a lot less information to work with here but should still record the presence of a HETATM.
+        # The atom counts may be less than those present in the molecule if the coordinates of some atoms were not
+        # determined.
+        # Another special case is water molecules or methanol solvent molecules which we still wish to record.
+        hetatm_molecules = {}
+        for het_line in self.parsed_lines.get('HETATM', []):
+            het_id = het_line[17:20].strip()
+            chain_id = het_line[21]
+            het_seq_id = het_line[22:27] # similar to 5-character residue ID
+            if not((len(het_id) == 3 and (chain_id in self.ligands and het_seq_id in self.ligands[chain_id])) or
+                   (1 <= len(het_id) <= 2 and (chain_id in self.ions    and het_seq_id in self.ions[chain_id]))):
+                # Otherwise this case was handled above
+                hetatm_molecules[chain_id] = hetatm_molecules.get(chain_id, {})
+                if het_seq_id in hetatm_molecules[chain_id]:
+                    assert(hetatm_molecules[chain_id][het_seq_id][0] == het_id)
+                    hetatm_molecules[chain_id][het_seq_id][1] += 1 # count the number of atoms
+                else:
+                    hetatm_molecules[chain_id][het_seq_id] = [het_id, 1]
+
+        for chain_id, seq_ids in sorted(hetatm_molecules.iteritems()):
+            for het_seq_id, tpl in sorted(seq_ids.iteritems()):
+                het_id = tpl[0]
+                numHetAtoms  = tpl[1]
+                description = common_solutions.get(het_id, het_id)
+                formula = None
+                if het_id in common_solutions:
+                    formula = het_id
+                    assert(1 <= numHetAtoms <= 3)
+                    self.solution[chain_id] = self.solution.get(chain_id, {})
+                    self.solution[chain_id][het_id] = self.solution[chain_id].get(het_id, set())
+                    assert(chain_id == ' ' or het_seq_id not in self.solution[chain_id][het_id]) # the first expression is a hack to handle bad cases - see 1UOX
+                    self.solution[chain_id][het_id].add(het_seq_id)
+                elif len(het_id) == 3:
+                    lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = [], formula = None)
+                    self.ligands[chain_id] = self.ligands.get(chain_id, {})
+                    assert(chain_id == ' ' or het_seq_id not in self.ligands[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
+                    self.ligands[chain_id][het_seq_id] = lig
+                else:
+                    assert(1 <= len(het_id) <= 2)
+                    ion = PDBIon(het_id, het_seq_id, description = description, chain_id = chain_id, names = [], formula = None)
+                    self.ions[chain_id] = self.ions.get(chain_id, {})
+                    assert(chain_id == ' ' or het_seq_id not in self.ions[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
+                    self.ions[chain_id][het_seq_id] = ion
 
 
     ### END OF REFACTORED CODE

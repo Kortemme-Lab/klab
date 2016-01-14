@@ -133,6 +133,15 @@ non_canonical_amino_acids = {
     'CRG' : 'YG'  # Specially defined by Noah
 }
 
+
+common_solutions = {
+    'HOH'   : 'Water',
+    'DOD'   : 'Deuterated water',
+    # methanol as solvent is?
+}
+common_solution_ids = set(common_solutions.keys())
+
+
 ###
 # Secondary structure
 ###
@@ -846,3 +855,4 @@ def generate_all_combinations_of_mutations(mutations):
     '''A wrapper for the mutation_combinations generator.
        Note: You need to use ChainMutation objects here as their equality considers the chain id.'''
     return [mutation_set for mutation_set in mutation_combinations(mutations)]
+
