@@ -1,15 +1,20 @@
-import time
+import datetime
 import math
 import sys
+
+# Time in seconds function
+# Converts datetime timedelta object to number of seconds
+def ts(td):
+    return (td.microseconds + (td.seconds + td.days * 24 * 3600) * 1e6) / 1e6
 
 class Reporter:
     def __init__(self, task, entries='files', print_output=True):
         self.print_output = print_output
-        self.start = time.time()
+        self.start = datetime.datetime.now()
         self.entries = entries
         self.lastreport = self.start
         self.task = task
-        self.report_interval = 1 # Interval to print progress (seconds)
+        self.report_interval = datetime.timedelta( seconds = 1 ) # Interval to print progress
         self.n = 0
         self.completion_time = None
         if self.print_output:
@@ -22,46 +27,17 @@ class Reporter:
         self.total_count -= 1
     def report(self, n):
         self.n = n
-        t = time.time()
-        if self.print_output and self.lastreport < (t-self.report_interval):
-            self.lastreport = t
+        time_now = datetime.datetime.now()
+        if self.print_output and self.lastreport < (time_now - self.report_interval):
+            self.lastreport = time_now
             if self.total_count:
                 percent_done = float(self.n) / float(self.total_count)
-                time_now = time.time()
-                est_total_time = (time_now - self.start) * (1.0 / percent_done)
+                est_total_time = datetime.timedelta( seconds = ts(time_now - self.start) * (1.0 / percent_done) )
                 time_remaining = est_total_time - (time_now - self.start)
-                time_remaining_str = 'Est. time remaining: '
+                eta = time_now + time_remaining
+                time_remaining_str = 'ETA: %s Est. time remaining: ' % eta.strftime("%Y-%m-%d %H:%M:%S")
 
-                weeks_remaining = math.floor(time_remaining / 604800.0)
-                if weeks_remaining > 0:
-                    time_remaining_str += '%d weeks' % weeks_remaining
-                time_remaining -= weeks_remaining * 604800.0
-
-                days_remaining = math.floor(time_remaining / 86400.0)
-                if days_remaining > 0:
-                    if time_remaining_str[-1] != ' ' and time_remaining_str[-1] != ',':
-                        time_remaining_str += ', '
-                    time_remaining_str += '%d days' % days_remaining
-                time_remaining -= days_remaining * 86400.0
-
-                hours_remaining = math.floor(time_remaining / 3600.0)
-                if hours_remaining > 0:
-                    if time_remaining_str[-1] != ' ' and time_remaining_str[-1] != ',':
-                        time_remaining_str += ', '
-                    time_remaining_str += '%d hours' % hours_remaining
-                time_remaining -= hours_remaining * 3600.0
-
-                minutes_remaining = math.floor(time_remaining / 60.0)
-                if minutes_remaining > 0:
-                    if time_remaining_str[-1] != ' ' and time_remaining_str[-1] != ',':
-                        time_remaining_str += ', '
-                    time_remaining_str += '%d minutes' % minutes_remaining
-                time_remaining -= minutes_remaining * 60.0
-                
-                seconds_remaining = int(time_remaining)
-                if time_remaining_str[-1] != ' ' and time_remaining_str[-1] != ',':
-                    time_remaining_str += ', '
-                time_remaining_str += '%d seconds' % seconds_remaining
+                time_remaining_str += str( datetime.timedelta( seconds = int(ts(time_remaining)) ) )
 
                 output_string = "  Processed: %d %s (%.1f%%) %s\r" % (n, self.entries, percent_done*100.0, time_remaining_str)
             else:
