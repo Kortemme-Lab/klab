@@ -59,9 +59,9 @@ class Reporter:
     def add_to_report(self, x):
         self.report(self.n + x)
     def done(self):
-        self.completion_time = time.time()
+        self.completion_time = datetime.datetime.now()
         if self.print_output:
-            print 'Done %s, processed %d %s, took %.3f seconds\n' % (self.task, self.n, self.entries, self.completion_time-self.start)
+            print 'Done %s, processed %d %s, took %s\n' % (self.task, self.n, self.entries, self.completion_time-self.start)
     def elapsed_time(self):
         if self.completion_time:
             return self.completion_time - self.start
