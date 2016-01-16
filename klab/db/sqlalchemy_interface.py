@@ -16,6 +16,15 @@ import sys
 import string
 import re
 import traceback
+import copy
+
+from sqlalchemy import Table, Column, Integer, ForeignKey
+from sqlalchemy.orm import relationship, backref
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import scoped_session, sessionmaker
+from sqlalchemy import create_engine, and_
+from sqlalchemy import inspect as sqlalchemy_inspect
+
 if __name__ == '__main__':
     sys.path.insert(0, '..')
 from klab import colortext
@@ -42,7 +51,7 @@ def get_single_record_from_query(result_set):
         return result_set[0]
 
 
-def get_or_create_in_transaction(tsession, model, values, missing_columns = []):
+def get_or_create_in_transaction(tsession, model, values, missing_columns = [], only_use_supplied_columns = False):
     '''
     Uses the SQLAlchemy model to retrieve an existing record based on the supplied field values or, if there is no
     existing record, to create a new database record.
@@ -59,11 +68,13 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = []):
     for c in missing_columns:
         fieldnames.remove(c)
 
+    if only_use_supplied_columns:
+        fieldnames = sorted(set(fieldnames).intersection(set(values.keys())))
+
     pruned_values = {}
     for k in set(values.keys()).intersection(set(fieldnames)):
         v = values[k]
         pruned_values[k] = v
-    assert(sorted(pruned_values.keys()) == sorted(fieldnames))
 
     instance = tsession.query(model).filter_by(**pruned_values)
     if instance.count() > 1:
@@ -73,6 +84,9 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = []):
     if instance:
         return instance
     else:
+        if sorted(pruned_values.keys()) != sorted(fieldnames):
+            # When adding new records, we require that all necessary fields are present
+            raise Exception('Some required fields are missing: {0}. Either supply these fields or add them to the missing_columns list.'.format(set(fieldnames).difference(pruned_values.keys())))
         instance = model(**pruned_values)
         tsession.add(instance)
         tsession.flush()
@@ -174,6 +188,7 @@ class IntermediateField(object):
 
         s += ')'
         return s
+
 
 class MySQLSchemaConverter(object):
 
