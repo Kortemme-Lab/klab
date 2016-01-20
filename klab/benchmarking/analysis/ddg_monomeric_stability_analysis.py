@@ -81,7 +81,7 @@ class BenchmarkRun(ReportingObject):
     def __init__(self, benchmark_run_name, dataset_cases, analysis_data, contains_experimental_data = True, benchmark_run_directory = None, use_single_reported_value = False,
                  description = None, dataset_description = None, credit = None, take_lowest = 3, generate_plots = True, report_analysis = True, include_derived_mutations = False, recreate_graphs = False, silent = False, burial_cutoff = 0.25,
                  stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False, store_data_on_disk = True, misc_dataframe_attributes = {},
-                 terminal_width = 200):
+                 terminal_width = 200, restrict_to = set(), remove_cases = set()):
 
         self.contains_experimental_data = contains_experimental_data
         self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
@@ -96,8 +96,10 @@ class BenchmarkRun(ReportingObject):
         self.amino_acid_details, self.CAA, self.PAA, self.HAA = BenchmarkRun.get_amino_acid_details()
         self.benchmark_run_name = benchmark_run_name
         self.benchmark_run_directory = benchmark_run_directory
-        self.dataset_cases = dataset_cases
-        self.analysis_data = analysis_data
+        self.dataset_cases = copy.deepcopy(dataset_cases)
+        self.analysis_data = copy.deepcopy(analysis_data)
+        self.restrict_to = restrict_to
+        self.remove_cases = remove_cases
         self.use_single_reported_value = use_single_reported_value
         self.description = description
         self.dataset_description = dataset_description
@@ -130,6 +132,13 @@ class BenchmarkRun(ReportingObject):
             self.analysis_csv_input_filepath, self.analysis_json_input_filepath, self.analysis_raw_data_input_filepath, self.analysis_pandas_input_filepath = None, None, None, None
         self.use_existing_benchmark_data = use_existing_benchmark_data
         self.ddg_analysis_type_description = None
+        self.filter_data()
+
+
+    def filter_data(self):
+        pass
+        #self.restrict_to
+        #self.remove_cases
 
 
     def __repr__(self):
@@ -360,6 +369,7 @@ class BenchmarkRun(ReportingObject):
         additional_prediction_data_columns = sorted(additional_prediction_data_columns)
 
         # Initialize the dataframe
+        self.reset_csv_headers() # this is necessary for the DBBenchmarkRun class which is missing the Experimental, AbsoluteError, and StabilityClassification columns since it adds new columns per analysis set.
         res = pandas.DataFrame(columns=(self.csv_headers + additional_prediction_data_columns))
         dataframe_columns = self.csv_headers + additional_prediction_data_columns
         additional_prediction_data_columns = tuple(additional_prediction_data_columns)
@@ -431,6 +441,10 @@ class BenchmarkRun(ReportingObject):
                 os.remove(analysis_pandas_input_filepath)
             raise
         return dataframe_blob
+
+
+    def reset_csv_headers(self):
+        pass
 
 
     def is_this_record_a_derived_mutation(self, record):
@@ -810,19 +824,18 @@ class BenchmarkRun(ReportingObject):
         SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
         SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
         SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
-        print(SCOP_classifications, SCOP_folds, SCOP_classes)
         if len(SCOP_classes) <= 25:
-            if len(SCOP_classes) == 1 and (numpy.isnan(sorted(SCOP_classes)[0]) or not(sorted(SCOP_classes)[0])):
+            if len(SCOP_classes) == 1 and ((None in SCOP_classes) or (numpy.isnan(sorted(SCOP_classes)[0]) or not(sorted(SCOP_classes)[0]))):
                 print('There are no defined SCOP classes. Skipping the SCOP class plot.')
             else:
                 graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP class', self.scatterplot_scop_class, '{0}scatterplot_scop_class.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         if len(SCOP_folds) <= 25:
-            if len(SCOP_folds) == 1 and (numpy.isnan(sorted(SCOP_folds)[0]) or not(sorted(SCOP_folds)[0])):
+            if len(SCOP_folds) == 1 and ((None in SCOP_folds) or (numpy.isnan(sorted(SCOP_folds)[0]) or not(sorted(SCOP_folds)[0]))):
                 print('There are no defined SCOP folds. Skipping the SCOP fold plot.')
             else:
                 graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP fold', self.scatterplot_scop_fold, '{0}scatterplot_scop_fold.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         if len(SCOP_classifications) <= 25:
-            if len(SCOP_classifications) == 1 and (numpy.isnan(sorted(SCOP_classifications)[0]) or not(sorted(SCOP_classifications)[0])):
+            if len(SCOP_classifications) == 1 and ((None in SCOP_classifications) or (numpy.isnan(sorted(SCOP_classifications)[0]) or not(sorted(SCOP_classifications)[0]))):
                 print('There are no defined SCOP classifications. Skipping the SCOP classification plot.')
             else:
                 graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP classification', self.scatterplot_scop_classification, '{0}scatterplot_scop_classification.png'.format(analysis_file_prefix), analysis_set = analysis_set))
@@ -1533,6 +1546,20 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def get_record_mutations(self, record):
         return record['PDBMutations']
+
+
+    def reset_csv_headers(self):
+        for record in self.dataset_cases.values():
+            analysis_sets = self.get_analysis_sets(record)
+            break
+        if analysis_sets:
+            self.csv_headers.remove('Experimental')
+            self.csv_headers.remove('AbsoluteError')
+            self.csv_headers.remove('StabilityClassification')
+            for analysis_set in analysis_sets:
+                self.csv_headers.append(BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set))
+                self.csv_headers.append(BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set))
+                self.csv_headers.append(BenchmarkRun.get_analysis_set_fieldname('StabilityClassification', analysis_set))
 
 
     def get_experimental_ddg_values(self, record, dataframe_record):
