@@ -40,8 +40,8 @@ except:
     pass
 
 from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_solutions, common_solution_ids
-from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms
-from klab.bio.ligand import SimplePDBLigand, PDBIon
+from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms, three_letter_ion_codes
+from klab.bio.ligand import SimplePDBLigand, PDBIon, Ligand
 from klab import colortext
 from klab.fs.fsio import read_file, write_file
 from klab.pymath.stats import get_mean_and_standard_deviation
@@ -404,6 +404,7 @@ class PDB(object):
         self.modified_residue_mapping_3 = {}
         self.pdb_id = None
         self.strict = strict
+        self.cache_dir = None                           # todo: Add a cache dir for when we download data e.g. ligand info
 
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
@@ -413,6 +414,8 @@ class PDB(object):
         self.ligands = {}                               # A dict mapping chain IDs to ligands
         self.ions = {}                                  # A dict mapping chain IDs to ions
         self.solution = {}                              # A dict mapping chain IDs to solution molecules (typically water)
+        self.bfactors = None                            # A dict containing overall and per-residue B-factors. Filled in on request by get_B_factors.
+        self.ligand_objects = {}                        # A dict mapping PDB codes to object files retrieved via the ligand module from the RCSB.
 
         # PDB deprecation fields
         self.deprecation_date = None
@@ -496,8 +499,40 @@ class PDB(object):
                             added_COMPND = True
                     elif l.startswith("ATOM  ") or l.startswith("HETATM") or l.startswith("TER"):
                         newlines.append('%s%s%s' % (l[0:21], 'A', l[22:]))
+                    elif l.startswith("HET   "):
+                        newlines.append('%s%s%s' % (l[0:12], 'A', l[13:]))
                     elif l.startswith("SEQRES"):
                         newlines.append('%s%s%s' % (l[0:12], 'A', l[13:]))
+                    else:
+                        newlines.append(l)
+                self.lines = newlines
+            elif pdb_id == '1HE1':
+                newlines = []
+                for l in self.lines:
+                    if l.startswith('HET     NI  C 204       2'):
+                        newlines.append('HET     NI  C 204       1') # There is one atom in two possible locations. Marking this entry as having 2 atoms breaks an assertion below.
+                    else:
+                        newlines.append(l)
+                self.lines = newlines
+            elif pdb_id == '1R0R':
+                newlines = []
+                for l in self.lines:
+                    if l.startswith('HET     CA  E 303       2'):
+                        newlines.append('HET     CA  E 303       1') # There is one atom in two possible locations. Marking this entry as having 2 atoms breaks an assertion below.
+                    elif l.startswith('HET     CA  E 305       2'):
+                        newlines.append('HET     CA  E 305       1') # There is one atom in two possible locations. Marking this entry as having 2 atoms breaks an assertion below.
+                    else:
+                        newlines.append(l)
+                self.lines = newlines
+            elif pdb_id == '3H7P':
+                newlines = []
+                for l in self.lines:
+                    if l.startswith('HET     CD  A  78       2'):
+                        newlines.append('HET     CD  A  78       1') # There is one atom in two possible locations. Marking this entry as having 2 atoms breaks an assertion below.
+                    elif l.startswith('HET     CD  A  80       2'):
+                        newlines.append('HET     CD  A  80       1') # There is one atom in two possible locations. Marking this entry as having 2 atoms breaks an assertion below.
+                    elif l.startswith('HET     CD  B  78       2'):
+                        newlines.append('HET     CD  B  78       1') # There is one atom in two possible locations. Marking this entry as having 2 atoms breaks an assertion below.
                     else:
                         newlines.append(l)
                 self.lines = newlines
@@ -575,6 +610,7 @@ class PDB(object):
 
     ### Private functions ###
 
+
     def _split_lines(self):
         '''Creates the parsed_lines dict which keeps all record data in document order indexed by the record type.'''
         parsed_lines = {}
@@ -591,6 +627,7 @@ class PDB(object):
 
         self.parsed_lines = parsed_lines
         self._update_structure_lines() # This does a second loop through the lines. We could do this logic above but I prefer a little performance hit for the cleaner code
+
 
     def _update_structure_lines(self):
         '''ATOM and HETATM lines may be altered by function calls. When this happens, this function should be called to keep self.structure_lines up to date.'''
@@ -1797,7 +1834,7 @@ class PDB(object):
         ion_codes = set()
         for c, cions in self.ions.iteritems():
             for seq_id, i in cions.iteritems():
-                ion_codes.add(i.PDBCode)
+                ion_codes.add(i.Element)
         return sorted(ion_codes)
 
 
@@ -1833,6 +1870,14 @@ class PDB(object):
             else:
                 assert(het_id not in het_names)
                 het_names[het_id] = description.strip()
+
+        #  Read in the associated CIF files for the ligand
+        for het_id in het_ids:
+            if not self.ligand_objects.get(het_id):
+                try:
+                    self.ligand_objects[het_id] = Ligand.retrieve_data_from_rcsb(het_id.strip(), cached_dir = self.cache_dir)
+                except:
+                    colortext.error('Failed to retrieve/parse the ligand .cif entry.')
 
         # Parse HETSYN names
         het_synonyms = {}
@@ -1881,14 +1926,21 @@ class PDB(object):
             description = het_line[30:].strip() or None
             numHetAtoms = int(het_line[20:25].strip())
             assert(het_id not in common_solutions)
-            if len(het_id) == 3:
-                lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
+
+            has_many_atoms = ((het_id in self.ligand_objects) and (self.ligand_objects[het_id].has_many_atoms)) or (numHetAtoms > 1) # Note: the first expression can be None so the order is important here (None or False = False but False or None = None).
+            if ((het_id == 'UNL') or (len(het_id) == 3 and has_many_atoms)) and (het_id not in three_letter_ion_codes):
+                # If a HET record has exactly one atom specified in the formula, we treat it as an ion e.g. FE2 in 1ZZ7.pdb.
+                # This may not be the correct approach for all cases but has fit cases I have come across so far and seems reasonable.
+                lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id), number_of_atoms = numHetAtoms)
+                #colortext.pcyan('Adding ligand: case 1, {0} {1}{2}'.format(het_id, chain_id, het_seq_id))
                 self.ligands[chain_id] = self.ligands.get(chain_id, {})
                 assert(chain_id == ' ' or het_seq_id not in self.ligands[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
                 self.ligands[chain_id][het_seq_id] = lig
             else:
-                assert(1 <= len(het_id) <= 2)
-                ion = PDBIon(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id))
+                assert((1 <= len(het_id) <= 2) or (numHetAtoms == 1))
+                assert(numHetAtoms == 1) # this should be true
+                #colortext.pcyan('Adding ion: case 1, {0} {1}{2}'.format(het_id, chain_id, het_seq_id))
+                ion = PDBIon(het_id, het_seq_id, description = description, chain_id = chain_id, names = het_names.get(het_id), formula = het_formulae.get(het_id), number_of_atoms = numHetAtoms)
                 self.ions[chain_id] = self.ions.get(chain_id, {})
                 assert(chain_id == ' ' or het_seq_id not in self.ions[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
                 self.ions[chain_id][het_seq_id] = ion
@@ -1904,8 +1956,8 @@ class PDB(object):
             het_id = het_line[17:20].strip()
             chain_id = het_line[21]
             het_seq_id = het_line[22:27] # similar to 5-character residue ID
-            if not((len(het_id) == 3 and (chain_id in self.ligands and het_seq_id in self.ligands[chain_id])) or
-                   (1 <= len(het_id) <= 2 and (chain_id in self.ions    and het_seq_id in self.ions[chain_id]))):
+            if not((len(het_id) == 3      and (chain_id in self.ligands and het_seq_id in self.ligands[chain_id])) or
+                   (1 <= len(het_id) <= 3 and (chain_id in self.ions    and het_seq_id in self.ions[chain_id]))): # some ions use three-letter codes e.g. FE2 in 1ZZ7
                 # Otherwise this case was handled above
                 hetatm_molecules[chain_id] = hetatm_molecules.get(chain_id, {})
                 if het_seq_id in hetatm_molecules[chain_id]:
@@ -1920,6 +1972,8 @@ class PDB(object):
                 numHetAtoms  = tpl[1]
                 description = common_solutions.get(het_id, het_id)
                 formula = None
+
+                has_many_atoms = ((het_id in self.ligand_objects) and (self.ligand_objects[het_id].has_many_atoms)) or (numHetAtoms > 1) # Note: the first expression can be None so the order is important here (None or False = False but False or None = None).
                 if het_id in common_solutions:
                     formula = het_id
                     assert(1 <= numHetAtoms <= 3)
@@ -1927,17 +1981,67 @@ class PDB(object):
                     self.solution[chain_id][het_id] = self.solution[chain_id].get(het_id, set())
                     assert(chain_id == ' ' or het_seq_id not in self.solution[chain_id][het_id]) # the first expression is a hack to handle bad cases - see 1UOX
                     self.solution[chain_id][het_id].add(het_seq_id)
-                elif len(het_id) == 3:
+                elif ((het_id == 'UNL') or (len(het_id) == 3 and has_many_atoms)) and (het_id not in three_letter_ion_codes):
+                    # NOTE: Just using len(het_id) == 3 can falsely identify ions as ligands.
+                    #       Since there may be missing ATOM records, we cannot infer that a heterogen is an ion based on
+                    #       the existence of only one ATOM record.
+                    #
+                    #       Instead, we require that has_many_atoms is True. This fixes the problem above but now we can
+                    #       cascade into the next case and falsely identify ligands as ions. However, this should only
+                    #       happen if there is no corresponding .cif entry for the ligand or if that .cif entry is missing
+                    #       the _chem_comp.formula field which is presumably unlikely.
+                    #
+                    #       A wrong classification could also occur if a user changed the ligand entry from the standard
+                    #       RCSB code to something else e.g. "GTP" -> "LIG". It is difficult to protect against this case
+                    #       but it seems likely that most users would use a three-letter code in this case.
                     lig = SimplePDBLigand(het_id, het_seq_id, description = description, chain_id = chain_id, names = [], formula = None)
+                    #colortext.pcyan('Adding ligand: case 2, {0} {1}{2}'.format(het_id, chain_id, het_seq_id))
                     self.ligands[chain_id] = self.ligands.get(chain_id, {})
                     assert(chain_id == ' ' or het_seq_id not in self.ligands[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
                     self.ligands[chain_id][het_seq_id] = lig
                 else:
                     assert(1 <= len(het_id) <= 2)
                     ion = PDBIon(het_id, het_seq_id, description = description, chain_id = chain_id, names = [], formula = None)
+                    #colortext.pcyan('Adding ion: case 2, {0} {1}{2}'.format(het_id, chain_id, het_seq_id))
                     self.ions[chain_id] = self.ions.get(chain_id, {})
                     assert(chain_id == ' ' or het_seq_id not in self.ions[chain_id]) # the first expression is a hack to handle bad cases - see 1UOX
                     self.ions[chain_id][het_seq_id] = ion
+
+
+    def get_B_factors(self, force = False):
+        '''This reads in all ATOM lines and compute the mean and standard deviation of each
+           residue's B-factors. It returns a table of the mean and standard deviation per
+           residue as well as the mean and standard deviation over all residues with each
+           residue having equal weighting.
+
+           Whether the atom is occupied or not is not taken into account.'''
+
+        # Read in the list of bfactors for each ATOM line.
+        if (not self.bfactors) or (force == True):
+            bfactors = {}
+            old_chain_residue_id = None
+            for line in self.lines:
+                if line[0:4] == "ATOM":
+                    chain_residue_id = line[21:27]
+                    if chain_residue_id != old_chain_residue_id:
+                        bfactors[chain_residue_id] = []
+                        old_chain_residue_id = chain_residue_id
+                    bfactors[chain_residue_id].append(float(line[60:66]))
+
+            # Compute the mean and standard deviation for the list of B-factors of each residue
+            B_factor_per_residue = {}
+            mean_per_residue = []
+            for chain_residue_id, bfactor_list in bfactors.iteritems():
+                mean, stddev, variance = get_mean_and_standard_deviation(bfactor_list)
+                B_factor_per_residue[chain_residue_id] = dict(mean = mean, stddev = stddev)
+                mean_per_residue.append(mean)
+            total_average, total_standard_deviation, variance = get_mean_and_standard_deviation(mean_per_residue)
+
+            self.bfactors =  dict(
+                Overall     =  dict(mean = total_average, stddev = total_standard_deviation),
+                PerResidue  =  B_factor_per_residue,
+            )
+        return self.bfactors
 
 
     ### END OF REFACTORED CODE
@@ -2299,37 +2403,10 @@ class PDB(object):
 
         return resid_list # format: "A 123" or: '%s%4.i' % (chain,resid)
 
+
     def ComputeBFactors(self):
-        '''This reads in all ATOM lines and compute the mean and standard deviation of each
-           residue's bfactors. It returns a table of the mean and standard deviation per
-           residue as well as the mean and standard deviation over all residues with each
-           residue having equal weighting.
+        raise Exception('Use get_b_factors() instead.')
 
-           Whether the atom is occupied or not is not taken into account.'''
-
-        # Read in the list of bfactors for each ATOM line.
-        bfactors = {}
-        old_residueID = None
-        for line in self.lines:
-            if line[0:4] == "ATOM":
-                residueID = line[21:27]
-                if residueID != old_residueID:
-                    bfactors[residueID] = []
-                    old_residueID = residueID
-                bfactors[residueID].append(float(line[60:66]))
-
-        # Compute the mean and standard deviation for the list of bfactors of each residue
-        BFPerResidue = {}
-        MeanPerResidue = []
-        for residueID, bfactorlist in bfactors.iteritems():
-            mean, stddev, variance = get_mean_and_standard_deviation(bfactorlist)
-            BFPerResidue[residueID] = (mean, stddev)
-            MeanPerResidue.append(mean)
-        TotalAverage, TotalStandardDeviation, variance = get_mean_and_standard_deviation(MeanPerResidue)
-
-        return {"_description" : "First tuple element is average, second is standard deviation",
-                "Total"        : (TotalAverage, TotalStandardDeviation),
-                "PerResidue"    : BFPerResidue}
 
     def CheckForPresenceOf(self, reslist):
         '''This checks whether residues in reslist exist in the ATOM lines. 
