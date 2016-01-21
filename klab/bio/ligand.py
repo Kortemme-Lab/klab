@@ -447,7 +447,7 @@ class PDBIon(SimplePDBLigand):
             ion_formula = ion_formula.group(1)
         else:
             ion_formula = self.Formula
-        
+
         iname = None
         if self.Names:
             iname = self.Names[0]
