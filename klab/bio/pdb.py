@@ -439,7 +439,8 @@ class PDB(object):
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
         self.hetatm_formulae = PDB.convert_hetatms_to_Hill_notation(self.parsed_lines['HETATM'])
-        self._get_heterogens()
+        if False: ### TODO SHANE AGAIN
+            self._get_heterogens()
 
 
     def __repr__(self):

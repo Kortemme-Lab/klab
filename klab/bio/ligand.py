@@ -113,7 +113,8 @@ class Ligand(object):
         pdb_ligand_info_path = None
         if cached_dir:
             pdb_ligand_info_path = os.path.join(cached_dir, '{0}.pdb.ligandinfo'.format(l.pdb_id.lower()))
-        if l.pdb_id:
+        if len(l.pdb_id) == 4:
+            ### TODO: This (somewhat nasty) hack was made by Shane, so should be fixed by Shane, despite git blame blaming Kyle
             if cached_dir:
                 if os.path.exists(pdb_ligand_info_path):
                     pdb_ligand_info = read_file(pdb_ligand_info_path)
