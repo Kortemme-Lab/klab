@@ -10,7 +10,6 @@ Created by Shane O'Connor 2012
 import os
 from httplib import HTTPConnection
 
-
 def get(url, timeout = None):
     url = url.strip()
     if url[:7].lower()==("http://"):
@@ -69,10 +68,10 @@ class Connection(object):
 
 
     def get(self, resource):
-        self._get_connection()
         attempts_left = self.attempts
         while attempts_left > 0:
             try:
+                self._get_connection()
                 self.connection.request("GET", resource)
                 response = self.connection.getresponse()
                 contents = response.read()
