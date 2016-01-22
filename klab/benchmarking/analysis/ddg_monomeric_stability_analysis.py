@@ -409,7 +409,7 @@ class BenchmarkRun(ReportingObject):
 
         # Write the dataframe out to CSV
         if self.store_data_on_disk:
-            dataframe.to_csv(self.analysis_csv_input_filepath, sep = ',', header = True)
+            self.write_dataframe_to_csv(self.analysis_csv_input_filepath)
 
         # Write the dataframe out to JSON
         # Note: I rolled my own as dataframe.to_dict(orient = 'records') gives us the correct format but discards the DatasetID (index) field
@@ -442,6 +442,9 @@ class BenchmarkRun(ReportingObject):
             raise
         return dataframe_blob
 
+    def write_dataframe_to_csv(self, output_path):
+        # Write the dataframe out to CSV
+        self.dataframe.to_csv(output_path, sep = ',', header = True)
 
     def reset_csv_headers(self):
         pass
