@@ -527,3 +527,17 @@ class LigandMap(object):
     def add(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
         assert(from_pdb_residue_id not in self.mapping)
         self.mapping[from_pdb_residue_id] = LigandMap._MapPoint(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = strict)
+
+
+    def is_injective(self):
+        '''Returns True if the mapping is injective (1-to-1).'''
+        codomain_residues = [v.to_pdb_residue_id for k, v in self.mapping.iteritems()]
+        return(len(codomain_residues) == len(set(codomain_residues)))
+
+
+    def is_complete(self, all_domain_residue_ids):
+        '''Check that all ligands (specified via the set or list all_domain_residue_ids containing columns 21:27 of the
+           HETATM records) in the source PDB file are considered in the mapping.'''
+        mapped_domain_residues = sorted([v.from_pdb_residue_id for k, v in self.mapping.iteritems()])
+        assert(len(all_domain_residue_ids) == len(set(all_domain_residue_ids)))
+        return mapped_domain_residues == sorted(all_domain_residue_ids)
