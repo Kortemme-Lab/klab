@@ -142,6 +142,11 @@ common_solutions = {
 common_solution_ids = set(common_solutions.keys())
 
 
+# "ion" here means charged atom rather than charged molecule
+three_letter_ion_codes = {
+    'IOD' : 'I',
+}
+
 ###
 # Secondary structure
 ###

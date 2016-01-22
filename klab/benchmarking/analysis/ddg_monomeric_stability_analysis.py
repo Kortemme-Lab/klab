@@ -136,9 +136,47 @@ class BenchmarkRun(ReportingObject):
 
 
     def filter_data(self):
-        pass
-        #self.restrict_to
-        #self.remove_cases
+        '''A very rough filtering step to remove certain data.
+           todo: It is probably best to do this do the actual dataframe rather than at this point.
+           todo: We currently only handle one filtering criterium.
+        '''
+
+        if not self.dataset_cases or not self.analysis_data:
+            colortext.error('No dataset cases or analysis (DDG) data were passed. Cannot filter the data. If you are using an '
+                  'existing dataframe, this may explain why no data was passed.')
+            return
+        if self.restrict_to or self.remove_cases:
+
+            # Remove any cases with missing data
+            available_cases = set(self.analysis_data.keys())
+            missing_dataset_cases = [k for k in self.dataset_cases.keys() if k not in available_cases]
+            for k in missing_dataset_cases:
+                del self.dataset_cases[k]
+
+            cases_to_remove = set()
+            if self.restrict_to:
+                # Remove cases which do not meet the restriction criteria
+                if 'Exposed' in self.restrict_to:
+                    for k, v in self.dataset_cases.iteritems():
+                        for m in v['PDBMutations']:
+                            if (m.get('ComplexExposure') or m.get('MonomericExposure')) <= self.burial_cutoff:
+                                cases_to_remove.add(k)
+                                break
+            if self.remove_cases:
+                # Remove cases which meet the removal criteria
+                if 'Exposed' in self.remove_cases:
+                    for k, v in self.dataset_cases.iteritems():
+                        for m in v['PDBMutations']:
+                            if (m.get('ComplexExposure') or m.get('MonomericExposure')) > self.burial_cutoff:
+                                cases_to_remove.add(k)
+                                break
+
+            if cases_to_remove:
+                colortext.warning('Filtering out {0} records.'.format(len(cases_to_remove)))
+
+            for k in cases_to_remove:
+                del self.dataset_cases[k]
+                del self.analysis_data[k]
 
 
     def __repr__(self):

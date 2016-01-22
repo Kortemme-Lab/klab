@@ -117,21 +117,21 @@ class MonomerDSSP(object):
     '''
 
     @classmethod
-    def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
+        return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
 
     @classmethod
-    def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
+        return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
 
     @classmethod
-    def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
+        return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
 
-    def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+    def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         '''This function strips a PDB file to one chain and then runs DSSP on this new file.
            p should be a PDB object (see pdb.py).
         '''
@@ -143,7 +143,11 @@ class MonomerDSSP(object):
         self.cut_off = cut_off
         self.tmp_dir = tmp_dir
         self.residue_max_acc = residue_max_acc[acc_array]
-        self.pdb = p.clone() # make a local copy in case this gets modified externally
+        self.read_only = read_only
+        if not self.read_only:
+            self.pdb = p.clone() # make a local copy in case this gets modified externally
+        else:
+            self.pdb = p
         self.chain_order = self.pdb.atom_chain_order
         self.dssp_output = {}
         self.dssp = {}
@@ -173,9 +177,9 @@ class MonomerDSSP(object):
 
     def compute(self, chain_id):
         tmp_dir = self.tmp_dir
-        p = self.pdb.clone()
-        p.strip_to_chains(chain_id)
-        input_filepath = write_temp_file(tmp_dir, p.get_content(), ftype = 'w', prefix = 'dssp_')
+        pdb_object = self.pdb.clone() # we are immediately modifying the PDB file by stripping chains so we need to make a copy
+        pdb_object.strip_to_chains(chain_id)
+        input_filepath = write_temp_file(tmp_dir, pdb_object.get_content(), ftype = 'w', prefix = 'dssp_')
         output_filepath = write_temp_file(tmp_dir, '', ftype = 'w', prefix = 'dssp_')
         try:
             p = _Popen('.', shlex.split('mkdssp -i {input_filepath} -o {output_filepath}'.format(**locals())))
@@ -327,21 +331,21 @@ class ComplexDSSP(MonomerDSSP):
     '''
 
     @classmethod
-    def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
+        return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
 
     @classmethod
-    def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
+        return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
 
     @classmethod
-    def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
-        return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir)
+    def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
+        return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
 
-    def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp'):
+    def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         '''This function strips a PDB file to one chain and then runs DSSP on this new file.
            p should be a PDB object (see pdb.py).
         '''
@@ -353,7 +357,11 @@ class ComplexDSSP(MonomerDSSP):
         self.cut_off = cut_off
         self.tmp_dir = tmp_dir
         self.residue_max_acc = residue_max_acc[acc_array]
-        self.pdb = p.clone() # make a local copy in case this gets modified externally
+        self.read_only = read_only
+        if not self.read_only:
+            self.pdb = p.clone() # make a local copy in case this gets modified externally
+        else:
+            self.pdb = p
         self.chain_order = self.pdb.atom_chain_order
         self.dssp_output = None
         self.dssp = {}
@@ -364,8 +372,11 @@ class ComplexDSSP(MonomerDSSP):
 
     def compute(self):
         tmp_dir = self.tmp_dir
-        p = self.pdb.clone()
-        input_filepath = write_temp_file(tmp_dir, p.get_content(), ftype = 'w', prefix = 'dssp_')
+        if not self.read_only:
+            pdb_object = self.pdb.clone()
+        else:
+            pdb_object = self.pdb # in general, we should not be modifying the structure in this class
+        input_filepath = write_temp_file(tmp_dir, pdb_object.get_content(), ftype = 'w', prefix = 'dssp_')
         output_filepath = write_temp_file(tmp_dir, '', ftype = 'w', prefix = 'dssp_')
         try:
             p = _Popen('.', shlex.split('mkdssp -i {input_filepath} -o {output_filepath}'.format(**locals())))

@@ -14,6 +14,7 @@ import copy
 from PIL import Image
 
 from klab.bio.rcsb import retrieve_ligand_cif, retrieve_pdb_ligand_info, retrieve_ligand_diagram
+from klab.bio.basics import three_letter_ion_codes
 from klab.fs.fsio import read_file, write_file
 from klab import colortext
 
@@ -35,6 +36,14 @@ class Ligand(object):
         self.InChI = None
         self.InChIKey = None
         self.pdb_id = None
+        self.has_many_atoms = None # The PDB file for 1BIZ lists CAC as having one atom. This property is intended to simply record when a ligand file has many atoms so we treat it as a ligand rather than a charged atom.
+
+        if ligand_code == 'UNL':
+            # Unknown ligand
+            self.has_many_atoms = True
+        elif ligand_code == 'UNX':
+            # Unknown atom or ion
+            self.has_many_atoms = False
 
          # These fields are not filled in automatically
         self.Solubility = None
@@ -85,9 +94,9 @@ class Ligand(object):
         if cached_dir:
             assert(os.path.exists(cached_dir))
 
-        ligand_info, pdb_ligand_info, pdb_ligand_info_path = None, None, None
-        ligand_info_path = os.path.join(cached_dir, '{0}.cif'.format(ligand_code))
+        ligand_info_path, ligand_info, pdb_ligand_info, pdb_ligand_info_path = None, None, None, None
         if cached_dir:
+            ligand_info_path = os.path.join(cached_dir, '{0}.cif'.format(ligand_code))
             if os.path.exists(ligand_info_path):
                 ligand_info = read_file(ligand_info_path)
         if not ligand_info:
@@ -101,15 +110,18 @@ class Ligand(object):
         l.pdb_id = pdb_id or l.pdb_id
 
         # Parse PDB XML
-        if l.pdb_id:
+        pdb_ligand_info_path = None
+        if cached_dir:
             pdb_ligand_info_path = os.path.join(cached_dir, '{0}.pdb.ligandinfo'.format(l.pdb_id.lower()))
+        if l.pdb_id:
             if cached_dir:
                 if os.path.exists(pdb_ligand_info_path):
                     pdb_ligand_info = read_file(pdb_ligand_info_path)
-        if l.pdb_id:
-            pdb_ligand_info = retrieve_pdb_ligand_info(l.pdb_id)
-            if cached_dir:
-                write_file(pdb_ligand_info_path, pdb_ligand_info)
+                else:
+                    pdb_ligand_info = retrieve_pdb_ligand_info(l.pdb_id)
+                    write_file(pdb_ligand_info_path, pdb_ligand_info)
+            else:
+                pdb_ligand_info = retrieve_pdb_ligand_info(l.pdb_id)
         if pdb_ligand_info:
             l.parse_pdb_ligand_info(pdb_ligand_info)
 
@@ -188,6 +200,13 @@ class Ligand(object):
         self.MolecularWeight = header['_chem_comp.formula_weight']
         self.LigandType = header['_chem_comp.type'].replace('"', '')
         self.pdb_id = header['_chem_comp.pdbx_model_coordinates_db_code']
+
+        # Does this molecule have many atoms?
+        if '_chem_comp.formula' in header:
+            normalized_formula = header['_chem_comp.formula'].replace('?', '').strip()
+            if (len(normalized_formula.split()) > 1) or (len([c for c in normalized_formula if c.isdigit()]) > 1):
+                assert(self.has_many_atoms == True or self.has_many_atoms == None)
+                self.has_many_atoms = True
 
         if not header['_chem_comp.id'] == header['_chem_comp.three_letter_code']:
             raise Exception('Handle this case.')
@@ -379,11 +398,11 @@ class PDBLigand(Ligand):
 
 
 
-class SimplePDBLigand():
+class SimplePDBLigand(object):
     '''A simple container class for the basic ligand properties described in PDB files. The Ligand and PDBLigand classes
        have more features.'''
 
-    def __init__(self, ligand_code, sequence_id, description = None, chain_id = None, names = [], formula = None):
+    def __init__(self, ligand_code, sequence_id, description = None, chain_id = None, names = [], formula = None, number_of_atoms = None):
         assert(len(sequence_id) == 5)
         self.PDBCode = ligand_code
         self.Chain = chain_id
@@ -391,10 +410,15 @@ class SimplePDBLigand():
         self.Description = description
         self.Names = names
         self.Formula = formula
+        self.NumberOfAtoms = number_of_atoms
+
+
+    def get_code(self):
+        return self.PDBCode
 
 
     def __repr__(self):
-        s = ['{0}{1}: {2}'.format(self.Chain or ' ', self.SequenceID, self.PDBCode)]
+        s = ['{0}{1}: {2}'.format(self.Chain or ' ', self.SequenceID, self.get_code())]
         if self.Formula:
             s.append(self.Formula)
         if self.Description:
@@ -406,4 +430,114 @@ class SimplePDBLigand():
 
 class PDBIon(SimplePDBLigand):
     '''A simple container class for the basic ion properties described in PDB files.'''
-    pass
+
+    def __init__(self, *args, **kwargs):
+        super(PDBIon, self).__init__(*args, **kwargs)
+        self.Element = ''.join([c for c in self.PDBCode if c.isalpha()]).strip().lower()
+        self.Element = self.Element[0].upper() + self.Element[1:] # the elemental symbol
+        assert((1 <= len(self.Element) <= 2) or (self.Element.upper() in three_letter_ion_codes) or (self.Element.upper() == 'UNX'))
+        assert(self.NumberOfAtoms == None or self.NumberOfAtoms == 1)
+
+
+    def get_db_records(self, pdb_id, pdb_ion_code = None, file_content_id = None, ion_id = None):
+
+        # Extract the charge of the ion - we do not care about the number of ions
+        ion_formula = re.match('\s*\d+[(](.*?)[)]\s*', self.Formula)
+        if ion_formula:
+            ion_formula = ion_formula.group(1)
+        else:
+            ion_formula = self.Formula
+
+        iname = None
+        if self.Names:
+            iname = self.Names[0]
+        return dict(
+            Ion = dict(
+                PDBCode = self.PDBCode,
+                Formula = ion_formula,
+                Description = self.Description or iname
+            ),
+            PDBIon = dict(
+                PDBFileID = pdb_id,
+                Chain = self.Chain,
+                SeqID = self.SequenceID,
+                PDBIonCode = pdb_ion_code or self.PDBCode, # the code may be changed in non-standard/non-RCSB PDB files
+                IonID = ion_id, # set to Ion.ID
+                ParamsFileContentID = file_content_id,
+                Element = self.Element
+            )
+        )
+
+
+    def get_element(self):
+        return self.Element
+
+
+    def __repr__(self):
+        return super(PDBIon, self).__repr__() + ', ' + self.Element + ' ion'
+
+
+
+class LigandMap(object):
+    '''A simple container class to map between ligands.
+       This is useful for keeping track of ligands in modified PDB files where the user has renamed the ligand ID (e.g. to "LIG" or chain/residue ID e.g. to chain "X").
+    '''
+
+
+    class _MapPoint(object):
+        '''A mapping from a single ligand in one PDB to a single ligand in another.'''
+        def __init__(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
+            '''PDB codes are the contents of columns [17:20] (Python format i.e. zero-indexed) of HETATM lines.
+               PDB residue IDs are the contents of columns [21:27] of HETATM lines.'''
+
+            print(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id)
+            assert((len(from_pdb_residue_id) == 6) and (len(to_pdb_residue_id) == 6))
+            assert(from_pdb_residue_id[1:5].strip().isdigit() and to_pdb_residue_id[1:5].strip().isdigit())
+
+            if strict:
+                assert((len(from_pdb_code) == 3) and (len(to_pdb_code) == 3))
+            else:
+                assert((1 <= len(from_pdb_code) <= 3) and (1 <= len(to_pdb_code) <= 3))
+                if len(from_pdb_code) < 3:
+                    from_pdb_code = from_pdb_code.strip().rjust(3)
+                if len(to_pdb_code) < 3:
+                    to_pdb_code = to_pdb_code.strip().rjust(3)
+
+            self.from_pdb_code = from_pdb_code
+            self.to_pdb_code = to_pdb_code
+            self.from_pdb_residue_id = from_pdb_residue_id
+            self.to_pdb_residue_id = to_pdb_residue_id
+
+
+    def __init__(self):
+        self.mapping = {}
+
+
+    @staticmethod
+    def from_tuples_dict(pair_dict):
+        '''pair_dict should be a dict mapping tuple (HET code, residue ID) -> (HET code, residue ID) e.g. {('MG ', 'A 204 ') : ('MG ', 'C 221 '), ...}.
+           HET codes and residue IDs should respectively correspond to columns 17:20 and 21:27 of the PDB file.
+        '''
+        lm = LigandMap()
+        for k, v in pair_dict.iteritems():
+            lm.add(k[0], k[1], v[0], v[1])
+        return lm
+
+
+    def add(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
+        assert(from_pdb_residue_id not in self.mapping)
+        self.mapping[from_pdb_residue_id] = LigandMap._MapPoint(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = strict)
+
+
+    def is_injective(self):
+        '''Returns True if the mapping is injective (1-to-1).'''
+        codomain_residues = [v.to_pdb_residue_id for k, v in self.mapping.iteritems()]
+        return(len(codomain_residues) == len(set(codomain_residues)))
+
+
+    def is_complete(self, all_domain_residue_ids):
+        '''Check that all ligands (specified via the set or list all_domain_residue_ids containing columns 21:27 of the
+           HETATM records) in the source PDB file are considered in the mapping.'''
+        mapped_domain_residues = sorted([v.from_pdb_residue_id for k, v in self.mapping.iteritems()])
+        assert(len(all_domain_residue_ids) == len(set(all_domain_residue_ids)))
+        return mapped_domain_residues == sorted(all_domain_residue_ids)
