@@ -477,3 +477,53 @@ class PDBIon(SimplePDBLigand):
         return super(PDBIon, self).__repr__() + ', ' + self.Element + ' ion'
 
 
+
+class LigandMap(object):
+    '''A simple container class to map between ligands.
+       This is useful for keeping track of ligands in modified PDB files where the user has renamed the ligand ID (e.g. to "LIG" or chain/residue ID e.g. to chain "X").
+    '''
+
+
+    class _MapPoint(object):
+        '''A mapping from a single ligand in one PDB to a single ligand in another.'''
+        def __init__(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
+            '''PDB codes are the contents of columns [17:20] (Python format i.e. zero-indexed) of HETATM lines.
+               PDB residue IDs are the contents of columns [21:27] of HETATM lines.'''
+
+            print(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id)
+            assert((len(from_pdb_residue_id) == 6) and (len(to_pdb_residue_id) == 6))
+            assert(from_pdb_residue_id[1:5].strip().isdigit() and to_pdb_residue_id[1:5].strip().isdigit())
+
+            if strict:
+                assert((len(from_pdb_code) == 3) and (len(to_pdb_code) == 3))
+            else:
+                assert((1 <= len(from_pdb_code) <= 3) and (1 <= len(to_pdb_code) <= 3))
+                if len(from_pdb_code) < 3:
+                    from_pdb_code = from_pdb_code.strip().rjust(3)
+                if len(to_pdb_code) < 3:
+                    to_pdb_code = to_pdb_code.strip().rjust(3)
+
+            self.from_pdb_code = from_pdb_code
+            self.to_pdb_code = to_pdb_code
+            self.from_pdb_residue_id = from_pdb_residue_id
+            self.to_pdb_residue_id = to_pdb_residue_id
+
+
+    def __init__(self):
+        self.mapping = {}
+
+
+    @staticmethod
+    def from_tuples_dict(pair_dict):
+        '''pair_dict should be a dict mapping tuple (HET code, residue ID) -> (HET code, residue ID) e.g. {('MG ', 'A 204 ') : ('MG ', 'C 221 '), ...}.
+           HET codes and residue IDs should respectively correspond to columns 17:20 and 21:27 of the PDB file.
+        '''
+        lm = LigandMap()
+        for k, v in pair_dict.iteritems():
+            lm.add(k[0], k[1], v[0], v[1])
+        return lm
+
+
+    def add(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
+        assert(from_pdb_residue_id not in self.mapping)
+        self.mapping[from_pdb_residue_id] = LigandMap._MapPoint(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = strict)
