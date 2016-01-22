@@ -26,7 +26,7 @@ rcsb_connection = None
 def get_rcsb_connection():
     global rcsb_connection
     if not rcsb_connection:
-        rcsb_connection = Connection('www.rcsb.org')
+        rcsb_connection = Connection('www.rcsb.org', timeout = 10)
     return rcsb_connection
 
 
