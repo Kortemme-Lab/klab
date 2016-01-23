@@ -273,7 +273,8 @@ class MissingRecordsException(Exception): pass
 class NonCanonicalResidueException(Exception): pass
 class PDBValidationException(Exception): pass
 class PDBMissingMainchainAtomsException(Exception): pass
-
+class RequestedLigandsWithoutParsingException(Exception): pass
+class RequestedIonsWithoutParsingException(Exception): pass
 
 class JRNL(object):
 
@@ -385,7 +386,10 @@ class PDB(object):
 
     ### Constructor ###
 
-    def __init__(self, pdb_content, pdb_id = None, strict = True):
+    _std_ligand_parsing_error_message = 'Ligand information was requested but ligands are not parsed by default. Please set parse_ligands=True in the constructor for the PDB object.'
+    _std_ion_parsing_error_message = 'Ion information was requested but ions are not parsed by default. Please set parse_ligands=True in the constructor for the PDB object.'
+
+    def __init__(self, pdb_content, pdb_id = None, strict = True, parse_ligands = False):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
         self.pdb_content = pdb_content
@@ -411,11 +415,13 @@ class PDB(object):
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
         self.atom_sequences = {}                        # A dict mapping chain IDs to ATOM Sequence objects
         self.chain_atoms = {}                           # A dict mapping chain IDs to a set of ATOM types. This is useful to test whether some chains only have CA entries e.g. in 1LRP, 1AIN, 1C53, 1HIO, 1XAS, 2TMA
-        self.ligands = {}                               # A dict mapping chain IDs to ligands
-        self.ions = {}                                  # A dict mapping chain IDs to ions
         self.solution = {}                              # A dict mapping chain IDs to solution molecules (typically water)
         self.bfactors = None                            # A dict containing overall and per-residue B-factors. Filled in on request by get_B_factors.
-        self.ligand_objects = {}                        # A dict mapping PDB codes to object files retrieved via the ligand module from the RCSB.
+
+        # Heterogen fields
+        self.ligands = None                             # A dict mapping chain IDs to ligands. This is initialized to None so we can distinguish between two cases: i) the user is not parsing any ligand information (self.ligands should be set to None after initialization); and ii) the user is parsing ligand information but this PDB file has no information (self.ligands should be set to {} after initialization).
+        self.ligand_objects = None                      # A dict mapping PDB codes to object files retrieved via the ligand module from the RCSB. See comment for self.ligands above.
+        self.ions = None                                # A dict mapping chain IDs to ions. See comment for self.ligands above.
 
         # PDB deprecation fields
         self.deprecation_date = None
@@ -439,7 +445,7 @@ class PDB(object):
         self._get_SEQRES_sequences()
         self._get_ATOM_sequences()
         self.hetatm_formulae = PDB.convert_hetatms_to_Hill_notation(self.parsed_lines['HETATM'])
-        if False: ### TODO SHANE AGAIN
+        if parse_ligands:
             self._get_heterogens()
 
 
@@ -1824,6 +1830,8 @@ class PDB(object):
 
 
     def get_ligand_codes(self):
+        if self.ligands == None:
+            raise RequestedLigandsWithoutParsingException(PDB._std_ligand_parsing_error_message)
         ligand_codes = set()
         for c, cligands in self.ligands.iteritems():
             for seq_id, l in cligands.iteritems():
@@ -1832,6 +1840,8 @@ class PDB(object):
 
 
     def get_ion_codes(self):
+        if self.ions == None:
+            raise RequestedIonsWithoutParsingException(PDB._std_ion_parsing_error_message)
         ion_codes = set()
         for c, cions in self.ions.iteritems():
             for seq_id, i in cions.iteritems():
@@ -1856,6 +1866,12 @@ class PDB(object):
 
 
     def _get_heterogens(self):
+
+        # Initialize properties
+        self.ligands = {}
+        self.ligand_objects = {}
+        self.ions = {}
+
         het_ids = set()
 
         # Parse HETATM names
