@@ -409,7 +409,7 @@ class PDB(object):
         self.pdb_id = None
         self.strict = strict
         self.cache_dir = None                           # todo: Add a cache dir for when we download data e.g. ligand info
-
+        
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
@@ -583,18 +583,18 @@ class PDB(object):
 
 
     @staticmethod
-    def from_filepath(filepath, strict = True):
+    def from_filepath(filepath, strict = True, parse_ligands = False):
         '''A function to replace the old constructor call where a filename was passed in.'''
-        return PDB(read_file(filepath), strict = strict)
+        return PDB(read_file(filepath), strict = strict, parse_ligands = parse_ligands)
 
     @staticmethod
-    def from_lines(pdb_file_lines, strict = True):
+    def from_lines(pdb_file_lines, strict = True, parse_ligands = False):
         '''A function to replace the old constructor call where a list of the file's lines was passed in.'''
-        return PDB("\n".join(pdb_file_lines), strict = strict)
+        return PDB("\n".join(pdb_file_lines), strict = strict, parse_ligands = parse_ligands)
 
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None, strict = True):
+    def retrieve(pdb_id, cache_dir = None, strict = True, parse_ligands = False):
         '''Creates a PDB object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
 
         # Check to see whether we have a cached copy
@@ -602,7 +602,7 @@ class PDB(object):
         if cache_dir:
             filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
             if os.path.exists(filename):
-                return PDB(read_file(filename), strict = strict)
+                return PDB(read_file(filename), strict = strict, parse_ligands = parse_ligands)
 
         # Get a copy from the RCSB
         contents = rcsb.retrieve_pdb(pdb_id)
@@ -612,7 +612,7 @@ class PDB(object):
             write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), contents)
 
         # Return the object
-        return PDB(contents, strict = strict)
+        return PDB(contents, strict = strict, parse_ligands = parse_ligands)
 
 
     ### Private functions ###
@@ -667,9 +667,9 @@ class PDB(object):
 
     ### Basic functions ###
 
-    def clone(self):
+    def clone(self, parse_ligands = False):
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
-        return PDB("\n".join(self.lines), pdb_id = self.pdb_id, strict = self.strict)
+        return PDB("\n".join(self.lines), pdb_id = self.pdb_id, strict = self.strict, parse_ligands = parse_ligands) # todo: we should copy the ligand information rather than reparse it
 
     def get_content(self):
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
