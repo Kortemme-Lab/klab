@@ -483,8 +483,10 @@ class LigandMap(object):
     '''
 
 
+
     class _MapPoint(object):
         '''A mapping from a single ligand in one PDB to a single ligand in another.'''
+
         def __init__(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
             '''PDB codes are the contents of columns [17:20] (Python format i.e. zero-indexed) of HETATM lines.
                PDB residue IDs are the contents of columns [21:27] of HETATM lines.'''
@@ -508,8 +510,18 @@ class LigandMap(object):
             self.to_pdb_residue_id = to_pdb_residue_id
 
 
+        def __repr__(self):
+            return '{0} ({1}) -> {2} ({3})'.format(self.from_pdb_residue_id, self.from_pdb_code, self.to_pdb_residue_id, self.to_pdb_code)
+
+
+
     def __init__(self):
         self.mapping = {}
+
+
+    def __repr__(self):
+        import pprint
+        return pprint.pformat(self.mapping)
 
 
     @staticmethod

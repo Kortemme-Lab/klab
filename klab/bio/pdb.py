@@ -409,7 +409,7 @@ class PDB(object):
         self.pdb_id = None
         self.strict = strict
         self.cache_dir = None                           # todo: Add a cache dir for when we download data e.g. ligand info
-        
+
         self.seqres_chain_order = []                    # A list of the PDB chains in document-order of SEQRES records
         self.seqres_sequences = {}                      # A dict mapping chain IDs to SEQRES Sequence objects
         self.atom_chain_order = []                      # A list of the PDB chains in document-order of ATOM records (not necessarily the same as seqres_chain_order)
