@@ -51,11 +51,13 @@ def plot_scatter(
     plot_title = None,
     fig_dpi = 300,
     fig_width = None,
-    fig_height = None
+    fig_height = None,
+    fig_grid = True,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
     fig, ax = plt.subplots()
+    ax.grid(fig_grid)
     if dropna:
         dataframe = dataframe[[x_series, y_series]].replace([np.inf, -np.inf], np.nan).dropna()
 
@@ -123,7 +125,8 @@ def make_corr_plot(
     plot_title = None,
     fig_dpi = 300,
     fig_height = None,
-    fig_width = None
+    fig_width = None,
+    fig_grid = True,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -178,6 +181,8 @@ def make_corr_plot(
     axScatter.scatter(x, y)
     axScatter.set_xlabel( make_latex_safe(df.columns[0]) )
     axScatter.set_ylabel( make_latex_safe(df.columns[1]) )
+    axScatter.grid(fig_grid)
+
 
     # determine best fit line
     par = np.polyfit(x, y, 1, full=True)
@@ -192,9 +197,19 @@ def make_corr_plot(
     residuals = np.var([(slope*xx + intercept - yy)  for xx,yy in zip(x,y)])
     Rsqr = 1-residuals/variance
     r, p_val = scipy.stats.stats.pearsonr(x, y)
-    axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$\n$p=%.2e$'% (Rsqr,slope, r, p_val),
-                fontsize=16, ha='left', va='top'
-    )
+    if max( len(x), len(y) ) >= 500:
+        # From scipy documentation:
+        # The p-value roughly indicates the probability of an uncorrelated system producing datasets that have a Pearson correlation
+        # at least as extreme as the one computed from these datasets. The p-values are not entirely reliable but are probably
+        # reasonable for datasets larger than 500 or so.
+        axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$\n$p=%.2e$'% (Rsqr,slope, r, p_val),
+                    fontsize=16, ha='left', va='top'
+        )
+    else:
+        # Too small for p-value to be reliable
+        axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$'% (Rsqr,slope, r),
+                    fontsize=16, ha='left', va='top'
+        )
 
     yerrUpper = [(xx*slope+intercept)+(slope*xx**2 + intercept*xx + par[2]) for xx in x]
     yerrLower = [(xx*slope+intercept)-(slope*xx**2 + intercept*xx + par[2]) for xx in x]
