@@ -35,7 +35,6 @@ import os
 import shutil
 import numpy
 import pprint
-import subprocess
 import shlex
 import tempfile
 import copy
@@ -50,6 +49,7 @@ import pandas
 
 from klab import colortext
 from klab.Reporter import Reporter
+from klab.latex.latex_report import LatexReport
 from klab.fs.fsio import read_file, write_file, write_temp_file
 from klab.loggers.simple import ReportingObject
 from klab.gfx.color_definitions import rgb_colors as plot_colors
@@ -809,7 +809,7 @@ class BenchmarkRun(ReportingObject):
         analysis_file_prefix = os.path.abspath( os.path.join( self.subplot_directory, self.benchmark_run_name + analysis_set_prefix + '_' ) )
 
         dataframe = self.dataframe
-        graph_order = []
+        latex_report = LatexReport()
 
         # Create a subtitle for the first page
         subtitle = self.benchmark_run_name
@@ -846,19 +846,21 @@ class BenchmarkRun(ReportingObject):
             self.log('Saving scatterplot to %s.' % main_scatterplot)
             plot_pandas(dataframe, experimental_series, 'Predicted', main_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction')
 
-        graph_order.append(self.create_section_slide('{0}section_1.pdf'.format(analysis_file_prefix), 'Main metrics', subtitle, self.credit or ''))
-        graph_order.append(main_scatterplot)
+        latex_report.set_title_page( title = 'Main metrics', subtitle = subtitle )
+        if self.credit:
+            latex_report.set_abstract(self.credit)
+        latex_report.add_plot(main_scatterplot, plot_title = 'R generated Experimental vs. Prediction scatterplot')
 
         if matplotlib_plots:
-            graph_order.append( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 11, fig_width = 8.5) )
-            graph_order.append( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 11, fig_width = 8.5) )
+            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with density binning' )
+            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
-        graph_order.append(self.plot_absolute_error_histogram('{0}absolute_errors'.format(analysis_file_prefix), absolute_error_series, analysis_set = analysis_set))
-        graph_order.append(self.create_section_slide('{0}section_2.pdf'.format(analysis_file_prefix), 'Adjustments', 'Optimization of the cutoffs\nfor the fraction correct metric'))
-        graph_order.append(scalar_adjustment_calculation_plot)
-        graph_order.append(optimal_predictive_cutoff_plot)
+        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors'.format(analysis_file_prefix), absolute_error_series, analysis_set = analysis_set), plot_title = 'Absolute error histogram')
+        latex_report.add_section_page( title = 'Adjustments', subtext = 'Optimization of the cutoffs\nfor the fraction correct metric' )
+        latex_report.add_plot(scalar_adjustment_calculation_plot, plot_title = 'Scalar adjustment calculation plot')
+        latex_report.add_plot(optimal_predictive_cutoff_plot, plot_title = 'Optimal predictive cutoff plot')
 
         # Create a scatterplot and histogram for the adjusted results
         adjusted_predicted_value_series = BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)
@@ -867,56 +869,60 @@ class BenchmarkRun(ReportingObject):
         if not(os.path.exists(main_adj_scatterplot) and not(self.recreate_graphs)):
             self.log('Saving scatterplot to %s.' % main_adj_scatterplot)
             plot_pandas(dataframe, experimental_series, adjusted_predicted_value_series, main_adj_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction: adjusted scale')
-        graph_order.append(main_adj_scatterplot)
-        graph_order.append(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix), adjusted_absolute_error_series, analysis_set = analysis_set))
+        latex_report.add_plot(main_adj_scatterplot, plot_title = 'Main adj. scatterplot')
+        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix), adjusted_absolute_error_series, analysis_set = analysis_set), plot_title = 'Absolute errors adjusted with scalar')
 
         # Scatterplots colored by residue context / change on mutation
-        graph_order.append(self.create_section_slide('{0}section_3.pdf'.format(analysis_file_prefix), 'Residue context'))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Residue charges', self.scatterplot_charges, '{0}scatterplot_charges.png'.format(analysis_file_prefix), analysis_set = analysis_set))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff, self.scatterplot_exposure, '{0}scatterplot_exposure.png'.format(analysis_file_prefix), analysis_set = analysis_set))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix), analysis_set = analysis_set))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Wildtype residue s.s.', self.scatterplot_ss, '{0}scatterplot_ss.png'.format(analysis_file_prefix), analysis_set = analysis_set))
+        latex_report.add_section_page( title = 'Residue context' )
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Residue charges', self.scatterplot_charges, '{0}scatterplot_charges.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Residue charges')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff, self.scatterplot_exposure, '{0}scatterplot_exposure.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff)
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Change in volume')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype residue s.s.', self.scatterplot_ss, '{0}scatterplot_ss.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Wildtype residue s.s.')
 
         # Scatterplots colored by SCOPe classification
-        graph_order.append(self.create_section_slide('{0}section_4.pdf'.format(analysis_file_prefix), 'SCOPe classes'))
         SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
         SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
         SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
+        scop_section_page_generated = False
         if len(SCOP_classes) <= 25:
             if len(SCOP_classes) == 1 and ((None in SCOP_classes) or (numpy.isnan(sorted(SCOP_classes)[0]) or not(sorted(SCOP_classes)[0]))):
                 print('There are no defined SCOP classes. Skipping the SCOP class plot.')
             else:
-                graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP class', self.scatterplot_scop_class, '{0}scatterplot_scop_class.png'.format(analysis_file_prefix), analysis_set = analysis_set))
+                if not scop_section_page_generated:
+                    latex_report.add_section_page( title = 'SCOPe classes' )
+                    scop_section_page_generated = True
+                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP class', self.scatterplot_scop_class, '{0}scatterplot_scop_class.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP class')
         if len(SCOP_folds) <= 25:
             if len(SCOP_folds) == 1 and ((None in SCOP_folds) or (numpy.isnan(sorted(SCOP_folds)[0]) or not(sorted(SCOP_folds)[0]))):
                 print('There are no defined SCOP folds. Skipping the SCOP fold plot.')
             else:
-                graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP fold', self.scatterplot_scop_fold, '{0}scatterplot_scop_fold.png'.format(analysis_file_prefix), analysis_set = analysis_set))
+                if not scop_section_page_generated:
+                    latex_report.add_section_page( title = 'SCOPe classes' )
+                    scop_section_page_generated = True
+                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP fold', self.scatterplot_scop_fold, '{0}scatterplot_scop_fold.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP fold')
         if len(SCOP_classifications) <= 25:
             if len(SCOP_classifications) == 1 and ((None in SCOP_classifications) or (numpy.isnan(sorted(SCOP_classifications)[0]) or not(sorted(SCOP_classifications)[0]))):
                 print('There are no defined SCOP classifications. Skipping the SCOP classification plot.')
             else:
-                graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP classification', self.scatterplot_scop_classification, '{0}scatterplot_scop_classification.png'.format(analysis_file_prefix), analysis_set = analysis_set))
+                if not scop_section_page_generated:
+                    latex_report.add_section_page( title = 'SCOPe classes' )
+                    scop_section_page_generated = True
+                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP classification', self.scatterplot_scop_classification, '{0}scatterplot_scop_classification.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP classification')
 
         # Scatterplots colored by residue types
-        graph_order.append(self.create_section_slide('{0}section_5.pdf'.format(analysis_file_prefix), 'Residue types'))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Wildtype', self.scatterplot_wildtype_aa, '{0}scatterplot_wildtype_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Mutant', self.scatterplot_mutant_aa, '{0}scatterplot_mutant_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Glycine/Proline', self.scatterplot_GP, '{0}scatterplot_gp.png'.format(analysis_file_prefix), analysis_set = analysis_set))
+        latex_report.add_section_page( title = 'Residue types' )
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype', self.scatterplot_wildtype_aa, '{0}scatterplot_wildtype_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Wildtype')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Mutant', self.scatterplot_mutant_aa, '{0}scatterplot_mutant_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Mutant')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Glycine/Proline', self.scatterplot_GP, '{0}scatterplot_gp.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Glycine/Proline')
 
         # Scatterplots colored PDB resolution and chain length
-        graph_order.append(self.create_section_slide('{0}section_6.pdf'.format(analysis_file_prefix), 'Chain properties'))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - PDB resolution', self.scatterplot_pdb_res_binned, '{0}scatterplot_pdb_res_binned.png'.format(analysis_file_prefix), analysis_set = analysis_set))
-        graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Chain length', self.scatterplot_chain_length, '{0}scatterplot_chain_length.png'.format(analysis_file_prefix), analysis_set = analysis_set))
+        latex_report.add_section_page( title = 'Chain properties' )
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - PDB resolution', self.scatterplot_pdb_res_binned, '{0}scatterplot_pdb_res_binned.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - PDB resolution')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Chain length', self.scatterplot_chain_length, '{0}scatterplot_chain_length.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Chain length')
 
         # Errors / debugging
-        graph_order.append(self.create_section_slide('{0}section_7.pdf'.format(analysis_file_prefix), 'Errors / debugging'))
-        graph_order.append(self.plot_derivative_error_barchart(analysis_file_prefix))
-
-        # Make sure all of the graphs have been created
-        relative_graph_paths = [os.path.relpath(g) for g in graph_order]
-        for rp in relative_graph_paths:
-            assert( os.path.isfile(rp) )
+        latex_report.add_section_page( title =  'Errors / debugging' )
+        latex_report.add_plot(self.plot_derivative_error_barchart(analysis_file_prefix), plot_title = 'Derivative error barchart')
 
         # Copy the analysis input files into the analysis directory - these files are duplicated but it makes it easier to share data
         if self.analysis_csv_input_filepath:
@@ -926,49 +932,12 @@ class BenchmarkRun(ReportingObject):
         if self.analysis_raw_data_input_filepath:
             shutil.copyfile(self.analysis_raw_data_input_filepath, self.analysis_directory)
 
-        # Convert .PNG plots to PDFs
-        pdf_plot_paths = []
-        pdf_plot_dir = tempfile.mkdtemp( prefix = '%s-%s-pdf-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
-        r = Reporter('converting image plots to PDFs', entries = 'plots')
-        r.set_total_count( len([rp for rp in relative_graph_paths if rp.lower().endswith('.png')]) )
-        for rp in relative_graph_paths:
-            if rp.lower().endswith('.png'):
-                # self.log('\n\nCreating a PDF of plot: {0}'.format(rp), colortext.message)
-                plot_file = os.path.join(pdf_plot_dir, os.path.splitext(os.path.basename(rp))[0] + '.pdf')
-                try:
-                    # print 'convert "{0}" "{1}"'.format(rp, plot_file)
-                    p = subprocess.Popen(shlex.split( 'convert "{0}" "{1}"'.format(rp, plot_file)) )
-                    stdoutdata, stderrdata = p.communicate()
-                    if p.returncode != 0: raise Exception('')
-                    pdf_plot_paths.append(plot_file)
-                    r.increment_report()
-                except:
-                    self.log( shlex.split( 'convert "{0}" "{1}"'.format(rp, plot_file)), colortext.error )
-                    self.log('An error occurred while combining the positional scatterplots using the convert application (ImageMagick).', colortext.error)
-                    r.decrement_total_count()
-            elif rp.lower().endswith('.pdf'):
-                pdf_plot_paths.append(rp)
-            else:
-                self.log('A subplot that is not a known file type was discovered. Name: ' + rp, colortext.error)
-                raise Exception('Unrecognized filetype')
-        r.done()
-
-
         # Combine the plots into a PDF file
-        all_plot_file = os.path.join(self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name))
-        self.log('\n\nCreating a PDF containing all of the plots: {0}'.format(all_plot_file), colortext.message)
-        pdfunite_command = shlex.split('pdfunite "{0}" "{1}"'.format('" "'.join(pdf_plot_paths), all_plot_file))
-        try:
-            if os.path.exists(all_plot_file):
-                os.remove(all_plot_file)
-            p = subprocess.Popen(pdfunite_command)
-            stdoutdata, stderrdata = p.communicate()
-            if p.returncode != 0: raise Exception('')
-        except:
-            self.log('An error occurred while combining the subplots using the pdfunite application.', colortext.error)
-            self.log('Attemped command: ' + pdfunite_command, colortext.error)
-
-        shutil.rmtree(pdf_plot_dir) # Remove temporary PDF directory
+        latex_report.generate_pdf_report(
+            os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) )
+        )
+        self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
+        
         self.generate_plots = old_generate_plots
 
 
@@ -1012,59 +981,6 @@ class BenchmarkRun(ReportingObject):
                 max_value_cutoff, max_value = p[0], p[1]
 
         return max_value_cutoff, max_value, fraction_correct_range
-
-
-    def create_section_slide(self, plot_filename, title, subtitle = '', footer = ''):
-
-        if os.path.exists(plot_filename) and not(self.recreate_graphs):
-            return plot_filename
-
-        R_filename = os.path.splitext(plot_filename)[0] + '.R'
-
-        title_size = 8
-        longest_line = max(map(len, title.split('\n')))
-        if longest_line <= 11:
-            title_size = 16
-        elif longest_line <= 16:
-            title_size = 12
-        elif longest_line <= 19:
-            title_size = 10
-
-        subtitle_size = 6
-        longest_line = max(map(len, subtitle.split('\n')))
-        if longest_line <= 11:
-            subtitle_size = 16
-        elif longest_line <= 16:
-            subtitle_size = 12
-        elif longest_line <= 19:
-            subtitle_size = 10
-        elif longest_line <= 32:
-            subtitle_size = 8
-        subtitle_size = min(title_size - 2, subtitle_size)
-
-        footer_size = 6
-
-        # Create plot
-        if self.generate_plots:
-            r_script = '''library(ggplot2)
-library(gridExtra)
-library(scales)
-library(qualV)
-
-pdf('%(plot_filename)s', paper="letter", bg="white")
-
-p <- ggplot(mtcars, aes(x = wt, y = mpg)) + geom_blank() +
-     coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
-     theme(axis.ticks.x=element_blank(), axis.ticks.y=element_blank(), axis.text.x=element_blank(), axis.text.y=element_blank(), axis.title.x=element_blank(), axis.title.y=element_blank()) +
-     geom_text(hjust=0, vjust=1, size=%(title_size)d, color="black", aes(5, 90, fontface="plain", family = "Times", face = "bold", label="%(title)s")) +
-     geom_text(hjust=0, vjust=1, size=%(subtitle_size)d, color="black", aes(5, 50, fontface="plain", family = "Times", face = "bold", label="%(subtitle)s")) +
-     geom_text(hjust=0, vjust=1, size=%(footer_size)d, color="black", aes(5, 5, fontface="italic", family = "Times", face = "bold", label="%(footer)s"))
-p
-dev.off()'''
-            self.log('Section slide %s.' % plot_filename)
-            RInterface._runRScript(r_script % locals())
-            return plot_filename
-
 
     def plot_optimum_prediction_fraction_correct_cutoffs(self, analysis_set, analysis_file_prefix, stability_classication_x_cutoff):
 
