@@ -37,15 +37,19 @@ import numpy
 import pprint
 import subprocess
 import shlex
+import tempfile
 import copy
 import StringIO
 import gzip
+import time
+import getpass
 try: import json
 except: import simplejson as json
 
 import pandas
 
 from klab import colortext
+from klab.Reporter import Reporter
 from klab.fs.fsio import read_file, write_file, write_temp_file
 from klab.loggers.simple import ReportingObject
 from klab.gfx.color_definitions import rgb_colors as plot_colors
@@ -97,6 +101,8 @@ class BenchmarkRun(ReportingObject):
         self.benchmark_run_directory = benchmark_run_directory
         self.dataset_cases = copy.deepcopy(dataset_cases)
         self.analysis_data = copy.deepcopy(analysis_data)
+        self.analysis_directory = None
+        self.subplot_directory = None
         self.restrict_to = restrict_to
         self.remove_cases = remove_cases
         self.use_single_reported_value = use_single_reported_value
@@ -260,17 +266,28 @@ class BenchmarkRun(ReportingObject):
                 print(str)
 
 
-    def create_subplot_directory(self, analysis_directory):
-        # Create subplot directory
-        subplot_directory = os.path.join(analysis_directory, self.benchmark_run_name + '_subplots')
-        if not(os.path.exists(subplot_directory)):
-            try:
-                os.makedirs(subplot_directory)
-                assert(os.path.exists(subplot_directory))
-                self.subplot_directory = subplot_directory
-            except Exception, e:
-                raise colortext.Exception('An exception occurred creating the subplot directory %s.' % subplot_directory)
+    def create_analysis_directory(self, analysis_directory = None):
+        if self.analysis_directory:
+            return
+        if analysis_directory:
+            if not(os.path.isdir(analysis_directory)):
+                try:
+                    os.makedirs(analysis_directory)
+                    assert(os.path.isdir(analysis_directory))
+                    self.analysis_directory = analysis_directory
+                except Exception, e:
+                    raise colortext.Exception('An exception occurred creating the subplot directory %s.' % analysis_directory)
+        else:
+            self.analysis_directory = tempfile.mkdtemp( prefix = '%s-%s-%s_' % (time.strftime("%y%m%d"), getpass.getuser(), self.benchmark_run_name) )
 
+    def create_subplot_directory(self, analysis_directory = None):
+        if self.subplot_directory:
+            return
+
+        self.create_analysis_directory(analysis_directory = analysis_directory)
+        self.subplot_directory = os.path.join(self.analysis_directory, self.benchmark_run_name + '_subplots')
+        if not os.path.isdir(self.subplot_directory):
+            os.makedirs(self.subplot_directory)
 
     def read_dataframe_from_content(self, hdfstore_blob):
         fname = write_temp_file('/tmp', hdfstore_blob, ftype = 'wb')
@@ -772,11 +789,9 @@ class BenchmarkRun(ReportingObject):
             self.report(metrics_textfile[-1], fn = colortext.warning)
 
         # Write the analysis to file
-        if analysis_directory:
-            self.create_subplot_directory(analysis_directory)
-            self.metrics_filepath = os.path.join(analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
-            write_file(self.metrics_filepath, '\n'.join(metrics_textfile))
-
+        self.create_analysis_directory(analysis_directory)
+        self.metrics_filepath = os.path.join(self.analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
+        write_file(self.metrics_filepath, '\n'.join(metrics_textfile))
 
     def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True):
         if matplotlib_plots:
@@ -785,17 +800,13 @@ class BenchmarkRun(ReportingObject):
         old_generate_plots = self.generate_plots # todo: hacky - replace with option to return graphs in memory
         self.generate_plots = True
 
-        temp_analysis_directory = analysis_directory
-        if not temp_analysis_directory:
-            temp_analysis_directory = '/tmp/analysis'
-        else:
-            self.create_subplot_directory(analysis_directory) # Create a directory for plots
+        self.create_subplot_directory(analysis_directory) # Create a directory for plots
 
         analysis_set_prefix = ''
         if analysis_set:
             analysis_set_prefix = '_{0}'.format(analysis_set)
 
-        analysis_file_prefix = os.path.join(temp_analysis_directory, self.benchmark_run_name + '_subplots', self.benchmark_run_name + analysis_set_prefix + '_')
+        analysis_file_prefix = os.path.abspath( os.path.join( self.subplot_directory, self.benchmark_run_name + analysis_set_prefix + '_' ) )
 
         dataframe = self.dataframe
         graph_order = []
@@ -835,7 +846,7 @@ class BenchmarkRun(ReportingObject):
             self.log('Saving scatterplot to %s.' % main_scatterplot)
             plot_pandas(dataframe, experimental_series, 'Predicted', main_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction')
 
-        graph_order.append(self.create_section_slide('{0}section_1.png'.format(analysis_file_prefix), 'Main metrics', subtitle, self.credit or ''))
+        graph_order.append(self.create_section_slide('{0}section_1.pdf'.format(analysis_file_prefix), 'Main metrics', subtitle, self.credit or ''))
         graph_order.append(main_scatterplot)
 
         if matplotlib_plots:
@@ -845,7 +856,7 @@ class BenchmarkRun(ReportingObject):
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
         graph_order.append(self.plot_absolute_error_histogram('{0}absolute_errors'.format(analysis_file_prefix), absolute_error_series, analysis_set = analysis_set))
-        graph_order.append(self.create_section_slide('{0}section_2.png'.format(analysis_file_prefix), 'Adjustments', 'Optimization of the cutoffs\nfor the fraction correct metric'))
+        graph_order.append(self.create_section_slide('{0}section_2.pdf'.format(analysis_file_prefix), 'Adjustments', 'Optimization of the cutoffs\nfor the fraction correct metric'))
         graph_order.append(scalar_adjustment_calculation_plot)
         graph_order.append(optimal_predictive_cutoff_plot)
 
@@ -860,14 +871,14 @@ class BenchmarkRun(ReportingObject):
         graph_order.append(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix), adjusted_absolute_error_series, analysis_set = analysis_set))
 
         # Scatterplots colored by residue context / change on mutation
-        graph_order.append(self.create_section_slide('{0}section_3.png'.format(analysis_file_prefix), 'Residue context'))
+        graph_order.append(self.create_section_slide('{0}section_3.pdf'.format(analysis_file_prefix), 'Residue context'))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Residue charges', self.scatterplot_charges, '{0}scatterplot_charges.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff, self.scatterplot_exposure, '{0}scatterplot_exposure.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Wildtype residue s.s.', self.scatterplot_ss, '{0}scatterplot_ss.png'.format(analysis_file_prefix), analysis_set = analysis_set))
 
         # Scatterplots colored by SCOPe classification
-        graph_order.append(self.create_section_slide('{0}section_4.png'.format(analysis_file_prefix), 'SCOPe classes'))
+        graph_order.append(self.create_section_slide('{0}section_4.pdf'.format(analysis_file_prefix), 'SCOPe classes'))
         SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
         SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
         SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
@@ -888,47 +899,76 @@ class BenchmarkRun(ReportingObject):
                 graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP classification', self.scatterplot_scop_classification, '{0}scatterplot_scop_classification.png'.format(analysis_file_prefix), analysis_set = analysis_set))
 
         # Scatterplots colored by residue types
-        graph_order.append(self.create_section_slide('{0}section_5.png'.format(analysis_file_prefix), 'Residue types'))
+        graph_order.append(self.create_section_slide('{0}section_5.pdf'.format(analysis_file_prefix), 'Residue types'))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Wildtype', self.scatterplot_wildtype_aa, '{0}scatterplot_wildtype_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Mutant', self.scatterplot_mutant_aa, '{0}scatterplot_mutant_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Glycine/Proline', self.scatterplot_GP, '{0}scatterplot_gp.png'.format(analysis_file_prefix), analysis_set = analysis_set))
 
         # Scatterplots colored PDB resolution and chain length
-        graph_order.append(self.create_section_slide('{0}section_6.png'.format(analysis_file_prefix), 'Chain properties'))
+        graph_order.append(self.create_section_slide('{0}section_6.pdf'.format(analysis_file_prefix), 'Chain properties'))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - PDB resolution', self.scatterplot_pdb_res_binned, '{0}scatterplot_pdb_res_binned.png'.format(analysis_file_prefix), analysis_set = analysis_set))
         graph_order.append(self.scatterplot_generic('Experimental vs. Prediction - Chain length', self.scatterplot_chain_length, '{0}scatterplot_chain_length.png'.format(analysis_file_prefix), analysis_set = analysis_set))
 
         # Errors / debugging
-        graph_order.append(self.create_section_slide('{0}section_7.png'.format(analysis_file_prefix), 'Errors / debugging'))
+        graph_order.append(self.create_section_slide('{0}section_7.pdf'.format(analysis_file_prefix), 'Errors / debugging'))
         graph_order.append(self.plot_derivative_error_barchart(analysis_file_prefix))
 
         # Make sure all of the graphs have been created
-        relative_graph_paths = [os.path.join(self.benchmark_run_name + '_subplots', os.path.split(g)[1]) for g in graph_order]
+        relative_graph_paths = [os.path.relpath(g) for g in graph_order]
         for rp in relative_graph_paths:
-            assert(os.path.exists(os.path.join(temp_analysis_directory, rp)))
+            assert( os.path.isfile(rp) )
 
         # Copy the analysis input files into the analysis directory - these files are duplicated but it makes it easier to share data
         if self.analysis_csv_input_filepath:
-            shutil.copyfile(self.analysis_csv_input_filepath, os.path.join(temp_analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_csv_input_filepath)[1]))
+            shutil.copyfile(self.analysis_csv_input_filepath, self.analysis_directory)
         if self.analysis_json_input_filepath:
-            shutil.copyfile(self.analysis_json_input_filepath, os.path.join(temp_analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_json_input_filepath)[1]))
+            shutil.copyfile(self.analysis_json_input_filepath, self.analysis_directory)
         if self.analysis_raw_data_input_filepath:
-            shutil.copyfile(self.analysis_raw_data_input_filepath, os.path.join(temp_analysis_directory, self.benchmark_run_name + '_' + os.path.split(self.analysis_raw_data_input_filepath)[1]))
+            shutil.copyfile(self.analysis_raw_data_input_filepath, self.analysis_directory)
 
+        # Convert .PNG plots to PDFs
+        pdf_plot_paths = []
+        pdf_plot_dir = tempfile.mkdtemp( prefix = '%s-%s-pdf-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
+        r = Reporter('converting image plots to PDFs', entries = 'plots')
+        r.set_total_count( len([rp for rp in relative_graph_paths if rp.lower().endswith('.png')]) )
+        for rp in relative_graph_paths:
+            if rp.lower().endswith('.png'):
+                # self.log('\n\nCreating a PDF of plot: {0}'.format(rp), colortext.message)
+                plot_file = os.path.join(pdf_plot_dir, os.path.splitext(os.path.basename(rp))[0] + '.pdf')
+                try:
+                    # print 'convert "{0}" "{1}"'.format(rp, plot_file)
+                    p = subprocess.Popen(shlex.split( 'convert "{0}" "{1}"'.format(rp, plot_file)) )
+                    stdoutdata, stderrdata = p.communicate()
+                    if p.returncode != 0: raise Exception('')
+                    pdf_plot_paths.append(plot_file)
+                    r.increment_report()
+                except:
+                    self.log( shlex.split( 'convert "{0}" "{1}"'.format(rp, plot_file)), colortext.error )
+                    self.log('An error occurred while combining the positional scatterplots using the convert application (ImageMagick).', colortext.error)
+                    r.decrement_total_count()
+            elif rp.lower().endswith('.pdf'):
+                pdf_plot_paths.append(rp)
+            else:
+                self.log('A subplot that is not a known file type was discovered. Name: ' + rp, colortext.error)
+                raise Exception('Unrecognized filetype')
+        r.done()
+                
+            
         # Combine the plots into a PDF file
-        plot_file = os.path.join(temp_analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name))
-        self.log('\n\nCreating a PDF containing all of the plots: {0}'.format(plot_file), colortext.message)
+        all_plot_file = os.path.join(self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name))
+        self.log('\n\nCreating a PDF containing all of the plots: {0}'.format(all_plot_file), colortext.message)
+        pdfunite_command = shlex.split('pdfunite "{0}" "{1}"'.format('" "'.join(pdf_plot_paths), all_plot_file))
         try:
-            if os.path.exists(plot_file):
-                # raise Exception('remove this exception') #todo
-                os.remove(plot_file)
-            print(shlex.split('convert "{0}" {1}'.format('" "'.join(relative_graph_paths), plot_file)))
-            p = subprocess.Popen(shlex.split('convert "{0}" "{1}"'.format('" "'.join(relative_graph_paths), plot_file)), cwd = temp_analysis_directory)
+            if os.path.exists(all_plot_file):
+                os.remove(all_plot_file)
+            p = subprocess.Popen(pdfunite_command)
             stdoutdata, stderrdata = p.communicate()
             if p.returncode != 0: raise Exception('')
         except:
-            self.log('An error occurred while combining the positional scatterplots using the convert application (ImageMagick).', colortext.error)
+            self.log('An error occurred while combining the subplots using the pdfunite application.', colortext.error)
+            self.log('Attemped command: ' + pdfunite_command, colortext.error)
 
+        shutil.rmtree(pdf_plot_dir) # Remove temporary PDF directory
         self.generate_plots = old_generate_plots
 
 
@@ -1011,7 +1051,7 @@ library(gridExtra)
 library(scales)
 library(qualV)
 
-png('%(plot_filename)s', height=4096, width=4096, bg="white", res=600)
+pdf('%(plot_filename)s', paper="letter", bg="white")
 
 p <- ggplot(mtcars, aes(x = wt, y = mpg)) + geom_blank() +
      coord_cartesian(xlim = c(0, 100), ylim = c(0, 100)) +
