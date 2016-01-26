@@ -94,7 +94,7 @@ def plot_scatter(
         hh[hh < thresh] = np.nan # fill the areas with low density by NaNs
 
         plt.scatter(xdat_low, ydat_low, s = 10, alpha = 0.6, linewidth = 0.1)
-        plt.scatter(xdat_high, ydat_high, s = 0.6, alpha = 0.3, linewidth = 0.1, color='white')
+        plt.scatter(xdat_high, ydat_high, s = 0.6, alpha = 0.15, linewidth = 0.1, color='white')
         plt.imshow(np.flipud(hh.T),cmap='jet',extent=np.array(xyrange).flatten(), interpolation='none')
         plt.colorbar(label = 'Counts per (high point density) histogram region')
     else:
@@ -127,6 +127,7 @@ def make_corr_plot(
     fig_height = None,
     fig_width = None,
     fig_grid = True,
+    scatter_alpha = 0.8,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -178,7 +179,7 @@ def make_corr_plot(
     axHisty.yaxis.set_major_formatter(nullfmt)
 
     # the scatter plot:
-    axScatter.scatter(x, y)
+    axScatter.scatter(x, y, alpha = scatter_alpha)
     axScatter.set_xlabel( make_latex_safe(df.columns[0]) )
     axScatter.set_ylabel( make_latex_safe(df.columns[1]) )
     axScatter.grid(fig_grid)
