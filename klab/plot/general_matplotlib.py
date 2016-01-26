@@ -74,7 +74,7 @@ def plot_scatter(
 
         #histogram definition
         xyrange = [ [np.min(xdat), np.max(xdat)], [np.min(ydat), np.max(ydat)] ] # data range
-        bins = [80, 80] # number of bins
+        bins = [100, 100] # number of bins
         thresh = 3  #density threshold
 
         # histogram the data
@@ -92,7 +92,7 @@ def plot_scatter(
         hh[hh < thresh] = np.nan # fill the areas with low density by NaNs
 
         plt.scatter(xdat_low, ydat_low, s = 10, alpha = 0.6, linewidth = 0.1)
-        plt.scatter(xdat_high, ydat_high, s = 1, alpha = 0.6, linewidth = 0.1, color='white')
+        plt.scatter(xdat_high, ydat_high, s = 0.6, alpha = 0.3, linewidth = 0.1, color='white')
         plt.imshow(np.flipud(hh.T),cmap='jet',extent=np.array(xyrange).flatten(), interpolation='none')
         plt.colorbar(label = 'Counts per (high point density) histogram region')
     else:
