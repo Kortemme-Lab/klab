@@ -36,8 +36,9 @@ with open(os.path.join(cwd, 'document_header.tex'), 'r') as f:
     document_header = f.read()
 
 class LatexReport:
-    def __init__(self, latex_template_file = None, table_of_contents = False):
+    def __init__(self, latex_template_file = None, table_of_contents = False, number_compilations = 3):
         self.latex_template_file = latex_template_file
+        self.number_compilations = int( number_compilations )
 
         self.title_page_title = None
         self.title_page_subtitle = None
@@ -56,9 +57,9 @@ class LatexReport:
     def set_abstract(self, abstract_text):
         self.abstract_text = make_latex_safe(abstract_text)
 
-    def add_section_page(self, title = '', subtext = None):
+    def add_section_page(self, title = '', subtext = None, clearpage = True):
         self.content.append(
-            LatexPageSection(title, subtext)
+            LatexPageSection(title, subtext, clearpage)
         )
 
     def add_plot(self, plot_filename, plot_title = None):
@@ -86,7 +87,7 @@ class LatexReport:
             latex_strings.append( content_obj.generate_latex() )
 
         latex_strings.append( '\\end{document}' )
-            
+
         self.latex = ''
         for s in latex_strings:
             if s.endswith('\n'):
@@ -100,8 +101,8 @@ class LatexReport:
         tmp_latex_file = os.path.join(out_dir, 'report.tex')
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
-        print out_dir
-        latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
+        for x in xrange(self.number_compilations):
+            latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
         tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
         assert( os.path.isfile(tmp_latex_pdf) )
         shutil.copy( tmp_latex_pdf, report_filepath )
@@ -111,8 +112,9 @@ class LatexPage:
     pass
 
 class LatexPageSection(LatexPage):
-    def __init__(self, title, subtext):
+    def __init__(self, title, subtext, clearpage):
         self.title = make_latex_safe(title)
+        self.clearpage = clearpage
         if subtext:
             self.subtext = make_latex_safe(subtext)
         else:
@@ -123,6 +125,8 @@ class LatexPageSection(LatexPage):
         if self.subtext:
             return_str += '\n\\textit{%s}\n' % self.subtext
         return_str += '\n'
+        if self.clearpage:
+            return_str += '\\clearpage'
         return return_str
 
 class LatexPagePlot(LatexPage):
@@ -141,6 +145,7 @@ class LatexPagePlot(LatexPage):
     def generate_latex(self):
         return_str = '\\begin{figure}[H]'
         return_str += '  \\includegraphics[width=\\textwidth]{{%s}%s}' % (os.path.splitext(self.plot_filename)[0], os.path.splitext(self.plot_filename)[1])
-        return_str += '  \\caption{%s}' % self.plot_title
+        if self.plot_title != '':
+            return_str += '  \\caption{%s}' % self.plot_title
         return_str += '\\end{figure}'
         return return_str
