@@ -827,7 +827,7 @@ class BenchmarkRun(ReportingObject):
             subtitle += '\n{0}'.format('\n'.join(description_lines))
         if self.dataset_description:
             subtitle += '\n{0}'.format(self.dataset_description)
-        if analysis_set:
+        if analysis_set and analysis_set != self.dataset_description:
             subtitle += ' ({0})'.format(analysis_set)
 
         # Plot which y-cutoff yields the best value for the fraction correct metric
@@ -850,8 +850,8 @@ class BenchmarkRun(ReportingObject):
         graph_order.append(main_scatterplot)
 
         if matplotlib_plots:
-            graph_order.append( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter') )
-            graph_order.append( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction') )
+            graph_order.append( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 11, fig_width = 8.5) )
+            graph_order.append( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 11, fig_width = 8.5) )
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
@@ -952,8 +952,8 @@ class BenchmarkRun(ReportingObject):
                 self.log('A subplot that is not a known file type was discovered. Name: ' + rp, colortext.error)
                 raise Exception('Unrecognized filetype')
         r.done()
-                
-            
+
+
         # Combine the plots into a PDF file
         all_plot_file = os.path.join(self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name))
         self.log('\n\nCreating a PDF containing all of the plots: {0}'.format(all_plot_file), colortext.message)

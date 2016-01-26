@@ -40,12 +40,31 @@ import scipy
 def make_latex_safe(text):
     return text.replace('_', '\_')
 
-def plot_scatter(dataframe, x_series, y_series, output_name = 'scatter', output_directory = None, output_format='png', verbose = True, dropna = True, density_plot = False, plot_title = None, dpi = 300):
+def plot_scatter(
+    dataframe, x_series, y_series,
+    output_name = 'scatter',
+    output_directory = None,
+    output_format = None,
+    verbose = True,
+    dropna = True,
+    density_plot = False,
+    plot_title = None,
+    fig_dpi = 300,
+    fig_width = None,
+    fig_height = None
+):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
     fig, ax = plt.subplots()
     if dropna:
         dataframe = dataframe[[x_series, y_series]].replace([np.inf, -np.inf], np.nan).dropna()
+
+    if not output_format:
+        # If there are many points, save figure as a PNG (since PDFs perform poorly with many points)
+        if max( len(dataframe.as_matrix([x_series])), len(dataframe.as_matrix([y_series])) ) >= 1500:
+            output_format = 'png'
+        else:
+            output_format = 'pdf'
 
     output_path = os.path.join(output_directory, output_name + '.' + output_format)
 
@@ -83,24 +102,44 @@ def plot_scatter(dataframe, x_series, y_series, output_name = 'scatter', output_
     plt.xlabel( make_latex_safe(x_series) )
     if plot_title:
         plt.title( make_latex_safe(plot_title) )
-    
+
     if verbose:
         print 'Saving scatterplot figure to:', output_path
+    if fig_height and fig_width:
+        plt.gcf().set_size_inches(fig_width, fig_height)
     plt.savefig(
-        output_path, dpi=dpi, format = output_format
+        output_path, dpi = fig_dpi, format = output_format
     )
     plt.close()
     return output_path
 
-def make_corr_plot(df, x_series, y_series, output_name = 'histogram_fit_scatter', output_directory = None, output_format='pdf', verbose = True, dropna = True, plot_title = None, dpi = 300):
+def make_corr_plot(
+    df, x_series, y_series,
+    output_name = 'histogram_fit_scatter',
+    output_directory = None,
+    output_format = None,
+    verbose = True,
+    dropna = True,
+    plot_title = None,
+    fig_dpi = 300,
+    fig_height = None,
+    fig_width = None
+):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
-
-    fig_path = os.path.join(output_directory, output_name + '.' + output_format)
 
     df = df[[x_series, y_series]].dropna()
     x = np.array(df.ix[:,0])
     y = np.array(df.ix[:,1])
+
+    if not output_format:
+        # If there are many points, save figure as a PNG (since PDFs perform poorly with many points)
+        if max( len(x), len(y) ) >= 1500:
+            output_format = 'png'
+        else:
+            output_format = 'pdf'
+
+    fig_path = os.path.join(output_directory, output_name + '.' + output_format)
 
     nullfmt = NullFormatter()         # no labels
 
@@ -110,12 +149,19 @@ def make_corr_plot(df, x_series, y_series, output_name = 'histogram_fit_scatter'
     bottom_h = left_h = left+width+0.02
 
     rect_scatter = [left, bottom, width, height]
-    rect_histx = [left, bottom_h, width, 0.2]
+    if plot_title:
+        # Leave extra space for the plot title
+        rect_histx = [left, bottom_h, width, 0.17]
+        rect_text = [left_h, bottom_h, 0.2, 0.17]
+    else:
+        rect_histx = [left, bottom_h, width, 0.2]
+        rect_text = [left_h, bottom_h, 0.2, 0.2]
     rect_histy = [left_h, bottom, 0.2, height]
-    rect_text = [left_h, bottom_h, 0.2, 0.2]
 
-    # start with a rectangular Figure
-    plt.figure(1, figsize=(8,8))
+    if fig_width and fig_height:
+        plt.figure( 1, figsize=(fig_width, fig_height) )
+    else:
+        plt.figure( 1, figsize=(8, 8) )
 
     axScatter = plt.axes(rect_scatter)
     axHistx = plt.axes(rect_histx)
@@ -176,10 +222,13 @@ def make_corr_plot(df, x_series, y_series, output_name = 'histogram_fit_scatter'
     axHistx.set_ylabel('Counts')
     axHisty.set_xlabel('Counts')
 
-    plt.savefig(fig_path, dpi = 300, format = output_format)
     if verbose:
         print 'Saving scatterplot to:', fig_path
     if plot_title:
-        plt.title( make_latex_safe(plot_title) )
+        if fig_width and fig_height:
+            plt.gcf().suptitle( make_latex_safe(plot_title), fontsize = fig_width*fig_height/4.1 )
+        else:
+            plt.gcf().suptitle( make_latex_safe(plot_title) )
+    plt.savefig(fig_path, dpi = fig_dpi, format = output_format)
     plt.close()
     return fig_path
