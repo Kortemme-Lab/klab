@@ -53,7 +53,6 @@ from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fract
 from klab.benchmarking.analysis.plot import plot_pandas
 from klab.plot.rtools import RInterface
 
-
 class BenchmarkRun(ReportingObject):
     '''A object to contain benchmark run data which can be used to analyze that run or else to cross-analyze the run with another run.'''
 
@@ -268,6 +267,7 @@ class BenchmarkRun(ReportingObject):
             try:
                 os.makedirs(subplot_directory)
                 assert(os.path.exists(subplot_directory))
+                self.subplot_directory = subplot_directory
             except Exception, e:
                 raise colortext.Exception('An exception occurred creating the subplot directory %s.' % subplot_directory)
 
@@ -778,7 +778,9 @@ class BenchmarkRun(ReportingObject):
             write_file(self.metrics_filepath, '\n'.join(metrics_textfile))
 
 
-    def plot(self, analysis_set = '', analysis_directory = None):
+    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True):
+        if matplotlib_plots:
+            from klab.plot import general_matplotlib
 
         old_generate_plots = self.generate_plots # todo: hacky - replace with option to return graphs in memory
         self.generate_plots = True
@@ -835,6 +837,10 @@ class BenchmarkRun(ReportingObject):
 
         graph_order.append(self.create_section_slide('{0}section_1.png'.format(analysis_file_prefix), 'Main metrics', subtitle, self.credit or ''))
         graph_order.append(main_scatterplot)
+
+        if matplotlib_plots:
+            graph_order.append( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter') )
+            graph_order.append( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction') )
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
