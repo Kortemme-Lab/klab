@@ -36,9 +36,7 @@ plt.rc('font', family='sans-serif')
 from matplotlib.ticker import NullFormatter
 
 import scipy
-
-def make_latex_safe(text):
-    return text.replace('_', '\_')
+from klab.latex.util import make_latex_safe
 
 def plot_scatter(
     dataframe, x_series, y_series,
