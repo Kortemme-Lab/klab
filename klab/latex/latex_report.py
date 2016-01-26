@@ -34,9 +34,11 @@ from klab.latex.util import make_latex_safe
 cwd = os.path.dirname(os.path.realpath(__file__))
 with open(os.path.join(cwd, 'document_header.tex'), 'r') as f:
     document_header = f.read()
+with open(os.path.join(cwd, 'html_document_header.tex'), 'r') as f:
+    html_document_header = f.read()
 
 class LatexReport:
-    def __init__(self, latex_template_file = None, table_of_contents = False, number_compilations = 3):
+    def __init__(self, latex_template_file = None, table_of_contents = True, number_compilations = 3):
         self.latex_template_file = latex_template_file
         self.number_compilations = int( number_compilations )
 
@@ -67,8 +69,12 @@ class LatexReport:
             LatexPagePlot(plot_filename, plot_title)
         )
 
-    def generate_latex(self):
-        latex_strings = [document_header]
+    def generate_latex(self, output_type='pdf'):
+        if output_type == 'pdf':
+            latex_strings = [document_header]
+        elif output_type == 'html':
+            latex_strings = [html_document_header]
+
         make_title_page = False
         if self.title_page_title != None and self.title_page_title != '':
             latex_strings.append( '\\title{%s}' % self.title_page_title )
@@ -81,7 +87,7 @@ class LatexReport:
             latex_strings.append('\\begin{document}\n\\maketitle')
 
         if self.table_of_contents:
-            latex_strings.append('\\tableofcontents')
+            latex_strings.append('\\tableofcontents\n\n\\clearpage\n\n')
 
         for content_obj in self.content:
             latex_strings.append( content_obj.generate_latex() )
@@ -96,8 +102,21 @@ class LatexReport:
                 self.latex += s + '\n'
 
     def generate_pdf_report(self, report_filepath):
-        self.generate_latex()
-        out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex_' % (time.strftime("%y%m%d"), getpass.getuser()) )
+        self.generate_latex( output_type = 'pdf' )
+        out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex-pdf_' % (time.strftime("%y%m%d"), getpass.getuser()) )
+        tmp_latex_file = os.path.join(out_dir, 'report.tex')
+        with open(tmp_latex_file, 'w') as f:
+            f.write(self.latex)
+        for x in xrange(self.number_compilations):
+            latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
+        tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
+        assert( os.path.isfile(tmp_latex_pdf) )
+        shutil.copy( tmp_latex_pdf, report_filepath )
+        shutil.rmtree(out_dir)
+
+    def generate_html_report(self, report_filepath):
+        self.generate_latex( output_type = 'html' )
+        out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex-html_' % (time.strftime("%y%m%d"), getpass.getuser()) )
         tmp_latex_file = os.path.join(out_dir, 'report.tex')
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
@@ -121,12 +140,13 @@ class LatexPageSection(LatexPage):
             self.subtext = None
 
     def generate_latex(self):
-        return_str = '\\section{%s}' % self.title
-        if self.subtext:
-            return_str += '\n\\textit{%s}\n' % self.subtext
-        return_str += '\n'
+        return_str = ''
         if self.clearpage:
-            return_str += '\\clearpage'
+            return_str += '\n\\clearpage\n\n'
+        return_str += '\\section{%s}\n' % self.title
+        if self.subtext:
+            return_str += '\\textit{%s}\n' % self.subtext
+        return_str += '\n'
         return return_str
 
 class LatexPagePlot(LatexPage):
@@ -143,9 +163,9 @@ class LatexPagePlot(LatexPage):
             self.plot_title = ''
 
     def generate_latex(self):
-        return_str = '\\begin{figure}[H]'
-        return_str += '  \\includegraphics[width=\\textwidth]{{%s}%s}' % (os.path.splitext(self.plot_filename)[0], os.path.splitext(self.plot_filename)[1])
+        return_str = '\\begin{figure}[H]\n'
+        return_str += '  \\includegraphics[width=\\textwidth]{{%s}%s}\n' % (os.path.splitext(self.plot_filename)[0], os.path.splitext(self.plot_filename)[1])
         if self.plot_title != '':
-            return_str += '  \\caption{%s}' % self.plot_title
-        return_str += '\\end{figure}'
+            return_str += '  \\caption{%s}\n' % self.plot_title
+        return_str += '\\end{figure}\n'
         return return_str
