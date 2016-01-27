@@ -44,7 +44,7 @@ class LatexReport:
 
         self.title_page_title = None
         self.title_page_subtitle = None
-        self.abstract_text = None
+        self.abstract_text = []
 
         self.latex = None
 
@@ -56,8 +56,8 @@ class LatexReport:
         self.title_page_title = make_latex_safe(title)
         self.title_page_subtitle = make_latex_safe(subtitle)
 
-    def set_abstract(self, abstract_text):
-        self.abstract_text = make_latex_safe(abstract_text)
+    def add_to_abstract(self, abstract_text):
+        self.abstract_text.append( make_latex_safe(abstract_text) )
 
     def add_section_page(self, title = '', subtext = None, clearpage = True):
         self.content.append(
@@ -88,6 +88,12 @@ class LatexReport:
 
         if self.table_of_contents:
             latex_strings.append('\\tableofcontents\n\n\\clearpage\n\n')
+
+        if len( self.abstract_text ) > 0:
+            latex_strings.append('\\begin{abstract}\n')
+            for abstract_text_paragraph in self.abstract_text:
+                latex_strings.append( abstract_text_paragraph + '\n\n' )
+            latex_strings.append('\\end{abstract}\n\n')
 
         for content_obj in self.content:
             latex_strings.append( content_obj.generate_latex() )
@@ -121,10 +127,8 @@ class LatexReport:
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
         for x in xrange(self.number_compilations):
-            latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
-        tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
-        assert( os.path.isfile(tmp_latex_pdf) )
-        shutil.copy( tmp_latex_pdf, report_filepath )
+            latex_output = subprocess.check_output( ['htlatex', 'report.tex'], cwd = out_dir )
+        raise Exception("Output files not yet copied from: " + out_dir)
         shutil.rmtree(out_dir)
 
 class LatexPage:

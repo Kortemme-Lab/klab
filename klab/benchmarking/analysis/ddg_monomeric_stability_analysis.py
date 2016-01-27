@@ -848,7 +848,8 @@ class BenchmarkRun(ReportingObject):
 
         latex_report.set_title_page( title = 'Main metrics', subtitle = subtitle )
         if self.credit:
-            latex_report.set_abstract(self.credit)
+            latex_report.add_to_abstract(self.credit)
+        latex_report.add_section_page( title = 'Main plots' )
         latex_report.add_plot(main_scatterplot, plot_title = 'R generated Experimental vs. Prediction scatterplot')
 
         if matplotlib_plots:
@@ -937,7 +938,7 @@ class BenchmarkRun(ReportingObject):
             os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) )
         )
         self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
-        
+
         self.generate_plots = old_generate_plots
 
 
