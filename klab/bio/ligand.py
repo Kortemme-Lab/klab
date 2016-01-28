@@ -442,7 +442,7 @@ class PDBIon(SimplePDBLigand):
 
         # Extract the charge of the ion - we do not care about the number of ions
         ion_formula = None
-         if self.Formula:
+        if self.Formula:
             ion_formula = re.match('\s*\d+[(](.*?)[)]\s*', self.Formula)
             if ion_formula:
                 ion_formula = ion_formula.group(1)
