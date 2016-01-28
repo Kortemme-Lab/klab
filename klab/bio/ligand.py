@@ -441,11 +441,13 @@ class PDBIon(SimplePDBLigand):
     def get_db_records(self, pdb_id, pdb_ion_code = None, file_content_id = None, ion_id = None):
 
         # Extract the charge of the ion - we do not care about the number of ions
-        ion_formula = re.match('\s*\d+[(](.*?)[)]\s*', self.Formula)
-        if ion_formula:
-            ion_formula = ion_formula.group(1)
-        else:
-            ion_formula = self.Formula
+        ion_formula = None
+         if self.Formula:
+            ion_formula = re.match('\s*\d+[(](.*?)[)]\s*', self.Formula)
+            if ion_formula:
+                ion_formula = ion_formula.group(1)
+            else:
+                ion_formula = self.Formula
 
         iname = None
         if self.Names:
@@ -491,7 +493,6 @@ class LigandMap(object):
             '''PDB codes are the contents of columns [17:20] (Python format i.e. zero-indexed) of HETATM lines.
                PDB residue IDs are the contents of columns [21:27] of HETATM lines.'''
 
-            print(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id)
             assert((len(from_pdb_residue_id) == 6) and (len(to_pdb_residue_id) == 6))
             assert(from_pdb_residue_id[1:5].strip().isdigit() and to_pdb_residue_id[1:5].strip().isdigit())
 
@@ -517,6 +518,7 @@ class LigandMap(object):
 
     def __init__(self):
         self.mapping = {}
+        self.code_map = {}
 
 
     def __repr__(self):
@@ -538,6 +540,16 @@ class LigandMap(object):
     def add(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
         assert(from_pdb_residue_id not in self.mapping)
         self.mapping[from_pdb_residue_id] = LigandMap._MapPoint(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = strict)
+
+        # Consistency check - make sure that we always map the same code e.g. 'LIG' to the same code e.g. 'GTP'
+        if from_pdb_code in self.code_map:
+            assert(self.code_map[from_pdb_code] == to_pdb_code)
+        else:
+            self.code_map[from_pdb_code] = to_pdb_code
+
+
+    def map_code(self, from_pdb_code):
+        return self.code_map.get(from_pdb_code)
 
 
     def is_injective(self):
