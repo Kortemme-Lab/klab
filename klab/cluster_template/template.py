@@ -57,8 +57,6 @@ app_name = '#$#appname#$#'
 cluster_rosetta_binary_type = '#$#cluster_rosetta_binary_type#$#'
 local_rosetta_binary_type = '#$#local_rosetta_binary_type#$#'
 
-run_from_database = #$#run_from_database#$#
-
 zip_rosetta_output = True
 
 generic_rosetta_args = [
@@ -146,88 +144,8 @@ class Reporter:
         else:
             return time.time() - self.start
 
-def run_single_from_db(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
-    # Add ddglib and klab to path
-    if not os.path.lexists('klab'):
-        os.symlink( os.path.expanduser('~/gits/klab'), 'klab' )
-    if not os.path.lexists('ddglib'):
-        os.symlink( os.path.expanduser('~/gits/ddg/ddglib'), 'ddglib')
-    cwd = os.path.abspath( os.getcwd() )
-    if cwd not in sys.path:
-        sys.path.append(cwd)
-    from ddglib.ppi_api import get_interface_with_config_file
-
-    # These next two lines are specific to the ppi_api, but could be generalized
-    # with string formatting
-    prediction_set_id = '#$#db_id#$#'
-    ppi_api = get_interface_with_config_file()
-    prediction_ids = sorted( ppi_api.get_prediction_ids(prediction_set_id) )
-
-    prediction_id = prediction_ids[task_id]
-    job_details = ppi_api.get_job_details(prediction_id)
-    if not job_details['DevelopmentProtocolID']:
-        raise Exception("Missing DevelopmentProtocolID")
-    development_protocol = ppi_api.get_development_protocol(job_details['DevelopmentProtocolID'])
-    app_name = development_protocol['Application']
-    flags_list = development_protocol['TemplateCommandLine'].strip().split()
-    file_tuples = [] # List of names, contents
-    for file_info in job_details['Files']['Input']:
-        file_tuples.append( (file_info['Filename'], file_info['Content']) )
-    substitution_parameters = json.loads(job_details['JSONParameters'])
-    extra_parameters = job_details['ExtraParameters']
-    job_dir = str(prediction_id)
-
-    # Add extra parameters to flags_list
-    for extra_parameter in extra_parameters.strip().split():
-        flags_list.append(extra_parameter)
-
-    # Make temporary directories
-    if not os.path.isdir(scratch_dir):
-        os.mkdir(scratch_dir)
-    tmp_data_dir = tempfile.mkdtemp(prefix='%d.%d_data_' % (job_id,task_id), dir=scratch_dir)
-    tmp_output_dir = tempfile.mkdtemp(prefix='%d.%d_output_' % (job_id,task_id), dir=scratch_dir)
-
-    if verbosity >= 1:
-        print 'Temporary data dir:', tmp_data_dir
-        print 'Temporary output dir:', tmp_output_dir
-        print 'Job dir:', job_dir
-        if len(file_tuples) > 0:
-            print 'Starting moving files'
-
-    files_dict = {} # Maps name to filepath position
-    for file_name, file_contents in file_tuples:
-        new_file_location = os.path.join(tmp_data_dir, file_name)
-        with open(new_file_location, 'w') as f:
-            f.write(file_contents)
-        files_dict[file_name] = new_file_location
-
-    args=[
-        os.path.join(rosetta_bin, app_name + rosetta_binary_type),
-    ]
-
-    # Append specific Rosetta database path if this argument is included
-    if len(rosetta_db) > 0:
-        args.append('-database')
-        args.append(rosetta_db)
-
-    for flag in flags_list:
-        matches = re.findall('%%.+%%', flag)
-        for match_str in matches:
-            if match_str in substitution_parameters:
-                if substitution_parameters[match_str] in files_dict:
-                    flag = flag.replace(match_str, files_dict[substitution_parameters[match_str]])
-                else:
-                    flag = flag.replace(match_str, substitution_parameters[match_str])
-
-        # Check if argument is a file
-        if flag in files_dict:
-            flag = files_dict[flag]
-
-        args.append(flag)
-
-    return finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=verbosity, move_output_files=move_output_files)
-
 def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=True):
+    # This is split out from run_single, because one could (and one has) written a run_single_from_db function, for example
     time_start = roundTime()
 
     if verbosity >= 1:
@@ -538,10 +456,7 @@ def unzip_file(file_path):
         return f_out_name
 
 if __name__=='__main__':
-    if run_from_database:
-        run_func = run_single_from_db
-    else:
-        run_func = run_single
+    run_func = run_single
 
     if run_locally:
         run_local(run_func)
