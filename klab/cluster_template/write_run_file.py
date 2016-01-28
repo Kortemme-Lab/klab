@@ -12,39 +12,21 @@ path_to_this_module = os.path.abspath( os.path.dirname( inspect.getsourcefile(sy
 template_file = os.path.join(path_to_this_module, 'template.py')
 
 def process(data_dict, database_run = False, job_dict = None):
-    if database_run:
-        required_arguments = [
-            'numjobs', 'scriptname', 'mem_free',
-            'cluster_rosetta_bin',
-            'local_rosetta_bin',
-            'output_dir',
-            'cluster_rosetta_binary_type',
-            'local_rosetta_binary_type',
-            'db_id',
-        ]
-        unrequired_arguments = [
-            'add_extra_ld_path',
-            'numclusterjobs',
-            'appname', 'rosetta_args_list',
-            'rosetta_binary_type',
-            'run_from_database',
-        ]
-    else:
-        required_arguments = [
-            'numjobs', 'scriptname', 'mem_free',
-            'cluster_rosetta_bin',
-            'local_rosetta_bin',
-            'appname', 'rosetta_args_list',
-            'output_dir',
-            'cluster_rosetta_binary_type',
-            'local_rosetta_binary_type',
-        ]
-        unrequired_arguments = [
-            'add_extra_ld_path',
-            'numclusterjobs',
-            'run_from_database',
-            'db_id',
-        ]
+    required_arguments = [
+        'numjobs', 'scriptname', 'mem_free',
+        'cluster_rosetta_bin',
+        'local_rosetta_bin',
+        'appname', 'rosetta_args_list',
+        'output_dir',
+        'cluster_rosetta_binary_type',
+        'local_rosetta_binary_type',
+    ]
+    unrequired_arguments = [
+        'add_extra_ld_path',
+        'numclusterjobs',
+        'run_from_database',
+        'db_id',
+    ]
 
     for arg in required_arguments:
         if arg not in data_dict:
@@ -57,14 +39,10 @@ def process(data_dict, database_run = False, job_dict = None):
             sys.exit(1)
 
     if 'job_dict_name' not in data_dict:
-        data_dict['job_dict_name'] = 'job_dict.pickle'        
-            
-    if database_run:
-        data_dict['appname'] = ''
-        data_dict['run_from_database'] = 'True'
-    else:
-        data_dict['run_from_database'] = 'False'
-            
+        data_dict['job_dict_name'] = 'job_dict.pickle'
+
+    data_dict['run_from_database'] = 'False'
+
     # Handle LD paths
     if 'extra_ld_path' in data_dict:
         data_dict['add_extra_ld_path'] = 'True'
@@ -72,24 +50,21 @@ def process(data_dict, database_run = False, job_dict = None):
         data_dict['add_extra_ld_path'] = 'False'
         data_dict['extra_ld_path'] = ''
 
-    if not database_run:
-        # Handle if general rosetta args are a list instead of a string
-        if not isinstance(data_dict['rosetta_args_list'], basestring):
-            rosetta_args = ""
-            if len(data_dict['rosetta_args_list']) == 1:
-                rosetta_args += "'%s'" % data_dict['rosetta_args_list']
-            elif len(data_dict['rosetta_args_list']) > 1:
-                for arg in data_dict['rosetta_args_list'][:-1]:
-                    rosetta_args += "'%s', " % arg
-                rosetta_args += "'%s'" % data_dict['rosetta_args_list'][-1]
-            data_dict['rosetta_args_list'] = rosetta_args
-    else:
-        data_dict['rosetta_args_list'] = ''
+    # Handle if general rosetta args are a list instead of a string
+    if not isinstance(data_dict['rosetta_args_list'], basestring):
+        rosetta_args = ""
+        if len(data_dict['rosetta_args_list']) == 1:
+            rosetta_args += "'%s'" % data_dict['rosetta_args_list']
+        elif len(data_dict['rosetta_args_list']) > 1:
+            for arg in data_dict['rosetta_args_list'][:-1]:
+                rosetta_args += "'%s', " % arg
+            rosetta_args += "'%s'" % data_dict['rosetta_args_list'][-1]
+        data_dict['rosetta_args_list'] = rosetta_args
 
     # Handle other options
     if 'db_id' not in data_dict:
         data_dict['db_id'] = ''
-    
+
     if 'cluster_rosetta_db' not in data_dict:
         data_dict['cluster_rosetta_db'] = ''
 
@@ -110,7 +85,7 @@ def process(data_dict, database_run = False, job_dict = None):
     # Check for invalid script name
     if data_dict['scriptname'][0].isdigit():
         data_dict['scriptname'] = 'run_' + data_dict['scriptname']
-        
+
     formatted_data_dict = {}
     for arg in data_dict:
         new_arg = '#$#%s#$#' % arg
@@ -130,10 +105,15 @@ def process(data_dict, database_run = False, job_dict = None):
             f.write(line)
 
     output_data_dir = os.path.join(data_dict['output_dir'], 'data')
-    
+
     if not os.path.isdir(output_data_dir):
         os.makedirs(output_data_dir)
 
+    if 'pickle_protocol' in data_dict:
+        pickle_protocol = data_dict['pickle_protocol']
+    else:
+        pickle_protocol = 2
+
     if job_dict != None:
         with open(os.path.join(output_data_dir, data_dict['job_dict_name']), 'w') as f:
-            pickle.dump(job_dict, f)
+            pickle.dump(job_dict, f, protocol = pickle_protocol)
