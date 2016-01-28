@@ -42,6 +42,12 @@ from mysql import DatabaseInterface
 #        but I need to read the documentation.
 
 
+def row_to_dict(r):
+    '''Converts an SQLAlchemy record to a Python dict. We assume that _sa_instance_state exists and is the only value we do not care about.'''
+    d = copy.deepcopy(r.__dict__)
+    del d['_sa_instance_state']
+    return d
+
 
 def get_single_record_from_query(result_set):
     '''Helper function to return the single result from a query. We assume that either a result does not exist or exactly
