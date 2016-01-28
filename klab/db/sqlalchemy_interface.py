@@ -102,7 +102,7 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
 class IntermediateField(object):
 
 
-    def __init__(self, field_name, field_type, not_null = False, default_type = None, default_value = None, comment = None, is_primary_key = False):
+    def __init__(self, field_name, field_type, not_null = False, default_type = None, default_value = None, comment = None, is_primary_key = False, unicode_collation_or_character_set = False):
         self.field_name = field_name
         self.field_type = field_type
         self.not_null = not_null
@@ -110,6 +110,7 @@ class IntermediateField(object):
         self.default_value = default_value
         self.comment = comment
         self.is_primary_key = is_primary_key
+        self.unicode_collation_or_character_set = unicode_collation_or_character_set
 
 
     def to_sql_alchemy(self, typedefs):
@@ -123,9 +124,13 @@ class IntermediateField(object):
             mtchs = re.match("varchar[(](\d+)[)]", self.field_type)
             assert(mtchs)
             length = int(mtchs.group(1))
-            s += 'Unicode(%d)' % length
             is_string_type = True
-            typedefs['sqlalchemy.types'].add('Unicode')
+            if self.unicode_collation_or_character_set:
+                s += 'Unicode(%d)' % length
+                typedefs['sqlalchemy.types'].add('Unicode')
+            else:
+                typedefs['sqlalchemy.types'].add('String')
+                s += 'String(%d)' % length
 
         elif self.field_type == 'double':
             s += 'DOUBLE'
@@ -288,6 +293,10 @@ class MySQLSchemaConverter(object):
                 field_type = f.split()[1]
                 remaining_description = (' '.join(f.split()[2:])).strip()
 
+            unicode_collation_or_character_set = False
+            if remaining_description.find('utf') != -1:
+                unicode_collation_or_character_set = True
+
             not_null = False
             if remaining_description.find('NOT NULL') != -1:
                 not_null = True
@@ -331,7 +340,7 @@ class MySQLSchemaConverter(object):
             remaining_description = remaining_description.strip()
 
             self.intermediate_schema[tbl] = self.intermediate_schema.get(tbl, [])
-            self.intermediate_schema[tbl].append(IntermediateField(field_name, field_type, not_null = not_null, default_type = default_type, default_value = default_value, comment = comment, is_primary_key = field_name in pk_fields))
+            self.intermediate_schema[tbl].append(IntermediateField(field_name, field_type, not_null = not_null, default_type = default_type, default_value = default_value, comment = comment, is_primary_key = field_name in pk_fields, unicode_collation_or_character_set = unicode_collation_or_character_set))
 
             #print('field_name : %s' % field_name)
             #print('field_type : %s' % field_type)
