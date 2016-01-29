@@ -172,6 +172,7 @@ class DatabaseInterface(object):
 
 
     def execute_select(self, sql, parameters = None, quiet = False, locked = False):
+        print('execute_select {0} {1}'.format(sql, parameters))
         return self.execute(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
 
 
@@ -201,6 +202,7 @@ class DatabaseInterface(object):
                 cursor = self.SSDictCursor_connection.cursor()
                 if locked:
                     if self.lockstring:
+                        print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
                 if parameters:
@@ -213,6 +215,7 @@ class DatabaseInterface(object):
                 results = cursor.fetchall()
                 if locked:
                     if self.unlockstring:
+                        print('UNLOCKING')
                         cursor.execute(self.unlockstring)
                     self.locked = False
                 cursor.close()
@@ -221,6 +224,7 @@ class DatabaseInterface(object):
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
+                            print('UNLOCKING')
                             cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
@@ -231,6 +235,7 @@ class DatabaseInterface(object):
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
+                            print('UNLOCKING')
                             cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
@@ -264,6 +269,7 @@ class DatabaseInterface(object):
                 cursor = self.StdCursor_connection.cursor()
                 if locked:
                     if self.lockstring:
+                        print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
                 if parameters:
@@ -276,6 +282,7 @@ class DatabaseInterface(object):
                 results = cursor.fetchall()
                 if locked:
                     if self.unlockstring:
+                        print('UNLOCKING')
                         cursor.execute(self.unlockstring)
                     self.locked = False
                 cursor.close()
@@ -284,6 +291,7 @@ class DatabaseInterface(object):
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
+                            print('UNLOCKING')
                             cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
@@ -294,6 +302,7 @@ class DatabaseInterface(object):
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
+                            print('UNLOCKING')
                             cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
@@ -354,6 +363,7 @@ class DatabaseInterface(object):
                 cursor = self.connection.cursor()
                 if locked:
                     if self.lockstring:
+                        print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
                 if parameters:
@@ -366,6 +376,7 @@ class DatabaseInterface(object):
                 results = cursor.fetchall()
                 if locked:
                     if self.unlockstring:
+                        print('UNLOCKING')
                         cursor.execute(self.unlockstring)
                     self.locked = False
                 cursor.close()
@@ -376,6 +387,7 @@ class DatabaseInterface(object):
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
+                            print('UNLOCKING')
                             cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
@@ -388,6 +400,7 @@ class DatabaseInterface(object):
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
+                            print('UNLOCKING')
                             cursor.execute(self.unlockstring)
                         self.locked = False
                     cursor.close()
