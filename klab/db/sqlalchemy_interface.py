@@ -24,11 +24,13 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import create_engine, and_
 from sqlalchemy import inspect as sqlalchemy_inspect
+from sqlalchemy.ext.declarative import declarative_base
 
 if __name__ == '__main__':
     sys.path.insert(0, '..')
 from klab import colortext
 from mysql import DatabaseInterface
+
 
 
 # @todo. This module saves time creating SQLAlchemy class definitions. It is still very basic however (and hacked together).
@@ -42,10 +44,19 @@ from mysql import DatabaseInterface
 #        but I need to read the documentation.
 
 
-def row_to_dict(r):
-    '''Converts an SQLAlchemy record to a Python dict. We assume that _sa_instance_state exists and is the only value we do not care about.'''
+def row_to_dict(r, DeclarativeBase = None):
+    '''Converts an SQLAlchemy record to a Python dict. We assume that _sa_instance_state exists and is the only value we do not care about.
+       If DeclarativeBase is passed then all DeclarativeBase objects (e.g. those created by relationships) are also removed.
+    '''
     d = copy.deepcopy(r.__dict__)
     del d['_sa_instance_state']
+    if DeclarativeBase:
+        to_remove = []
+        for k, v in d.iteritems():
+            if isinstance(v, DeclarativeBase):
+                to_remove.append(k)
+        for k in to_remove:
+            del d[k]
     return d
 
 
