@@ -50,7 +50,9 @@ local_rosetta_bin = '#$#local_rosetta_bin#$#'
 local_rosetta_db = '#$#local_rosetta_db#$#'
 local_scratch_dir = '/tmp'
 
-job_pickle_file = 'data/#$#job_dict_name#$#'
+job_pickle_files = [
+    'data/#$#job_dict_name#$#'
+]
 
 app_name = '#$#appname#$#'
 
@@ -254,115 +256,119 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
     return time_end
 
 def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
-    if os.path.isfile(job_pickle_file):
+    for subtask, job_pickle_file in enumerate(job_pickle_files):
+        if len(job_pickle_files) > 1:
+            print 'Processing subtask %d out of %d total (range 0-%d)' % (subtask, len(job_pickle_files), len(job_pickle_files-1))
+
+        assert( os.path.isfile(job_pickle_file) )
         p = open(job_pickle_file,'r')
         job_dict = pickle.load(p)
         p.close()
 
-    job_dirs = sorted(job_dict.keys())
+        job_dirs = sorted(job_dict.keys())
 
-    job_dir = job_dirs[task_id]
+        job_dir = job_dirs[task_id]
 
-    if verbosity >= 1:
-        print 'Job dir:', job_dir
+        if verbosity >= 1:
+            print 'Job dir:', job_dir
 
-    # Make temporary directories
-    if not os.path.isdir(scratch_dir):
-        os.mkdir(scratch_dir)
-    tmp_data_dir = tempfile.mkdtemp(prefix='%d.%d_data_' % (job_id,task_id), dir=scratch_dir)
-    tmp_output_dir = tempfile.mkdtemp(prefix='%d.%d_output_' % (job_id,task_id), dir=scratch_dir)
+        # Make temporary directories
+        if not os.path.isdir(scratch_dir):
+            os.mkdir(scratch_dir)
+        tmp_data_dir = tempfile.mkdtemp(prefix='%d.%d_data_' % (job_id,task_id), dir=scratch_dir)
+        tmp_output_dir = tempfile.mkdtemp(prefix='%d.%d_output_' % (job_id,task_id), dir=scratch_dir)
 
-    if verbosity >= 1:
-        print 'Temporary data dir:', tmp_data_dir
-        print 'Temporary output dir:', tmp_output_dir
+        if verbosity >= 1:
+            print 'Temporary data dir:', tmp_data_dir
+            print 'Temporary output dir:', tmp_output_dir
 
-    args=[
-        os.path.join(rosetta_bin, app_name + rosetta_binary_type),
-    ]
+        args=[
+            os.path.join(rosetta_bin, app_name + rosetta_binary_type),
+        ]
 
-    # Append specific Rosetta database path if this argument is included
-    if len(rosetta_db) > 0:
-        args.append('-database')
-        args.append(rosetta_db)
+        # Append specific Rosetta database path if this argument is included
+        if len(rosetta_db) > 0:
+            args.append('-database')
+            args.append(rosetta_db)
 
-    def copy_file_helper(original_file):
-        new_file = os.path.join(tmp_data_dir, os.path.basename(original_file))
-        shutil.copy(original_file, new_file)
-        value = os.path.relpath(new_file, tmp_output_dir)
-        if verbosity>=1:
-            print 'Copied file to local scratch:', os.path.basename(original_file)
-        return value
+        def copy_file_helper(original_file):
+            new_file = os.path.join(tmp_data_dir, os.path.basename(original_file))
+            shutil.copy(original_file, new_file)
+            value = os.path.relpath(new_file, tmp_output_dir)
+            if verbosity>=1:
+                print 'Copied file to local scratch:', os.path.basename(original_file)
+            return value
 
-    flags_dict = job_dict[job_dir]
-    for flag in flags_dict:
-        if flag.startswith('FLAGLIST'):
-            for split_flag in flags_dict[flag]:
-                args.append(str(split_flag))
-            continue
+        flags_dict = job_dict[job_dir]
+        for flag in flags_dict:
+            if flag.startswith('FLAGLIST'):
+                for split_flag in flags_dict[flag]:
+                    args.append(str(split_flag))
+                continue
 
-        # Process later if input file list
-        if flag == 'input_file_list':
-            continue
+            # Process later if input file list
+            if flag == 'input_file_list':
+                continue
 
-        # Check if argument is a rosetta script variable
-        if flag == '-parser:script_vars':
-            args.append(flag)
-            script_vars = flags_dict[flag]
-            assert( not isinstance(script_vars, basestring) )
-            for varstring in script_vars:
-                assert( '=' in varstring )
-                name, value = varstring.split('=')
-                if os.path.isfile(value):
-                    value = copy_file_helper( os.path.abspath(value) )
-                args.append( '%s=%s' % (name, value) )
-            continue
+            # Check if argument is a rosetta script variable
+            if flag == '-parser:script_vars':
+                args.append(flag)
+                script_vars = flags_dict[flag]
+                assert( not isinstance(script_vars, basestring) )
+                for varstring in script_vars:
+                    assert( '=' in varstring )
+                    name, value = varstring.split('=')
+                    if os.path.isfile(value):
+                        value = copy_file_helper( os.path.abspath(value) )
+                    args.append( '%s=%s' % (name, value) )
+                continue
 
-        # Add only the value if NOAPPEND, otherwise also add the key here
-        if not flag.startswith('NOAPPEND'):
-            args.append(flag)
+            # Add only the value if NOAPPEND, otherwise also add the key here
+            if not flag.startswith('NOAPPEND'):
+                args.append(flag)
 
-        # Check if argument is a file or directory
-        # If so, copy to temporary data directory
-        value = str(flags_dict[flag])
-        if os.path.isfile(value):
-            value = copy_file_helper( os.path.abspath(value) )
+            # Check if argument is a file or directory
+            # If so, copy to temporary data directory
+            value = str(flags_dict[flag])
+            if os.path.isfile(value):
+                value = copy_file_helper( os.path.abspath(value) )
 
-        elif os.path.isdir(value):
-            original_dir = os.path.abspath(value)
-            new_dir = os.path.join(tmp_data_dir, os.path.basename(original_dir))
-            shutil.copytree(original_dir, new_dir)
-            value = os.path.relpath(new_dir, tmp_output_dir)
-            if verbosity >= 1:
-                print 'Copied dir to local scratch:', os.path.basename(original_dir)
+            elif os.path.isdir(value):
+                original_dir = os.path.abspath(value)
+                new_dir = os.path.join(tmp_data_dir, os.path.basename(original_dir))
+                shutil.copytree(original_dir, new_dir)
+                value = os.path.relpath(new_dir, tmp_output_dir)
+                if verbosity >= 1:
+                    print 'Copied dir to local scratch:', os.path.basename(original_dir)
 
-        if not isinstance(flags_dict[flag], basestring):
-            # Is a list
-            for list_item in flags_dict[flag]:
-                args.append(list_item)
-        else:
-            args.append(value)
+            if not isinstance(flags_dict[flag], basestring):
+                # Is a list
+                for list_item in flags_dict[flag]:
+                    args.append(list_item)
+            else:
+                args.append(value)
 
-    if 'input_file_list' in flags_dict:
-        input_list_file = os.path.join(tmp_data_dir, 'structs.txt')
-        tmp_pdb_dir = os.path.join(tmp_data_dir, 'input_list_pdbs')
-        os.mkdir(tmp_pdb_dir)
-        args.append('-l')
-        args.append( os.path.relpath(input_list_file, tmp_output_dir) )
-        f = open(input_list_file, 'w')
-        pdbs = sorted(flags_dict['input_file_list'])
-        for i, input_pdb in enumerate(pdbs):
-            inner_tmp_pdb_dir = tempfile.mkdtemp(prefix='pdb_dir_', dir=tmp_pdb_dir)
-            new_input_file = os.path.join(inner_tmp_pdb_dir, os.path.basename(input_pdb))
-            shutil.copy(input_pdb, new_input_file)
-            if new_input_file.endswith('.gz'):
-                new_input_file = unzip_file(new_input_file)
-            f.write( os.path.abspath(new_input_file) )
-            f.write('\n')
-        f.close()
+        if 'input_file_list' in flags_dict:
+            input_list_file = os.path.join(tmp_data_dir, 'structs.txt')
+            tmp_pdb_dir = os.path.join(tmp_data_dir, 'input_list_pdbs')
+            os.mkdir(tmp_pdb_dir)
+            args.append('-l')
+            args.append( os.path.relpath(input_list_file, tmp_output_dir) )
+            f = open(input_list_file, 'w')
+            pdbs = sorted(flags_dict['input_file_list'])
+            for i, input_pdb in enumerate(pdbs):
+                inner_tmp_pdb_dir = tempfile.mkdtemp(prefix='pdb_dir_', dir=tmp_pdb_dir)
+                new_input_file = os.path.join(inner_tmp_pdb_dir, os.path.basename(input_pdb))
+                shutil.copy(input_pdb, new_input_file)
+                if new_input_file.endswith('.gz'):
+                    new_input_file = unzip_file(new_input_file)
+                f.write( os.path.abspath(new_input_file) )
+                f.write('\n')
+            f.close()
 
-    args.extend(generic_rosetta_args)
+        args.extend(generic_rosetta_args)
 
-    return finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
+        return finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
 
 def run_local(run_func):
     # Only import multiprocessing here because it may not be available in old cluster python environments
