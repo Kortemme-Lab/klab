@@ -25,6 +25,7 @@ from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy import create_engine, and_
 from sqlalchemy import inspect as sqlalchemy_inspect
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm.collections import InstrumentedList
 
 if __name__ == '__main__':
     sys.path.insert(0, '..')
@@ -44,20 +45,20 @@ from mysql import DatabaseInterface
 #        but I need to read the documentation.
 
 
-def row_to_dict(r, DeclarativeBase = None):
+def row_to_dict(r, keep_relationships = False):
     '''Converts an SQLAlchemy record to a Python dict. We assume that _sa_instance_state exists and is the only value we do not care about.
        If DeclarativeBase is passed then all DeclarativeBase objects (e.g. those created by relationships) are also removed.
     '''
-    d = copy.deepcopy(r.__dict__)
-    del d['_sa_instance_state']
-    if DeclarativeBase:
-        to_remove = []
-        for k, v in d.iteritems():
-            if isinstance(v, DeclarativeBase):
-                to_remove.append(k)
-        for k in to_remove:
-            del d[k]
-    return d
+    d = {}
+    if not keep_relationships:
+        # only returns the table columns
+        t = r.__table__
+        for c in [c.name for c in list(sqlalchemy_inspect(t).columns)]:
+            d[c] = getattr(r, c)
+        return d
+    else:
+        # keeps all objects including those of type DeclarativeBase or InstrumentedList and the _sa_instance_state object
+        return copy.deepcopy(r.__dict__)
 
 
 def get_single_record_from_query(result_set):
