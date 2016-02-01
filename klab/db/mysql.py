@@ -172,7 +172,8 @@ class DatabaseInterface(object):
 
 
     def execute_select(self, sql, parameters = None, quiet = False, locked = False):
-        print('execute_select {0} {1}'.format(sql, parameters))
+        if locked:
+            print('LOCKED execute_select {0} {1}'.format(sql, parameters))
         return self.execute(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
 
 
@@ -202,6 +203,7 @@ class DatabaseInterface(object):
                 cursor = self.SSDictCursor_connection.cursor()
                 if locked:
                     if self.lockstring:
+                        print(sql, parameters)
                         print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
@@ -269,6 +271,7 @@ class DatabaseInterface(object):
                 cursor = self.StdCursor_connection.cursor()
                 if locked:
                     if self.lockstring:
+                        print(sql, parameters)
                         print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
@@ -363,6 +366,7 @@ class DatabaseInterface(object):
                 cursor = self.connection.cursor()
                 if locked:
                     if self.lockstring:
+                        print(sql, parameters)
                         print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
@@ -534,21 +538,23 @@ class DatabaseInterface(object):
     def t_insert_dict_if_new(self, tblname, d, PKfields, fields=None):
         '''A version of insertDictIfNew for transactions. This does not call commit.'''
         SQL, values = self._insert_dict_if_new_inner(tblname, d, PKfields, fields=fields)
-        print(SQL, values)
         if SQL != False:
             self.execute_select(SQL, parameters=values, locked=True)
             return True, d
         return False, values
 
 
-    def insertDictIfNew(self, tblname, d, PKfields, fields=None):
+    def insertDictIfNew(self, tblname, d, PKfields, fields=None, locked = True):
         '''Simple function for inserting a dictionary whose keys match the fieldnames of tblname. The function returns two values, the
             second of which is a dict containing the primary keys of the record. If a record already exists then no insertion is performed and
             (False, the dictionary of existing primary keys) is returned. Otherwise, the record is inserted into the database and (True, d)
             is returned.'''
-        SQL, values = self._insert_dict_if_new_inner(tblname, d, PKfields, fields=fields)
+        SQL, values = self._insert_dict_if_new_inner(tblname, d, PKfields, fields=fields, locked = locked)
         if SQL != False:
-            self.locked_execute(SQL, parameters=values)
+            if locked:
+                self.locked_execute(SQL, parameters=values)
+            else:
+                self.execute(SQL, parameters=values, locked = False)
             return True, d
         return False, values
 
@@ -573,15 +579,15 @@ class DatabaseInterface(object):
                     PKvalues.append(d[PKfield])
             PKfields = join(PKfields, ",")
             wherestr = join(wherestr, " AND ")
-            existingRecord = self.locked_execute("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr,
-                                                 parameters=tuple(PKvalues))
+            existingRecord = self.execute("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr,
+                                          parameters=tuple(PKvalues), locked = locked)
             if existingRecord:
                 return False, existingRecord[0]
 
             SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (
             tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
             values = tuple([d[k] for k in fields])
-            self.locked_execute(SQL, parameters=values)
+            self.execute(SQL, parameters=values, locked = locked)
             return True, d
         except Exception, e:
             if SQL and values:
@@ -592,7 +598,7 @@ class DatabaseInterface(object):
             raise Exception("Error occurred during database insertion: '%s'. %s" % (str(e), traceback.format_exc()))
 
 
-    def _insert_dict_if_new_inner(self, tblname, d, PKfields, fields=None):
+    def _insert_dict_if_new_inner(self, tblname, d, PKfields, fields=None, locked = True):
         '''The main function of the insert_dict functions.
            This creates and returns the SQL query and parameters used by the other functions but does not insert any data into the database.
 
@@ -622,7 +628,7 @@ class DatabaseInterface(object):
             PKfields = join(PKfields, ",")
             wherestr = join(wherestr, " AND ")
 
-            existingRecord = self.execute_select("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr, parameters=tuple(PKvalues), locked = True)
+            existingRecord = self.execute_select("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr, parameters=tuple(PKvalues), locked = locked)
             if existingRecord:
                 return False, existingRecord[0]
 

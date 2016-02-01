@@ -1622,7 +1622,7 @@ class DBBenchmarkRun(BenchmarkRun):
             new_idxs.append(absolute_error_fieldname)
             dataframe_record[absolute_error_fieldname] = None
 
-            if ddg_details:
+            if ddg_details and predicted_data[self.ddg_analysis_type] != None:
                 absolute_error = abs(dataframe_record[exp_ddg_fieldname] - predicted_data[self.ddg_analysis_type])
                 dataframe_record[absolute_error_fieldname] = absolute_error
 
