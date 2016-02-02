@@ -41,6 +41,7 @@ import copy
 import StringIO
 import gzip
 import time
+import datetime
 import getpass
 try: import json
 except: import simplejson as json
@@ -572,6 +573,8 @@ class BenchmarkRun(ReportingObject):
         scops = set()
         mutation_string = []
         num_derivative_errors = predicted_data.get('Errors', {}).get('Derivative error count', 0)
+        run_time = predicted_data.get('RunTime', None)
+        max_memory = predicted_data.get('MaxMemory', None)
 
         mutations = self.get_record_mutations(record)
         for m in mutations:
@@ -686,6 +689,8 @@ class BenchmarkRun(ReportingObject):
             PDBResolutionBin = pdb_resolution_bin,
             NumberOfResidues = self.count_residues(record, pdb_record) or None,
             NumberOfDerivativeErrors = num_derivative_errors,
+            RunTime = run_time,
+            MaxMemory = max_memory,
             )
         for c in additional_prediction_data_columns:
             dataframe_record[c] = predicted_data.get(c)
@@ -855,6 +860,16 @@ class BenchmarkRun(ReportingObject):
         if matplotlib_plots:
             latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with density binning' )
             latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+            latex_report.add_plot( general_matplotlib.plot_bar(
+                self._get_dataframe_columns( ['RunTime'] ),
+                output_directory = self.subplot_directory,
+                plot_title = 'Prediction Run Time',
+                output_name = 'runtime',
+                fig_height = 9,
+                fig_width = 7,
+                ylabel = 'Run time (minutes)',
+                xlabel = 'Prediction Set',
+            ))
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
@@ -1115,6 +1130,11 @@ dev.off()'''
 
         return average_scalar, plot_filename
 
+    def _get_dataframe_columns(self, column_names):
+        new_dataframe = self.dataframe.copy()
+        new_dataframe = new_dataframe[column_names]
+        new_dataframe.columns = [name + '_' + self.benchmark_run_name for name in new_dataframe.columns]
+        return new_dataframe
 
     def plot_derivative_error_barchart(self, analysis_file_prefix):
 
