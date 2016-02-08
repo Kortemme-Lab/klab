@@ -15,11 +15,11 @@ def format_list_to_string(l):
     assert( not isinstance(l, basestring) )
     return_str = ""
     if len(l) == 1:
-        return_str += "'%s'" % l
+        return_str += "'%s'" % str( l[0] )
     elif len(l) > 1:
         for arg in l[:-1]:
-            return_str += "'%s', " % arg
-        return_str += "'%s'" % l[-1]
+            return_str += "'%s', " % str( arg )
+        return_str += "'%s'" % str( l[-1] )
 
     return return_str
 
@@ -125,27 +125,29 @@ class ClusterTemplate():
 
     def format_settings_dict(self):
         formatted_settings_dict = {}
-        for arg in settings_dict:
+        for arg in self.settings_dict:
             new_arg = '#$#%s#$#' % arg
-            value = settings_dict[arg]
+            value = self.settings_dict[arg]
 
-            formatted_settings_dict[new_arg] = str(settings_dict[arg])
+            formatted_settings_dict[new_arg] = str(self.settings_dict[arg])
         self.formatted_settings_dict = formatted_settings_dict
 
     def verify_internal_data(self):
         first_job_dict_len = len(self.job_dicts[0])
         for job_dict in self.job_dicts[1:]:
             assert( len(job_dict) == first_job_dict_len )
+        self.format_settings_dict()
 
     def write_runs(self, script_name_template = None):
         self.verify_internal_data()
 
         job_pickle_file_relpaths = []
+        output_dir = self.settings_dict['output_dir']
         for step_num in xrange(self.num_steps):
-            output_data_dir = os.path.join(self.formatted_settings_dict['output_dir'], 'data-%d' % step_num)
+            output_data_dir = os.path.join(output_dir, 'data-%d' % step_num)
 
             job_pickle_file = os.path.join(output_data_dir, self.job_dict_template_name % step_num)
-            job_pickle_file_relpaths.append( os.path.relpath(job_pickle_file, output_data_dir) )
+            job_pickle_file_relpaths.append( os.path.relpath(job_pickle_file, output_dir) )
 
             if not os.path.isdir(output_data_dir):
                 os.makedirs(output_data_dir)
@@ -164,9 +166,9 @@ class ClusterTemplate():
         new_lines = []
         for line in self.template_file_lines:
             for arg in self.formatted_settings_dict:
-                line = line.replace(arg, formatted_settings_dict[arg])
+                line = line.replace(arg, self.formatted_settings_dict[arg])
             new_lines.append(line)
 
-        with open(os.path.join(self.formatted_settings_dict['output_dir'], '%s.py' % self.script_template_name), 'w') as f:
+        with open(os.path.join(self.settings_dict['output_dir'], '%s.py' % self.script_template_name), 'w') as f:
             for line in new_lines:
                 f.write(line)
