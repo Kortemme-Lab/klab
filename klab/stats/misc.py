@@ -243,43 +243,50 @@ def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_c
 
 
 keymap = dict(
-    pearsonr = "Pearson's R",
-    spearmanr = "Spearman's R",
-    gamma_CC = "Gamma correlation coef.",
-    fraction_correct = "Fraction correct",
-    fraction_correct_fuzzy_linear = "Fraction correct (fuzzy)",
-    ks_2samp = "Kolmogorov-Smirnov test (XY)",
-    kstestx = "X-axis Kolmogorov-Smirnov test",
-    kstesty = "Y-axis Kolmogorov-Smirnov test",
-    normaltestx = "X-axis normality test",
-    normaltesty = "Y-axis normality test",
+    # Dictionary matches stat name (key) with ('full string description', 'value information format string')
+    pearsonr = ("Pearson's R", '(2-tailed p-value=%s)'),
+    spearmanr = ("Spearman's R", '(2-tailed p-value=%s)'),
+    gamma_CC = ("Gamma correlation coef.", ''),
+    fraction_correct = ("Fraction correct", ''),
+    fraction_correct_fuzzy_linear = ("Fraction correct (fuzzy)", ''),
+    ks_2samp = ("Kolmogorov-Smirnov test (XY)", '(2-tailed p-value=%s)'),
+    kstestx = ("X-axis Kolmogorov-Smirnov test", '(p-value=%s)'),
+    kstesty = ("Y-axis Kolmogorov-Smirnov test", '(p-value=%s)'),
+    normaltestx = ("X-axis normality test", '(2-sided chi^2 p-value=%s)'),
+    normaltesty = ("Y-axis normality test", '(2-sided chi^2 p-value=%s)'),
 )
 
-
-def format_stats_for_printing(stats):
+def format_stats_for_printing(stats, floating_point_format = '%0.3f', sci_notation_format = '%.3E'):
     s = []
     newstats = {}
     for k, v in stats.iteritems():
-        key = keymap.get(k, k)
-        if k == 'ks_2samp':
-            newstats[key] = '%0.3f (2-tailed p-value=%s)' % (v[0], str(v[1]))
-        elif k == 'kstestx':
-            newstats[key] = '%0.3f (p-value=%s)' % (v[0], str(v[1]))
-        elif k == 'kstesty':
-            newstats[key] = '%0.3f (p-value=%s)' % (v[0], str(v[1]))
-        elif k == 'normaltestx':
-            newstats[key] = '%0.3f (2-sided chi^2 p-value=%s)' % (v[0], str(v[1]))
-        elif k == 'normaltesty':
-            newstats[key] = '%0.3f (2-sided chi^2 p-value=%s)' % (v[0], str(v[1]))
-        elif k == 'pearsonr':
-            newstats[key] = '%0.3f (2-tailed p-value=%s)' % (v[0], str(v[1]))
-        elif k == 'spearmanr':
-            newstats[key] = '%0.3f (2-tailed p-value=%s)' % (v[0], str(v[1]))
+        key, value_format_str = keymap.get(k, (k, ''))
+        if len(value_format_str) > 0:
+            value_str = floating_point_format + ' ' + value_format_str % sci_notation_format
+            newstats[key] = value_str % (v[0], v[1])
         else:
-            newstats[key] = '%0.3f' % v
+            value_str = floating_point_format
+            newstats[key] = floating_point_format % float(v)
+
+    max_k_len = max([len(x) for x in newstats.keys()])
     for k, v in sorted(newstats.iteritems()):
-        s.append('%s: %s' % (str(k).ljust(32), str(v)))
+        s.append('%s: %s' % (str(k).ljust(max_k_len), str(v)))
     return '\n'.join(s)
 
+def format_stats_for_latex(stats, floating_point_format = '%0.3f'):
+    raise Exception('Not yet implemented')
+    s = []
+    newstats = {}
+    for k, v in stats.iteritems():
+        key, value_format_str = keymap.get(k, (k, ''))
+        if len(value_format_str) > 0:
+            value_str = floating_point_format + ' ' + value_format_str
+            newstats[key] = value_str % (v[0], str(v[1]))
+        else:
+            value_str = floating_point_format
+            newstats[key] = floating_point_format % v[0]
 
-
+    max_k_len = max([len(x) for x in newstats.keys()])
+    for k, v in sorted(newstats.iteritems()):
+        s.append('%s: %s' % (str(k).ljust(max_k_len), str(v)))
+    return '\n'.join(s)
