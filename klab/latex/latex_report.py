@@ -255,13 +255,16 @@ class LatexText(LatexPage):
         return return_str
 
 class LatexTable(LatexPage):
-    def __init__ (self, header_row, data_rows, header_text = None):
+    def __init__ (self, header_row, data_rows, header_text = None, column_format = None):
         self.num_columns = len(header_row)
         for data_row in data_rows:
             if self.num_columns != len(data_row):
                 print 'Header row:', header_row
                 print 'Data row:', data_row
                 raise Exception('This data row has a different number of columns than the header row')
+
+        self.set_column_format(column_format)
+
         self.header_row = [make_latex_safe( x.strip() ) for x in header_row]
         self.data_rows = [[make_latex_safe( x.strip() ) for x in data_row] for data_row in data_rows]
         if header_text:
@@ -269,10 +272,20 @@ class LatexTable(LatexPage):
         else:
             self.header_text = None
 
+    def set_column_format(self, column_format):
+        self.column_format = column_format
+        if column_format:
+            assert( len(column_format) == self.num_columns )
+
     def generate_latex(self):
+        if self.column_format:
+            column_format = ' '.join( self.column_format )
+        else:
+            column_format = ( 'c ' * self.num_columns )
+
         return_str = '\n\n'
         return_str += '\\begin{table}[H]\\begin{center}\n'
-        return_str += '\\begin{tabular}{ %s}\n' % ('c '*self.num_columns)
+        return_str += '\\begin{tabular}{ %s}\n' % column_format
         return_str += self.row_to_latex_row(self.header_row)
         return_str += '\\hline\n'
         for row in self.data_rows:

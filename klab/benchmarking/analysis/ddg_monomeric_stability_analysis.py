@@ -32,6 +32,7 @@ DDG analysis.
 '''
 
 import os
+import sys
 import shutil
 import numpy
 import pprint
@@ -733,7 +734,8 @@ class BenchmarkRun(ReportingObject):
 
         self.metric_latex_objects.append( LatexPageSection('Data tables', None, True) )
         intro_text = LatexText( text = self.ddg_analysis_type_description )
-        header_row = ['Statistic name', 'Value', 'p-value']
+        header_row = ['Statistic name', '{Value}', 'p-value']
+        stats_column_format = ['l', 'S[table-format=3.2]', 'l']
 
         if self.include_derived_mutations:
             running_analysis_str = '\nDerived mutations in analysis are included):'
@@ -770,6 +772,7 @@ class BenchmarkRun(ReportingObject):
                 section_latex_objs.append( LatexTable(
                     header_row,
                     list_stats,
+                    column_format = stats_column_format,
                     header_text = table_header
                 ))
                 self.data_tables[(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))] = list_stats
@@ -791,6 +794,7 @@ class BenchmarkRun(ReportingObject):
         section_latex_objs.append( LatexTable(
             header_row,
             list_stats,
+            column_format = stats_column_format,
             header_text = table_header
         ))
         self.data_tables[('cases with G or P', len(subcase_dataframe))] = list_stats
@@ -800,6 +804,7 @@ class BenchmarkRun(ReportingObject):
         section_latex_objs.append( LatexTable(
             header_row,
             list_stats,
+            column_format = stats_column_format,
             header_text = table_header
         ))
         self.data_tables[('cases without G or P', len(subcase_dataframe))] = list_stats
@@ -818,6 +823,7 @@ class BenchmarkRun(ReportingObject):
             section_latex_objs.append( LatexTable(
                 header_row,
                 list_stats,
+                column_format = stats_column_format,
                 header_text = table_header
             ))
             self.data_tables[('single mutations', len(subcase_dataframe))] = list_stats
@@ -828,6 +834,7 @@ class BenchmarkRun(ReportingObject):
             section_latex_objs.append( LatexTable(
                 header_row,
                 list_stats,
+                column_format = stats_column_format,
                 header_text = table_header
             ))
             self.data_tables[('multiple mutations', len(subcase_dataframe))] = list_stats
@@ -838,6 +845,7 @@ class BenchmarkRun(ReportingObject):
         #     section_latex_objs.append( LatexTable(
         #         header_row,
         #         list_stats,
+        #         column_format = stats_column_format,
         #         header_text = table_header
         #     ))
         #     self.data_tables[('2-4 mutations', len(subcase_dataframe))] = list_stats
@@ -853,6 +861,7 @@ class BenchmarkRun(ReportingObject):
         #         section_latex_objs.append( LatexTable(
         #             header_row,
         #             list_stats,
+        #             column_format = stats_column_format,
         #             header_text = table_header
         #         ))
         #         self.data_tables[('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe))] = list_stats
@@ -872,6 +881,7 @@ class BenchmarkRun(ReportingObject):
         section_latex_objs.append( LatexTable(
             header_row,
             list_stats,
+            column_format = stats_column_format,
             header_text = table_header
         ))
         self.data_tables[('complete dataset (scaled)', len(dataframe))] = list_stats
@@ -890,6 +900,7 @@ class BenchmarkRun(ReportingObject):
         section_latex_objs.append( LatexTable(
             header_row,
             list_stats,
+            column_format = stats_column_format,
             header_text = table_header
         ))
         self.data_tables[('complete dataset', len(dataframe))] = list_stats

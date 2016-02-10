@@ -25,11 +25,19 @@
 import re
 
 latex_chars_to_escape = ['_']
+spaced_chars_to_escape = []
 
-def make_latex_safe(text):
+def make_latex_safe(text, make_prettier = True):
     for char in latex_chars_to_escape:
         text = text.replace(char, '\\%s' % char)
-    if '^' in text:
-        text = re.sub(r'(\^)(\d+)', r'$\1{\2}$', text)
-    text = re.sub(r'(\d+[.]\d+)(E)([+-]\d+)', r'$\1\\times10^{\3}$', text)
+    for char in spaced_chars_to_escape:
+        text = text.replace(' %s ' % char, ' \\%s ' % char)
+    if make_prettier:
+        # Make exponent text prettier
+        if '^' in text:
+            text = re.sub(r'(\^)(\d+)', r'$\1{\2}$', text)
+        # Convert to latex right arrows
+        text = text.replace(' -> ', ' $\\rightarrow$\\ ')
+        # Convert to prettier exponent scientific notation format
+        text = re.sub(r'(\d+[.]\d+)(E)([+-]\d+)', r'$\1\\times10^{\3}$', text)
     return text
