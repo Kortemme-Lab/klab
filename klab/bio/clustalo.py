@@ -132,7 +132,9 @@ class SequenceAligner(object):
             s.append("%s: %s" % (k, ["%s, %s" % (x, y) for x, y in sorted(v.iteritems(), key=lambda x:-x[1]) if x !=k ]))
         return "\n".join(s)
 
-    def add_sequence(self, sequence_id, sequence):
+    def add_sequence(self, sequence_id, sequence, ignore_bad_chains = False):
+        '''If ignore_bad_chains is True then any chains containing all Xs as the sequence will be silently skipped.
+           The default behavior is to raise a MalformedSequenceException in this case.'''
 
         # This is a sanity check. ClustalO allows ':' in the chain ID but ClustalW replaces ':' with '_' which breaks our parsing
         # All callers to add_sequence now need to replace ':' with '_' so that we can use ClustalW
@@ -141,7 +143,10 @@ class SequenceAligner(object):
         if sequence_id in self.sequence_ids.values():
             raise Exception("Sequence IDs must be unique")
         if list(set(sequence)) == ['X']:
-            raise MalformedSequenceException('The sequence contains only X characters. This will crash Clustal Omega.')
+            if ignore_bad_chains:
+                return
+            else:
+                raise MalformedSequenceException('The sequence contains only X characters. This will crash Clustal Omega.')
         self.records.append(">%s\n%s" % (sequence_id, "\n".join([sequence[i:i+80] for i in range(0, len(sequence), 80)])))
         self.sequence_ids[len(self.sequence_ids) + 1] = sequence_id
 
@@ -774,8 +779,9 @@ class PDBChainSequenceAligner(object):
        Example usage:
             pcsa = PDBChainSequenceAligner(initial_chains = [('2GOO', 'A'), ('2GOO', 'D'), ('2H62', 'A'), ('2H62', 'B')], cache_dir = '/tmp')
             output, best_matches = pcsa.align()
-            colortext.warning(pprint.pformat(best_matches)).
+            colortext.warning(pprint.pformat(best_matches))
     '''
+
 
     def __init__(self, initial_chains = [], cache_dir = None):
         '''initial_chains should be a list of (pdb_id, chain_id) tuples/lists.'''
@@ -785,22 +791,27 @@ class PDBChainSequenceAligner(object):
             self.add(ic[0], ic[1])
 
 
-    def add(self, pdb_id, chain_id):
-        assert(len(pdb_id) == 4)
+    def add(self, pdb_id, chain_id, sequence = None):
         assert(len(chain_id) == 1)
-        f = FASTA.retrieve(pdb_id, cache_dir = self.cache_dir)
-        print(f[pdb_id][chain_id])
+        if len(pdb_id) == 4 and not sequence:
+            # RCSB files
+            f = FASTA.retrieve(pdb_id, cache_dir = self.cache_dir)
+            #print(f[pdb_id][chain_id])
+            sequence = f[pdb_id][chain_id]
         self.pdb_chains.append(dict(
             pdb_id = pdb_id,
             chain_id = chain_id,
-            sequence = f[pdb_id][chain_id],
+            sequence = sequence,
         ))
 
-    def align(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2):
+
+    def align(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2, ignore_bad_chains = False):
+        '''If ignore_bad_chains is True then any chains containing all Xs as the sequence will be silently skipped.
+           The default behavior is to raise a MalformedSequenceException in this case.'''
         if len(self.pdb_chains) > 1:
             sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
             for pdb_chain in self.pdb_chains:
-                sa.add_sequence('%s_%s' % (pdb_chain['pdb_id'], pdb_chain['chain_id']), pdb_chain['sequence'])
+                sa.add_sequence('%s_%s' % (pdb_chain['pdb_id'], pdb_chain['chain_id']), pdb_chain['sequence'], ignore_bad_chains = ignore_bad_chains)
             best_matches = sa.align()
             return sa.alignment_output, best_matches
         else:
