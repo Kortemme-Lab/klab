@@ -831,31 +831,31 @@ class BenchmarkRun(ReportingObject):
                 header_text = table_header
             ))
             self.data_tables[('multiple mutations', len(subcase_dataframe))] = list_stats
-        subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= 2) & (dataframe.NumberOfMutations <= 5)]
-        if len(subcase_dataframe) >= case_n_cutoff:
-            table_header = 'Statistics - 2-4 mutations (%d cases)' % len(subcase_dataframe)
-            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
-            section_latex_objs.append( LatexTable(
-                header_row,
-                list_stats,
-                header_text = table_header
-            ))
-            self.data_tables[('2-4 mutations', len(subcase_dataframe))] = list_stats
-        mutation_cutoffs = [5, 10, 20, 50, 100, 200]
-        for i, mutation_cutoff in enumerate(mutation_cutoffs):
-            if len(mutation_cutoffs) - 1 == i:
-                break
-            next_cutoff = mutation_cutoffs[i+1]
-            subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= mutation_cutoff) & (dataframe.NumberOfMutations <= next_cutoff)]
-            if len(subcase_dataframe) >= case_n_cutoff:
-                table_header = 'Statistics - %d $<=$ number of mutations $<=$ %d (%d cases)' % (mutation_cutoff, next_cutoff, len(subcase_dataframe))
-                list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
-                section_latex_objs.append( LatexTable(
-                    header_row,
-                    list_stats,
-                    header_text = table_header
-                ))
-                self.data_tables[('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe))] = list_stats
+        # subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= 2) & (dataframe.NumberOfMutations <= 5)]
+        # if len(subcase_dataframe) >= case_n_cutoff:
+        #     table_header = 'Statistics - 2-4 mutations (%d cases)' % len(subcase_dataframe)
+        #     list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        #     section_latex_objs.append( LatexTable(
+        #         header_row,
+        #         list_stats,
+        #         header_text = table_header
+        #     ))
+        #     self.data_tables[('2-4 mutations', len(subcase_dataframe))] = list_stats
+        # mutation_cutoffs = [5, 10, 20, 50, 100, 200]
+        # for i, mutation_cutoff in enumerate(mutation_cutoffs):
+        #     if len(mutation_cutoffs) - 1 == i:
+        #         break
+        #     next_cutoff = mutation_cutoffs[i+1]
+        #     subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= mutation_cutoff) & (dataframe.NumberOfMutations <= next_cutoff)]
+        #     if len(subcase_dataframe) >= case_n_cutoff:
+        #         table_header = 'Statistics - %d $<=$ number of mutations $<=$ %d (%d cases)' % (mutation_cutoff, next_cutoff, len(subcase_dataframe))
+        #         list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        #         section_latex_objs.append( LatexTable(
+        #             header_row,
+        #             list_stats,
+        #             header_text = table_header
+        #         ))
+        #         self.data_tables[('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe))] = list_stats
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
         ####
@@ -932,19 +932,9 @@ class BenchmarkRun(ReportingObject):
         # Create a subtitle for the first page
         subtitle = self.benchmark_run_name
         if self.description:
-            tokens = self.description.split(' ')
-            description_lines = []
-            s = []
-            for t in tokens:
-                if s and (len(s) + len(t) + 1 > 32):
-                    description_lines.append(' '.join(s))
-                    s = [t]
-                else:
-                    s.append(t)
-            if s: description_lines.append(' '.join(s))
-            subtitle += '\n{0}'.format('\n'.join(description_lines))
-        if self.dataset_description:
-            subtitle += '\n{0}'.format(self.dataset_description)
+            subtitle += ' ' + self.description
+        if self.dataset_description and self.dataset_description != self.description:
+            subtitle += ' ' + self.dataset_description
         if analysis_set and analysis_set != self.dataset_description:
             subtitle += ' ({0})'.format(analysis_set)
 
@@ -958,17 +948,10 @@ class BenchmarkRun(ReportingObject):
         # Identify the column with the experimental values for the analysis_set
         experimental_series = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
-        # Create a scatterplot for the results
-        main_scatterplot = '{0}main_scatterplot.png'.format(analysis_file_prefix)
-        if not(os.path.exists(main_scatterplot) and not(self.recreate_graphs)):
-            self.log('Saving scatterplot to %s.' % main_scatterplot)
-            plot_pandas(dataframe, experimental_series, 'Predicted', main_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction')
-
-        latex_report.set_title_page( title = 'Main metrics', subtitle = subtitle )
+        latex_report.set_title_page( title = '$\Delta\Delta G$ Report', subtitle = subtitle )
         if self.credit:
-            latex_report.add_to_abstract(self.credit)
+            latex_report.add_to_abstract('Prediction set scoring credit: ' + self.credit)
         latex_report.add_section_page( title = 'Main plots' )
-        latex_report.add_plot(main_scatterplot, plot_title = 'R generated Experimental vs. Prediction scatterplot')
 
         if matplotlib_plots:
             latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with density binning' )
