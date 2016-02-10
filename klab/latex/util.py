@@ -22,5 +22,14 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
+import re
+
+latex_chars_to_escape = ['_']
+
 def make_latex_safe(text):
-    return text.replace('_', '\_')
+    for char in latex_chars_to_escape:
+        text = text.replace(char, '\\%s' % char)
+    if '^' in text:
+        text = re.sub(r'(\^)(\d+)', r'$\1{\2}$', text)
+    text = re.sub(r'(\d+[.]\d+)(E)([+-]\d+)', r'$\1\\times10^{\3}$', text)
+    return text

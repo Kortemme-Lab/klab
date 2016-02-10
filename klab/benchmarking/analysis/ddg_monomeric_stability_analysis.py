@@ -41,6 +41,7 @@ import copy
 import StringIO
 import gzip
 import time
+import datetime
 import getpass
 try: import json
 except: import simplejson as json
@@ -49,11 +50,11 @@ import pandas
 
 from klab import colortext
 from klab.Reporter import Reporter
-from klab.latex.latex_report import LatexReport
+from klab.latex.latex_report import LatexReport, LatexPageSection, LatexText, LatexTable, LatexSubSection
 from klab.fs.fsio import read_file, write_file, write_temp_file
 from klab.loggers.simple import ReportingObject
 from klab.gfx.color_definitions import rgb_colors as plot_colors
-from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats_for_printing
+from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats
 from klab.benchmarking.analysis.plot import plot_pandas
 from klab.plot.rtools import RInterface
 
@@ -123,6 +124,9 @@ class BenchmarkRun(ReportingObject):
         self.misc_dataframe_attributes = misc_dataframe_attributes
         assert(credit not in self.misc_dataframe_attributes)
         self.misc_dataframe_attributes['Credit'] = credit
+
+        self.metric_latex_objects = []
+        self.data_tables = {}
 
         if self.store_data_on_disk:
             # This may be False in some cases e.g. when interfacing with a database
@@ -572,6 +576,8 @@ class BenchmarkRun(ReportingObject):
         scops = set()
         mutation_string = []
         num_derivative_errors = predicted_data.get('Errors', {}).get('Derivative error count', 0)
+        run_time = predicted_data.get('RunTime', None)
+        max_memory = predicted_data.get('MaxMemory', None)
 
         mutations = self.get_record_mutations(record)
         for m in mutations:
@@ -686,6 +692,8 @@ class BenchmarkRun(ReportingObject):
             PDBResolutionBin = pdb_resolution_bin,
             NumberOfResidues = self.count_residues(record, pdb_record) or None,
             NumberOfDerivativeErrors = num_derivative_errors,
+            RunTime = run_time,
+            MaxMemory = max_memory,
             )
         for c in additional_prediction_data_columns:
             dataframe_record[c] = predicted_data.get(c)
@@ -713,22 +721,32 @@ class BenchmarkRun(ReportingObject):
             self.plot(analysis_set, analysis_directory = analysis_directory)
 
 
-    def calculate_metrics(self, analysis_set = '', analysis_directory = None):
-        '''Calculates the main metrics for the benchmark run and writes them to file.'''
+    def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True):
+        '''Calculates the main metrics for the benchmark run and writes them to file and LaTeX object.'''
 
         dataframe = self.dataframe
+        if drop_missing:
+            dataframe = dataframe.dropna(subset=['Predicted'])
+
         scalar_adjustment = self.scalar_adjustments[analysis_set]
         experimental_field = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
-        metrics_textfile = [self.ddg_analysis_type_description]
+        self.metric_latex_objects.append( LatexPageSection('Data tables', None, True) )
+        intro_text = LatexText( text = self.ddg_analysis_type_description )
+        header_row = ['Statistic name', 'Value', 'p-value']
 
         if self.include_derived_mutations:
-            metrics_textfile.append('\nRunning analysis (derived mutations will be included):')
+            running_analysis_str = '\nDerived mutations in analysis are included):'
         else:
-            metrics_textfile.append('\nRunning analysis (derived mutations will be omitted):')
-        self.report(metrics_textfile[-1], fn = colortext.message)
-        metrics_textfile.append('The stability classification cutoffs are: Experimental=%0.2f kcal/mol, Predicted=%0.2f energy units.' % (self.stability_classication_x_cutoff, self.stability_classication_y_cutoff))
-        self.report(metrics_textfile[-1], fn = colortext.warning)
+            running_analysis_str = '\nDerived mutations in analysis are omitted):'
+        intro_text.add_text(running_analysis_str)
+        self.report(running_analysis_str, fn = colortext.message)
+
+        classification_cutoffs_str = 'The stability classification cutoffs are: Experimental=%0.2f kcal/mol, Predicted=%0.2f energy units.' % (self.stability_classication_x_cutoff, self.stability_classication_y_cutoff)
+        intro_text.add_text( classification_cutoffs_str )
+        self.report(classification_cutoffs_str, fn = colortext.warning)
+
+        self.metric_latex_objects.append( intro_text )
 
         amino_acid_details, CAA, PAA, HAA = self.amino_acid_details, self.CAA, self.PAA, self.HAA
 
@@ -739,59 +757,102 @@ class BenchmarkRun(ReportingObject):
             volume_groups[v] = volume_groups.get(v, [])
             volume_groups[v].append(aa_code)
 
-        metrics_textfile.append('\n\nSection 1. Breakdown by volume.')
-        metrics_textfile.append('A case is considered a small-to-large (resp. large-to-small) mutation if all of the wildtype residues have a smaller (resp. larger) van der Waals volume than the corresponding mutant residue. The order is defined as %s so some cases are considered to have no change in volume e.g. MET -> LEU.' % (' < '.join([''.join(sorted(v)) for k, v in sorted(volume_groups.iteritems())])))
-        self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
+        section_latex_objs = []
+        section_latex_objs.append( LatexSubSection(
+            'Breakdown by volume',
+            'A case is considered a small-to-large (resp. large-to-small) mutation if all of the wildtype residues have a smaller (resp. larger) van der Waals volume than the corresponding mutant residue. The order is defined as %s so some cases are considered to have no change in volume e.g. MET -> LEU.' % (' < '.join([''.join(sorted(v)) for k, v in sorted(volume_groups.iteritems())]))
+        ) )
         for subcase in ('XX', 'SL', 'LS'):
             subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
-            metrics_textfile.append('\n' + '*'*10 + (' Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))) +'*'*10)
+            table_header = ' Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
             if len(subcase_dataframe) >= 8:
-                metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
+                list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+                section_latex_objs.append( LatexTable(
+                    header_row,
+                    list_stats,
+                    header_text = table_header
+                ))
+                self.data_tables[(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))] = list_stats
             else:
-                metrics_textfile.append('Not enough data for analysis (at least 8 cases are required).')
-            self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
+                section_latex_objs.append( LatexText(
+                    'Not enough data for analysis of mutations ''%s'' (at least 8 cases are required).' % BenchmarkRun.by_volume_descriptions[subcase]
+                ))
+        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        self.metric_latex_objects.extend( section_latex_objs )
 
-        metrics_textfile.append('\n\nSection 2. Separating out mutations involving glycine or proline.')
-        metrics_textfile.append('This cases may involve changes to secondary structure so we separate them out here.')
+        section_latex_objs = []
+        section_latex_objs.append( LatexSubSection(
+            'Separating out mutations involving glycine or proline.',
+            'This cases may involve changes to secondary structure so we separate them out here.'
+        ))
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 1]
-        metrics_textfile.append('\n' + '*'*10 + (' Statistics - cases with G or P (%d cases)' % (len(subcase_dataframe))) +'*'*10)
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
-        self.report('\n'.join(metrics_textfile[-4:]), fn = colortext.sprint)
+        table_header = 'Statistics - cases with G or P (%d cases)' % len(subcase_dataframe)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( LatexTable(
+            header_row,
+            list_stats,
+            header_text = table_header
+        ))
+        self.data_tables[('cases with G or P', len(subcase_dataframe))] = list_stats
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 0]
-        metrics_textfile.append('\n' + '*'*10 + (' Statistics - cases without G or P (%d cases)' % (len(subcase_dataframe))) +'*'*10)
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
-        self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
+        table_header = 'Statistics - cases without G or P (%d cases)' % len(subcase_dataframe)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( LatexTable(
+            header_row,
+            list_stats,
+            header_text = table_header
+        ))
+        self.data_tables[('cases without G or P', len(subcase_dataframe))] = list_stats
+        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        self.metric_latex_objects.extend( section_latex_objs )
 
-
-        metrics_textfile.append('\nSection 3. Entire dataset using a scaling factor of 1/%.03f to improve the fraction correct metric.' % scalar_adjustment)
-        self.report(metrics_textfile[-1], fn = colortext.sprint)
-        metrics_textfile.append('Warning: Results in this section use an averaged scaling factor to improve the value for the fraction correct metric. This scalar will vary over benchmark runs so these results should not be interpreted as performance results; they should be considered as what could be obtained if the predicted values were scaled by a "magic" value.')
-        self.report(metrics_textfile[-1], fn = colortext.warning)
-        metrics_textfile.append('\n' + '*'*10 + (' Statistics - complete dataset (%d cases)' % len(dataframe)) +'*'*10)
+        section_latex_objs = []
+        section_latex_objs.append( LatexSubSection(
+            'Entire dataset using a scaling factor of 1/%.03f to improve the fraction correct metric.' % scalar_adjustment,
+            'Warning: Results in this section use an averaged scaling factor to improve the value for the fraction correct metric. This scalar will vary over benchmark runs so these results should not be interpreted as performance results; they should be considered as what could be obtained if the predicted values were scaled by a "magic" value.'
+        ))
+        table_header = 'Statistics - complete dataset (scaled) (%d cases)' % len(dataframe)
         # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(dataframe, experimental_field, BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True)))
-        self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( LatexTable(
+            header_row,
+            list_stats,
+            header_text = table_header
+        ))
+        self.data_tables[('complete dataset (scaled)', len(dataframe))] = list_stats
+        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        self.metric_latex_objects.extend( section_latex_objs )
 
-        metrics_textfile.append('\n\nSection 4. Entire dataset.')
-        self.report(metrics_textfile[-1], fn = colortext.sprint)
-        metrics_textfile.append('Overall statistics')
-        self.report(metrics_textfile[-1], fn = colortext.message)
-        metrics_textfile.append('\n' + '*'*10 + (' Statistics - complete dataset (%d cases)' % len(dataframe)) +'*'*10)
-        metrics_textfile.append(format_stats_for_printing(get_xy_dataset_statistics_pandas(dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)))
-        self.report('\n'.join(metrics_textfile[-2:]), fn = colortext.sprint)
+        section_latex_objs = []
+        section_latex_objs.append( LatexSubSection(
+            'Entire dataset',
+            'Overall statistics'
+        ))
+        table_header = 'Statistics - complete dataset (%d cases)' % len(dataframe)
+        # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( LatexTable(
+            header_row,
+            list_stats,
+            header_text = table_header
+        ))
+        self.data_tables[('complete dataset', len(dataframe))] = list_stats
+        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        self.metric_latex_objects.extend( section_latex_objs )
 
         # There is probably a better way of writing the pandas code here
         record_with_most_errors = (dataframe[['PDBFileID', 'NumberOfDerivativeErrors', 'Mutations']].sort_values(by = 'NumberOfDerivativeErrors')).tail(1)
         record_index = record_with_most_errors.index.tolist()[0]
         pdb_id, num_errors, mutation_str = dataframe.loc[record_index, 'PDBFileID'], dataframe.loc[record_index, 'NumberOfDerivativeErrors'], dataframe.loc[record_index, 'Mutations']
         if num_errors > 0:
-            metrics_textfile.append('\n\nDerivative errors were found in the run. Record #{0} - {1}, {2} - has the most amount ({3}) of derivative errors.'.format(record_index, pdb_id, mutation_str, num_errors))
-            self.report(metrics_textfile[-1], fn = colortext.warning)
+            error_detection_text = '\n\nDerivative errors were found in the run. Record #{0} - {1}, {2} - has the most amount ({3}) of derivative errors.'.format(record_index, pdb_id, mutation_str, num_errors)
+            self.metric_latex_objects.append( LatexText(error_detection_text, color = 'red') )
+            self.report(error_detection_text, fn = colortext.warning)
 
         # Write the analysis to file
         self.create_analysis_directory(analysis_directory)
         self.metrics_filepath = os.path.join(self.analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
-        write_file(self.metrics_filepath, '\n'.join(metrics_textfile))
+        write_file(self.metrics_filepath, '\n'.join([x.generate_plaintext() for x in self.metric_latex_objects]))
 
     def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True):
         if matplotlib_plots:
@@ -810,6 +871,7 @@ class BenchmarkRun(ReportingObject):
 
         dataframe = self.dataframe
         latex_report = LatexReport()
+        latex_report.content.extend( self.metric_latex_objects ) # Add on table sections generated in calculate_metrics
 
         # Create a subtitle for the first page
         subtitle = self.benchmark_run_name
@@ -855,6 +917,16 @@ class BenchmarkRun(ReportingObject):
         if matplotlib_plots:
             latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with density binning' )
             latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+            latex_report.add_plot( general_matplotlib.plot_bar(
+                self._get_dataframe_columns( ['RunTime'] ),
+                output_directory = self.subplot_directory,
+                plot_title = 'Prediction Run Time',
+                output_name = 'runtime',
+                fig_height = 9,
+                fig_width = 7,
+                ylabel = 'Run time (minutes)',
+                xlabel = 'Prediction Set',
+            ))
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
@@ -1115,6 +1187,11 @@ dev.off()'''
 
         return average_scalar, plot_filename
 
+    def _get_dataframe_columns(self, column_names):
+        new_dataframe = self.dataframe.copy()
+        new_dataframe = new_dataframe[column_names]
+        new_dataframe.columns = [name + '_' + self.benchmark_run_name for name in new_dataframe.columns]
+        return new_dataframe
 
     def plot_derivative_error_barchart(self, analysis_file_prefix):
 

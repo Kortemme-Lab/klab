@@ -246,3 +246,70 @@ def make_corr_plot(
     plt.savefig(fig_path, dpi = fig_dpi, format = output_format)
     plt.close()
     return fig_path
+
+def plot_bar(
+    dataframe,
+    output_name = 'bar',
+    output_directory = None,
+    output_format = None,
+    verbose = True,
+    dropna = True,
+    plot_title = None,
+    fig_dpi = 300,
+    fig_width = None,
+    fig_height = None,
+    fig_grid = True,
+    ylabel = None,
+    xlabel = 'Data',
+    plot_average = True,
+):
+    if not output_directory:
+        output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
+
+    fig, ax = plt.subplots()
+    if dropna:
+        dataframe = dataframe.replace([np.inf, -np.inf], np.nan).dropna()
+
+    if not output_format:
+        output_format = 'pdf'
+
+    dataframe_columns = sorted(list(dataframe.columns.values))
+
+    output_path = os.path.join(output_directory, output_name + '.' + output_format)
+
+    meanpointprops = dict(marker='*', markeredgecolor='black',
+                          markerfacecolor='firebrick')
+
+    bp = ax.boxplot(dataframe.as_matrix(), notch=True, meanline=False,
+                    showmeans = plot_average)
+    plt.setp(bp['fliers'], color='forestgreen', marker='+', markersize=12)
+
+    ax.set_xticklabels([make_latex_safe(x) for x in dataframe_columns])
+
+    y_min_limit = dataframe.min()
+    y_max_limit = dataframe.max()
+    bottom_pad = 0.05 * (y_max_limit - y_min_limit)
+    y_min_limit = y_min_limit - bottom_pad
+
+    for i, column_name in enumerate(dataframe_columns):
+        ax.text(i+1, y_min_limit,
+                'n=%d' % len( dataframe[[column_name]] ),
+                fontsize = 16,
+                ha='center', va='bottom')
+
+    if ylabel:
+        plt.ylabel( make_latex_safe(ylabel) )
+    if xlabel:
+        plt.xlabel( make_latex_safe(xlabel) )
+    if plot_title:
+        plt.title( make_latex_safe(plot_title) )
+
+    if verbose:
+        print 'Saving bar plot figure to:', output_path
+    if fig_height and fig_width:
+        plt.gcf().set_size_inches(fig_width, fig_height)
+    plt.savefig(
+        output_path, dpi = fig_dpi, format = output_format
+    )
+    plt.close()
+    return output_path
