@@ -29,6 +29,7 @@ import getpass
 import tempfile
 import subprocess
 import shutil
+import copy
 from klab.latex.util import make_latex_safe
 
 cwd = os.path.dirname(os.path.realpath(__file__))
@@ -85,6 +86,8 @@ class LatexReport:
         if make_title_page:
             latex_strings.append('\\date{\\today}')
             latex_strings.append('\\begin{document}\n\\maketitle')
+        else:
+            latex_strings.append('\\begin{document}\n')
 
         if self.table_of_contents:
             latex_strings.append('\\tableofcontents\n\n\\clearpage\n\n')
@@ -107,9 +110,12 @@ class LatexReport:
             else:
                 self.latex += s + '\n'
 
-    def generate_pdf_report(self, report_filepath):
+    def generate_pdf_report(self, report_filepath, copy_tex_file = True, verbose = True):
         self.generate_latex( output_type = 'pdf' )
         out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex-pdf_' % (time.strftime("%y%m%d"), getpass.getuser()) )
+        if verbose:
+            print 'Outputting latex files to temporary directory:', out_dir
+
         tmp_latex_file = os.path.join(out_dir, 'report.tex')
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
@@ -118,6 +124,9 @@ class LatexReport:
         tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
         assert( os.path.isfile(tmp_latex_pdf) )
         shutil.copy( tmp_latex_pdf, report_filepath )
+
+        if copy_tex_file and os.path.isfile(tmp_latex_file):
+            shutil.copy(tmp_latex_file, os.path.dirname(report_filepath))
         shutil.rmtree(out_dir)
 
     def generate_html_report(self, report_filepath):
@@ -131,8 +140,29 @@ class LatexReport:
         raise Exception("Output files not yet copied from: " + out_dir)
         shutil.rmtree(out_dir)
 
-class LatexPage:
-    pass
+    def generate_plaintext(self):
+        # Returns saved information as plaintext string
+        return_strings = []
+        if len( self.abstract_text ) > 0:
+            return_strings.append('Abstract:\n')
+            for abstract_text_paragraph in self.abstract_text:
+                return_strings.append( abstract_text_paragraph + '\n\n' )
+
+        for content_obj in self.content:
+            latex_strings.append( content_obj.generate_plaintext() )
+
+        return_str = ''
+        for return_string in return_strings:
+            if return_string.endswith('\n'):
+                return_str += return_string
+            else:
+                return_str += return_string + '\n'
+
+        return return_str
+
+class LatexPage(object):
+    def generate_plaintext(self):
+        return ''
 
 class LatexPageSection(LatexPage):
     def __init__(self, title, subtext, clearpage):
@@ -142,16 +172,32 @@ class LatexPageSection(LatexPage):
             self.subtext = make_latex_safe(subtext)
         else:
             self.subtext = None
+        self.section_latex_func = 'section'
 
     def generate_latex(self):
         return_str = ''
         if self.clearpage:
             return_str += '\n\\clearpage\n\n'
-        return_str += '\\section{%s}\n' % self.title
+        return_str += '\\%s{%s}\n' % (self.section_latex_func, self.title)
         if self.subtext:
             return_str += '\\textit{%s}\n' % self.subtext
         return_str += '\n'
         return return_str
+
+    def generate_plaintext(self):
+        return_str = ''
+        if self.clearpage:
+            return_str += '\n\n'
+        return_str += '\n\n%s %s\n\n' % (self.section_latex_func.upper(), self.title)
+        if self.subtext:
+            return_str = return_str[:-1] + '%s' % self.subtext
+        return_str += '\n\n'
+        return return_str
+
+class LatexSubSection(LatexPageSection):
+    def __init__(self, title, subtext, clearpage = False):
+        super(LatexSubSection, self).__init__(title, subtext, clearpage)
+        self.section_latex_func = 'subsection'
 
 class LatexPagePlot(LatexPage):
     def __init__(self, plot_filename, plot_title):
@@ -173,3 +219,104 @@ class LatexPagePlot(LatexPage):
             return_str += '  \\caption{%s}\n' % self.plot_title
         return_str += '\\end{figure}\n'
         return return_str
+
+class LatexText(LatexPage):
+    # Each "text" object will be turned into a paragraph
+    def __init__ (self, text, color = None):
+        self.text = []
+        self.color = color
+        if text:
+            self.add_text(text)
+
+    def add_text(self, text):
+        self.text.append( make_latex_safe(text.strip()) )
+
+    def generate_latex(self):
+        if self.color:
+            return_str = '{\\color{%s} ' % self.color
+        else:
+            return_str = ''
+
+        return_str += self.generate_plaintext()
+
+        if self.color:
+            return_str += '}'
+        return return_str
+
+    def generate_plaintext(self):
+        return_str = ''
+        if len(self.text) > 1:
+            for text in self.text[:-1]:
+                return_str += text + '\n\n'
+        return_str += self.text[-1] + '\n'
+        return return_str
+
+class LatexTable(LatexPage):
+    def __init__ (self, header_row, data_rows, header_text = None):
+        self.num_columns = len(header_row)
+        for data_row in data_rows:
+            if self.num_columns != len(data_row):
+                print 'Header row:', header_row
+                print 'Data row:', data_row
+                raise Exception('This data row has a different number of columns than the header row')
+        self.header_row = [make_latex_safe( x.strip() ) for x in header_row]
+        self.data_rows = [[make_latex_safe( x.strip() ) for x in data_row] for data_row in data_rows]
+        if header_text:
+            self.header_text = make_latex_safe( header_text.strip() )
+        else:
+            self.header_text = None
+
+    def generate_latex(self):
+        return_str = '\n\n'
+        return_str += '\\begin{table}[H]\\begin{center}\n'
+        return_str += '\\begin{tabular}{ %s}\n' % ('c '*self.num_columns)
+        return_str += self.row_to_latex_row(self.header_row)
+        return_str += '\\hline\n'
+        for row in self.data_rows:
+            return_str += self.row_to_latex_row(row)
+        return_str += '\\end{tabular}\n'
+        if self.header_text:
+            return_str += '\\caption{%s}\n' % self.header_text
+        return_str += '\\end{center}\\end{table}\n\n\n'
+        return return_str
+
+    def generate_plaintext(self):
+        l = copy.deepcopy(self.data_rows)
+        l.insert(0, self.header_row)
+        return format_list_table(l)
+
+    def row_to_latex_row(self, row):
+        return_str = ''
+        if len(row) > 1:
+            for x in row[:-1]:
+                return_str += '%s & ' % str(x)
+        if len(row) > 0:
+            return_str += '%s' % str(row[-1])
+        return_str += '\\\\\n'
+        return return_str
+
+def format_list_table(data):
+    max_lengths = []
+    strings_to_print = []
+    for i, l in enumerate(data):
+        strings_to_print.append([])
+        for j, s in enumerate(l):
+            s = str(s)
+            strings_to_print[i].append(s)
+            s_len = len(s)
+            while len(max_lengths) < j+1:
+                max_lengths.append(0)
+            if s_len > max_lengths[j]:
+                max_lengths[j] = s_len
+
+    return_str = ''
+    for row in strings_to_print:
+        row_str = ''
+        for i, x in enumerate(row):
+            if i >= len(row) - 2:
+                row_str += '%s\t' % x.ljust(max_lengths[i])
+            else:
+                row_str += '%s\t' % x.rjust(max_lengths[i])
+
+        return_str += row_str[:-1] + '\n' # Remove trailing space
+    return return_str

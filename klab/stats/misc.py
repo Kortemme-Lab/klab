@@ -172,7 +172,7 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
     return correct / float(considered_points)
 
 
-def mae(x_values, y_values):
+def mae(x_values, y_values, drop_missing = True):
     '''Mean absolute/unsigned error.'''
     num_points = len(x_values)
     assert(num_points == len(y_values) and num_points > 0)
@@ -256,37 +256,22 @@ keymap = dict(
     normaltesty = ("Y-axis normality test", '(2-sided chi^2 p-value=%s)'),
 )
 
-def format_stats_for_printing(stats, floating_point_format = '%0.3f', sci_notation_format = '%.3E'):
+def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '%.3E', return_string = True):
     s = []
     newstats = {}
     for k, v in stats.iteritems():
         key, value_format_str = keymap.get(k, (k, ''))
         if len(value_format_str) > 0:
-            value_str = floating_point_format + ' ' + value_format_str % sci_notation_format
-            newstats[key] = value_str % (v[0], v[1])
+            pval_str = value_format_str % sci_notation_format
+            newstats[key] = [floating_point_format % v[0], pval_str % v[1]]
         else:
             value_str = floating_point_format
-            newstats[key] = floating_point_format % float(v)
+            newstats[key] = [floating_point_format % float(v), '']
 
-    max_k_len = max([len(x) for x in newstats.keys()])
-    for k, v in sorted(newstats.iteritems()):
-        s.append('%s: %s' % (str(k).ljust(max_k_len), str(v)))
-    return '\n'.join(s)
-
-def format_stats_for_latex(stats, floating_point_format = '%0.3f'):
-    raise Exception('Not yet implemented')
-    s = []
-    newstats = {}
-    for k, v in stats.iteritems():
-        key, value_format_str = keymap.get(k, (k, ''))
-        if len(value_format_str) > 0:
-            value_str = floating_point_format + ' ' + value_format_str
-            newstats[key] = value_str % (v[0], str(v[1]))
-        else:
-            value_str = floating_point_format
-            newstats[key] = floating_point_format % v[0]
-
-    max_k_len = max([len(x) for x in newstats.keys()])
-    for k, v in sorted(newstats.iteritems()):
-        s.append('%s: %s' % (str(k).ljust(max_k_len), str(v)))
-    return '\n'.join(s)
+    if return_string:
+        max_k_len = max([len(x) for x in newstats.keys()])
+        for k, v in sorted(newstats.iteritems()):
+            s.append( '%s: %s %s ' % (str(k).ljust(max_k_len), v[0], v[1]) )
+        return '\n'.join(s)
+    else:
+        return [[k, v[0], v[1]] for k, v in sorted(newstats.iteritems())]
