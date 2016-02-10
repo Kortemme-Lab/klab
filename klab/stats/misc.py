@@ -178,6 +178,11 @@ def mae(x_values, y_values, drop_missing = True):
     assert(num_points == len(y_values) and num_points > 0)
     return numpy.sum(numpy.apply_along_axis(numpy.abs, 0, numpy.subtract(x_values, y_values))) / float(num_points)
 
+def normaltest_check(values):
+    try:
+        return normaltest(values)
+    except ValueError:
+        return (numpy.nan, None)
 
 # this was renamed from get_xy_dataset_correlations to match the DDG benchmark capture repository
 def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
@@ -198,8 +203,8 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
         spearmanr = spearmanr(x_values, y_values),
         gamma_CC = gamma_CC(x_values, y_values),
         MAE = mae(x_values, y_values),
-        normaltestx = normaltest(x_values),
-        normaltesty = normaltest(y_values),
+        normaltestx = normaltest_check(x_values),
+        normaltesty = normaltest_check(y_values),
         kstestx = kstest(x_values, 'norm'),
         kstesty = kstest(y_values, 'norm'),
         ks_2samp = ks_2samp(x_values, y_values),
@@ -262,8 +267,11 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
     for k, v in stats.iteritems():
         key, value_format_str = keymap.get(k, (k, ''))
         if len(value_format_str) > 0:
-            pval_str = value_format_str % sci_notation_format
-            newstats[key] = [floating_point_format % v[0], pval_str % v[1]]
+            if numpy.isnan(v[0]):
+                newstats[key] = [str(v[0]), '']
+            else:
+                pval_str = value_format_str % sci_notation_format
+                newstats[key] = [floating_point_format % v[0], pval_str % v[1]]
         else:
             value_str = floating_point_format
             newstats[key] = [floating_point_format % float(v), '']
