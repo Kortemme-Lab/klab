@@ -965,27 +965,30 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_section_page( title = 'Main plots' )
 
         if matplotlib_plots:
-            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with density binning' )
-            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'matplotlib generated Experimental vs. Prediction scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 8, fig_width = 7), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 8, fig_width = 7), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
 
             single_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
             if len(single_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'Single mutations Experimental vs. Prediction scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'Single mutations data subset' )
 
             multiple_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
             if len(multiple_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'Multiple mutations Experimental vs. Prediction scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'Multiple mutations data subset' )
 
-            latex_report.add_plot( general_matplotlib.plot_bar(
-                self._get_dataframe_columns( ['RunTime'] ),
-                output_directory = self.subplot_directory,
-                plot_title = 'Prediction Run Time',
-                output_name = 'runtime',
-                fig_height = 9,
-                fig_width = 7,
-                ylabel = 'Run time (minutes)',
-                xlabel = 'Prediction Set',
-            ))
+            latex_report.add_plot(
+                general_matplotlib.plot_bar(
+                    self._get_dataframe_columns( ['RunTime'] ),
+                    output_directory = self.subplot_directory,
+                    plot_title = 'Prediction Run Time',
+                    output_name = 'runtime',
+                    fig_height = 9,
+                    fig_width = 7,
+                    ylabel = 'Run time (minutes)',
+                    xlabel = 'Prediction Set',
+                ),
+                plot_title = 'Run time'
+            )
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
