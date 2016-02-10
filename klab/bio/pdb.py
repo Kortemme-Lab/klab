@@ -671,12 +671,15 @@ class PDB(object):
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
         return PDB("\n".join(self.lines), pdb_id = self.pdb_id, strict = self.strict, parse_ligands = parse_ligands) # todo: we should copy the ligand information rather than reparse it
 
+
     def get_content(self):
         '''A function to replace the old constructor call where a PDB object was passed in and 'cloned'.'''
         return '\n'.join(self.lines)
 
+
     def write(self, pdbpath, separator = '\n'):
         write_file(pdbpath, separator.join(self.lines))
+
 
     def get_pdb_id(self):
         '''Return the PDB ID. If one was passed in to the constructor, this takes precedence, otherwise the header is
@@ -692,9 +695,11 @@ class PDB(object):
                 return self.pdb_id
         return None
 
+
     def get_ATOM_and_HETATM_chains(self):
         '''todo: remove this function as it now just returns a member element'''
         return self.atom_chain_order
+
 
     def get_annotated_chain_sequence_string(self, chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = True):
         '''A helper function to return the Sequence for a chain. If use_seqres_sequences_if_possible then we return the SEQRES
@@ -708,12 +713,14 @@ class PDB(object):
         else:
             return None
 
+
     def get_chain_sequence_string(self, chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = True):
         '''Similar to get_annotated_chain_sequence_string except that we only return the Sequence and do not state which sequence it was.'''
         chain_pair = self.get_annotated_chain_sequence_string(chain_id, use_seqres_sequences_if_possible, raise_Exception_if_not_found = raise_Exception_if_not_found)
         if chain_pair:
             return chain_pair[1]
         return None
+
 
     def _get_modified_residues(self):
         if not self.modified_residues:
@@ -762,7 +769,9 @@ class PDB(object):
                     assert(len(tokens[2]) == 4)
                     self.replacement_pdb_id = tokens[2]
 
+
     ### PDB mutating functions ###
+
 
     def strip_to_chains(self, chains, break_at_endmdl = True):
         '''Throw away all ATOM/HETATM/ANISOU/TER lines for chains that are not in the chains list.'''
@@ -910,6 +919,7 @@ class PDB(object):
 
     ### PDB file parsing functions ###
 
+
     def _get_pdb_format_version(self):
         '''Remark 4 indicates the version of the PDB File Format used to generate the file.'''
         if not self.format_version:
@@ -929,6 +939,7 @@ class PDB(object):
                     except:
                         pass
             self.format_version = version
+
 
     def get_resolution(self):
         resolution = None
@@ -972,10 +983,12 @@ class PDB(object):
             raise PDBParsingException("Could not determine resolution.")
         return resolution
 
+
     def get_title(self):
         if self.parsed_lines.get("TITLE "):
             return " ".join([line[10:80].strip() for line in self.parsed_lines["TITLE "] if line[10:80].strip()])
         return None
+
 
     def get_techniques(self):
         techniques = None
@@ -990,8 +1003,10 @@ class PDB(object):
             raise PDBParsingException("Could not determine techniques used.")
         return techniques
 
+
     def get_UniProt_ACs(self):
         return [v['dbAccession'] for k, v in self.get_DB_references().get(self.pdb_id, {}).get('UNIPROT', {}).iteritems()]
+
 
     def get_DB_references(self):
         ''' "The DBREF record provides cross-reference links between PDB sequences (what appears in SEQRES record) and
@@ -1036,6 +1051,7 @@ class PDB(object):
                 }
             )
         return DBref
+
 
     def get_molecules_and_source(self):
         # Check the COMPND lines

@@ -62,8 +62,10 @@ def row_to_dict(r, keep_relationships = False):
 
 
 def get_single_record_from_query(result_set):
-    '''Helper function to return the single result from a query. We assume that either a result does not exist or exactly
-       one exists. Returns None in the former case and the result in the latter case.'''
+    '''A helper function to return the single result from a query. This is a variation of SQLAlchemy's <result_set>.one()
+       function. We assume that either a result does not exist or exactly one exists (one() assumes that exactly one exists).
+       Returns None in the former case and the result in the latter case.
+    '''
     assert(result_set.count() <= 1)
     if result_set.count() == 1:
         return result_set[0]
