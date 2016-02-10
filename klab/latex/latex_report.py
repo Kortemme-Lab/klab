@@ -110,7 +110,7 @@ class LatexReport:
             else:
                 self.latex += s + '\n'
 
-    def generate_pdf_report(self, report_filepath, copy_tex_file = True, verbose = True):
+    def generate_pdf_report(self, report_filepath, copy_tex_file_dir = True, verbose = True):
         self.generate_latex( output_type = 'pdf' )
         out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex-pdf_' % (time.strftime("%y%m%d"), getpass.getuser()) )
         if verbose:
@@ -125,8 +125,11 @@ class LatexReport:
         assert( os.path.isfile(tmp_latex_pdf) )
         shutil.copy( tmp_latex_pdf, report_filepath )
 
-        if copy_tex_file and os.path.isfile(tmp_latex_file):
-            shutil.copy(tmp_latex_file, os.path.dirname(report_filepath))
+        if copy_tex_file_dir:
+            shutil.copytree(
+                out_dir,
+                os.path.join(os.path.dirname(report_filepath), 'latex_files')
+            )
         shutil.rmtree(out_dir)
 
     def generate_html_report(self, report_filepath):
@@ -165,7 +168,7 @@ class LatexPage(object):
         return ''
 
 class LatexPageSection(LatexPage):
-    def __init__(self, title, subtext, clearpage):
+    def __init__(self, title, subtext = None, clearpage = True):
         self.title = make_latex_safe(title)
         self.clearpage = clearpage
         if subtext:
@@ -195,7 +198,7 @@ class LatexPageSection(LatexPage):
         return return_str
 
 class LatexSubSection(LatexPageSection):
-    def __init__(self, title, subtext, clearpage = False):
+    def __init__(self, title, subtext = None, clearpage = False):
         super(LatexSubSection, self).__init__(title, subtext, clearpage)
         self.section_latex_func = 'subsection'
 

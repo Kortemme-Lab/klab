@@ -721,7 +721,7 @@ class BenchmarkRun(ReportingObject):
             self.plot(analysis_set, analysis_directory = analysis_directory)
 
 
-    def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True):
+    def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True, case_n_cutoff = 5):
         '''Calculates the main metrics for the benchmark run and writes them to file and LaTeX object.'''
 
         dataframe = self.dataframe
@@ -806,6 +806,51 @@ class BenchmarkRun(ReportingObject):
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
+        #### Single mutations
+        section_latex_objs = []
+        section_latex_objs.append( LatexSubSection(
+            'Number of mutations',
+        ))
+        subcase_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
+        if len(subcase_dataframe) >= case_n_cutoff:
+            table_header = 'Statistics - single mutations (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+            section_latex_objs.append( LatexTable(
+                header_row,
+                list_stats,
+                header_text = table_header
+            ))
+            self.data_tables[('single mutations', len(subcase_dataframe))] = list_stats
+        subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= 2) & (dataframe.NumberOfMutations <= 5)]
+        if len(subcase_dataframe) >= case_n_cutoff:
+            table_header = 'Statistics - 2-4 mutations (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+            section_latex_objs.append( LatexTable(
+                header_row,
+                list_stats,
+                header_text = table_header
+            ))
+            self.data_tables[('2-4 mutations', len(subcase_dataframe))] = list_stats
+        mutation_cutoffs = [5, 10, 20, 50, 100, 200]
+        for i, mutation_cutoff in enumerate(mutation_cutoffs):
+            if len(mutation_cutoffs) - 1 == i:
+                break
+            next_cutoff = mutation_cutoffs[i+1]
+            subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= mutation_cutoff) & (dataframe.NumberOfMutations <= next_cutoff)]
+            if len(subcase_dataframe) >= case_n_cutoff:
+                table_header = 'Statistics - %d <= number of mutations <= %d (%d cases)' % (mutation_cutoff, next_cutoff, len(subcase_dataframe))
+                list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+                section_latex_objs.append( LatexTable(
+                    header_row,
+                    list_stats,
+                    header_text = table_header
+                ))
+                self.data_tables[('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe))] = list_stats
+        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        self.metric_latex_objects.extend( section_latex_objs )
+        ####
+
+        #### Complete dataset (scaled)
         section_latex_objs = []
         section_latex_objs.append( LatexSubSection(
             'Entire dataset using a scaling factor of 1/%.03f to improve the fraction correct metric.' % scalar_adjustment,
@@ -822,6 +867,7 @@ class BenchmarkRun(ReportingObject):
         self.data_tables[('complete dataset (scaled)', len(dataframe))] = list_stats
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
+        ####
 
         section_latex_objs = []
         section_latex_objs.append( LatexSubSection(
