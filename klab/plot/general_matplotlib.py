@@ -37,6 +37,7 @@ from matplotlib.ticker import NullFormatter
 
 import scipy
 from klab.latex.util import make_latex_safe
+from klab.stats.misc import mae
 
 def plot_scatter(
     dataframe, x_series, y_series,
@@ -196,17 +197,19 @@ def make_corr_plot(
     residuals = np.var([(slope*xx + intercept - yy)  for xx,yy in zip(x,y)])
     Rsqr = 1-residuals/variance
     r, p_val = scipy.stats.stats.pearsonr(x, y)
+    mae_value = mae(x, y)
+
     if max( len(x), len(y) ) >= 500:
         # From scipy documentation:
         # The p-value roughly indicates the probability of an uncorrelated system producing datasets that have a Pearson correlation
         # at least as extreme as the one computed from these datasets. The p-values are not entirely reliable but are probably
         # reasonable for datasets larger than 500 or so.
-        axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$\n$p=%.2e$'% (Rsqr,slope, r, p_val),
+        axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$\n$mae=%.2f$\n$p=%.2e$'% (Rsqr,slope, r, mae_value, p_val),
                     fontsize=16, ha='left', va='top'
         )
     else:
         # Too small for p-value to be reliable
-        axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$'% (Rsqr,slope, r),
+        axText.text(0, 1, '$R^2=%0.2f$\n$m=%.2f$\n$R=%.2f$\n$mae=%.2f$'% (Rsqr,slope, r, mae_value),
                     fontsize=16, ha='left', va='top'
         )
 
