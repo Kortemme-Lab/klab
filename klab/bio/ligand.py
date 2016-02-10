@@ -537,9 +537,22 @@ class LigandMap(object):
         return lm
 
 
+    @staticmethod
+    def from_code_map(ligand_code_map):
+        lm = LigandMap()
+        for k, v in ligand_code_map.iteritems():
+            lm.add_code_mapping(k, v)
+        return lm
+
+
     def add(self, from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = True):
         assert(from_pdb_residue_id not in self.mapping)
         self.mapping[from_pdb_residue_id] = LigandMap._MapPoint(from_pdb_code, from_pdb_residue_id, to_pdb_code, to_pdb_residue_id, strict = strict)
+        self.add_code_mapping(from_pdb_code, to_pdb_code)
+
+
+    def add_code_mapping(self, from_pdb_code, to_pdb_code):
+        '''Add a code mapping without a given instance.'''
 
         # Consistency check - make sure that we always map the same code e.g. 'LIG' to the same code e.g. 'GTP'
         if from_pdb_code in self.code_map:
