@@ -261,7 +261,7 @@ keymap = dict(
     normaltesty = ("Y-axis normality test", '(2-sided chi^2 p-value=%s)'),
 )
 
-def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '%.3E', return_string = True):
+def format_stats(stats, floating_point_format = '%0.2f', sci_notation_format = '%.2E', return_string = True):
     s = []
     newstats = {}
     for k, v in stats.iteritems():
