@@ -821,6 +821,16 @@ class BenchmarkRun(ReportingObject):
                 header_text = table_header
             ))
             self.data_tables[('single mutations', len(subcase_dataframe))] = list_stats
+        subcase_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
+        if len(subcase_dataframe) >= case_n_cutoff:
+            table_header = 'Statistics - multiple mutations (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+            section_latex_objs.append( LatexTable(
+                header_row,
+                list_stats,
+                header_text = table_header
+            ))
+            self.data_tables[('multiple mutations', len(subcase_dataframe))] = list_stats
         subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= 2) & (dataframe.NumberOfMutations <= 5)]
         if len(subcase_dataframe) >= case_n_cutoff:
             table_header = 'Statistics - 2-4 mutations (%d cases)' % len(subcase_dataframe)
@@ -838,7 +848,7 @@ class BenchmarkRun(ReportingObject):
             next_cutoff = mutation_cutoffs[i+1]
             subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= mutation_cutoff) & (dataframe.NumberOfMutations <= next_cutoff)]
             if len(subcase_dataframe) >= case_n_cutoff:
-                table_header = 'Statistics - %d <= number of mutations <= %d (%d cases)' % (mutation_cutoff, next_cutoff, len(subcase_dataframe))
+                table_header = 'Statistics - %d $<=$ number of mutations $<=$ %d (%d cases)' % (mutation_cutoff, next_cutoff, len(subcase_dataframe))
                 list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
                 section_latex_objs.append( LatexTable(
                     header_row,
