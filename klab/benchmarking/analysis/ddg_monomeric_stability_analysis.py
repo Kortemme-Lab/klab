@@ -127,7 +127,7 @@ class BenchmarkRun(ReportingObject):
         self.misc_dataframe_attributes['Credit'] = credit
 
         self.metric_latex_objects = []
-        self.data_tables = {}
+        self.stored_metrics_df = pandas.DataFrame()
 
         if self.store_data_on_disk:
             # This may be False in some cases e.g. when interfacing with a database
@@ -144,6 +144,12 @@ class BenchmarkRun(ReportingObject):
         self.ddg_analysis_type_description = None
         self.filter_data()
 
+    def add_stored_metric_to_df(self, case_description, case_length, case_stats):
+        df = pandas.DataFrame(case_stats, columns = ['stat_type', 'value', 'p_value'])
+        num_rows = len(df.index)
+        df.loc[:,'case_description'] = pandas.Series([case_description for x in xrange(num_rows)], index=df.index)
+        df.loc[:,'benchmark_run_name'] = pandas.Series([self.benchmark_run_name for x in xrange(num_rows)], index=df.index)
+        self.stored_metrics_df = pandas.concat([self.stored_metrics_df, df])
 
     def filter_data(self):
         '''A very rough filtering step to remove certain data.
@@ -766,7 +772,7 @@ class BenchmarkRun(ReportingObject):
         ) )
         for subcase in ('XX', 'SL', 'LS'):
             subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
-            table_header = ' Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
+            table_header = 'Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
             if len(subcase_dataframe) >= 8:
                 list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
                 section_latex_objs.append( LatexTable(
@@ -775,7 +781,7 @@ class BenchmarkRun(ReportingObject):
                     column_format = stats_column_format,
                     header_text = table_header
                 ))
-                self.data_tables[(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))] = list_stats
+                self.add_stored_metric_to_df(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe), list_stats)
             else:
                 section_latex_objs.append( LatexText(
                     'Not enough data for analysis of mutations ''%s'' (at least 8 cases are required).' % BenchmarkRun.by_volume_descriptions[subcase]
@@ -797,7 +803,7 @@ class BenchmarkRun(ReportingObject):
             column_format = stats_column_format,
             header_text = table_header
         ))
-        self.data_tables[('cases with G or P', len(subcase_dataframe))] = list_stats
+        self.add_stored_metric_to_df('cases with G or P', len(subcase_dataframe), list_stats)
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 0]
         table_header = 'Statistics - cases without G or P (%d cases)' % len(subcase_dataframe)
         list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
@@ -807,7 +813,7 @@ class BenchmarkRun(ReportingObject):
             column_format = stats_column_format,
             header_text = table_header
         ))
-        self.data_tables[('cases without G or P', len(subcase_dataframe))] = list_stats
+        self.add_stored_metric_to_df('cases without G or P', len(subcase_dataframe), list_stats)
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
@@ -826,7 +832,7 @@ class BenchmarkRun(ReportingObject):
                 column_format = stats_column_format,
                 header_text = table_header
             ))
-            self.data_tables[('single mutations', len(subcase_dataframe))] = list_stats
+            self.add_stored_metric_to_df('single mutations', len(subcase_dataframe), list_stats)
         subcase_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
         if len(subcase_dataframe) >= case_n_cutoff:
             table_header = 'Statistics - multiple mutations (%d cases)' % len(subcase_dataframe)
@@ -837,7 +843,7 @@ class BenchmarkRun(ReportingObject):
                 column_format = stats_column_format,
                 header_text = table_header
             ))
-            self.data_tables[('multiple mutations', len(subcase_dataframe))] = list_stats
+            self.add_stored_metric_to_df('multiple mutations', len(subcase_dataframe), list_stats)
         # subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= 2) & (dataframe.NumberOfMutations <= 5)]
         # if len(subcase_dataframe) >= case_n_cutoff:
         #     table_header = 'Statistics - 2-4 mutations (%d cases)' % len(subcase_dataframe)
@@ -848,7 +854,7 @@ class BenchmarkRun(ReportingObject):
         #         column_format = stats_column_format,
         #         header_text = table_header
         #     ))
-        #     self.data_tables[('2-4 mutations', len(subcase_dataframe))] = list_stats
+        #     self.add_stored_metric_to_df('2-4 mutations', len(subcase_dataframe), list_stats)
         # mutation_cutoffs = [5, 10, 20, 50, 100, 200]
         # for i, mutation_cutoff in enumerate(mutation_cutoffs):
         #     if len(mutation_cutoffs) - 1 == i:
@@ -864,7 +870,7 @@ class BenchmarkRun(ReportingObject):
         #             column_format = stats_column_format,
         #             header_text = table_header
         #         ))
-        #         self.data_tables[('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe))] = list_stats
+        #         self.add_stored_metric_to_df('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe), list_stats)
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
         ####
@@ -884,7 +890,7 @@ class BenchmarkRun(ReportingObject):
             column_format = stats_column_format,
             header_text = table_header
         ))
-        self.data_tables[('complete dataset (scaled)', len(dataframe))] = list_stats
+        self.add_stored_metric_to_df('complete dataset (scaled)', len(dataframe), list_stats)
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
         ####
@@ -903,7 +909,7 @@ class BenchmarkRun(ReportingObject):
             column_format = stats_column_format,
             header_text = table_header
         ))
-        self.data_tables[('complete dataset', len(dataframe))] = list_stats
+        self.add_stored_metric_to_df('complete dataset', len(dataframe), list_stats)
         self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
@@ -929,6 +935,10 @@ class BenchmarkRun(ReportingObject):
         self.generate_plots = True
 
         self.create_subplot_directory(analysis_directory) # Create a directory for plots
+
+        # Save metric data (if it exists)
+        if len(self.stored_metrics_df.index) > 0:
+            self.stored_metrics_df.to_csv( os.path.join(analysis_directory, 'metrics.csv') )
 
         analysis_set_prefix = ''
         if analysis_set:
@@ -959,7 +969,7 @@ class BenchmarkRun(ReportingObject):
         # Identify the column with the experimental values for the analysis_set
         experimental_series = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
-        latex_report.set_title_page( title = '$\Delta\Delta G$ Report', subtitle = subtitle )
+        latex_report.set_title_page( title = '$\Delta\Delta G$ Report --- %s' % self.benchmark_run_name, subtitle = subtitle )
         if self.credit:
             latex_report.add_to_abstract('Prediction set scoring credit: ' + self.credit)
         latex_report.add_section_page( title = 'Main plots' )
