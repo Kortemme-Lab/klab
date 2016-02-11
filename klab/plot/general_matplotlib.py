@@ -295,7 +295,7 @@ def plot_bar(
     y_min_limit = y_min_limit - bottom_pad
 
     for i, column_name in enumerate(dataframe_columns):
-        ax.text(i+1, y_min_limit,
+        ax.text(i+1, y_min_limit + bottom_pad,
                 'n=%d' % len( dataframe[[column_name]] ),
                 fontsize = 16,
                 ha='center', va='bottom')
