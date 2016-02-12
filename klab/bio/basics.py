@@ -204,6 +204,11 @@ dna_nucleotides_3to1_map = {
     'ADE' : 'A', 'CYT' : 'C', 'GUA' : 'G', 'THY' : 'T', #'DU' : 'U', 'DI' : 'I',
 }
 
+rna_nucleotides_3to1_map = {
+    # Used to map Rosetta features database mappings to single letter sequences
+    'RAD' : 'A', 'RCY' : 'C', 'RGU' : 'G', 'RX' : 'X', 'URA' : 'T', 'VRT' : 'X',
+}
+
 dna_nucleotides_2to1_map = {
     # Used to map PDB SEQRES DNA sequences to single letter sequences
     'DA' : 'A', 'DC' : 'C', 'DG' : 'G', 'DT' : 'T', 'DU' : 'U', 'DI' : 'I',
