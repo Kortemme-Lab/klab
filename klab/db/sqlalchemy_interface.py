@@ -71,7 +71,7 @@ def get_single_record_from_query(result_set):
         return result_set[0]
 
 
-def get_or_create_in_transaction(tsession, model, values, missing_columns = [], updatable_columns = [], only_use_supplied_columns = False):
+def get_or_create_in_transaction(tsession, model, values, missing_columns = [], variable_columns = [], updatable_columns = [], only_use_supplied_columns = False):
     '''
     Uses the SQLAlchemy model to retrieve an existing record based on the supplied field values or, if there is no
     existing record, to create a new database record.
@@ -80,6 +80,7 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     :param values: A dict of values which will be used to populate the fields of the model
     :param missing_columns: Elements of missing_columns are expected to be fields in the model but are left blank regardless of whether they exist in values. This is useful for auto_increment fields.
     :param updatable_columns: If these are specified, they are treated as missing columns in the record matching and if a record is found, these fields will be updated
+    :param variable_columns: If these are specified, they are treated as missing columns in the record matching but are not updated. A good use of these are for datetime fields which default to the current datetime
     :return:
     '''
 
@@ -89,6 +90,8 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     for c in missing_columns:
         fieldnames.remove(c)
     for c in updatable_columns:
+        fieldnames.remove(c)
+    for c in variable_columns:
         fieldnames.remove(c)
 
     if only_use_supplied_columns:

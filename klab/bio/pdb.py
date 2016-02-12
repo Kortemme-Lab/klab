@@ -40,7 +40,7 @@ except:
     pass
 
 from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_solutions, common_solution_ids
-from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms, three_letter_ion_codes
+from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, rna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms, three_letter_ion_codes
 from klab.bio.ligand import SimplePDBLigand, PDBIon, Ligand
 from klab import colortext
 from klab.fs.fsio import read_file, write_file
@@ -1666,17 +1666,25 @@ class PDB(object):
             for rosetta_id, residue_info in sorted(v.iteritems()):
                 short_residue_type = None
 
+                residue_type = None
                 if chain_type == 'Protein':
                     residue_type = residue_info['name3'].strip()
                     short_residue_type = residue_type_3to1_map[residue_type]
                 else:
-                    assert(chain_type == 'DNA' or chain_type == 'RNA')
                     residue_type = residue_info['res_type'].strip()
-                    if residue_type.find('UpperDNA') != -1 or residue_type.find('LowerDNA') != -1:
-                        residue_type = residue_type[:3]
-                    short_residue_type = dna_nucleotides_3to1_map.get(residue_type) # Commenting this out since Rosetta does not seem to handle these "or non_canonical_dna.get(residue_type)"
+                    if chain_type == 'DNA':
+                        if residue_type.find('UpperDNA') != -1 or residue_type.find('LowerDNA') != -1:
+                            residue_type = residue_type[:3]
+                        short_residue_type = dna_nucleotides_3to1_map.get(residue_type) # Commenting this out since Rosetta does not seem to handle these "or non_canonical_dna.get(residue_type)"
+                    else:
+                        assert(chain_type == 'RNA')
+                        if residue_type.find('UpperRNA') != -1 or residue_type.find('LowerRNA') != -1 or (len(residue_type) > 3 and residue_type[3] == ':'):
+                            residue_type = residue_type[:3]
+                        short_residue_type = rna_nucleotides_3to1_map.get(residue_type)
 
-                assert(short_residue_type)
+                if short_residue_type == None:
+                    raise colortext.Exception('Could not determine the one-letter code of the residue: chain {0}, chain_type "{1}", residue "{2}", residue type "{3}".'.format(chain_id, chain_type, rosetta_id, residue_type))
+
                 rosetta_sequences[chain_id].add(Residue(chain_id, rosetta_id, short_residue_type, chain_type))
 
 
