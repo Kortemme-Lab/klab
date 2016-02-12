@@ -293,7 +293,7 @@ class Sequence(object):
         self.sequence_type = sequence_type
 
         if sequence_type:
-            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton' or sequence_type == 'Unknown')
+            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton' or sequence_type == 'Ligand' or sequence_type == 'Unknown')
 
         self.special_insertion_count = 1
 
