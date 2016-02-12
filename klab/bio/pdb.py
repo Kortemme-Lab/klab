@@ -1669,7 +1669,7 @@ class PDB(object):
                 residue_type = None
                 if chain_type == 'Protein':
                     residue_type = residue_info['name3'].strip()
-                    short_residue_type = residue_type_3to1_map[residue_type]
+                    short_residue_type = residue_type_3to1_map.get(residue_type, 'X') # some HETATMs can be passed here e.g. MG so we can not map those cases
                 else:
                     residue_type = residue_info['res_type'].strip()
                     if chain_type == 'DNA':
