@@ -94,7 +94,6 @@ class BenchmarkRun(ReportingObject):
         self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
         self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
         self.additional_join_parameters = additional_join_parameters
-        self.latex_report = None
 
         if not self.contains_experimental_data:
             self.csv_headers.remove('Experimental')
@@ -740,7 +739,9 @@ class BenchmarkRun(ReportingObject):
         self.analysis_directory = output_directory
         self.calculate_metrics(analysis_set = analysis_set, analysis_directory = output_directory, verbose = verbose)
         self.write_dataframe_to_csv( os.path.join(output_directory, 'data.csv') )
-        self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose)
+
+        # Return latex_report
+        return self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose)
 
 
     def get_definitive_name(self, topx_unique, unique_ajps):
@@ -791,15 +792,20 @@ class BenchmarkRun(ReportingObject):
         # Process each benchmark run object individually
         if use_multiprocessing:
             pool = mp.Pool()
-
+        latex_chapters = []
+        def save_latex_report(t):
+            unique_name, latex_report = t
+            latex_report.set_title_page( title = unique_name )
+            latex_chapters.append( latex_report )
         for br in benchmark_runs:
             for analysis_set in analysis_sets:
-                subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, br.get_definitive_name(topx_unique, unique_ajps)) ) )
+                unique_name = br.get_definitive_name(topx_unique, unique_ajps)
+                subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
                 if use_multiprocessing:
-                    pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir ) )
+                    pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name ), callback = save_latex_report )
                 else:
                     print 'Individual report saving in:', subdir
-                    br.full_analysis( analysis_set, subdir )
+                    save_latex_report( br.full_analysis( analysis_set, subdir ) )
         if use_multiprocessing:
             pool.close()
             pool.join()
@@ -812,11 +818,25 @@ class BenchmarkRun(ReportingObject):
         ##### calls individual methods e.g. barchart(benchmark_run_objects)
 
         # Report concatenation
+        intro_report = LatexReport()
+        intro_report.set_title_page('Introduction')
+
+        main_latex_report = LatexReport()
+        main_latex_report.set_title_page('$\Delta\Delta G$ Report')
+        main_latex_report.add_chapter(intro_report)
+        for chapter in latex_chapters:
+            main_latex_report.add_chapter(chapter)
+        main_latex_report.generate_pdf_report(
+            os.path.join( analysis_directory, 'report.pdf' ),
+            verbose = True,
+        )
 
 
-
-
-    def compare(self, other):
+    def compare(self, other, output_directory):
+        """
+        Generate comparison latex report in specified output directory
+        Returns LatexReport object
+        """
         pass
 
 
@@ -1190,11 +1210,9 @@ class BenchmarkRun(ReportingObject):
         if verbose:
             self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
 
-        # Save latex report for future report concatenation
-        self.latex_report = latex_report
-
         self.generate_plots = old_generate_plots
 
+        return latex_report
 
     def compare(self, other):
         '''Compare this benchmark run with another run.'''
@@ -1772,14 +1790,13 @@ plot_scale <- scale_color_manual(
         return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands, analysis_set = analysis_set, verbose = verbose)
 
 
-def _full_analysis_mp_alias(br_obj, analysis_set, output_directory):
+def _full_analysis_mp_alias(br_obj, analysis_set, output_directory, unique_name):
     """
     Alias for instance method that allows the method to be called in a
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    br_obj.full_analysis(analysis_set, output_directory, verbose = False)
-    return
+    return (unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = False))
 
 
 class DBBenchmarkRun(BenchmarkRun):

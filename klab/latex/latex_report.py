@@ -51,14 +51,21 @@ class LatexReport:
 
         self.content = []
 
+        self.chapters = []
+
         self.table_of_contents = table_of_contents
 
     def set_title_page(self, title = '', subtitle = ''):
-        self.title_page_title = make_latex_safe(title)
-        self.title_page_subtitle = make_latex_safe(subtitle)
+        if title != '':
+            self.title_page_title = make_latex_safe(title)
+        if subtitle != '':
+            self.title_page_subtitle = make_latex_safe(subtitle)
 
     def add_to_abstract(self, abstract_text):
         self.abstract_text.append( make_latex_safe(abstract_text) )
+
+    def extend_abstract(self, abstract_lines):
+        self.abstract_text.extend( abstract_lines )
 
     def add_section_page(self, title = '', subtext = None, clearpage = True):
         self.content.append(
@@ -69,6 +76,34 @@ class LatexReport:
         self.content.append(
             LatexPagePlot(plot_filename, plot_title)
         )
+
+    def add_chapter(self, chapter):
+        self.chapters.append(chapter)
+
+    def set_latex_from_strings(self, latex_strings):
+        self.latex = ''
+        for s in latex_strings:
+            if s.endswith('\n'):
+                self.latex += s
+            else:
+                self.latex += s + '\n'
+
+    def generate_latex_chapter(self):
+        latex_strings = []
+        latex_strings.append( '\\chapter{%s}\n\n' % self.title_page_title )
+        if self.title_page_subtitle != '' and self.title_page_subtitle != None:
+            latex_strings.append( '\\textbf{%s}\n\n' % self.title_page_subtitle)
+        if self.table_of_contents:
+            latex_strings.append( '\\minitoc\n\n' )
+        if len( self.abstract_text ) > 0:
+            latex_strings.extend( self.generate_abstract_lines() )
+
+        for content_obj in self.content:
+            latex_strings.append( content_obj.generate_latex() )
+
+        self.set_latex_from_strings( latex_strings )
+
+        return self.latex
 
     def generate_latex(self, output_type='pdf'):
         if output_type == 'pdf':
@@ -94,21 +129,27 @@ class LatexReport:
 
         if len( self.abstract_text ) > 0:
             latex_strings.append('\\begin{abstract}\n')
-            for abstract_text_paragraph in self.abstract_text:
-                latex_strings.append( abstract_text_paragraph + '\n\n' )
+            latex_strings.extend( self.generate_abstract_lines )
             latex_strings.append('\\end{abstract}\n\n')
 
         for content_obj in self.content:
             latex_strings.append( content_obj.generate_latex() )
 
+        for chapter_obj in self.chapters:
+            latex_strings.append( chapter_obj.generate_latex_chapter() )
+
         latex_strings.append( '\\end{document}' )
 
-        self.latex = ''
-        for s in latex_strings:
-            if s.endswith('\n'):
-                self.latex += s
-            else:
-                self.latex += s + '\n'
+        self.set_latex_from_strings( latex_strings )
+
+        return self.latex
+
+    def generate_abstract_lines(self):
+        latex_strings = []
+        if len( self.abstract_text ) > 0:
+            for abstract_text_paragraph in self.abstract_text:
+                latex_strings.append( abstract_text_paragraph + '\n\n' )
+        return latex_strings
 
     def generate_pdf_report(self, report_filepath, copy_tex_file_dir = True, verbose = True):
         self.generate_latex( output_type = 'pdf' )
