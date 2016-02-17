@@ -1123,7 +1123,7 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_section_page( title = 'Residue context' )
         latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Residue charges', self.scatterplot_charges, '{0}scatterplot_charges.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Residue charges')
         latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff, self.scatterplot_exposure, '{0}scatterplot_exposure.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff)
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix, verbose = verbose), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Change in volume')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Change in volume')
         latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype residue s.s.', self.scatterplot_ss, '{0}scatterplot_ss.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Wildtype residue s.s.')
 
         # Scatterplots colored by SCOPe classification
@@ -1494,7 +1494,7 @@ dev.off()''' % locals()
             return plot_filename
 
 
-    def scatterplot_color_by_series(self, colorseries, xseries = "Experimental", yseries = "Predicted", title = '', plot_scale = '', point_opacity = 0.4, extra_commands = '', analysis_set = ''):
+    def scatterplot_color_by_series(self, colorseries, xseries = "Experimental", yseries = "Predicted", title = '', plot_scale = '', point_opacity = 0.4, extra_commands = '', analysis_set = '', verbose = True):
 
         experimental_field = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
@@ -1593,7 +1593,7 @@ plot_scale <- scale_color_manual(
         return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "Exposure", title = title, plot_scale = plot_scale, analysis_set = analysis_set)
 
 
-    def scatterplot_volume(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_volume(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by change in volume upon mutation.'''
 
         # Create CSV input
@@ -1608,10 +1608,10 @@ plot_scale <- scale_color_manual(
 plot_scale <- scale_color_manual(
     values = c( "None" = '#777777', "SL" = '%(brown)s', "LS" = '%(purple)s', 'XX' = "%(cornflower_blue)s"),
     labels = c( "None" = "N/A", "SL" = "Increase", "LS" = "Decrease", "XX" = "No change"))''' % plot_colors
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "VolumeChange", title = title, plot_scale = plot_scale, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "VolumeChange", title = title, plot_scale = plot_scale, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_ss(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_ss(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by secondary structure.'''
 
         # Create CSV input
@@ -1628,10 +1628,10 @@ plot_scale <- scale_color_manual(
     name="Secondary structure",
     values = c( "None" = '#777777', "H" = 'magenta', "S" = 'orange', "O" = '%(cornflower_blue)s'),
     labels = c( "None" = "N/A", "H" = "Helix", "S" = "Sheet", "O" = "Other"))''' % plot_colors
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WTSecondaryStructure", title = title, plot_scale = plot_scale, point_opacity = 0.6, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WTSecondaryStructure", title = title, plot_scale = plot_scale, point_opacity = 0.6, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_scop_class(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_scop_class(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by SCOPe class.'''
 
         # Create CSV input
@@ -1642,10 +1642,10 @@ plot_scale <- scale_color_manual(
         new_dataframe = new_dataframe.dropna(subset = [experimental_field, 'Predicted'])
         new_dataframe.to_csv(csv_filename, sep = ',', header = True)
 
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WildTypeSCOPClass", title = title, point_opacity = 0.6, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WildTypeSCOPClass", title = title, point_opacity = 0.6, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_scop_fold(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_scop_fold(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by SCOPe fold.'''
 
         # Create CSV input
@@ -1670,10 +1670,10 @@ plot_scale <- scale_color_manual(
         new_dataframe = new_dataframe.dropna(subset = [experimental_field, 'Predicted'])
         new_dataframe.to_csv(csv_filename, sep = ',', header = True)
 
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WildTypeSCOPClassification", title = title, point_opacity = 0.6, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WildTypeSCOPClassification", title = title, point_opacity = 0.6, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_wildtype_aa(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_wildtype_aa(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by wildtype residue.'''
 
         # Create CSV input
@@ -1690,10 +1690,10 @@ plot_scale <- scale_color_manual(
     values = c( "None" = '#808080', "A" = '#FF0000', "C" = '#BFBF00', "D" = '#008000', "E" = "#80FFFF", "F" = "#8080FF", "G" = "#BF40BF", "H" = "#A0A424", "I" = "#411BEA", "K" = "#1EAC41", "L" = "#F0C80E", "M" = "#B430E5", "N" = "#ED7651", "P" = "#19CB97", "Q" = "#362698", "R" = "#7E7EB8", "S" = "#603000", "T" = "#A71818", "V" = "#DF8020", "W" = "#E75858", "Y" = "#082008"),
     labels = c( "None" = "N/A", "A" = "A", "C" = "C", "D" = "D", "E" = "E", "F" = "F", "G" = "G", "H" = "H", "I" = "I", "K" = "K", "L" = "L", "M" = "M", "N" = "N", "P" = "P", "Q" = "Q", "R" = "R", "S" = "S", "T" = "T", "V" = "V", "W" = "W", "Y" = "Y"))
     ''' % plot_colors
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WildTypeAA", title = title, plot_scale = plot_scale, point_opacity = 0.6, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "WildTypeAA", title = title, plot_scale = plot_scale, point_opacity = 0.6, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_mutant_aa(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_mutant_aa(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by mutant residue.'''
 
         # Create CSV input
@@ -1710,10 +1710,10 @@ plot_scale <- scale_color_manual(
     values = c( "None" = '#808080', "A" = '#FF0000', "C" = '#BFBF00', "D" = '#008000', "E" = "#80FFFF", "F" = "#8080FF", "G" = "#BF40BF", "H" = "#A0A424", "I" = "#411BEA", "K" = "#1EAC41", "L" = "#F0C80E", "M" = "#B430E5", "N" = "#ED7651", "P" = "#19CB97", "Q" = "#362698", "R" = "#7E7EB8", "S" = "#603000", "T" = "#A71818", "V" = "#DF8020", "W" = "#E75858", "Y" = "#082008"),
     labels = c( "None" = "N/A", "A" = "A", "C" = "C", "D" = "D", "E" = "E", "F" = "F", "G" = "G", "H" = "H", "I" = "I", "K" = "K", "L" = "L", "M" = "M", "N" = "N", "P" = "P", "Q" = "Q", "R" = "R", "S" = "S", "T" = "T", "V" = "V", "W" = "W", "Y" = "Y"))
     ''' % plot_colors
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "MutantAA", title = title, plot_scale = plot_scale, point_opacity = 0.6, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "MutantAA", title = title, plot_scale = plot_scale, point_opacity = 0.6, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_GP(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_GP(self, title, csv_filename, analysis_set = '', verbose = True):
 
         # Create CSV input
         new_dataframe = self.dataframe.copy()
@@ -1729,10 +1729,10 @@ plot_scale <- scale_color_manual(
     name="Glycine/Proline",
     values = c( "None" = '#777777', "GP" = '%(neon_green)s', "Other" = '#440077'),
     labels = c( "None" = "N/A", "GP" = "GP", "Other" = "Other"))''' % plot_colors
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "GP", title = title, plot_scale = plot_scale, point_opacity = 0.75, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "GP", title = title, plot_scale = plot_scale, point_opacity = 0.75, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_pdb_res_binned(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_pdb_res_binned(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by binned PDB resolution.'''
 
         # Create CSV input
@@ -1748,10 +1748,10 @@ plot_scale <- scale_color_manual(
     name = "Resolution",
     values = c( "N/A" = '#777777', "<1.5" = '#0052aE', "1.5-2.0" = '#554C54', '2.0-2.5' = "#FFA17F", '>=2.5' = "#ce4200")
     )''' % plot_colors
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "PDBResolutionBin", title = title, plot_scale = plot_scale, point_opacity = 0.75, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "PDBResolutionBin", title = title, plot_scale = plot_scale, point_opacity = 0.75, analysis_set = analysis_set, verbose = verbose)
 
 
-    def scatterplot_chain_length(self, title, csv_filename, analysis_set = ''):
+    def scatterplot_chain_length(self, title, csv_filename, analysis_set = '', verbose = True):
         '''Scatterplot by chain length.'''
 
         # Create CSV input
@@ -1769,7 +1769,7 @@ plot_scale <- scale_color_manual(
     values = c( "N/A" = '#777777', "<1.5" = '#0052aE', "1.5-2.0" = '#554C54', '2.0-2.5' = "#FFA17F", '>=2.5' = "#ce4200")
     )''' % plot_colors
         extra_commands ='\n    scale_colour_gradient(low="yellow", high="#880000") +'
-        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands, analysis_set = analysis_set)
+        return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands, analysis_set = analysis_set, verbose = verbose)
 
 
 def _full_analysis_mp_alias(br_obj, analysis_set, output_directory):
