@@ -75,6 +75,7 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     '''
     Uses the SQLAlchemy model to retrieve an existing record based on the supplied field values or, if there is no
     existing record, to create a new database record.
+
     :param tsession: An SQLAlchemy transactioned session
     :param model: The name of the SQLAlchemy class representing the table
     :param values: A dict of values which will be used to populate the fields of the model
@@ -82,7 +83,11 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     :param updatable_columns: If these are specified, they are treated as missing columns in the record matching and if a record is found, these fields will be updated
     :param variable_columns: If these are specified, they are treated as missing columns in the record matching but are not updated. A good use of these are for datetime fields which default to the current datetime
     :return:
-    '''
+
+    Note: This function is a convenience function and is NOT efficient. The "tsession.query(model).filter_by(**pruned_values)"
+          call is only (sometimes) efficient if an index exists on the keys of pruned_values. If any of the fields of pruned_values are
+          large (even if otherwise deferred/loaded lazily) then you will incur a performance hit on lookup. You may need
+          to reconsider any calls to this function in inner loops of your code.'''
 
     values = copy.deepcopy(values) # todo: this does not seem to be necessary since we do not seem to be writing
 
@@ -120,6 +125,12 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
         tsession.add(instance)
         tsession.flush()
         return instance
+
+
+def get_or_create_in_transaction_wrapper(tsession, model, values, missing_columns = [], variable_columns = [], updatable_columns = [], only_use_supplied_columns = False):
+    '''This function can be used to determine which calling method is spending time in get_or_create_in_transaction when profiling the database API.
+       Switch out calls to get_or_create_in_transaction to get_or_create_in_transaction_wrapper in the suspected functions to determine where the pain lies.'''
+    return get_or_create_in_transaction(tsession, model, values, missing_columns = missing_columns, variable_columns = variable_columns, updatable_columns = updatable_columns, only_use_supplied_columns = only_use_supplied_columns)
 
 
 class IntermediateField(object):
