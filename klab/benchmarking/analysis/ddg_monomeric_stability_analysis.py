@@ -44,6 +44,7 @@ import gzip
 import time
 import datetime
 import getpass
+import multiprocessing as mp
 try: import json
 except: import simplejson as json
 
@@ -85,12 +86,15 @@ class BenchmarkRun(ReportingObject):
 
     def __init__(self, benchmark_run_name, dataset_cases, analysis_data, contains_experimental_data = True, benchmark_run_directory = None, use_single_reported_value = False,
                  description = None, dataset_description = None, credit = None, take_lowest = 3, generate_plots = True, report_analysis = True, include_derived_mutations = False, recreate_graphs = False, silent = False, burial_cutoff = 0.25,
+                 additional_join_parameters = {},
                  stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False, store_data_on_disk = True, misc_dataframe_attributes = {},
                  terminal_width = 200, restrict_to = set(), remove_cases = set()):
 
         self.contains_experimental_data = contains_experimental_data
         self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
         self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
+        self.additional_join_parameters = additional_join_parameters
+        self.latex_report = None
 
         if not self.contains_experimental_data:
             self.csv_headers.remove('Experimental')
@@ -150,6 +154,7 @@ class BenchmarkRun(ReportingObject):
         df.loc[:,'case_description'] = pandas.Series([case_description for x in xrange(num_rows)], index=df.index)
         df.loc[:,'benchmark_run_name'] = pandas.Series([self.benchmark_run_name for x in xrange(num_rows)], index=df.index)
         self.stored_metrics_df = pandas.concat([self.stored_metrics_df, df])
+
 
     def filter_data(self):
         '''A very rough filtering step to remove certain data.
@@ -465,7 +470,7 @@ class BenchmarkRun(ReportingObject):
         if self.contains_experimental_data:
             self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
             for analysis_set in self.analysis_sets:
-                self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True)
+                self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
 
             # Add new columns derived from the adjusted values
             for analysis_set in self.analysis_sets:
@@ -728,7 +733,94 @@ class BenchmarkRun(ReportingObject):
             self.plot(analysis_set, analysis_directory = analysis_directory)
 
 
-    def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True, case_n_cutoff = 5):
+    def full_analysis(self, analysis_set, output_directory, verbose = True):
+        '''Combines calculate_metrics, write_dataframe_to_csv, and plot'''
+        if not os.path.isdir(output_directory):
+            os.makedirs(output_directory)
+        self.analysis_directory = output_directory
+        self.calculate_metrics(analysis_set = analysis_set, analysis_directory = output_directory, verbose = verbose)
+        self.write_dataframe_to_csv( os.path.join(output_directory, 'data.csv') )
+        self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose)
+
+
+    def get_definitive_name(self, topx_unique, unique_ajps):
+        """
+        Generates a definitive name for this benchmark run object, including topx value
+        (if passed arg indicates this is unique), and other unique additional join parameters
+        (as passed)
+        """
+        name = str(self.benchmark_run_name)
+        if topx_unique:
+            name += '-topx_%d' % self.take_lowest
+        for ajp in unique_ajps:
+            name += '-' + str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
+        return name
+
+
+    @staticmethod
+    def analyze_multiple(
+            benchmark_runs,
+            analysis_sets = [],
+            # Singleton arguments
+            analysis_directory = None,
+            remove_existing_analysis_directory = True,
+            use_multiprocessing = True,
+    ):
+        '''This function runs the analysis for multiple input settings'''
+        if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
+            shutil.rmtree(analysis_directory)
+
+        # Determine which join parameters (including special case of topx/take_lowest) are unique
+        br_topx_values = set()
+        br_ajps = {}
+        for br in benchmark_runs:
+            br_topx_values.add( br.take_lowest )
+            for ajp in br.additional_join_parameters:
+                if ajp not in br_ajps:
+                    br_ajps[ajp] = set()
+                br_ajps[ajp].add( br.additional_join_parameters[ajp]['short_name'] )
+        if len(br_topx_values) > 1:
+            topx_unique = True
+        else:
+            topx_unique = False
+        unique_ajps = []
+        for ajp in br_ajps:
+            if len( br_ajps[ajp] ) > 1:
+                unique_ajps.append( ajp )
+
+        # Process each benchmark run object individually
+        if use_multiprocessing:
+            pool = mp.Pool()
+
+        for br in benchmark_runs:
+            for analysis_set in analysis_sets:
+                subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, br.get_definitive_name(topx_unique, unique_ajps)) ) )
+                if use_multiprocessing:
+                    pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir ) )
+                else:
+                    print 'Individual report saving in:', subdir
+                    br.full_analysis( analysis_set, subdir )
+        if use_multiprocessing:
+            pool.close()
+            pool.join()
+
+        # pointwise
+        ##### for x in xrange(len(benchmark runs) - 1):
+            ##### benchmark_runs[x].compare(benchmark_runs[x + 1])
+
+        # series comparison
+        ##### calls individual methods e.g. barchart(benchmark_run_objects)
+
+        # Report concatenation
+
+
+
+
+    def compare(self, other):
+        pass
+
+
+    def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True, case_n_cutoff = 5, verbose = True):
         '''Calculates the main metrics for the benchmark run and writes them to file and LaTeX object.'''
 
         dataframe = self.dataframe
@@ -748,11 +840,13 @@ class BenchmarkRun(ReportingObject):
         else:
             running_analysis_str = '\nDerived mutations in analysis are omitted):'
         intro_text.add_text(running_analysis_str)
-        self.report(running_analysis_str, fn = colortext.message)
+        if verbose:
+            self.report(running_analysis_str, fn = colortext.message)
 
         classification_cutoffs_str = 'The stability classification cutoffs are: Experimental=%0.2f kcal/mol, Predicted=%0.2f energy units.' % (self.stability_classication_x_cutoff, self.stability_classication_y_cutoff)
         intro_text.add_text( classification_cutoffs_str )
-        self.report(classification_cutoffs_str, fn = colortext.warning)
+        if verbose:
+            self.report(classification_cutoffs_str, fn = colortext.warning)
 
         self.metric_latex_objects.append( intro_text )
 
@@ -786,7 +880,8 @@ class BenchmarkRun(ReportingObject):
                 section_latex_objs.append( LatexText(
                     'Not enough data for analysis of mutations ''%s'' (at least 8 cases are required).' % BenchmarkRun.by_volume_descriptions[subcase]
                 ))
-        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        if verbose:
+            self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
         section_latex_objs = []
@@ -814,7 +909,8 @@ class BenchmarkRun(ReportingObject):
             header_text = table_header
         ))
         self.add_stored_metric_to_df('cases without G or P', len(subcase_dataframe), list_stats)
-        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        if verbose:
+            self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
         #### Single mutations
@@ -871,7 +967,8 @@ class BenchmarkRun(ReportingObject):
         #             header_text = table_header
         #         ))
         #         self.add_stored_metric_to_df('%d <= mutations<= %d' % (mutation_cutoff, next_cutoff), len(subcase_dataframe), list_stats)
-        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        if verbose:
+            self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
         ####
 
@@ -891,7 +988,8 @@ class BenchmarkRun(ReportingObject):
             header_text = table_header
         ))
         self.add_stored_metric_to_df('complete dataset (scaled)', len(dataframe), list_stats)
-        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        if verbose:
+            self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
         ####
 
@@ -910,7 +1008,8 @@ class BenchmarkRun(ReportingObject):
             header_text = table_header
         ))
         self.add_stored_metric_to_df('complete dataset', len(dataframe), list_stats)
-        self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        if verbose:
+            self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
         # There is probably a better way of writing the pandas code here
@@ -920,14 +1019,15 @@ class BenchmarkRun(ReportingObject):
         if num_errors > 0:
             error_detection_text = '\n\nDerivative errors were found in the run. Record #{0} - {1}, {2} - has the most amount ({3}) of derivative errors.'.format(record_index, pdb_id, mutation_str, num_errors)
             self.metric_latex_objects.append( LatexText(error_detection_text, color = 'red') )
-            self.report(error_detection_text, fn = colortext.warning)
+            if verbose:
+                self.report(error_detection_text, fn = colortext.warning)
 
         # Write the analysis to file
         self.create_analysis_directory(analysis_directory)
         self.metrics_filepath = os.path.join(self.analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
         write_file(self.metrics_filepath, '\n'.join([x.generate_plaintext() for x in self.metric_latex_objects]))
 
-    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True):
+    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True, verbose = True):
         if matplotlib_plots:
             from klab.plot import general_matplotlib
 
@@ -960,11 +1060,11 @@ class BenchmarkRun(ReportingObject):
             subtitle += ' ({0})'.format(analysis_set)
 
         # Plot which y-cutoff yields the best value for the fraction correct metric
-        scalar_adjustment, scalar_adjustment_calculation_plot = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = False, analysis_file_prefix = analysis_file_prefix)
+        scalar_adjustment, scalar_adjustment_calculation_plot = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = False, analysis_file_prefix = analysis_file_prefix, verbose = verbose)
         assert(self.scalar_adjustments[analysis_set] == scalar_adjustment)
 
         # Plot which the optimum y-cutoff given the specified or default x-cutoff
-        optimal_predictive_cutoff_plot = self.plot_optimum_prediction_fraction_correct_cutoffs(analysis_set, analysis_file_prefix, self.stability_classication_x_cutoff)
+        optimal_predictive_cutoff_plot = self.plot_optimum_prediction_fraction_correct_cutoffs(analysis_set, analysis_file_prefix, self.stability_classication_x_cutoff, verbose = verbose)
 
         # Identify the column with the experimental values for the analysis_set
         experimental_series = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
@@ -975,16 +1075,16 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_section_page( title = 'Main plots' )
 
         if matplotlib_plots:
-            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 8, fig_width = 7), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
-            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 8, fig_width = 7), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
 
             single_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
             if len(single_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'Single mutations data subset' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7, verbose = verbose), plot_title = 'Single mutations data subset' )
 
             multiple_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
             if len(multiple_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7), plot_title = 'Multiple mutations data subset' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
 
             latex_report.add_plot(
                 general_matplotlib.plot_bar(
@@ -996,13 +1096,14 @@ class BenchmarkRun(ReportingObject):
                     fig_width = 7,
                     ylabel = 'Run time (minutes)',
                     xlabel = 'Prediction Set',
+                    verbose = verbose,
                 ),
                 plot_title = 'Run time'
             )
 
         # Plot a histogram of the absolute errors
         absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError', analysis_set)
-        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors'.format(analysis_file_prefix), absolute_error_series, analysis_set = analysis_set), plot_title = 'Absolute error histogram')
+        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors'.format(analysis_file_prefix), absolute_error_series, analysis_set = analysis_set, verbose = verbose), plot_title = 'Absolute error histogram')
         latex_report.add_section_page( title = 'Adjustments', subtext = 'Optimization of the cutoffs\nfor the fraction correct metric' )
         latex_report.add_plot(scalar_adjustment_calculation_plot, plot_title = 'Scalar adjustment calculation plot')
         latex_report.add_plot(optimal_predictive_cutoff_plot, plot_title = 'Optimal predictive cutoff plot')
@@ -1012,17 +1113,18 @@ class BenchmarkRun(ReportingObject):
         adjusted_absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)
         main_adj_scatterplot = '{0}main_adjusted_with_scalar_scatterplot.png'.format(analysis_file_prefix)
         if not(os.path.exists(main_adj_scatterplot) and not(self.recreate_graphs)):
-            self.log('Saving scatterplot to %s.' % main_adj_scatterplot)
+            if verbose:
+                self.log('Saving scatterplot to %s.' % main_adj_scatterplot)
             plot_pandas(dataframe, experimental_series, adjusted_predicted_value_series, main_adj_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction: adjusted scale')
         latex_report.add_plot(main_adj_scatterplot, plot_title = 'Main adj. scatterplot')
-        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix), adjusted_absolute_error_series, analysis_set = analysis_set), plot_title = 'Absolute errors adjusted with scalar')
+        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix, verbose = verbose), adjusted_absolute_error_series, analysis_set = analysis_set, verbose = verbose), plot_title = 'Absolute errors adjusted with scalar')
 
         # Scatterplots colored by residue context / change on mutation
         latex_report.add_section_page( title = 'Residue context' )
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Residue charges', self.scatterplot_charges, '{0}scatterplot_charges.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Residue charges')
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff, self.scatterplot_exposure, '{0}scatterplot_exposure.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff)
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Change in volume')
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype residue s.s.', self.scatterplot_ss, '{0}scatterplot_ss.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Wildtype residue s.s.')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Residue charges', self.scatterplot_charges, '{0}scatterplot_charges.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Residue charges')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff, self.scatterplot_exposure, '{0}scatterplot_exposure.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Exposure (cutoff = %0.2f)' % self.burial_cutoff)
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Change in volume', self.scatterplot_volume, '{0}scatterplot_volume.png'.format(analysis_file_prefix, verbose = verbose), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Change in volume')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype residue s.s.', self.scatterplot_ss, '{0}scatterplot_ss.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Wildtype residue s.s.')
 
         # Scatterplots colored by SCOPe classification
         SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
@@ -1031,43 +1133,46 @@ class BenchmarkRun(ReportingObject):
         scop_section_page_generated = False
         if len(SCOP_classes) <= 25:
             if len(SCOP_classes) == 1 and ((None in SCOP_classes) or (numpy.isnan(sorted(SCOP_classes)[0]) or not(sorted(SCOP_classes)[0]))):
-                print('There are no defined SCOP classes. Skipping the SCOP class plot.')
+                if verbose:
+                    print('There are no defined SCOP classes. Skipping the SCOP class plot.')
             else:
                 if not scop_section_page_generated:
                     latex_report.add_section_page( title = 'SCOPe classes' )
                     scop_section_page_generated = True
-                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP class', self.scatterplot_scop_class, '{0}scatterplot_scop_class.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP class')
+                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP class', self.scatterplot_scop_class, '{0}scatterplot_scop_class.png'.format(analysis_file_prefix, verbose = verbose), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP class')
         if len(SCOP_folds) <= 25:
             if len(SCOP_folds) == 1 and ((None in SCOP_folds) or (numpy.isnan(sorted(SCOP_folds)[0]) or not(sorted(SCOP_folds)[0]))):
-                print('There are no defined SCOP folds. Skipping the SCOP fold plot.')
+                if verbose:
+                    print('There are no defined SCOP folds. Skipping the SCOP fold plot.')
             else:
                 if not scop_section_page_generated:
                     latex_report.add_section_page( title = 'SCOPe classes' )
                     scop_section_page_generated = True
-                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP fold', self.scatterplot_scop_fold, '{0}scatterplot_scop_fold.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP fold')
+                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP fold', self.scatterplot_scop_fold, '{0}scatterplot_scop_fold.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - WT residue SCOP fold')
         if len(SCOP_classifications) <= 25:
             if len(SCOP_classifications) == 1 and ((None in SCOP_classifications) or (numpy.isnan(sorted(SCOP_classifications)[0]) or not(sorted(SCOP_classifications)[0]))):
-                print('There are no defined SCOP classifications. Skipping the SCOP classification plot.')
+                if verbose:
+                    print('There are no defined SCOP classifications. Skipping the SCOP classification plot.')
             else:
                 if not scop_section_page_generated:
                     latex_report.add_section_page( title = 'SCOPe classes' )
                     scop_section_page_generated = True
-                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP classification', self.scatterplot_scop_classification, '{0}scatterplot_scop_classification.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - WT residue SCOP classification')
+                latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - WT residue SCOP classification', self.scatterplot_scop_classification, '{0}scatterplot_scop_classification.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - WT residue SCOP classification')
 
         # Scatterplots colored by residue types
         latex_report.add_section_page( title = 'Residue types' )
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype', self.scatterplot_wildtype_aa, '{0}scatterplot_wildtype_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Wildtype')
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Mutant', self.scatterplot_mutant_aa, '{0}scatterplot_mutant_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Mutant')
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Glycine/Proline', self.scatterplot_GP, '{0}scatterplot_gp.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Glycine/Proline')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Wildtype', self.scatterplot_wildtype_aa, '{0}scatterplot_wildtype_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Wildtype')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Mutant', self.scatterplot_mutant_aa, '{0}scatterplot_mutant_aa.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Mutant')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Glycine/Proline', self.scatterplot_GP, '{0}scatterplot_gp.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Glycine/Proline')
 
         # Scatterplots colored PDB resolution and chain length
         latex_report.add_section_page( title = 'Chain properties' )
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - PDB resolution', self.scatterplot_pdb_res_binned, '{0}scatterplot_pdb_res_binned.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - PDB resolution')
-        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Chain length', self.scatterplot_chain_length, '{0}scatterplot_chain_length.png'.format(analysis_file_prefix), analysis_set = analysis_set), plot_title = 'Experimental vs. Prediction - Chain length')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - PDB resolution', self.scatterplot_pdb_res_binned, '{0}scatterplot_pdb_res_binned.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - PDB resolution')
+        latex_report.add_plot(self.scatterplot_generic('Experimental vs. Prediction - Chain length', self.scatterplot_chain_length, '{0}scatterplot_chain_length.png'.format(analysis_file_prefix), analysis_set = analysis_set, verbose = verbose), plot_title = 'Experimental vs. Prediction - Chain length')
 
         # Errors / debugging
         latex_report.add_section_page( title =  'Errors / debugging' )
-        latex_report.add_plot(self.plot_derivative_error_barchart(analysis_file_prefix), plot_title = 'Derivative error barchart')
+        latex_report.add_plot(self.plot_derivative_error_barchart(analysis_file_prefix, verbose = verbose), plot_title = 'Derivative error barchart')
 
         # Copy the analysis input files into the analysis directory - these files are duplicated but it makes it easier to share data
         if self.analysis_csv_input_filepath:
@@ -1079,9 +1184,14 @@ class BenchmarkRun(ReportingObject):
 
         # Combine the plots into a PDF file
         latex_report.generate_pdf_report(
-            os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) )
+            os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ),
+            verbose = verbose,
         )
-        self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
+        if verbose:
+            self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
+
+        # Save latex report for future report concatenation
+        self.latex_report = latex_report
 
         self.generate_plots = old_generate_plots
 
@@ -1127,7 +1237,7 @@ class BenchmarkRun(ReportingObject):
 
         return max_value_cutoff, max_value, fraction_correct_range
 
-    def plot_optimum_prediction_fraction_correct_cutoffs(self, analysis_set, analysis_file_prefix, stability_classication_x_cutoff):
+    def plot_optimum_prediction_fraction_correct_cutoffs(self, analysis_set, analysis_file_prefix, stability_classication_x_cutoff, verbose = True):
 
         # Determine the optimal values
         max_value_cutoff, max_value, fraction_correct_range = self.determine_optimum_fraction_correct_cutoffs(analysis_set, self.dataframe, stability_classication_x_cutoff)
@@ -1148,7 +1258,8 @@ class BenchmarkRun(ReportingObject):
                 lines.append(','.join(map(str, (p[0], p[1], 'best'))))
             else:
                 lines.append(','.join(map(str, (p[0], p[1], 'other'))))
-        print(csv_filename)
+        if verbose:
+            print(csv_filename)
         write_file(csv_filename, '\n'.join(lines))
 
         # Create plot
@@ -1179,12 +1290,13 @@ p <- ggplot(data = plot_data, aes(x = NeutralityCutoff, y = FractionCorrect)) +
  geom_text(hjust=0, size=4, color="black", aes(6.5, best_y, fontface="plain", family = "sans", label=sprintf("Max = %(max_value)0.2f\\nCutoff = %(max_value_cutoff)0.2f")))
 p
 dev.off()'''
-            self.log('Saving plot of approximate optimal fraction correct cutoffs to %s.' % plot_filename)
+            if verbose:
+                self.log('Saving plot of approximate optimal fraction correct cutoffs to %s.' % plot_filename)
             RInterface._runRScript(r_script % locals())
             return plot_filename
 
 
-    def plot_optimum_prediction_fraction_correct_cutoffs_over_range(self, analysis_set, min_stability_classication_x_cutoff, max_stability_classication_x_cutoff, suppress_plot = False, analysis_file_prefix = None):
+    def plot_optimum_prediction_fraction_correct_cutoffs_over_range(self, analysis_set, min_stability_classication_x_cutoff, max_stability_classication_x_cutoff, suppress_plot = False, analysis_file_prefix = None, verbose = True):
         '''Plots the optimum cutoff for the predictions to maximize the fraction correct metric over a range of experimental cutoffs.
            Returns the average scalar corresponding to the best value of fraction correct over a range of cutoff values for the experimental cutoffs.'''
 
@@ -1229,8 +1341,9 @@ dev.off()'''
         # Create plot
         if plot_graph:
             if not(os.path.exists(plot_filename) and not(self.recreate_graphs)):
-                self.log('Saving scatterplot to %s.' % plot_filename)
-                self.log('Saving plot of approximate optimal fraction correct cutoffs over varying experimental cutoffs to %s.' % plot_filename)
+                if verbose:
+                    self.log('Saving scatterplot to %s.' % plot_filename)
+                    self.log('Saving plot of approximate optimal fraction correct cutoffs over varying experimental cutoffs to %s.' % plot_filename)
 
                 title = 'Optimum cutoff for fraction correct metric at varying experimental cutoffs'
                 if analysis_set:
@@ -1265,7 +1378,7 @@ dev.off()'''
         new_dataframe.columns = [name + '_' + self.benchmark_run_name for name in new_dataframe.columns]
         return new_dataframe
 
-    def plot_derivative_error_barchart(self, analysis_file_prefix):
+    def plot_derivative_error_barchart(self, analysis_file_prefix, verbose = True):
 
         # Filenames
         output_filename_prefix = '{0}errors_by_pdb_id'.format(analysis_file_prefix)
@@ -1285,7 +1398,8 @@ dev.off()'''
         # Create plot
         firebrick = plot_colors['firebrick']
         brown = plot_colors['brown']
-        self.log('Saving barchart to %s.' % plot_filename)
+        if verbose:
+            self.log('Saving barchart to %s.' % plot_filename)
         title = 'Average count of Inaccurate G! errors by PDB ID'
         r_script = '''library(ggplot2)
 library(gridExtra)
@@ -1314,7 +1428,7 @@ dev.off()'''
         return plot_filename
 
 
-    def plot_absolute_error_histogram(self, output_filename_prefix, data_series, analysis_set = ''):
+    def plot_absolute_error_histogram(self, output_filename_prefix, data_series, analysis_set = '', verbose = True):
 
         # Filenames
         plot_filename = output_filename_prefix + '.png'
@@ -1332,7 +1446,8 @@ dev.off()'''
             return
 
         # Create plot
-        self.log('Saving scatterplot to %s.' % plot_filename)
+        if verbose:
+            self.log('Saving scatterplot to %s.' % plot_filename)
         title = 'Distribution of absolute errors (prediction - observed)'
         if analysis_set:
             title += ' for {0}'.format(analysis_set)
@@ -1355,7 +1470,7 @@ dev.off()'''
         return plot_filename
 
 
-    def scatterplot_generic(self, title, plotfn, plot_filename, analysis_set = ''):
+    def scatterplot_generic(self, title, plotfn, plot_filename, analysis_set = '', verbose = True):
         if os.path.exists(plot_filename) and not(self.recreate_graphs):
             return plot_filename
 
@@ -1373,7 +1488,8 @@ plot_data <- read.csv('%(csv_filename)s', header=T)
 
 dev.off()''' % locals()
         if self.generate_plots:
-            self.log('Saving scatterplot to %s.' % plot_filename)
+            if verbose:
+                self.log('Saving scatterplot to %s.' % plot_filename)
             RInterface._runRScript(r_script)
             return plot_filename
 
@@ -1654,6 +1770,16 @@ plot_scale <- scale_color_manual(
     )''' % plot_colors
         extra_commands ='\n    scale_colour_gradient(low="yellow", high="#880000") +'
         return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands, analysis_set = analysis_set)
+
+
+def _full_analysis_mp_alias(br_obj, analysis_set, output_directory):
+    """
+    Alias for instance method that allows the method to be called in a
+    multiprocessing pool. Needed as multiprocessing does not otherwise work
+    on object instance methods.
+    """
+    br_obj.full_analysis(analysis_set, output_directory, verbose = False)
+    return
 
 
 class DBBenchmarkRun(BenchmarkRun):
