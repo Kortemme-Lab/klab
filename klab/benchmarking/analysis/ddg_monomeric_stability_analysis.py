@@ -792,11 +792,11 @@ class BenchmarkRun(ReportingObject):
         # Process each benchmark run object individually
         if use_multiprocessing:
             pool = mp.Pool()
-        latex_chapters = []
+        singleton_chapters = []
         def save_latex_report(t):
             unique_name, latex_report = t
             latex_report.set_title_page( title = unique_name )
-            latex_chapters.append( latex_report )
+            singleton_chapters.append( latex_report )
         for br in benchmark_runs:
             for analysis_set in analysis_sets:
                 unique_name = br.get_definitive_name(topx_unique, unique_ajps)
@@ -810,7 +810,14 @@ class BenchmarkRun(ReportingObject):
             pool.close()
             pool.join()
 
-        # pointwise
+        # Pointwise all-by-all comparison
+        comparison_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
+        for analysis_set in analysis_sets:
+            subdir = os.path.join(comparison_subdir, analysis_set)
+            for i, br_i in enumerate(benchmark_runs):
+                for j, br_j in enumerate(benchmark_runs):
+                    if i > j:
+                        br_i.compare(j, output_directory)
         ##### for x in xrange(len(benchmark runs) - 1):
             ##### benchmark_runs[x].compare(benchmark_runs[x + 1])
 
@@ -824,7 +831,7 @@ class BenchmarkRun(ReportingObject):
         main_latex_report = LatexReport()
         main_latex_report.set_title_page('$\Delta\Delta G$ Report')
         main_latex_report.add_chapter(intro_report)
-        for chapter in latex_chapters:
+        for chapter in singleton_chapters:
             main_latex_report.add_chapter(chapter)
         main_latex_report.generate_pdf_report(
             os.path.join( analysis_directory, 'report.pdf' ),
@@ -837,6 +844,8 @@ class BenchmarkRun(ReportingObject):
         Generate comparison latex report in specified output directory
         Returns LatexReport object
         """
+        comparison_report = LatexReport()
+
         pass
 
 
