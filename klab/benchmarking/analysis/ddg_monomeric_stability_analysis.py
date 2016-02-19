@@ -805,19 +805,19 @@ class BenchmarkRun(ReportingObject):
                     pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name ), callback = save_latex_report )
                 else:
                     print 'Individual report saving in:', subdir
-                    save_latex_report( br.full_analysis( analysis_set, subdir ) )
+                    save_latex_report( _full_analysis_mp_alias( br, analysis_set, subdir, unique_name ) )
         if use_multiprocessing:
             pool.close()
             pool.join()
 
         # Pointwise all-by-all comparison
-        comparison_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
-        for analysis_set in analysis_sets:
-            subdir = os.path.join(comparison_subdir, analysis_set)
-            for i, br_i in enumerate(benchmark_runs):
-                for j, br_j in enumerate(benchmark_runs):
-                    if i > j:
-                        br_i.compare(j, output_directory)
+        # comparison_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
+        # for analysis_set in analysis_sets:
+        #     subdir = os.path.join(comparison_subdir, analysis_set)
+        #     for i, br_i in enumerate(benchmark_runs):
+        #         for j, br_j in enumerate(benchmark_runs):
+        #             if i > j:
+        #                 br_i.compare(j, output_directory)
         ##### for x in xrange(len(benchmark runs) - 1):
             ##### benchmark_runs[x].compare(benchmark_runs[x + 1])
 
@@ -837,6 +837,7 @@ class BenchmarkRun(ReportingObject):
             os.path.join( analysis_directory, 'report.pdf' ),
             verbose = True,
         )
+        print os.path.join( analysis_directory, 'report.pdf' )
 
 
     def compare(self, other, output_directory):
