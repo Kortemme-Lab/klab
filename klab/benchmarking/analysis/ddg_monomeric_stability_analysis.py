@@ -52,13 +52,14 @@ import pandas
 
 from klab import colortext
 from klab.Reporter import Reporter
-from klab.latex.latex_report import LatexReport, LatexPageSection, LatexText, LatexTable, LatexSubSection
+import klab.latex.latex_report as lr
 from klab.fs.fsio import read_file, write_file, write_temp_file
 from klab.loggers.simple import ReportingObject
 from klab.gfx.color_definitions import rgb_colors as plot_colors
-from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats
+from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats, subtract_dataframe_columns, add_subtraction_column
 from klab.benchmarking.analysis.plot import plot_pandas
 from klab.plot.rtools import RInterface
+from klab.plot import general_matplotlib
 
 class BenchmarkRun(ReportingObject):
     '''A object to contain benchmark run data which can be used to analyze that run or else to cross-analyze the run with another run.'''
@@ -790,34 +791,34 @@ class BenchmarkRun(ReportingObject):
                 unique_ajps.append( ajp )
 
         # Process each benchmark run object individually
-        if use_multiprocessing:
-            pool = mp.Pool()
-        singleton_chapters = []
-        def save_latex_report(t):
-            unique_name, latex_report = t
-            latex_report.set_title_page( title = unique_name )
-            singleton_chapters.append( latex_report )
-        for br in benchmark_runs:
-            for analysis_set in analysis_sets:
-                unique_name = br.get_definitive_name(topx_unique, unique_ajps)
-                subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
-                if use_multiprocessing:
-                    pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name ), callback = save_latex_report )
-                else:
-                    print 'Individual report saving in:', subdir
-                    save_latex_report( _full_analysis_mp_alias( br, analysis_set, subdir, unique_name ) )
-        if use_multiprocessing:
-            pool.close()
-            pool.join()
+        # if use_multiprocessing:
+        #     pool = mp.Pool()
+        # singleton_chapters = []
+        # def save_latex_report(t):
+        #     unique_name, latex_report = t
+        #     latex_report.set_title_page( title = unique_name )
+        #     singleton_chapters.append( latex_report )
+        # for br in benchmark_runs:
+        #     for analysis_set in analysis_sets:
+        #         unique_name = br.get_definitive_name(topx_unique, unique_ajps)
+        #         subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
+        #         if use_multiprocessing:
+        #             pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name ), callback = save_latex_report )
+        #         else:
+        #             print 'Individual report saving in:', subdir
+        #             save_latex_report( _full_analysis_mp_alias( br, analysis_set, subdir, unique_name ) )
+        # if use_multiprocessing:
+        #     pool.close()
+        #     pool.join()
 
         # Pointwise all-by-all comparison
-        # comparison_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
-        # for analysis_set in analysis_sets:
-        #     subdir = os.path.join(comparison_subdir, analysis_set)
-        #     for i, br_i in enumerate(benchmark_runs):
-        #         for j, br_j in enumerate(benchmark_runs):
-        #             if i > j:
-        #                 br_i.compare(j, output_directory)
+        comparison_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
+        for analysis_set in analysis_sets:
+            subdir = os.path.join(comparison_subdir, analysis_set)
+            for i, br_i in enumerate(benchmark_runs):
+                for j, br_j in enumerate(benchmark_runs):
+                    if i > j:
+                        br_i.compare(br_j, analysis_set, subdir, topx_unique, unique_ajps)
         ##### for x in xrange(len(benchmark runs) - 1):
             ##### benchmark_runs[x].compare(benchmark_runs[x + 1])
 
@@ -825,10 +826,10 @@ class BenchmarkRun(ReportingObject):
         ##### calls individual methods e.g. barchart(benchmark_run_objects)
 
         # Report concatenation
-        intro_report = LatexReport()
+        intro_report = lr.LatexReport()
         intro_report.set_title_page('Introduction')
 
-        main_latex_report = LatexReport()
+        main_latex_report = lr.LatexReport()
         main_latex_report.set_title_page('$\Delta\Delta G$ Report')
         main_latex_report.add_chapter(intro_report)
         for chapter in singleton_chapters:
@@ -840,15 +841,76 @@ class BenchmarkRun(ReportingObject):
         print os.path.join( analysis_directory, 'report.pdf' )
 
 
-    def compare(self, other, output_directory):
+    def compare(self, other, analysis_set, output_directory, topx_unique, unique_ajps, verbose = True):
         """
         Generate comparison latex report in specified output directory
         Returns LatexReport object
         """
-        comparison_report = LatexReport()
+        subplot_directory = os.path.join(output_directory, 'plots')
+        if not os.path.isdir(subplot_directory):
+            os.makedirs(subplot_directory)
 
+        report = lr.LatexReport()
+        self_unique_name = self.get_definitive_name(topx_unique, unique_ajps)
+        other_unique_name = other.get_definitive_name(topx_unique, unique_ajps)
+
+        both_predictions = pandas.merge( self.dataframe[['Predicted']], other.dataframe[['Predicted']], left_index = True, right_index = True )
+        both_predictions.columns = (
+            self_unique_name + ' ' + 'Predicted',
+            other_unique_name + ' ' + 'Predicted',
+        )
+        both_predictions = add_subtraction_column(
+            both_predictions
+        )
+
+        self_diff = self.get_pred_minus_exp_dataframe(analysis_set)
+        self_diff.columns = [self_unique_name + '-' + self_diff.columns[0]]
+        other_diff = other.get_pred_minus_exp_dataframe(analysis_set)
+        other_diff.columns = [other_unique_name + '-' + other_diff.columns[0]]
+        diff_v_diff_dataframe = pandas.merge(
+            self_diff, other_diff, left_index = True, right_index = True
+        )
+        diff_v_diff_dataframe = add_subtraction_column(
+            diff_v_diff_dataframe
+        )
+
+        report.set_title_page('%s vs %s' % (self_unique_name, other_unique_name) )
+        report.add_plot( general_matplotlib.make_corr_plot(both_predictions, both_predictions.columns.values[0], both_predictions.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+
+        column_format = ['l', 'S[table-format=3.2]', 'S[table-format=3.2]', 'S[table-format=3.2]']
+        report.content.append( lr.LatexPandasTable(
+            both_predictions[:10], header_text = 'Values v. values',
+            column_format = column_format,
+        ) )
+        
+        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+
+        # subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
+        # table_header = 'Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
+        # if len(subcase_dataframe) >= 8:
+        #     list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+        #     section_latex_objs.append( LatexTable(
+        #         header_row,
+        #         list_stats,
+        #         column_format = stats_column_format,
+        #         header_text = table_header
+        #     ))
+        #     self.add_stored_metric_to_df(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe), list_stats)
+
+        report.generate_pdf_report(
+            os.path.join( output_directory, 'comparison.pdf' ),
+            verbose = verbose,
+        )
+        print os.path.join( output_directory, 'comparison.pdf' )
+        sys.exit(1)
         pass
 
+
+    def get_pred_minus_exp_dataframe(self, analysis_set):
+        exp_name = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
+        return_df = self.dataframe['Predicted'].subtract( self.dataframe[exp_name] ).to_frame()
+        return_df.columns = ['delta' + '-' + exp_name]
+        return return_df
 
     def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True, case_n_cutoff = 5, verbose = True):
         '''Calculates the main metrics for the benchmark run and writes them to file and LaTeX object.'''
@@ -860,8 +922,8 @@ class BenchmarkRun(ReportingObject):
         scalar_adjustment = self.scalar_adjustments[analysis_set]
         experimental_field = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
 
-        self.metric_latex_objects.append( LatexPageSection('Data tables', None, True) )
-        intro_text = LatexText( text = self.ddg_analysis_type_description )
+        self.metric_latex_objects.append( lr.LatexPageSection('Data tables', None, True) )
+        intro_text = lr.LatexText( text = self.ddg_analysis_type_description )
         header_row = ['Statistic name', '{Value}', 'p-value']
         stats_column_format = ['l', 'S[table-format=3.2]', 'l']
 
@@ -890,7 +952,7 @@ class BenchmarkRun(ReportingObject):
             volume_groups[v].append(aa_code)
 
         section_latex_objs = []
-        section_latex_objs.append( LatexSubSection(
+        section_latex_objs.append( lr.LatexSubSection(
             'Breakdown by volume',
             'A case is considered a small-to-large (resp. large-to-small) mutation if all of the wildtype residues have a smaller (resp. larger) van der Waals volume than the corresponding mutant residue. The order is defined as %s so some cases are considered to have no change in volume e.g. MET -> LEU.' % (' < '.join([''.join(sorted(v)) for k, v in sorted(volume_groups.iteritems())]))
         ) )
@@ -899,7 +961,7 @@ class BenchmarkRun(ReportingObject):
             table_header = 'Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
             if len(subcase_dataframe) >= 8:
                 list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-                section_latex_objs.append( LatexTable(
+                section_latex_objs.append( lr.LatexTable(
                     header_row,
                     list_stats,
                     column_format = stats_column_format,
@@ -907,7 +969,7 @@ class BenchmarkRun(ReportingObject):
                 ))
                 self.add_stored_metric_to_df(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe), list_stats)
             else:
-                section_latex_objs.append( LatexText(
+                section_latex_objs.append( lr.LatexText(
                     'Not enough data for analysis of mutations ''%s'' (at least 8 cases are required).' % BenchmarkRun.by_volume_descriptions[subcase]
                 ))
         if verbose:
@@ -915,14 +977,14 @@ class BenchmarkRun(ReportingObject):
         self.metric_latex_objects.extend( section_latex_objs )
 
         section_latex_objs = []
-        section_latex_objs.append( LatexSubSection(
+        section_latex_objs.append( lr.LatexSubSection(
             'Separating out mutations involving glycine or proline.',
             'This cases may involve changes to secondary structure so we separate them out here.'
         ))
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 1]
         table_header = 'Statistics - cases with G or P (%d cases)' % len(subcase_dataframe)
         list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( LatexTable(
+        section_latex_objs.append( lr.LatexTable(
             header_row,
             list_stats,
             column_format = stats_column_format,
@@ -932,7 +994,7 @@ class BenchmarkRun(ReportingObject):
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 0]
         table_header = 'Statistics - cases without G or P (%d cases)' % len(subcase_dataframe)
         list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( LatexTable(
+        section_latex_objs.append( lr.LatexTable(
             header_row,
             list_stats,
             column_format = stats_column_format,
@@ -945,14 +1007,14 @@ class BenchmarkRun(ReportingObject):
 
         #### Single mutations
         section_latex_objs = []
-        section_latex_objs.append( LatexSubSection(
+        section_latex_objs.append( lr.LatexSubSection(
             'Number of mutations',
         ))
         subcase_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
         if len(subcase_dataframe) >= case_n_cutoff:
             table_header = 'Statistics - single mutations (%d cases)' % len(subcase_dataframe)
             list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
-            section_latex_objs.append( LatexTable(
+            section_latex_objs.append( lr.LatexTable(
                 header_row,
                 list_stats,
                 column_format = stats_column_format,
@@ -963,7 +1025,7 @@ class BenchmarkRun(ReportingObject):
         if len(subcase_dataframe) >= case_n_cutoff:
             table_header = 'Statistics - multiple mutations (%d cases)' % len(subcase_dataframe)
             list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
-            section_latex_objs.append( LatexTable(
+            section_latex_objs.append( lr.LatexTable(
                 header_row,
                 list_stats,
                 column_format = stats_column_format,
@@ -1004,14 +1066,14 @@ class BenchmarkRun(ReportingObject):
 
         #### Complete dataset (scaled)
         section_latex_objs = []
-        section_latex_objs.append( LatexSubSection(
+        section_latex_objs.append( lr.LatexSubSection(
             'Entire dataset using a scaling factor of 1/%.03f to improve the fraction correct metric.' % scalar_adjustment,
             'Warning: Results in this section use an averaged scaling factor to improve the value for the fraction correct metric. This scalar will vary over benchmark runs so these results should not be interpreted as performance results; they should be considered as what could be obtained if the predicted values were scaled by a "magic" value.'
         ))
         table_header = 'Statistics - complete dataset (scaled) (%d cases)' % len(dataframe)
         # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
         list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( LatexTable(
+        section_latex_objs.append( lr.LatexTable(
             header_row,
             list_stats,
             column_format = stats_column_format,
@@ -1024,14 +1086,14 @@ class BenchmarkRun(ReportingObject):
         ####
 
         section_latex_objs = []
-        section_latex_objs.append( LatexSubSection(
+        section_latex_objs.append( lr.LatexSubSection(
             'Entire dataset',
             'Overall statistics'
         ))
         table_header = 'Statistics - complete dataset (%d cases)' % len(dataframe)
         # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
         list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( LatexTable(
+        section_latex_objs.append( lr.LatexTable(
             header_row,
             list_stats,
             column_format = stats_column_format,
@@ -1048,7 +1110,7 @@ class BenchmarkRun(ReportingObject):
         pdb_id, num_errors, mutation_str = dataframe.loc[record_index, 'PDBFileID'], dataframe.loc[record_index, 'NumberOfDerivativeErrors'], dataframe.loc[record_index, 'Mutations']
         if num_errors > 0:
             error_detection_text = '\n\nDerivative errors were found in the run. Record #{0} - {1}, {2} - has the most amount ({3}) of derivative errors.'.format(record_index, pdb_id, mutation_str, num_errors)
-            self.metric_latex_objects.append( LatexText(error_detection_text, color = 'red') )
+            self.metric_latex_objects.append( lr.LatexText(error_detection_text, color = 'red') )
             if verbose:
                 self.report(error_detection_text, fn = colortext.warning)
 
@@ -1077,7 +1139,7 @@ class BenchmarkRun(ReportingObject):
         analysis_file_prefix = os.path.abspath( os.path.join( self.subplot_directory, self.benchmark_run_name + analysis_set_prefix + '_' ) )
 
         dataframe = self.dataframe
-        latex_report = LatexReport()
+        latex_report = lr.LatexReport()
         latex_report.content.extend( self.metric_latex_objects ) # Add on table sections generated in calculate_metrics
 
         # Create a subtitle for the first page
@@ -1223,11 +1285,6 @@ class BenchmarkRun(ReportingObject):
         self.generate_plots = old_generate_plots
 
         return latex_report
-
-    def compare(self, other):
-        '''Compare this benchmark run with another run.'''
-        pass
-        #todo implement this
 
 
     def determine_optimum_fraction_correct_cutoffs(self, analysis_set, dataframe, stability_classication_x_cutoff):

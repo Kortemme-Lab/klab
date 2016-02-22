@@ -33,6 +33,7 @@ Created by Shane O'Connor 2014
 import math
 import numpy
 import scipy
+import pandas
 from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
 
 from klab.unmerged.rpache.functions_lib import gamma_CC
@@ -283,3 +284,18 @@ def format_stats(stats, floating_point_format = '%0.2f', sci_notation_format = '
         return '\n'.join(s)
     else:
         return [[k, v[0], v[1]] for k, v in sorted(newstats.iteritems())]
+
+#### Pandas helper functions ####
+
+def subtract_dataframe_columns(df, column_i = 0, column_j = 1, new_column_name = 'delta'):
+    new_df = df[ df.columns[0] ].subtract (
+        df[ df.columns[1] ]
+    ).to_frame()
+    new_df.columns = [new_column_name]
+    return new_df.sort( [new_column_name] )
+
+def add_subtraction_column(df, column_i = 0, column_j = 1, new_column_name = 'delta'):
+    return pandas.merge(
+        df, subtract_dataframe_columns(df, column_i = column_i, column_j = column_j, new_column_name = new_column_name),
+        left_index = True, right_index = True,
+    ).sort( [new_column_name] )

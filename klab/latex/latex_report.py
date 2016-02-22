@@ -352,6 +352,28 @@ class LatexTable(LatexPage):
         return_str += '\\\\\n'
         return return_str
 
+class LatexPandasTable(LatexTable):
+    def __init__ (self, df, header_text = None, column_format = None, index_name = 'Index', float_format = '%.2f'):
+        self.num_columns = len(df.columns) + 1
+        self.set_column_format(column_format)
+
+        self.header_row = [index_name]
+        self.header_row = [make_latex_safe( x ) for x in df.columns]
+
+        self.data_rows = []
+        for index, series in df.iterrows():
+            assert( len(series) == self.num_columns - 1)
+            new_row = [index]
+            for val in series:
+                new_row.append( float_format % val )
+            self.data_rows.append( new_row )
+
+        if header_text:
+            self.header_text = make_latex_safe( header_text.strip() )
+        else:
+            self.header_text = None
+
+
 def format_list_table(data):
     max_lengths = []
     strings_to_print = []

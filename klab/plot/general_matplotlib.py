@@ -52,6 +52,7 @@ def plot_scatter(
     fig_width = None,
     fig_height = None,
     fig_grid = True,
+    axis_label_size = 12.0,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -99,8 +100,8 @@ def plot_scatter(
     else:
         plt.scatter(dataframe[[x_series]], dataframe[[y_series]], s = 10, alpha = 0.6)
 
-    plt.ylabel( make_latex_safe(y_series) )
-    plt.xlabel( make_latex_safe(x_series) )
+    plt.ylabel( make_latex_safe(y_series), fontsize = axis_label_size )
+    plt.xlabel( make_latex_safe(x_series), fontsize = axis_label_size )
     if plot_title:
         plt.title( make_latex_safe(plot_title) )
 
@@ -127,6 +128,8 @@ def make_corr_plot(
     fig_width = None,
     fig_grid = True,
     scatter_alpha = 0.8,
+    axis_label_size = 12.0,
+    plot_11_line = False,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -179,8 +182,8 @@ def make_corr_plot(
 
     # the scatter plot:
     axScatter.scatter(x, y, alpha = scatter_alpha)
-    axScatter.set_xlabel( make_latex_safe(df.columns[0]) )
-    axScatter.set_ylabel( make_latex_safe(df.columns[1]) )
+    axScatter.set_xlabel( make_latex_safe(df.columns[0]), fontsize = axis_label_size )
+    axScatter.set_ylabel( make_latex_safe(df.columns[1]), fontsize = axis_label_size )
     axScatter.grid(fig_grid)
 
 
@@ -220,6 +223,9 @@ def make_corr_plot(
     # axScatter.plot(x, yerrLower, '--r')
     # axScatter.plot(x, yerrUpper, '--r')
 
+    if plot_11_line:
+        axScatter.plot(xl, xl, '-g')
+    
     # now determine nice limits by hand:
     xbinwidth = np.max(np.fabs(x)) / 30.0
     ybinwidth = np.max(np.fabs(y)) / 30.0
