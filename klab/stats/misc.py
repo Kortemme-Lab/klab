@@ -287,15 +287,57 @@ def format_stats(stats, floating_point_format = '%0.2f', sci_notation_format = '
 
 #### Pandas helper functions ####
 
-def subtract_dataframe_columns(df, column_i = 0, column_j = 1, new_column_name = 'delta'):
-    new_df = df[ df.columns[0] ].subtract (
-        df[ df.columns[1] ]
-    ).to_frame()
-    new_df.columns = [new_column_name]
-    return new_df.sort( [new_column_name] )
+def float_format_2sigfig(x):
+    return '%.2f' % x
 
-def add_subtraction_column(df, column_i = 0, column_j = 1, new_column_name = 'delta'):
-    return pandas.merge(
-        df, subtract_dataframe_columns(df, column_i = column_i, column_j = column_j, new_column_name = new_column_name),
-        left_index = True, right_index = True,
-    ).sort( [new_column_name] )
+def subtract_row_pairs_for_display(df, min_abs_delta = 1.0, pairs_to_show = 15, output_csv = None, verbose = True, merge_df = None):
+    assert( len(df.columns.values) == 1 )
+    exp_column_name = df.columns.values[0]
+
+    df.sort_index( inplace = True )
+
+    prior_row_value = None
+    prior_row_index = None
+    df['AbsDelta'] = ''
+    df['Delta'] = ''
+    for row in df.iterrows():
+        # Rows are (index, series) tuples, so first select series,
+        # then select column, then values list, then value
+        if prior_row_value != None:
+            diff = prior_row_value - row[1][[exp_column_name]].values[0]
+            abs_diff = abs( diff )
+            df.loc[prior_row_index,'AbsDelta'] = abs_diff
+            df.loc[row[0],'AbsDelta'] = abs_diff
+            df.loc[prior_row_index,'Delta'] = diff
+            df.loc[row[0],'Delta'] = diff
+            prior_row_value = None
+        else:
+            prior_row_value = row[1][[exp_column_name]].values[0]
+            prior_row_index = row[0]
+    df['colFromIndex'] = df.index
+    df.sort_values( ['AbsDelta', 'colFromIndex'], inplace = True, ascending = False )
+    df = df.drop('colFromIndex', 1)
+
+    if output_csv:
+        if verbose:
+            print 'Saving comparison CSV to:', output_csv
+        if not merge_df is None:
+            output_df = df.join(
+                merge_df,
+                how = 'inner',
+                lsuffix = '_x',
+                rsuffix = '_y',
+            )
+        else:
+            output_df = df
+        output_df.to_csv( output_csv )
+
+    # Remove values we don't care about printing
+    df = df[ df['AbsDelta'] >= min_abs_delta]
+    df = df[:pairs_to_show*2]
+    # Now that sorting is done, clear unneccesary values (for prettier printing)
+    df = df.drop('AbsDelta', 1)
+    for i, row in enumerate(df.iterrows()):
+        if ( i % 2 ) == 1:
+            df.loc[row[0],'Delta'] = ''
+    return df

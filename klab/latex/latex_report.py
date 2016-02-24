@@ -94,8 +94,8 @@ class LatexReport:
         latex_strings.append( '\\chapter{%s}\n\n' % self.title_page_title )
         if self.title_page_subtitle != '' and self.title_page_subtitle != None:
             latex_strings.append( '\\textbf{%s}\n\n' % self.title_page_subtitle)
-        if self.table_of_contents:
-            latex_strings.append( '\\minitoc\n\n' )
+        # if self.table_of_contents:
+        #     latex_strings.append( '\\minitoc\n\n' )
         if len( self.abstract_text ) > 0:
             latex_strings.extend( self.generate_abstract_lines() )
 
@@ -353,11 +353,25 @@ class LatexTable(LatexPage):
         return_str += '\\\\\n'
         return return_str
 
-class LatexPandasTable(LatexTable):
-    def __init__ (self, df, caption_text = None):
-        self.df = df
-        self.caption_text = caption_text
 
+class LatexPandasTable(LatexTable):
+    def __init__ (self, df, caption_text = None, header = True, float_format = None, sparsify = True):
+        self.df = df
+        if caption_text:
+            self.caption_text = make_latex_safe( caption_text )
+        else:
+            self.caption_text = caption_text
+        self.header = header
+        self.float_format = float_format
+        self.sparsify = sparsify
+
+    def generate_latex(self):
+        latex = '\\begin{table}[H]\n'
+        latex += self.df.to_latex( header = self.header, float_format = self.float_format, sparsify = self.sparsify )
+        if self.caption_text:
+            latex += '\\caption{%s}\n' % str(self.caption_text)
+        latex += '\\end{table}\n'
+        return latex
 
 def format_list_table(data):
     max_lengths = []

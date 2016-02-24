@@ -56,7 +56,7 @@ import klab.latex.latex_report as lr
 from klab.fs.fsio import read_file, write_file, write_temp_file
 from klab.loggers.simple import ReportingObject
 from klab.gfx.color_definitions import rgb_colors as plot_colors
-from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats, subtract_dataframe_columns, add_subtraction_column
+from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats, float_format_2sigfig, subtract_row_pairs_for_display
 from klab.benchmarking.analysis.plot import plot_pandas
 from klab.plot.rtools import RInterface
 from klab.plot import general_matplotlib
@@ -772,7 +772,7 @@ class BenchmarkRun(ReportingObject):
         if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
             shutil.rmtree(analysis_directory)
 
-        # Determine which join parameters (including special case of topx/take_lowest) are unique
+        ### Determine which join parameters (including special case of topx/take_lowest) are unique
         br_topx_values = set()
         br_ajps = {}
         for br in benchmark_runs:
@@ -790,37 +790,47 @@ class BenchmarkRun(ReportingObject):
             if len( br_ajps[ajp] ) > 1:
                 unique_ajps.append( ajp )
 
-        # Process each benchmark run object individually
-        # if use_multiprocessing:
-        #     pool = mp.Pool()
-        # singleton_chapters = []
-        # def save_latex_report(t):
-        #     unique_name, latex_report = t
-        #     latex_report.set_title_page( title = unique_name )
-        #     singleton_chapters.append( latex_report )
-        # for br in benchmark_runs:
-        #     for analysis_set in analysis_sets:
-        #         unique_name = br.get_definitive_name(topx_unique, unique_ajps)
-        #         subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
-        #         if use_multiprocessing:
-        #             pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name ), callback = save_latex_report )
-        #         else:
-        #             print 'Individual report saving in:', subdir
-        #             save_latex_report( _full_analysis_mp_alias( br, analysis_set, subdir, unique_name ) )
-        # if use_multiprocessing:
-        #     pool.close()
-        #     pool.join()
+        ###  Process each benchmark run object individually
+        if use_multiprocessing:
+            pool = mp.Pool()
+        singleton_chapters = []
+        def save_latex_report(t):
+            unique_name, latex_report = t
+            latex_report.set_title_page( title = unique_name )
+            singleton_chapters.append( latex_report )
+        for br in benchmark_runs:
+            for analysis_set in analysis_sets:
+                unique_name = br.get_definitive_name(topx_unique, unique_ajps)
+                subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
+                if use_multiprocessing:
+                    pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name, False ), callback = save_latex_report )
+                else:
+                    print 'Individual report saving in:', subdir
+                    save_latex_report( _full_analysis_mp_alias( br, analysis_set, subdir, unique_name, True ) )
+        if use_multiprocessing:
+            pool.close()
+            pool.join()
 
-        # Pointwise all-by-all comparison
-        comparison_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
+        ### Pointwise all-by-all comparison
+        if use_multiprocessing:
+            pool = mp.Pool()
+        comparison_chapters = []
+        def save_latex_report(t):
+            latex_report = t
+            comparison_chapters.append( latex_report )
+        comparisons_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
         for analysis_set in analysis_sets:
-            subdir = os.path.join(comparison_subdir, analysis_set)
+            analysis_set_subdir = os.path.join(comparisons_subdir, analysis_set)
             for i, br_i in enumerate(benchmark_runs):
                 for j, br_j in enumerate(benchmark_runs):
                     if i > j:
-                        br_i.compare(br_j, analysis_set, subdir, topx_unique, unique_ajps)
-        ##### for x in xrange(len(benchmark runs) - 1):
-            ##### benchmark_runs[x].compare(benchmark_runs[x + 1])
+                        if use_multiprocessing:
+                            pool.apply_async( _compare_mp_alias, (br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
+                        else:
+                            save_latex_report( _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, True) )
+        if use_multiprocessing:
+            pool.close()
+            pool.join()
 
         # series comparison
         ##### calls individual methods e.g. barchart(benchmark_run_objects)
@@ -832,6 +842,8 @@ class BenchmarkRun(ReportingObject):
         main_latex_report = lr.LatexReport()
         main_latex_report.set_title_page('$\Delta\Delta G$ Report')
         main_latex_report.add_chapter(intro_report)
+        for chapter in comparison_chapters:
+            main_latex_report.add_chapter(chapter)
         for chapter in singleton_chapters:
             main_latex_report.add_chapter(chapter)
         main_latex_report.generate_pdf_report(
@@ -846,71 +858,106 @@ class BenchmarkRun(ReportingObject):
         Generate comparison latex report in specified output directory
         Returns LatexReport object
         """
+        self_unique_name = self.get_definitive_name(topx_unique, unique_ajps)
+        other_unique_name = other.get_definitive_name(topx_unique, unique_ajps)
+
+        output_directory = os.path.join(output_directory, os.path.join(self_unique_name, other_unique_name) )
+        assert( not os.path.isdir( output_directory ) )
+
         subplot_directory = os.path.join(output_directory, 'plots')
         if not os.path.isdir(subplot_directory):
             os.makedirs(subplot_directory)
 
         report = lr.LatexReport()
-        self_unique_name = self.get_definitive_name(topx_unique, unique_ajps)
-        other_unique_name = other.get_definitive_name(topx_unique, unique_ajps)
 
-        both_predictions = pandas.merge( self.dataframe[['Predicted']], other.dataframe[['Predicted']], left_index = True, right_index = True )
-        both_predictions.columns = (
-            self_unique_name + ' ' + 'Predicted',
-            other_unique_name + ' ' + 'Predicted',
-        )
-        both_predictions = add_subtraction_column(
-            both_predictions
+        # Construct dataframe comparing our predictions to other's predictions
+        both_predictions = pandas.concat(
+            [
+                self.add_identifying_columns_to_df(self.dataframe[['Predicted']], topx_unique, unique_ajps),
+                other.add_identifying_columns_to_df(other.dataframe[['Predicted']], topx_unique, unique_ajps),
+            ],
+            join = 'outer',
+        ).sort_index()
+        both_predictions_subtracted = subtract_row_pairs_for_display(
+            both_predictions,
+            output_csv = os.path.join(output_directory, 'predictions_v_predictions.csv'),
+            merge_df = self.dataframe,
+            verbose = verbose,
         )
 
-        self_diff = self.get_pred_minus_exp_dataframe(analysis_set)
-        self_diff.columns = [self_unique_name + '-' + self_diff.columns[0]]
-        other_diff = other.get_pred_minus_exp_dataframe(analysis_set)
-        other_diff.columns = [other_unique_name + '-' + other_diff.columns[0]]
-        diff_v_diff_dataframe = pandas.merge(
-            self_diff, other_diff, left_index = True, right_index = True
+        # Construct dataframe comparing our diff with experimental values to other's
+        self_diff = self.get_pred_minus_exp_dataframe(analysis_set, topx_unique, unique_ajps)
+        other_diff = other.get_pred_minus_exp_dataframe(analysis_set, topx_unique, unique_ajps)
+        diffs_df = pandas.concat(
+            [self_diff, other_diff],
+            join = 'outer',
         )
-        diff_v_diff_dataframe = add_subtraction_column(
-            diff_v_diff_dataframe
+
+        diffs_df = subtract_row_pairs_for_display(
+            diffs_df,
+            output_csv = os.path.join(output_directory, 'diffs_v_diffs.csv'),
+            merge_df = self.dataframe,
+            verbose = verbose,
         )
+
 
         report.set_title_page('%s vs %s' % (self_unique_name, other_unique_name) )
-        report.add_plot( general_matplotlib.make_corr_plot(both_predictions, both_predictions.columns.values[0], both_predictions.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+        predictions_v_predictions_df = self.dataframe[['Predicted']].merge(
+            other.dataframe[['Predicted']],
+            left_index = True,
+            right_index = True,
+        )
+        predictions_v_predictions_df.columns = [self_unique_name, other_unique_name]
+        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
 
-        column_format = ['l', 'S[table-format=3.2]', 'S[table-format=3.2]', 'S[table-format=3.2]']
-        report.content.append( lr.LatexPandasTable(
-            both_predictions[:10], header_text = 'Values v. values',
-            column_format = column_format,
-        ) )
-        
+        diff_v_diff_dataframe = self.get_pred_minus_exp_dataframe(analysis_set).merge(
+            other.get_pred_minus_exp_dataframe(analysis_set),
+            left_index = True,
+            right_index = True,
+        )
+        diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
         report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
 
-        # subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
-        # table_header = 'Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
-        # if len(subcase_dataframe) >= 8:
-        #     list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        #     section_latex_objs.append( LatexTable(
-        #         header_row,
-        #         list_stats,
-        #         column_format = stats_column_format,
-        #         header_text = table_header
-        #     ))
-        #     self.add_stored_metric_to_df(BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe), list_stats)
+        report.content.append( lr.LatexPandasTable(
+            diffs_df, float_format = float_format_2sigfig,
+            caption_text = 'Comparison of error (Predicted - Experimental) for first prediction set (%s) vs second set of predictions (%s). Values sorted by descending absolute delta.' % (self_unique_name, other_unique_name),
+        ) )
+
+        report.content.append( lr.LatexPandasTable(
+            both_predictions_subtracted, float_format = float_format_2sigfig,
+            caption_text = 'Direct comparison of predicted values. Values sorted by descending absolute delta.',
+        ) )
 
         report.generate_pdf_report(
             os.path.join( output_directory, 'comparison.pdf' ),
             verbose = verbose,
         )
-        print os.path.join( output_directory, 'comparison.pdf' )
-        sys.exit(1)
-        pass
+        if verbose:
+            print 'Comparison report saved to:', os.path.join( output_directory, 'comparison.pdf' )
+        return report
 
 
-    def get_pred_minus_exp_dataframe(self, analysis_set):
+    def get_pred_minus_exp_dataframe(self, analysis_set, topx_unique = None, unique_ajps = None):
         exp_name = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
         return_df = self.dataframe['Predicted'].subtract( self.dataframe[exp_name] ).to_frame()
         return_df.columns = ['delta' + '-' + exp_name]
-        return return_df
+        return_df.index.name = 'ID'
+        if topx_unique and unique_ajps:
+            return self.add_identifying_columns_to_df(return_df, topx_unique, unique_ajps)
+        else:
+            return return_df
+
+
+    def add_identifying_columns_to_df(self, df, topx_unique, unique_ajps):
+        df.index.name = 'ID'
+        for ajp in unique_ajps:
+            df[ajp] = self.additional_join_parameters[ajp]['short_name']
+            df.set_index(ajp, append = True, inplace = True)
+        if topx_unique:
+            df['TopX'] = self.take_lowest
+            df.set_index('TopX', append = True, inplace = True)
+        return df
+
 
     def calculate_metrics(self, analysis_set = '', analysis_directory = None, drop_missing = True, case_n_cutoff = 5, verbose = True):
         '''Calculates the main metrics for the benchmark run and writes them to file and LaTeX object.'''
@@ -1120,6 +1167,10 @@ class BenchmarkRun(ReportingObject):
         write_file(self.metrics_filepath, '\n'.join([x.generate_plaintext() for x in self.metric_latex_objects]))
 
     def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True, verbose = True):
+        # Reset to new current working directory
+        tmp_working_dir = tempfile.mkdtemp( prefix = '%s-%s-%s_' % (time.strftime("%y%m%d"), getpass.getuser(), 'plot-working-dir') )
+        os.chdir(tmp_working_dir)
+
         if matplotlib_plots:
             from klab.plot import general_matplotlib
 
@@ -1283,6 +1334,8 @@ class BenchmarkRun(ReportingObject):
             self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
 
         self.generate_plots = old_generate_plots
+
+        shutil.rmtree( tmp_working_dir )
 
         return latex_report
 
@@ -1857,13 +1910,22 @@ plot_scale <- scale_color_manual(
         return self.scatterplot_color_by_series(xseries = experimental_field, colorseries = "Residues", title = title, plot_scale = '', point_opacity = 0.75, extra_commands = extra_commands, analysis_set = analysis_set, verbose = verbose)
 
 
-def _full_analysis_mp_alias(br_obj, analysis_set, output_directory, unique_name):
+def _full_analysis_mp_alias(br_obj, analysis_set, output_directory, unique_name, verbose):
     """
     Alias for instance method that allows the method to be called in a
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    return (unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = False))
+    return (unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose))
+
+
+def _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose):
+    """
+    Alias for instance method that allows the method to be called in a
+    multiprocessing pool. Needed as multiprocessing does not otherwise work
+    on object instance methods.
+    """
+    return br_i.compare(br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose = verbose)
 
 
 class DBBenchmarkRun(BenchmarkRun):
