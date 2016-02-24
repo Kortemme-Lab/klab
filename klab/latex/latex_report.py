@@ -31,6 +31,7 @@ import subprocess
 import shutil
 import copy
 from klab.latex.util import make_latex_safe
+import numpy as np
 
 cwd = os.path.dirname(os.path.realpath(__file__))
 with open(os.path.join(cwd, 'document_header.tex'), 'r') as f:
@@ -353,26 +354,81 @@ class LatexTable(LatexPage):
         return return_str
 
 class LatexPandasTable(LatexTable):
-    def __init__ (self, df, header_text = None, column_format = None, index_name = 'Index', float_format = '%.2f'):
-        self.num_columns = len(df.columns) + 1
-        self.set_column_format(column_format)
+    def __init__ (self, df, caption_text = None):
+        self.df = df
+        self.caption_text = caption_text
 
-        self.header_row = [index_name]
-        self.header_row = [make_latex_safe( x ) for x in df.columns]
 
-        self.data_rows = []
-        for index, series in df.iterrows():
-            assert( len(series) == self.num_columns - 1)
-            new_row = [index]
-            for val in series:
-                new_row.append( float_format % val )
-            self.data_rows.append( new_row )
+class LatexNestedTable(LatexPage):
+    def __init__ (self, df, float_format = '%.2f', caption = None):
+        # Find matching headers
+        column_pairs = []
+        for i, i_column in enumerate(df.columns.values):
+            if '_' in i_column:
+                search_str = i_column[:i_column.rfind('_')]
+                for j, j_column in enumerate(df.columns.values):
+                    if i < j and j_column.startswith( search_str ):
+                        column_pairs.append( (search_str, i_column, j_column) )
 
-        if header_text:
-            self.header_text = make_latex_safe( header_text.strip() )
+        # See which columns are ints or floats
+        column_format_strings = []
+        column_header = ''
+        for i, column in enumerate(df.columns.values):
+            test_value = df[column].iloc[0]
+            if isinstance(test_value, np.float64) or ('.' in str(test_value) and can_be_float( test_value )):
+                column_format_strings.append( float_format )
+                if i + 1 < len(df.columns.values):
+                    column_header += ' & '
+                else:
+                    column_header += '\\'
+            elif isinstance(test_value, np.int64) or can_be_long( test_value ):
+                column_format_strings.append( '%d' )
+            else:
+                column_format_strings.append( '%s' )
+
+        self.column_format_strings = column_format_strings
+        self.column_pairs = column_pairs
+        self.df = df
+        print df.head()
+        print df.columns.values
+        print column_format_strings
+        print column_pairs
+
+    def generate_latex(self):
+        if self.column_format:
+            column_format = ' '.join( self.column_format )
         else:
-            self.header_text = None
+            column_format = ( 'c ' * self.num_columns )
 
+        return_str = '\n\n'
+        return_str += '\\begin{table}[H]\\begin{center}\n'
+        return_str += '\\begin{tabular}{ %s}\n' % column_format
+        return_str += self.row_to_latex_row(self.header_row)
+        return_str += '\\hline\n'
+        for row in self.data_rows:
+            return_str += self.row_to_latex_row(row)
+        return_str += '\\end{tabular}\n'
+        if self.header_text:
+            return_str += '\\caption{%s}\n' % self.header_text
+        return_str += '\\end{center}\\end{table}\n\n\n'
+        return return_str
+
+    def generate_plaintext(self):
+        pass
+
+def can_be_float(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False
+
+def can_be_long(s):
+    try:
+        long(s)
+        return True
+    except ValueError:
+        return False
 
 def format_list_table(data):
     max_lengths = []
