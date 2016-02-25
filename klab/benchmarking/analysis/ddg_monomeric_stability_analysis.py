@@ -853,13 +853,19 @@ class BenchmarkRun(ReportingObject):
             pool.close()
             pool.join()
 
-        # series comparison
-        ##### calls individual methods e.g. barchart(benchmark_run_objects)
+
+        intro_report = lr.LatexReport()
+        intro_report.set_title_page('All data comparison')
+        # All data series comparison
+        # Get joined stats comparison dataframe
+        stats_df = BenchmarkRun.get_stats_comparison_dataframe(
+            benchmark_runs, topx_unique, unique_ajps,
+            output_csv = os.path.join(analysis_directory, 'analysis_metrics.csv'),
+        )
+        intro_report.add_section_page( title = 'Case comparison tables' )
+        intro_report.content.extend( BenchmarkRun.make_case_description_tables( stats_df ) )
 
         # Report concatenation
-        intro_report = lr.LatexReport()
-        intro_report.set_title_page('Introduction')
-
         main_latex_report = lr.LatexReport()
         main_latex_report.set_title_page('$\Delta\Delta G$ Report')
         main_latex_report.add_chapter(intro_report)
@@ -936,8 +942,11 @@ class BenchmarkRun(ReportingObject):
             left_index = True,
             right_index = True,
         )
+        report.add_section_page( title = 'Plots' )
         diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
         report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+
+        report.add_section_page( title = 'Tables' )
 
         report.content.append( lr.LatexPandasTable(
             diffs_df, float_format = float_format_2sigfig,
@@ -950,7 +959,10 @@ class BenchmarkRun(ReportingObject):
         ) )
 
         # Get joined stats comparison dataframe
-        for case_table in BenchmarkRun.make_case_description_tables( BenchmarkRun.get_stats_comparison_dataframe( [self, other], topx_unique, unique_ajps) ):
+        for case_table in BenchmarkRun.make_case_description_tables( BenchmarkRun.get_stats_comparison_dataframe(
+                [self, other], topx_unique, unique_ajps,
+                output_csv = os.path.join(output_directory, 'comparison_metrics.csv'),
+        ) ):
             report.content.append( case_table )
 
 
@@ -994,7 +1006,26 @@ class BenchmarkRun(ReportingObject):
 
 
     @staticmethod
-    def get_stats_comparison_dataframe(benchmark_runs, topx_unique, unique_ajps):
+    def make_specific_case_table(stats_df, case):
+        stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
+        stats_columns_names = ['n', 'FC', "R", 'MAE']
+        select_columns = list( stats_columns )
+        select_columns.append('case_description')
+        stats_df = stats_df[ select_columns ]
+
+        inner_df = stats_df[ stats_df['case_description'] == case ]
+        inner_df = inner_df.sort_values(by = "Pearson's R", ascending = False)
+        inner_df = inner_df[ stats_columns ]
+        inner_df.columns = stats_columns_names
+        return lr.LatexPandasTable(
+            inner_df,
+            float_format = float_format_2sigfig,
+            caption_text = case + ". Abbreviations: FC = fraction correct, R = Pearson's R" ,
+        )
+
+
+    @staticmethod
+    def get_stats_comparison_dataframe(benchmark_runs, topx_unique, unique_ajps, output_csv = None):
         annotated_stats_dfs = [
             br.add_identifying_columns_to_df(
                 br.stored_metrics_df,
@@ -1006,6 +1037,8 @@ class BenchmarkRun(ReportingObject):
         ]
         stats_df = pandas.concat(annotated_stats_dfs)
         stats_df = stats_df.sort_index()
+        if output_csv:
+            stats_df.to_csv( output_csv )
         return stats_df
 
     def get_pred_minus_exp_dataframe(self, analysis_set, topx_unique = None, unique_ajps = None):
