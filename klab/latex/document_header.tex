@@ -26,11 +26,25 @@
 \usepackage{adjustbox}
 \usepackage{array}
 \usepackage{minitoc}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks,
+    citecolor=black,
+    filecolor=black,
+    linkcolor=black,
+    urlcolor=black
+}
 
 \newcolumntype{R}[2]{%
     >{\adjustbox{angle=#1,lap=\width-(#2)}\bgroup}%
     l%
     <{\egroup}%
 }
+
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\chapter}{\if@openright\cleardoublepage\else\clearpage\fi}{}{}{}
+\makeatother
 
 \newcommand*\rot{\multicolumn{1}{R{45}{1em}}}% no optional argument here, please
