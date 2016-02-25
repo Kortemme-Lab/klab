@@ -822,16 +822,6 @@ class BenchmarkRun(ReportingObject):
             pool.join()
         benchmark_runs = calculated_brs
 
-        ### TMP
-        # for br in benchmark_runs:
-        #     for analysis_set in analysis_sets:
-        #         unique_name = br.get_definitive_name(topx_unique, unique_ajps)
-        #         subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
-        #         if not os.path.isdir(subdir):
-        #             os.makedirs(subdir)
-        #         br.analysis_directory = subdir
-        #         br.calculate_metrics(analysis_set = analysis_set, analysis_directory = subdir)
-
         ### Pointwise all-by-all comparison
         if use_multiprocessing:
             pool = mp.Pool()
