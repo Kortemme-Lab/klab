@@ -148,11 +148,19 @@ class BenchmarkRun(ReportingObject):
         self.ddg_analysis_type_description = None
         self.filter_data()
 
+
     def add_stored_metric_to_df(self, case_description, case_length, case_stats):
-        df = pandas.DataFrame(case_stats, columns = ['stat_type', 'value', 'p_value'])
+        # Reformat statitistics to put a column for each stat type
+        stats = {}
+        for case_stat in case_stats:
+            stats[ case_stat[0] ] = [case_stat[1]]
+            stats[ case_stat[0] + '-p-val' ] = [case_stat[2]]
+
+        df = pandas.DataFrame.from_dict(stats)
         num_rows = len(df.index)
         df.loc[:,'case_description'] = pandas.Series([case_description for x in xrange(num_rows)], index=df.index)
         df.loc[:,'benchmark_run_name'] = pandas.Series([self.benchmark_run_name for x in xrange(num_rows)], index=df.index)
+        df.loc[:,'n'] = pandas.Series([case_length for x in xrange(num_rows)], index=df.index)
         self.stored_metrics_df = pandas.concat([self.stored_metrics_df, df])
 
 
@@ -794,10 +802,12 @@ class BenchmarkRun(ReportingObject):
         if use_multiprocessing:
             pool = mp.Pool()
         singleton_chapters = []
+        calculated_brs = []
         def save_latex_report(t):
-            unique_name, latex_report = t
+            br, unique_name, latex_report = t
             latex_report.set_title_page( title = unique_name )
             singleton_chapters.append( latex_report )
+            calculated_brs.append( br )
         for br in benchmark_runs:
             for analysis_set in analysis_sets:
                 unique_name = br.get_definitive_name(topx_unique, unique_ajps)
@@ -810,6 +820,17 @@ class BenchmarkRun(ReportingObject):
         if use_multiprocessing:
             pool.close()
             pool.join()
+        benchmark_runs = calculated_brs
+
+        ### TMP
+        # for br in benchmark_runs:
+        #     for analysis_set in analysis_sets:
+        #         unique_name = br.get_definitive_name(topx_unique, unique_ajps)
+        #         subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
+        #         if not os.path.isdir(subdir):
+        #             os.makedirs(subdir)
+        #         br.analysis_directory = subdir
+        #         br.calculate_metrics(analysis_set = analysis_set, analysis_directory = subdir)
 
         ### Pointwise all-by-all comparison
         if use_multiprocessing:
@@ -868,7 +889,7 @@ class BenchmarkRun(ReportingObject):
         if not os.path.isdir(subplot_directory):
             os.makedirs(subplot_directory)
 
-        report = lr.LatexReport()
+        report = lr.LatexReport( table_of_contents = False )
 
         # Construct dataframe comparing our predictions to other's predictions
         both_predictions = pandas.concat(
@@ -916,17 +937,22 @@ class BenchmarkRun(ReportingObject):
             right_index = True,
         )
         diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
 
         report.content.append( lr.LatexPandasTable(
             diffs_df, float_format = float_format_2sigfig,
-            caption_text = 'Comparison of error (Predicted - Experimental) for first prediction set (%s) vs second set of predictions (%s). Values sorted by descending absolute delta.' % (self_unique_name, other_unique_name),
+            caption_text = 'Outliers --- Comparison of error (Predicted - Experimental) for first prediction set (%s) vs second set of predictions (%s). Values sorted by descending absolute delta.' % (self_unique_name, other_unique_name),
         ) )
 
         report.content.append( lr.LatexPandasTable(
             both_predictions_subtracted, float_format = float_format_2sigfig,
             caption_text = 'Direct comparison of predicted values. Values sorted by descending absolute delta.',
         ) )
+
+        # Get joined stats comparison dataframe
+        for case_table in BenchmarkRun.make_case_description_tables( BenchmarkRun.get_stats_comparison_dataframe( [self, other], topx_unique, unique_ajps) ):
+            report.content.append( case_table )
+
 
         report.generate_pdf_report(
             os.path.join( output_directory, 'comparison.pdf' ),
@@ -936,6 +962,51 @@ class BenchmarkRun(ReportingObject):
             print 'Comparison report saved to:', os.path.join( output_directory, 'comparison.pdf' )
         return report
 
+
+    @staticmethod
+    def make_case_description_tables(stats_df):
+        stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
+        stats_columns_names = ['n', 'FC', "R", 'MAE']
+        select_columns = list( stats_columns )
+        select_columns.append('case_description')
+        stats_df = stats_df[ select_columns ]
+        # Put tables for complete datasets first
+        first_cases_to_process = set( ['complete dataset', 'complete dataset (scaled)'] )
+        other_cases = set( stats_df['case_description'].unique() )
+        first_cases_to_process.intersection_update( other_cases )
+        other_cases.difference_update(first_cases_to_process)
+        other_cases = sorted( list( other_cases ) )
+        cases = sorted( list( first_cases_to_process ) )
+        cases.extend( other_cases)
+        # Make subcase tables
+        report_content = []
+        for case in cases:
+            inner_df = stats_df[ stats_df['case_description'] == case ]
+            inner_df = inner_df.sort_values(by = "Pearson's R", ascending = False)
+            inner_df = inner_df[ stats_columns ]
+            inner_df.columns = stats_columns_names
+            report_content.append( lr.LatexPandasTable(
+                inner_df,
+                float_format = float_format_2sigfig,
+                caption_text = case + ". Abbreviations: FC = fraction correct, R = Pearson's R" ,
+            ) )
+        return report_content
+
+
+    @staticmethod
+    def get_stats_comparison_dataframe(benchmark_runs, topx_unique, unique_ajps):
+        annotated_stats_dfs = [
+            br.add_identifying_columns_to_df(
+                br.stored_metrics_df,
+                topx_unique,
+                unique_ajps,
+                reset_index = True,
+            )
+            for br in benchmark_runs
+        ]
+        stats_df = pandas.concat(annotated_stats_dfs)
+        stats_df = stats_df.sort_index()
+        return stats_df
 
     def get_pred_minus_exp_dataframe(self, analysis_set, topx_unique = None, unique_ajps = None):
         exp_name = BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)
@@ -948,14 +1019,17 @@ class BenchmarkRun(ReportingObject):
             return return_df
 
 
-    def add_identifying_columns_to_df(self, df, topx_unique, unique_ajps):
-        df.index.name = 'ID'
+    def add_identifying_columns_to_df(self, df, topx_unique, unique_ajps, reset_index = False):
+        if not reset_index:
+            df.index.name = 'ID'
         for ajp in unique_ajps:
             df[ajp] = self.additional_join_parameters[ajp]['short_name']
             df.set_index(ajp, append = True, inplace = True)
         if topx_unique:
             df['TopX'] = self.take_lowest
             df.set_index('TopX', append = True, inplace = True)
+        if reset_index:
+            df = df.reset_index( level = 0 ).drop('level_0', axis = 1)
         return df
 
 
@@ -1916,7 +1990,7 @@ def _full_analysis_mp_alias(br_obj, analysis_set, output_directory, unique_name,
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    return (unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose))
+    return (br_obj, unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose))
 
 
 def _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose):
