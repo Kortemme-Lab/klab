@@ -225,7 +225,7 @@ def make_corr_plot(
 
     if plot_11_line:
         axScatter.plot(xl, xl, '-g')
-    
+
     # now determine nice limits by hand:
     xbinwidth = np.max(np.fabs(x)) / 30.0
     ybinwidth = np.max(np.fabs(y)) / 30.0
@@ -271,6 +271,7 @@ def plot_bar(
     ylabel = None,
     xlabel = 'Data',
     plot_average = True,
+    xtick_fontsize = 10,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -289,14 +290,16 @@ def plot_bar(
     meanpointprops = dict(marker='*', markeredgecolor='black',
                           markerfacecolor='firebrick')
 
-    bp = ax.boxplot(dataframe.as_matrix(), notch=True, meanline=False,
+    # Convert to list of columns because matplotlib chokes if array columns aren't of equal length
+    data = [list(column) for column in dataframe.values.transpose()]
+    bp = ax.boxplot(dataframe.values, notch=True, meanline=False,
                     showmeans = plot_average)
     plt.setp(bp['fliers'], color='forestgreen', marker='+', markersize=12)
 
-    ax.set_xticklabels([make_latex_safe(x) for x in dataframe_columns])
+    ax.set_xticklabels([make_latex_safe(x) for x in dataframe_columns], fontsize = xtick_fontsize)
 
-    y_min_limit = dataframe.min()
-    y_max_limit = dataframe.max()
+    y_min_limit = min(dataframe.min())
+    y_max_limit = max(dataframe.max())
     bottom_pad = 0.05 * (y_max_limit - y_min_limit)
     y_min_limit = y_min_limit - bottom_pad
 
@@ -317,6 +320,7 @@ def plot_bar(
         print 'Saving bar plot figure to:', output_path
     if fig_height and fig_width:
         plt.gcf().set_size_inches(fig_width, fig_height)
+
     plt.savefig(
         output_path, dpi = fig_dpi, format = output_format
     )

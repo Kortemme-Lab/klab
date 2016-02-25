@@ -759,11 +759,15 @@ class BenchmarkRun(ReportingObject):
         (if passed arg indicates this is unique), and other unique additional join parameters
         (as passed)
         """
-        name = str(self.benchmark_run_name)
+        name = ''
         if topx_unique:
-            name += '-topx_%d' % self.take_lowest
+            if len(name) > 0:
+                name += '-'
+            name += 'topx_%d' % self.take_lowest
         for ajp in unique_ajps:
-            name += '-' + str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
+            if len(name) > 0:
+                name += '-'
+            name += str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
         return name
 
 
@@ -775,6 +779,7 @@ class BenchmarkRun(ReportingObject):
             analysis_directory = None,
             remove_existing_analysis_directory = True,
             use_multiprocessing = True,
+            verbose = True,
     ):
         '''This function runs the analysis for multiple input settings'''
         if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
@@ -843,7 +848,6 @@ class BenchmarkRun(ReportingObject):
             pool.close()
             pool.join()
 
-
         intro_report = lr.LatexReport()
         intro_report.set_title_page('All data comparison')
         # All data series comparison
@@ -855,6 +859,36 @@ class BenchmarkRun(ReportingObject):
         intro_report.add_section_page( title = 'Case comparison tables' )
         intro_report.content.extend( BenchmarkRun.make_case_description_tables( stats_df ) )
 
+        intro_report.add_section_page('All data plots')
+        subplot_directory = os.path.join(analysis_directory, 'subplots')
+        if not os.path.isdir( subplot_directory ):
+            os.makedirs(subplot_directory)
+        runtime_df = benchmark_runs[0]._get_dataframe_columns( ['RunTime'] )
+        runtime_df.columns = [ benchmark_runs[0].get_definitive_name(topx_unique, unique_ajps) ]
+        for br in benchmark_runs[1:]:
+            inner_runtime_df = br._get_dataframe_columns( ['RunTime'] )
+            inner_runtime_df.columns = [ br.get_definitive_name(topx_unique, unique_ajps) ]
+            runtime_df = runtime_df.merge(
+                inner_runtime_df,
+                left_index = True,
+                right_index = True,
+            )
+        intro_report.add_plot(
+            general_matplotlib.plot_bar(
+                runtime_df,
+                output_directory = subplot_directory,
+                plot_title = 'Prediction Run Times',
+                output_name = 'runtimes',
+                fig_height = 9,
+                fig_width = 7,
+                ylabel = 'Run time (minutes)',
+                xlabel = 'Prediction Set',
+                verbose = verbose,
+                xtick_fontsize = 4,
+            ),
+            plot_title = 'Run times'
+        )
+
         # Report concatenation
         main_latex_report = lr.LatexReport()
         main_latex_report.set_title_page('$\Delta\Delta G$ Report')
@@ -865,7 +899,7 @@ class BenchmarkRun(ReportingObject):
             main_latex_report.add_chapter(chapter)
         main_latex_report.generate_pdf_report(
             os.path.join( analysis_directory, 'report.pdf' ),
-            verbose = True,
+            verbose = verbose,
         )
         print os.path.join( analysis_directory, 'report.pdf' )
 
