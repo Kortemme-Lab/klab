@@ -381,7 +381,7 @@ class BenchmarkRun(ReportingObject):
         return analysis_pandas_input_filepath + '.gz'
 
 
-    def create_dataframe(self, pdb_data = {}):
+    def create_dataframe(self, pdb_data = {}, verbose = True):
         '''This function creates a dataframe (a matrix with one row per dataset record and one column for fields of interest)
            from the benchmark run and the dataset data.
            For rows with multiple mutations, there may be multiple values for some fields e.g. wildtype residue exposure.

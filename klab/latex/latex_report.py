@@ -130,7 +130,7 @@ class LatexReport:
 
         if len( self.abstract_text ) > 0:
             latex_strings.append('\\begin{abstract}\n')
-            latex_strings.extend( self.generate_abstract_lines )
+            latex_strings.extend( self.generate_abstract_lines() )
             latex_strings.append('\\end{abstract}\n\n')
 
         for content_obj in self.content:
