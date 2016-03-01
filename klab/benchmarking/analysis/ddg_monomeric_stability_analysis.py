@@ -741,7 +741,7 @@ class BenchmarkRun(ReportingObject):
             self.plot(analysis_set, analysis_directory = analysis_directory)
 
 
-    def full_analysis(self, analysis_set, output_directory, verbose = True):
+    def full_analysis(self, analysis_set, output_directory, verbose = True, compile_pdf = True):
         '''Combines calculate_metrics, write_dataframe_to_csv, and plot'''
         if not os.path.isdir(output_directory):
             os.makedirs(output_directory)
@@ -750,10 +750,10 @@ class BenchmarkRun(ReportingObject):
         self.write_dataframe_to_csv( os.path.join(output_directory, 'data.csv') )
 
         # Return latex_report
-        return self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose)
+        return self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose, compile_pdf = compile_pdf)
 
 
-    def get_definitive_name(self, topx_unique, unique_ajps):
+    def get_definitive_name(self, topx_unique, unique_ajps, join_character = '-'):
         """
         Generates a definitive name for this benchmark run object, including topx value
         (if passed arg indicates this is unique), and other unique additional join parameters
@@ -762,11 +762,11 @@ class BenchmarkRun(ReportingObject):
         name = ''
         if topx_unique:
             if len(name) > 0:
-                name += '-'
+                name += join_character
             name += 'topx_%d' % self.take_lowest
         for ajp in unique_ajps:
             if len(name) > 0:
-                name += '-'
+                name += join_character
             name += str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
         return name
 
@@ -780,6 +780,7 @@ class BenchmarkRun(ReportingObject):
             remove_existing_analysis_directory = True,
             use_multiprocessing = True,
             verbose = True,
+            compile_pdf = True
     ):
         '''This function runs the analysis for multiple input settings'''
         if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
@@ -841,7 +842,9 @@ class BenchmarkRun(ReportingObject):
                 for j, br_j in enumerate(benchmark_runs):
                     if i > j:
                         if use_multiprocessing:
-                            pool.apply_async( _compare_mp_alias, (br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
+                            br_i_copy = copy.deepcopy( br_i )
+                            br_j_copy = copy.deepcopy( br_j )
+                            pool.apply_async( _compare_mp_alias, (br_i_copy, br_j_copy, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
                         else:
                             save_latex_report( _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, True) )
         if use_multiprocessing:
@@ -879,8 +882,8 @@ class BenchmarkRun(ReportingObject):
                 output_directory = subplot_directory,
                 plot_title = 'Prediction Run Times',
                 output_name = 'runtimes',
-                fig_height = 9,
-                fig_width = 7,
+                fig_height = 7,
+                fig_width = 9,
                 ylabel = 'Run time (minutes)',
                 xlabel = 'Prediction Set',
                 verbose = verbose,
@@ -900,11 +903,12 @@ class BenchmarkRun(ReportingObject):
         main_latex_report.generate_pdf_report(
             os.path.join( analysis_directory, 'report.pdf' ),
             verbose = verbose,
+            compile_pdf = compile_pdf,
         )
         print os.path.join( analysis_directory, 'report.pdf' )
 
 
-    def compare(self, other, analysis_set, output_directory, topx_unique, unique_ajps, verbose = True):
+    def compare(self, other, analysis_set, output_directory, topx_unique, unique_ajps, verbose = True, compile_pdf = True):
         """
         Generate comparison latex report in specified output directory
         Returns LatexReport object
@@ -959,7 +963,7 @@ class BenchmarkRun(ReportingObject):
             right_index = True,
         )
         predictions_v_predictions_df.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
 
         diff_v_diff_dataframe = self.get_pred_minus_exp_dataframe(analysis_set).merge(
             other.get_pred_minus_exp_dataframe(analysis_set),
@@ -968,7 +972,7 @@ class BenchmarkRun(ReportingObject):
         )
         report.add_section_page( title = 'Plots' )
         diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
 
         report.add_section_page( title = 'Tables' )
 
@@ -993,6 +997,7 @@ class BenchmarkRun(ReportingObject):
         report.generate_pdf_report(
             os.path.join( output_directory, 'comparison.pdf' ),
             verbose = verbose,
+            compile_pdf = compile_pdf,
         )
         if verbose:
             print 'Comparison report saved to:', os.path.join( output_directory, 'comparison.pdf' )
@@ -1297,11 +1302,7 @@ class BenchmarkRun(ReportingObject):
         self.metrics_filepath = os.path.join(self.analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
         write_file(self.metrics_filepath, '\n'.join([x.generate_plaintext() for x in self.metric_latex_objects]))
 
-    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True, verbose = True):
-        # Reset to new current working directory
-        tmp_working_dir = tempfile.mkdtemp( prefix = '%s-%s-%s_' % (time.strftime("%y%m%d"), getpass.getuser(), 'plot-working-dir') )
-        os.chdir(tmp_working_dir)
-
+    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True, verbose = True, compile_pdf = True):
         if matplotlib_plots:
             from klab.plot import general_matplotlib
 
@@ -1349,16 +1350,16 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_section_page( title = 'Main plots' )
 
         if matplotlib_plots:
-            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 7, fig_width = 8, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
             latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
 
             single_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
             if len(single_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7, verbose = verbose), plot_title = 'Single mutations data subset' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 6, fig_width = 7, verbose = verbose), plot_title = 'Single mutations data subset' )
 
             multiple_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
             if len(multiple_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 6, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
 
             latex_report.add_plot(
                 general_matplotlib.plot_bar(
@@ -1366,7 +1367,7 @@ class BenchmarkRun(ReportingObject):
                     output_directory = self.subplot_directory,
                     plot_title = 'Prediction Run Time',
                     output_name = 'runtime',
-                    fig_height = 9,
+                    fig_height = 6,
                     fig_width = 7,
                     ylabel = 'Run time (minutes)',
                     xlabel = 'Prediction Set',
@@ -1460,13 +1461,12 @@ class BenchmarkRun(ReportingObject):
         latex_report.generate_pdf_report(
             os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ),
             verbose = verbose,
+            compile_pdf = compile_pdf,
         )
         if verbose:
             self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
 
         self.generate_plots = old_generate_plots
-
-        shutil.rmtree( tmp_working_dir )
 
         return latex_report
 
@@ -2047,7 +2047,7 @@ def _full_analysis_mp_alias(br_obj, analysis_set, output_directory, unique_name,
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    return (br_obj, unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose))
+    return (br_obj, unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose, compile_pdf = verbose))
 
 
 def _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose):
@@ -2056,7 +2056,7 @@ def _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    return br_i.compare(br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose = verbose)
+    return br_i.compare(br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose = verbose, compile_pdf = verbose)
 
 
 class DBBenchmarkRun(BenchmarkRun):

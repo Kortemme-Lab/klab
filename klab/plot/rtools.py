@@ -3,6 +3,9 @@ import os
 import inspect
 import subprocess
 import time
+import tempfile
+import getpass
+import shutil
 
 from klab.fs.fsio import read_file, write_temp_file
 
@@ -10,9 +13,11 @@ class RInterface(object):
 
     @staticmethod
     def _runRScript(RScript):
-        rscriptname = write_temp_file(".", RScript)
-        #p = subprocess.Popen(["/opt/R-2.15.1/bin/R","CMD", "BATCH", rscriptname])
-        p = subprocess.Popen(["R", "CMD", "BATCH", rscriptname])
+        # Reset to new current working directory
+        tmp_working_dir = tempfile.mkdtemp( prefix = '%s-%s-%s_' % (time.strftime("%y%m%d"), getpass.getuser(), 'plot-working-dir') )
+
+        rscriptname = write_temp_file(tmp_working_dir, RScript)
+        p = subprocess.Popen(["R", "CMD", "BATCH", rscriptname], cwd = tmp_working_dir)
         while True:
             time.sleep(0.3)
             errcode = p.poll()
@@ -29,6 +34,9 @@ class RInterface(object):
         if errcode != 0:
             print(rout_contents )
             raise Exception("The R script failed with error code %d." % errcode)
+
+        shutil.rmtree( tmp_working_dir )
+
         return rout_contents
 
 
