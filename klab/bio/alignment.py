@@ -69,7 +69,10 @@ def match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = 60.0, allow_mul
 
         sa = SequenceAligner()
 
-        # If these assertions do not hold we will need to fix the logic below
+        # This is a hack to ensure that the assertions below hold. The alternative is to fix the logic below (maybe allow the separator character to be a parameter).
+        pdb1_name = pdb1_name.replace('_', chr(254))
+        pdb2_name = pdb2_name.replace('_', chr(254))
+
         assert(pdb1_name.find('_') == -1)
         assert(pdb2_name.find('_') == -1)
 
@@ -404,6 +407,7 @@ class MatchedChainList(object):
             s.append('No matches.')
         return '\n'.join(s)
 
+
 class PipelinePDBChainMapper(BasePDBChainMapper):
     '''Similar to the removed PDBChainMapper class except this takes a list of PDB files which should be related in some way.
        The matching is done pointwise, matching all PDBs in the list to each other.
@@ -486,6 +490,61 @@ class PipelinePDBChainMapper(BasePDBChainMapper):
         # differing_atom_residue_ids is a mapping from (pdb_name1, pdb_name2) to the list of ATOM residues *in pdb_name1* that differ from those of pdb_name2
         self.differing_atom_residue_ids = {}
         self.chain_mapping = {}
+
+        # Partition the set of PDBs over the ATOM coordinates i.e. if two PDBs have the same ATOM residues then they are
+        # part of the same equivalence class
+
+        equivalence_classes = []
+
+        sorted_objects = [(pdb_name, pdb_object) for pdb_name, pdb_object in sorted(self.pdb_name_to_structure_mapping.iteritems())]
+
+        print(sorted_objects[0][0])
+        print(sorted_objects[0][1].atom_sequences)
+        print(sorted_objects[1][0])
+        print(sorted_objects[1][1].atom_sequences)
+        print('TEST 1')
+        print(sorted_objects[0][1].atom_sequences == sorted_objects[1][1].atom_sequences)
+
+        for pp in sorted_objects:
+            print(pp[0])
+            pdb_object = pp[1]
+            s = pdb_object.atom_sequences
+
+            found_class = None
+            p_sequences = pdb_object.atom_sequences
+            for tpl in equivalence_classes:
+                atom_sequence_set = tpl[0]
+                if atom_sequence_set == p_sequences:
+                    tpl[1].append(pp[0])
+                    found_class = True
+
+            if not found_class:
+                atom_sequence_set = pdb_object.atom_sequences
+                equivalence_classes.append([atom_sequence_set, [pp[0]]])
+
+        # equivalence_classes is now a list of tuples [x, y] where:
+        #   - x is map from chain ID to a Sequence object (using the ATOM sequence)
+        #   - y is a subset of pdb_names
+        # where given two distinct tuples [x_1, y_1] and [x_2, y_2],  y_1 is mutually exclusive from y_2
+        # i.e. we have partitioned the set of PDB structures using an equivalence relation on the chain Sequences
+
+        # partition_by_sequence is a map pdb_name -> Int where two pdb names in the same equivalence class map to the same integer (i.e. it is a partition)
+        # representative_pdbs is a map Int -> pdb_object mapping the equivalence classes (represented by an integer) to a representative PDB file
+        partition_by_sequence = {}
+        representative_pdbs = {}
+        for x in range(len(equivalence_classes)):
+            representative_pdbs[x] = self.pdb_name_to_structure_mapping[equivalence_classes[x][1][0]]
+            for pdb_name in equivalence_classes[x][1]:
+                partition_by_sequence[pdb_name] = x
+
+        # For each pair of equivalence classes, match each chain in the first representative pdb to its best match in the second representative pdb
+        for x in range(len(pdbs) - 1):
+            for y in range(x + 1, len(pdbs)):
+                pdb1, pdb2 = pdbs[x], pdbs[y]
+                pdb1_name, pdb2_name = pdb_names[x], pdb_names[y]
+        #representative_pdbs
+
+        # This section just creates the chain id->chain id mapping
 
         # For each pair of adjacent PDB files in the list, match each chain in the first pdb to its best match in the second pdb
         # This section just creates the chain id->chain id mapping
@@ -1001,6 +1060,78 @@ class ScaffoldModelDesignChainMapper(PipelinePDBChainMapper):
         return PSE_files[0], b.PSE_scripts[0]
 
 
+class DecoyChainMapper(PipelinePDBChainMapper):
+    '''A convenience class for the special case where we are mapping specifically from structures which are based on the
+       protein but may include a small number mutations.
+       Use cases:
+         - creating PyMOL sessions for backrub ensembles;
+         - creating PyMOL sessions for wildtype and mutant ensembles
+    '''
+
+
+    def __init__(self, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
+        self.cut_off = cut_off
+        self.use_seqres_sequences_if_possible = use_seqres_sequences_if_possible
+        self.strict = strict
+        self.structures = []
+        self.fixed = False
+
+
+    def finalize_colors():
+        pass
+
+
+    def add(self, pdb_object, structure_name, backbone_color = None, sidechain_color = None, backbone_display = 'cartoon', sidechain_display = 'sticks'):
+        self.structures.append(dict(
+            pdb_object = pdb_object,
+            name = structure_name,
+            backbone_color = backbone_color,
+            sidechain_color = sidechain_color,
+            backbone_display = backbone_display,
+            sidechain_display = sidechain_display,
+        ))
+
+
+    def fix(self):
+        if self.fixed:
+            raise Exception('This object has already been aligned. It cannot be aligned again.')
+
+        super(DecoyChainMapper, self).__init__(
+            [s['pdb_object'] for s in self.structures],
+            [s['name'] for s in self.structures],
+            cut_off = self.cut_off, use_seqres_sequences_if_possible = self.use_seqres_sequences_if_possible, strict = self.strict)
+        self.fixed = True
+        print('HERE')
+
+
+    def get_differing_model_residue_ids(self):
+        print('HERE')
+        return self.get_differing_atom_residue_ids(self.structure_2_name, [self.structure_1_name])
+
+
+    def get_differing_scaffold_residue_ids(self):
+        return self.get_differing_atom_residue_ids(self.structure_1_name, [self.structure_2_name])
+
+
+    def generate_pymol_session(self, pymol_executable = 'pymol', settings = {}):
+        ''' Generates the PyMOL session for the scaffold, model, and design structures.
+            Returns this session and the script which generated it.'''
+
+        if not self.fixed:
+            self.fix()
+
+        b = BatchBuilder(pymol_executable = pymol_executable)
+
+        structures_list = [
+            (self.structure_1_name, self.scaffold_pdb.pdb_content, self.get_differing_scaffold_residue_ids()),
+            (self.structure_2_name, self.model_pdb.pdb_content, self.get_differing_model_residue_ids()),
+        ]
+
+        PSE_files = b.run(ScaffoldModelDesignBuilder, [PDBContainer.from_content_triple(structures_list)], settings = settings)
+
+        return PSE_files[0], b.PSE_scripts[0]
+
+
 if __name__ == '__main__':
     from klab.fs.fsio import read_file
 
@@ -1122,3 +1253,473 @@ if __name__ == '__main__':
 
     print(PSE_script)
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#### Deprecated ####
+
+# todo: remove this class in favor of PipelinePDBChainMapper
+#       PipelinePDBChainMapper quotients the set of structures by ATOM sequence
+#       This allows it to scale better for cases with large numbers of structures but with few unique structures up to ATOM sequence
+#       The only reason to keep PipelinePDBChainMapper_old in use is in case PipelinePDBChainMapper breaks any existing code and we want a quick fix
+class PipelinePDBChainMapper(BasePDBChainMapper):
+    '''Similar to the removed PDBChainMapper class except this takes a list of PDB files which should be related in some way.
+       The matching is done pointwise, matching all PDBs in the list to each other.
+       This class is useful for a list of structures that are the result of a linear pipeline e.g. a scaffold structure (RCSB),
+       a model structure (Rosetta), and a design structure (experimental result).
+
+       The 'chain_mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to the mapping from chain IDs in pdb_name1 to
+       a MatchedChainList object. This object can be used to return the list of chain IDs in pdb_name2 related to the
+       respective chain in pdb_name1 based on sequence alignment. It can also be used to return the percentage identities
+       for this alignment. The old mapping and mapping_percentage_identity members of this class can be built from this member
+       e.g.
+            self.mapping[('Scaffold', 'ExpStructure')] == self.get_chain_mapping('Scaffold', 'ExpStructure')
+
+       The 'residue_id_mapping' member stores a mapping from a pair (pdb_name1, pdb_name2) to a mapping
+            'ATOM' -> chains_of_pdb_name_1 -> ATOM residues of that chain -> list of corresponding ATOM residues in the corresponding chains of pdb_name2
+            'SEQRES' -> chains_of_pdb_name_1 -> SEQRES residues of that chain -> pairs of (chain_id, corresponding SEQRES residue_id) in the corresponding chains of pdb_name2
+       For example, using the homodimer 3MW0 for both Scaffold and ExpStructure:
+        residue_id_mapping[('Scaffold', 'ExpStructure')]['ATOM']['A'] -> {'A 167 ': ['A 167 ', 'B 167 '], ...}
+        residue_id_mapping[('Scaffold', 'ExpStructure')]['SEQRES']['B'] -> {167 : [('A', 167), ('C', 167)], ...}
+
+       Objects of this class have a differing_atom_residue_ids mapping which maps the pair (pdb_name1, pdb_name2) to the list
+       of ATOM residues *in pdb_name1* that differ from those of pdb_name2. Note: there is some subtlety here in terms of
+       direction. For example, take this artificial example. We take a homodimer 3MWO as the scaffold and a monomer 1BN1
+       with identical sequence as the model. We mutate A110 in 1BN1. We then take 3MWO with a mutation on A106 as the design.
+         chain_mapper = ScaffoldModelDesignChainMapper.from_file_contents(retrieve_pdb('3MWO'), retrieve_pdb('1BN1').replace('ASP A 110', 'ASN A 110'), retrieve_pdb('3MWO').replace('GLU A 106', 'GLN A 106'))
+       differing_atom_residue_ids then looks like this:
+         ('Model', 'ExpStructure') = ['A 106 ', 'A 110 '] # In Model, A110 is a mutation, reverted in ExpStructure. In ExpStructure, A106 is a mutation.
+         ('Model', 'Scaffold') = ['A 110 '] # In Model, A110 is a mutation.
+
+         ('ExpStructure', 'Model') =  ['A 106 ', 'A 110 ', 'B 110 '] # In ExpStructure, A106 is a mutation. A110 and B110 are revertant mutations from the Model.
+         ('ExpStructure', 'Scaffold') = ['A 106 '] # In ExpStructure, A106 is a mutation.
+
+         ('Scaffold', 'ExpStructure') = ['A 106 ', 'B 106 '] # Note: In Scaffold, A106 is the wildtype which was mutated in ExpStructure. Since B106 also maps to A106, that is added to the list of differing residues.
+         ('Scaffold', 'Model') = ['A 110 ', 'B 110 '] # In Scaffold, A110 and B110 are the wildtypes which was mutated in Model.
+       There is a subtlety here - the differing residue ids from Scaffold to ExpStructure are A106 and B106 corresponding to the
+       mutated A106 in the ExpStructure. However, the differing residue ids from ExpStructure to Scaffold has only one member - A106. This
+       makes sense as it is the only mutation however this may not be the desired behavior - one may wish instead to close
+       the list of residues over the relations mapping the residues between the structures i.e. to generate an equivalence
+       relation from the relation described by the mappings Scaffold->ExpStructure and ExpStructure->Scaffold. If that were done, then
+       ('ExpStructure', 'Scaffold') would be ['A 106 ', 'B 106 '] as ExpStructure:A106 -> {Scaffold:A106, Scaffold:B106} and
+       Scaffold:B106 -> {ExpStructure:A106, ExpStructure:B106} so ExpStructure:A106 and ExpStructure:B106 are in the same equivalence class.
+
+       If use_seqres_sequences_if_possible is set, the alignment will use the SEQRES sequences when available. See match_pdb_chains
+       for more information.
+       '''
+
+    # Constructors
+
+    @staticmethod
+    def from_file_paths(pdb_paths, pdb_names, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
+        assert(len(pdb_paths) == len(pdb_names) and len(pdb_paths) > 1)
+
+        pdbs = []
+        stage = None
+        try:
+            for x in range(len(pdb_paths)):
+                stage = pdb_names[x]
+                pdb_path = pdb_paths[x]
+                pdbs.append(PDB.from_filepath(pdb_path), strict = strict)
+        except (PDBParsingException, NonCanonicalResidueException, PDBValidationException), e:
+            raise PDBParsingException("An error occurred while loading the %s structure: '%s'" % (stage, str(e)))
+
+        return PipelinePDBChainMapper(pdbs, pdb_names, cut_off = cut_off, use_seqres_sequences_if_possible = use_seqres_sequences_if_possible, strict = strict)
+
+
+    def __init__(self, pdbs, pdb_names, cut_off = 60.0, use_seqres_sequences_if_possible = True, strict = True):
+
+        assert(len(pdbs) == len(pdb_names) and len(pdbs) > 1)
+        assert(len(set(pdb_names)) == len(pdb_names)) # pdb_names must be a list of unique names
+
+        self.pdbs = pdbs
+        self.pdb_names = pdb_names
+        self.use_seqres_sequences_if_possible = use_seqres_sequences_if_possible
+        self.strict = strict
+
+        self.pdb_name_to_structure_mapping = {}
+        for x in range(len(pdb_names)):
+            self.pdb_name_to_structure_mapping[pdb_names[x]] = pdbs[x]
+
+        # differing_atom_residue_ids is a mapping from (pdb_name1, pdb_name2) to the list of ATOM residues *in pdb_name1* that differ from those of pdb_name2
+        self.differing_atom_residue_ids = {}
+        self.chain_mapping = {}
+
+        # For each pair of adjacent PDB files in the list, match each chain in the first pdb to its best match in the second pdb
+        # This section just creates the chain id->chain id mapping
+        for x in range(len(pdbs) - 1):
+            for y in range(x + 1, len(pdbs)):
+                pdb1, pdb2 = pdbs[x], pdbs[y]
+                pdb1_name, pdb2_name = pdb_names[x], pdb_names[y]
+
+                mapping_key = (pdb1_name, pdb2_name)
+                self.chain_mapping[mapping_key] = {}
+                self.differing_atom_residue_ids[mapping_key] = {}
+
+                # To allow for X cases, we allow the matcher to return multiple matches
+                # An artificial example X case would be 3MWO -> 1BN1 -> 3MWO where 3MWO_A and 3MWO_B both map to 1BN1_A
+                # In this case, we would like 1BN1_A to map to both 3MWO_A and 3MWO_B.
+                chain_matches = match_pdb_chains(pdb1, pdb1_name, pdb2, pdb2_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = self.use_seqres_sequences_if_possible)
+
+                for pdb1_chain_id, list_of_matches in chain_matches.iteritems():
+                    if list_of_matches:
+                        mcl = MatchedChainList(pdb1_name, pdb1_chain_id)
+                        for l in list_of_matches:
+                            mcl.add_chain(pdb2_name, l[0], l[1])
+                        self.chain_mapping[mapping_key][pdb1_chain_id] = mcl
+
+                # todo: We could create the reverse entry from the results above which would be more efficient (match_pdb_chains
+                # performs a sequence alignment) but I will just repeat the logic here for now.
+                mapping_key = (pdb2_name, pdb1_name)
+                self.chain_mapping[mapping_key] = {}
+                self.differing_atom_residue_ids[mapping_key] = {}
+
+                chain_matches = match_pdb_chains(pdb2, pdb2_name, pdb1, pdb1_name, cut_off = cut_off, allow_multiple_matches = True, multiple_match_error_margin = 3.0, use_seqres_sequences_if_possible = self.use_seqres_sequences_if_possible)
+                for pdb2_chain_id, list_of_matches in chain_matches.iteritems():
+                    if list_of_matches:
+                        mcl = MatchedChainList(pdb2_name, pdb2_chain_id)
+                        for l in list_of_matches:
+                            mcl.add_chain(pdb1_name, l[0], l[1])
+                        self.chain_mapping[mapping_key][pdb2_chain_id] = mcl
+
+        self.residue_id_mapping = {}
+
+        # Create the residue ID -> residue ID mapping based on the chain mapping
+        self._map_residues()
+
+
+    # Private functions
+
+
+    def _map_residues(self):
+        '''For each pair of PDB files, match the residues of a chain in the first PDB to the residues of appropriate chains in the second PDB.
+
+            Note: we do a lot of repeated work here. Some of the lookups e.g. atom_sequences/seqres_sequences here could be cached.
+            If speed is important and the sequences are expected to be similar or have lots of repeats, we could use a list of unique sequences
+            as equivalence class representatives and then duplicate the matching for the other equivalent sequences.'''
+
+        pdbs = self.pdbs
+        pdb_names = self.pdb_names
+
+        # Map the SEQRES sequences to the ATOM sequences
+        # Note: The correct way to do this for RCSB files would be to use the SIFTS information like the ResidueRelatrix
+        # does. However, we have to consider the case where users upload PDB files which have not yet been deposited in
+        # the PDB so we have to resort to automatic sequence alignments. Ideally, we would store these alignments in a
+        # database and then do a lookup at this point. This would not only speed up the computation here but also allow
+        # us to manually fix misalignments (which will probably only occur due to gaps rather than mismatches).
+        seqres_to_atom_maps = {}
+        atom_to_seqres_maps = {}
+        for x in range(len(pdbs)):
+            pdb_object = pdbs[x]
+            pdb_name = pdb_names[x]
+            seqres_to_atom_map, atom_to_seqres_map = pdb_object.construct_seqres_to_atom_residue_map()
+            seqres_to_atom_maps[pdb_name] = seqres_to_atom_map
+            atom_to_seqres_maps[pdb_name] = atom_to_seqres_map
+
+        # Iterate over all pairs of PDBs and determine the residue mapping and sets of differing ATOM residues
+        for x in range(len(pdbs) - 1):
+            for y in range(x + 1, len(pdbs)):
+                pdb1, pdb2 = pdbs[x], pdbs[y]
+                pdb1_name, pdb2_name = pdb_names[x], pdb_names[y]
+                mapping_key = (pdb1_name, pdb2_name)
+                reverse_mapping_key = mapping_key[::-1]
+
+                residue_id_mapping = {'ATOM' : {}, 'SEQRES' : {}} # todo: add the other types of mapping here e.g. FASTA and Rosetta
+                pdb1_differing_atom_residue_ids = []
+                pdb2_differing_atom_residue_ids = []
+
+                for pdb1_chain, pdb2_chains in self.get_chain_mapping(mapping_key[0], mapping_key[1]).iteritems():
+                #for pdb1_chain, pdb2_chain in self.chain_mapping[mapping_key].iteritems():
+
+                    residue_id_mapping['ATOM'][pdb1_chain] = {}
+                    residue_id_mapping['SEQRES'][pdb1_chain] = {}
+
+                    # Use the SEQRES or ATOM sequence appropriately
+                    pdb1_chain_sequence_type, pdb1_chain_sequence = pdb1.get_annotated_chain_sequence_string(pdb1_chain, self.use_seqres_sequences_if_possible)
+
+                    for pdb2_chain in pdb2_chains:
+                        # Get the mapping between the sequences
+                        # Note: sequences and mappings are 1-based following the UniProt convention
+                        # The mapping returned from sa.get_residue_mapping is an abstract mapping between *sequences of characters*
+                        # and knows nothing about residue identifiers e.g. ATOM residue IDs or whether the sequences are
+                        # SEQRES or ATOM sequences
+
+                        sa = SequenceAligner()
+                        pdb2_chain_sequence_type, pdb2_chain_sequence = pdb2.get_annotated_chain_sequence_string(pdb2_chain, self.use_seqres_sequences_if_possible)
+
+                        sa.add_sequence('%s_%s' % (pdb1_name, pdb1_chain), str(pdb1_chain_sequence))
+                        sa.add_sequence('%s_%s' % (pdb2_name, pdb2_chain), str(pdb2_chain_sequence))
+                        mapping, match_mapping = sa.get_residue_mapping()
+
+                        # Since the mapping is only between sequences and we wish to use the original residue identifiers of
+                        # the sequence e.g. the PDB/ATOM residue ID, we look this information up in the order mapping of the
+                        # Sequence objects
+                        for pdb1_residue_index, pdb2_residue_index in mapping.iteritems():
+                            pdb1_residue_id = pdb1_chain_sequence.order[pdb1_residue_index - 1] # order is a 0-based list
+                            pdb2_residue_id = pdb2_chain_sequence.order[pdb2_residue_index - 1] # order is a 0-based list
+                            pdb1_atom_residue_id, pdb2_atom_residue_id = None, None
+
+                            if pdb1_chain_sequence_type == 'SEQRES' and pdb2_chain_sequence_type == 'SEQRES':
+                                residue_id_mapping['SEQRES'][pdb1_chain][pdb1_residue_id] = residue_id_mapping['SEQRES'][pdb1_chain].get(pdb1_residue_id, [])
+                                residue_id_mapping['SEQRES'][pdb1_chain][pdb1_residue_id].append((pdb2_chain, pdb2_residue_id))
+
+                                pdb1_atom_residue_id = seqres_to_atom_maps.get(pdb1_name, {}).get(pdb1_chain, {}).get(pdb1_residue_id)
+                                pdb2_atom_residue_id = seqres_to_atom_maps.get(pdb2_name, {}).get(pdb2_chain, {}).get(pdb2_residue_id)
+                                if pdb1_atom_residue_id != None and pdb2_atom_residue_id != None:
+                                    residue_id_mapping['ATOM'][pdb1_chain][pdb1_atom_residue_id] = residue_id_mapping['ATOM'][pdb1_chain].get(pdb1_atom_residue_id, [])
+                                    residue_id_mapping['ATOM'][pdb1_chain][pdb1_atom_residue_id].append(pdb2_atom_residue_id)
+
+                            elif pdb1_chain_sequence_type == 'SEQRES' and pdb2_chain_sequence_type == 'ATOM':
+                                pdb1_atom_residue_id = seqres_to_atom_maps.get(pdb1_name, {}).get(pdb1_chain, {}).get(pdb1_residue_id)
+                                if pdb1_atom_residue_id != None:
+                                    residue_id_mapping['ATOM'][pdb1_chain][pdb1_atom_residue_id] = residue_id_mapping['ATOM'][pdb1_chain].get(pdb1_atom_residue_id, [])
+                                    residue_id_mapping['ATOM'][pdb1_chain][pdb1_atom_residue_id].append(pdb2_residue_id)
+
+                            elif pdb1_chain_sequence_type == 'ATOM' and pdb2_chain_sequence_type == 'SEQRES':
+                                pdb2_atom_residue_id = seqres_to_atom_maps.get(pdb2_name, {}).get(pdb2_chain, {}).get(pdb2_residue_id)
+                                if pdb2_atom_residue_id != None:
+                                    residue_id_mapping['ATOM'][pdb1_chain][pdb1_residue_id] = residue_id_mapping['ATOM'][pdb1_chain].get(pdb1_residue_id, [])
+                                    residue_id_mapping['ATOM'][pdb1_chain][pdb1_residue_id].append(pdb2_atom_residue_id)
+
+                            elif pdb1_chain_sequence_type == 'ATOM' and pdb2_chain_sequence_type == 'ATOM':
+                                residue_id_mapping['ATOM'][pdb1_chain][pdb1_residue_id] = residue_id_mapping['ATOM'][pdb1_chain].get(pdb1_residue_id, [])
+                                residue_id_mapping['ATOM'][pdb1_chain][pdb1_residue_id].append(pdb2_residue_id)
+                            else:
+                                raise Exception('An exception occurred.') # this should not happen
+
+                            # We store a *list* of corresponding residues i.e. if pdb1_chain matches pdb2_chain_1 and pdb2_chain_2
+                            # then we may map a residue in pdb1_chain to a residue in each of those chains
+                            #residue_id_mapping[pdb1_chain][pdb1_residue_id] = residue_id_mapping[pdb1_chain].get(pdb1_residue_id, [])
+                            #residue_id_mapping[pdb1_chain][pdb1_residue_id].append(pdb2_residue_id)
+
+                        # Determine which residues of each sequence differ between the sequences
+                        # We ignore leading and trailing residues from both sequences
+                        pdb1_residue_indices = mapping.keys()
+                        pdb2_residue_indices = mapping.values()
+                        differing_pdb1_indices = []
+                        differing_pdb2_indices = []
+                        for pdb1_residue_index, match_details in match_mapping.iteritems():
+                            if match_details.clustal == 0 or match_details.clustal == -1 or match_details.clustal == -2:
+                                # The residues differed
+                                differing_pdb1_indices.append(pdb1_residue_index)
+                                differing_pdb2_indices.append(mapping[pdb1_residue_index])
+
+                        # Convert the different sequence indices into PDB ATOM residue IDs. Sometimes there may not be a
+                        # mapping from SEQRES residues to the ATOM residues e.g. missing density
+                        for idx in differing_pdb1_indices:
+                            if pdb1_chain_sequence_type == 'SEQRES':
+                                pdb1_seqres_residue_id = pdb1_chain_sequence.order[idx - 1]
+                                pdb1_atom_residue_id = seqres_to_atom_maps.get(pdb1_name, {}).get(pdb1_chain, {}).get(pdb1_seqres_residue_id)
+                                if pdb1_atom_residue_id != None:
+                                    pdb1_differing_atom_residue_ids.append(pdb1_atom_residue_id)
+                            elif pdb1_chain_sequence_type == 'ATOM':
+                                pdb1_differing_atom_residue_ids.append(pdb1_chain_sequence.order[idx - 1])
+                        for idx in differing_pdb2_indices:
+                            if pdb2_chain_sequence_type == 'SEQRES':
+                                pdb2_seqres_residue_id = pdb2_chain_sequence.order[idx - 1]
+                                pdb2_atom_residue_id = seqres_to_atom_maps.get(pdb2_name, {}).get(pdb2_chain, {}).get(pdb2_seqres_residue_id)
+                                if pdb2_atom_residue_id != None:
+                                    pdb2_differing_atom_residue_ids.append(pdb2_atom_residue_id)
+                            elif pdb2_chain_sequence_type == 'ATOM':
+                                pdb2_differing_atom_residue_ids.append(pdb2_chain_sequence.order[idx - 1])
+
+                self.residue_id_mapping[mapping_key] = residue_id_mapping
+                self.differing_atom_residue_ids[mapping_key] = pdb1_differing_atom_residue_ids
+                self.differing_atom_residue_ids[reverse_mapping_key] = pdb2_differing_atom_residue_ids
+
+        for k, v in sorted(self.differing_atom_residue_ids.iteritems()):
+            self.differing_atom_residue_ids[k] = sorted(set(v)) # the list of residues may not be unique in general so we make it unique here
+
+        self.seqres_to_atom_maps = seqres_to_atom_maps
+        self.atom_to_seqres_maps = atom_to_seqres_maps
+
+    # Public functions
+
+
+    def get_chain_mapping(self, pdb_name1, pdb_name2):
+        '''This replaces the old mapping member by constructing it from self.chain_mapping. This function returns a mapping from
+        chain IDs in pdb_name1 to chain IDs in pdb_name2.'''
+        d = {}
+        for pdb1_chain_id, matched_chain_list in self.chain_mapping[(pdb_name1, pdb_name2)].iteritems():
+            d[pdb1_chain_id] = matched_chain_list.get_related_chains_ids(pdb_name2)
+        return d
+
+
+    def get_differing_atom_residue_ids(self, pdb_name, pdb_list):
+        '''Returns a list of residues in pdb_name which differ from the pdbs corresponding to the names in pdb_list.'''
+
+        assert(pdb_name in self.pdb_names)
+        assert(set(pdb_list).intersection(set(self.pdb_names)) == set(pdb_list)) # the names in pdb_list must be in pdb_names
+
+        differing_atom_residue_ids = set()
+        for other_pdb in pdb_list:
+            differing_atom_residue_ids = differing_atom_residue_ids.union(set(self.differing_atom_residue_ids[(pdb_name, other_pdb)]))
+
+        return sorted(differing_atom_residue_ids)
+
+
+    def get_sequence_alignment_printer_objects(self, pdb_list = [], reversed = True, width = 80, line_separator = '\n'):
+        '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+            Using the first element of this list as a base, get the sequence alignments with chains in other members
+            of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
+            return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
+            members.
+
+            Returns a list of tuples (chain_id, sequence_alignment_printer_object). Each sequence_alignment_printer_object
+            can be used to generate a printable version of the sequence alignment. '''
+
+        if not pdb_list:
+            pdb_list = self.pdb_names
+
+        assert(len(set(pdb_list)) == len(pdb_list) and (len(pdb_list) > 1))
+        assert(sorted(set(pdb_list).intersection(set(self.pdb_names))) == sorted(set(pdb_list)))
+
+        primary_pdb = self.pdb_name_to_structure_mapping[pdb_list[0]]
+        primary_pdb_name = pdb_list[0]
+        primary_pdb_chains = sorted(primary_pdb.chain_atoms.keys())
+
+        sequence_alignment_printer_objects = []
+        for primary_pdb_chain in primary_pdb_chains:
+
+            sa = SequenceAligner()
+
+            # Add the primary PDB's sequence for the chain
+            primary_pdb_sequence_type, primary_pdb_sequence = primary_pdb.get_annotated_chain_sequence_string(primary_pdb_chain, self.use_seqres_sequences_if_possible)
+            sa.add_sequence('%s_%s' % (primary_pdb_name, primary_pdb_chain), str(primary_pdb_sequence))
+            other_chain_types_and_sequences = {}
+            for other_pdb_name in pdb_list[1:]:
+                other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
+                other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
+                #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                if other_chains:
+                    other_chain = sorted(other_chains)[0]
+                    other_pdb_sequence_type, other_pdb_sequence = other_pdb.get_annotated_chain_sequence_string(other_chain, self.use_seqres_sequences_if_possible)
+                    other_chain_types_and_sequences[other_pdb_name] = (other_pdb_sequence_type, other_pdb_sequence)
+                    sa.add_sequence('%s_%s' % (other_pdb_name, other_chain), str(other_pdb_sequence))
+
+            if len(sa.records) > 1:
+                # If there are no corresponding sequences in any other PDB, do not return the non-alignment
+                sa.align()
+
+                #pdb1_alignment_str = sa._get_alignment_lines()['%s:%s' % (primary_pdb_name, pdb1_chain)]
+                #pdb2_alignment_str = sa._get_alignment_lines()['%s:%s' % (pdb2_name, pdb2_chain)]
+
+                sequence_names, sequences, sequence_tooltips = [], [], []
+
+                sequence_names.append('%s_%s' % (primary_pdb_name, primary_pdb_chain))
+                primary_pdb_alignment_lines = sa._get_alignment_lines()['%s_%s' % (primary_pdb_name, primary_pdb_chain)]
+                sequences.append(primary_pdb_alignment_lines)
+                sequence_tooltips.append(self.get_sequence_tooltips(primary_pdb, primary_pdb_sequence, primary_pdb_sequence_type, primary_pdb_name, primary_pdb_chain, primary_pdb_alignment_lines))
+                for other_pdb_name in pdb_list[1:]:
+                    #other_chain = self.mapping[(primary_pdb_name, other_pdb_name)].get(primary_pdb_chain)
+                    other_pdb = self.pdb_name_to_structure_mapping[other_pdb_name]
+                    other_chains = self.get_chain_mapping(primary_pdb_name, other_pdb_name).get(primary_pdb_chain)
+                    if other_chains:
+                        other_chain = sorted(other_chains)[0]
+                        sequence_names.append('%s_%s' % (other_pdb_name, other_chain))
+                        other_pdb_alignment_lines = sa._get_alignment_lines()['%s_%s' % (other_pdb_name, other_chain)]
+                        sequences.append(other_pdb_alignment_lines)
+                        other_pdb_sequence_type, other_pdb_sequence = other_chain_types_and_sequences[other_pdb_name]
+                        sequence_tooltips.append(self.get_sequence_tooltips(other_pdb, other_pdb_sequence, other_pdb_sequence_type, other_pdb_name, other_chain, other_pdb_alignment_lines))
+
+                sap = MultipleSequenceAlignmentPrinter(sequence_names, sequences, sequence_tooltips)
+                sequence_alignment_printer_objects.append((primary_pdb_chain, sap))
+
+        return sequence_alignment_printer_objects
+
+    def get_sequence_tooltips(self, pdb_object, pdb_sequence, pdb_sequence_type, pdb_name, pdb_chain, pdb_alignment_lines):
+        '''pdb_sequence is a Sequence object. pdb_sequence_type is a type returned by PDB.get_annotated_chain_sequence_string,
+           pdb_name is the name of the PDB used throughout this object e.g. 'Scaffold', pdb_chain is the chain of interest,
+           pdb_alignment_lines are the lines returned by SequenceAligner._get_alignment_lines.
+
+           This function returns a set of tooltips corresponding to the residues in the sequence. The tooltips are the ATOM
+           residue IDs. These tooltips can be used to generate useful (and/or interactive using JavaScript) sequence alignments
+           in HTML.
+           '''
+        tooltips = None
+        atom_sequence = pdb_object.atom_sequences.get(pdb_chain)
+
+        try:
+            if pdb_sequence_type == 'SEQRES':
+                seqres_to_atom_map = self.seqres_to_atom_maps.get(pdb_name, {}).get(pdb_chain, {})
+                tooltips = []
+                if seqres_to_atom_map:
+                    idx = 1
+                    for aligned_residue in pdb_alignment_lines.strip():
+                        if aligned_residue != '-':
+                            atom_residue = seqres_to_atom_map.get(idx)
+                            if atom_residue:
+                                # This is a sanity check to make sure that the tooltips are mapping the correct residues types to
+                                # the correct residues types
+                                assert(aligned_residue == atom_sequence.sequence[atom_residue].ResidueAA)
+                            tooltips.append(atom_residue)
+                            idx += 1
+                    assert(len(tooltips) == len(str(pdb_sequence)))
+            elif pdb_sequence_type == 'ATOM':
+                tooltips = []
+                idx = 0
+                for aligned_residue in pdb_alignment_lines.strip():
+                    if aligned_residue != '-':
+                        # This is a sanity check to make sure that the tooltips are mapping the correct residues types to
+                        # the correct residues types
+                        assert(aligned_residue == pdb_sequence.sequence[pdb_sequence.order[idx]].ResidueAA)
+                        tooltips.append(pdb_sequence.order[idx])
+                        idx += 1
+                assert(len(tooltips) == len(str(pdb_sequence)))
+        except:
+            raise Exception('An error occurred during HTML tooltip creation for the multiple sequence alignment.')
+
+        return tooltips
+
+
+    def get_sequence_alignment_strings(self, pdb_list = [], reversed = True, width = 80, line_separator = '\n'):
+        '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+            Using the first element of this list as a base, get the sequence alignments with chains in other members
+            of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
+            return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
+            members.
+
+            Returns one sequence alignment string for each chain mapping. Each line is a concatenation of lines of the
+            specified width, separated by the specified line separator.'''
+
+        sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
+        alignment_strings = []
+        for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
+            primary_pdb_chain = sequence_alignment_printer_tuple[0]
+            sap = sequence_alignment_printer_tuple[1]
+            alignment_strings.append(sap.to_lines(reversed = reversed, width = width, line_separator = line_separator))
+
+        return alignment_strings
+
+
+    def get_sequence_alignment_strings_as_html(self, pdb_list = [], reversed = False, width = 80, line_separator = '\n', extra_tooltip_class = ''):
+        '''Takes a list, pdb_list, of pdb names e.g. ['Model', 'Scaffold', ...] with which the object was created.
+            Using the first element of this list as a base, get the sequence alignments with chains in other members
+            of the list. For simplicity, if a chain in the first PDB matches multiple chains in another PDB, we only
+            return the alignment for one of the chains. If pdb_list is empty then the function defaults to the object's
+            members.
+
+            Returns HTML for the sequence alignments and an empty string if no alignments were made.'''
+        sequence_alignment_printer_tuples = self.get_sequence_alignment_printer_objects(pdb_list = pdb_list, reversed = reversed, width = width, line_separator = line_separator)
+        if not sequence_alignment_printer_tuples:
+            return ''
+        html = []
+        for sequence_alignment_printer_tuple in sequence_alignment_printer_tuples:
+            primary_pdb_chain = sequence_alignment_printer_tuple[0]
+            sap = sequence_alignment_printer_tuple[1]
+            html.append(sap.to_html(reversed = reversed, width = width, line_separator = line_separator, extra_tooltip_class = extra_tooltip_class))
+
+        return '\n'.join(html)
