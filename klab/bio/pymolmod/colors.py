@@ -7,6 +7,13 @@ A list of predefined PyMOL colors.
 Created by Shane O'Connor 2014.
 """
 
+import traceback
+import colorsys
+
+import matplotlib.colors as mpl_colors
+
+from klab.gfx.colors import ggplot_color_wheel
+
 # How to update this list:
 #
 # Go to http://pymolwiki.org/index.php/Color_Values and copy the color lines from there. Then run this in a Python terminal:
@@ -241,11 +248,121 @@ default_color_scheme = {
         'bb' : 'violetpurple',
         'hetatm' : 'warmpink',
         'mutations' : 'magenta'
-    }
+    },
 }
+
+
+# todo: I now specify protein color and display options in PyMOLStructureBase objects. Rewrite this code so that default_color_scheme
+#       specifies global options e.g. view options, background colors. This will probably be easier if the other PSE builders
+#       are rewritten to match MultiStructureBuilder.
+
+
+class PyMOLStructureBase(object):
+
+    '''A simple structure-less class to store parameters used to display a structure. Open to heavy modification as we add more
+       customization.'''
+
+
+    def __init__(self, backbone_color = 'white', backbone_display = 'cartoon',
+                       sidechain_color = 'grey80', sidechain_display = 'sticks',
+                       hetatm_color = 'grey60', hetatm_display = 'sticks',
+                       visible = True):
+        self.backbone_color = backbone_color or 'white'
+        self.backbone_display = backbone_display or 'cartoon'
+        self.sidechain_color = sidechain_color or 'grey80'
+        self.sidechain_display = sidechain_display or 'sticks'
+        self.hetatm_color = hetatm_color or  'grey60'
+        self.hetatm_display = hetatm_display or 'sticks'
+        self.visible = visible
+
+
+class PyMOLStructure(PyMOLStructureBase):
+
+    '''A simple structure-containing class to store parameters used to display a structure. Open to heavy modification as we add more
+       customization.'''
+
+
+    def __init__(self, pdb_object, structure_name, residues_of_interest = [], label_all_residues_of_interest = False, **kwargs):
+        '''The chain_seed_color kwarg can be either:
+               - a triple of R,G,B values e.g. [0.5, 1.0, 0.75] where each value is between 0.0 and 1.0;
+               - a hex string #RRGGBB e.g. #77ffaa;
+               - a name defined in the predefined dict above e.g. "aquamarine".
+        '''
+        self.pdb_object = pdb_object
+        self.structure_name = structure_name
+        self.add_residues_of_interest(residues_of_interest)
+        self.label_all_residues_of_interest = label_all_residues_of_interest
+        self.chain_colors = kwargs.get('chain_colors') or {}
+
+        # Set up per-chain colors
+        try:
+            if not self.chain_colors and kwargs.get('chain_seed_color'):
+                chain_seed_color = kwargs.get('chain_seed_color')
+                if isinstance(chain_seed_color, str) or isinstance(chain_seed_color, unicode):
+                    chain_seed_color = str(chain_seed_color)
+                    if chain_seed_color.startswith('#'):
+                        if len(chain_seed_color) != 7:
+                            chain_seed_color = None
+                    else:
+                        trpl = predefined.get(chain_seed_color)
+                        chain_seed_color = None
+                        if trpl:
+                            chain_seed_color = mpl_colors.rgb2hex(trpl)
+                elif isinstance(chain_seed_color, list) and len(chain_seed_color) == 3:
+                    chain_seed_color = mpl_colors.rgb2hex(chain_seed_color)
+
+                if chain_seed_color.startswith('#') and len(chain_seed_color) == 7:
+
+                    # todo: We are moving between color spaces multiple times so are probably introducing artifacts due to rounding. Rewrite this to minimize this movement.
+                    chain_seed_color = chain_seed_color[1:]
+
+                    hsl_color = colorsys.rgb_to_hls(int(chain_seed_color[0:2], 16)/255.0, int(chain_seed_color[2:4], 16)/255.0, int(chain_seed_color[4:6], 16)/255.0)
+                    chain_seed_hue = int(360.0 * hsl_color[0])
+                    chain_seed_saturation = max(0.15, hsl_color[1]) # otherwise some colors e.g. near-black will not yield any alternate colors
+                    chain_seed_lightness = max(0.15, hsl_color[2]) # otherwise some colors e.g. near-black will not yield any alternate colors
+
+                    min_colors_in_wheel = 4 # choose at least 4 colors - this usually results in a wider variety of colors and prevents clashes e.g. given 2 chains in both mut and wt, wt seeded with blue, and mut seeded with yellow, we will get a clash
+                    chain_ids = sorted(pdb_object.atom_sequences.keys())
+
+                    # Choose complementary colors, respecting the original saturation and lightness values
+                    chain_colors = ggplot_color_wheel(max(len(chain_ids), min_colors_in_wheel), start = chain_seed_hue, saturation_adjustment = None, saturation = chain_seed_saturation, lightness = chain_seed_lightness)
+                    assert(len(chain_colors) >= len(chain_ids))
+                    self.chain_colors = {}
+                    for i in xrange(len(chain_ids)):
+                        self.chain_colors[chain_ids[i]] = str(list(mpl_colors.hex2color('#' + chain_colors[i])))
+
+                    # Force use of the original seed as this may have been altered above in the "= max(" statements
+                    self.chain_colors[chain_ids[0]] = str(list(mpl_colors.hex2color('#' + chain_seed_color)))
+
+        except Exception, e:
+            print('An exception occurred setting the chain colors. Ignoring exception and resuming with default colors.')
+            print(str(e))
+            print(traceback.format_exc())
+
+        super(PyMOLStructure, self).__init__(
+                 backbone_color = kwargs.get('backbone_color'), backbone_display = kwargs.get('backbone_display'),
+                 sidechain_color = kwargs.get('sidechain_color'), sidechain_display = kwargs.get('sidechain_display'),
+                 hetatm_color = kwargs.get('hetatm_color'), hetatm_display = kwargs.get('hetatm_display'),
+                 visible = kwargs.get('visible', True),
+                 )
+
+
+
+    def add_residues_of_interest(self, residues_of_interest):
+        # todo: we should check the residue IDs against the PDB object to make sure that the coordinates exist
+        # For now, do a simple assignment
+        if residues_of_interest:
+            self.residues_of_interest = residues_of_interest
+
+
+default_display_scheme = dict(
+    GenericProtein = PyMOLStructureBase(),
+)
+
 
 def create_new_color_command(color_name, r, g, b):
     return 'set_color %(color_name)s, [%(r).10f,%(g).10f,%(b).10f]' % vars()
+
 
 class ColorScheme(object):
     '''A dict wrapper class. The dict that is stored is intended to have a tree structure. The paths of the tree describe
@@ -257,6 +374,8 @@ class ColorScheme(object):
         '''If a color_scheme is passed in then this is merged with the default color scheme.'''
         color_scheme = {}
         color_scheme.update(default_color_scheme)
+        display_scheme = {}
+        display_scheme.update(default_display_scheme)
         if custom_color_scheme:
             assert(type(custom_color_scheme) == type(predefined))
             color_scheme.update(custom_color_scheme)

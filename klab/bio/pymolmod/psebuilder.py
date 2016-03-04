@@ -88,6 +88,7 @@ class BatchBuilder(object):
 
         return PSE_files
 
+
 class PyMOLSessionBuilder(object):
 
     def __init__(self, pdb_containers, settings = {}, rootdir = '/tmp'):
@@ -133,7 +134,6 @@ class PyMOLSessionBuilder(object):
         write_file(self._filepath('script.pml'), self.script)
 
         # Run PyMOL
-
         #colortext.message(self.visualization_pymol +' -c ' + self._filepath('script.pml'))
         po = tprocess.Popen(self.outdir, [self.visualization_pymol, '-c', self._filepath('script.pml')])
         #colortext.message(po.stdout)
@@ -149,7 +149,5 @@ class PyMOLSessionBuilder(object):
         pse_path = self._filepath('session.pse')
         if os.path.exists(pse_path):
             self.PSE = read_file(pse_path, binary = True)
-
-
 
 
