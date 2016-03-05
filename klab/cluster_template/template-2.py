@@ -60,8 +60,7 @@ local_rosetta_binary_type_list = #$#local_rosetta_binary_type_list#$#
 zip_rosetta_output = True
 
 generic_rosetta_args_list = [
-#$#rosetta_args_list_list#$#
-]
+#$#rosetta_args_list_list#$#]
 
 sge_task_id = 0
 run_locally = True
@@ -255,8 +254,8 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
 
 def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
     for step, job_pickle_file in enumerate(job_pickle_file_list):
-        if len(job_pickle_file_list) > 1:
-            print 'Processing step %d out of %d total (range 0-%d)' % (step, len(job_pickle_files), len(job_pickle_files-1))
+        if len(job_pickle_file_list) > 1 and verbosity >= 1:
+            print '\nProcessing step %d out of %d total' % (step+1, len(job_pickle_file_list))
 
         assert( os.path.isfile(job_pickle_file) )
         p = open(job_pickle_file,'r')
@@ -377,7 +376,8 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
 
         args.extend(generic_rosetta_args_list[step])
 
-        return finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
+        time_end = finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
+    return time_end
 
 def run_local(run_func):
 
@@ -390,7 +390,7 @@ def run_local(run_func):
 
     # Only import multiprocessing here because it may not be available in old cluster python environments
     num_jobs = #$#numjobs#$#
-    if jobs_to_run and jobs_to_run > 1 and num_jobs > 1:
+    if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
         from multiprocessing import Pool
         import multiprocessing
 
@@ -398,7 +398,7 @@ def run_local(run_func):
         def __init__(self, task, func):
             self.reporter = Reporter(task)
             self.func = func
-            if jobs_to_run and jobs_to_run > 1 and num_jobs > 1:
+            if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
                 self.pool = Pool(processes=multiprocessing.cpu_count())
             else:
                 self.pool = None
@@ -407,7 +407,7 @@ def run_local(run_func):
             self.number_finished += 1
             self.reporter.report(self.number_finished)
         def addJob(self,argsTuple):
-            if jobs_to_run and jobs_to_run > 1 and num_jobs > 1:
+            if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
                 # Multiprocessing
                 self.pool.apply_async(self.func, argsTuple, callback=self.cb)
             else:
@@ -415,7 +415,7 @@ def run_local(run_func):
                 self.cb( self.func(argsTuple[0], argsTuple[1], argsTuple[2], argsTuple[3]) )
 
         def finishJobs(self):
-            if jobs_to_run and jobs_to_run > 1 and num_jobs > 1:
+            if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
                 self.pool.close()
                 self.pool.join()
                 self.reporter.done()

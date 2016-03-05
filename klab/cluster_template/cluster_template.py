@@ -6,6 +6,7 @@ import sys
 import inspect
 import math
 import cPickle as pickle
+import copy
 
 path_to_this_module = os.path.abspath( os.path.dirname( inspect.getsourcefile(sys.modules[__name__]) ) )
 
@@ -28,7 +29,7 @@ def convert_list_arguments_to_list(settings, num_steps):
     l.extend(global_arguments_with_defaults)
     for arg in l:
         if arg in settings:
-            settings[arg + '_list'] = [settings[arg] for x in xrange(num_steps)]
+            settings[arg + '_list'] = [copy.deepcopy(settings[arg]) for x in xrange(num_steps)]
             del( settings[arg] )
     return settings
 
@@ -120,12 +121,12 @@ class ClusterTemplate():
                 if arg == 'rosetta_args_list':
                     if not isinstance(settings_dict['rosetta_args_list'], basestring):
                         args_str = format_list_to_string(settings_dict['rosetta_args_list'])
-                        settings_dict['rosetta_args_list_list'] = "    [" + str(args_str) + "]"
+                        settings_dict['rosetta_args_list_list'] = ["    [" + str(args_str) + "]\n" for x in xrange(self.num_steps)]
                     else:
                         args_str = settings_dict['rosetta_args_list']
-                        settings_dict['rosetta_args_list_list'] = "    ['" + str(args_str) + "']"
+                        settings_dict['rosetta_args_list_list'] = ["    ['" + str(args_str) + "']\n" for x in xrange(self.num_steps)]
                 else:
-                    settings_dict[ arg + '_list' ] = "[ '" + str(settings_dict[arg]) + "' ]"
+                    settings_dict[ arg + '_list' ] = [str(settings_dict[arg]) for x in xrange(self.num_steps)]
                 del( settings_dict[arg] )
             elif arg + '_list' in settings_dict:
                 if arg == 'rosetta_args_list':
