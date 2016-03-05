@@ -11,6 +11,27 @@ path_to_this_module = os.path.abspath( os.path.dirname( inspect.getsourcefile(sy
 
 template_file = os.path.join(path_to_this_module, 'template-2.py')
 
+global_list_required_arguments = [
+    'cluster_rosetta_bin',
+    'local_rosetta_bin',
+    'appname', 'rosetta_args_list',
+    'cluster_rosetta_binary_type',
+    'local_rosetta_binary_type',
+]
+global_arguments_with_defaults = [
+    'cluster_rosetta_db',
+    'local_rosetta_db',
+]
+
+def convert_list_arguments_to_list(settings, num_steps):
+    l = list(global_list_required_arguments)
+    l.extend(global_arguments_with_defaults)
+    for arg in l:
+        if arg in settings:
+            settings[arg + '_list'] = [settings[arg] for x in xrange(num_steps)]
+            del( settings[arg] )
+    return settings
+
 def format_list_to_string(l):
     assert( not isinstance(l, basestring) )
     return_str = ""
@@ -32,17 +53,8 @@ class ClusterTemplate():
         with open(template_file, 'r') as f:
             self.template_file_lines = f.readlines()
 
-        self.arguments_with_defaults = [
-            'cluster_rosetta_db',
-            'local_rosetta_db',
-        ]
-        self.list_required_arguments = [
-            'cluster_rosetta_bin',
-            'local_rosetta_bin',
-            'appname', 'rosetta_args_list',
-            'cluster_rosetta_binary_type',
-            'local_rosetta_binary_type',
-        ]
+        self.arguments_with_defaults = global_arguments_with_defaults
+        self.list_required_arguments = global_list_required_arguments
         self.list_required_arguments.extend( self.arguments_with_defaults )
 
         # Arguments
@@ -120,6 +132,7 @@ class ClusterTemplate():
                     subl = ''
                     for l in settings_dict['rosetta_args_list_list']:
                         subl += '    [' + format_list_to_string(l) + '],\n'
+                    settings_dict[ 'rosetta_args_list_list' ] = subl
                 else:
                     settings_dict[ arg + '_list' ] = '[' + format_list_to_string(settings_dict[ arg + '_list' ]) + ']'
             else:
