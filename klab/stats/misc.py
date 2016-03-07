@@ -199,6 +199,21 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
     :return: A table of statistics.
     '''
     assert(len(x_values) == len(y_values))
+
+    num_null_cases = 0
+    if ignore_null_values:
+        truncated_x_values, truncated_y_values = [], []
+        for i in xrange(len(x_values)):
+            if (x_values[i] == None) or (numpy.isnan(x_values[i])):
+                num_null_cases += 1
+            elif (y_values[i] == None) or (numpy.isnan(y_values[i])):
+                num_null_cases += 1
+            else:
+                truncated_x_values.append(x_values[i])
+                truncated_y_values.append(y_values[i])
+        x_values = truncated_x_values
+        y_values = truncated_y_values
+
     return dict(
         pearsonr = pearsonr(x_values, y_values),
         spearmanr = spearmanr(x_values, y_values),
@@ -211,6 +226,8 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
         ks_2samp = ks_2samp(x_values, y_values),
         fraction_correct = fraction_correct(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff, ignore_null_values = ignore_null_values),
         fraction_correct_fuzzy_linear = fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = fcorrect_x_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar),
+        n = len(x_values),
+        num_null_cases = num_null_cases,
     )
 
 
