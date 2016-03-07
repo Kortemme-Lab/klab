@@ -6,10 +6,32 @@ import sys
 import inspect
 import math
 import cPickle as pickle
+import copy
 
 path_to_this_module = os.path.abspath( os.path.dirname( inspect.getsourcefile(sys.modules[__name__]) ) )
 
 template_file = os.path.join(path_to_this_module, 'template-2.py')
+
+global_list_required_arguments = [
+    'cluster_rosetta_bin',
+    'local_rosetta_bin',
+    'appname', 'rosetta_args_list',
+    'cluster_rosetta_binary_type',
+    'local_rosetta_binary_type',
+]
+global_arguments_with_defaults = [
+    'cluster_rosetta_db',
+    'local_rosetta_db',
+]
+
+def convert_list_arguments_to_list(settings, num_steps):
+    l = list(global_list_required_arguments)
+    l.extend(global_arguments_with_defaults)
+    for arg in l:
+        if arg in settings:
+            settings[arg + '_list'] = [copy.deepcopy(settings[arg]) for x in xrange(num_steps)]
+            del( settings[arg] )
+    return settings
 
 def format_list_to_string(l):
     assert( not isinstance(l, basestring) )
@@ -31,6 +53,10 @@ class ClusterTemplate():
         self.settings_dict = None
         with open(template_file, 'r') as f:
             self.template_file_lines = f.readlines()
+
+        self.arguments_with_defaults = global_arguments_with_defaults
+        self.list_required_arguments = global_list_required_arguments
+        self.list_required_arguments.extend( self.arguments_with_defaults )
 
         # Arguments
         self.num_steps = num_steps
@@ -59,12 +85,7 @@ class ClusterTemplate():
 
         required_arguments = [
             'numjobs', 'mem_free',
-            'cluster_rosetta_bin',
-            'local_rosetta_bin',
-            'appname', 'rosetta_args_list',
             'output_dir',
-            'cluster_rosetta_binary_type',
-            'local_rosetta_binary_type',
         ]
         unrequired_arguments = [
             'add_extra_ld_path',
@@ -83,6 +104,41 @@ class ClusterTemplate():
                 print 'ERROR: Data dictionary cannot contain argument', arg
                 sys.exit(1)
 
+        arguments_with_defaults = self.arguments_with_defaults
+        for arg in arguments_with_defaults:
+            if arg not in settings_dict and arg + '_list' not in settings_dict:
+                settings_dict[arg] = ''
+
+        # Handle arguments which used to be single but are now lists (for steps)
+        list_required_arguments = self.list_required_arguments
+
+        # Most of the if statements below could be simplified by making format_list_to_string recursive
+        for arg in list_required_arguments:
+            if arg in settings_dict and arg + '_list' in settings_dict:
+                raise Exception("Can't have list and arg versions of settings arg: " + str(arg))
+
+            if arg in settings_dict:
+                if arg == 'rosetta_args_list':
+                    if not isinstance(settings_dict['rosetta_args_list'], basestring):
+                        args_str = format_list_to_string(settings_dict['rosetta_args_list'])
+                        settings_dict['rosetta_args_list_list'] = ["    [" + str(args_str) + "]\n" for x in xrange(self.num_steps)]
+                    else:
+                        args_str = settings_dict['rosetta_args_list']
+                        settings_dict['rosetta_args_list_list'] = ["    ['" + str(args_str) + "']\n" for x in xrange(self.num_steps)]
+                else:
+                    settings_dict[ arg + '_list' ] = [str(settings_dict[arg]) for x in xrange(self.num_steps)]
+                del( settings_dict[arg] )
+            elif arg + '_list' in settings_dict:
+                if arg == 'rosetta_args_list':
+                    subl = ''
+                    for l in settings_dict['rosetta_args_list_list']:
+                        subl += '    [' + format_list_to_string(l) + '],\n'
+                    settings_dict[ 'rosetta_args_list_list' ] = subl
+                else:
+                    settings_dict[ arg + '_list' ] = '[' + format_list_to_string(settings_dict[ arg + '_list' ]) + ']'
+            else:
+                raise Exception("Missing required argument (in _list form or otherwise): " + str(arg))
+
         # There once was a way to run from a database, but it is no more, so we set False
         settings_dict['run_from_database'] = 'False'
 
@@ -93,19 +149,9 @@ class ClusterTemplate():
             settings_dict['add_extra_ld_path'] = 'False'
             settings_dict['extra_ld_path'] = ''
 
-        # Handle if general rosetta args are a list instead of a string
-        if not isinstance(settings_dict['rosetta_args_list'], basestring):
-            settings_dict['rosetta_args_list'] = format_list_to_string(settings_dict['rosetta_args_list'])
-
         # Handle other options
         if 'db_id' not in settings_dict:
             settings_dict['db_id'] = ''
-
-        if 'cluster_rosetta_db' not in settings_dict:
-            settings_dict['cluster_rosetta_db'] = ''
-
-        if 'local_rosetta_db' not in settings_dict:
-            settings_dict['local_rosetta_db'] = ''
 
         if 'tasks_per_process' not in settings_dict or settings_dict['tasks_per_process'] == 1:
             settings_dict['tasks_per_process'] = 1
@@ -136,6 +182,8 @@ class ClusterTemplate():
         first_job_dict_len = len(self.job_dicts[0])
         for job_dict in self.job_dicts[1:]:
             assert( len(job_dict) == first_job_dict_len )
+        for arg in self.list_required_arguments:
+            assert( arg + '_list' in self.settings_dict )
         self.format_settings_dict()
 
     def write_runs(self, script_name_template = None):
@@ -160,7 +208,7 @@ class ClusterTemplate():
             with open(job_pickle_file, 'w') as f:
                 pickle.dump(self.job_dicts[step_num], f, protocol = pickle_protocol)
 
-        self.settings_dict['job_pickle_files'] = format_list_to_string(job_pickle_file_relpaths)
+        self.settings_dict['job_pickle_files'] = '[ ' + format_list_to_string(job_pickle_file_relpaths) + ' ]'
         self.format_settings_dict()
 
         new_lines = []

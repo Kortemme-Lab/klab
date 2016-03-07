@@ -43,27 +43,24 @@ print "Script:", script_name
 tasks_per_process = #$#tasks_per_process#$#
 total_number_tasks = #$#numjobs#$#
 
-cluster_rosetta_bin = '#$#cluster_rosetta_bin#$#'
-cluster_rosetta_db = '#$#cluster_rosetta_db#$#'
+cluster_rosetta_bin_list = #$#cluster_rosetta_bin_list#$#
+cluster_rosetta_db_list = #$#cluster_rosetta_db_list#$#
 
-local_rosetta_bin = '#$#local_rosetta_bin#$#'
-local_rosetta_db = '#$#local_rosetta_db#$#'
+local_rosetta_bin_list = #$#local_rosetta_bin_list#$#
+local_rosetta_db_list = #$#local_rosetta_db_list#$#
 local_scratch_dir = '/tmp'
 
-job_pickle_files = [
-    #$#job_pickle_files#$#
-]
+job_pickle_file_list = #$#job_pickle_files#$#
 
-app_name = '#$#appname#$#'
+app_name_list = #$#appname_list#$#
 
-cluster_rosetta_binary_type = '#$#cluster_rosetta_binary_type#$#'
-local_rosetta_binary_type = '#$#local_rosetta_binary_type#$#'
+cluster_rosetta_binary_type_list = #$#cluster_rosetta_binary_type_list#$#
+local_rosetta_binary_type_list = #$#local_rosetta_binary_type_list#$#
 
 zip_rosetta_output = True
 
-generic_rosetta_args = [
-    #$#rosetta_args_list#$#
-]
+generic_rosetta_args_list = [
+#$#rosetta_args_list_list#$#]
 
 sge_task_id = 0
 run_locally = True
@@ -178,7 +175,7 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
     # Check that Rosetta binary exists
     assert( os.path.isfile( args[0] ) )
     # Output to file
-    rosetta_process = subprocess.Popen(args, stdout=rosetta_outfile, stderr=subprocess.STDOUT, close_fds = True, cwd=tmp_output_dir, env=rosetta_env )
+    rosetta_process = subprocess.Popen(' '.join(args), stdout=rosetta_outfile, stderr=subprocess.STDOUT, close_fds = True, cwd=tmp_output_dir, env=rosetta_env, shell = True )
 
     # Output to terminal for debugging
     # rosetta_process=subprocess.Popen(args, close_fds = True, cwd=tmp_output_dir, env=rosetta_env )
@@ -255,15 +252,26 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
 
     return time_end
 
-def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
-    for subtask, job_pickle_file in enumerate(job_pickle_files):
-        if len(job_pickle_files) > 1:
-            print 'Processing subtask %d out of %d total (range 0-%d)' % (subtask, len(job_pickle_files), len(job_pickle_files-1))
+def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
+    for step, job_pickle_file in enumerate(job_pickle_file_list):
+        if len(job_pickle_file_list) > 1 and verbosity >= 1:
+            print '\nProcessing step %d out of %d total' % (step+1, len(job_pickle_file_list))
 
         assert( os.path.isfile(job_pickle_file) )
         p = open(job_pickle_file,'r')
         job_dict = pickle.load(p)
         p.close()
+
+        if local_or_cluster == 'local':
+            rosetta_bin = local_rosetta_bin_list[step]
+            rosetta_binary_type = local_rosetta_binary_type_list[step]
+            rosetta_db = local_rosetta_db_list[step]
+        elif local_or_cluster == 'cluster':
+            rosetta_bin = cluster_rosetta_bin_list[step]
+            rosetta_binary_type = cluster_rosetta_binary_type_list[step]
+            rosetta_db = cluster_rosetta_db_list[step]
+        else:
+            raise Exception("Unrecognized run type: " + str(local_or_cluster))
 
         job_dirs = sorted(job_dict.keys())
 
@@ -283,7 +291,7 @@ def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_di
             print 'Temporary output dir:', tmp_output_dir
 
         args=[
-            os.path.join(rosetta_bin, app_name + rosetta_binary_type),
+            os.path.join(rosetta_bin, app_name_list[step] + rosetta_binary_type),
         ]
 
         # Append specific Rosetta database path if this argument is included
@@ -366,14 +374,12 @@ def run_single(task_id, rosetta_bin, rosetta_binary_type, rosetta_db, scratch_di
                 f.write('\n')
             f.close()
 
-        args.extend(generic_rosetta_args)
+        args.extend(generic_rosetta_args_list[step])
 
-        return finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
+        time_end = finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
+    return time_end
 
 def run_local(run_func):
-    # Only import multiprocessing here because it may not be available in old cluster python environments
-    from multiprocessing import Pool
-    import multiprocessing
 
     # Integer argument allows number of jobs to run to be specified
     # Jobs will be run single-threaded for debugging
@@ -382,40 +388,49 @@ def run_local(run_func):
     else:
         jobs_to_run = None
 
+    # Only import multiprocessing here because it may not be available in old cluster python environments
+    num_jobs = #$#numjobs#$#
+    if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
+        from multiprocessing import Pool
+        import multiprocessing
+
     class MultiWorker:
         def __init__(self, task, func):
             self.reporter = Reporter(task)
             self.func = func
-            self.pool = Pool(processes=multiprocessing.cpu_count())
+            if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
+                self.pool = Pool(processes=multiprocessing.cpu_count())
+            else:
+                self.pool = None
             self.number_finished = 0
         def cb(self, time_return):
             self.number_finished += 1
             self.reporter.report(self.number_finished)
         def addJob(self,argsTuple):
-            if jobs_to_run:
-                # Testing
-                self.cb( self.func(argsTuple[0], argsTuple[1], argsTuple[2], argsTuple[3], argsTuple[4], argsTuple[5]) )
-            else:
+            if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
                 # Multiprocessing
                 self.pool.apply_async(self.func, argsTuple, callback=self.cb)
+            else:
+                # Testing
+                self.cb( self.func(argsTuple[0], argsTuple[1], argsTuple[2], argsTuple[3]) )
 
         def finishJobs(self):
-            self.pool.close()
-            self.pool.join()
-            self.reporter.done()
+            if (jobs_to_run and jobs_to_run > 1 and num_jobs > 1) or (jobs_to_run == None):
+                self.pool.close()
+                self.pool.join()
+                self.reporter.done()
 
     worker = MultiWorker('running script locally', run_func)
 
-    num_jobs = #$#numjobs#$#
     worker.reporter.set_total_count(num_jobs)
 
     for i in xrange(0, num_jobs): # Manually specify which jobs to run here, if you desire. Or pass as argument
         if jobs_to_run and i >= jobs_to_run:
             break
         if jobs_to_run:
-            worker.addJob( (i, local_rosetta_bin, local_rosetta_binary_type, local_rosetta_db, local_scratch_dir, 1) )
+            worker.addJob( (i, 'local', local_scratch_dir, 1) )
         else:
-            worker.addJob( (i, local_rosetta_bin, local_rosetta_binary_type, local_rosetta_db, local_scratch_dir, 0) )
+            worker.addJob( (i, 'local', local_scratch_dir, 0) )
 
     worker.finishJobs()
 
@@ -435,9 +450,9 @@ def run_cluster(run_func):
         if len(tasks_to_run) != 1:
             print 'Running subtask %d (%d of %d)' % (task_id, i+1, len(tasks_to_run))
         if i+1 == len(tasks_to_run):
-            run_func(task_id, cluster_rosetta_bin, cluster_rosetta_binary_type, cluster_rosetta_db, scratch_dir='/scratch', move_output_files=True)
+            run_func(task_id, 'cluster', scratch_dir='/scratch', move_output_files=True)
         else:
-            run_func(task_id, cluster_rosetta_bin, cluster_rosetta_binary_type, cluster_rosetta_db, scratch_dir='/scratch')
+            run_func(task_id, 'cluster', scratch_dir='/scratch')
 
 def zip_file(file_path):
     if os.path.isfile(file_path):
