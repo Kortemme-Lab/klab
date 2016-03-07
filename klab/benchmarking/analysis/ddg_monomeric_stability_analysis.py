@@ -313,6 +313,7 @@ class BenchmarkRun(ReportingObject):
         if not os.path.isdir(self.subplot_directory):
             os.makedirs(self.subplot_directory)
 
+
     def read_dataframe_from_content(self, hdfstore_blob):
         fname = write_temp_file('/tmp', hdfstore_blob, ftype = 'wb')
         try:
