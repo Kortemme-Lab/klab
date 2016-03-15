@@ -26,9 +26,10 @@ class Reporter:
         self.rolling_est_total_time = collections.deque( maxlen = 50 )
     def set_total_count(self, x):
         self.total_count = x
-        self.rolling_est_total_time = collections.deque( maxlen = int( .05 * x ) )
+        self.rolling_est_total_time = collections.deque( maxlen = max(1, int( .05 * x )) )
     def decrement_total_count(self):
-        self.total_count -= 1
+        if self.total_count:
+            self.total_count -= 1
     def report(self, n):
         self.n = n
         time_now = datetime.datetime.now()
