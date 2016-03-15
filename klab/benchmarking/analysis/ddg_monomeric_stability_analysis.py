@@ -92,7 +92,6 @@ class BenchmarkRun(ReportingObject):
                  terminal_width = 200, restrict_to = set(), remove_cases = set()):
 
         self.contains_experimental_data = contains_experimental_data
-        self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
         self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
         self.additional_join_parameters = additional_join_parameters
 
@@ -360,6 +359,62 @@ class BenchmarkRun(ReportingObject):
             os.remove(analysis_pandas_input_filepath)
 
 
+    def set_dataframe(self, dataframe, verbose = True):
+        self.dataframe = dataframe
+        # Report the SCOPe classification counts
+        SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
+        SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
+        SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
+        self.log('The mutated residues span {0} unique SCOP(e) classifications in {1} unique SCOP(e) folds and {2} unique SCOP(e) classes.'.format(len(SCOP_classifications), len(SCOP_folds), len(SCOP_classes)), colortext.message)
+
+        # Plot the optimum y-cutoff over a range of x-cutoffs for the fraction correct metric (when experimental data is available).
+        # Include the user's cutoff in the range.
+        if self.contains_experimental_data:
+            self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
+            for analysis_set in self.scalar_adjustments.keys():
+                self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
+
+            # Add new columns derived from the adjusted values
+            for analysis_set in self.scalar_adjustments:
+                dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)] = dataframe['Predicted'] / self.scalar_adjustments[analysis_set]
+                dataframe[BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)] = (dataframe[BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)] - dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)]).abs()
+                add_fraction_correct_values_to_dataframe(dataframe, BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set), BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), BenchmarkRun.get_analysis_set_fieldname('StabilityClassification_adj', analysis_set),  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)
+
+        # Write the dataframe out to CSV
+        if self.store_data_on_disk:
+            self.write_dataframe_to_csv(self.analysis_csv_input_filepath)
+
+        # Write the dataframe out to JSON
+        # Note: I rolled my own as dataframe.to_dict(orient = 'records') gives us the correct format but discards the DatasetID (index) field
+        json_records = {}
+        indices = dataframe.index.values.tolist()
+        for i in indices:
+            json_records[i] = {}
+        for k, v in dataframe.to_dict().iteritems():
+            for i, v in v.iteritems():
+                assert(k not in json_records[i])
+                json_records[i][k] = v
+        if self.analysis_json_input_filepath and self.store_data_on_disk:
+            write_file(self.analysis_json_input_filepath, json.dumps(json_records, indent = 4, sort_keys=True))
+
+        # Write the values computed in this function out to disk
+        analysis_pandas_input_filepath = self.analysis_pandas_input_filepath
+        if self.store_data_on_disk:
+            if os.path.exists(analysis_pandas_input_filepath):
+                os.remove(analysis_pandas_input_filepath)
+        else:
+            analysis_pandas_input_filepath = write_temp_file('/tmp', '', ftype = 'wb')
+        try:
+            analysis_pandas_input_filepath = self.write_dataframe(analysis_pandas_input_filepath)
+            dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
+            if not self.store_data_on_disk:
+                os.remove(analysis_pandas_input_filepath)
+        except Exception, e:
+            if not self.store_data_on_disk:
+                os.remove(analysis_pandas_input_filepath)
+            raise
+        return dataframe_blob
+
     def write_dataframe(self, analysis_pandas_input_filepath):
         store = pandas.HDFStore(analysis_pandas_input_filepath)
 
@@ -466,61 +521,7 @@ class BenchmarkRun(ReportingObject):
                     dataframe_table[h].append(dataframe_record[h])
                 assert(sorted(dataframe_columns) == sorted(dataframe_record.keys()))
         dataframe = pandas.DataFrame(dataframe_table, index = indices)
-        self.dataframe = dataframe
-
-        # Report the SCOPe classification counts
-        SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
-        SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
-        SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
-        self.log('The mutated residues span {0} unique SCOP(e) classifications in {1} unique SCOP(e) folds and {2} unique SCOP(e) classes.'.format(len(SCOP_classifications), len(SCOP_folds), len(SCOP_classes)), colortext.message)
-
-        # Plot the optimum y-cutoff over a range of x-cutoffs for the fraction correct metric (when experimental data is available).
-        # Include the user's cutoff in the range.
-        if self.contains_experimental_data:
-            self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
-            for analysis_set in self.analysis_sets:
-                self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
-
-            # Add new columns derived from the adjusted values
-            for analysis_set in self.analysis_sets:
-                dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)] = dataframe['Predicted'] / self.scalar_adjustments[analysis_set]
-                dataframe[BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)] = (dataframe[BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)] - dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)]).abs()
-                add_fraction_correct_values_to_dataframe(dataframe, BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set), BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), BenchmarkRun.get_analysis_set_fieldname('StabilityClassification_adj', analysis_set),  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)
-
-        # Write the dataframe out to CSV
-        if self.store_data_on_disk:
-            self.write_dataframe_to_csv(self.analysis_csv_input_filepath)
-
-        # Write the dataframe out to JSON
-        # Note: I rolled my own as dataframe.to_dict(orient = 'records') gives us the correct format but discards the DatasetID (index) field
-        json_records = {}
-        indices = dataframe.index.values.tolist()
-        for i in indices:
-            json_records[i] = {}
-        for k, v in dataframe.to_dict().iteritems():
-            for i, v in v.iteritems():
-                assert(k not in json_records[i])
-                json_records[i][k] = v
-        if self.analysis_json_input_filepath and self.store_data_on_disk:
-            write_file(self.analysis_json_input_filepath, json.dumps(json_records, indent = 4, sort_keys=True))
-
-        # Write the values computed in this function out to disk
-        analysis_pandas_input_filepath = self.analysis_pandas_input_filepath
-        if self.store_data_on_disk:
-            if os.path.exists(analysis_pandas_input_filepath):
-                os.remove(analysis_pandas_input_filepath)
-        else:
-            analysis_pandas_input_filepath = write_temp_file('/tmp', '', ftype = 'wb')
-        try:
-            analysis_pandas_input_filepath = self.write_dataframe(analysis_pandas_input_filepath)
-            dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
-            if not self.store_data_on_disk:
-                os.remove(analysis_pandas_input_filepath)
-        except Exception, e:
-            if not self.store_data_on_disk:
-                os.remove(analysis_pandas_input_filepath)
-            raise
-        return dataframe_blob
+        return self.set_dataframe(dataframe, verbose = verbose)
 
     def write_dataframe_to_csv(self, output_path):
         # Write the dataframe out to CSV
@@ -731,7 +732,7 @@ class BenchmarkRun(ReportingObject):
 
     def analyze_all(self, analysis_directory = None):
         '''This function runs the analysis and creates the plots and summary file.'''
-        for analysis_set in self.analysis_sets:
+        for analysis_set in self.scalar_adjustments:
             self.analyze(analysis_set, analysis_directory = analysis_directory)
 
 
@@ -781,11 +782,22 @@ class BenchmarkRun(ReportingObject):
             remove_existing_analysis_directory = True,
             use_multiprocessing = True,
             verbose = True,
-            compile_pdf = True
+            compile_pdf = True,
+            limit_to_complete_presence = True,
     ):
         '''This function runs the analysis for multiple input settings'''
         if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
             shutil.rmtree(analysis_directory)
+
+        if limit_to_complete_presence:
+            common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
+            for br in benchmark_runs[1:]:
+                common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
+            # limited_benchmark_runs = []
+            for br in benchmark_runs:
+                br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = use_multiprocessing )
+                # limited_benchmark_runs.append( br )
+            # benchmark_runs = limited_benchmark_runs
 
         ### Determine which join parameters (including special case of topx/take_lowest) are unique
         br_topx_values = set()
@@ -2075,13 +2087,10 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def __init__(self, *args, **kwargs):
         super(DBBenchmarkRun, self).__init__(*args, **kwargs)
-        self.analysis_sets = []
 
 
     def get_analysis_sets(self, record):
-        if not self.analysis_sets:
-            self.analysis_sets = sorted(record['DDG'].keys())
-        return self.analysis_sets
+        return self.scalar_adjustments.keys()
 
 
     def is_this_record_a_derived_mutation(self, record):

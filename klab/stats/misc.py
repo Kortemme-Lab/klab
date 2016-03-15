@@ -114,6 +114,8 @@ def fraction_correct_pandas(dataframe, x_series, y_series, x_cutoff = 1.0, y_cut
 def add_fraction_correct_values_to_dataframe(dataframe, x_series, y_series, new_label, x_cutoff = 1.0, y_cutoff = 1.0, ignore_null_values = False):
     '''Adds a new column (new_label) to the dataframe with the fraction correct computed over X and Y values.'''
     new_series_values = fraction_correct_values(dataframe.index.values.tolist(), dataframe[x_series].values.tolist(), dataframe[y_series].values.tolist(), x_cutoff = x_cutoff, y_cutoff = y_cutoff, ignore_null_values = ignore_null_values)
+    if new_label in dataframe.columns.values:
+        del dataframe[new_label]
     dataframe.insert(len(dataframe.columns), new_label, new_series_values)
 
 
