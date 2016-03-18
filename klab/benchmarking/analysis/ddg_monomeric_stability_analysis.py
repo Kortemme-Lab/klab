@@ -92,6 +92,7 @@ class BenchmarkRun(ReportingObject):
                  terminal_width = 200, restrict_to = set(), remove_cases = set()):
 
         self.contains_experimental_data = contains_experimental_data
+        self.analysis_sets = [''] # some subclasses store values for multiple analysis sets
         self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
         self.additional_join_parameters = additional_join_parameters
 
@@ -146,7 +147,6 @@ class BenchmarkRun(ReportingObject):
         self.use_existing_benchmark_data = use_existing_benchmark_data
         self.ddg_analysis_type_description = None
         self.filter_data()
-
 
     def add_stored_metric_to_df(self, case_description, case_length, case_stats):
         # Reformat statitistics to put a column for each stat type
@@ -370,12 +370,15 @@ class BenchmarkRun(ReportingObject):
         # Plot the optimum y-cutoff over a range of x-cutoffs for the fraction correct metric (when experimental data is available).
         # Include the user's cutoff in the range.
         if self.contains_experimental_data:
+            if len(self.analysis_sets) == 0 and len(self.scalar_adjustments):
+                self.analysis_sets = self.scalar_adjustments.keys()
             self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
-            for analysis_set in self.scalar_adjustments.keys():
+            for analysis_set in self.analysis_sets:#scalar_adjustments.keys():
                 self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
 
+
             # Add new columns derived from the adjusted values
-            for analysis_set in self.scalar_adjustments:
+            for analysis_set in self.analysis_sets:
                 dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)] = dataframe['Predicted'] / self.scalar_adjustments[analysis_set]
                 dataframe[BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)] = (dataframe[BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)] - dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)]).abs()
                 add_fraction_correct_values_to_dataframe(dataframe, BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set), BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), BenchmarkRun.get_analysis_set_fieldname('StabilityClassification_adj', analysis_set),  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)
@@ -732,7 +735,7 @@ class BenchmarkRun(ReportingObject):
 
     def analyze_all(self, analysis_directory = None):
         '''This function runs the analysis and creates the plots and summary file.'''
-        for analysis_set in self.scalar_adjustments:
+        for analysis_set in self.analysis_sets:
             self.analyze(analysis_set, analysis_directory = analysis_directory)
 
 
@@ -784,6 +787,7 @@ class BenchmarkRun(ReportingObject):
             verbose = True,
             compile_pdf = True,
             limit_to_complete_presence = True,
+            all_by_all_comparisons = False,
     ):
         '''This function runs the analysis for multiple input settings'''
         if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
@@ -842,27 +846,28 @@ class BenchmarkRun(ReportingObject):
         benchmark_runs = calculated_brs
 
         ### Pointwise all-by-all comparison
-        if use_multiprocessing:
-            pool = mp.Pool()
         comparison_chapters = []
-        def save_latex_report(t):
-            latex_report = t
-            comparison_chapters.append( latex_report )
-        comparisons_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
-        for analysis_set in analysis_sets:
-            analysis_set_subdir = os.path.join(comparisons_subdir, analysis_set)
-            for i, br_i in enumerate(benchmark_runs):
-                for j, br_j in enumerate(benchmark_runs):
-                    if i > j:
-                        if use_multiprocessing:
-                            br_i_copy = copy.deepcopy( br_i )
-                            br_j_copy = copy.deepcopy( br_j )
-                            pool.apply_async( _compare_mp_alias, (br_i_copy, br_j_copy, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
-                        else:
-                            save_latex_report( _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, True) )
-        if use_multiprocessing:
-            pool.close()
-            pool.join()
+        if all_by_all_comparisons:
+            if use_multiprocessing:
+                pool = mp.Pool()
+            def save_latex_report(t):
+                latex_report = t
+                comparison_chapters.append( latex_report )
+            comparisons_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
+            for analysis_set in analysis_sets:
+                analysis_set_subdir = os.path.join(comparisons_subdir, analysis_set)
+                for i, br_i in enumerate(benchmark_runs):
+                    for j, br_j in enumerate(benchmark_runs):
+                        if i > j:
+                            if use_multiprocessing:
+                                br_i_copy = copy.deepcopy( br_i )
+                                br_j_copy = copy.deepcopy( br_j )
+                                pool.apply_async( _compare_mp_alias, (br_i_copy, br_j_copy, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
+                            else:
+                                save_latex_report( _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, True) )
+            if use_multiprocessing:
+                pool.close()
+                pool.join()
 
         intro_report = lr.LatexReport()
         intro_report.set_title_page('All data comparison')
@@ -1018,7 +1023,7 @@ class BenchmarkRun(ReportingObject):
 
 
     @staticmethod
-    def make_case_description_tables(stats_df):
+    def make_case_description_tables(stats_df, sort_by = "Pearson's R"):
         stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
         stats_columns_names = ['n', 'FC', "R", 'MAE']
         select_columns = list( stats_columns )
@@ -1035,8 +1040,14 @@ class BenchmarkRun(ReportingObject):
         # Make subcase tables
         report_content = []
         for case in cases:
+            if case == 'complete dataset (scaled)':
+                inner_sort_by = 'MAE'
+                sort_ascending = True
+            else:
+                inner_sort_by = sort_by
+                sort_ascending = False
             inner_df = stats_df[ stats_df['case_description'] == case ]
-            inner_df = inner_df.sort_values(by = "Pearson's R", ascending = False)
+            inner_df = inner_df.sort_values(by = inner_sort_by, ascending = sort_ascending)
             inner_df = inner_df[ stats_columns ]
             inner_df.columns = stats_columns_names
             report_content.append( lr.LatexPandasTable(
@@ -1048,7 +1059,7 @@ class BenchmarkRun(ReportingObject):
 
 
     @staticmethod
-    def make_specific_case_table(stats_df, case):
+    def make_specific_case_table(stats_df, case, sort_by = "Pearson's R"):
         stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
         stats_columns_names = ['n', 'FC', "R", 'MAE']
         select_columns = list( stats_columns )
@@ -1056,7 +1067,7 @@ class BenchmarkRun(ReportingObject):
         stats_df = stats_df[ select_columns ]
 
         inner_df = stats_df[ stats_df['case_description'] == case ]
-        inner_df = inner_df.sort_values(by = "Pearson's R", ascending = False)
+        inner_df = inner_df.sort_values(by = sort_by, ascending = False)
         inner_df = inner_df[ stats_columns ]
         inner_df.columns = stats_columns_names
         return lr.LatexPandasTable(
@@ -2087,10 +2098,13 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def __init__(self, *args, **kwargs):
         super(DBBenchmarkRun, self).__init__(*args, **kwargs)
+        self.analysis_sets = []
 
 
     def get_analysis_sets(self, record):
-        return self.scalar_adjustments.keys()
+        if not self.analysis_sets:
+            self.analysis_sets = sorted(record['DDG'].keys())
+        return self.analysis_sets
 
 
     def is_this_record_a_derived_mutation(self, record):
