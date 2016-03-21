@@ -894,6 +894,7 @@ class BenchmarkRun(ReportingObject):
                 left_index = True,
                 right_index = True,
             )
+
         intro_report.add_plot(
             general_matplotlib.plot_bar(
                 runtime_df,
@@ -905,7 +906,10 @@ class BenchmarkRun(ReportingObject):
                 ylabel = 'Run time (minutes)',
                 xlabel = 'Prediction Set',
                 verbose = verbose,
-                xtick_fontsize = 4,
+                xtick_fontsize = 3,
+                rotation_angle = 45,
+                log_y = True,
+                label_n = False,
             ),
             plot_title = 'Run times'
         )
