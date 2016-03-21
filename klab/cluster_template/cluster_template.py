@@ -121,7 +121,7 @@ class ClusterTemplate():
                 if arg == 'rosetta_args_list':
                     if not isinstance(settings_dict['rosetta_args_list'], basestring):
                         args_str = format_list_to_string(settings_dict['rosetta_args_list'])
-                        settings_dict['rosetta_args_list_list'] = ["    [" + str(args_str) + "]\n" for x in xrange(self.num_steps)]
+                        settings_dict['rosetta_args_list_list'] = [str(args_str) for x in xrange(self.num_steps)]
                     else:
                         args_str = settings_dict['rosetta_args_list']
                         settings_dict['rosetta_args_list_list'] = ["    ['" + str(args_str) + "']\n" for x in xrange(self.num_steps)]
