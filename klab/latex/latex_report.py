@@ -152,7 +152,7 @@ class LatexReport:
                 latex_strings.append( abstract_text_paragraph + '\n\n' )
         return latex_strings
 
-    def generate_pdf_report(self, report_filepath, copy_tex_file_dir = True, verbose = True):
+    def generate_pdf_report(self, report_filepath, copy_tex_file_dir = True, verbose = True, compile_pdf = True):
         self.generate_latex( output_type = 'pdf' )
         out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex-pdf_' % (time.strftime("%y%m%d"), getpass.getuser()) )
         if verbose:
@@ -161,11 +161,12 @@ class LatexReport:
         tmp_latex_file = os.path.join(out_dir, 'report.tex')
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
-        for x in xrange(self.number_compilations):
-            latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
-        tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
-        assert( os.path.isfile(tmp_latex_pdf) )
-        shutil.copy( tmp_latex_pdf, report_filepath )
+        if compile_pdf:
+            for x in xrange(self.number_compilations):
+                latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
+            tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
+            assert( os.path.isfile(tmp_latex_pdf) )
+            shutil.copy( tmp_latex_pdf, report_filepath )
 
         if copy_tex_file_dir:
             shutil.copytree(

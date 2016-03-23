@@ -1,6 +1,8 @@
 import datetime
 import math
 import sys
+import collections
+import numpy as np
 
 # Time in seconds function
 # Converts datetime timedelta object to number of seconds
@@ -21,10 +23,13 @@ class Reporter:
             print '\nStarting ' + task
         self.total_count = None # Total tasks to be processed
         self.maximum_output_string_length = 0
+        self.rolling_est_total_time = collections.deque( maxlen = 50 )
     def set_total_count(self, x):
         self.total_count = x
+        self.rolling_est_total_time = collections.deque( maxlen = max(1, int( .05 * x )) )
     def decrement_total_count(self):
-        self.total_count -= 1
+        if self.total_count:
+            self.total_count -= 1
     def report(self, n):
         self.n = n
         time_now = datetime.datetime.now()
@@ -32,7 +37,9 @@ class Reporter:
             self.lastreport = time_now
             if self.total_count:
                 percent_done = float(self.n) / float(self.total_count)
-                est_total_time = datetime.timedelta( seconds = ts(time_now - self.start) * (1.0 / percent_done) )
+                est_total_time_seconds = ts(time_now - self.start) * (1.0 / percent_done)
+                self.rolling_est_total_time.append( est_total_time_seconds )
+                est_total_time = datetime.timedelta( seconds = np.mean(self.rolling_est_total_time) )
                 time_remaining = est_total_time - (time_now - self.start)
                 eta = time_now + time_remaining
                 time_remaining_str = 'ETA: %s Est. time remaining: ' % eta.strftime("%Y-%m-%d %H:%M:%S")

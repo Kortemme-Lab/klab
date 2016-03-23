@@ -156,7 +156,7 @@ dssp_secondary_structure_types = dict(
     G = '3-turn/310 helix',
     H = '4-turn/α helix',
     I = '5-turn/π helix',
-    T = 'hydrogen bonded turn',
+    T = 'hydrogen-bonded turn',
     E = 'β-sheet',
     B = 'residue in isolated β-bridge',
     S = 'bend',
@@ -318,6 +318,20 @@ class Sequence(object):
         except:
             raise StopIteration
 
+
+    def __eq__(self, other):
+        '''Equality is defined on residue ID and type.'''
+        num_res = len(self.order)
+        if num_res != len(other.order):
+            return False
+        for x in xrange(num_res):
+            if self.order[x] != other.order[x]:
+                return False
+            if self.sequence[self.order[x]] != other.sequence[other.order[x]]:
+                return False
+        return True
+
+
     def add(self, r):
         '''Takes an id and a Residue r and adds them to the Sequence.'''
         id = r.get_residue_id()
@@ -342,9 +356,11 @@ class Sequence(object):
                 r.residue_type = sequence_type
             self.sequence_type = sequence_type
 
+
     def __repr__(self):
         sequence = self.sequence
         return "".join([sequence[id].ResidueAA for id in self.order])
+
 
     @staticmethod
     def from_sequence(chain, list_of_residues, sequence_type = None):
@@ -356,7 +372,9 @@ class Sequence(object):
             count += 1
         return s
 
+
 class InconsistentMappingException(Exception): pass
+
 
 class SequenceMap(object):
     ''' A class to map the IDs of one Sequence to another.'''
@@ -680,9 +698,15 @@ class Residue(object):
     def __repr__(self):
         return "%s:%s %s" % (self.Chain, str(self.ResidueID).strip(), self.ResidueAA)
 
+
+    def __ne__(self, other):
+        return not(self.__eq__(other))
+
+
     def __eq__(self, other):
         '''Basic form of equality, just checking the amino acid types. This lets us check equality over different chains with different residue IDs.'''
         return (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
+
 
     def get_residue_id(self):
         return self.ResidueID
@@ -695,6 +719,7 @@ class PDBResidue(Residue):
         assert(len(ResidueID) == 5)
         super(PDBResidue, self).__init__(Chain, ResidueID, ResidueAA, residue_type)
         self.Residue3AA = Residue3AA
+
 
     def add_position(self, x, y, z):
         self.x, self.y, self.z = x, y, z

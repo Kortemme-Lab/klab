@@ -92,7 +92,7 @@ class BenchmarkRun(ReportingObject):
                  terminal_width = 200, restrict_to = set(), remove_cases = set()):
 
         self.contains_experimental_data = contains_experimental_data
-        self.analysis_sets = ['']                                         # some subclasses store values for multiple analysis sets
+        self.analysis_sets = [''] # some subclasses store values for multiple analysis sets
         self.csv_headers = copy.deepcopy(self.__class__.csv_headers)
         self.additional_join_parameters = additional_join_parameters
 
@@ -147,7 +147,6 @@ class BenchmarkRun(ReportingObject):
         self.use_existing_benchmark_data = use_existing_benchmark_data
         self.ddg_analysis_type_description = None
         self.filter_data()
-
 
     def add_stored_metric_to_df(self, case_description, case_length, case_stats):
         # Reformat statitistics to put a column for each stat type
@@ -313,6 +312,7 @@ class BenchmarkRun(ReportingObject):
         if not os.path.isdir(self.subplot_directory):
             os.makedirs(self.subplot_directory)
 
+
     def read_dataframe_from_content(self, hdfstore_blob):
         fname = write_temp_file('/tmp', hdfstore_blob, ftype = 'wb')
         try:
@@ -358,6 +358,65 @@ class BenchmarkRun(ReportingObject):
         if remove_file:
             os.remove(analysis_pandas_input_filepath)
 
+
+    def set_dataframe(self, dataframe, verbose = True):
+        self.dataframe = dataframe
+        # Report the SCOPe classification counts
+        SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
+        SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
+        SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
+        self.log('The mutated residues span {0} unique SCOP(e) classifications in {1} unique SCOP(e) folds and {2} unique SCOP(e) classes.'.format(len(SCOP_classifications), len(SCOP_folds), len(SCOP_classes)), colortext.message)
+
+        # Plot the optimum y-cutoff over a range of x-cutoffs for the fraction correct metric (when experimental data is available).
+        # Include the user's cutoff in the range.
+        if self.contains_experimental_data:
+            if len(self.analysis_sets) == 0 and len(self.scalar_adjustments):
+                self.analysis_sets = self.scalar_adjustments.keys()
+            self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
+            for analysis_set in self.analysis_sets:#scalar_adjustments.keys():
+                self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
+
+
+            # Add new columns derived from the adjusted values
+            for analysis_set in self.analysis_sets:
+                dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)] = dataframe['Predicted'] / self.scalar_adjustments[analysis_set]
+                dataframe[BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)] = (dataframe[BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)] - dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)]).abs()
+                add_fraction_correct_values_to_dataframe(dataframe, BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set), BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), BenchmarkRun.get_analysis_set_fieldname('StabilityClassification_adj', analysis_set),  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)
+
+        # Write the dataframe out to CSV
+        if self.store_data_on_disk:
+            self.write_dataframe_to_csv(self.analysis_csv_input_filepath)
+
+        # Write the dataframe out to JSON
+        # Note: I rolled my own as dataframe.to_dict(orient = 'records') gives us the correct format but discards the DatasetID (index) field
+        json_records = {}
+        indices = dataframe.index.values.tolist()
+        for i in indices:
+            json_records[i] = {}
+        for k, v in dataframe.to_dict().iteritems():
+            for i, v in v.iteritems():
+                assert(k not in json_records[i])
+                json_records[i][k] = v
+        if self.analysis_json_input_filepath and self.store_data_on_disk:
+            write_file(self.analysis_json_input_filepath, json.dumps(json_records, indent = 4, sort_keys=True))
+
+        # Write the values computed in this function out to disk
+        analysis_pandas_input_filepath = self.analysis_pandas_input_filepath
+        if self.store_data_on_disk:
+            if os.path.exists(analysis_pandas_input_filepath):
+                os.remove(analysis_pandas_input_filepath)
+        else:
+            analysis_pandas_input_filepath = write_temp_file('/tmp', '', ftype = 'wb')
+        try:
+            analysis_pandas_input_filepath = self.write_dataframe(analysis_pandas_input_filepath)
+            dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
+            if not self.store_data_on_disk:
+                os.remove(analysis_pandas_input_filepath)
+        except Exception, e:
+            if not self.store_data_on_disk:
+                os.remove(analysis_pandas_input_filepath)
+            raise
+        return dataframe_blob
 
     def write_dataframe(self, analysis_pandas_input_filepath):
         store = pandas.HDFStore(analysis_pandas_input_filepath)
@@ -465,61 +524,7 @@ class BenchmarkRun(ReportingObject):
                     dataframe_table[h].append(dataframe_record[h])
                 assert(sorted(dataframe_columns) == sorted(dataframe_record.keys()))
         dataframe = pandas.DataFrame(dataframe_table, index = indices)
-        self.dataframe = dataframe
-
-        # Report the SCOPe classification counts
-        SCOP_classifications = set(dataframe['WildTypeSCOPClassification'].values.tolist())
-        SCOP_folds = set(dataframe['WildTypeSCOPFold'].values.tolist())
-        SCOP_classes = set(dataframe['WildTypeSCOPClass'].values.tolist())
-        self.log('The mutated residues span {0} unique SCOP(e) classifications in {1} unique SCOP(e) folds and {2} unique SCOP(e) classes.'.format(len(SCOP_classifications), len(SCOP_folds), len(SCOP_classes)), colortext.message)
-
-        # Plot the optimum y-cutoff over a range of x-cutoffs for the fraction correct metric (when experimental data is available).
-        # Include the user's cutoff in the range.
-        if self.contains_experimental_data:
-            self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
-            for analysis_set in self.analysis_sets:
-                self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
-
-            # Add new columns derived from the adjusted values
-            for analysis_set in self.analysis_sets:
-                dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)] = dataframe['Predicted'] / self.scalar_adjustments[analysis_set]
-                dataframe[BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)] = (dataframe[BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set)] - dataframe[BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)]).abs()
-                add_fraction_correct_values_to_dataframe(dataframe, BenchmarkRun.get_analysis_set_fieldname('Experimental', analysis_set), BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), BenchmarkRun.get_analysis_set_fieldname('StabilityClassification_adj', analysis_set),  x_cutoff = self.stability_classication_x_cutoff, y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True)
-
-        # Write the dataframe out to CSV
-        if self.store_data_on_disk:
-            self.write_dataframe_to_csv(self.analysis_csv_input_filepath)
-
-        # Write the dataframe out to JSON
-        # Note: I rolled my own as dataframe.to_dict(orient = 'records') gives us the correct format but discards the DatasetID (index) field
-        json_records = {}
-        indices = dataframe.index.values.tolist()
-        for i in indices:
-            json_records[i] = {}
-        for k, v in dataframe.to_dict().iteritems():
-            for i, v in v.iteritems():
-                assert(k not in json_records[i])
-                json_records[i][k] = v
-        if self.analysis_json_input_filepath and self.store_data_on_disk:
-            write_file(self.analysis_json_input_filepath, json.dumps(json_records, indent = 4, sort_keys=True))
-
-        # Write the values computed in this function out to disk
-        analysis_pandas_input_filepath = self.analysis_pandas_input_filepath
-        if self.store_data_on_disk:
-            if os.path.exists(analysis_pandas_input_filepath):
-                os.remove(analysis_pandas_input_filepath)
-        else:
-            analysis_pandas_input_filepath = write_temp_file('/tmp', '', ftype = 'wb')
-        try:
-            analysis_pandas_input_filepath = self.write_dataframe(analysis_pandas_input_filepath)
-            dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
-            if not self.store_data_on_disk:
-                os.remove(analysis_pandas_input_filepath)
-        except Exception, e:
-            if not self.store_data_on_disk:
-                os.remove(analysis_pandas_input_filepath)
-            raise
-        return dataframe_blob
+        return self.set_dataframe(dataframe, verbose = verbose)
 
     def write_dataframe_to_csv(self, output_path):
         # Write the dataframe out to CSV
@@ -741,7 +746,7 @@ class BenchmarkRun(ReportingObject):
             self.plot(analysis_set, analysis_directory = analysis_directory)
 
 
-    def full_analysis(self, analysis_set, output_directory, verbose = True):
+    def full_analysis(self, analysis_set, output_directory, verbose = True, compile_pdf = True):
         '''Combines calculate_metrics, write_dataframe_to_csv, and plot'''
         if not os.path.isdir(output_directory):
             os.makedirs(output_directory)
@@ -750,10 +755,10 @@ class BenchmarkRun(ReportingObject):
         self.write_dataframe_to_csv( os.path.join(output_directory, 'data.csv') )
 
         # Return latex_report
-        return self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose)
+        return self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose, compile_pdf = compile_pdf)
 
 
-    def get_definitive_name(self, topx_unique, unique_ajps):
+    def get_definitive_name(self, topx_unique, unique_ajps, join_character = '-'):
         """
         Generates a definitive name for this benchmark run object, including topx value
         (if passed arg indicates this is unique), and other unique additional join parameters
@@ -762,11 +767,11 @@ class BenchmarkRun(ReportingObject):
         name = ''
         if topx_unique:
             if len(name) > 0:
-                name += '-'
+                name += join_character
             name += 'topx_%d' % self.take_lowest
         for ajp in unique_ajps:
             if len(name) > 0:
-                name += '-'
+                name += join_character
             name += str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
         return name
 
@@ -780,10 +785,23 @@ class BenchmarkRun(ReportingObject):
             remove_existing_analysis_directory = True,
             use_multiprocessing = True,
             verbose = True,
+            compile_pdf = True,
+            limit_to_complete_presence = True,
+            all_by_all_comparisons = False,
     ):
         '''This function runs the analysis for multiple input settings'''
         if remove_existing_analysis_directory and os.path.isdir(analysis_directory):
             shutil.rmtree(analysis_directory)
+
+        if limit_to_complete_presence:
+            common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
+            for br in benchmark_runs[1:]:
+                common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
+            # limited_benchmark_runs = []
+            for br in benchmark_runs:
+                br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = use_multiprocessing )
+                # limited_benchmark_runs.append( br )
+            # benchmark_runs = limited_benchmark_runs
 
         ### Determine which join parameters (including special case of topx/take_lowest) are unique
         br_topx_values = set()
@@ -828,25 +846,28 @@ class BenchmarkRun(ReportingObject):
         benchmark_runs = calculated_brs
 
         ### Pointwise all-by-all comparison
-        if use_multiprocessing:
-            pool = mp.Pool()
         comparison_chapters = []
-        def save_latex_report(t):
-            latex_report = t
-            comparison_chapters.append( latex_report )
-        comparisons_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
-        for analysis_set in analysis_sets:
-            analysis_set_subdir = os.path.join(comparisons_subdir, analysis_set)
-            for i, br_i in enumerate(benchmark_runs):
-                for j, br_j in enumerate(benchmark_runs):
-                    if i > j:
-                        if use_multiprocessing:
-                            pool.apply_async( _compare_mp_alias, (br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
-                        else:
-                            save_latex_report( _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, True) )
-        if use_multiprocessing:
-            pool.close()
-            pool.join()
+        if all_by_all_comparisons:
+            if use_multiprocessing:
+                pool = mp.Pool()
+            def save_latex_report(t):
+                latex_report = t
+                comparison_chapters.append( latex_report )
+            comparisons_subdir = os.path.join(analysis_directory, 'comparison_analysis_sets')
+            for analysis_set in analysis_sets:
+                analysis_set_subdir = os.path.join(comparisons_subdir, analysis_set)
+                for i, br_i in enumerate(benchmark_runs):
+                    for j, br_j in enumerate(benchmark_runs):
+                        if i > j:
+                            if use_multiprocessing:
+                                br_i_copy = copy.deepcopy( br_i )
+                                br_j_copy = copy.deepcopy( br_j )
+                                pool.apply_async( _compare_mp_alias, (br_i_copy, br_j_copy, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, False), callback = save_latex_report )
+                            else:
+                                save_latex_report( _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, True) )
+            if use_multiprocessing:
+                pool.close()
+                pool.join()
 
         intro_report = lr.LatexReport()
         intro_report.set_title_page('All data comparison')
@@ -879,8 +900,8 @@ class BenchmarkRun(ReportingObject):
                 output_directory = subplot_directory,
                 plot_title = 'Prediction Run Times',
                 output_name = 'runtimes',
-                fig_height = 9,
-                fig_width = 7,
+                fig_height = 7,
+                fig_width = 9,
                 ylabel = 'Run time (minutes)',
                 xlabel = 'Prediction Set',
                 verbose = verbose,
@@ -900,11 +921,12 @@ class BenchmarkRun(ReportingObject):
         main_latex_report.generate_pdf_report(
             os.path.join( analysis_directory, 'report.pdf' ),
             verbose = verbose,
+            compile_pdf = compile_pdf,
         )
         print os.path.join( analysis_directory, 'report.pdf' )
 
 
-    def compare(self, other, analysis_set, output_directory, topx_unique, unique_ajps, verbose = True):
+    def compare(self, other, analysis_set, output_directory, topx_unique, unique_ajps, verbose = True, compile_pdf = True):
         """
         Generate comparison latex report in specified output directory
         Returns LatexReport object
@@ -959,7 +981,7 @@ class BenchmarkRun(ReportingObject):
             right_index = True,
         )
         predictions_v_predictions_df.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
 
         diff_v_diff_dataframe = self.get_pred_minus_exp_dataframe(analysis_set).merge(
             other.get_pred_minus_exp_dataframe(analysis_set),
@@ -968,7 +990,7 @@ class BenchmarkRun(ReportingObject):
         )
         report.add_section_page( title = 'Plots' )
         diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 8, fig_width = 7, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
 
         report.add_section_page( title = 'Tables' )
 
@@ -993,6 +1015,7 @@ class BenchmarkRun(ReportingObject):
         report.generate_pdf_report(
             os.path.join( output_directory, 'comparison.pdf' ),
             verbose = verbose,
+            compile_pdf = compile_pdf,
         )
         if verbose:
             print 'Comparison report saved to:', os.path.join( output_directory, 'comparison.pdf' )
@@ -1000,7 +1023,7 @@ class BenchmarkRun(ReportingObject):
 
 
     @staticmethod
-    def make_case_description_tables(stats_df):
+    def make_case_description_tables(stats_df, sort_by = "Pearson's R"):
         stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
         stats_columns_names = ['n', 'FC', "R", 'MAE']
         select_columns = list( stats_columns )
@@ -1017,8 +1040,14 @@ class BenchmarkRun(ReportingObject):
         # Make subcase tables
         report_content = []
         for case in cases:
+            if case == 'complete dataset (scaled)':
+                inner_sort_by = 'MAE'
+                sort_ascending = True
+            else:
+                inner_sort_by = sort_by
+                sort_ascending = False
             inner_df = stats_df[ stats_df['case_description'] == case ]
-            inner_df = inner_df.sort_values(by = "Pearson's R", ascending = False)
+            inner_df = inner_df.sort_values(by = inner_sort_by, ascending = sort_ascending)
             inner_df = inner_df[ stats_columns ]
             inner_df.columns = stats_columns_names
             report_content.append( lr.LatexPandasTable(
@@ -1030,7 +1059,7 @@ class BenchmarkRun(ReportingObject):
 
 
     @staticmethod
-    def make_specific_case_table(stats_df, case):
+    def make_specific_case_table(stats_df, case, sort_by = "Pearson's R"):
         stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
         stats_columns_names = ['n', 'FC', "R", 'MAE']
         select_columns = list( stats_columns )
@@ -1038,7 +1067,7 @@ class BenchmarkRun(ReportingObject):
         stats_df = stats_df[ select_columns ]
 
         inner_df = stats_df[ stats_df['case_description'] == case ]
-        inner_df = inner_df.sort_values(by = "Pearson's R", ascending = False)
+        inner_df = inner_df.sort_values(by = sort_by, ascending = False)
         inner_df = inner_df[ stats_columns ]
         inner_df.columns = stats_columns_names
         return lr.LatexPandasTable(
@@ -1297,11 +1326,7 @@ class BenchmarkRun(ReportingObject):
         self.metrics_filepath = os.path.join(self.analysis_directory, '{0}_metrics.txt'.format(self.benchmark_run_name))
         write_file(self.metrics_filepath, '\n'.join([x.generate_plaintext() for x in self.metric_latex_objects]))
 
-    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True, verbose = True):
-        # Reset to new current working directory
-        tmp_working_dir = tempfile.mkdtemp( prefix = '%s-%s-%s_' % (time.strftime("%y%m%d"), getpass.getuser(), 'plot-working-dir') )
-        os.chdir(tmp_working_dir)
-
+    def plot(self, analysis_set = '', analysis_directory = None, matplotlib_plots = True, verbose = True, compile_pdf = True):
         if matplotlib_plots:
             from klab.plot import general_matplotlib
 
@@ -1349,16 +1374,16 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_section_page( title = 'Main plots' )
 
         if matplotlib_plots:
-            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 7, fig_width = 8, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
             latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
 
             single_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
             if len(single_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7, verbose = verbose), plot_title = 'Single mutations data subset' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(single_mutations_dataframe, experimental_series, 'Predicted', output_name = 'single_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 6, fig_width = 7, verbose = verbose), plot_title = 'Single mutations data subset' )
 
             multiple_mutations_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
             if len(multiple_mutations_dataframe) > 0:
-                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 9, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
+                latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 6, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
 
             latex_report.add_plot(
                 general_matplotlib.plot_bar(
@@ -1366,7 +1391,7 @@ class BenchmarkRun(ReportingObject):
                     output_directory = self.subplot_directory,
                     plot_title = 'Prediction Run Time',
                     output_name = 'runtime',
-                    fig_height = 9,
+                    fig_height = 6,
                     fig_width = 7,
                     ylabel = 'Run time (minutes)',
                     xlabel = 'Prediction Set',
@@ -1460,13 +1485,12 @@ class BenchmarkRun(ReportingObject):
         latex_report.generate_pdf_report(
             os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ),
             verbose = verbose,
+            compile_pdf = compile_pdf,
         )
         if verbose:
             self.log('Report written to: ' + os.path.join( self.analysis_directory, '{0}_benchmark_plots.pdf'.format(self.benchmark_run_name) ) )
 
         self.generate_plots = old_generate_plots
-
-        shutil.rmtree( tmp_working_dir )
 
         return latex_report
 
@@ -2047,7 +2071,7 @@ def _full_analysis_mp_alias(br_obj, analysis_set, output_directory, unique_name,
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    return (br_obj, unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose))
+    return (br_obj, unique_name, br_obj.full_analysis(analysis_set, output_directory, verbose = verbose, compile_pdf = verbose))
 
 
 def _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose):
@@ -2056,7 +2080,7 @@ def _compare_mp_alias(br_i, br_j, analysis_set, analysis_set_subdir, topx_unique
     multiprocessing pool. Needed as multiprocessing does not otherwise work
     on object instance methods.
     """
-    return br_i.compare(br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose = verbose)
+    return br_i.compare(br_j, analysis_set, analysis_set_subdir, topx_unique, unique_ajps, verbose = verbose, compile_pdf = verbose)
 
 
 class DBBenchmarkRun(BenchmarkRun):
