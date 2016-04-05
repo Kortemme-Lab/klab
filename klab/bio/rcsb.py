@@ -12,6 +12,7 @@ import StringIO
 from io import BytesIO
 from PIL import Image
 import urllib
+import gzip
 import shlex
 
 from klab.comms.http import Connection
@@ -21,6 +22,7 @@ from klab.process import Popen
 
 
 rcsb_connection = None
+rcsb_files_connection = None
 
 
 def get_rcsb_connection():
@@ -30,12 +32,18 @@ def get_rcsb_connection():
     return rcsb_connection
 
 
-def retrieve_file_from_RCSB(resource, silent = True):
+def get_rcsb_files_connection():
+    global rcsb_files_connection
+    if not rcsb_files_connection:
+        rcsb_files_connection = Connection('files.rcsb.org', timeout = 10)
+    return rcsb_files_connection
+
+
+def retrieve_file_from_RCSB(http_connection, resource, silent = True):
     '''Retrieve a file from the RCSB.'''
-    get_rcsb_connection()
     if not silent:
         colortext.printf("Retrieving %s from RCSB" % os.path.split(resource)[1], color = "aqua")
-    return rcsb_connection.get(resource)
+    return http_connection.get(resource)
 
 
 def download_pdb(pdb_id, dest_dir, silent = True, filename = None):
@@ -57,23 +65,31 @@ def download_pdb(pdb_id, dest_dir, silent = True, filename = None):
 
 
 def retrieve_pdb(pdb_id, silent = True):
-    return retrieve_file_from_RCSB("/pdb/files/%s.pdb" % pdb_id, silent = silent)
+    return retrieve_file_from_RCSB(get_rcsb_files_connection(), "/download/%s.pdb" % pdb_id, silent = silent)
 
 
 def retrieve_fasta(pdb_id, silent = True):
-    return retrieve_file_from_RCSB("/pdb/files/fasta.txt?structureIdList=%s" % pdb_id, silent = silent)
+    return retrieve_file_from_RCSB(get_rcsb_connection(), "/pdb/files/fasta.txt?structureIdList=%s" % pdb_id, silent = silent)
 
 
 def retrieve_xml(pdb_id, silent = True):
-    return retrieve_file_from_RCSB("/pdb/files/%s.xml" % pdb_id, silent = silent)
+    '''The RCSB website now compresses XML files.'''
+    xml_gz = retrieve_file_from_RCSB(get_rcsb_files_connection(), "/download/%s.xml.gz" % pdb_id, silent = silent)
+    cf = StringIO.StringIO()
+    cf.write(xml_gz)
+    cf.seek(0)
+    df = gzip.GzipFile(fileobj = cf, mode='rb')
+    contents = df.read()
+    df.close()
+    return contents
 
 
 def retrieve_ligand_cif(ligand_id, silent = True):
-    return retrieve_file_from_RCSB("/pdb/files/ligand/%s.cif" % ligand_id, silent = silent)
+    return retrieve_file_from_RCSB(get_rcsb_connection(), "/pdb/files/ligand/%s.cif" % ligand_id, silent = silent)
 
 
 def retrieve_pdb_ligand_info(pdb_id, silent = True):
-    return retrieve_file_from_RCSB("http://www.rcsb.org/pdb/rest/ligandInfo?structureId={0}".format(pdb_id), silent = silent)
+    return retrieve_file_from_RCSB(get_rcsb_connection(), "http://www.rcsb.org/pdb/rest/ligandInfo?structureId={0}".format(pdb_id), silent = silent)
 
 
 def retrieve_ligand_diagram(pdb_ligand_code):
@@ -85,6 +101,7 @@ def retrieve_ligand_diagram(pdb_ligand_code):
         img = Image.open(file)
         width, height = img.size
         if width < 100:
+            colortext.warning('Could not find a diagram for ligand {0}. It is possible that the URLs have changed.'.format(pdb_ligand_code))
             return None
     file.seek(0)
     return file.read()
