@@ -308,6 +308,7 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             return value
 
         flags_dict = job_dict[job_dir]
+        make_input_file_list = False
         for flag in flags_dict:
             if flag.startswith('FLAGLIST'):
                 for split_flag in flags_dict[flag]:
@@ -315,7 +316,8 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
                 continue
 
             # Process later if input file list
-            if flag == 'input_file_list':
+            if flag.startswith( 'input_file_list' ):
+                make_input_file_list = True
                 continue
 
             # Check if argument is a rosetta script variable
@@ -356,14 +358,19 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             else:
                 args.append(value)
 
-        if 'input_file_list' in flags_dict:
+        if make_input_file_list:
             input_list_file = os.path.join(tmp_data_dir, 'structs.txt')
             tmp_pdb_dir = os.path.join(tmp_data_dir, 'input_list_pdbs')
             os.mkdir(tmp_pdb_dir)
-            args.append('-l')
+            if 'input_file_list' in flags_dict:
+                list_flag_name = 'input_file_list'
+                args.append('-l')
+            elif 'input_file_list-fragmix' in flags_dict:
+                list_flag_name = 'input_file_list-fragmix'
+                args.append('-fragmix:input_pdbs')
             args.append( os.path.relpath(input_list_file, tmp_output_dir) )
             f = open(input_list_file, 'w')
-            pdbs = sorted(flags_dict['input_file_list'])
+            pdbs = sorted(flags_dict[list_flag_name])
             for i, input_pdb in enumerate(pdbs):
                 inner_tmp_pdb_dir = tempfile.mkdtemp(prefix='pdb_dir_', dir=tmp_pdb_dir)
                 new_input_file = os.path.join(inner_tmp_pdb_dir, os.path.basename(input_pdb))
