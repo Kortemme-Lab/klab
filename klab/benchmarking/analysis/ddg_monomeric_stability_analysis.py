@@ -773,8 +773,31 @@ class BenchmarkRun(ReportingObject):
             if len(name) > 0:
                 name += join_character
             name += str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
+        if name == '':
+            name = 'ddg-benchmark'
         return name
 
+
+    @staticmethod
+    def get_unique_ajps( benchmark_runs ):
+        ### Determine which join parameters (including special case of topx/take_lowest) are unique
+        br_topx_values = set()
+        br_ajps = {}
+        for br in benchmark_runs:
+            br_topx_values.add( br.take_lowest )
+            for ajp in br.additional_join_parameters:
+                if ajp not in br_ajps:
+                    br_ajps[ajp] = set()
+                br_ajps[ajp].add( br.additional_join_parameters[ajp]['short_name'] )
+        if len(br_topx_values) > 1:
+            topx_unique = True
+        else:
+            topx_unique = False
+        unique_ajps = []
+        for ajp in br_ajps:
+            if len( br_ajps[ajp] ) > 1:
+                unique_ajps.append( ajp )
+        return (topx_unique, unique_ajps)
 
     @staticmethod
     def analyze_multiple(
@@ -803,23 +826,7 @@ class BenchmarkRun(ReportingObject):
                 # limited_benchmark_runs.append( br )
             # benchmark_runs = limited_benchmark_runs
 
-        ### Determine which join parameters (including special case of topx/take_lowest) are unique
-        br_topx_values = set()
-        br_ajps = {}
-        for br in benchmark_runs:
-            br_topx_values.add( br.take_lowest )
-            for ajp in br.additional_join_parameters:
-                if ajp not in br_ajps:
-                    br_ajps[ajp] = set()
-                br_ajps[ajp].add( br.additional_join_parameters[ajp]['short_name'] )
-        if len(br_topx_values) > 1:
-            topx_unique = True
-        else:
-            topx_unique = False
-        unique_ajps = []
-        for ajp in br_ajps:
-            if len( br_ajps[ajp] ) > 1:
-                unique_ajps.append( ajp )
+        topx_unique, unique_ajps = BindingAffinityBenchmarkRun.get_unique_ajps( benchmark_runs )
 
         ###  Process each benchmark run object individually
         if use_multiprocessing:
@@ -894,6 +901,7 @@ class BenchmarkRun(ReportingObject):
                 left_index = True,
                 right_index = True,
             )
+
         intro_report.add_plot(
             general_matplotlib.plot_bar(
                 runtime_df,
@@ -905,7 +913,10 @@ class BenchmarkRun(ReportingObject):
                 ylabel = 'Run time (minutes)',
                 xlabel = 'Prediction Set',
                 verbose = verbose,
-                xtick_fontsize = 4,
+                xtick_fontsize = 3,
+                rotation_angle = 45,
+                log_y = True,
+                label_n = False,
             ),
             plot_title = 'Run times'
         )
@@ -2103,7 +2114,8 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def get_analysis_sets(self, record):
         if not self.analysis_sets:
-            self.analysis_sets = sorted(record['DDG'].keys())
+            if record['DDG'] != None:
+                self.analysis_sets = sorted(record['DDG'].keys())
         return self.analysis_sets
 
 
@@ -2129,6 +2141,7 @@ class DBBenchmarkRun(BenchmarkRun):
 
 
     def reset_csv_headers(self):
+        analysis_sets = None
         for record in self.dataset_cases.values():
             analysis_sets = self.get_analysis_sets(record)
             break
