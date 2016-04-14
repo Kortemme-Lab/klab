@@ -143,7 +143,7 @@ class Reporter:
         else:
             return time.time() - self.start
 
-def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=True):
+def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=False):
     # This is split out from run_single, because one could (and one has) written a run_single_from_db function, for example
     time_start = roundTime()
 
@@ -223,14 +223,6 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
     ram_usage = None
     ram_usage_type = None
     if run_on_sge:
-        if move_output_files:
-            try:
-                # Encase this in try block in case script_name is wrong
-                shutil.move("%s.o%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
-                shutil.move("%s.e%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
-            except IOError:
-                print 'Failed moving script files, check script name'
-
         qstat_p = subprocess.Popen(['/usr/local/sge/bin/linux-x64/qstat', '-j', '%d' % job_id],
                                    stdout=subprocess.PIPE)
         out, err = qstat_p.communicate()
@@ -249,6 +241,13 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
         print "Elapsed time:", time_end-time_start
         if ram_usage:
             print 'Max virtual memory usage: %.1f%s' % (ram_usage, ram_usage_type)
+    if run_on_sge and move_output_files:
+        try:
+            # Encase this in try block in case script_name is wrong
+            shutil.move("%s.o%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
+            shutil.move("%s.e%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
+        except IOError:
+            print 'Failed moving script files, check script name'
 
     return time_end
 
