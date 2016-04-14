@@ -22,5 +22,6 @@ def pairwise_rmsd(input_pdbs):
 
 
 if __name__ == '__main__':
-    input_pdbs = sorted( [os.path.join('pdbs', f ) for f in os.listdir('pdbs')] )
+    pdb_dir = os.path.join('..', '..', '.testdata','pdbs')
+    input_pdbs = sorted( [os.path.join(pdb_dir, f ) for f in os.listdir(pdb_dir)] )
     pairwise_rmsd( input_pdbs[:2] )
