@@ -826,7 +826,7 @@ class BenchmarkRun(ReportingObject):
                 # limited_benchmark_runs.append( br )
             # benchmark_runs = limited_benchmark_runs
 
-        topx_unique, unique_ajps = BindingAffinityBenchmarkRun.get_unique_ajps( benchmark_runs )
+        topx_unique, unique_ajps = BenchmarkRun.get_unique_ajps( benchmark_runs )
 
         ###  Process each benchmark run object individually
         if use_multiprocessing:
