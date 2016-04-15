@@ -60,7 +60,8 @@ local_rosetta_binary_type_list = #$#local_rosetta_binary_type_list#$#
 zip_rosetta_output = True
 
 generic_rosetta_args_list = [
-#$#rosetta_args_list_list#$#]
+    #$#rosetta_args_list_list#$#
+]
 
 sge_task_id = 0
 run_locally = True
@@ -69,6 +70,17 @@ if os.environ.has_key("SGE_TASK_ID"):
     sge_task_id = long(os.environ["SGE_TASK_ID"])
     run_locally = False
     run_on_sge = True
+
+intel_processor = False
+cpuinfo_path = '/proc/cpuinfo'
+with open(cpuinfo_path, 'r') as f:
+    for line in f:
+        if 'Intel' in line:
+            print 'Found intel processor'
+            print 'Matching line:', line.strip()
+            print
+            intel_processor = True
+            break
 
 job_id = 0
 if os.environ.has_key("JOB_ID"):
@@ -251,7 +263,7 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
 
     return time_end
 
-def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
+def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
     for step, job_pickle_file in enumerate(job_pickle_file_list):
         if len(job_pickle_file_list) > 1 and verbosity >= 1:
             print '\nProcessing step %d out of %d total' % (step+1, len(job_pickle_file_list))
@@ -289,8 +301,21 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             print 'Temporary data dir:', tmp_data_dir
             print 'Temporary output dir:', tmp_output_dir
 
+        full_app_path = os.path.join(rosetta_bin, app_name_list[step] + rosetta_binary_type)
+        if intel_processor:
+            dyn_icc_app_path = full_app_path.replace('gcc', 'icc')
+            dyn_icc_app_path = dyn_icc_app_path.replace('clang', 'icc')
+            icc_app_paths = [ dyn_icc_app_path ]
+            icc_app_paths.append( dyn_icc_app_path.replace('.linuxicc', '.static.linuxicc') )
+            for icc_app_path in icc_app_paths:
+                if os.path.isfile( icc_app_path ):
+                    if verbosity >= 1:
+                        print 'Switching to icc binary found at:', icc_app_path
+                    full_app_path = icc_app_path
+                    break
+
         args=[
-            os.path.join(rosetta_bin, app_name_list[step] + rosetta_binary_type),
+            full_app_path
         ]
 
         # Append specific Rosetta database path if this argument is included
@@ -385,7 +410,20 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
         time_end = finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
     return time_end
 
+def verify_job_integrity():
+    for step, job_pickle_file in enumerate(job_pickle_file_list):
+        assert( os.path.isfile(job_pickle_file) )
+        p = open(job_pickle_file,'r')
+        job_dict = pickle.load(p)
+        p.close()
+
+        if total_number_tasks != len( job_dict.keys() ):
+            print job_dirs
+            print task_id
+            raise IndexError('task_in not in job_dirs')
+
 def run_local(run_func):
+    verify_job_integrity()
 
     # Integer argument allows number of jobs to run to be specified
     # Jobs will be run single-threaded for debugging
@@ -430,7 +468,7 @@ def run_local(run_func):
 
     worker.reporter.set_total_count(num_jobs)
 
-    for i in xrange(0, num_jobs): # Manually specify which jobs to run here, if you desire. Or pass as argument
+    for i in xrange(0, num_jobs):
         if jobs_to_run and i >= jobs_to_run:
             break
         if jobs_to_run:
