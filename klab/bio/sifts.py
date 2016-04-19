@@ -9,9 +9,11 @@ We also extract the region maps for each chain i.e. the mappings from parts of t
 Created by Shane O'Connor 2013
 """
 
+import time
 import os
 import xml
 from xml.sax import parse as parse_xml
+
 
 if __name__ == '__main__':
     import sys
@@ -59,7 +61,14 @@ def retrieve_file_from_EBI(resource, silent = True):
     '''Retrieve a file from the RCSB.'''
     if not silent:
         colortext.printf("Retrieving %s from EBI" % os.path.split(resource)[1], color = "aqua")
-    return get_insecure_resource("ftp.ebi.ac.uk", resource)
+    attempts = 10
+    while attempts > 0:
+        try:
+            return get_insecure_resource("ftp.ebi.ac.uk", resource)
+        except:
+            print('FAILED, RETRYING')
+            attempts -= 1
+            time.sleep(3)
 
 def retrieve_xml(pdb_id, silent = True):
     return retrieve_file_from_EBI("/pub/databases/msd/sifts/xml/%s.xml.gz" % pdb_id.lower(), silent)
