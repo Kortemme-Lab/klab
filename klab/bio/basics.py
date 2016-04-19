@@ -523,6 +523,7 @@ class SequenceMap(object):
                 s.append('%s->%s' % (str(key), str(val)))
         return ", ".join(s)
 
+
 class PDBUniParcSequenceMap(SequenceMap):
     ''' A class to map the IDs of a PDB chain's Sequence (ATOM/SEQRES/FASTA) to a UniParc residue pairs (UniParcID, sequence index).
         Mapping to tuples is necessary for some cases e.g. for chimeras like 1M7T.
@@ -547,6 +548,7 @@ class PDBUniParcSequenceMap(SequenceMap):
         s.map = d
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
+
 
 class UniParcPDBSequenceMap(SequenceMap):
     ''' A class to map the IDs of UniParc residue pairs (UniParcID, sequence index) to a PDB chain's Sequence (ATOM/SEQRES/FASTA).
@@ -573,6 +575,7 @@ class UniParcPDBSequenceMap(SequenceMap):
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
 
+
 def sequence_formatter(sequences):
     assert(sequences and (len(set(map(len, sequences))) == 1))
     first_sequence = sequences[0]
@@ -596,6 +599,9 @@ class SubstitutionScore(object):
     clustal_symbols = {1 : '*', 0 : ':', -1 : '.', -2 : ' '}
 
     def __init__(self, clustal, from_residue, to_residue):
+        if not blosum62 or not pam250:
+            raise colortext.Exception('ERROR: Biopython is required for blosum62 and pam250 matrices.')
+
         assert(-2 <= clustal <= 1)
         self.clustal = clustal
         self.blosum62 = blosum62[(from_residue, to_residue)]
@@ -841,6 +847,7 @@ class Mutation(SimpleMutation):
 
 class ChainMutation(Mutation):
     '''Refines Mutation by adding the chain as a parameter of the equality function.'''
+
 
     def __eq__(self, other):
         if self.WildTypeAA != other.WildTypeAA:
