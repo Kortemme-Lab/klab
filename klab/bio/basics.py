@@ -151,16 +151,25 @@ three_letter_ion_codes = {
 # Secondary structure
 ###
 
-
 dssp_secondary_structure_types = dict(
-    G = '3-turn/310 helix',
-    H = '4-turn/α helix',
-    I = '5-turn/π helix',
-    T = 'hydrogen-bonded turn',
-    E = 'β-sheet',
-    B = 'residue in isolated β-bridge',
-    S = 'bend',
-    C = 'coil',
+    G = u'3-turn/310 helix',
+    H = u'4-turn/α helix',
+    I = u'5-turn/π helix',
+    T = u'hydrogen-bonded turn',
+    E = u'β-sheet',
+    B = u'residue in isolated β-bridge',
+    S = u'bend',
+    C = u'coil',
+)
+dssp_secondary_structure_colors = dict(
+    G = '#a00080',
+    H = '#ff0080',
+    I = '#600080',
+    T = '#6080ff',
+    E = '#ffff00',
+    B = '#ff6080',
+    S = '#e0e0e0',
+    C = '#c0c0c0',
 )
 dssp_secondary_structure_types[' '] = 'loop or irregular'
 

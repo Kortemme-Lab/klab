@@ -60,7 +60,8 @@ local_rosetta_binary_type_list = #$#local_rosetta_binary_type_list#$#
 zip_rosetta_output = True
 
 generic_rosetta_args_list = [
-#$#rosetta_args_list_list#$#]
+    #$#rosetta_args_list_list#$#
+]
 
 sge_task_id = 0
 run_locally = True
@@ -69,6 +70,17 @@ if os.environ.has_key("SGE_TASK_ID"):
     sge_task_id = long(os.environ["SGE_TASK_ID"])
     run_locally = False
     run_on_sge = True
+
+intel_processor = False
+cpuinfo_path = '/proc/cpuinfo'
+with open(cpuinfo_path, 'r') as f:
+    for line in f:
+        if 'Intel' in line:
+            print 'Found intel processor'
+            print 'Matching line:', line.strip()
+            print
+            intel_processor = True
+            break
 
 job_id = 0
 if os.environ.has_key("JOB_ID"):
@@ -143,7 +155,7 @@ class Reporter:
         else:
             return time.time() - self.start
 
-def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=True):
+def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verbosity=1, move_output_files=False):
     # This is split out from run_single, because one could (and one has) written a run_single_from_db function, for example
     time_start = roundTime()
 
@@ -223,14 +235,6 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
     ram_usage = None
     ram_usage_type = None
     if run_on_sge:
-        if move_output_files:
-            try:
-                # Encase this in try block in case script_name is wrong
-                shutil.move("%s.o%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
-                shutil.move("%s.e%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
-            except IOError:
-                print 'Failed moving script files, check script name'
-
         qstat_p = subprocess.Popen(['/usr/local/sge/bin/linux-x64/qstat', '-j', '%d' % job_id],
                                    stdout=subprocess.PIPE)
         out, err = qstat_p.communicate()
@@ -249,10 +253,17 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
         print "Elapsed time:", time_end-time_start
         if ram_usage:
             print 'Max virtual memory usage: %.1f%s' % (ram_usage, ram_usage_type)
+    if run_on_sge and move_output_files:
+        try:
+            # Encase this in try block in case script_name is wrong
+            shutil.move("%s.o%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
+            shutil.move("%s.e%d.%d" % (script_name,job_id,sge_task_id), job_dir_path)
+        except IOError:
+            print 'Failed moving script files, check script name'
 
     return time_end
 
-def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=True):
+def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosity=1, move_output_files=False):
     for step, job_pickle_file in enumerate(job_pickle_file_list):
         if len(job_pickle_file_list) > 1 and verbosity >= 1:
             print '\nProcessing step %d out of %d total' % (step+1, len(job_pickle_file_list))
@@ -290,8 +301,21 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             print 'Temporary data dir:', tmp_data_dir
             print 'Temporary output dir:', tmp_output_dir
 
+        full_app_path = os.path.join(rosetta_bin, app_name_list[step] + rosetta_binary_type)
+        if intel_processor:
+            dyn_icc_app_path = full_app_path.replace('gcc', 'icc')
+            dyn_icc_app_path = dyn_icc_app_path.replace('clang', 'icc')
+            icc_app_paths = [ dyn_icc_app_path ]
+            icc_app_paths.append( dyn_icc_app_path.replace('.linuxicc', '.static.linuxicc') )
+            for icc_app_path in icc_app_paths:
+                if os.path.isfile( icc_app_path ):
+                    if verbosity >= 1:
+                        print 'Switching to icc binary found at:', icc_app_path
+                    full_app_path = icc_app_path
+                    break
+
         args=[
-            os.path.join(rosetta_bin, app_name_list[step] + rosetta_binary_type),
+            full_app_path
         ]
 
         # Append specific Rosetta database path if this argument is included
@@ -308,6 +332,7 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             return value
 
         flags_dict = job_dict[job_dir]
+        make_input_file_list = False
         for flag in flags_dict:
             if flag.startswith('FLAGLIST'):
                 for split_flag in flags_dict[flag]:
@@ -315,7 +340,8 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
                 continue
 
             # Process later if input file list
-            if flag == 'input_file_list':
+            if flag.startswith( 'input_file_list' ):
+                make_input_file_list = True
                 continue
 
             # Check if argument is a rosetta script variable
@@ -356,14 +382,19 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             else:
                 args.append(value)
 
-        if 'input_file_list' in flags_dict:
+        if make_input_file_list:
             input_list_file = os.path.join(tmp_data_dir, 'structs.txt')
             tmp_pdb_dir = os.path.join(tmp_data_dir, 'input_list_pdbs')
             os.mkdir(tmp_pdb_dir)
-            args.append('-l')
+            if 'input_file_list' in flags_dict:
+                list_flag_name = 'input_file_list'
+                args.append('-l')
+            elif 'input_file_list-fragmix' in flags_dict:
+                list_flag_name = 'input_file_list-fragmix'
+                args.append('-fragmix:input_pdbs')
             args.append( os.path.relpath(input_list_file, tmp_output_dir) )
             f = open(input_list_file, 'w')
-            pdbs = sorted(flags_dict['input_file_list'])
+            pdbs = sorted(flags_dict[list_flag_name])
             for i, input_pdb in enumerate(pdbs):
                 inner_tmp_pdb_dir = tempfile.mkdtemp(prefix='pdb_dir_', dir=tmp_pdb_dir)
                 new_input_file = os.path.join(inner_tmp_pdb_dir, os.path.basename(input_pdb))
@@ -379,7 +410,20 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
         time_end = finish_run_single(args, job_dir, tmp_output_dir,  tmp_data_dir, task_id, verbosity=verbosity)
     return time_end
 
+def verify_job_integrity():
+    for step, job_pickle_file in enumerate(job_pickle_file_list):
+        assert( os.path.isfile(job_pickle_file) )
+        p = open(job_pickle_file,'r')
+        job_dict = pickle.load(p)
+        p.close()
+
+        if total_number_tasks != len( job_dict.keys() ):
+            print job_dirs
+            print task_id
+            raise IndexError('task_in not in job_dirs')
+
 def run_local(run_func):
+    verify_job_integrity()
 
     # Integer argument allows number of jobs to run to be specified
     # Jobs will be run single-threaded for debugging
@@ -424,7 +468,7 @@ def run_local(run_func):
 
     worker.reporter.set_total_count(num_jobs)
 
-    for i in xrange(0, num_jobs): # Manually specify which jobs to run here, if you desire. Or pass as argument
+    for i in xrange(0, num_jobs):
         if jobs_to_run and i >= jobs_to_run:
             break
         if jobs_to_run:

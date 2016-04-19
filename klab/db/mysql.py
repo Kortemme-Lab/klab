@@ -677,7 +677,7 @@ class DatabaseInterface(object):
 
             record_exists = None
             if check_existing:
-                record_exists = not(not(self.execute_select("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr, parameters=tuple(PKvalues), locked = True)))
+                record_exists = not(not(self.execute_select("SELECT %s FROM %s" % (PKfields, tblname) + " WHERE %s" % wherestr, parameters=tuple(PKvalues), locked = False)))
 
             SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (
             tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))

@@ -272,6 +272,9 @@ def plot_bar(
     xlabel = 'Data',
     plot_average = True,
     xtick_fontsize = 10,
+    rotation_angle = 0,
+    log_y = False,
+    label_n = True,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -296,18 +299,22 @@ def plot_bar(
                     showmeans = plot_average)
     plt.setp(bp['fliers'], color='forestgreen', marker='+', markersize=12)
 
-    ax.set_xticklabels([make_latex_safe(x) for x in dataframe_columns], fontsize = xtick_fontsize)
+    ax.set_xticklabels([make_latex_safe(x) for x in dataframe_columns], fontsize = xtick_fontsize, rotation = rotation_angle)
 
     y_min_limit = min(dataframe.min())
     y_max_limit = max(dataframe.max())
     bottom_pad = 0.05 * (y_max_limit - y_min_limit)
     y_min_limit = y_min_limit - bottom_pad
 
-    for i, column_name in enumerate(dataframe_columns):
-        ax.text(i+1, y_min_limit + bottom_pad,
-                'n=%d' % len( dataframe[[column_name]] ),
-                fontsize = 16,
-                ha='center', va='bottom')
+    if label_n:
+        for i, column_name in enumerate(dataframe_columns):
+            ax.text(i+1, y_min_limit + bottom_pad,
+                    'n=%d' % len( dataframe[[column_name]] ),
+                    fontsize = 8,
+                    ha='center', va='bottom')
+
+    if log_y:
+        ax.set_yscale("log", nonposy='clip')
 
     if ylabel:
         plt.ylabel( make_latex_safe(ylabel) )

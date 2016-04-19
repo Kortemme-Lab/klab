@@ -1,6 +1,38 @@
 import os
 import gzip
 import subprocess
+from subprocess import Popen, PIPE, check_call
+import signal
+
+class LineReader:
+    def __init__(self,fname):
+        if fname.endswith('.gz'):
+            if not os.path.isfile(fname):
+                raise IOError(fname)
+            self.f = Popen(['gunzip', '-c', fname], stdout=PIPE, stderr=PIPE)
+            self.zipped=True
+        else:
+            self.f = open(fname,'r')
+            self.zipped=False
+    def readlines(self):
+        if self.zipped:
+            for line in self.f.stdout:
+                yield line
+        else:
+            for line in self.f.readlines():
+                yield line
+    def close(self):
+        if self.zipped:
+            if self.f.poll() == None:
+                os.kill(self.f.pid, signal.SIGHUP)
+        else:
+            self.f.close()
+    def __enter__(self):
+        return self
+    def __exit__(self, type, value, traceback):
+        self.close()
+    def __iter__(self):
+        return self.readlines()
 
 def zip_file(file_path):
     if os.path.isfile(file_path):
