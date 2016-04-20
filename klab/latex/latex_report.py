@@ -91,7 +91,7 @@ class LatexReport:
 
     def generate_latex_chapter(self):
         latex_strings = []
-        latex_strings.append( '\\chapter{%s}\n\n' % self.title_page_title )
+        latex_strings.append( '\\chapter{%s}\n\n\\clearpage\n\n' % self.title_page_title )
         if self.title_page_subtitle != '' and self.title_page_subtitle != None:
             latex_strings.append( '\\textbf{%s}\n\n' % self.title_page_subtitle)
         # if self.table_of_contents:
