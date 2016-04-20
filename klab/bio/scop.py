@@ -65,7 +65,7 @@ class SCOPeTableCollection(object):
 
 class SCOPeDatabase(DatabaseInterface):
 
-    def __init__(self, passwd = None, username = 'anonymous', use_utf=False, fallback_on_failures = True):
+    def __init__(self, passwd = None, username = 'anonymous', use_utf=False, fallback_on_failures = True, cache_dir = '/kortemmelab/data/oconchus/SIFTS'):
         super(SCOPeDatabase, self).__init__({},
             isInnoDB = True,
             numTries = 32,
@@ -77,6 +77,7 @@ class SCOPeDatabase(DatabaseInterface):
             unix_socket = "/var/lib/mysql/mysql.sock",
             use_utf = use_utf)
 
+        self.cache_dir = cache_dir
         self.fallback_on_failures = fallback_on_failures
         self.levels = self.get_SCOPe_levels()
         del self.levels[1] # remove the root level
@@ -123,7 +124,7 @@ class SCOPeDatabase(DatabaseInterface):
             pdb_id = pdb_id.lower()
             if self.SIFTS.get(pdb_id):
                 return self.SIFTS[pdb_id]
-            self.SIFTS[pdb_id] = SIFTS.retrieve(pdb_id, cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = require_uniprot_residue_mapping)
+            self.SIFTS[pdb_id] = SIFTS.retrieve(pdb_id, cache_dir = self.cache_dir, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = require_uniprot_residue_mapping)
             return self.SIFTS[pdb_id]
         except Exception, e:
             colortext.error('An exception happened retrieving the SIFTS file for %s: "%s". Ignoring this exception and continuing on...' % (pdb_id, str(e)))
