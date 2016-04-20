@@ -34,3 +34,9 @@ assert(sorted(c.pdb_contents.keys()) == sorted(['1AK4', '1BRS', '1CBW', '1CHO'])
 c.get_pdb_contents('1A22')
 pprint.pprint(c.pdb_contents) # there should be 4 PDBs
 assert(sorted(c.pdb_contents.keys()) == sorted(['1BRS', '1CBW', '1CHO', '1A22']))
+
+# Re-read in an old file which was thrown away above - this should trigger another file read and erase an older entry
+c.get_pdb_contents('1BRS') # refresh the access time for 1BRS, currently the oldest file in the cache
+c.get_pdb_contents('1A4Y') # read in a new (relative to the cache contents) PDB file. This should kick out the oldest file which is not '1CBW'
+pprint.pprint(c.pdb_contents) # there should be 4 PDBs
+assert(sorted(c.pdb_contents.keys()) == sorted(['1BRS', '1CHO', '1A22', '1A4Y']))

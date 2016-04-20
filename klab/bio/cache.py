@@ -15,6 +15,7 @@ from klab import colortext
 from klab.bio.rcsb import download_pdb, retrieve_pdb
 from klab.bio.pdb import PDB
 
+
 class CacheNode(object):
     '''Simple class to store an object and the time of insertion.'''
 
@@ -23,7 +24,12 @@ class CacheNode(object):
         self.o = payload
 
 
-    def get(self): return self.o
+    def get(self):
+        '''Refresh the access time and return the object.'''
+        self.t = datetime.datetime.now()
+        return self.o
+
+
     def __repr__(self): return '{0}: {1}'.format(self.t, self.o.__repr__()[:50])
     def __cmp__(self, other): return (self.t).__cmp__(other.t)
     def __gt__(self, other): return (self.t).__gt__(other.t)
