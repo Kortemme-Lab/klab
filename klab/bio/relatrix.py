@@ -631,7 +631,7 @@ class ResidueRelatrix(object):
 
                     if not self.PDB_UniParc_SA:
                         # Initialize the PDBUniParcSequenceAligner the first time through
-                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
+                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = cache_dir, cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
                     else:
                         # We have already retrieved the UniParc entries. We just need to try the mapping again. This saves
                         # lots of time for entries with large numbers of UniProt entries e.g. 1HIO even if disk caching is used.
