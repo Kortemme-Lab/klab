@@ -1617,7 +1617,7 @@ class PDB(object):
         return seqres_to_atom_maps, atom_to_seqres_maps
 
 
-    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path, extra_command_flags = None):
+    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path = None, extra_command_flags = None):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
             Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
@@ -1638,7 +1638,7 @@ class PDB(object):
 
         # Get the residue mapping using the features database
         pdb_file_contents = "\n".join(self.structure_lines)
-        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path, pdb_id = self.pdb_id, extra_flags = ((specific_flag_hacks or '') + ' ' + (extra_command_flags or '')).strip())
+        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path = rosetta_database_path, pdb_id = self.pdb_id, extra_flags = ((specific_flag_hacks or '') + ' ' + (extra_command_flags or '')).strip())
         if not success:
             raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
 
@@ -2214,10 +2214,12 @@ class PDB(object):
 
         return sequences, residue_objects
 
+
     @staticmethod
     def ChainResidueID2String(chain, residueID):
         '''Takes a chain ID e.g. 'A' and a residueID e.g. '123' or '123A' and returns the 6-character identifier spaced as in the PDB format.'''
         return "%s%s" % (chain, PDB.ResidueID2String(residueID))
+
 
     @staticmethod
     def ResidueID2String(residueID):
@@ -2226,6 +2228,7 @@ class PDB(object):
             return "%s " % (residueID.rjust(4))
         else:
             return "%s" % (residueID.rjust(5))
+
 
     def validate_mutations(self, mutations):
         '''This function has been refactored to use the SimpleMutation class.
@@ -3121,6 +3124,19 @@ class PDB(object):
             return pandas.DataFrame(dict(chain = chain_id_list, res_id = plain_res_id_list, atom = atom_type_list, altloc = loc_list, AA = residue_aa_list, X = x_list, Y = y_list, Z = z_list), index = res_id_list)
         else:
             return pandas.DataFrame(dict(X = x_list, Y = y_list, Z = z_list), index = res_id_list)
+
+
+def sequence(pdb_filepath):
+    '''A convenience method for printing PDB sequences in command-line execution.
+
+        :param pdb_filepath: A path to a PDB file.
+        :return: A string where odd line is a chain letter and each following even line is that chain's ATOM sequence.
+
+        Example use:
+            from klab.bio import pdb
+            print(pdb.sequence('1234.pdb'))
+    '''
+    return '\n'.join(['{0}\n{1}'.format(chain_id, str(seq)) for chain_id, seq in sorted(PDB.from_filepath(pdb_filepath).atom_sequences.iteritems())])
 
 
 if __name__ == "__main__":

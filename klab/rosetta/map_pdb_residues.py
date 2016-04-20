@@ -66,7 +66,7 @@ def get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path
        Note: extra_flags should typically include '-ignore_zero_occupancy false' and '-ignore_unrecognized_res'.'''
 
     filename = write_temp_file("/tmp", pdb_file_contents)
-    success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path, pdb_id = pdb_id, extra_flags = extra_flags)
+    success, mapping = get_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path = rosetta_database_path, pdb_id = pdb_id, extra_flags = extra_flags)
     os.remove(filename)
     return success, mapping
 

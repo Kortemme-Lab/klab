@@ -71,7 +71,7 @@ def get_single_record_from_query(result_set):
         return result_set[0]
 
 
-def get_or_create_in_transaction(tsession, model, values, missing_columns = [], variable_columns = [], updatable_columns = [], only_use_supplied_columns = False):
+def get_or_create_in_transaction(tsession, model, values, missing_columns = [], variable_columns = [], updatable_columns = [], only_use_supplied_columns = False, read_only = False):
     '''
     Uses the SQLAlchemy model to retrieve an existing record based on the supplied field values or, if there is no
     existing record, to create a new database record.
@@ -82,12 +82,14 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     :param missing_columns: Elements of missing_columns are expected to be fields in the model but are left blank regardless of whether they exist in values. This is useful for auto_increment fields.
     :param updatable_columns: If these are specified, they are treated as missing columns in the record matching and if a record is found, these fields will be updated
     :param variable_columns: If these are specified, they are treated as missing columns in the record matching but are not updated. A good use of these are for datetime fields which default to the current datetime
+    :param read_only: If this is set then we query the database and return an instance if one exists but we do not create a new record.
     :return:
 
     Note: This function is a convenience function and is NOT efficient. The "tsession.query(model).filter_by(**pruned_values)"
           call is only (sometimes) efficient if an index exists on the keys of pruned_values. If any of the fields of pruned_values are
           large (even if otherwise deferred/loaded lazily) then you will incur a performance hit on lookup. You may need
           to reconsider any calls to this function in inner loops of your code.'''
+
 
     values = copy.deepcopy(values) # todo: this does not seem to be necessary since we do not seem to be writing
 
@@ -97,10 +99,15 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     for c in updatable_columns:
         fieldnames.remove(c)
     for c in variable_columns:
-        fieldnames.remove(c)
+        if c in fieldnames:
+            fieldnames.remove(c)
 
     if only_use_supplied_columns:
         fieldnames = sorted(set(fieldnames).intersection(set(values.keys())))
+    else:
+        unexpected_fields = set(values.keys()).difference(set(fieldnames)).difference(set(variable_columns)).difference(set(updatable_columns))
+        if unexpected_fields:
+            raise Exception("The fields '{0}' were passed but not found in the schema for table {1}.".format("', '".join(sorted(unexpected_fields)), model.__dict__['__tablename__']))
 
     pruned_values = {}
     for k in set(values.keys()).intersection(set(fieldnames)):
@@ -113,24 +120,27 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
     instance = instance.first()
 
     if instance:
-        for c in updatable_columns:
-            setattr(instance, c, values[c])
-        tsession.flush()
+        if read_only == False:
+            for c in updatable_columns:
+                setattr(instance, c, values[c])
+            tsession.flush()
         return instance
     else:
-        if sorted(pruned_values.keys()) != sorted(fieldnames):
-            # When adding new records, we require that all necessary fields are present
-            raise Exception('Some required fields are missing: {0}. Either supply these fields or add them to the missing_columns list.'.format(set(fieldnames).difference(pruned_values.keys())))
-        instance = model(**pruned_values)
-        tsession.add(instance)
-        tsession.flush()
-        return instance
+        if read_only == False:
+            if sorted(pruned_values.keys()) != sorted(fieldnames):
+                # When adding new records, we require that all necessary fields are present
+                raise Exception('Some required fields are missing: {0}. Either supply these fields or add them to the missing_columns list.'.format(set(fieldnames).difference(pruned_values.keys())))
+            instance = model(**pruned_values)
+            tsession.add(instance)
+            tsession.flush()
+            return instance
+        return None
 
 
-def get_or_create_in_transaction_wrapper(tsession, model, values, missing_columns = [], variable_columns = [], updatable_columns = [], only_use_supplied_columns = False):
+def get_or_create_in_transaction_wrapper(tsession, model, values, missing_columns = [], variable_columns = [], updatable_columns = [], only_use_supplied_columns = False, read_only = False):
     '''This function can be used to determine which calling method is spending time in get_or_create_in_transaction when profiling the database API.
        Switch out calls to get_or_create_in_transaction to get_or_create_in_transaction_wrapper in the suspected functions to determine where the pain lies.'''
-    return get_or_create_in_transaction(tsession, model, values, missing_columns = missing_columns, variable_columns = variable_columns, updatable_columns = updatable_columns, only_use_supplied_columns = only_use_supplied_columns)
+    return get_or_create_in_transaction(tsession, model, values, missing_columns = missing_columns, variable_columns = variable_columns, updatable_columns = updatable_columns, only_use_supplied_columns = only_use_supplied_columns, read_only = read_only)
 
 
 class IntermediateField(object):

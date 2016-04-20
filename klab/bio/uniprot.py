@@ -10,6 +10,7 @@ Created by Shane O'Connor 2013
 import sys
 import os
 import string
+import re
 import urllib,urllib2
 try:
     import json as simplejson
@@ -25,8 +26,28 @@ from klab.hash import CRC64
 from klab.fs.fsio import read_file, write_file
 from klab.bio.uniprot_patches import * # UniParcMergedSubmittedNamesRemap, UniParcMergedRecommendedNamesRemap, clashing_subsections_for_removal, subsections_for_addition, AC_entries_where_we_ignore_the_subsections, overlapping_subsections_for_removal, PDBs_marked_as_XRay_with_no_resolution
 
+
 class ProteinSubsectionOverlapException(colortext.Exception): pass
 class UniParcEntryStandardizationException(colortext.Exception): pass
+
+
+def get_obsolete_acc_to_uniparc(acc):
+    ''' Tries to determine the UniParc ID for obsolete ACCs which are not returned using uniprot_map.
+
+        :param acc: The UniProt accession number.
+        :return: The corresponding UniParc ID.
+
+        Warning: This is a fragile function as the underlying website generation or URL could change.
+    '''
+    contents = http_get('www.uniprot.org/uniparc/?query={0}'.format(acc))
+    mtchs = re.findall(r'"UPI[A-Z0-9]+?"', contents, re.DOTALL)
+    uniparc_id = set([m[1:-1] for m in mtchs])
+    if len(uniparc_id) == 1:
+        return uniparc_id.pop()
+    elif len(uniparc_id) > 1:
+        raise Exception('Multiple UPI identifiers found.')
+    return None
+
 
 def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, silent = True):
     '''Maps from one ID scheme to another using the UniProt service.

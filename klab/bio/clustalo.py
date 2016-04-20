@@ -554,7 +554,7 @@ class PDBUniParcSequenceAligner(object):
             equivalent_chain_ids = set()
             for equivalent_chain in equivalent_chains:
                 assert(len(equivalent_chain) == 6)
-                assert(equivalent_chain[:5] == '%s_' % self.pdb_id)
+                assert((equivalent_chain[:5] == '%s_' % self.pdb_id) or (equivalent_chain[:5] == '%s:' % self.pdb_id)) # ClustalW changes e.g. 1KI1:A to 1KI1_A in its output
                 equivalent_chain_ids.add(equivalent_chain[5])
             found = False
             for equivalent_chain_id in equivalent_chain_ids:

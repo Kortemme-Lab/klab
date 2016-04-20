@@ -71,7 +71,7 @@ class ResidueRelatrix(object):
 
     schemes = ['rosetta', 'atom', 'seqres', 'fasta', 'uniparc']
 
-    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, acceptable_sifts_sequence_percentage_match = None, starting_clustal_cut_off = 100): # keep_HETATMS = False
+    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path = None, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, acceptable_sifts_sequence_percentage_match = None, starting_clustal_cut_off = 100): # keep_HETATMS = False
         ''' acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually
             90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues. I set
             this to 80.00% to cover most cases.'''
@@ -83,7 +83,7 @@ class ResidueRelatrix(object):
         assert(0.0 <= acceptable_sequence_percentage_match <= 100.0)
         assert(0.0 <= acceptable_sifts_sequence_percentage_match <= 100.0)
 
-        if not(type(pdb_id) == types.StringType and len(pdb_id) == 4 and pdb_id.isalnum()):
+        if not((type(pdb_id) == types.StringType or type(pdb_id) == type(u'')) and len(pdb_id) == 4 and pdb_id.isalnum()):
             raise Exception("Expected an 4-character long alphanumeric PDB identifer. Received '%s'." % str(pdb_id))
         self.pdb_id = pdb_id.upper()
         self.silent = silent
@@ -503,7 +503,7 @@ class ResidueRelatrix(object):
 
         # Create the Rosetta sequences and the maps from the Rosetta sequences to the ATOM sequences
         try:
-            self.pdb.construct_pdb_to_rosetta_residue_map(self.rosetta_scripts_path, self.rosetta_database_path)
+            self.pdb.construct_pdb_to_rosetta_residue_map(self.rosetta_scripts_path, rosetta_database_path = self.rosetta_database_path)
         except PDBMissingMainchainAtomsException:
             self.pdb_to_rosetta_residue_map_error = True
 
@@ -574,7 +574,8 @@ class ResidueRelatrix(object):
             colortext.message("Creating the PDB object.")
         try:
             self.pdb = PDB.retrieve(pdb_id, cache_dir = cache_dir)
-            self.pdb.strip_to_chains(chains_to_keep)
+            if chains_to_keep:
+                self.pdb.strip_to_chains(chains_to_keep)
             if strip_HETATMS:
                 self.pdb.strip_HETATMs()
         except:
@@ -630,7 +631,7 @@ class ResidueRelatrix(object):
 
                     if not self.PDB_UniParc_SA:
                         # Initialize the PDBUniParcSequenceAligner the first time through
-                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = '/home/oconchus/temp', cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
+                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = cache_dir, cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
                     else:
                         # We have already retrieved the UniParc entries. We just need to try the mapping again. This saves
                         # lots of time for entries with large numbers of UniProt entries e.g. 1HIO even if disk caching is used.
