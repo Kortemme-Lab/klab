@@ -39,7 +39,7 @@ class FASTA(dict):
     ''' This class may replace the one in rcsb.py. I am trying to make the class more generally useful.
 
         This class inherits from dict. This lets us use some useful shortcuts e.g.
-           f = FASTA.retrieve('1A2C', cache_dir = '/home/oconchus/temp')
+           f = FASTA.retrieve('1A2C', cache_dir = '~/temp')
            print(f['1A2C']['I'])
         will print the sequence for chain I. We index by both the PDB ID and chain ID as FASTA files could be
         merged and chain letters may not be unique identifiers.
