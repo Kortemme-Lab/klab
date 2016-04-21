@@ -1617,15 +1617,19 @@ class PDB(object):
         return seqres_to_atom_maps, atom_to_seqres_maps
 
 
-    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path = None, extra_command_flags = None):
+    def construct_pdb_to_rosetta_residue_map(self, rosetta_scripts_path, rosetta_database_path = None, extra_command_flags = None, cache_dir = None):
         ''' Uses the features database to create a mapping from Rosetta-numbered residues to PDB ATOM residues.
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
             Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
 
             The extra_command_flags parameter expects a string e.g. "-ignore_zero_occupancy false".
+
+            If cache_dir is passed then the file <self.pdb_id>.
         '''
 
         ## Create a mapping from Rosetta-numbered residues to PDB ATOM residues
+
+        import json
 
         # Apply any PDB-specific hacks
         specific_flag_hacks = None
@@ -1637,10 +1641,22 @@ class PDB(object):
             raise PDBMissingMainchainAtomsException('The PDB to Rosetta residue map could not be created as chains %s only have CA atoms present.' % ", ".join(skeletal_chains))
 
         # Get the residue mapping using the features database
-        pdb_file_contents = "\n".join(self.structure_lines)
-        success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path = rosetta_database_path, pdb_id = self.pdb_id, extra_flags = ((specific_flag_hacks or '') + ' ' + (extra_command_flags or '')).strip())
-        if not success:
-            raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
+        mapping = None
+        cached_json_mapping_filepath = None
+        if cache_dir:
+            cached_json_mapping_filepath = os.path.join(cache_dir, '{0}.rosetta2pdb.rawmap.json'.format(self.pdb_id)) # note: the resmap.json file created by self.get_atom_sequence_to_rosetta_json_map is more involved - rawmap is simply what is returned by get_pdb_contents_to_pose_residue_map
+        if self.pdb_id and cache_dir and os.path.exists(cached_json_mapping_filepath):
+            # Read cached file
+            try:
+                mapping = json.loads(read_file(cached_json_mapping_filepath))
+            except: pass
+        if mapping == None:
+            pdb_file_contents = "\n".join(self.structure_lines)
+            success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path = rosetta_database_path, pdb_id = self.pdb_id, extra_flags = ((specific_flag_hacks or '') + ' ' + (extra_command_flags or '')).strip())
+            if not success:
+                raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
+            if self.pdb_id and cache_dir:
+                write_file(cached_json_mapping_filepath, json.dumps(mapping, indent = 4, sort_keys = True))
 
         ## Create Sequences for the Rosetta residues (self.rosetta_sequences)
 
@@ -1730,7 +1746,7 @@ class PDB(object):
         for c, sm in atom_sequence_to_rosetta_mapping.iteritems():
             for k, v in sm.map.iteritems():
                 d[k] = v
-        return json.dumps(d, sort_keys = True)
+        return json.dumps(d, indent = 4, sort_keys = True)
 
 
     def get_rosetta_sequence_to_atom_json_map(self):
@@ -1744,7 +1760,7 @@ class PDB(object):
             for k, v in sm.map.iteritems():
                 d[k] = v
             #d[c] = sm.map
-        return json.dumps(d, sort_keys = True)
+        return json.dumps(d, indent = 4, sort_keys = True)
 
 
     def map_pdb_residues_to_rosetta_residues(self, mutations):
