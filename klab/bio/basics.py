@@ -869,6 +869,7 @@ class ChainMutation(Mutation):
             return False
         return True
 
+
     def is_the_same_position(self, other):
         if self.Chain != other.Chain:
             return False
@@ -877,6 +878,7 @@ class ChainMutation(Mutation):
         if self.WildTypeAA != other.WildTypeAA:
             return Exception('The two residues have the same chain and residue ID but different wildtypes so they are incomparable.')
         return True
+
 
 class SKEMPIMutation(ChainMutation):
     '''Adds a Location member to the ChainMutation class.'''
