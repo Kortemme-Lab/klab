@@ -71,7 +71,7 @@ class ResidueRelatrix(object):
 
     schemes = ['rosetta', 'atom', 'seqres', 'fasta', 'uniparc']
 
-    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path = None, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, acceptable_sifts_sequence_percentage_match = None, starting_clustal_cut_off = 100): # keep_HETATMS = False
+    def __init__(self, pdb_id, rosetta_scripts_path, rosetta_database_path = None, chains_to_keep = [], min_clustal_cut_off = 80, cache_dir = None, silent = False, acceptable_sequence_percentage_match = 80.0, acceptable_sifts_sequence_percentage_match = None, starting_clustal_cut_off = 100, bio_cache = None): # keep_HETATMS = False
         ''' acceptable_sequence_percentage_match is used when checking whether the SEQRES sequences have a mapping. Usually
             90.00% works but some cases e.g. 1AR1, chain C, have a low matching score mainly due to extra residues. I set
             this to 80.00% to cover most cases.'''
@@ -89,6 +89,10 @@ class ResidueRelatrix(object):
         self.silent = silent
         self.rosetta_scripts_path = rosetta_scripts_path
         self.rosetta_database_path = rosetta_database_path
+        self.bio_cache = bio_cache
+        self.cache_dir = cache_dir
+        if (not self.cache_dir) and self.bio_cache:
+            self.cache_dir = self.bio_cache.cache_dir
 
         self.alignment_cutoff = None
         self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
@@ -126,7 +130,7 @@ class ResidueRelatrix(object):
 
         self.pdb_chain_to_uniparc_chain_mapping = {}
 
-        self._create_objects(chains_to_keep, starting_clustal_cut_off, min_clustal_cut_off, True, cache_dir) # todo: at present, we always strip HETATMs. We may want to change this in the future.
+        self._create_objects(chains_to_keep, starting_clustal_cut_off, min_clustal_cut_off, True) # todo: at present, we always strip HETATMs. We may want to change this in the future.
         self._create_sequences()
         self._create_sequence_maps()
         self._merge_sifts_maps()
@@ -503,7 +507,7 @@ class ResidueRelatrix(object):
 
         # Create the Rosetta sequences and the maps from the Rosetta sequences to the ATOM sequences
         try:
-            self.pdb.construct_pdb_to_rosetta_residue_map(self.rosetta_scripts_path, rosetta_database_path = self.rosetta_database_path)
+            self.pdb.construct_pdb_to_rosetta_residue_map(self.rosetta_scripts_path, rosetta_database_path = self.rosetta_database_path, cache_dir = self.cache_dir)
         except PDBMissingMainchainAtomsException:
             self.pdb_to_rosetta_residue_map_error = True
 
@@ -556,7 +560,7 @@ class ResidueRelatrix(object):
 
     ### Private object creation functions ###
 
-    def _create_objects(self, chains_to_keep, starting_clustal_cut_off, min_clustal_cut_off, strip_HETATMS, cache_dir):
+    def _create_objects(self, chains_to_keep, starting_clustal_cut_off, min_clustal_cut_off, strip_HETATMS):
 
         pdb_id = self.pdb_id
         assert(20 <= min_clustal_cut_off <= starting_clustal_cut_off <= 100)
@@ -565,7 +569,10 @@ class ResidueRelatrix(object):
         if not self.silent:
             colortext.message("Creating the FASTA object.")
         try:
-            self.FASTA = FASTA.retrieve(pdb_id, cache_dir = cache_dir)
+            if self.bio_cache:
+                self.FASTA = self.bio_cache.get_fasta_object(pdb_id)
+            else:
+                self.FASTA = FASTA.retrieve(pdb_id, cache_dir = self.cache_dir)
         except:
             raise colortext.Exception("Relatrix construction failed creating the FASTA object for %s.\n%s" % (pdb_id, traceback.format_exc()))
 
@@ -573,7 +580,10 @@ class ResidueRelatrix(object):
         if not self.silent:
             colortext.message("Creating the PDB object.")
         try:
-            self.pdb = PDB.retrieve(pdb_id, cache_dir = cache_dir)
+            if self.bio_cache:
+                self.pdb = self.bio_cache.get_pdb_object(pdb_id)
+            else:
+                self.pdb = PDB.retrieve(pdb_id, cache_dir = self.cache_dir)
             if chains_to_keep:
                 self.pdb.strip_to_chains(chains_to_keep)
             if strip_HETATMS:
@@ -592,7 +602,10 @@ class ResidueRelatrix(object):
         if not self.silent:
             colortext.message("Creating the PDBML object.")
         try:
-            self.pdbml = PDBML.retrieve(pdb_id, cache_dir = cache_dir)
+            if self.bio_cache:
+                self.pdbml = self.bio_cache.get_pdbml_object(pdb_id)
+            else:
+                self.pdbml = PDBML.retrieve(pdb_id, cache_dir = self.cache_dir, bio_cache = self.bio_cache)
         except:
             raise colortext.Exception("Relatrix construction failed creating the PDBML object for %s.\n%s" % (pdb_id, traceback.format_exc()))
 
@@ -605,7 +618,10 @@ class ResidueRelatrix(object):
 
         # Create the SIFTS object
         try:
-            self.sifts = SIFTS.retrieve(pdb_id, cache_dir = cache_dir, acceptable_sequence_percentage_match = self.acceptable_sifts_sequence_percentage_match)
+            if self.bio_cache:
+                self.sifts = self.bio_cache.get_sifts_object(pdb_id, acceptable_sequence_percentage_match  = self.acceptable_sifts_sequence_percentage_match)
+            else:
+                self.sifts = SIFTS.retrieve(pdb_id, cache_dir = self.cache_dir, acceptable_sequence_percentage_match = self.acceptable_sifts_sequence_percentage_match)
         except MissingSIFTSRecord:
             colortext.warning("No SIFTS entry was found for %s." % pdb_id)
         except BadSIFTSMapping:
@@ -631,7 +647,7 @@ class ResidueRelatrix(object):
 
                     if not self.PDB_UniParc_SA:
                         # Initialize the PDBUniParcSequenceAligner the first time through
-                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = cache_dir, cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
+                        self.PDB_UniParc_SA = PDBUniParcSequenceAligner(pdb_id, cache_dir = self.cache_dir, cut_off = cut_off, sequence_types = self.sequence_types, replacement_pdb_id = self.replacement_pdb_id, added_uniprot_ACs = self.pdb.get_UniProt_ACs())
                     else:
                         # We have already retrieved the UniParc entries. We just need to try the mapping again. This saves
                         # lots of time for entries with large numbers of UniProt entries e.g. 1HIO even if disk caching is used.
