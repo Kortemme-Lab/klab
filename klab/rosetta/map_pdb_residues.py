@@ -75,6 +75,13 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
     '''Takes a path to a PDB file, the RosettaScripts executable, and the Rosetta database and then uses the features database to map PDB residue IDs to pose residue IDs.
        On success, (True, the residue mapping) is returned. On failure, (False, a list of errors) is returned.
 
+       The mapping maps residue IDs to a dict with the three letter residue code and the Rosetta pose id e.g.
+
+           mapping = {
+              u'B 435 ': {'name3': u'GLN', 'pose_residue_id': 370, 'res_type': u'GLN'},
+              ...
+           }
+
        Note: extra_flags should typically include '-ignore_zero_occupancy false' and '-ignore_unrecognized_res'.'''
 
     mapping = {}
@@ -134,6 +141,7 @@ INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id A
         return False, errors
 
     return True, mapping
+
 
 def strip_pdb(pdb_path, chains = [], strip_hetatms = False):
     '''Takes a PDB file and strips all lines except ATOM and HETATM records. If chains is specified, only those chains are kept. If strip_hetatms is True then HETATM lines are also stripped.
