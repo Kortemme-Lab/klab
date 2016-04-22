@@ -250,17 +250,21 @@ class SequenceAligner(object):
                 # We do not want to include matches which are distant from other matches
                 has_surrounding_matches = ((x > 0) and (match_sequence[x - 1] != ' ')) or (((x + 1) < len(match_sequence)) and (match_sequence[x + 1] != ' '))
                 if match_type == '*':
+                    # "a single, fully conserved residue" - http://www.ebi.ac.uk/Tools/msa/clustalw2/help/faq.html
                     mapping[from_residue_id] = to_residue_id
                     match_mapping[from_residue_id] = SubstitutionScore(1, from_residue, to_residue)
                 elif match_type == ':':
+                    # "conservation between groups of strongly similar properties - scoring > 0.5 in the Gonnet PAM 250 matrix" - ibid.
                     if has_surrounding_matches:
                         mapping[from_residue_id] = to_residue_id
                         match_mapping[from_residue_id] = SubstitutionScore(0, from_residue, to_residue)
                 elif match_type == '.':
+                    # "conservation between groups of weakly similar properties - scoring =< 0.5 in the Gonnet PAM 250 matrix" - ibid.
                     if has_surrounding_matches:
                         mapping[from_residue_id] = to_residue_id
                         match_mapping[from_residue_id] = SubstitutionScore(-1, from_residue, to_residue)
                 elif match_type == ' ':
+                    # not conserved
                     # Allow unmatched residues if they have surrounding matches
                     if has_surrounding_matches:
                         mapping[from_residue_id] = to_residue_id
