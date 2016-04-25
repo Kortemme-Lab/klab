@@ -213,11 +213,16 @@ def finish_run_single(args, job_dir, tmp_output_dir, tmp_data_dir, task_id, verb
             if x.startswith('tmppdbnocopy'):
                 # Skip temporary output PDB files
                 continue
-            x=os.path.abspath(os.path.join(d, x))
+            x = os.path.abspath(os.path.join(d, x))
             if os.path.isfile(x):
-                if x.endswith('.pdb') or x.endswith('score.sc') or x.endswith('.db3'):
-                    x=zip_file(x)
-                shutil.copy(x, copy_to_dir)
+                if 'core.' in x:
+                    x_name = os.path.basename(x)
+                    new_x = os.path.join(copy_to_dir, x_name)
+                    open(new_x, 'a').close()
+                else:
+                    if x.endswith('.pdb') or x.endswith('score.sc') or x.endswith('.db3'):
+                        x = zip_file(x)
+                    shutil.copy(x, copy_to_dir)
                 os.remove(x)
             elif os.path.isdir(x):
                 new_copy_to_dir = os.path.join(copy_to_dir, x)
