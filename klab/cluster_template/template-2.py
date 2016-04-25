@@ -418,8 +418,8 @@ def verify_job_integrity():
         p.close()
 
         if total_number_tasks != len( job_dict.keys() ):
-            print job_dirs
-            print task_id
+            print 'Total number tasks:', total_number_tasks
+            print 'Keys in job_dict:', len( job_dict.keys() )
             raise IndexError('task_in not in job_dirs')
 
 def run_local(run_func):
