@@ -72,6 +72,24 @@ def retrieve_fasta(pdb_id, silent = True):
     return retrieve_file_from_RCSB(get_rcsb_connection(), "/pdb/files/fasta.txt?structureIdList=%s" % pdb_id, silent = silent)
 
 
+def download_fasta(pdb_id, dest_dir, silent = True, filename = None):
+    assert(os.path.exists(dest_dir))
+    lower_case_filename = os.path.join(dest_dir, '{0}.fasta'.format(pdb_id.lower()))
+    upper_case_filename = os.path.join(dest_dir, '{0}.fasta'.format(pdb_id.upper()))
+    if filename:
+        requested_filename = os.path.join(dest_dir, filename)
+        if os.path.exists(requested_filename):
+            return read_file(requested_filename)
+    if os.path.exists(lower_case_filename):
+        return read_file(lower_case_filename)
+    elif os.path.exists(upper_case_filename):
+        return read_file(upper_case_filename)
+    else:
+        contents = retrieve_fasta(pdb_id, silent = silent)
+        write_file(os.path.join(dest_dir, filename or '{0}.fasta'.format(pdb_id)), contents)
+        return contents
+
+
 def retrieve_xml(pdb_id, silent = True):
     '''The RCSB website now compresses XML files.'''
     xml_gz = retrieve_file_from_RCSB(get_rcsb_files_connection(), "/download/%s.xml.gz" % pdb_id, silent = silent)
@@ -82,6 +100,24 @@ def retrieve_xml(pdb_id, silent = True):
     contents = df.read()
     df.close()
     return contents
+
+
+def download_xml(pdb_id, dest_dir, silent = True, filename = None):
+    assert(os.path.exists(dest_dir))
+    lower_case_filename = os.path.join(dest_dir, '{0}.xml'.format(pdb_id.lower()))
+    upper_case_filename = os.path.join(dest_dir, '{0}.xml'.format(pdb_id.upper()))
+    if filename:
+        requested_filename = os.path.join(dest_dir, filename)
+        if os.path.exists(requested_filename):
+            return read_file(requested_filename)
+    if os.path.exists(lower_case_filename):
+        return read_file(lower_case_filename)
+    elif os.path.exists(upper_case_filename):
+        return read_file(upper_case_filename)
+    else:
+        contents = retrieve_xml(pdb_id, silent = silent)
+        write_file(os.path.join(dest_dir, filename or '{0}.xml'.format(pdb_id)), contents)
+        return contents
 
 
 def retrieve_ligand_cif(ligand_id, silent = True):

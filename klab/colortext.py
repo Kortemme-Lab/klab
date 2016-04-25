@@ -52,6 +52,13 @@ colors = {
     'silver'		: (37, True),
 }
 
+
+the_clinton = ['lightblue', 'lightgreen', 'yellow', 'orange', 'pink', 'lightpurple', 'cyan', 'blue', 'aqua', 'green', 'red', 'purple']
+
+
+purple_revolution = ['lightpurple', 'white', 'purple'] # 2016-04-21
+
+
 colors_to_html = {
     #'lightblue'		: (34, False),
     'blue'			: '00005f',

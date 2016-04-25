@@ -12,26 +12,17 @@ Created by Shane O'Connor 2013
 import time
 import os
 import xml
+
 from xml.sax import parse as parse_xml
 
-
-if __name__ == '__main__':
-    import sys
-    sys.path.insert(0, '../..')
-
-from klab.fs.fsio import read_file, write_file, safe_gz_unzip
-from klab.comms.ftp import get_insecure_resource, FTPException550
 from klab import colortext
+from klab.fs.fsio import read_file, write_file, read_gzip_in_memory
+from klab.comms.ftp import get_insecure_resource, FTPException550
 from klab.general.strutil import parse_range, merge_range_pairs
-import rcsb
-
-if __name__ == '__main__':
-    from klab.bio.pdb import PDB#, cases_with_ACE_residues_we_can_ignore
-else:
-    from pdb import PDB#, cases_with_ACE_residues_we_can_ignore
-
-from basics import Sequence, SequenceMap, PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
-from uniprot import uniprot_map, UniParcEntry
+from klab.bio import rcsb
+from klab.bio.pdb import PDB#, cases_with_ACE_residues_we_can_ignore
+from klab.bio.basics import Sequence, SequenceMap, PDBUniParcSequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
+from klab.bio.uniprot import uniprot_map, UniParcEntry
 
 
 # Known bad cases (only up-to-date at the time of commit)
@@ -59,6 +50,11 @@ expected_residue_numbering_schemes = {
 
 def retrieve_file_from_EBI(resource, silent = True):
     '''Retrieve a file from the RCSB.'''
+    #import sys
+    #import traceback
+    #print(resource)
+    #print('\n'.join(traceback.format_stack()))
+    #sys.exit(0)
     if not silent:
         colortext.printf("Retrieving %s from EBI" % os.path.split(resource)[1], color = "aqua")
     attempts = 10
@@ -70,8 +66,50 @@ def retrieve_file_from_EBI(resource, silent = True):
             attempts -= 1
             time.sleep(3)
 
-def retrieve_xml(pdb_id, silent = True):
-    return retrieve_file_from_EBI("/pub/databases/msd/sifts/xml/%s.xml.gz" % pdb_id.lower(), silent)
+
+def retrieve_xml(pdb_id, silent = True, unzip = True):
+    if unzip:
+        return read_gzip_in_memory(retrieve_file_from_EBI("/pub/databases/msd/sifts/xml/%s.xml.gz" % pdb_id.lower(), silent))
+    else:
+        return retrieve_file_from_EBI("/pub/databases/msd/sifts/xml/%s.xml.gz" % pdb_id.lower(), silent)
+
+
+def download_xml(pdb_id, dest_dir, silent = True, filename = None, unzip = False):
+    assert(os.path.exists(dest_dir))
+    lower_case_gz_filename = os.path.join(dest_dir, '{0}.sifts.xml.gz'.format(pdb_id.lower()))
+    upper_case_gz_filename = os.path.join(dest_dir, '{0}.sifts.xml.gz'.format(pdb_id.upper()))
+    lower_case_filename = os.path.join(dest_dir, '{0}.sifts.xml'.format(pdb_id.lower()))
+    upper_case_filename = os.path.join(dest_dir, '{0}.sifts.xml'.format(pdb_id.upper()))
+
+    if filename:
+        requested_filename = os.path.join(dest_dir, filename)
+        if os.path.exists(requested_filename):
+            return read_file(requested_filename)
+
+    if unzip == True:
+        if os.path.exists(lower_case_filename):
+            contents = read_file(lower_case_filename)
+        elif os.path.exists(upper_case_filename):
+            contents = read_file(upper_case_filename)
+        elif os.path.exists(lower_case_gz_filename):
+            contents = read_gzip_in_memory(read_file(lower_case_gz_filename))
+        elif os.path.exists(upper_case_gz_filename):
+            contents = read_gzip_in_memory(read_file(upper_case_gz_filename))
+        else:
+            contents = retrieve_xml(pdb_id, silent = silent, unzip = True)
+            write_file(os.path.join(dest_dir, filename or '{0}.sifts.xml'.format(pdb_id)), contents)
+        return contents
+    else:
+        if os.path.exists(lower_case_gz_filename):
+            contents = read_file(lower_case_gz_filename) # Note: read_file already unzips .gz files
+        if os.path.exists(upper_case_gz_filename):
+            contents = read_file(upper_case_gz_filename) # Note: read_file already unzips .gz files
+        else:
+            gzip_contents = retrieve_xml(pdb_id, silent = silent, unzip = False)
+            write_file(os.path.join(dest_dir, filename or '{0}.sifts.xml.gz'.format(pdb_id)), gzip_contents)
+            contents = read_gzip_in_memory(gzip_contents)
+        return contents
+
 
 # Classes
 class MissingSIFTSRecord(Exception): pass
@@ -206,10 +244,11 @@ class SIFTSResidue(object):
 class SIFTS(xml.sax.handler.ContentHandler):
 
 
-    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88, require_uniprot_residue_mapping = True):
+    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88, require_uniprot_residue_mapping = True, bio_cache = None, pdb_id = None):
         ''' The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.
             If require_uniprot_residue_mapping is set and there is no PDB residue -> UniProt sequence index mapping (e.g. 2IMM at the time of writing) then we raise an exception.
             Otherwise, we store the information we can which can still be useful e.g. SCOP domain data.
+            bio_cache should be a klab.bio.cache.py::BioCache object and is used to avoid reading/downloading cached files repeatedly.
         '''
 
         self.atom_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(PDB ResidueID -> (UniParc ID, UniParc sequence index)) where the UniParc sequence index is 1-based (first element has index 1)
@@ -219,7 +258,8 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         self.seqres_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(SEQRES index -> (UniParc ID, UniParc sequence index)) where the SEQRES index and UniParc sequence index is 1-based (first element has index 1)
         self.counters = {}
-        self.pdb_id = None
+        self.pdb_id = pdb_id
+        self.bio_cache = bio_cache
         self.acceptable_sequence_percentage_match = acceptable_sequence_percentage_match
         self.tag_data = []
         self.cache_dir = cache_dir
@@ -230,8 +270,12 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.region_map_coordinate_systems = {}
         self.domain_overlap_cutoff = domain_overlap_cutoff # the percentage (measured in the range [0, 1.0]) at which we consider two domains to be the same e.g. if a Pfam domain of length 60 overlaps with a SCOP domain on 54 residues then the overlap would be 54/60 = 0.9
         self.require_uniprot_residue_mapping = require_uniprot_residue_mapping
+        self.xml_contents = xml_contents
 
-        self.modified_residues = PDB(pdb_contents).modified_residues
+        if bio_cache and pdb_id:
+            self.modified_residues = bio_cache.get_pdb_object(pdb_id).modified_residues
+        else:
+            self.modified_residues = PDB(pdb_contents).modified_residues
 
         self._STACK = []                        # This is used to create a simple FSA for the parsing
         self.current_residue = None
@@ -278,8 +322,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = True):
-        '''Creates a PDBML object by using a cached copy of the files if they exists or by retrieving the files from the RCSB.'''
+    def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = True, bio_cache = None):
+        '''Creates a PDBML object by using a cached copy of the files if they exists or by retrieving the files from the RCSB.
+           bio_cache should be a klab.bio.cache.py::BioCache object and is used to avoid reading/downloading cached files repeatedly.
+        '''
 
         pdb_contents = None
         xml_contents = None
@@ -290,16 +336,22 @@ class SIFTS(xml.sax.handler.ContentHandler):
         if len(pdb_id) != 4 or not pdb_id.isalnum():
             raise Exception("Bad PDB identifier '%s'." % pdb_id)
 
-        if cache_dir:
-            # Check to see whether we have a cached copy of the PDB file
-            filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
-            if os.path.exists(filename):
-                pdb_contents = read_file(filename)
+        if bio_cache:
+            pdb_contents = bio_cache.get_pdb_contents(pdb_id)
+            xml_contents = bio_cache.get_sifts_xml_contents(pdb_id)
 
-            # Check to see whether we have a cached copy of the XML file
-            filename = os.path.join(cache_dir, "%s.sifts.xml.gz" % l_pdb_id)
-            if os.path.exists(filename):
-                xml_contents = read_file(filename)
+        if cache_dir:
+            if not pdb_contents:
+                # Check to see whether we have a cached copy of the PDB file
+                filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
+                if os.path.exists(filename):
+                    pdb_contents = read_file(filename)
+
+            if not xml_contents:
+                # Check to see whether we have a cached copy of the XML file
+                filename = os.path.join(cache_dir, "%s.sifts.xml.gz" % l_pdb_id)
+                if os.path.exists(filename):
+                    xml_contents = read_file(filename)
 
         # Get any missing files from the RCSB and create cached copies if appropriate
         if not pdb_contents:
@@ -315,10 +367,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
             except FTPException550:
                 raise MissingSIFTSRecord('The file "%s.sifts.xml.gz" could not be found on the EBI FTP server.' % l_pdb_id)
 
-        xml_contents = safe_gz_unzip(xml_contents)
+        xml_contents = xml_contents
 
         # Return the object
-        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir, require_uniprot_residue_mapping = require_uniprot_residue_mapping)
+        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir, require_uniprot_residue_mapping = require_uniprot_residue_mapping, bio_cache = bio_cache, pdb_id = pdb_id)
         xml.sax.parseString(xml_contents, handler)
         return handler
 
@@ -446,7 +498,10 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
     def parse_header(self, attributes):
         if attributes.get('dbAccessionId'):
-            self.pdb_id = attributes.get('dbAccessionId').upper()
+            pdb_id = attributes.get('dbAccessionId').upper()
+            if self.pdb_id:
+                assert(self.pdb_id.upper() == pdb_id)
+            self.pdb_id = pdb_id
         else:
             raise Exception('Could not verify the PDB ID from the <entry> tag.')
 
@@ -700,21 +755,3 @@ class SIFTS(xml.sax.handler.ContentHandler):
     endDocument = end_document
     startElement = start_element
     endElement = end_element
-
-
-
-if __name__ == '__main__':
-    import pprint
-
-    #for pdb_id in ['1AQT', '1lmb', '1utx', '2gzu', '2pnr', '1y8p', '2q8i', '1y8n', '1y8o', '1oax', '3dvn', '1mnu', '1mcl', '2p4a', '1s78', '1i8k']:
-    for pdb_id in ['2pnr']:
-        print('\n')
-        colortext.message(pdb_id)
-        s = SIFTS.retrieve(pdb_id, cache_dir = '/kortemmelab/data/oconchus/SIFTS', acceptable_sequence_percentage_match = 70.0)
-        colortext.warning(pprint.pformat(s.region_mapping))
-        colortext.warning(pprint.pformat(s.region_map_coordinate_systems))
-        colortext.warning(pprint.pformat(s.pfam_scop_mapping))
-        colortext.warning(pprint.pformat(s.scop_pfam_mapping))
-        print('\n')
-
-    print('\n\n')

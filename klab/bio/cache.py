@@ -10,10 +10,18 @@ Created by Shane O'Connor 2016.
 import os
 import datetime
 import operator
+import traceback
 
 from klab import colortext
-from klab.bio.rcsb import download_pdb, retrieve_pdb
+from klab.bio.rcsb import download_pdb, retrieve_pdb, download_fasta, retrieve_fasta
+from klab.bio.rcsb import download_xml as download_pdbml
+from klab.bio.rcsb import retrieve_xml as retrieve_pdbml
 from klab.bio.pdb import PDB
+from klab.bio.sifts import SIFTS
+from klab.bio.sifts import retrieve_xml as retrieve_sifts_xml
+from klab.bio.sifts import download_xml as download_sifts_xml
+from klab.bio.pdbml import PDBML
+from klab.bio.fasta import FASTA
 
 
 class CacheNode(object):
@@ -29,7 +37,6 @@ class CacheNode(object):
         self.t = datetime.datetime.now()
         return self.o
 
-
     def __repr__(self): return '{0}: {1}'.format(self.t, self.o.__repr__()[:50])
     def __cmp__(self, other): return (self.t).__cmp__(other.t)
     def __gt__(self, other): return (self.t).__gt__(other.t)
@@ -40,22 +47,58 @@ class CacheNode(object):
     def __ne__(self, other): return (self.t).__ne__(other.t)
 
 
-class PDBCache(object):
-    '''Class to store a cache of PDB-related objects. This can be used to avoid reading the same data in from disk over
+
+class CacheNodeDict(dict):
+
+    def __getitem__(self, k):
+        return dict.__getitem__(self, k).get()
+
+
+
+class BioCache(object):
+    '''Class to store a cache of klab.bio objects. This can be used to avoid reading the same data in from disk over
        and over again.
     '''
 
 
-    def __init__(self, cache_dir = None, max_capacity = None):
+    def __init__(self, cache_dir = None, max_capacity = None, silent = True):
+        '''max_capacity is currently used to set the maximum capacity of all object lists i.e. you cannot currently set different
+           max capacities for different lists.'''
         if cache_dir:
             assert(os.path.exists(cache_dir))
         if max_capacity != None:
             max_capacity = int(max_capacity)
             assert(max_capacity >= 1)
         self.cache_dir = cache_dir
-        self.pdb_contents = {}
-        self.pdb_objects = {}
+
+        # PDB files
+        self.pdb_contents = CacheNodeDict()
+        self.pdb_objects = CacheNodeDict()
+
+        # SIFTS XML files
+        self.sifts_xml_contents = CacheNodeDict()
+        self.sifts_objects = CacheNodeDict()
+
+        # PDBML files
+        self.pdbml_contents = CacheNodeDict()
+        self.pdbml_objects = CacheNodeDict()
+
+        # FASTA files
+        self.fasta_contents = CacheNodeDict()
+        self.fasta_objects = CacheNodeDict()
+
         self.max_capacity = max_capacity
+        self.silent = silent
+
+
+    def log(self, msg):
+        if not self.silent:
+            colortext.plightpurple(msg)
+
+
+    def log_lookup(self, msg):
+        self.log('CACHE LOOKUP: {0}'.format(msg))
+        #self.log('CACHE LOOKUP: {0}.\n{1}'.format(msg, '\n'.join([l[:-1] for l in traceback.format_stack()])))
 
 
     def add_node(self, container, k, v):
@@ -67,11 +110,17 @@ class PDBCache(object):
         container[k] = CacheNode(v)
 
 
+    ######################
+    # PDB files
+    ######################
+
+
     def add_pdb_contents(self, pdb_id, contents):
-        self.add_node(self.pdb_contents, pdb_id, contents)
+        self.add_node(self.pdb_contents, pdb_id.upper(), contents)
 
 
     def get_pdb_contents(self, pdb_id):
+        self.log_lookup('pdb contents {0}'.format(pdb_id))
         pdb_id = pdb_id.upper()
         if not self.pdb_contents.get(pdb_id):
             if self.pdb_objects.get(pdb_id):
@@ -80,14 +129,15 @@ class PDBCache(object):
                 self.add_pdb_contents(pdb_id, download_pdb(pdb_id, self.cache_dir, silent = True))
             else:
                 self.add_pdb_contents(pdb_id, retrieve_pdb(pdb_id, silent = True))
-        return self.pdb_contents[pdb_id].get()
+        return self.pdb_contents[pdb_id]
 
 
     def add_pdb_object(self, pdb_id, pdb_object):
-        self.add_node(self.pdb_objects, pdb_id, pdb_object)
+        self.add_node(self.pdb_objects, pdb_id.upper(), pdb_object)
 
 
-    def get_pdb_objects(self, pdb_id):
+    def get_pdb_object(self, pdb_id):
+        self.log_lookup('pdb object {0}'.format(pdb_id))
         pdb_id = pdb_id.upper()
         if not self.pdb_objects.get(pdb_id):
             if not self.pdb_contents.get(pdb_id):
@@ -96,6 +146,121 @@ class PDBCache(object):
                 else:
                     self.add_pdb_contents(pdb_id, retrieve_pdb(pdb_id, silent = True))
             self.add_pdb_object(pdb_id, PDB(self.pdb_contents[pdb_id]))
-        return self.pdb_objects[pdb_id].get()
+        return self.pdb_objects[pdb_id]
 
 
+    ######################
+    # SIFTS XML files
+    ######################
+
+
+    def add_sifts_xml_contents(self, pdb_id, sifts_xml_contents):
+        self.add_node(self.sifts_xml_contents, pdb_id.upper(), sifts_xml_contents)
+
+
+    def get_sifts_xml_contents(self, pdb_id):
+        self.log_lookup('SIFTS xml {0}'.format(pdb_id))
+        pdb_id = pdb_id.upper()
+        if not self.sifts_xml_contents.get(pdb_id):
+            if self.sifts_objects.get(pdb_id):
+                self.add_sifts_xml_contents(pdb_id, self.sifts_objects[pdb_id].xml_contents)
+            elif self.cache_dir:
+                self.add_sifts_xml_contents(pdb_id, download_sifts_xml(pdb_id, self.cache_dir, silent = True))
+            else:
+                self.add_sifts_xml_contents(pdb_id, retrieve_sifts_xml(pdb_id, silent = True))
+        return self.sifts_xml_contents[pdb_id]
+
+
+    def add_sifts_object(self, pdb_id, sifts_object):
+        self.add_node(self.sifts_objects, pdb_id.upper(), sifts_object)
+
+
+    def get_sifts_object(self, pdb_id, acceptable_sequence_percentage_match = 90.0):
+        self.log_lookup('SIFTS object {0}'.format(pdb_id))
+        pdb_id = pdb_id.upper()
+        if not self.sifts_objects.get(pdb_id):
+            if not self.sifts_xml_contents.get(pdb_id):
+                if self.cache_dir:
+                    self.add_sifts_xml_contents(pdb_id, download_sifts_xml(pdb_id, self.cache_dir, silent = True))
+                else:
+                    self.add_sifts_xml_contents(pdb_id, retrieve_sifts_xml(pdb_id, silent = True))
+            self.add_sifts_object(pdb_id, SIFTS.retrieve(pdb_id, cache_dir = self.cache_dir, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, bio_cache = self))
+        return self.sifts_objects[pdb_id]
+
+
+    ######################
+    # PDBML files
+    ######################
+
+
+    def add_pdbml_contents(self, pdb_id, pdbml_contents):
+        self.add_node(self.pdbml_contents, pdb_id.upper(), pdbml_contents)
+
+
+    def get_pdbml_contents(self, pdb_id):
+        self.log_lookup('PDBML {0}'.format(pdb_id))
+        pdb_id = pdb_id.upper()
+        if not self.pdbml_contents.get(pdb_id):
+            if self.pdbml_objects.get(pdb_id):
+                self.add_pdbml_contents(pdb_id, self.pdbml_objects[pdb_id].xml_contents)
+            elif self.cache_dir:
+                self.add_pdbml_contents(pdb_id, download_pdbml(pdb_id, self.cache_dir, silent = True))
+            else:
+                self.add_pdbml_contents(pdb_id, retrieve_pdbml(pdb_id, silent = True))
+        return self.pdbml_contents[pdb_id]
+
+
+    def add_pdbml_object(self, pdb_id, pdbml_object):
+        self.add_node(self.pdbml_objects, pdb_id.upper(), pdbml_object)
+
+
+    def get_pdbml_object(self, pdb_id, acceptable_sequence_percentage_match = 90.0):
+        self.log_lookup('PDBML object {0}'.format(pdb_id))
+        pdb_id = pdb_id.upper()
+        if not self.pdbml_objects.get(pdb_id):
+            if not self.pdbml_contents.get(pdb_id):
+                if self.cache_dir:
+                    self.add_pdbml_contents(pdb_id, download_pdbml(pdb_id, self.cache_dir, silent = True))
+                else:
+                    self.add_pdbml_contents(pdb_id, retrieve_pdbml(pdb_id, silent = True))
+            self.add_pdbml_object(pdb_id, PDBML.retrieve(pdb_id, cache_dir = self.cache_dir, bio_cache = self))
+        return self.pdbml_objects[pdb_id]
+
+
+    ######################
+    # FASTA files
+    ######################
+
+
+    def add_fasta_contents(self, pdb_id, fasta_contents):
+        self.add_node(self.fasta_contents, pdb_id.upper(), fasta_contents)
+
+
+    def get_fasta_contents(self, pdb_id):
+        self.log_lookup('FASTA {0}'.format(pdb_id))
+        pdb_id = pdb_id.upper()
+        if not self.fasta_contents.get(pdb_id):
+            if self.fasta_objects.get(pdb_id):
+                self.add_fasta_contents(pdb_id, self.fasta_objects[pdb_id].fasta_contents)
+            elif self.cache_dir:
+                self.add_fasta_contents(pdb_id, download_fasta(pdb_id, self.cache_dir, silent = True))
+            else:
+                self.add_fasta_contents(pdb_id, retrieve_fasta(pdb_id, silent = True))
+        return self.fasta_contents[pdb_id]
+
+
+    def add_fasta_object(self, pdb_id, fasta_object):
+        self.add_node(self.fasta_objects, pdb_id.upper(), fasta_object)
+
+
+    def get_fasta_object(self, pdb_id, acceptable_sequence_percentage_match = 90.0):
+        self.log_lookup('FASTA object {0}'.format(pdb_id))
+        pdb_id = pdb_id.upper()
+        if not self.fasta_objects.get(pdb_id):
+            if not self.fasta_contents.get(pdb_id):
+                if self.cache_dir:
+                    self.add_fasta_contents(pdb_id, download_fasta(pdb_id, self.cache_dir, silent = True))
+                else:
+                    self.add_fasta_contents(pdb_id, retrieve_fasta(pdb_id, silent = True))
+            self.add_fasta_object(pdb_id, FASTA.retrieve(pdb_id, cache_dir = self.cache_dir, bio_cache = self))
+        return self.fasta_objects[pdb_id]

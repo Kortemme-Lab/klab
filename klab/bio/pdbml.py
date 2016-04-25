@@ -217,8 +217,10 @@ class AtomSite(object):
         'ATOMSeqresResidueAA',      #   PDBx:label_comp_id      The residue type in the SEQRES sequence     String (we seem to assume 3 letter protein residues here...)
     ]
 
+
     def __init__(self):
         self.clear()
+
 
     def clear(self):
         d = self.__dict__
@@ -229,11 +231,13 @@ class AtomSite(object):
         d['ATOMResidueiCode'] = ' '
         #self.__dict__['ATOMResidueiCodeIsNull'] = True
 
+
     def get_pdb_residue_id(self):
         d = self.__dict__
         residue_identifier = '%s%s%s' % (d['PDBChainID'], str(d['ATOMResidueID']).rjust(4), d['ATOMResidueiCode'])
         assert(len(residue_identifier) == 6)
         return residue_identifier
+
 
     def validate(self):
         # Assertions
@@ -252,6 +256,7 @@ class AtomSite(object):
         assert(len(self.PDBChainID) == 1)
         assert(self.PDBChainID.isalnum() or self.PDBChainID == ' ') # e.g. 2MBP
 
+
     def convert_to_residue(self, modified_residues):
         residue_3_letter = self.ATOMResidueAA
         residue_1_letter = residue_type_3to1_map.get(residue_3_letter) or protonated_residue_type_3to1_map.get(residue_3_letter) or non_canonical_amino_acids.get(residue_3_letter)
@@ -267,9 +272,11 @@ class AtomSite(object):
         pdb_residue = IdentifyingPDBResidue(self.PDBChainID, ("%d%s" % (self.ATOMResidueID, self.ATOMResidueiCode)).rjust(5), residue_1_letter, None, residue_3_letter)
         return pdb_residue, self.SEQRESIndex, residue_1_letter, residue_3_letter
 
+
     def __repr__(self):
         # For debugging
         return '\n'.join([('%s : %s' % (f.ljust(23), self.__dict__[f])) for f in self.__class__.fields if self.__dict__[f] != None])
+
 
 class AtomSite_xyz(AtomSite):
     fields = [
@@ -309,13 +316,13 @@ class AtomSite_xyz(AtomSite):
 
 class PDBML(xml.sax.handler.ContentHandler):
 
-    def __init__(self, xml_contents, pdb_contents):
+    def __init__(self, xml_contents, pdb_contents, bio_cache = None, pdb_id = None):
         '''The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.'''
 
         self.xml_contents = xml_contents
         self.atom_to_seqres_sequence_maps = {}
         self.counters = {}
-        self.pdb_id = None
+        self.pdb_id = pdb_id
         self.xml_version = None
         self.tag_data = []
         self.in_atom_sites_block = False
@@ -323,9 +330,13 @@ class PDBML(xml.sax.handler.ContentHandler):
         self._residues_read = {}
         self._BLOCK = None                      # This is used to create a simple FSA for the parsing
         self.current_atom_site = AtomSite()
+        self.bio_cache = bio_cache
 
         # Create the PDB
-        self.modified_residues = PDB(pdb_contents).modified_residues
+        if bio_cache and pdb_id:
+            self.modified_residues = bio_cache.get_pdb_object(pdb_id).modified_residues
+        else:
+            self.modified_residues = PDB(pdb_contents).modified_residues
 
         self.deprecated = True
         self.replacement_pdb_id = None
@@ -340,24 +351,31 @@ class PDBML(xml.sax.handler.ContentHandler):
         }
         assert(xml_contents.find('encoding="UTF-8"') != -1)
 
+
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None):
+    def retrieve(pdb_id, cache_dir = None, bio_cache = None):
         '''Creates a PDBML object by using a cached copy of the files if they exists or by retrieving the files from the RCSB.'''
 
         pdb_contents = None
         xml_contents = None
         pdb_id = pdb_id.upper()
 
-        if cache_dir:
-            # Check to see whether we have a cached copy of the PDB file
-            filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
-            if os.path.exists(filename):
-                pdb_contents = read_file(filename)
+        if bio_cache:
+            pdb_contents = bio_cache.get_pdb_contents(pdb_id)
+            xml_contents = bio_cache.get_pdbml_contents(pdb_id)
 
-            # Check to see whether we have a cached copy of the XML file
-            filename = os.path.join(cache_dir, "%s.xml" % pdb_id)
-            if os.path.exists(filename):
-                xml_contents = read_file(filename)
+        if cache_dir:
+            if not pdb_contents:
+                # Check to see whether we have a cached copy of the PDB file
+                filename = os.path.join(cache_dir, "%s.pdb" % pdb_id)
+                if os.path.exists(filename):
+                    pdb_contents = read_file(filename)
+
+            if not xml_contents:
+                # Check to see whether we have a cached copy of the XML file
+                filename = os.path.join(cache_dir, "%s.xml" % pdb_id)
+                if os.path.exists(filename):
+                    xml_contents = read_file(filename)
 
         # Get any missing files from the RCSB and create cached copies if appropriate
         if not pdb_contents:
@@ -371,11 +389,13 @@ class PDBML(xml.sax.handler.ContentHandler):
                 write_file(os.path.join(cache_dir, "%s.xml" % pdb_id), xml_contents)
 
         # Return the object
-        handler = PDBML(xml_contents, pdb_contents)
+        handler = PDBML(xml_contents, pdb_contents, bio_cache = bio_cache, pdb_id = pdb_id)
         xml.sax.parseString(xml_contents, handler)
         return handler
 
+
     def start_document(self): pass
+
 
     def start_element(self, name, attributes):
         self.tag_data = []
@@ -437,7 +457,10 @@ class PDBML(xml.sax.handler.ContentHandler):
 
     def parse_header(self, attributes):
         if attributes.get('datablockName'):
-            self.pdb_id = attributes.get('datablockName').upper()
+            pdb_id = attributes.get('datablockName').upper()
+            if self.pdb_id:
+                assert(pdb_id == self.pdb_id)
+            self.pdb_id = pdb_id
 
         xsd_version = os.path.split(attributes.get('xmlns:PDBx'))[1]
         if xsd_versions.get(xsd_version):
@@ -504,7 +527,7 @@ class PDBML(xml.sax.handler.ContentHandler):
                 if self.pdb_id.upper() == '2MBP':
                     current_atom_site.PDBChainID = 'A' # e.g. 2MBP
                 else:
-                    current_atom_site.PDBChainID = ' ' # e.g. 2MBP
+                    current_atom_site.PDBChainID = ' '
 
         elif name == 'PDBx:auth_seq_id':
             assert(not(current_atom_site.ATOMResidueID))

@@ -801,6 +801,8 @@ class SimpleMutation(object):
 
     def __eq__(self, other):
         '''Only checks amino acid types and residue ID.'''
+        if other == None:
+            return False
         if self.WildTypeAA != other.WildTypeAA:
             return False
         if self.ResidueID != other.ResidueID:
@@ -810,6 +812,8 @@ class SimpleMutation(object):
         return True
 
     def __cmp__(self, other):
+        if other == None:
+            return 1
         if self.Chain != other.Chain:
             if ord(self.Chain) < ord(other.Chain):
                 return -1
@@ -859,6 +863,8 @@ class ChainMutation(Mutation):
 
 
     def __eq__(self, other):
+        if other == None:
+            return False
         if self.WildTypeAA != other.WildTypeAA:
             return False
         if self.ResidueID != other.ResidueID:
@@ -869,6 +875,7 @@ class ChainMutation(Mutation):
             return False
         return True
 
+
     def is_the_same_position(self, other):
         if self.Chain != other.Chain:
             return False
@@ -877,6 +884,7 @@ class ChainMutation(Mutation):
         if self.WildTypeAA != other.WildTypeAA:
             return Exception('The two residues have the same chain and residue ID but different wildtypes so they are incomparable.')
         return True
+
 
 class SKEMPIMutation(ChainMutation):
     '''Adds a Location member to the ChainMutation class.'''
@@ -901,6 +909,7 @@ def mutation_combinations(mutations):
             positions = ['%s%s' % (m.Chain, m.ResidueID.strip()) for m in c]
             if len(positions) == len(set(positions)): # filter out combinations where
                 yield c
+
 
 def generate_all_combinations_of_mutations(mutations):
     '''A wrapper for the mutation_combinations generator.

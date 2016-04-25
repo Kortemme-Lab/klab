@@ -88,11 +88,15 @@ class FASTA(dict):
         return None
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None):
+    def retrieve(pdb_id, cache_dir = None, bio_cache = None):
         '''Creates a FASTA object by using a cached copy of the file if it exists or by retrieving the file from the RCSB.'''
 
-        # Check to see whether we have a cached copy
         pdb_id = pdb_id.upper()
+
+        if bio_cache:
+            return FASTA(bio_cache.get_fasta_contents(pdb_id))
+
+        # Check to see whether we have a cached copy
         if cache_dir:
             filename = os.path.join(cache_dir, "%s.fasta" % pdb_id)
             if os.path.exists(filename):
