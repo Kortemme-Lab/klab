@@ -256,7 +256,7 @@ def make_corr_plot(
     plt.close()
     return fig_path
 
-def plot_bar(
+def plot_box(
     dataframe,
     output_name = 'bar',
     output_directory = None,

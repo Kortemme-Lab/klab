@@ -758,7 +758,7 @@ class BenchmarkRun(ReportingObject):
         return self.plot(analysis_set = analysis_set, analysis_directory = output_directory, matplotlib_plots = True, verbose = verbose, compile_pdf = compile_pdf)
 
 
-    def get_definitive_name(self, topx_unique, unique_ajps, join_character = '-'):
+    def get_definitive_name(self, topx_unique, unique_ajps, join_character = '-', prepend_label = True):
         """
         Generates a definitive name for this benchmark run object, including topx value
         (if passed arg indicates this is unique), and other unique additional join parameters
@@ -768,11 +768,15 @@ class BenchmarkRun(ReportingObject):
         if topx_unique:
             if len(name) > 0:
                 name += join_character
-            name += 'topx_%d' % self.take_lowest
+            if prepend_label:
+                name += 'topx_'
+            name += '%d' % self.take_lowest
         for ajp in unique_ajps:
             if len(name) > 0:
                 name += join_character
-            name += str(ajp) + '_' + str(self.additional_join_parameters[ajp]['short_name'])
+            if prepend_label:
+                name += str(ajp) + '_'
+            name += str(self.additional_join_parameters[ajp]['short_name'])
         if name == '':
             name = 'ddg-benchmark'
         return name
@@ -820,6 +824,7 @@ class BenchmarkRun(ReportingObject):
             common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
             for br in benchmark_runs[1:]:
                 common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
+            print 'Common dataset size will be:', len(common_ids)
             # limited_benchmark_runs = []
             for br in benchmark_runs:
                 br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = use_multiprocessing )
@@ -840,7 +845,7 @@ class BenchmarkRun(ReportingObject):
             calculated_brs.append( br )
         for br in benchmark_runs:
             for analysis_set in analysis_sets:
-                unique_name = br.get_definitive_name(topx_unique, unique_ajps)
+                unique_name = br.get_definitive_name(topx_unique, unique_ajps, join_character = '\n')
                 subdir = os.path.join(analysis_directory, os.path.join('analysis_sets', os.path.join(analysis_set, unique_name) ) )
                 if use_multiprocessing:
                     pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name, False ), callback = save_latex_report )
@@ -892,10 +897,10 @@ class BenchmarkRun(ReportingObject):
         if not os.path.isdir( subplot_directory ):
             os.makedirs(subplot_directory)
         runtime_df = benchmark_runs[0]._get_dataframe_columns( ['RunTime'] )
-        runtime_df.columns = [ benchmark_runs[0].get_definitive_name(topx_unique, unique_ajps) ]
+        runtime_df.columns = [ benchmark_runs[0].get_definitive_name(topx_unique, unique_ajps, join_character = '\n', prepend_label = False) ]
         for br in benchmark_runs[1:]:
             inner_runtime_df = br._get_dataframe_columns( ['RunTime'] )
-            inner_runtime_df.columns = [ br.get_definitive_name(topx_unique, unique_ajps) ]
+            inner_runtime_df.columns = [ br.get_definitive_name(topx_unique, unique_ajps, join_character = '\n', prepend_label = False) ]
             runtime_df = runtime_df.merge(
                 inner_runtime_df,
                 left_index = True,
@@ -903,18 +908,17 @@ class BenchmarkRun(ReportingObject):
             )
 
         intro_report.add_plot(
-            general_matplotlib.plot_bar(
+            general_matplotlib.plot_box(
                 runtime_df,
                 output_directory = subplot_directory,
                 plot_title = 'Prediction Run Times',
                 output_name = 'runtimes',
                 fig_height = 7,
-                fig_width = 9,
+                fig_width = 10,
                 ylabel = 'Run time (minutes)',
                 xlabel = 'Prediction Set',
                 verbose = verbose,
-                xtick_fontsize = 3,
-                rotation_angle = 45,
+                xtick_fontsize = 4,
                 log_y = True,
                 label_n = False,
             ),
@@ -985,7 +989,12 @@ class BenchmarkRun(ReportingObject):
         )
 
 
-        report.set_title_page('%s vs %s' % (self_unique_name, other_unique_name) )
+        report.set_title_page(
+            '%s vs %s' % (
+                self.get_definitive_name(topx_unique, unique_ajps, join_character = '\n'),
+                other.get_definitive_name(topx_unique, unique_ajps, join_character = '\n')
+            )
+        )
         predictions_v_predictions_df = self.dataframe[['Predicted']].merge(
             other.dataframe[['Predicted']],
             left_index = True,
@@ -1397,7 +1406,7 @@ class BenchmarkRun(ReportingObject):
                 latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 6, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
 
             latex_report.add_plot(
-                general_matplotlib.plot_bar(
+                general_matplotlib.plot_box(
                     self._get_dataframe_columns( ['RunTime'] ),
                     output_directory = self.subplot_directory,
                     plot_title = 'Prediction Run Time',
