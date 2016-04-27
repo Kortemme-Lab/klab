@@ -486,6 +486,12 @@ class BenchmarkRun(ReportingObject):
         elif self.ddg_analysis_type[4:].startswith('Top'):
             take_lowest = int(self.ddg_analysis_type[7:])
             self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed using the {0} lowest-scoring mutant structures and the {0} lowest-scoring wildtype structures.'.format(take_lowest)
+        elif self.ddg_analysis_type[4:].startswith('Random'):
+            ddg_analysis_type = self.ddg_analysis_type[4:]
+            if len( ddg_analysis_type ) > len('Random'):
+                self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by pairing {0} random mutant structures with {0} random wildtype structures.'.format( int(ddg_analysis_type[len('Random'):]) )
+            else:
+                self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by pairing random mutant structures with random wildtype structures.'
         else:
             raise Exception("Couldn't parse ddg_analysis_type: " + str(ddg_analysis_type))
         self.log(self.ddg_analysis_type_description)
@@ -1431,15 +1437,16 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_plot(optimal_predictive_cutoff_plot, plot_title = 'Optimal predictive cutoff plot')
 
         # Create a scatterplot and histogram for the adjusted results
-        adjusted_predicted_value_series = BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)
-        adjusted_absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)
-        main_adj_scatterplot = '{0}main_adjusted_with_scalar_scatterplot.png'.format(analysis_file_prefix)
-        if not(os.path.exists(main_adj_scatterplot) and not(self.recreate_graphs)):
-            if verbose:
-                self.log('Saving scatterplot to %s.' % main_adj_scatterplot)
-            plot_pandas(dataframe, experimental_series, adjusted_predicted_value_series, main_adj_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction: adjusted scale')
-        latex_report.add_plot(main_adj_scatterplot, plot_title = 'Main adj. scatterplot')
-        latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix, verbose = verbose), adjusted_absolute_error_series, analysis_set = analysis_set, verbose = verbose), plot_title = 'Absolute errors adjusted with scalar')
+        if self.calculate_scalar_adjustments:
+            adjusted_predicted_value_series = BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set)
+            adjusted_absolute_error_series = BenchmarkRun.get_analysis_set_fieldname('AbsoluteError_adj', analysis_set)
+            main_adj_scatterplot = '{0}main_adjusted_with_scalar_scatterplot.png'.format(analysis_file_prefix)
+            if not(os.path.exists(main_adj_scatterplot) and not(self.recreate_graphs)):
+                if verbose:
+                    self.log('Saving scatterplot to %s.' % main_adj_scatterplot)
+                plot_pandas(dataframe, experimental_series, adjusted_predicted_value_series, main_adj_scatterplot, RInterface.correlation_coefficient_gplot, title = 'Experimental vs. Prediction: adjusted scale')
+            latex_report.add_plot(main_adj_scatterplot, plot_title = 'Main adj. scatterplot')
+            latex_report.add_plot(self.plot_absolute_error_histogram('{0}absolute_errors_adjusted_with_scalar'.format(analysis_file_prefix, verbose = verbose), adjusted_absolute_error_series, analysis_set = analysis_set, verbose = verbose), plot_title = 'Absolute errors adjusted with scalar')
 
         # Scatterplots colored by residue context / change on mutation
         latex_report.add_section_page( title = 'Residue context' )
