@@ -179,8 +179,7 @@ class BenchmarkRun(ReportingObject):
         '''
 
         if not self.dataset_cases or not self.analysis_data:
-            # colortext.error('No dataset cases or analysis (DDG) data were passed. Cannot filter the data. If you are using an '
-                  'existing dataframe, this may explain why no data was passed.')
+            # colortext.error('No dataset cases or analysis (DDG) data were passed. Cannot filter the data. If you are using an existing dataframe, this may explain why no data was passed.')
             return
         if self.restrict_to or self.remove_cases:
 
