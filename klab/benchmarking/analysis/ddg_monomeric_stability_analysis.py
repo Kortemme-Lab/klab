@@ -491,6 +491,10 @@ class BenchmarkRun(ReportingObject):
                 self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by pairing {0} random mutant structures with {0} random wildtype structures.'.format( int(ddg_analysis_type[len('Random'):]) )
             else:
                 self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by pairing random mutant structures with random wildtype structures.'
+        elif self.ddg_analysis_type[4:] == 'AvgAllPairs':
+            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by constructing all pairs of all mutant structures with all wildtype structures.'
+        elif self.ddg_analysis_type[4:] == 'MatchPairs':
+            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by matching each wildtype structure with its corresponding (round number) mutant structure.'
         else:
             raise Exception("Couldn't parse ddg_analysis_type: " + str(ddg_analysis_type))
         self.log(self.ddg_analysis_type_description)
