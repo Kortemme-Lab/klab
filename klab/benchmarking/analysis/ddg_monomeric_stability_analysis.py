@@ -927,7 +927,7 @@ class BenchmarkRun(ReportingObject):
                 output_directory = subplot_directory,
                 plot_title = 'Prediction Run Times',
                 output_name = 'runtimes',
-                fig_height = 7,
+                fig_height = 6.7,
                 fig_width = 10,
                 ylabel = 'Run time (minutes)',
                 xlabel = 'Prediction Set',
@@ -935,6 +935,7 @@ class BenchmarkRun(ReportingObject):
                 xtick_fontsize = 4,
                 log_y = True,
                 label_n = False,
+                rotation_angle = 45,
             ),
             plot_title = 'Run times'
         )
@@ -1407,8 +1408,8 @@ class BenchmarkRun(ReportingObject):
         latex_report.add_section_page( title = 'Main plots' )
 
         if matplotlib_plots:
-            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 7, fig_width = 8, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
-            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 8, fig_width = 7, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
+            latex_report.add_plot( general_matplotlib.plot_scatter(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, density_plot = True, plot_title = 'Experimental vs. Prediction', output_name = 'experimental_prediction_scatter', fig_height = 7, fig_width = 9, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+            latex_report.add_plot( general_matplotlib.make_corr_plot(self.dataframe, experimental_series, 'Predicted', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 7, fig_width = 9, verbose = verbose ), plot_title = 'Experimental vs. Predicted scatterplot, with histograms and linear fit statistics. The p-value here (if present) indicates the likelihood that a random set of this many points would produce a correlation at least as strong as the observed correlation.' )
 
 
         if not quick_plots:
