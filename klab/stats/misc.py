@@ -281,7 +281,7 @@ keymap = dict(
     normaltesty = ("Y-axis normality test", '(2-sided chi^2 p-value=%s)'),
 )
 
-def format_stats(stats, floating_point_format = '%0.2f', sci_notation_format = '%.2E', return_string = True):
+def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '%.2E', return_string = True):
     s = []
     newstats = {}
     for k, v in stats.iteritems():
@@ -308,6 +308,9 @@ def format_stats(stats, floating_point_format = '%0.2f', sci_notation_format = '
 
 def float_format_2sigfig(x):
     return '%.2f' % x
+
+def float_format_3sigfig(x):
+    return '%.3f' % x
 
 def subtract_row_pairs_for_display(df, min_abs_delta = 1.0, pairs_to_show = 15, output_csv = None, verbose = True, merge_df = None):
     assert( len(df.columns.values) == 1 )

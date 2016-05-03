@@ -56,7 +56,7 @@ import klab.latex.latex_report as lr
 from klab.fs.fsio import read_file, write_file, write_temp_file
 from klab.loggers.simple import ReportingObject
 from klab.gfx.color_definitions import rgb_colors as plot_colors
-from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats, float_format_2sigfig, subtract_row_pairs_for_display
+from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats, float_format_2sigfig, float_format_3sigfig, subtract_row_pairs_for_display
 from klab.benchmarking.analysis.plot import plot_pandas
 from klab.plot.rtools import RInterface
 from klab.plot import general_matplotlib
@@ -495,6 +495,9 @@ class BenchmarkRun(ReportingObject):
             self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by constructing all pairs of all mutant structures with all wildtype structures.'
         elif self.ddg_analysis_type[4:] == 'MatchPairs':
             self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by matching each wildtype structure with its corresponding (round number) mutant structure.'
+        elif self.ddg_analysis_type[4:].startswith( 'CplxBoltz' ):
+            assert( len(self.ddg_analysis_type[4:]) > len( 'CplxBoltz' ) )
+            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by boltzmann weighting matching complex DDG scores on the sum complex score (temperature %.2f).' % float(self.ddg_analysis_type[4+len('CplxBoltz'):])
         else:
             raise Exception("Couldn't parse ddg_analysis_type: " + str(ddg_analysis_type))
         self.log(self.ddg_analysis_type_description)
@@ -1062,13 +1065,13 @@ class BenchmarkRun(ReportingObject):
         stats_columns = ['n', 'Fraction correct', "Pearson's R", 'MAE']
         stats_columns_names = ['n', 'FC', "R", 'MAE']
         select_columns = list( stats_columns )
-        select_columns.append('case_description')
+        select_columns.append( 'case_description' )
         stats_df = stats_df[ select_columns ]
         # Put tables for complete datasets first
         first_cases_to_process = set( ['complete dataset', 'complete dataset (scaled)'] )
         other_cases = set( stats_df['case_description'].unique() )
         first_cases_to_process.intersection_update( other_cases )
-        other_cases.difference_update(first_cases_to_process)
+        other_cases.difference_update( first_cases_to_process )
         other_cases = sorted( list( other_cases ) )
         cases = sorted( list( first_cases_to_process ) )
         cases.extend( other_cases)
@@ -1087,7 +1090,7 @@ class BenchmarkRun(ReportingObject):
             inner_df.columns = stats_columns_names
             report_content.append( lr.LatexPandasTable(
                 inner_df,
-                float_format = float_format_2sigfig,
+                float_format = float_format_3sigfig,
                 caption_text = case + ". Abbreviations: FC = fraction correct, R = Pearson's R" ,
             ) )
         return report_content
@@ -1107,7 +1110,7 @@ class BenchmarkRun(ReportingObject):
         inner_df.columns = stats_columns_names
         return lr.LatexPandasTable(
             inner_df,
-            float_format = float_format_2sigfig,
+            float_format = float_format_3sigfig,
             caption_text = case + ". Abbreviations: FC = fraction correct, R = Pearson's R" ,
         )
 
