@@ -499,7 +499,7 @@ def run_cluster(run_func):
         if len(tasks_to_run) != 1:
             print 'Running subtask %d (%d of %d)' % (task_id, i+1, len(tasks_to_run))
         if i+1 == len(tasks_to_run):
-            run_func(task_id, 'cluster', scratch_dir='/scratch', move_output_files=True)
+            run_func(task_id, 'cluster', scratch_dir='/scratch', move_output_files=False)
         else:
             run_func(task_id, 'cluster', scratch_dir='/scratch')
 
