@@ -294,7 +294,10 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
                 newstats[key] = [floating_point_format % v[0], pval_str % v[1]]
         else:
             value_str = floating_point_format
-            newstats[key] = [floating_point_format % float(v), '']
+            if str(v) == 'n/a':
+                newstats[key] = [v, '']
+            else:
+                newstats[key] = [floating_point_format % float(v), '']
 
     if return_string:
         max_k_len = max([len(x) for x in newstats.keys()])
