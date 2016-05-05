@@ -40,6 +40,7 @@ Created by Shane O'Connor 2013
 #   The Residue class is now located here and renamed to PDBResidue (since we assert that the chain is 1 character long).
 #   The Mutation class is now located here. ChainMutation was called something else.
 
+import copy
 import types
 import itertools
 
@@ -130,7 +131,13 @@ non_canonical_amino_acids = {
     'ASX' : 'N', # ??? N in UniProt entry P0A786 for 2ATC, chain A
     'GLX' : 'Q', # ??? Q in UniProt entry P01075 for 4CPA, chain I
     'CRT' : 'T', # Specially defined by Noah
-    'CRG' : 'YG'  # Specially defined by Noah
+    'CRG' : 'YG',# Specially defined by Noah
+    #
+    '0QE' : 'X', # Chloromethane (2PUQ)
+    'CGU' : 'E', # ??? (3TH3)
+    'IAS' : 'D', # Beta-l-aspartic acid
+    'OBF' : 'X', # (2S)-2-amino-4,4-difluorobutanoic acid in 4Y10
+    '3EG' : 'X', # (2S)-2-amino-4,4,4-trifluorobutanoic acid in 4Y11
 }
 
 
@@ -402,6 +409,7 @@ class SequenceMap(object):
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
 
+
     def add(self, key, value, substitution_score):
         self[key] = value
         self.substitution_scores[key] = substitution_score
@@ -559,6 +567,13 @@ class PDBUniParcSequenceMap(SequenceMap):
         return s
 
 
+    def reverse(self):
+        sm = UniParcPDBSequenceMap()
+        for v in self:
+            sm.add(v[1], v[0], v[2])
+        return sm
+
+
 class UniParcPDBSequenceMap(SequenceMap):
     ''' A class to map the IDs of UniParc residue pairs (UniParcID, sequence index) to a PDB chain's Sequence (ATOM/SEQRES/FASTA).
         Mapping from tuples is necessary for some cases e.g. for chimeras like 1M7T.
@@ -583,6 +598,13 @@ class UniParcPDBSequenceMap(SequenceMap):
         s.map = d
         s.substitution_scores = dict.fromkeys(d.keys(), None)
         return s
+
+
+    def reverse(self):
+        sm = PDBUniParcSequenceMap()
+        for v in self:
+            sm.add(v[1], v[0], v[2])
+        return sm
 
 
 def sequence_formatter(sequences):
@@ -720,6 +742,8 @@ class Residue(object):
 
     def __eq__(self, other):
         '''Basic form of equality, just checking the amino acid types. This lets us check equality over different chains with different residue IDs.'''
+        if type(other) == types.NoneType:
+            return False
         return (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
 
 
@@ -750,10 +774,14 @@ class IdentifyingPDBResidue(PDBResidue):
     '''A sortable subclass.'''
 
     def __eq__(self, other):
+        if type(other) == types.NoneType:
+            return False
         return (self.Chain == other.Chain) and (self.ResidueID == other.ResidueID) and (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
 
     def __cmp__(self, other):
         '''Only checks chains and residue IDs.'''
+        if type(other) == types.NoneType:
+            return 1
         if self.Chain != other.Chain:
             if ord(self.Chain) < ord(other.Chain):
                 return -1
@@ -783,6 +811,7 @@ class IdentifyingPDBResidue(PDBResidue):
 #   to UniParc sequences where Chain is the UniParc ID and ResidueID is an integer.
 ###
 
+
 class SimpleMutation(object):
     '''A class to describe mutations to (PDB) structures.'''
 
@@ -792,12 +821,14 @@ class SimpleMutation(object):
         self.MutantAA = MutantAA
         self.Chain = Chain
 
+
     def __repr__(self):
         suffix = ''
         if self.Chain:
             return "%s:%s %s->%s%s" % (self.Chain, self.WildTypeAA, str(self.ResidueID), self.MutantAA, suffix)
         else:
             return "?:%s %s->%s%s" % (self.WildTypeAA, str(self.ResidueID), self.MutantAA, suffix)
+
 
     def __eq__(self, other):
         '''Only checks amino acid types and residue ID.'''
@@ -811,6 +842,7 @@ class SimpleMutation(object):
             return False
         return True
 
+
     def __cmp__(self, other):
         if other == None:
             return 1
@@ -819,8 +851,8 @@ class SimpleMutation(object):
                 return -1
             else:
                 return 1
-        selfResidueID = self.ResidueID
-        otherResidueID = other.ResidueID
+        selfResidueID = str(self.ResidueID)
+        otherResidueID = str(other.ResidueID)
         if selfResidueID != otherResidueID:
             if not selfResidueID.isdigit():
                 spair = (int(selfResidueID[:-1]), ord(selfResidueID[-1]))
@@ -835,6 +867,7 @@ class SimpleMutation(object):
             else:
                 return 1
         return 0
+
 
 class Mutation(SimpleMutation):
     '''A class to describe mutations to structures.
@@ -858,9 +891,9 @@ class Mutation(SimpleMutation):
         else:
             return "?:%s %s->%s%s" % (self.WildTypeAA, str(self.ResidueID), self.MutantAA, suffix)
 
+
 class ChainMutation(Mutation):
     '''Refines Mutation by adding the chain as a parameter of the equality function.'''
-
 
     def __eq__(self, other):
         if other == None:
@@ -895,6 +928,40 @@ class SKEMPIMutation(ChainMutation):
 
     def __repr__(self):
         return "%s:%s %s->%s in %s" % (self.Chain, self.WildTypeAA, str(self.ResidueID), self.MutantAA, self.Location)
+
+
+class PDBMutationPair(object):
+    '''A simple x,y container containing a relation pair of mutations:
+           one SEQRES mutation: these are the actual mutations from wildtype and will inform the structure even if the corresponding coordinates are missing; and
+           one ATOM mutation: these are the mutations that can be made in computational modeling based purely on the structure.
+    '''
+
+    def __init__(self, seqres_mutation, atom_mutation):
+        assert(seqres_mutation != None)
+        assert((atom_mutation == None) or (seqres_mutation.WildTypeAA == atom_mutation.WildTypeAA))
+        assert((atom_mutation == None) or (seqres_mutation.MutantAA == atom_mutation.MutantAA))
+        self.seqres_mutation = seqres_mutation
+        self.atom_mutation = atom_mutation
+
+
+    def __hash__(self):
+        '''This is used by the set() construction to remove duplicates in sets of RadialStrands.'''
+        return hash(str(self.seqres_mutation) + '|' + str(self.atom_mutation))
+
+
+    def __cmp__(self, other):
+        '''This is used by the set() construction to remove duplicates in sets of RadialStrands.'''
+        return self.seqres_mutation.__cmp__(other.seqres_mutation)
+
+
+    def __eq__(self, other):
+        # ow
+        return (self.seqres_mutation == other.seqres_mutation) and (self.atom_mutation == other.atom_mutation)
+
+
+    def __repr__(self):
+        # ow
+        return '[SEQ: {0}, ATOM: {1}]'.format(str(self.seqres_mutation), str(self.atom_mutation))
 
 
 def mutation_combinations(mutations):
