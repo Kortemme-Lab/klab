@@ -8,6 +8,8 @@ Created by Shane O'Connor 2012
 """
 
 import os
+import time
+import traceback
 from httplib import HTTPConnection
 
 def get(url, timeout = None):
@@ -77,12 +79,18 @@ class Connection(object):
                 contents = response.read()
                 if contents[0:6] == "<html>":
                     raise Exception("Error retrieving %s." % os.path.split(self.url)[1])
+                if attempts_left != self.attempts:
+                    print('Success.')
                 return contents
             except Exception, e:
-                import traceback
+                print('Error retrieving {0} {1}.'.format(os.path.split(self.url)[1], resource))
                 print(str(e))
                 print(traceback.format_exc())
-                self._close()
+                attempts_left -= 1
+                if attempts_left > 0:
+                    print('Retrying.')
+                    self._close()
+                    time.sleep(2)
         raise Exception('get {0} failed'.format(resource))
 
 
