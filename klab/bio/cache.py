@@ -11,6 +11,7 @@ import os
 import datetime
 import operator
 import traceback
+import json
 
 from klab import colortext
 from klab.bio.rcsb import download_pdb, retrieve_pdb, download_fasta, retrieve_fasta
@@ -22,6 +23,8 @@ from klab.bio.sifts import retrieve_xml as retrieve_sifts_xml
 from klab.bio.sifts import download_xml as download_sifts_xml
 from klab.bio.pdbml import PDBML
 from klab.bio.fasta import FASTA
+from klab.fs.fsio import read_file, write_file
+from klab.hash.CRC64 import CRC64digest
 
 
 class CacheNode(object):
@@ -175,7 +178,9 @@ class BioCache(object):
         self.add_node(self.sifts_objects, pdb_id.upper(), sifts_object)
 
 
-    def get_sifts_object(self, pdb_id, acceptable_sequence_percentage_match = 90.0):
+    def get_sifts_object(self, pdb_id, acceptable_sequence_percentage_match = 90.0, restrict_match_percentage_errors_to_these_uniparc_ids = None):
+        # todo: we need to store all/important parameters for object creation and key on those as well e.g. "give me the SIFTS object with , restrict_match_percentage_errors_to_these_uniparc_ids = <some_set>"
+        #       otherwise, unexpected behavior may occur
         self.log_lookup('SIFTS object {0}'.format(pdb_id))
         pdb_id = pdb_id.upper()
         if not self.sifts_objects.get(pdb_id):
@@ -184,7 +189,7 @@ class BioCache(object):
                     self.add_sifts_xml_contents(pdb_id, download_sifts_xml(pdb_id, self.cache_dir, silent = True))
                 else:
                     self.add_sifts_xml_contents(pdb_id, retrieve_sifts_xml(pdb_id, silent = True))
-            self.add_sifts_object(pdb_id, SIFTS.retrieve(pdb_id, cache_dir = self.cache_dir, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, bio_cache = self))
+            self.add_sifts_object(pdb_id, SIFTS.retrieve(pdb_id, cache_dir = self.cache_dir, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, bio_cache = self, restrict_match_percentage_errors_to_these_uniparc_ids = restrict_match_percentage_errors_to_these_uniparc_ids))
         return self.sifts_objects[pdb_id]
 
 
@@ -264,3 +269,85 @@ class BioCache(object):
                     self.add_fasta_contents(pdb_id, retrieve_fasta(pdb_id, silent = True))
             self.add_fasta_object(pdb_id, FASTA.retrieve(pdb_id, cache_dir = self.cache_dir, bio_cache = self))
         return self.fasta_objects[pdb_id]
+
+
+    ######################
+    # BLAST results
+    ######################
+
+
+    def _get_blast_pdb_filepath(self, pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off):
+        assert(self.cache_dir)
+        return os.path.join(self.cache_dir, '{0}_{1}_{2}_{3}_{4}.BLAST.json'.format(pdb_id.upper(), chain_id, cut_off, matrix, sequence_identity_cut_off))
+
+
+    def load_pdb_chain_blast(self, pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off):
+        if self.cache_dir:
+            filepath = self._get_blast_pdb_filepath(pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off)
+            if os.path.exists(filepath):
+                return json.loads(read_file(filepath))
+        return None
+
+
+    def save_pdb_chain_blast(self, pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off, data):
+        if self.cache_dir:
+            filepath = self._get_blast_pdb_filepath(pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off)
+            write_file(filepath, json.dumps(data))
+            return True
+        return False
+
+
+    def _get_blast_sequence_filepath(self, sequence, cut_off, matrix, sequence_identity_cut_off):
+        assert(self.cache_dir)
+        id = '{0}_{1}_{2}_{3}'.format(CRC64digest(sequence), len(sequence), sequence[:5], sequence[-5:])
+        return os.path.join(self.cache_dir, '{0}_{1}_{2}_{3}.BLAST.json'.format(id, cut_off, matrix, sequence_identity_cut_off))
+
+
+    def load_sequence_blast(self, sequence, cut_off, matrix, sequence_identity_cut_off):
+        if self.cache_dir:
+            filepath = self._get_blast_sequence_filepath(sequence, cut_off, matrix, sequence_identity_cut_off)
+            if os.path.exists(filepath):
+                for sequence_hits in json.loads(read_file(filepath)):
+                    if sequence_hits['sequence'] == sequence:
+                        return sequence_hits
+        return None
+
+
+    def save_sequence_blast(self, sequence, cut_off, matrix, sequence_identity_cut_off, data):
+        assert(data['sequence'] == sequence)
+        sequence_data = [data] # put the new hit at the start of the file
+        if self.cache_dir:
+            filepath = self._get_blast_sequence_filepath(sequence, cut_off, matrix, sequence_identity_cut_off)
+            if os.path.exists(filepath):
+                for sequence_hits in json.loads(read_file(filepath)):
+                    if sequence_hits['sequence'] != sequence:
+                        sequence_data.append(sequence_hits)
+            write_file(filepath, json.dumps(sequence_data))
+            return True
+        return False
+
+
+    ######################
+    # Static methods
+    ######################
+
+
+    @staticmethod
+    def static_get_pdb_object(pdb_id, bio_cache = None, cache_dir = None):
+        '''This method does not necessarily use a BioCache but it seems to fit here.'''
+        pdb_id = pdb_id.upper()
+
+        if bio_cache:
+            return bio_cache.get_pdb_object(pdb_id)
+
+        if cache_dir:
+            # Check to see whether we have a cached copy of the PDB file
+            filepath = os.path.join(cache_dir, '{0}.pdb'.format(pdb_id))
+            if os.path.exists(filepath):
+                return PDB.from_filepath(filepath)
+
+        # Get any missing files from the RCSB and create cached copies if appropriate
+        pdb_contents = retrieve_pdb(pdb_id)
+        if cache_dir:
+            write_file(os.path.join(cache_dir, "%s.pdb" % pdb_id), pdb_contents)
+        return PDB(pdb_contents)
