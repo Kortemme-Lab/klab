@@ -356,6 +356,7 @@ class Sequence(object):
 
             # KAB - allow for multiresidue noncanonicals
             if id in self.order:
+                raise colortext.Exception('Warning: using code to "allow for multiresidue noncanonicals" - check this case manually.')
                 id = '%s.%d'%(str(id),self.special_insertion_count)
                 self.special_insertion_count += 1
 
