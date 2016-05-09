@@ -72,5 +72,5 @@ if __name__ == '__main__':
     ]
     raster_blaster = BLAST(bio_cache = None, cache_dir = '/kortemmelab/shared/DDG/structures', matrix = 'BLOSUM62', silent = False, cut_off = 0.001, sequence_identity_cut_off = 70)
 
-    #test_pdb_files(raster_blaster, zemu_cases)
+    test_pdb_files(raster_blaster, zemu_cases)
     test_sequences(raster_blaster, sequences)
