@@ -1,3 +1,11 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+sifts.py test code.
+
+Created by Shane O'Connor 2016
+"""
+
 import sys
 import os
 import time
