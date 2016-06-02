@@ -181,6 +181,38 @@ def mae(x_values, y_values, drop_missing = True):
     assert(num_points == len(y_values) and num_points > 0)
     return numpy.sum(numpy.apply_along_axis(numpy.abs, 0, numpy.subtract(x_values, y_values))) / float(num_points)
 
+
+def bootstrap(data, func, alpha, bootstrap_trials, func_kwargs = {}):
+    n = len(data)
+    idx = numpy.random.randint(0, n, (bootstrap_trials, n))
+    stat = []
+    for sample_index_array in idx:
+        stat.append( error_unzip_helper( [data[i] for i in sample_index_array], func, func_kwargs ) )
+    stat.sort()
+    return float(stat[int((1-alpha/2.0)*bootstrap_trials)] - stat[int((alpha/2.0)*bootstrap_trials)]) / 2.0
+
+
+def error_unzip_helper(values, func, func_kwargs):
+    '''Splits [(x1, y1), (x2, y2), ...] and gives to func'''
+    x_values = [x for x, y in values]
+    y_values = [y for x, y in values]
+    result = func(x_values, y_values, **func_kwargs)
+    if isinstance(result, float):
+        return result
+    else:
+        return result[0]
+
+
+def bootstrap_xy_stat(x_values, y_values, func, alpha = 0.05, bootstrap_trials = 10000, func_kwargs = {}):
+    return bootstrap(
+        zip(x_values, y_values),
+        func,
+        alpha = alpha,
+        bootstrap_trials = bootstrap_trials,
+        func_kwargs = func_kwargs,
+    )
+
+
 def normaltest_check(values):
     try:
         return normaltest(values)
@@ -218,15 +250,18 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
 
     return dict(
         pearsonr = pearsonr(x_values, y_values),
+        pearsonr_error = bootstrap_xy_stat(x_values, y_values, pearsonr),
         spearmanr = spearmanr(x_values, y_values),
         gamma_CC = gamma_CC(x_values, y_values),
         MAE = mae(x_values, y_values),
+        MAE_error = bootstrap_xy_stat(x_values, y_values, mae),
         normaltestx = normaltest_check(x_values),
         normaltesty = normaltest_check(y_values),
         kstestx = kstest(x_values, 'norm'),
         kstesty = kstest(y_values, 'norm'),
         ks_2samp = ks_2samp(x_values, y_values),
         fraction_correct = fraction_correct(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff, ignore_null_values = ignore_null_values),
+        fraction_correct_error = bootstrap_xy_stat(x_values, y_values, fraction_correct, func_kwargs = {'x_cutoff' : fcorrect_x_cutoff, 'y_cutoff' : fcorrect_y_cutoff, 'ignore_null_values' : ignore_null_values}),
         fraction_correct_fuzzy_linear = fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = fcorrect_x_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar),
         n = len(x_values),
         num_null_cases = num_null_cases,
@@ -270,9 +305,11 @@ def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_c
 keymap = dict(
     # Dictionary matches stat name (key) with ('full string description', 'value information format string')
     pearsonr = ("Pearson's R", '(2-tailed p-value=%s)'),
+    pearsonr_error = ("Pearson's R (error +/-)", ''),
     spearmanr = ("Spearman's R", '(2-tailed p-value=%s)'),
     gamma_CC = ("Gamma correlation coef.", ''),
     fraction_correct = ("Fraction correct", ''),
+    fraction_correct_error = ("Fraction correct (error +/-)", ''),
     fraction_correct_fuzzy_linear = ("Fraction correct (fuzzy)", ''),
     ks_2samp = ("Kolmogorov-Smirnov test (XY)", '(2-tailed p-value=%s)'),
     kstestx = ("X-axis Kolmogorov-Smirnov test", '(p-value=%s)'),
