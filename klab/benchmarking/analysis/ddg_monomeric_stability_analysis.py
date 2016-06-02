@@ -495,9 +495,15 @@ class BenchmarkRun(ReportingObject):
             self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by constructing all pairs of all mutant structures with all wildtype structures.'
         elif self.ddg_analysis_type[4:] == 'MatchPairs':
             self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by matching each wildtype structure with its corresponding (round number) mutant structure.'
-        elif self.ddg_analysis_type[4:].startswith( 'CplxBoltz' ):
-            assert( len(self.ddg_analysis_type[4:]) > len( 'CplxBoltz' ) )
-            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by boltzmann weighting matching complex DDG scores on the sum complex score (temperature %.2f).' % float(self.ddg_analysis_type[4+len('CplxBoltz'):])
+        elif self.ddg_analysis_type[4:].startswith( 'CplxBoltzWT' ):
+            assert( len(self.ddg_analysis_type[4:]) > len( 'CplxBoltzWT' ) )
+            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by boltzmann weighting matching DDG scores on the wildtype complex score (temperature %.2f).' % float(self.ddg_analysis_type[4+len('CplxBoltzWT'):])
+        elif self.ddg_analysis_type[4:].startswith( 'CplxBoltzMut' ):
+            assert( len(self.ddg_analysis_type[4:]) > len( 'CplxBoltzMut' ) )
+            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by boltzmann weighting matching DDG scores on the mutant complex score (temperature %.2f).' % float(self.ddg_analysis_type[4+len('CplxBoltzMut'):])
+        elif self.ddg_analysis_type[4:].startswith( 'CplxBoltzBoth' ):
+            assert( len(self.ddg_analysis_type[4:]) > len( 'CplxBoltzBoth' ) )
+            self.ddg_analysis_type_description = '\nThe predicted DDG value per case is computed by boltzmann weighting matching DDG scores on both the mutant complex score and the wildtype complex score, added together (temperature %.2f).' % float(self.ddg_analysis_type[4+len('CplxBoltzBoth'):])
         else:
             raise Exception("Couldn't parse ddg_analysis_type: " + str(ddg_analysis_type))
         self.log(self.ddg_analysis_type_description)
