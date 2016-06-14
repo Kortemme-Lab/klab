@@ -939,6 +939,8 @@ class PDBSeqresSequenceAligner(object):
         self.representative_alignment_output = None
         self.summary = None
 
+        self.alignments = {} # Chain in pdb_1 -> Chain in pdb_2 -> alignment object
+
 
     def align(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2, ignore_bad_chains = False):
         if not(self.best_matches) or not(self.complete_alignment_output):
@@ -994,14 +996,17 @@ class PDBSeqresSequenceAligner(object):
 
         # chain_mapping is a mapping of pdb_1 chains to a representative of the best match in pdb_2
         # we now create individual alignments for each case in the mapping
+
+        #self.alignments
         self.representative_alignment_output = ''
         for chain_1, chain_2_pair in chain_mapping.iteritems():
             chain_2 = chain_2_pair[0]
             sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
             sa.add_sequence('{0}_{1}'.format(self.pdb_id_1, chain_1), str(self.pdb_1.seqres_sequences[chain_1]), ignore_bad_chains = ignore_bad_chains)
             sa.add_sequence('{0}_{1}'.format(self.pdb_id_2, chain_2), str(self.pdb_2.seqres_sequences[chain_2]), ignore_bad_chains = ignore_bad_chains)
-            self.best_matches = sa.align()
             self.representative_alignment_output += sa.alignment_output + '\n'
+
+        #get_residue_mapping
 
         self.summary = ''
         for chain_id, related_chains in pdb_1_self_mapping.iteritems():
