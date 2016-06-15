@@ -394,6 +394,7 @@ class SequenceAligner(object):
 
         return sequences
 
+
     def _parse_percentage_identity_output(self, percentage_identity_output):
 
         # Initalize matrix
@@ -918,7 +919,7 @@ class PDBSeqresSequenceAligner(object):
            colortext.warning(pprint.pformat(chain_mapping))
     '''
 
-    def __init__(self, pdb_id_1, pdb_id_2, pdb_1 = None, pdb_2 = None, bio_cache = None, cache_dir = None):
+    def __init__(self, pdb_id_1, pdb_id_2, pdb_1 = None, pdb_2 = None, bio_cache = None, cache_dir = None, cut_off = 70.0, alignment_tool = 'clustalw', gap_opening_penalty = 0.2, ignore_bad_chains = False):
 
         self.pdb_id_1 = pdb_id_1
         self.pdb_id_2 = pdb_id_2
@@ -938,11 +939,21 @@ class PDBSeqresSequenceAligner(object):
         self.complete_alignment_output = None
         self.representative_alignment_output = None
         self.summary = None
+        self.alignment_tool = alignment_tool
+        self.gap_opening_penalty = gap_opening_penalty
+        self.ignore_bad_chains = ignore_bad_chains
+        self.cut_off = cut_off
 
-        self.alignments = {} # Chain in pdb_1 -> Chain in pdb_2 -> alignment object
+        self.alignments = {}  # Chain in pdb_1 -> Chain in pdb_2 -> alignment object
+        self.seqres_sequence_maps = {}  # Chain in pdb_1 -> Chain in pdb_2 -> residue map (from sequence index to sequence index)
+        self.atom_sequence_maps = {}
+
+        self.seqres_to_atom_maps_1, self.atom_to_seqres_maps_1 = self.pdb_1.construct_seqres_to_atom_residue_map()
+        self.seqres_to_atom_maps_2, self.atom_to_seqres_maps_2 = self.pdb_2.construct_seqres_to_atom_residue_map()
 
 
-    def align(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2, ignore_bad_chains = False):
+    def align(self):
+        alignment_tool, gap_opening_penalty, ignore_bad_chains = self.alignment_tool, self.gap_opening_penalty, self.ignore_bad_chains
         if not(self.best_matches) or not(self.complete_alignment_output):
             sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
             for chain_id, seq in sorted(self.pdb_1.seqres_sequences.iteritems()):
@@ -953,7 +964,7 @@ class PDBSeqresSequenceAligner(object):
             self.complete_alignment_output = sa.alignment_output
 
 
-    def get_representative_alignment(self, alignment_tool = 'clustalw', gap_opening_penalty = 0.2, ignore_bad_chains = False):
+    def get_representative_alignment(self):
 
         # Perform a global alignment of all chains
         self.align()
@@ -1001,11 +1012,8 @@ class PDBSeqresSequenceAligner(object):
         self.representative_alignment_output = ''
         for chain_1, chain_2_pair in chain_mapping.iteritems():
             chain_2 = chain_2_pair[0]
-            sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
-            sa.add_sequence('{0}_{1}'.format(self.pdb_id_1, chain_1), str(self.pdb_1.seqres_sequences[chain_1]), ignore_bad_chains = ignore_bad_chains)
-            sa.add_sequence('{0}_{1}'.format(self.pdb_id_2, chain_2), str(self.pdb_2.seqres_sequences[chain_2]), ignore_bad_chains = ignore_bad_chains)
+            sa = self._align_chains(chain_1, chain_2)
             self.representative_alignment_output += sa.alignment_output + '\n'
-
         #get_residue_mapping
 
         self.summary = ''
@@ -1017,6 +1025,94 @@ class PDBSeqresSequenceAligner(object):
             self.summary += 'Chain {0} of {1} matches chain {2} of {3} (and its represented chains) at {4}%.\n'.format(chain_id, self.pdb_id_1, mtch[0], self.pdb_id_2, mtch[1])
 
         return self.representative_alignment_output, chain_mapping, self.summary
+
+
+    def _align_chains(self, chain_1, chain_2):
+        alignment_tool, gap_opening_penalty, ignore_bad_chains = self.alignment_tool, self.gap_opening_penalty, self.ignore_bad_chains
+        if (chain_1, chain_2) in self.alignments:
+            return self.alignments[(chain_1, chain_2)]
+        else:
+            sa = SequenceAligner(alignment_tool=alignment_tool, gap_opening_penalty=gap_opening_penalty)
+            sa.add_sequence('{0}_{1}'.format(self.pdb_id_1, chain_1), str(self.pdb_1.seqres_sequences[chain_1]), ignore_bad_chains=ignore_bad_chains)
+            sa.add_sequence('{0}_{1}'.format(self.pdb_id_2, chain_2), str(self.pdb_2.seqres_sequences[chain_2]), ignore_bad_chains=ignore_bad_chains)
+            sa.align()
+            self.alignments[(chain_1, chain_2)] = sa
+            return sa
+
+
+    def build_residue_mappings(self, from_chain = None, to_chain = None):
+
+        alignment_tool, gap_opening_penalty, ignore_bad_chains = self.alignment_tool, self.gap_opening_penalty, self.ignore_bad_chains
+
+        # ...
+        if not self.alignments:
+            self.get_representative_alignment()
+        assert(self.alignments)
+
+        #matched_chains = self.alignments = {} # Chain in pdb_1 -> Chain in pdb_2 -> alignment object
+
+        # Perform individual alignments for all best-matched chains
+        for chain_1 in sorted(self.pdb_1.seqres_sequences.keys()):
+            if from_chain != None and from_chain != chain_1:
+                continue
+
+            #self.alignments[chain_1] = self.alignments.get(chain_1, {})
+            self.seqres_sequence_maps[chain_1] = self.seqres_sequence_maps.get(chain_1, {})
+            self.atom_sequence_maps[chain_1] = self.atom_sequence_maps.get(chain_1, {})
+
+            best_match_percentage = None
+            for pdb_chain, match in sorted(self.best_matches['{0}_{1}'.format(self.pdb_id_1, chain_1)].items(), key=lambda x: x[1], reverse=True):
+                if pdb_chain.startswith(self.pdb_id_1):
+                    continue
+                chain_2 = pdb_chain.split('_')[1]
+                if best_match_percentage == None or best_match_percentage == match:
+                    best_match_percentage = match
+                    if match < self.cut_off:
+                        # Do not bother aligning sequences below the sequence identity cut-off
+                        continue
+                    elif from_chain != None and from_chain != chain_1:
+                        continue
+                    elif to_chain != None and to_chain != chain_2:
+                        continue
+                    else:
+                        sa = self._align_chains(chain_1, chain_2)
+                        self.seqres_sequence_maps[chain_1][chain_2] = sa.get_residue_mapping()
+
+                    # self.seqres_sequence_maps contains the mappings between SEQRES sequences
+        #
+        for chain_1, matched_chains in self.seqres_sequence_maps.iteritems():
+            self.atom_sequence_maps[chain_1] = self.atom_sequence_maps.get(chain_1, {})
+            for chain_2, residue_mappings in matched_chains.iteritems():
+
+                if not self.atom_sequence_maps[chain_1].get(chain_2):
+                    self.atom_sequence_maps[chain_1][chain_2] = {}
+
+                    # mapping is a SEQRES -> SEQRES mapping
+                    mapping, match_mapping = residue_mappings
+
+                    if chain_1 in self.seqres_to_atom_maps_1 and chain_2 in self.seqres_to_atom_maps_2:
+                        for seqres_res_1, atom_res_1 in sorted(self.seqres_to_atom_maps_1[chain_1].iteritems()):
+                            if seqres_res_1 in mapping:
+                                seqres_res_2 = mapping[seqres_res_1]
+                                if seqres_res_2 in self.seqres_to_atom_maps_2[chain_2]:
+                                    atom_res_2 = self.seqres_to_atom_maps_2[chain_2][seqres_res_2]
+                                    self.atom_sequence_maps[chain_1][chain_2][atom_res_1] = atom_res_2
+
+
+    def get_atom_residue_mapping(self, from_chain, to_chain = None):
+        self.build_residue_mappings(from_chain, to_chain)
+        return self.atom_sequence_maps.get(from_chain, {}).get(to_chain, None)
+
+
+    def get_matching_chains(self, from_chain):
+        self.build_residue_mappings()
+        return sorted([p[1] for p in self.alignments.keys() if p[0] == from_chain])
+
+
+    def map_atom_residue(self, from_chain, to_chain, atom_res_1):
+        # atom_res_1 should not include the chain ID
+        self.build_residue_mappings(from_chain, to_chain)
+        return self.atom_sequence_maps.get(from_chain, {}).get(to_chain, {}).get('{0}{1}'.format(from_chain, atom_res_1), None)
 
 
 class SIFTSChainMutatorSequenceAligner(object):
