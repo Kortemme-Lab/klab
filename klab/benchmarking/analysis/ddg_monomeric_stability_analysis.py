@@ -1229,6 +1229,58 @@ class BenchmarkRun(ReportingObject):
             self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
+
+        section_latex_objs = []
+        section_latex_objs.append( lr.LatexSubSection(
+            'Mutations to alanine',
+            'And mutations not to alanine'
+        ))
+        subcase_dataframe = dataframe[dataframe['MutantAA'] == 'A']
+        table_header = 'Statistics - all mutations to alanine (including multiple mutations, if they are all to alanine) (%d cases)' % len(subcase_dataframe)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( lr.LatexTable(
+            header_row,
+            list_stats,
+            column_format = stats_column_format,
+            header_text = table_header
+        ))
+        self.add_stored_metric_to_df('all mutations to alanine', len(subcase_dataframe), list_stats)
+        subcase_dataframe = dataframe[(dataframe['MutantAA'] == 'A') & (dataframe['NumberOfMutations'] == 1)]
+        table_header = 'Statistics - single mutations to alanine (%d cases)' % len(subcase_dataframe)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( lr.LatexTable(
+            header_row,
+            list_stats,
+            column_format = stats_column_format,
+            header_text = table_header
+        ))
+        self.add_stored_metric_to_df('single mutations to alanine', len(subcase_dataframe), list_stats)
+        subcase_dataframe = dataframe[(dataframe['MutantAA'] == 'A') & (dataframe['NumberOfMutations'] != 1)]
+        if len(subcase_dataframe) > 0:
+            table_header = 'Statistics - multiple mutations to alanine (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+            section_latex_objs.append( lr.LatexTable(
+                header_row,
+                list_stats,
+                column_format = stats_column_format,
+                header_text = table_header
+            ))
+            self.add_stored_metric_to_df('multiple mutations to alanine', len(subcase_dataframe), list_stats)
+        subcase_dataframe = dataframe[dataframe['MutantAA'] != 'A']
+        table_header = 'Statistics - mutations to anything other than alanine (including multiple mutations that include a non-alanine mutation) (%d cases)' % len(subcase_dataframe)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+        section_latex_objs.append( lr.LatexTable(
+            header_row,
+            list_stats,
+            column_format = stats_column_format,
+            header_text = table_header
+        ))
+        self.add_stored_metric_to_df('mutations not to alanine', len(subcase_dataframe), list_stats)
+        if verbose:
+            self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
+        self.metric_latex_objects.extend( section_latex_objs )
+
+
         section_latex_objs = []
         section_latex_objs.append( lr.LatexSubSection(
             'Separating out mutations involving glycine or proline.',
