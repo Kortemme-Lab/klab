@@ -26,7 +26,7 @@ class BLAST(object):
     date_format = '%Y-%m-%dT%H:%M:%S'
 
 
-    def __init__(self, bio_cache = None, cache_dir = None, matrix = 'BLOSUM62', silent = False, cut_off = 0.001, sequence_identity_cut_off = 70, stale_period_in_hours = 7 * 24):
+    def __init__(self, bio_cache = None, cache_dir = None, matrix = 'BLOSUM62', silent = False, cut_off = 0.001, sequence_identity_cut_off = 70, stale_period_in_hours = 7 * 24, min_sequence_length = 20, force_lookup = False):
         '''If data is staler than stale_period_in_hours then we query it anew from the source e.g. BLAST results.'''
         self.bio_cache = bio_cache
         self.cache_dir = cache_dir
@@ -37,7 +37,8 @@ class BLAST(object):
         self.cut_off = cut_off
         self.sequence_identity_cut_off = sequence_identity_cut_off
         self.stale_period_in_hours = stale_period_in_hours
-
+        self.min_sequence_length = min_sequence_length
+        self.force_lookup = force_lookup
 
     #########################
     # Utility functions
@@ -60,6 +61,10 @@ class BLAST(object):
 
 
     def by_pdb(self, pdb_id, take_top_percentile = 30.0, cut_off = None, matrix = None, sequence_identity_cut_off = None, silent = None):
+        '''Returns a list of all PDB files which contain protein sequences similar to the protein sequences of pdb_id.
+           Only protein chains are considered in the matching so e.g. some results may have DNA or RNA chains or ligands
+           while some may not.
+        '''
 
         self.log('BLASTing {0}'.format(pdb_id), silent, colortext.pcyan)
 
@@ -77,8 +82,10 @@ class BLAST(object):
         # Run BLAST over all chains
         hits = set(self.blast_by_pdb_chain(pdb_id, chain_ids[0], cut_off = cut_off, matrix = matrix, sequence_identity_cut_off = sequence_identity_cut_off, take_top_percentile = take_top_percentile, silent = silent))
         for chain_id in chain_ids[1:]:
-            hits = hits.intersection(self.blast_by_pdb_chain(pdb_id, chain_id, cut_off = cut_off, matrix = matrix, sequence_identity_cut_off = sequence_identity_cut_off, take_top_percentile = take_top_percentile))
-
+            chain_hits = self.blast_by_pdb_chain(pdb_id, chain_id, cut_off = cut_off, matrix = matrix, sequence_identity_cut_off = sequence_identity_cut_off, take_top_percentile = take_top_percentile)
+            if chain_hits != None:
+                # None suggests that the chain was not a protein chain whereas an empty list suggest a protein chain with no hits
+                hits = hits.intersection(set(chain_hits))
         return sorted(hits)
 
 
@@ -108,14 +115,30 @@ class BLAST(object):
                 query_date = datetime.datetime.strptime(data['query_date'], BLAST.date_format)
                 age_in_hours = ((datetime.datetime.now() -  query_date).total_seconds()) / (3600.0)
                 assert(age_in_hours > -24.01)
-                if age_in_hours < self.stale_period_in_hours:
-                    return data['hits']
+                if not self.force_lookup:
+                    if age_in_hours < self.stale_period_in_hours:
+                        return data['hits']
 
         # POST the request and parse the PDB hits
         result = self._post(xml_query)
         hits = [l.strip().split(':')[0] for l in result.split('\n') if l.strip()]
         if pdb_id not in hits:
-            raise Exception('A BLAST of {0} chain {1} failed to find any hits for {0}.'.format(pdb_id, chain_id))
+            if not hits:
+                try:
+                    p = self.bio_cache.get_pdb_object(pdb_id)
+                    chain_type = p.chain_types[chain_id]
+                    sequence_length = len(p.seqres_sequences[chain_id])
+                    if not(chain_type == 'Protein' or chain_type == 'Protein skeleton'):
+                        colortext.warning('Chain {1} of {0} is a {2} chain.'.format(pdb_id, chain_id, chain_type))
+                        hits = None # None suggests that the chain was not a protein chain whereas an empty list suggest a protein chain with no hits
+                    elif sequence_length < self.min_sequence_length:
+                        colortext.warning('Chain {1} of {0} only contains {2} residues. The minimum sequence length is set to {3} residues so we will ignore this chain in matching.'.format(pdb_id, chain_id, sequence_length, self.min_sequence_length))
+                        hits = None # None suggests that the chain was not a protein chain whereas an empty list suggest a protein chain with no hits
+                except:
+                    raise colortext.Exception('Failed to determine the chain type for chain {1} of {0}.'.format(pdb_id, chain_id))
+            else:
+                raise Exception('A BLAST of {0} chain {1} failed to find any hits for {0}. Is the chain a polypeptide chain?'.format(pdb_id, chain_id))
+
         query_data['hits'] = hits
 
         # Cache the results
