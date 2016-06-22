@@ -1488,6 +1488,34 @@ class BenchmarkRun(ReportingObject):
                 if len(multiple_mutations_dataframe) > 0:
                     latex_report.add_plot( general_matplotlib.make_corr_plot(multiple_mutations_dataframe, experimental_series, 'Predicted', output_name = 'multiple_mutations_histogram_fit_scatter', output_directory = self.subplot_directory, plot_title = 'Experimental vs. Prediction', fig_height = 6, fig_width = 7, verbose = verbose), plot_title = 'Multiple mutations data subset' )
 
+                subcase_dataframe = dataframe[dataframe['MutantAA'] == 'A']
+                output_name = 'all_alanine_mutations_fit_scatter'
+                plot_title = 'Experimental vs. Prediction'
+                fig_title = 'All mutations to alanine data subset'
+                if len(subcase_dataframe) > 0:
+                    latex_report.add_plot( general_matplotlib.make_corr_plot(subcase_dataframe, experimental_series, 'Predicted', output_name = output_name, output_directory = self.subplot_directory, plot_title = plot_title, fig_height = 6, fig_width = 7, verbose = verbose), plot_title = fig_title )
+
+                subcase_dataframe = dataframe[(dataframe['MutantAA'] == 'A') & (dataframe['NumberOfMutations'] == 1)]
+                output_name = 'single_alanine_mutations_fit_scatter'
+                plot_title = 'Experimental vs. Prediction'
+                fig_title = 'All single mutations to alanine data subset'
+                if len(subcase_dataframe) > 0:
+                    latex_report.add_plot( general_matplotlib.make_corr_plot(subcase_dataframe, experimental_series, 'Predicted', output_name = output_name, output_directory = self.subplot_directory, plot_title = plot_title, fig_height = 6, fig_width = 7, verbose = verbose), plot_title = fig_title )
+
+                subcase_dataframe = dataframe[(dataframe['MutantAA'] == 'A') & (dataframe['NumberOfMutations'] != 1)]
+                output_name = 'multiple_alanine_mutations_fit_scatter'
+                plot_title = 'Experimental vs. Prediction'
+                fig_title = 'All multiple mutations to alanine data subset'
+                if len(subcase_dataframe) > 0:
+                    latex_report.add_plot( general_matplotlib.make_corr_plot(subcase_dataframe, experimental_series, 'Predicted', output_name = output_name, output_directory = self.subplot_directory, plot_title = plot_title, fig_height = 6, fig_width = 7, verbose = verbose), plot_title = fig_title )
+
+                subcase_dataframe = dataframe[dataframe['MutantAA'] != 'A']
+                output_name = 'all_non_alanine_mutations_fit_scatter'
+                plot_title = 'Experimental vs. Prediction'
+                fig_title = 'All mutations to anything but alanine data subset'
+                if len(subcase_dataframe) > 0:
+                    latex_report.add_plot( general_matplotlib.make_corr_plot(subcase_dataframe, experimental_series, 'Predicted', output_name = output_name, output_directory = self.subplot_directory, plot_title = plot_title, fig_height = 6, fig_width = 7, verbose = verbose), plot_title = fig_title )
+
                 latex_report.add_plot(
                     general_matplotlib.plot_box(
                         self._get_dataframe_columns( ['RunTime'] ),
