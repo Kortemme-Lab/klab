@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # encoding: utf-8
 """
 dssp.py
@@ -30,16 +30,16 @@ import traceback
 import string
 import pprint
 
-from klab.fs.fsio import open_temp_file, read_file, write_temp_file
+from klab.fs.fsio import read_file, write_temp_file
 from klab.process import Popen as _Popen
 from klab import colortext
-from pdb import PDB
-from rcsb import retrieve_pdb
-from basics import dssp_secondary_structure_types, residue_types_1, residue_type_1to3_map, residue_type_3to1_map
+from klab.bio.pdb import PDB
+from klab.bio.rcsb import retrieve_pdb
+from klab.bio.basics import dssp_secondary_structure_types, residue_types_1, residue_type_1to3_map, residue_type_3to1_map
 from klab.general.structures import NestedBunch
 
 
-secondary_structure_types = dssp_secondary_structure_types.keys() 
+secondary_structure_types = dssp_secondary_structure_types.keys()
 residue_types = [t for t in residue_types_1] + [ss_bridge_cysteine_code for ss_bridge_cysteine_code in string.ascii_lowercase]
 residue_type_1to3 = {}
 for k, v in residue_type_1to3_map.iteritems():
@@ -52,14 +52,22 @@ residue_max_acc = dict(
     # The code for the wrapper can be found at: http://wilke.openwetware.org/Software.html ("Program for computing relative solvent accessibilities for a protein that uses the DSSP program of Kabsch and Sander")
     # The values in the dict are presented in Tien et al., 2013 (http://dx.doi.org/10.1371/journal.pone.0080635)
     # and seem to be taken from the proposed values for ASA normalization (in A^2) from Miller et al., 1987 (http://dx.doi.org/10.1016/0022-2836(87)90038-6).
-    Miller = {
+    Miller={
         'A': 113.0, 'R': 241.0, 'N': 158.0, 'D': 151.0,
         'C': 140.0, 'Q': 189.0, 'E': 183.0, 'G': 85.0,
         'H': 194.0, 'I': 182.0, 'L': 180.0, 'K': 211.0,
         'M': 204.0, 'F': 218.0, 'P': 143.0, 'S': 122.0,
         'T': 146.0, 'W': 259.0, 'Y': 229.0, 'V': 160.0
     },
+    Wilke={
+        'A': 129.0, 'R': 274.0, 'N': 195.0, 'D': 193.0,
+        'C': 167.0, 'Q': 225.0, 'E': 223.0, 'G': 104.0,
+        'H': 224.0, 'I': 197.0, 'L': 201.0, 'K': 236.0,
+        'M': 224.0, 'F': 240.0, 'P': 159.0, 'S': 155.0,
+        'T': 172.0, 'W': 285.0, 'Y': 263.0, 'V': 174.0
+    },
 )
+
 
 class MissingAtomException(Exception): pass
 
@@ -120,16 +128,13 @@ class MonomerDSSP(object):
     def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
-
     @classmethod
     def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
-
     @classmethod
     def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
-
 
     def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         '''This function strips a PDB file to one chain and then runs DSSP on this new file.
@@ -137,7 +142,7 @@ class MonomerDSSP(object):
         '''
         try:
             _Popen('.', shlex.split('mkdssp --version'))
-        except Exception, e:
+        except:
             raise colortext.Exception('mkdssp does not seem to be installed in a location declared in the environment path.')
 
         self.cut_off = cut_off
@@ -145,7 +150,7 @@ class MonomerDSSP(object):
         self.residue_max_acc = residue_max_acc[acc_array]
         self.read_only = read_only
         if not self.read_only:
-            self.pdb = p.clone() # make a local copy in case this gets modified externally
+            self.pdb = p.clone()  # make a local copy in case this gets modified externally
         else:
             self.pdb = p
         self.chain_order = self.pdb.atom_chain_order
@@ -156,28 +161,24 @@ class MonomerDSSP(object):
         self.chain_order = [c for c in self.chain_order if c in self.dssp]
         self.dsspb = NestedBunch(self.dssp)
 
-
     def __iter__(self):
         self._iter_keys = [c for c in self.chain_order]
-        self._iter_keys.reverse() # we pop from the list
+        self._iter_keys.reverse()  # we pop from the list
         return self
 
-
-    def next(self): # todo: This is __next__ in Python 3.x
+    def next(self):  # todo: This is __next__ in Python 3.x
         try:
             chain_id = self._iter_keys.pop()
             return chain_id, self.dssp[chain_id]
         except:
             raise StopIteration
 
-
     def __repr__(self):
         return pprint.pformat(self.dssp)
 
-
     def compute(self, chain_id):
         tmp_dir = self.tmp_dir
-        pdb_object = self.pdb.clone() # we are immediately modifying the PDB file by stripping chains so we need to make a copy
+        pdb_object = self.pdb.clone()  # we are immediately modifying the PDB file by stripping chains so we need to make a copy
         pdb_object.strip_to_chains(chain_id)
         input_filepath = write_temp_file(tmp_dir, pdb_object.get_content(), ftype = 'w', prefix = 'dssp_')
         output_filepath = write_temp_file(tmp_dir, '', ftype = 'w', prefix = 'dssp_')
@@ -190,17 +191,16 @@ class MonomerDSSP(object):
                     raise Exception('An error occurred while calling DSSP:\n%s' % p.stderr)
             self.dssp_output[chain_id] = read_file(output_filepath)
             self.dssp[chain_id] = self.parse_output(chain_id)
-        except MissingAtomException, e:
+        except MissingAtomException as e:
             os.remove(input_filepath)
             os.remove(output_filepath)
             raise
-        except Exception, e:
+        except Exception as e:
             os.remove(input_filepath)
             os.remove(output_filepath)
             raise colortext.Exception('%s\n%s' % (str(e), traceback.format_exc()))
         os.remove(input_filepath)
         os.remove(output_filepath)
-
 
     def parse_output(self, chain_id):
         d = {}
@@ -238,30 +238,28 @@ class MonomerDSSP(object):
             bp_2 = data_line[29:33],
             sheet_label = data_line[33],
             acc = data_line[34:38],
-            )
-        if d['dssp_residue_aa'] != '!': # e.g. 1A22, chain A, between PDB residue IDs 129 and 136
-            self.check_line(d) # note: this function call has side-effects
+        )
+        if d['dssp_residue_aa'] != '!':  # e.g. 1A22, chain A, between PDB residue IDs 129 and 136
+            self.check_line(d)  # note: this function call has side-effects
             self.compute_burial(d)
             return d
         else:
             return None
 
-
     def check_line(self, d):
         d['dssp_res_id'] = int(d['dssp_res_id'])
         int(d['pdb_res_id'][:-1])
-        assert(d['pdb_res_id'][0] == ' ') # I think this is the case
+        assert(d['pdb_res_id'][0] == ' ')  # I think this is the case
         assert(d['pdb_res_id'][-1] == ' ' or d['pdb_res_id'][-1].isalpha())
         d['pdb_res_id'] = d['pdb_res_id'][1:]
         assert(d['chain_id'].isalnum())
-        d['residue_aa'] = residue_type_3to1_map[residue_type_1to3[d['dssp_residue_aa']]] # convert the DSSP residue type into a canonical 1-letter code or 'X'
+        d['residue_aa'] = residue_type_3to1_map[residue_type_1to3[d['dssp_residue_aa']]]  # convert the DSSP residue type into a canonical 1-letter code or 'X'
         assert(d['residue_aa'] in residue_types_1)
         assert(d['ss'] in secondary_structure_types)
         d['bp_1'] = int(d['bp_1'])
         d['bp_2'] = int(d['bp_2'])
         d['acc'] = int(d['acc'])
         d['3LC'] = residue_type_1to3.get(d['dssp_residue_aa'])
-
 
     def compute_burial(self, d):
         cut_off = self.cut_off
@@ -275,8 +273,6 @@ class MonomerDSSP(object):
                 d['is_buried'] = True
             else:
                 d['is_buried'] = False
-
-
 
 
 class ComplexDSSP(MonomerDSSP):
@@ -334,16 +330,13 @@ class ComplexDSSP(MonomerDSSP):
     def from_pdb_contents(cls, pdb_contents, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         return cls(PDB(pdb_contents), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
-
     @classmethod
     def from_pdb_filepath(cls, pdb_filepath, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         return cls(PDB(read_file(pdb_filepath)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
 
-
     @classmethod
     def from_RCSB(cls, pdb_id, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         return cls(PDB(retrieve_pdb(pdb_id)), cut_off = cut_off, acc_array = acc_array, tmp_dir = tmp_dir, read_only = read_only)
-
 
     def __init__(self, p, cut_off = 0.25, acc_array = 'Miller', tmp_dir = '/tmp', read_only = False):
         '''This function strips a PDB file to one chain and then runs DSSP on this new file.
@@ -351,7 +344,7 @@ class ComplexDSSP(MonomerDSSP):
         '''
         try:
             _Popen('.', shlex.split('mkdssp --version'))
-        except Exception, e:
+        except:
             raise colortext.Exception('mkdssp does not seem to be installed in a location declared in the environment path.')
 
         self.cut_off = cut_off
@@ -359,7 +352,7 @@ class ComplexDSSP(MonomerDSSP):
         self.residue_max_acc = residue_max_acc[acc_array]
         self.read_only = read_only
         if not self.read_only:
-            self.pdb = p.clone() # make a local copy in case this gets modified externally
+            self.pdb = p.clone()  # make a local copy in case this gets modified externally
         else:
             self.pdb = p
         self.chain_order = self.pdb.atom_chain_order
@@ -369,13 +362,12 @@ class ComplexDSSP(MonomerDSSP):
         self.chain_order = [c for c in self.chain_order if c in self.dssp]
         self.dsspb = NestedBunch(self.dssp)
 
-
     def compute(self):
         tmp_dir = self.tmp_dir
         if not self.read_only:
             pdb_object = self.pdb.clone()
         else:
-            pdb_object = self.pdb # in general, we should not be modifying the structure in this class
+            pdb_object = self.pdb  # in general, we should not be modifying the structure in this class
         input_filepath = write_temp_file(tmp_dir, pdb_object.get_content(), ftype = 'w', prefix = 'dssp_')
         output_filepath = write_temp_file(tmp_dir, '', ftype = 'w', prefix = 'dssp_')
         try:
@@ -388,17 +380,16 @@ class ComplexDSSP(MonomerDSSP):
 
             self.dssp_output = read_file(output_filepath)
             self.dssp = self.parse_output()
-        except MissingAtomException, e:
+        except MissingAtomException as e:
             os.remove(input_filepath)
             os.remove(output_filepath)
             raise
-        except Exception, e:
+        except Exception as e:
             os.remove(input_filepath)
             os.remove(output_filepath)
             raise colortext.Exception('%s\n%s' % (str(e), traceback.format_exc()))
         os.remove(input_filepath)
         os.remove(output_filepath)
-
 
     def parse_output(self):
         d = {}
@@ -414,4 +405,3 @@ class ComplexDSSP(MonomerDSSP):
                 d[l['chain_id']] = d.get(l['chain_id'], {})
                 d[l['chain_id']][l['pdb_res_id']] = l
         return d
-
