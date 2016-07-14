@@ -27,23 +27,17 @@ Analysis module for the site saturation mutagenesis data.
 This module was initially by Samuel Thompson but added to the repository by Shane O'Connor.
 '''
 
-
 import sys
+import os
+
 from scipy import stats
 import numpy as np
 
-
-# ========= Parameters =========
-
-STDev_cutoff = 1.0  # number of standard deviations as a threshold for significance cut-off
-# Used for both predictions and experiments
-
-expect_negative_correlation = False  # indicate if the predictions have the same or opposite sign as the experimental data
+from klab import colortext
+from klab.fs.fsio import get_file_lines
 
 
-# ========= End of Parameters =========
-
-def leastSquaresFixedOrigin(x, y):
+def least_squares_fixed_origin(x, y):
     x_linalg = x[:, np.newaxis]
     linalg_slope, linalg_residual = np.linalg.lstsq(x_linalg, y)[:2]
     slope = linalg_slope[0]
@@ -56,7 +50,7 @@ def leastSquaresFixedOrigin(x, y):
     return slope, r_value
 
 
-def getSTDev(values):
+def get_std_dev(values):
     temp_pos = []
     temp_neg = []
 
@@ -80,7 +74,16 @@ def getSTDev(values):
         return pos_stdeviation, neg_stdeviation
 
 
-def determineCorrectSign(prediction_data, experimental_data, expect_negative_correlation, STDev_cutoff):
+def determine_correct_sign(prediction_data, experimental_data, expect_negative_correlation = False, STDev_cutoff = 1.0):
+    """
+
+    :param prediction_data:
+    :param experimental_data:
+    :param expect_negative_correlation: Indicates wheter or not the predictions have the same or opposite sign as the experimental data.
+    :param STDev_cutoff: Number of standard deviations as a threshold for significance cut-off. Used for both predictions and experiments.
+
+    :return:
+    """
     if len(experimental_data['list']) != len(prediction_data['list']):
         print str("Error: number of experimental values (%d) and prediction values () do not match. Cannot continue.") % (len(experimental_data['list']), len(prediction_data['list']))
         exit()
@@ -189,7 +192,7 @@ def determineCorrectSign(prediction_data, experimental_data, expect_negative_cor
     return accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity
 
 
-def calculateMAE(prediction_data, experimental_data):
+def calculate_mae(prediction_data, experimental_data):
     warning = ""
 
     mae = np.mean(np.abs(np.array(prediction_data['array']) - np.array(experimental_data['array'])))
@@ -202,22 +205,44 @@ def calculateMAE(prediction_data, experimental_data):
     return mae, scaled_mae, warning
 
 
-def parseCSV(CSVfilename, expect_negative_correlation, STDev_cutoff):
+def parse_csv(csv_filepath, expect_negative_correlation = False, STDev_cutoff = 1.0, headers_start_with = 'ID'):
+    """
+    Expects a CSV file with a header line starting with headers_start_with e.g. "ID,experimental value, prediction 1 value, prediction 2 value,"
+    Record IDs are expected in the first column.
+    Experimental values are expected in the second column.
+    Predicted values are expected in the subsequent columns.
+
+    :param csv_filepath: The path to a CSV file containing experimental and predicted data for some dataset.
+    :param expect_negative_correlation: Indicates wheter or not the predictions have the same or opposite sign as the experimental data.
+    :param STDev_cutoff: Number of standard deviations as a threshold for significance cut-off. Used for both predictions and experiments.
+    :param headers_start_with: A string used to distinguish the header line.
+
+    """
     data = {}
     data['experimental'] = {}
     data['experimental']['list'] = []
     data['experimental']['dict'] = {}
     data['predictions'] = {}
 
-    infile = open(CSVfilename, 'r')
+    assert(os.path.exists(csv_filepath))
+    lines = get_file_lines(csv_filepath)
 
-    for line in infile:
+    skipped_cases = []
+    for line in lines:
         if line[:2] == "ID":
             continue  # Skip the header if it is present
 
-        fields = line.split(",")
+        fields = line.split(',')
+
         mut_name = fields[0]
         expt_value = fields[1]
+
+        # The script as is requires values for all records. We skip any which are missing some data.
+        predicted_values = [t.strip() for t in fields[2:] if t.strip()]
+        if(len(predicted_values) != len(fields) - 2):
+            skipped_cases.append(fields[0])
+            continue
+
         data['experimental']['dict'][mut_name] = float(expt_value)
         data['experimental']['list'].append(float(expt_value))
         predictions = fields[2:]
@@ -242,17 +267,17 @@ def parseCSV(CSVfilename, expect_negative_correlation, STDev_cutoff):
 
     for prediction_name in data['predictions'].keys():
         data['predictions'][prediction_name]['array'] = np.array(data['predictions'][prediction_name]['list'])
-        pos_STDev, neg_STDev = getSTDev(data['predictions'][prediction_name]['array'])
+        pos_STDev, neg_STDev = get_std_dev(data['predictions'][prediction_name]['array'])
         data['predictions'][prediction_name]['positive significance threshold'] = pos_STDev
         data['predictions'][prediction_name]['negative significance threshold'] = neg_STDev
 
     data['experimental']['array'] = np.array(data['experimental']['list'])
-    pos_STDev, neg_STDev = getSTDev(data['experimental']['array'])
+    pos_STDev, neg_STDev = get_std_dev(data['experimental']['array'])
     data['experimental']['positive significance threshold'] = pos_STDev
     data['experimental']['negative significance threshold'] = neg_STDev
 
     for prediction_name in data['predictions'].keys():
-        slope_through_origin, r_value_through_origin = leastSquaresFixedOrigin(
+        slope_through_origin, r_value_through_origin = least_squares_fixed_origin(
                 data['predictions'][prediction_name]['array'], data['experimental']['array'])
         slope, intercept, r_value, p_value, std_err = stats.linregress(data['predictions'][prediction_name]['array'],
                                                                        data['experimental']['array'])
@@ -261,11 +286,11 @@ def parseCSV(CSVfilename, expect_negative_correlation, STDev_cutoff):
         data['predictions'][prediction_name]['R-value through origin'] = r_value_through_origin
         data['predictions'][prediction_name]['slope'] = slope
         data['predictions'][prediction_name]['R value'] = r_value
-        mae, scaled_mae, warning = calculateMAE(data['predictions'][prediction_name], data['experimental'])
+        mae, scaled_mae, warning = calculate_mae(data['predictions'][prediction_name], data['experimental'])
         data['predictions'][prediction_name]['MAE'] = mae
         data['predictions'][prediction_name]['scaled MAE'] = scaled_mae
         data['predictions'][prediction_name]['warnings'].append(warning)
-        accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity = determineCorrectSign(
+        accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity = determine_correct_sign(
                 data['predictions'][prediction_name], data['experimental'], expect_negative_correlation, STDev_cutoff)
         data['predictions'][prediction_name]['accuracy'] = accuracy
         data['predictions'][prediction_name]['specificity'] = specificity
@@ -273,6 +298,8 @@ def parseCSV(CSVfilename, expect_negative_correlation, STDev_cutoff):
         data['predictions'][prediction_name]['significance specificity'] = significance_specificity
         data['predictions'][prediction_name]['significance sensitivity'] = significance_sensitivity
 
+        if skipped_cases:
+            colortext.warning('\nSkipped {0} cases due to partial data: {1}.\n'.format(len(skipped_cases), ', '.join(skipped_cases)))
         print str("Prediction number: %s") % prediction_name
         print str("\tR-value: %03f\t\tSlope: %03f") % (r_value, slope)
         print str("\tR-value with origin as intercept: %03f\t\tSlope: %03f") % (r_value_through_origin, slope_through_origin)
@@ -287,8 +314,8 @@ def parseCSV(CSVfilename, expect_negative_correlation, STDev_cutoff):
         print str("\n\n")
 
 
-datafilename = sys.argv[1]
-print str("\n\n--Analysis of predictions in %s--") % datafilename
-parseCSV(datafilename, expect_negative_correlation, STDev_cutoff)
+if __name__ == '__main__':
+    datafilename = sys.argv[1]
+    print str("\n\n--Analysis of predictions in %s--") % datafilename
+    parse_csv(datafilename, expect_negative_correlation, STDev_cutoff = 1.0, headers_start_with = 'ID')
 
-# ID,experimental value, prediction 1 value, prediction 2 value,
