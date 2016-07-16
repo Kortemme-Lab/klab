@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2015 Shane O'Connor, Roland A. Pache
+# Copyright (c) 2015 Shane O'Connor, Roland A. Pache, Kyle Barlow
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -38,6 +38,7 @@ from scipy.stats import pearsonr, spearmanr, normaltest, ks_2samp, kstest, norm
 
 from klab.unmerged.rpache.functions_lib import gamma_CC
 from klab.fs.fsio import write_temp_file
+from klab.benchmarking.analysis.ssm import get_std_xy_dataset_statistics
 
 
 class FrequencyCounter(object):
@@ -144,7 +145,7 @@ def fraction_correct_fuzzy_linear_create_vector(z, z_cutoff, z_fuzzy_range):
     return numpy.divide(zvec, length)
 
 
-def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0):
+def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, y_cutoff = None):
     '''A version of fraction_correct which is more forgiving at the boundary positions.
        In fraction_correct, if the x value is 1.01 and the y value is 0.99 (with cutoffs of 1.0) then that pair evaluates
        to zero despite the results being very close to each other.
@@ -162,11 +163,12 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
     assert(num_points == len(y_values))
     correct = 0.0
     considered_points = 0
+    y_fuzzy_range = x_fuzzy_range * y_scalar
+    if y_cutoff == None:
+        y_cutoff = x_cutoff * y_scalar
     for i in range(num_points):
         x = x_values[i]
         y = y_values[i]
-        y_cutoff = x_cutoff * y_scalar
-        y_fuzzy_range = x_fuzzy_range * y_scalar
         xvec = fraction_correct_fuzzy_linear_create_vector(x, x_cutoff, x_fuzzy_range)
         yvec = fraction_correct_fuzzy_linear_create_vector(y, y_cutoff, y_fuzzy_range)
         if xvec != None and yvec != None:
@@ -220,7 +222,12 @@ def normaltest_check(values):
         return (numpy.nan, None)
 
 # this was renamed from get_xy_dataset_correlations to match the DDG benchmark capture repository
-def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
+def _get_xy_dataset_statistics(x_values, y_values,
+                               fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0,
+                               ignore_null_values = False, bootstrap_data = False,
+                               expect_negative_correlation = False, STDev_cutoff = 1.0,
+                               run_standardized_analysis = True,
+                               check_multiple_analysis_for_consistency = True):
     '''
     A function which takes two lists of values of equal length with corresponding entries and returns a dict containing
     a variety of metrics.
@@ -230,6 +237,10 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
     :param fcorrect_y_cutoff: See get_xy_dataset_statistics.
     :param x_fuzzy_range: See get_xy_dataset_statistics.
     :param y_scalar: See get_xy_dataset_statistics.
+    :param ignore_null_values: Remove records with missing data before running analysis.
+    :param bootstrap_data: Set to True to enable bootstrapping. Bootstrapping data to estimate errors is an expensive operation so is disabled by default.
+    :param expect_negative_correlation: See klab.benchmarking.analysis.ssm::parse_csv().
+    :param STDev_cutoff: See klab.benchmarking.analysis.ssm::parse_csv().
     :return: A table of statistics.
     '''
     assert(len(x_values) == len(y_values))
@@ -248,27 +259,56 @@ def _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = 1.0, fcor
         x_values = truncated_x_values
         y_values = truncated_y_values
 
-    return dict(
+    stats = dict(
         pearsonr = pearsonr(x_values, y_values),
-        pearsonr_error = bootstrap_xy_stat(x_values, y_values, pearsonr),
         spearmanr = spearmanr(x_values, y_values),
         gamma_CC = gamma_CC(x_values, y_values),
         MAE = mae(x_values, y_values),
-        MAE_error = bootstrap_xy_stat(x_values, y_values, mae),
         normaltestx = normaltest_check(x_values),
         normaltesty = normaltest_check(y_values),
         kstestx = kstest(x_values, 'norm'),
         kstesty = kstest(y_values, 'norm'),
         ks_2samp = ks_2samp(x_values, y_values),
         fraction_correct = fraction_correct(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff, ignore_null_values = ignore_null_values),
-        fraction_correct_error = bootstrap_xy_stat(x_values, y_values, fraction_correct, func_kwargs = {'x_cutoff' : fcorrect_x_cutoff, 'y_cutoff' : fcorrect_y_cutoff, 'ignore_null_values' : ignore_null_values}),
-        fraction_correct_fuzzy_linear = fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = fcorrect_x_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar),
+        fraction_correct_fuzzy_linear = fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = fcorrect_x_cutoff, y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar),
         n = len(x_values),
         num_null_cases = num_null_cases,
     )
+    if bootstrap_data:
+        stats.update(dict(
+            pearsonr_error = bootstrap_xy_stat(x_values, y_values, pearsonr),
+            MAE_error = bootstrap_xy_stat(x_values, y_values, mae),
+            fraction_correct_error = bootstrap_xy_stat(x_values, y_values, fraction_correct, func_kwargs = {'x_cutoff' : fcorrect_x_cutoff, 'y_cutoff' : fcorrect_y_cutoff, 'ignore_null_values' : ignore_null_values}),
+        ))
+
+    # Call Samuel Thompson's analysis which uses confidence intervals when considering fraction correct-like metrics
+    if run_standardized_analysis:
+        std_stats = get_std_xy_dataset_statistics(x_values, y_values, expect_negative_correlation = expect_negative_correlation, STDev_cutoff = STDev_cutoff)
+
+        fields_to_remove = []
+        if check_multiple_analysis_for_consistency:
+            # Make sure that any common analysis agrees
+            fields_to_remove = sorted(set(std_stats.keys()).intersection(stats.keys()))
+            for common_stat in fields_to_remove:
+                s1, s2 = std_stats[common_stat], stats[common_stat]
+                if isinstance(s1, tuple):
+                    s1 = s1[0]
+                if isinstance(s2, tuple):
+                    s2 = s2[0]
+                assert(abs(s1 - s2) < 0.001)
+            for f in fields_to_remove:
+                del std_stats[f]
+
+        stats.update(std_stats)
+
+    return stats
 
 
-def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
+def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False,
+                                  bootstrap_data = False,
+                                  expect_negative_correlation = False, STDev_cutoff = 1.0,
+                                  run_standardized_analysis = True,
+                                  check_multiple_analysis_for_consistency = True):
     '''
     A version of _get_xy_dataset_statistics which accepts a list of dicts rather than X- and Y-value lists.
     :param analysis_table: A list of dict where each dict has Experimental and Predicted float elements
@@ -281,10 +321,23 @@ def get_xy_dataset_statistics(analysis_table, fcorrect_x_cutoff = 1.0, fcorrect_
 
     x_values = [record['Experimental'] for record in analysis_table]
     y_values = [record['Predicted'] for record in analysis_table]
-    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar, ignore_null_values = ignore_null_values)
+    return _get_xy_dataset_statistics(x_values, y_values,
+                                      fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range,
+                                      y_scalar = y_scalar, ignore_null_values = ignore_null_values,
+                                      bootstrap_data = bootstrap_data,
+                                      expect_negative_correlation = expect_negative_correlation, STDev_cutoff = STDev_cutoff,
+                                      run_standardized_analysis = run_standardized_analysis,
+                                      check_multiple_analysis_for_consistency = check_multiple_analysis_for_consistency)
 
 
-def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False):
+
+
+
+def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0, x_fuzzy_range = 0.1, y_scalar = 1.0, ignore_null_values = False,
+                                    bootstrap_data = False,
+                                    expect_negative_correlation = False, STDev_cutoff = 1.0,
+                                    run_standardized_analysis = True,
+                                    check_multiple_analysis_for_consistency = True):
     '''
     A version of _get_xy_dataset_statistics which accepts a pandas dataframe rather than X- and Y-value lists.
     :param dataframe: A pandas dataframe
@@ -299,15 +352,23 @@ def get_xy_dataset_statistics_pandas(dataframe, x_series, y_series, fcorrect_x_c
 
     x_values = dataframe[x_series].tolist()
     y_values = dataframe[y_series].tolist()
-    return _get_xy_dataset_statistics(x_values, y_values, fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range, y_scalar = y_scalar, ignore_null_values = ignore_null_values)
+    return _get_xy_dataset_statistics(x_values, y_values,
+                                      fcorrect_x_cutoff = fcorrect_x_cutoff, fcorrect_y_cutoff = fcorrect_y_cutoff, x_fuzzy_range = x_fuzzy_range,
+                                      y_scalar = y_scalar, ignore_null_values = ignore_null_values,
+                                      bootstrap_data = bootstrap_data,
+                                      expect_negative_correlation = expect_negative_correlation,
+                                      STDev_cutoff = STDev_cutoff,
+                                      run_standardized_analysis = run_standardized_analysis,
+                                      check_multiple_analysis_for_consistency = check_multiple_analysis_for_consistency)
 
 
 keymap = dict(
     # Dictionary matches stat name (key) with ('full string description', 'value information format string')
     pearsonr = ("Pearson's R", '(2-tailed p-value=%s)'),
     pearsonr_error = ("Pearson's R (error +/-)", ''),
-    spearmanr = ("Spearman's R", '(2-tailed p-value=%s)'),
+    spearmanr = ("Spearman's rho", '(2-tailed p-value=%s)'),
     gamma_CC = ("Gamma correlation coef.", ''),
+    MAE_error = ("MAE (error +/-)", ''),
     fraction_correct = ("Fraction correct", ''),
     fraction_correct_error = ("Fraction correct (error +/-)", ''),
     fraction_correct_fuzzy_linear = ("Fraction correct (fuzzy)", ''),
@@ -316,13 +377,30 @@ keymap = dict(
     kstesty = ("Y-axis Kolmogorov-Smirnov test", '(p-value=%s)'),
     normaltestx = ("X-axis normality test", '(2-sided chi^2 p-value=%s)'),
     normaltesty = ("Y-axis normality test", '(2-sided chi^2 p-value=%s)'),
+    n = ('n', ''),
+    num_null_cases = ("Null cases", ''),
+    pearsonr_slope = ("Slope of Pearson's R", ''),
+    pearsonr_origin = ("Pearson's R fit to origin", ''),
+    pearsonr_slope_origin = ("Slope of Pearson's R fit to origin", ''),
+    scaled_MAE = ('MAE (scaled)', ''),
+    accuracy = ('Accuracy', ''),
+    specificity = ('Specificity', ''),
+    sensitivity = ('Sensitivity', ''),
+    significance_sensitivity = ('Significance sensitivity', ''),
+    significance_specificity = ('Significance specificity', ''),
+    std_dev_cutoff = ('Standard deviation cutoff', ''),
+    warnings = ('Warnings', ''),
 )
+
 
 def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '%.2E', return_string = True):
     s = []
     newstats = {}
     for k, v in stats.iteritems():
         key, value_format_str = keymap.get(k, (k, ''))
+        if v == None:
+            newstats[key] = ['None', '']
+            continue
         if len(value_format_str) > 0:
             if numpy.isnan(v[0]):
                 newstats[key] = [str(v[0]), '']
@@ -344,13 +422,18 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
     else:
         return [[k, v[0], v[1]] for k, v in sorted(newstats.iteritems())]
 
+
 #### Pandas helper functions ####
 
+
 def float_format_2sigfig(x):
+    '''Todo: where is this used? pandas has built-in formatting options.'''
     return '%.2f' % x
+
 
 def float_format_3sigfig(x):
     return '%.3f' % x
+
 
 def subtract_row_pairs_for_display(df, min_abs_delta = 1.0, pairs_to_show = 15, output_csv = None, verbose = True, merge_df = None):
     assert( len(df.columns.values) == 1 )
