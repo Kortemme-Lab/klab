@@ -45,11 +45,18 @@ class DatasetDataFrame(object):
        columns contain predicted results from benchmark runs.'''
 
 
+    # Default name for the set of data for analysis
+    reference_dataset_name = 'Benchmark dataset'
+
+
     def iprint(msg):  # Note: no args, kwargs
-        print(msg)
+        print(str(msg))
 
 
-    def __init__(self, dataframe, reference_column_index = 0, restricted_predicted_column_indices = [], restricted_predicted_column_names = [], reference_dataset_name = 'Benchmark dataset', index_layers = [], log_level = 10, log_fn = iprint):
+    def __init__(self, dataframe,
+                 reference_column_index = 0, restricted_predicted_column_indices = [], restricted_predicted_column_names = [],
+                 reference_dataset_name = None, index_layers = [],
+                 log_level = 10, log_fn = iprint):
         '''Expects a dataframe where:
             the indices correspond to some set of IDs e.g. dataset case IDs;
             there is one reference column/series against which all other series will be pairwise compared.
@@ -64,6 +71,7 @@ class DatasetDataFrame(object):
         :param restricted_predicted_column_indices: Indices of columns which should be considered for analysis.
         :param restricted_predicted_column_indices: Names of columns which should be considered for analysis.
         :param log_level: All log messages with levels set below log_level will be printed.
+        :param log_fn: The logging function. This expects exactly one argument which is then passed to the print statement.
 
         By default, all non-reference columns are analyzed. If either restricted_predicted_column_indices or restricted_predicted_column_names
         is set then the set of columns is restricted to the *union* of those two lists.
@@ -71,6 +79,7 @@ class DatasetDataFrame(object):
         '''
 
         # Setup
+        reference_dataset_name = reference_dataset_name or DatasetDataFrame.reference_dataset_name
         all_series_names = dataframe.columns.values
         num_series = len(all_series_names)
         assert(num_series == len(set(all_series_names)))
@@ -169,6 +178,54 @@ class DatasetDataFrame(object):
             self.log('{0} cases do not have data for all series. Datasets pruned to the set of common records will be asterisked in the tabular results.'.format(num_pruned_cases), 3)
 
 
+    @staticmethod
+    def from_csv(id_field_column = 0, reference_field_column = 1, reference_dataset_name = None,
+                 id_col_name = None, reference_col_name = None, comparison_col_name_prefix = 'Predicted',
+                 columns_to_omit = [], columns_to_ignore = [],
+                 headers_included = True, separator = ',', ignore_lines_starting_with = None,
+                 log_level = 10, log_fn = iprint,
+                 ):
+        """
+
+        :param id_field_column: The column index (zero-indexed) whose corresponding column contains the ID (record/case ID) field. Values in this field must be integer values.
+        :param reference_field_column: The column index (zero-indexed) whose corresponding column contains the reference data (X-axis) e.g. experimental measurements or reference data. Values in this field are assumed to be integers or floating-point values. Otherwise, they will be imported as NaN.
+        :param reference_dataset_name: The name of the dataset being analyzed.
+        :param id_col_name: The name of the ID column. This will override any name in the header. If the header does not exist, this defaults to "ID".
+        :param reference_col_name: The name of the ID column. This will override any name in the header. If the header does not exist, this defaults to "Experimental".
+        :param comparison_col_name_prefix: Any remaining unnamed columns will be named (comparison_col_name_prefix + '_' + i) with integer i increasing.
+        :param columns_to_omit: These columns will be omitted from the dataframe.
+        :param columns_to_ignore: These columns will be included in the dataframe but not considered in analysis.
+        :param headers_included: Whether the CSV file has a header line. If this line exists, it must be the first parsable (non-blank and which does not start with the value of ignore_lines_starting_with) line in the file.
+        :param separator: Column separator. For CSV imports, ',' should be used. For TSV imports, '\t' should be used.
+        :param ignore_lines_starting_with. Any lines starting with this string will be ignored during parsing. This allows you to include comments in the CSV file.
+        :param log_level: See DatasetDataFrame constructor.
+        :param log_fn: See DatasetDataFrame constructor.
+
+        Note: Unlike the DatasetDataFrame constructor, this function does not currently handle multi-indexed tables.
+        """
+        raise Exception('todo: Implement this.')
+
+        # ignore all columns_to_ignore
+
+        # if headers_included, set id_col_name, reference_col_name, etc.
+        # if not id_col_name: id_col_name = 'RecordID'
+        # if not reference_col_name: reference_col_name = 'Experimental'
+        # if not comparison_col_name_prefix: comparison_col_name_prefix = 'Predicted'
+
+        # assert num columns >= 2
+        # Set up these variables
+        dataframe = None
+        # dataset IDs should be used for the index
+        # reference_column_index should be the first column
+        # remaining columns should contain prediction data
+
+        return DatasetDataFrame(
+            dataframe,
+            reference_dataset_name = reference_dataset_name,
+            log_level = log_level,
+            log_fn = log_fn)
+
+
     def log(self, msg, lvl = 0):
         '''Log messages according to the logging level (0 is highest priority).'''
         if self.log_level >= lvl:
@@ -217,6 +274,7 @@ class DatasetDataFrame(object):
                 # Compute the statistics for the common records
                 stats = get_xy_dataset_statistics_pandas(self.df_pruned, self.reference_series, dseries,
                                                          fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0,
+                                                         bootstrap_data = False,
                                                          x_fuzzy_range = 0.1,
                                                          y_scalar = 1.0, ignore_null_values = True)
 
@@ -230,6 +288,7 @@ class DatasetDataFrame(object):
                         # This dataset has records which are not in the pruned dataset
                         stats = get_xy_dataset_statistics_pandas(self.df, self.reference_series, dseries,
                                                                  fcorrect_x_cutoff = 1.0, fcorrect_y_cutoff = 1.0,
+                                                                 bootstrap_data = False,
                                                                  x_fuzzy_range = 0.1,
                                                                  y_scalar = 1.0, ignore_null_values = True)
                         self.analysis[dseries]['full'] = dict(data = stats, description = format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '%.2E', return_string = True))
