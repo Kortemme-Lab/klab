@@ -76,26 +76,52 @@ def least_squares_fixed_origin(x, y):
     return slope, r_value
 
 
-def get_std_dev(values):
-    temp_pos = []
-    temp_neg = []
+def get_symmetrical_std_dev(values, take_positive_values, ignore_zeros = True):
+    """Computes the standard deviation of either the positive or negative subset of values.
+       The subset is first converted into a symmetrical set of values by unioning it with its complemented/mirrored set
+       along the origin i.e. if x is a value in the subset then both x and -x are members of the symmetrical set.
+       The standard deviation is then computed on this symmetrical set.
 
-    for value in values:
+       Note: zeroes are generally ignored as they could be included into both sides of a distribution split.
 
-        if value == 0.0:
-            continue
+    :param values: A list of numerical values.
+    :param take_positive_values: If True then the subset of positive numbers in values is considered. Otherwise, the subset of negative values is considered.
+    :param ignore_zeros: Whether or not zeroes should be considered when determining the standard deviations.
+    :return:
+    """
+    if take_positive_values:
+        if ignore_zeros:
+            temp_pos = np.array([value for value in values if value > 0.0])
+        else:
+            temp_pos = np.array([value for value in values if value >= 0.0])
+    else:
+        if ignore_zeros:
+            temp_pos = np.array([value for value in values if value < 0.0])
+        else:
+            temp_pos = np.array([value for value in values if value <= 0.0])
 
-        if value > 0.0:
-            temp_pos.append(value)
-            temp_pos.append(-value)  # make it a symmetrical distribution
-        elif value < 0.0:
-            temp_neg.append(value)
-            temp_neg.append(-value)  # make it a symmetrical distribution
+    # Convert the subset into a symmetrical distribution
+    temp_pos = np.concatenate((temp_pos, -temp_pos))
 
-        # Calculate standard deviations for sigma-based significance cutoffs
-        pos_stdeviation = np.std(temp_pos)
-        neg_stdeviation = -np.std(temp_neg)
+    # Calculate standard deviations for sigma-based significance cutoffs
+    std_dev = np.std(temp_pos)
 
+    if not take_positive_values:
+        # Return a negative standard deviation for the subset of negative values
+        std_dev = -std_dev
+    return std_dev
+
+
+def get_symmetrical_std_devs(values, ignore_zeros = True):
+    """Takes a list of values and splits it into positive and negative values. For both of these subsets, a symmetrical
+       distribution is created by mirroring each value along the origin and the standard deviation for both subsets is returned.
+
+    :param values: A list of numerical values.
+    :param ignore_zeros: Whether or not zeroes should be considered when determining the standard deviations.
+    :return: A pair of values - the standard deviations of the positive and negative subsets respectively.
+    """
+    pos_stdeviation = get_symmetrical_std_dev(values, True, ignore_zeros = ignore_zeros)
+    neg_stdeviation = get_symmetrical_std_dev(values, False, ignore_zeros = ignore_zeros)
     return pos_stdeviation, neg_stdeviation
 
 
@@ -314,12 +340,12 @@ def parse_csv(csv_lines, expect_negative_correlation = False, STDev_cutoff = 1.0
     data['skipped_cases'] = skipped_cases
     for prediction_id, prediction_cases in data['predictions'].iteritems():
         prediction_cases['array'] = np.array(prediction_cases['list'])
-        pos_STDev, neg_STDev = get_std_dev(prediction_cases['array'])
+        pos_STDev, neg_STDev = get_symmetrical_std_devs(prediction_cases['array'])
         prediction_cases['positive significance threshold'] = pos_STDev
         prediction_cases['negative significance threshold'] = neg_STDev
 
     data['experimental']['array'] = np.array(data['experimental']['list'])
-    pos_STDev, neg_STDev = get_std_dev(data['experimental']['array'])
+    pos_STDev, neg_STDev = get_symmetrical_std_devs(data['experimental']['array'])
     data['experimental']['positive significance threshold'] = pos_STDev
     data['experimental']['negative significance threshold'] = neg_STDev
 
