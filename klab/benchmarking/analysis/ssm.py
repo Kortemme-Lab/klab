@@ -24,7 +24,7 @@
 '''
 
 Analysis module for the site saturation mutagenesis data.
-This module was initially by Samuel Thompson but added to the repository by Shane O'Connor.
+This module was initially by Samuel Thompson but added to the repository and edited by Shane O'Connor.
 '''
 
 import sys
@@ -52,6 +52,8 @@ field_name_mapper = (
     ('sensitivity', 'sensitivity'),
     ('significance_specificity', 'significance_specificity'),
     ('significance_sensitivity', 'significance_sensitivity'),
+    ('significant_beneficient_sensitivity', 'significant_beneficient_sensitivity'),
+    ('significant_beneficient_specificity', 'significant_beneficient_specificity'),
 )
 
 
@@ -89,12 +91,11 @@ def get_std_dev(values):
             temp_neg.append(value)
             temp_neg.append(-value)  # make it a symmetrical distribution
 
-
         # Calculate standard deviations for sigma-based significance cutoffs
         pos_stdeviation = np.std(temp_pos)
         neg_stdeviation = -np.std(temp_neg)
 
-        return pos_stdeviation, neg_stdeviation
+    return pos_stdeviation, neg_stdeviation
 
 
 def determine_correct_sign(prediction_data, experimental_data, expect_negative_correlation = False, STDev_cutoff = 1.0):
@@ -191,6 +192,12 @@ def determine_correct_sign(prediction_data, experimental_data, expect_negative_c
         experimental_significant_correct_sign = mat[0][4] + mat[0][3] + mat[4][0] + mat[4][1]  # Sensitivity
         predicted_significant_are_experimentally_significant = mat[0][4] + mat[4][0]  # Specific accuracy and
 
+        # Added during CADRES 2016
+        significant_beneficient_sensitivity_n = int(mat[4][0] + mat[4][1] + mat[4][2] + mat[4][3] + mat[4][4])
+        significant_beneficient_sensitivity = float(mat[4][0]) / float(significant_beneficient_sensitivity_n)
+        significant_beneficient_specificity_n = int(mat[0][0] + mat[1][0] + mat[2][0] + mat[3][0] + mat[4][0])
+        significant_beneficient_specificity = float(mat[4][0]) / float(significant_beneficient_specificity_n)
+
     elif expect_negative_correlation:
         true_positive = mat[0][0] + mat[0][1] + mat[1][0] + mat[1][1]
         true_negative = mat[3][3] + mat[3][4] + mat[4][3] + mat[4][4]
@@ -198,21 +205,25 @@ def determine_correct_sign(prediction_data, experimental_data, expect_negative_c
         experimental_significant_correct_sign = mat[4][4] + mat[4][3] + mat[0][0] + mat[0][1]  # Sensitivity
         predicted_significant_are_experimentally_significant = mat[4][4] + mat[0][0]  # Specific accuracy
 
+        # Added during CADRES 2016
+        significant_beneficient_sensitivity_n = int(mat[0][0] + mat[0][1] + mat[0][2] + mat[0][3] + mat[0][4])
+        significant_beneficient_sensitivity = float(mat[0][0]) / float(significant_beneficient_sensitivity_n)
+        significant_beneficient_specificity_n = int(mat[0][0] + mat[1][0] + mat[2][0] + mat[3][0] + mat[4][0])
+        significant_beneficient_specificity = float(mat[0][0]) / float(significant_beneficient_specificity_n)
+
     correct_sign = true_positive + true_negative  # Accuracy
     accuracy = float(correct_sign) / total
 
-    total_significant_predictions = mat[0][4] + mat[1][4] + mat[2][4] + mat[3][4] + mat[4][4] + mat[4][0] + mat[3][0] + \
-                                    mat[2][0] + mat[1][0] + mat[0][0]
+    total_significant_predictions = mat[0][4] + mat[1][4] + mat[2][4] + mat[3][4] + mat[4][4] + mat[4][0] + mat[3][0] + mat[2][0] + mat[1][0] + mat[0][0]
     specificity = float(predicted_significant_correct_sign) / total_significant_predictions
 
-    total_significant_experimental_hits = mat[4][4] + mat[4][3] + mat[4][2] + mat[4][1] + mat[4][0] + mat[0][0] + \
-                                          mat[0][1] + mat[0][2] + mat[0][3] + mat[0][4]
+    total_significant_experimental_hits = mat[4][4] + mat[4][3] + mat[4][2] + mat[4][1] + mat[4][0] + mat[0][0] + mat[0][1] + mat[0][2] + mat[0][3] + mat[0][4]
     sensitivity = float(experimental_significant_correct_sign) / total_significant_experimental_hits
 
     significance_specificity = float(predicted_significant_are_experimentally_significant) / total_significant_predictions
     significance_sensitivity = float(predicted_significant_are_experimentally_significant) / total_significant_experimental_hits
 
-    return accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity
+    return accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity, significant_beneficient_sensitivity, significant_beneficient_specificity, significant_beneficient_sensitivity_n, significant_beneficient_specificity_n
 
 
 def calculate_mae(prediction_data, experimental_data):
@@ -327,7 +338,7 @@ def parse_csv(csv_lines, expect_negative_correlation = False, STDev_cutoff = 1.0
 
         warnings = []
         mae, scaled_mae, warning = calculate_mae(prediction_cases, data['experimental'])
-        accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity = determine_correct_sign(prediction_cases, data['experimental'], expect_negative_correlation, STDev_cutoff)
+        accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity, significant_beneficient_sensitivity, significant_beneficient_specificity, significant_beneficient_sensitivity_n, significant_beneficient_specificity_n = determine_correct_sign(prediction_cases, data['experimental'], expect_negative_correlation, STDev_cutoff)
         if warning:
             warnings = [warning]
 
@@ -341,6 +352,8 @@ def parse_csv(csv_lines, expect_negative_correlation = False, STDev_cutoff = 1.0
             sensitivity = sensitivity,
             significance_specificity = significance_specificity,
             significance_sensitivity = significance_sensitivity,
+            significant_beneficient_sensitivity = (significant_beneficient_sensitivity, significant_beneficient_sensitivity_n),
+            significant_beneficient_specificity = (significant_beneficient_specificity, significant_beneficient_specificity_n),
         ))
     return data
 
