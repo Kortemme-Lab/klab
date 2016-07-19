@@ -284,7 +284,6 @@ def _get_xy_dataset_statistics(x_values, y_values,
     # Call Samuel Thompson's analysis which uses confidence intervals when considering fraction correct-like metrics
     if run_standardized_analysis:
         std_stats = get_std_xy_dataset_statistics(x_values, y_values, expect_negative_correlation = expect_negative_correlation, STDev_cutoff = STDev_cutoff)
-
         fields_to_remove = []
         if check_multiple_analysis_for_consistency:
             # Make sure that any common analysis agrees
@@ -390,10 +389,17 @@ keymap = dict(
     significance_specificity = ('Significance specificity', ''),
     std_dev_cutoff = ('Standard deviation cutoff', ''),
     warnings = ('Warnings', ''),
+    significant_beneficient_sensitivity = ('Significance beneficient sensitivity', ' (n = %s)'),
+    significant_beneficient_specificity = ('Significance beneficient specificity', ' (n = %s)'),
 )
 
 
 def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '%.2E', return_string = True):
+    # todo: This function is badly written (by me) e.g. see the horrible '%d' hack below. This is a case of simple functionality being extended to uses for which it was never designed.
+    #       We could do with a good replacement. At worst, the sci_notation_format should be baked into the keymap dict rather than this nasty string replacement.
+    #       It may be better to have a metric class which contains a name and value, an error (possibly null), a p-value (possibly null), and a count of the considered values i.e. n (possibly null)
+    #       and then subclass it for different values e.g. integers. A _repr__ function would return the string to be included in this function which would simply take a list of metrics.
+    #       The dataframe class should then use this metric class in the _analyze function.
     s = []
     newstats = {}
     for k, v in stats.iteritems():
@@ -405,10 +411,12 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
             if numpy.isnan(v[0]):
                 newstats[key] = [str(v[0]), '']
             else:
-                pval_str = value_format_str % sci_notation_format
+                if value_format_str.find('(n=') != -1 or value_format_str.find('(n =') != -1:
+                    pval_str = value_format_str % '%d'
+                else:
+                    pval_str = value_format_str % sci_notation_format
                 newstats[key] = [floating_point_format % v[0], pval_str % v[1]]
         else:
-            value_str = floating_point_format
             if str(v) == 'n/a':
                 newstats[key] = [v, '']
             else:
