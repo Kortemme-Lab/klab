@@ -388,7 +388,6 @@ keymap = dict(
     significance_sensitivity = ('Significance sensitivity', ''),
     significance_specificity = ('Significance specificity', ''),
     std_dev_cutoff = ('Standard deviation cutoff', ''),
-    warnings = ('Warnings', ''),
     significant_beneficient_sensitivity = ('Significance beneficient sensitivity', ' (n = %s)'),
     significant_beneficient_specificity = ('Significance beneficient specificity', ' (n = %s)'),
 )
@@ -403,6 +402,8 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
     s = []
     newstats = {}
     for k, v in stats.iteritems():
+        if isinstance(v, basestring):
+            continue
         key, value_format_str = keymap.get(k, (k, ''))
         if v == None:
             newstats[key] = ['None', '']

@@ -32,6 +32,7 @@ A wrapper class for pandas dataframes using the miscellaneous statistical functi
 Created by Shane O'Connor 2016
 """
 
+import copy
 import pprint
 
 import pandas
@@ -303,6 +304,66 @@ class DatasetDataFrame(object):
     def get_stats(self):
         if not self.analysis:
             self._analyze()
+        return self.analysis
+
+
+    def summarize(self, series_ = None, subset_ = None, summary_title_formatter = None):
+        summary = []
+        for series, subset in sorted(self.analysis.iteritems()):
+            if series_ == None or series_ == series:
+                ttl, sub_summary = series, []
+                for subset_type, v in sorted(subset.iteritems()):
+                    if subset_ == None or subset_ == series:
+                        if v:
+                            sub_summary.append(colortext.make('Subset: ' + subset_type, 'yellow'))
+                            sub_summary.append(self._summarize_case(v['data']))
+                if sub_summary:
+                    if summary_title_formatter:
+                        summary += [summary_title_formatter(series)] + sub_summary
+                    else:
+                        summary += [series] + sub_summary
+
+        if summary:
+            return '\n'.join(summary)
+        else:
+            return None
+
+
+    def _summarize_case(self, data):
+
+        assert(data)
+        s = []
+        data = copy.deepcopy(data)
+        # Some of the data is currently returned as tuples
+        data['significant_beneficient_sensitivity_n'] = data['significant_beneficient_sensitivity'][1]
+        data['significant_beneficient_sensitivity'] = data['significant_beneficient_sensitivity'][0]
+        data['significant_beneficient_specificity_n'] = data['significant_beneficient_specificity'][1]
+        data['significant_beneficient_specificity'] = data['significant_beneficient_specificity'][0]
+        data['pearsonr'], data['pearsonr_pvalue'] = data['pearsonr']
+        data['spearmanr'], data['spearmanr_pvalue'] = data['spearmanr']
+        return '''
+Cardinality
+\tn         : {n:d}
+\tNull cases: {num_null_cases:d}
+
+Correlation
+\tR-value: {pearsonr:<10.03f} Slope: {pearsonr_slope:<10.03f} pvalue={pearsonr_pvalue:.2E}\t (Pearson's R)
+\tR-value: {pearsonr_origin:<10.03f} Slope: {pearsonr_slope_origin:<10.03f} -               \t (Pearson's R through origin)
+\trho    : {spearmanr:<10.03f} -                 pvalue={pearsonr_pvalue:.2E}\t (Spearman's rho)
+
+Error:
+\tMAE                  : {MAE:<10.03f} Scaled MAE: {scaled_MAE:.03f}
+\tFraction correct (FC): {fraction_correct:<10.03f} Fuzzy FC  : {fraction_correct_fuzzy_linear:.03f}
+
+Error (normalized, signficance = {std_dev_cutoff:.2f} standard deviations):
+\tPercent correct sign (accuracy): {accuracy:.01%}
+\tPercent significant predictions with correct sign (specificity): {specificity:.01%}
+\tPercent significant experimental hits with correct prediction sign (sensitivity): {sensitivity:.01%}
+\tPercent significant predictions are significant experimental hits (significance specificity): {significance_specificity:.01%}
+\tPercent significant experimental hits are predicted significant hits (significance sensitivity): {significance_sensitivity:.01%}
+\tPercent significant beneficial experimental hits are predicted significant beneficial hits (significant beneficient sensitivity): {significant_beneficient_sensitivity:.01%}
+\tPercent significant beneficial predictions are significant beneficial experimental hits (significant beneficient specificity): {significant_beneficient_specificity:.01%}
+\n'''.format(**data)
 
 
     def tabulate(self, restricted_predicted_column_indices = [], restricted_predicted_column_names = [], dataset_name = None):

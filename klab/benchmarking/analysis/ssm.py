@@ -29,6 +29,7 @@ This module was initially by Samuel Thompson but added to the repository and edi
 
 import sys
 import os
+import copy
 
 from scipy import stats
 import numpy as np
@@ -44,7 +45,7 @@ field_name_mapper = (
     ('R_value_through_origin', 'pearsonr_origin'),
     ('slope_through_origin', 'pearsonr_slope_origin'),
     ('STDev_cutoff', 'std_dev_cutoff'),
-    ('warnings', 'warnings'),
+    ('warnings', 'std_warnings'),
     ('MAE', 'MAE'),
     ('scaled_MAE', 'scaled_MAE'),
     ('accuracy', 'accuracy'),
@@ -271,8 +272,6 @@ def parse_csv(csv_lines, expect_negative_correlation = False, STDev_cutoff = 1.0
     else:
         lines = [l for l in csv_lines if l.strip()]
 
-    print(lines[0], '&')
-
     headers = lines[0]
     assert(headers.startswith(headers_start_with))
     headers = headers.split(separator)
@@ -398,10 +397,10 @@ def get_std_xy_dataset_statistics(x_values, y_values, expect_negative_correlatio
     stats = {}
     for spair in field_name_mapper:
         stats[spair[1]] = summary_data[spair[0]]
-    if stats['warnings']:
-        stats['warnings'] = '\n'.join(stats['warnings'])
+    if stats['std_warnings']:
+        stats['std_warnings'] = '\n'.join(stats['std_warnings'])
     else:
-        stats['warnings'] = None
+        stats['std_warnings'] = None
     return stats
 
 
@@ -426,14 +425,22 @@ def analyze_dataframe(df, id_field_column, reference_field_column, prediction_fi
 ####################
 
 
-def print_summary(data):
+def get_summary(data):
 
+    s = []
+    if not data:
+        return ''
     if data['skipped_cases']:
-        colortext.warning('\nSkipped {0} cases due to partial data: {1}.\n'.format(len(data['skipped_cases']),
-                                                                                   ', '.join(data['skipped_cases'])))
+        s.append(colortext.make('\nSkipped {0} cases due to partial data: {1}.\n'.format(len(data['skipped_cases']), ', '.join(data['skipped_cases'])), color = 'yellow'))
     for prediction_id, prediction_cases in sorted(data['predictions'].iteritems()):
+        pcases = copy.deepcopy(prediction_cases)
 
-        print('''
+        pcases['significant_beneficient_sensitivity_n'] = pcases['significant_beneficient_sensitivity'][1]
+        pcases['significant_beneficient_sensitivity'] = pcases['significant_beneficient_sensitivity'][0]
+        pcases['significant_beneficient_specificity_n'] = pcases['significant_beneficient_specificity'][1]
+        pcases['significant_beneficient_specificity'] = pcases['significant_beneficient_specificity'][0]
+
+        s.append('''
 Prediction: #{id}
 Prediction name: {name}
 \tR-value: {R_value:.03f}\t\tSlope: {slope:.03f}
@@ -446,7 +453,14 @@ Prediction name: {name}
 \tPercent significant experimental hits with correct prediction sign (sensitivity): {sensitivity:.03f}
 \tPercent significant predictions are significant experimental hits (significance specificity): {significance_specificity:.03f}
 \tPercent significant experimental hits are predicted significant hits (significance sensitivity): {significance_sensitivity:.03f}
-\n\n'''.format(**prediction_cases))
+\tPercent significant beneficial experimental hits are predicted significant beneficial hits (significant beneficient sensitivity): {significant_beneficient_sensitivity:.03f}
+\tPercent significant beneficial predictions are significant beneficial experimental hits (significant beneficient specificity): {significant_beneficient_specificity:.03f}
+\n'''.format(**pcases))
+    return '\n'.join(s)
+
+
+def print_summary(data):
+    print(get_summary(data))
 
 
 ######################
