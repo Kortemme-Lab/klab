@@ -67,7 +67,7 @@ def least_squares_fixed_origin(x, y):
     x_linalg = x[:, np.newaxis]
     linalg_slope, linalg_residual = np.linalg.lstsq(x_linalg, y)[:2]
     slope = linalg_slope[0]
-    r_squared = 1 - linalg_residual[0] / sum((y - y.mean()) ** 2)
+    r_squared = 1 - linalg_residual[0] / sum((y - y.mean()) ** 2) # potential for division-by-zero?
     if r_squared >= 0.0:
         r_value = np.sqrt(r_squared)
     elif r_squared < 0.0:  # This can happen when the correlation is uncorrelated.
@@ -221,9 +221,15 @@ def determine_correct_sign(prediction_data, experimental_data, expect_negative_c
 
         # Added during CADRES 2016
         significant_beneficient_sensitivity_n = int(mat[4][0] + mat[4][1] + mat[4][2] + mat[4][3] + mat[4][4])
-        significant_beneficient_sensitivity = float(mat[4][0]) / float(significant_beneficient_sensitivity_n)
+        if float(significant_beneficient_sensitivity_n) != 0:
+            significant_beneficient_sensitivity = float(mat[4][0]) / float(significant_beneficient_sensitivity_n)
+        else:
+            significant_beneficient_sensitivity = np.NaN
         significant_beneficient_specificity_n = int(mat[0][0] + mat[1][0] + mat[2][0] + mat[3][0] + mat[4][0])
-        significant_beneficient_specificity = float(mat[4][0]) / float(significant_beneficient_specificity_n)
+        if float(significant_beneficient_specificity_n) != 0:
+            significant_beneficient_specificity = float(mat[4][0]) / float(significant_beneficient_specificity_n)
+        else:
+            significant_beneficient_specificity = np.NaN
 
     elif expect_negative_correlation:
         true_positive = mat[0][0] + mat[0][1] + mat[1][0] + mat[1][1]
@@ -234,21 +240,40 @@ def determine_correct_sign(prediction_data, experimental_data, expect_negative_c
 
         # Added during CADRES 2016
         significant_beneficient_sensitivity_n = int(mat[0][0] + mat[0][1] + mat[0][2] + mat[0][3] + mat[0][4])
-        significant_beneficient_sensitivity = float(mat[0][0]) / float(significant_beneficient_sensitivity_n)
+        if float(significant_beneficient_sensitivity_n) != 0:
+            significant_beneficient_sensitivity = float(mat[0][0]) / float(significant_beneficient_sensitivity_n)
+        else:
+            significant_beneficient_sensitivity = np.NaN
         significant_beneficient_specificity_n = int(mat[0][0] + mat[1][0] + mat[2][0] + mat[3][0] + mat[4][0])
-        significant_beneficient_specificity = float(mat[0][0]) / float(significant_beneficient_specificity_n)
+        if float(significant_beneficient_specificity_n) != 0:
+            significant_beneficient_specificity = float(mat[0][0]) / float(significant_beneficient_specificity_n)
+        else:
+            significant_beneficient_specificity = np.NaN
 
     correct_sign = true_positive + true_negative  # Accuracy
+    assert(total > 0)
     accuracy = float(correct_sign) / total
 
     total_significant_predictions = mat[0][4] + mat[1][4] + mat[2][4] + mat[3][4] + mat[4][4] + mat[4][0] + mat[3][0] + mat[2][0] + mat[1][0] + mat[0][0]
-    specificity = float(predicted_significant_correct_sign) / total_significant_predictions
+    if total_significant_predictions != 0:
+        specificity = float(predicted_significant_correct_sign) / total_significant_predictions
+    else:
+        specificity = np.NaN
 
     total_significant_experimental_hits = mat[4][4] + mat[4][3] + mat[4][2] + mat[4][1] + mat[4][0] + mat[0][0] + mat[0][1] + mat[0][2] + mat[0][3] + mat[0][4]
-    sensitivity = float(experimental_significant_correct_sign) / total_significant_experimental_hits
+    if total_significant_experimental_hits != 0:
+        sensitivity = float(experimental_significant_correct_sign) / total_significant_experimental_hits
+    else:
+        sensitivity = np.NaN
 
-    significance_specificity = float(predicted_significant_are_experimentally_significant) / total_significant_predictions
-    significance_sensitivity = float(predicted_significant_are_experimentally_significant) / total_significant_experimental_hits
+    if total_significant_predictions != 0:
+        significance_specificity = float(predicted_significant_are_experimentally_significant) / total_significant_predictions
+    else:
+        significance_specificity = np.NaN
+    if total_significant_experimental_hits != 0:
+        significance_sensitivity = float(predicted_significant_are_experimentally_significant) / total_significant_experimental_hits
+    else:
+        significance_sensitivity = np.NaN
 
     return accuracy, specificity, sensitivity, significance_specificity, significance_sensitivity, significant_beneficient_sensitivity, significant_beneficient_specificity, significant_beneficient_sensitivity_n, significant_beneficient_specificity_n
 
