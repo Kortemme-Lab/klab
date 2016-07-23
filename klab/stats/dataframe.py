@@ -302,12 +302,12 @@ class DatasetDataFrame(object):
 
 
     def get_stats(self):
-        if not self.analysis:
-            self._analyze()
+        self._analyze()
         return self.analysis
 
 
-    def summarize(self, series_ = None, subset_ = None, summary_title_formatter = None):
+    def summarize(self, series_ = None, subset_ = None, summary_title_formatter = None, color = True):
+        self._analyze()
         summary = []
         for series, subset in sorted(self.analysis.iteritems()):
             if series_ == None or series_ == series:
@@ -315,7 +315,10 @@ class DatasetDataFrame(object):
                 for subset_type, v in sorted(subset.iteritems()):
                     if subset_ == None or subset_ == series:
                         if v:
-                            sub_summary.append(colortext.make('Subset: ' + subset_type, 'yellow'))
+                            if color:
+                                sub_summary.append(colortext.make('Subset: ' + subset_type, 'yellow'))
+                            else:
+                                sub_summary.append('Subset: ' + subset_type)
                             sub_summary.append(self._summarize_case(v['data']))
                 if sub_summary:
                     if summary_title_formatter:
@@ -382,7 +385,7 @@ Error (normalized, signficance = {std_dev_cutoff:.2f} standard deviations):
             group_names.append(l)
 
         # Set up the table headers
-        headers = ['Dataset'] + group_names + ['n', 'R', 'rho', 'MAE', 'Fraction correct']
+        headers = ['Dataset'] + group_names + ['n', 'R', 'rho', 'MAE', 'Fraction correct  ', 'FC sign', 'SB sensitivity', 'SB specificity']
         table_rows = []
         for dseries in data_series:
             if isinstance(dseries, tuple):
@@ -407,10 +410,22 @@ Error (normalized, signficance = {std_dev_cutoff:.2f} standard deviations):
                 rho = result[1]['data']['spearmanr'][0]
                 mae = result[1]['data']['MAE']
                 fraction_correct = result[1]['data']['fraction_correct']
-                table_rows.append([dataset_name or self.reference_dataset_name] + result[0] + [n, R, rho, mae, fraction_correct])
+                accuracy = result[1]['data']['accuracy']
+                SBSensitivity = '{0:.3f} / {1}'.format(result[1]['data']['significant_beneficient_sensitivity'][0], result[1]['data']['significant_beneficient_sensitivity'][1])
+                SBSpecificity = '{0:.3f} / {1}'.format(result[1]['data']['significant_beneficient_specificity'][0], result[1]['data']['significant_beneficient_specificity'][1])
+
+                method = result[0]
+                if isinstance(method, tuple):
+                    method = list(method)
+
+                table_rows.append([dataset_name or self.reference_dataset_name] + method +
+                                  [n, R, rho, mae, fraction_correct, accuracy, SBSensitivity, SBSpecificity])
 
         # Convert the lists into a (wrapped) pandas dataframe to make use of the pandas formatting code to save reinventing the wheel...
         return DataTable(pandas.DataFrame(table_rows, columns = headers), self.index_layers)
+
+
+#outliers consistent
 
 
 class DataTable(object):
@@ -425,15 +440,18 @@ class DataTable(object):
             raise Exception('The two tables have different widths.')
         if len(self.index_layers) != len(other.index_layers):
             raise Exception('The two tables have different levels of grouping.')
+        if sorted(self.headers) != sorted(other.headers):
+            # todo: Think about what to do if the headers disagree (ignore and combine anyway or add additional columns?). Should we at least require the index layers to be identical?
+            raise Exception('The two tables have different headers and may contain different data.')
 
-        raise Exception('Implement. Think about what to do if the headers disagree (ignore and combine anyway or add additional columns?). '
-                        'Should we at least require the index layers to be identical?')
-
-        return DataTable(pandas.concat(self.df, other.df))
+        return DataTable(pandas.concat([self.df, other.df]), self.index_layers)
 
 
     def __repr__(self):
-        # Reinventing the wheel to get around problem justifying text columns - the justify argument to to_string only justifies the headers because that is a really sensible thing to do...
+        '''
+        Note: This is very sensitive to the width of the table. Move the formatters into the constructor instead.
+        Reinventing the wheel to get around problem justifying text columns - the justify argument to to_string only
+        justifies the headers because that is a really sensible thing to do...'''
         text_formatters = []
         for i in range(len(self.index_layers)):
             h = self.headers[1 + i]
@@ -448,7 +466,8 @@ class DataTable(object):
                 col_space = 9,
                 formatters = [None] + text_formatters +
                     ['{:,d}'.format] +     # n
-                    (['{:.3f}'.format] * 4)
+                    (['{:.3f}'.format] * 5) +
+                    (['{}'.format] * 2)
         )
 
 

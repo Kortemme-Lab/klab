@@ -29,7 +29,7 @@ A place for miscellaneous statistical functions to live until there is a suitabl
 Created by Shane O'Connor 2014
 """
 
-
+from types import NoneType
 import math
 import numpy
 import scipy
@@ -171,7 +171,7 @@ def fraction_correct_fuzzy_linear(x_values, y_values, x_cutoff = 1.0, x_fuzzy_ra
         y = y_values[i]
         xvec = fraction_correct_fuzzy_linear_create_vector(x, x_cutoff, x_fuzzy_range)
         yvec = fraction_correct_fuzzy_linear_create_vector(y, y_cutoff, y_fuzzy_range)
-        if xvec != None and yvec != None:
+        if not(isinstance(xvec, NoneType)) and not(isinstance(yvec, NoneType)):
             correct += numpy.dot(xvec, yvec)
             considered_points += 1
     return correct / float(considered_points)
