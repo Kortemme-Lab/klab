@@ -1,3 +1,18 @@
+#!/usr/bin/python
+# encoding: utf-8
+"""
+The error-by-error scatterplot takes a pandas dataframe containing a reference series (e.g. experimental values) and two
+other series (e.g. predicted values) of equal length to plot the errors (|experimental - predicted|) against each other.
+A legend counts the number of cases where one series is better than the other or similar.
+
+The plot has a number of configurable settings including the range of similarity and whether or not to label outliers
+(and what to use as the outliers).
+
+This function was used to generate assessment plots for CADRES 2016.
+
+Created by Shane O'Connor 2016
+"""
+
 import os
 
 from klab import colortext
