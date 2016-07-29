@@ -9,6 +9,7 @@ The plot has a number of configurable settings including the range of similarity
 (and what to use as the outliers).
 
 This function was used to generate assessment plots for CADRES 2016.
+See .examples/plot/graphs for expected output.
 
 Created by Shane O'Connor 2016
 """
