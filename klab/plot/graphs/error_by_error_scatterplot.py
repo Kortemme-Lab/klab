@@ -83,7 +83,6 @@ def error_by_error_scatterplot(output_directory, file_prefix, df,
     if not isinstance(label_series_index, int):
         label_outliers = False
     assert(x_series_name != None and y_series_name != None)
-    #df[reference_series_index - x_series_index]
 
     df = df.copy()
     headers = df.columns.values
@@ -104,8 +103,6 @@ def error_by_error_scatterplot(output_directory, file_prefix, df,
     # Get the list of domains common to both runs
     df['Classification'] = df.apply(lambda r: _classify_smallest_error(r['X_error'], r['Y_error'], similarity_range, x_series_name, y_series_name), axis = 1)
     error_classification_index = len(df.columns.values) - 1
-
-    print(df)
 
     # Create the R script
     boxplot_r_script = '''
