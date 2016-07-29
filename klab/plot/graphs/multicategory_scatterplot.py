@@ -28,6 +28,9 @@ def multicategory_scatterplot(output_directory, file_prefix, data_table_headers,
     # todo: use one column as the category e.g. "PDB". assert that there is a maximum number of categories. Test with > 2 categories
     # todo: remove all references to SNX27 and NHERF1 below and loop over the set of categories instead
     # todo: make the capped value for unquantified but classified measurements (e.g. DDG > 7 kcal/mol) parameterizable
+    # todo: add an option to identify outliers by standard deviations (over the set of errors |x - y|) rather than by fixed value
+    # todo: add an option to use geom_text_repel to avoid/reduce overlapping text
+    # todo: make the capped value for unquantified but classified measurements (e.g. DDG > 7 kcal/mol) parameterizable
 
     try: os.mkdir(output_directory)
     except: pass
