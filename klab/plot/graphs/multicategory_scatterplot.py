@@ -11,30 +11,62 @@ Created by Shane O'Connor 2016
 """
 
 import os
+import fractions
 
 import numpy
 
 from klab import colortext
 from klab.fs.fsio import write_file
 from klab.plot.rtools import run_r_script
+from klab.gfx.colors import get_spaced_plot_colors
 
 
-def multicategory_scatterplot(output_directory, file_prefix, data_table_headers, data_table, x_series_index, y_series_index, series_color, plot_title = '', x_axis_label = '', y_axis_label = '', min_predicted_ddg = None, max_predicted_ddg = None, min_experimental_ddg = None, max_experimental_ddg = None):
+def multicategory_scatterplot(output_directory, file_prefix, df,
+                              x_series_index, y_series_index, category_series_index,
+                              series_color, plot_title = '',
+                              x_axis_label = '', y_axis_label = '',
+                              min_predicted_ddg = None, max_predicted_ddg = None, min_experimental_ddg = None, max_experimental_ddg = None):
     '''This function was adapted from the covariation benchmark.'''
 
     # todo: Abstract this graph from the current usage (DDG measurements).
+    # todo: make the capped value for unquantified but classified measurements (e.g. DDG > 7 kcal/mol) parameterizable
+    # todo: add an option to identify outliers by standard deviations (over the set of errors |x - y|) rather than by fixed value
+    # todo: add an option to use geom_text_repel to avoid/reduce overlapping text
+    # todo: allow users to provide colors for the facets / categories
+
+    # Changeset
     # todo: Change it to take in a pandas dataframe instead of the data_table_headers + data_table parameters.
     # todo: Add exception if number of cases > 2 so the general case can be implemented once we have test data.
     # todo: use one column as the category e.g. "PDB". assert that there is a maximum number of categories. Test with > 2 categories
     # todo: remove all references to SNX27 and NHERF1 below and loop over the set of categories instead
-    # todo: make the capped value for unquantified but classified measurements (e.g. DDG > 7 kcal/mol) parameterizable
-    # todo: add an option to identify outliers by standard deviations (over the set of errors |x - y|) rather than by fixed value
-    # todo: add an option to use geom_text_repel to avoid/reduce overlapping text
-    # todo: make the capped value for unquantified but classified measurements (e.g. DDG > 7 kcal/mol) parameterizable
 
+    #print(df[facet_index])
+    color_map = {}
+    categories = list(df.ix[:, category_series_index].unique())
+    print(type(categories))
+    num_categories = len(categories)
+    category_colors = get_spaced_plot_colors(num_categories)
+    for x in xrange(num_categories):
+        color_map[categories[x]] = '#' + category_colors[x]
+
+    df['CategorizationColor'] = df.apply(lambda r: color_map[r[category_series_index]], axis = 1)
+    categorization_color_index = len(df.columns.values) - 1
+
+    # Monday: continue here
+    print(df)
+    sys.exit(0)
     try: os.mkdir(output_directory)
     except: pass
     assert(os.path.exists(output_directory))
+
+
+    df['Categorization'] = df.apply(lambda r: _determine_fraction_correct_class(r[x_series_index], r[y_series_index])[0], axis = 1)
+    categorization_index = len(df.columns.values) - 1
+    df['CategorizationShape'] = df.apply(lambda r: _determine_fraction_correct_class(r[x_series_index], r[y_series_index])[1], axis = 1)
+    categorization_shape_index = len(df.columns.values) - 1
+
+
+
 
     # Create the R script
     boxplot_r_script = '''
@@ -154,11 +186,15 @@ p <- qplot(main="", xvalues, yvalues, data=xy_data, xlab=xlabel, ylab=ylabel, sh
         scale_colour_manual(name="", values = c("1G9O"="orange", "3QDO"="blue", "3"="red", "value3"="grey", "value2"="black")) +
         labs(title = "%(plot_title)s") +
         theme(plot.title = element_text(color = "#555555", size=rel(0.75))) +
+
+        # Correlation fit lines (global + one per facet
         geom_abline(size = 0.125, color="black", intercept = lmv_intercept, slope = lmv_yvalues, alpha=0.2) +
         geom_abline(size = 0.125, color="orange", intercept = lmv_intercept_NHERF1, slope = lmv_yvalues_NHERF1, alpha=0.4) +
         geom_abline(size = 0.125, color="blue", intercept = lmv_intercept_SNX27, slope = lmv_yvalues_SNX27, alpha=0.4) +
+
         geom_abline(slope=1, intercept=0, linetype=3, size=0.25, alpha=0.4) + # add a diagonal (dotted)
         coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) + # set the graph limits
+
         geom_text(hjust = 0, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > 2 & xvalues <= 0), aes(xvalues, yvalues+0.35, label=Origin_of_peptide), check_overlap = TRUE) + # label outliers
         geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > 2 & xvalues > 0), aes(xvalues, yvalues+0.35, label=Origin_of_peptide), check_overlap = TRUE) + # label outliers
         geom_text(hjust=0, size=2, colour="black", aes(x = xpos, y = ypos, label = sprintf("R == %%0.2f", round(rvalue, digits = 4))), parse = TRUE) +
