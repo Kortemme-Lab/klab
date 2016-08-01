@@ -10,8 +10,7 @@ import fractions
 
 
 dumb_relative_prime_const = {
-    6 : 4,
-    6 : 4,
+    6 : 5,
     5 : 2,
     4 : 3,
     3 : 2,
@@ -38,7 +37,6 @@ def dumb_relative_half_prime(n, divisor = None):
             divisor = 4.0
         else:
             divisor = 5.0
-    nf = float(n)
     m = int(n / divisor)
     while m > 1:
         if fractions.gcd(n, m) == 1:
