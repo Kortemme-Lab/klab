@@ -138,6 +138,9 @@ non_canonical_amino_acids = {
     'IAS' : 'D', # Beta-l-aspartic acid
     'OBF' : 'X', # (2S)-2-amino-4,4-difluorobutanoic acid in 4Y10
     '3EG' : 'X', # (2S)-2-amino-4,4,4-trifluorobutanoic acid in 4Y11
+    'GLX' : 'Z', # missing residues in 4CPA
+    'CDE' : 'X', # 1,2-Dimethyl-propylamine (1B0R)
+    'BAL' : 'X', # ??? (in HIV-1 GAG protein, 1FGL)
 }
 
 
@@ -383,6 +386,7 @@ class Sequence(object):
 
             # KAB - allow for multiresidue noncanonicals
             if id in self.order:
+                raise colortext.Exception('Warning: using code to "allow for multiresidue noncanonicals" - check this case manually.')
                 id = '%s.%d'%(str(id),self.special_insertion_count)
                 self.special_insertion_count += 1
 
@@ -749,7 +753,7 @@ class Residue(object):
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
         if residue_type:
             if residue_type == 'Protein' or residue_type == 'Protein skeleton':
-                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X') or (ResidueAA == 'B'))
+                assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X') or (ResidueAA == 'B') or (ResidueAA == 'Z'))
             elif residue_type == 'Unknown':
                 assert(ResidueAA == 'X')
             else:
