@@ -216,6 +216,11 @@ class IntermediateField(object):
             is_numeric_type = True
             typedefs['sqlalchemy.dialects.mysql'].add('TINYINT')
 
+        elif self.field_type == 'blob':
+            s += 'BLOB'
+            is_numeric_type = True
+            typedefs['sqlalchemy.dialects.mysql'].add('BLOB')
+
         elif self.field_type == 'longblob':
             s += 'LONGBLOB'
             is_numeric_type = True

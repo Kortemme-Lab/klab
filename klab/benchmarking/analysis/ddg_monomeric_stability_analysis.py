@@ -158,7 +158,7 @@ class BenchmarkRun(ReportingObject):
         self.filter_data()
 
     def add_stored_metric_to_df(self, case_description, case_length, case_stats):
-        # Reformat statitistics to put a column for each stat type
+        # Reformat statistics to put a column for each stat type
         stats = {}
         for case_stat in case_stats:
             stats[ case_stat[0] ] = [case_stat[1]]
@@ -344,6 +344,7 @@ class BenchmarkRun(ReportingObject):
         store = pandas.HDFStore(analysis_pandas_input_filepath)
         self.scalar_adjustments = store['scalar_adjustments'].to_dict()
         self.ddg_analysis_type = store['ddg_analysis_type'].to_dict()['ddg_analysis_type']
+        self.calculate_scalar_adjustments = store['calculate_scalar_adjustments'].to_dict()['calculate_scalar_adjustments']
         self.ddg_analysis_type_description = store['ddg_analysis_type_description'].to_dict()['ddg_analysis_type_description']
 
         # Handle our old dataframe format
@@ -434,6 +435,7 @@ class BenchmarkRun(ReportingObject):
         store.append('dataframe', self.dataframe)
         store['scalar_adjustments'] = pandas.Series(self.scalar_adjustments)
         store['ddg_analysis_type'] = pandas.Series(dict(ddg_analysis_type = self.ddg_analysis_type))
+        store['calculate_scalar_adjustments'] = pandas.Series(dict(calculate_scalar_adjustments = self.calculate_scalar_adjustments))
         store['ddg_analysis_type_description'] = pandas.Series(dict(ddg_analysis_type_description = self.ddg_analysis_type_description))
         store['misc_dataframe_attribute_names'] = pandas.Series(dict.fromkeys(self.misc_dataframe_attributes, True))
         for k, v in self.misc_dataframe_attributes.iteritems():
@@ -822,6 +824,7 @@ class BenchmarkRun(ReportingObject):
                 unique_ajps.append( ajp )
         return unique_ajps
 
+
     @staticmethod
     def analyze_multiple(
             benchmark_runs,
@@ -1017,7 +1020,6 @@ class BenchmarkRun(ReportingObject):
             verbose = verbose,
         )
 
-
         report.set_title_page(
             '%s vs %s' % (
                 self.get_definitive_name(unique_ajps, join_character = '\n'),
@@ -1054,20 +1056,19 @@ class BenchmarkRun(ReportingObject):
         ) )
 
         # Get joined stats comparison dataframe
-        for case_table in BenchmarkRun.make_case_description_tables( BenchmarkRun.get_stats_comparison_dataframe(
+        for case_table in BenchmarkRun.make_case_description_tables(BenchmarkRun.get_stats_comparison_dataframe(
                 [self, other], unique_ajps,
                 output_csv = os.path.join(output_directory, 'comparison_metrics.csv'),
-        ) ):
+        )):
             report.content.append( case_table )
 
-
         report.generate_pdf_report(
-            os.path.join( output_directory, 'comparison.pdf' ),
+            os.path.join(output_directory, 'comparison.pdf'),
             verbose = verbose,
             compile_pdf = compile_pdf,
         )
         if verbose:
-            print 'Comparison report saved to:', os.path.join( output_directory, 'comparison.pdf' )
+            print 'Comparison report saved to:', os.path.join(output_directory, 'comparison.pdf')
         return report
 
 
