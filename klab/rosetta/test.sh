@@ -52,7 +52,10 @@ cd ..
 
 echo "Compiling parent_release..."
 cd $REPO_DIR/source
+mv tools/build/basic.settings tools/build/basic.settings.bak
+cat tools/build/basic.settings.bak | grep -v "Werror" > tools/build/basic.settings
 nice -n 15 ./scons.py bin mode=release -j $NUMPROC &>> parent_release.compilation.out
+mv tools/build/basic.settings.bak tools/build/basic.settings
 echo "Compilation done"
 echo "Finished compiling parent_release at: `date`" >> ../$output_file
 echo "  output at: source/parent_release.compilation.out" >> ../$output_file
@@ -86,7 +89,10 @@ echo "  output at: tests/integration/parent_integration.out" >> $REPO_DIR/$outpu
 echo "Compiling new_release..."
 cd $REPO_DIR/source
 git checkout $dev_branch_name
+mv tools/build/basic.settings tools/build/basic.settings.bak
+cat tools/build/basic.settings.bak | grep -v "Werror" > tools/build/basic.settings
 nice -n 15 ./scons.py bin mode=release -j $NUMPROC &>> new_release.compilation.out
+mv tools/build/basic.settings.bak tools/build/basic.settings
 echo "Compilation done"
 echo "Finished compiling new_release at: `date`" >> ../$output_file
 cd ../..
