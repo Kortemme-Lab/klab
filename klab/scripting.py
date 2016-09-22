@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 
 import os, shutil, glob
-from contextlib import contextmanager
+from functools import wraps
 
 def print_warning(message, *args, **kwargs):
     import colortext
@@ -9,20 +9,32 @@ def print_warning(message, *args, **kwargs):
     colortext.write(message + '\n', color='red')
 
 def print_error_and_die(message, *args, **kwargs):
-    print_warning(message + "  Aborting...", *args, **kwargs)
+    aborting = "Aborting..."
+    if not message.endswith('\n'):
+        aborting = '  ' + aborting
+    print_warning(message + aborting, *args, **kwargs)
     raise SystemExit(1)
 
-@contextmanager
-def catch_and_print_errors():
-    try:
-        yield
+class catch_and_print_errors:
 
-    except KeyboardInterrupt:
-        print
+    def __enter__(self):
+        pass
 
-    except Exception as error:
-        if hasattr(error, 'no_stack_trace'): print_warning(str(error))
-        else: raise
+    def __exit__(self, exc_type, exc_value, traceback):
+        if exc_type == KeyboardInterrupt:
+            print
+            return True
+        if getattr(exc_value, 'no_stack_trace', False):
+            print_warning(str(exc_value))
+            return True
+
+    def __call__(self, function):
+        @wraps(function)
+        def wrapper(*args, **kwargs):
+            with self:
+                return function(*args, **kwargs)
+        return wrapper
+
 
 def use_path_completion():
     import readline

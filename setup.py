@@ -12,7 +12,7 @@ import subprocess, shlex
 # $ git tag <version>; git push --tags
 # $ python setup.py sdist upload -r pypi
 
-version = '0.1.4'
+version = '0.2.0'
 distutils.core.setup(
     name='klab',
     version=version,
