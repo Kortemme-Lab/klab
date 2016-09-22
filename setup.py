@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 
-import distutils.core
-import subprocess, shlex
+from setuptools import setup, find_packages
 
 # Uploading to PyPI
 # =================
@@ -13,7 +12,7 @@ import subprocess, shlex
 # $ python setup.py sdist upload -r pypi
 
 version = '0.2.0'
-distutils.core.setup(
+setup(
     name='klab',
     version=version,
     author='Kortemme Lab, UCSF',
@@ -24,7 +23,7 @@ distutils.core.setup(
     description="A collection of utilities used by our lab for computational biophysics",
     long_description=open('README.rst').read(),
     keywords=['utilities', 'library', 'biophysics'],
-    packages=['klab'],
+    packages=find_packages(),
     classifiers=[
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
