@@ -1214,7 +1214,7 @@ class BenchmarkRun(ReportingObject):
             subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
             table_header = 'Statistics - %s (%d cases)' % (BenchmarkRun.by_volume_descriptions[subcase], len(subcase_dataframe))
             if len(subcase_dataframe) >= 8:
-                list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+                list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
                 section_latex_objs.append( lr.LatexTable(
                     header_row,
                     list_stats,
@@ -1237,29 +1237,33 @@ class BenchmarkRun(ReportingObject):
             'And mutations not to alanine'
         ))
         subcase_dataframe = dataframe[dataframe['MutantAA'] == 'A']
-        table_header = 'Statistics - all mutations to alanine (including multiple mutations, if they are all to alanine) (%d cases)' % len(subcase_dataframe)
-        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( lr.LatexTable(
-            header_row,
-            list_stats,
-            column_format = stats_column_format,
-            header_text = table_header
-        ))
-        self.add_stored_metric_to_df('all mutations to alanine', len(subcase_dataframe), list_stats)
+        if len(subcase_dataframe) > 0:
+            table_header = 'Statistics - all mutations to alanine (including multiple mutations, if they are all to alanine) (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
+            section_latex_objs.append( lr.LatexTable(
+                header_row,
+                list_stats,
+                column_format = stats_column_format,
+                header_text = table_header
+            ))
+            self.add_stored_metric_to_df('all mutations to alanine', len(subcase_dataframe), list_stats)
+
         subcase_dataframe = dataframe[(dataframe['MutantAA'] == 'A') & (dataframe['NumberOfMutations'] == 1)]
-        table_header = 'Statistics - single mutations to alanine (%d cases)' % len(subcase_dataframe)
-        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( lr.LatexTable(
-            header_row,
-            list_stats,
-            column_format = stats_column_format,
-            header_text = table_header
-        ))
-        self.add_stored_metric_to_df('single mutations to alanine', len(subcase_dataframe), list_stats)
+        if len(subcase_dataframe) > 0:
+            table_header = 'Statistics - single mutations to alanine (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
+            section_latex_objs.append( lr.LatexTable(
+                header_row,
+                list_stats,
+                column_format = stats_column_format,
+                header_text = table_header
+            ))
+            self.add_stored_metric_to_df('single mutations to alanine', len(subcase_dataframe), list_stats)
+
         subcase_dataframe = dataframe[(dataframe['MutantAA'] == 'A') & (dataframe['NumberOfMutations'] != 1)]
         if len(subcase_dataframe) > 0:
             table_header = 'Statistics - multiple mutations to alanine (%d cases)' % len(subcase_dataframe)
-            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
             section_latex_objs.append( lr.LatexTable(
                 header_row,
                 list_stats,
@@ -1267,47 +1271,55 @@ class BenchmarkRun(ReportingObject):
                 header_text = table_header
             ))
             self.add_stored_metric_to_df('multiple mutations to alanine', len(subcase_dataframe), list_stats)
+
         subcase_dataframe = dataframe[dataframe['MutantAA'] != 'A']
-        table_header = 'Statistics - mutations to anything other than alanine (including multiple mutations that include a non-alanine mutation) (%d cases)' % len(subcase_dataframe)
-        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( lr.LatexTable(
-            header_row,
-            list_stats,
-            column_format = stats_column_format,
-            header_text = table_header
-        ))
-        self.add_stored_metric_to_df('mutations not to alanine', len(subcase_dataframe), list_stats)
-        if verbose:
+        if len(subcase_dataframe) > 0:
+            table_header = 'Statistics - mutations to anything other than alanine (including multiple mutations that include a non-alanine mutation) (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
+            section_latex_objs.append( lr.LatexTable(
+                header_row,
+                list_stats,
+                column_format = stats_column_format,
+                header_text = table_header
+            ))
+            self.add_stored_metric_to_df('mutations not to alanine', len(subcase_dataframe), list_stats)
+        if verbose and len(section_latex_objs) > 0:
             self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
 
         section_latex_objs = []
-        section_latex_objs.append( lr.LatexSubSection(
-            'Separating out mutations involving glycine or proline.',
-            'This cases may involve changes to secondary structure so we separate them out here.'
-        ))
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 1]
-        table_header = 'Statistics - cases with G or P (%d cases)' % len(subcase_dataframe)
-        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( lr.LatexTable(
-            header_row,
-            list_stats,
-            column_format = stats_column_format,
-            header_text = table_header
-        ))
-        self.add_stored_metric_to_df('cases with G or P', len(subcase_dataframe), list_stats)
+        if len(subcase_dataframe) > 0:
+            table_header = 'Statistics - cases with G or P (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
+            section_latex_objs.append( lr.LatexTable(
+                header_row,
+                list_stats,
+                column_format = stats_column_format,
+                header_text = table_header
+            ))
+            self.add_stored_metric_to_df('cases with G or P', len(subcase_dataframe), list_stats)
+
         subcase_dataframe = dataframe[dataframe['HasGPMutation'] == 0]
-        table_header = 'Statistics - cases without G or P (%d cases)' % len(subcase_dataframe)
-        list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True), return_string = False)
-        section_latex_objs.append( lr.LatexTable(
-            header_row,
-            list_stats,
-            column_format = stats_column_format,
-            header_text = table_header
-        ))
-        self.add_stored_metric_to_df('cases without G or P', len(subcase_dataframe), list_stats)
-        if verbose:
+        if len(subcase_dataframe) > 0:
+            table_header = 'Statistics - cases without G or P (%d cases)' % len(subcase_dataframe)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_y_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
+            section_latex_objs.append( lr.LatexTable(
+                header_row,
+                list_stats,
+                column_format = stats_column_format,
+                header_text = table_header
+            ))
+            self.add_stored_metric_to_df('cases without G or P', len(subcase_dataframe), list_stats)
+
+        if len(section_latex_objs) > 0:
+            section_latex_objs.insert( 0, lr.LatexSubSection(
+                'Separating out mutations involving glycine or proline.',
+                'This cases may involve changes to secondary structure so we separate them out here.'
+            ))
+
+        if verbose and len(section_latex_objs) > 0:
             self.report('\n'.join([x.generate_plaintext() for x in section_latex_objs]), fn = colortext.sprint)
         self.metric_latex_objects.extend( section_latex_objs )
 
@@ -1319,7 +1331,7 @@ class BenchmarkRun(ReportingObject):
         subcase_dataframe = dataframe[dataframe['NumberOfMutations'] == 1]
         if len(subcase_dataframe) >= case_n_cutoff:
             table_header = 'Statistics - single mutations (%d cases)' % len(subcase_dataframe)
-            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
             section_latex_objs.append( lr.LatexTable(
                 header_row,
                 list_stats,
@@ -1330,7 +1342,7 @@ class BenchmarkRun(ReportingObject):
         subcase_dataframe = dataframe[dataframe['NumberOfMutations'] > 1]
         if len(subcase_dataframe) >= case_n_cutoff:
             table_header = 'Statistics - multiple mutations (%d cases)' % len(subcase_dataframe)
-            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
             section_latex_objs.append( lr.LatexTable(
                 header_row,
                 list_stats,
@@ -1341,7 +1353,7 @@ class BenchmarkRun(ReportingObject):
         # subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= 2) & (dataframe.NumberOfMutations <= 5)]
         # if len(subcase_dataframe) >= case_n_cutoff:
         #     table_header = 'Statistics - 2-4 mutations (%d cases)' % len(subcase_dataframe)
-        #     list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        #     list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
         #     section_latex_objs.append( LatexTable(
         #         header_row,
         #         list_stats,
@@ -1357,7 +1369,7 @@ class BenchmarkRun(ReportingObject):
         #     subcase_dataframe = dataframe[(dataframe.NumberOfMutations >= mutation_cutoff) & (dataframe.NumberOfMutations <= next_cutoff)]
         #     if len(subcase_dataframe) >= case_n_cutoff:
         #         table_header = 'Statistics - %d $<=$ number of mutations $<=$ %d (%d cases)' % (mutation_cutoff, next_cutoff, len(subcase_dataframe))
-        #         list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        #         list_stats = format_stats(get_xy_dataset_statistics_pandas(subcase_dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
         #         section_latex_objs.append( LatexTable(
         #             header_row,
         #             list_stats,
@@ -1379,7 +1391,7 @@ class BenchmarkRun(ReportingObject):
             ))
             table_header = 'Statistics - complete dataset (scaled) (%d cases)' % len(dataframe)
             # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
-            list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+            list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, BenchmarkRun.get_analysis_set_fieldname('Predicted_adj', analysis_set), fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
             section_latex_objs.append( lr.LatexTable(
                 header_row,
                 list_stats,
@@ -1399,7 +1411,7 @@ class BenchmarkRun(ReportingObject):
         ))
         table_header = 'Statistics - complete dataset (%d cases)' % len(dataframe)
         # For these statistics, we assume that we have reduced any scaling issues and use the same cutoff for the Y-axis as the user specified for the X-axis
-        list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True), return_string = False)
+        list_stats = format_stats(get_xy_dataset_statistics_pandas(dataframe, experimental_field, 'Predicted', fcorrect_x_cutoff = self.stability_classication_x_cutoff, fcorrect_y_cutoff = self.stability_classication_x_cutoff, ignore_null_values = True, run_standardized_analysis = False), return_string = False)
         section_latex_objs.append( lr.LatexTable(
             header_row,
             list_stats,
