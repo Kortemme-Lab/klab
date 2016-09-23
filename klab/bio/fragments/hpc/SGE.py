@@ -19,7 +19,7 @@ import re
 import subprocess
 
 sys.path.insert(0, "..")
-from utils import colorprinter
+from klab.bio.fragments.utils import colorprinter
 from klab.cluster import sge_interface
 import klab.cluster.sge_interface
 

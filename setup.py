@@ -23,10 +23,23 @@ setup(
     description="A collection of utilities used by our lab for computational biophysics",
     long_description=open('README.rst').read(),
     keywords=['utilities', 'library', 'biophysics'],
-    packages=find_packages(),
     classifiers=[
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Development Status :: 3 - Alpha",
+        'Programming Language :: Python :: 2',
     ],
+    packages=find_packages(),
+    package_data={
+        'klab.bio.fragments': [
+            'make_fragments_RAP_cluster.pl',
+
+        ],
+    },
+    install_requires=[],
+    entry_points={
+        'console_scripts': [
+            'klab_generate_fragments=klab.bio.fragments.generate_fragments:main',
+        ],
+    },
 )
