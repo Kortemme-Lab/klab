@@ -33,9 +33,8 @@ import pprint
 import re
 
 from klab.fs.fsio import read_file
-from klab.bio.basics import SimpleMutation
 from klab.general.strutil import parse_range
-
+from klab.bio.basics import SimpleMutation
 
 class RosettaFileParsingException(Exception): pass
 
@@ -459,17 +458,14 @@ class Mutfile (object):
     mutation_group_header_pattern = '^\s*(\d+)\s*(?:#.*)?$'
     mutation_pattern = '^\s*([A-Z])\s+(\d+)\s+([A-Z])\s*(?:#.*)?$'
 
-
     @staticmethod
     def from_file(filepath):
         return Mutfile(open(filepath).read())
-
 
     @staticmethod
     def from_mutagenesis(mutations):
         '''This is a special case (the common case) of from_mutations where there is only one mutagenesis/mutation group.'''
         return Mutfile.from_mutageneses([mutations])
-
 
     @staticmethod
     def from_mutageneses(mutation_groups):
@@ -477,7 +473,6 @@ class Mutfile (object):
         mf = Mutfile()
         mf.mutation_groups = mutation_groups
         return mf
-
 
     def __repr__(self):
         '''Creates a mutfile from the set of mutation groups.'''
@@ -498,9 +493,7 @@ class Mutfile (object):
         s.append('')
         return '\n'.join(s)
 
-
     def __init__(self, mutfile_content = None):
-
         self.mutation_groups = []
         if mutfile_content:
             # Parse the file header
@@ -544,10 +537,8 @@ class Mutfile (object):
 
             self.mutation_groups = mutation_groups
 
-
     def get_total_mutation_count(self):
         return sum([len(mg) for mg in self.mutation_groups])
-
 
 
 
@@ -579,7 +570,6 @@ def create_mutfile(pdb, mutations):
         raise Exception("An error occurred creating the mutfile.")
 
 
-
 if __name__ == '__main__':
 
     p = LoopsFile('''
@@ -605,7 +595,6 @@ LOOP 23 30 26 2 TrUe
         ''')
     for p, ss_def in sorted(ss.data.iteritems()):
         print('%s: %s' % (p, ''.join(ss_def)))
-
 
     mf = Mutfile('''
 total 3 #this is the total number of mutations being made.
