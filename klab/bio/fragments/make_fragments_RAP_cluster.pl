@@ -30,12 +30,16 @@ $| = 1; # disable stdout buffering
 $ENV{'SPARKSXDIR'} = '/netapp/home/klabqb3backrub/tools/sparks-x';
 
 # ROSETTA
+# It's really bad that the path to Roland's rosetta is hard-coded in this file.  
+# It would be better to get this path either from the command line or a 
+# configuration file (or both), and to update generate_fragments.py to provide 
+# the neccesary input.
 #my $FRAGMENT_PICKER = "$Bin/../../main/source/bin/fragment_picker.boost_thread.linuxgccrelease";
-my $FRAGMENT_PICKER = "/netapp/home/rpac/Rosetta_57617/main/source/bin/fragment_picker.default.linuxgccrelease";
+my $FRAGMENT_PICKER = "/netapp/home/rpac/Rosetta_57781/main/source/bin/fragment_picker.default.linuxgccrelease";
 #my $FRAGMENT_PICKER_NUM_CPUS = 8;    # number of processors to use
 my $FRAGMENT_PICKER_NUM_CPUS = 1;    # our cluster runs 1 job per core
 #my $ROSETTA_DATABASE = "$Bin/../../main/database"; # rosetta database
-my $ROSETTA_DATABASE = "/netapp/home/rpac/Rosetta_57617/main/database"; # rosetta database
+my $ROSETTA_DATABASE = "/netapp/home/rpac/Rosetta_57781/main/database"; # rosetta database
 #my $VALL = "$Bin/vall.jul19.2011"; # template database
 my $VALL = "/netapp/home/klabqb3backrub/tools/fragment_generation/vall.jul19.2011"; # template database
 
@@ -83,7 +87,7 @@ my $SLAVE_LAUNCHER_MAX_JOBS = 40;    # depends on your available machines/cpus
 #  --no_structure_profile option is added to reduce the run time
 # This feature is not supported yet in the Rosetta release
 #my $PDB2VALL = "$Bin/pdb2vall/pdb2vall.py --no_structure_profile";
-my $PDB2VALL = "/netapp/home/rpac/Rosetta_57617/tools/fragment_tools/pdb2vall/pdb2vall.py --no_structure_profile";
+my $PDB2VALL = "/netapp/home/rpac/Rosetta_57781/tools/fragment_tools/pdb2vall/pdb2vall.py --no_structure_profile";
 my $PDB2VALL_IGNORE_ERRORS = 1;    # ignore pdb2vall jobs that fail
 
 # The following can be ignored unless you want to use the secondary structure prediction
