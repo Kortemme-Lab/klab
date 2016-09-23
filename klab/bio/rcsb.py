@@ -10,7 +10,6 @@ Created by Shane O'Connor 2011/2012
 import os
 import StringIO
 from io import BytesIO
-from PIL import Image
 import urllib
 import gzip
 import shlex
@@ -129,6 +128,7 @@ def retrieve_pdb_ligand_info(pdb_id, silent = True):
 
 
 def retrieve_ligand_diagram(pdb_ligand_code):
+    from PIL import Image
     file = BytesIO(urllib.urlopen('http://www.rcsb.org/pdb/images/{0}_600.gif'.format(pdb_ligand_code)).read())
     img = Image.open(file)
     width, height = img.size

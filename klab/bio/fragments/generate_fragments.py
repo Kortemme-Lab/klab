@@ -260,8 +260,8 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     # RAM / scratch
     if options.scratch < 1:
         errors.append("The amount of scratch space requested must be at least 1 (GB).")
-    if options.memfree < 40:
-        errors.append("The amount of RAM requested must be at least 40 (GB).")
+    if options.memfree < 2:
+        errors.append("The amount of RAM requested must be at least 2 (GB).")
     if options.runtime < 6:
         errors.append("The requested runtime must be at least 6 (hours).")
 
