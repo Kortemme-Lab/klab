@@ -182,7 +182,12 @@ class ClusterTemplate():
     def verify_internal_data(self):
         first_job_dict_len = len(self.job_dicts[0])
         for job_dict in self.job_dicts[1:]:
-            assert( len(job_dict) == first_job_dict_len )
+            if len(job_dict) != first_job_dict_len:
+                print self.job_dicts[0]
+                print
+                print job_dict
+                print first_job_dict_len, len(job_dict)
+                raise AssertionError
         for arg in self.list_required_arguments:
             assert( arg + '_list' in self.settings_dict )
         self.format_settings_dict()
