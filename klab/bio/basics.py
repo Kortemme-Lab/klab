@@ -45,7 +45,7 @@ import types
 import itertools
 
 import klab.colortext as colortext
-from klab.stats.misc import FrequencyCounter
+from klab.stats.counters import FrequencyCounter
 
 ###
 # Residue maps and sets.

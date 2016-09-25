@@ -260,8 +260,8 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     # RAM / scratch
     if options.scratch < 1:
         errors.append("The amount of scratch space requested must be at least 1 (GB).")
-    if options.memfree < 40:
-        errors.append("The amount of RAM requested must be at least 40 (GB).")
+    if options.memfree < 2:
+        errors.append("The amount of RAM requested must be at least 2 (GB).")
     if options.runtime < 6:
         errors.append("The requested runtime must be at least 6 (hours).")
 
@@ -623,7 +623,6 @@ def parse_FASTA_files(options, fasta_file_contents):
     for non_protein_record in non_protein_records:
         del records[non_protein_record]
 
-
     # If a loops file was passed in, use that to cut up the sequences and concatenate these subsequences to generate a
     # shorter sequence to process. This should save a lot of time when the total length of the subsequences is considerably
     # shorter than the length of the total sequence e.g. in cases where the protein has @1000 residues but we only care about
@@ -828,10 +827,9 @@ def check_configuration_paths():
     return errors
 
 
-if __name__ == "__main__":
-
+def main():
     this_dir = os.path.dirname(os.path.realpath(__file__))
-    make_fragments_script = os.path.join(this_dir, make_fragments_script)
+    make_fragments_script_path = os.path.join(this_dir, make_fragments_script)
 
     errors = [] #check_configuration_paths()
     if errors:
@@ -849,7 +847,7 @@ if __name__ == "__main__":
     if options["outpath"] and options['job_inputs']:
         job_script = None
         try:
-            cluster_job = ClusterEngine.FragmentsJob(make_fragments_script, options, test_mode = test_mode)
+            cluster_job = ClusterEngine.FragmentsJob(make_fragments_script_path, options, test_mode = test_mode)
             job_script = cluster_job.script
         except JobInitializationException, e:
             colorprinter.error(str(e))
@@ -880,5 +878,5 @@ if __name__ == "__main__":
         print('')
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 
-
-
+if __name__ == "__main__":
+    main()
