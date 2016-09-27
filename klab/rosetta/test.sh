@@ -52,19 +52,14 @@ cd ..
 
 echo "Compiling parent_release..."
 cd $REPO_DIR/source
+mv tools/build/basic.settings tools/build/basic.settings.bak
+cat tools/build/basic.settings.bak | grep -v "Werror" > tools/build/basic.settings
 nice -n 15 ./scons.py bin mode=release -j $NUMPROC &>> parent_release.compilation.out
+mv tools/build/basic.settings.bak tools/build/basic.settings
 echo "Compilation done"
 echo "Finished compiling parent_release at: `date`" >> ../$output_file
 echo "  output at: source/parent_release.compilation.out" >> ../$output_file
 cd ../..
-
-# echo "Running initial score to build dunbrack binary..."
-# cd $REPO_DIR/source/bin
-# ./score.linuxgccrelease -s ../../tests/integration/tests/score_jd2/1l2y.pdb &>> ../run_initial_score
-# rm -f S_0001.pdb
-# rm -f score.sc
-# echo "Finished running inital score at: `date`" >> ../../$output_file
-# cd ../../..
 
 echo "Running parent integration tests"
 cd $REPO_DIR/tests/integration
@@ -86,7 +81,10 @@ echo "  output at: tests/integration/parent_integration.out" >> $REPO_DIR/$outpu
 echo "Compiling new_release..."
 cd $REPO_DIR/source
 git checkout $dev_branch_name
+mv tools/build/basic.settings tools/build/basic.settings.bak
+cat tools/build/basic.settings.bak | grep -v "Werror" > tools/build/basic.settings
 nice -n 15 ./scons.py bin mode=release -j $NUMPROC &>> new_release.compilation.out
+mv tools/build/basic.settings.bak tools/build/basic.settings
 echo "Compilation done"
 echo "Finished compiling new_release at: `date`" >> ../$output_file
 cd ../..
@@ -101,8 +99,11 @@ echo "  output at: tests/integration/new_integration.out" >> $REPO_DIR/$output_f
 
 echo "Compiling new_debug..."
 cd $REPO_DIR/source
+mv tools/build/basic.settings tools/build/basic.settings.bak
+cat tools/build/basic.settings.bak | grep -v "Werror" > tools/build/basic.settings
 nice -n 15 ./scons.py -j $NUMPROC &>> new_debug.compilation.out
 nice -n 15 ./scons.py -j $NUMPROC cat=test &>> new_debug.compilation.out
+mv tools/build/basic.settings.bak tools/build/basic.settings
 echo "Compilation done"
 echo "Finished compiling new_debug at: `date`" >> ../$output_file
 echo "  output at: source/new_debug.compilation.out" >> ../$output_file

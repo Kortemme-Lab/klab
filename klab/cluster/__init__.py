@@ -17,8 +17,7 @@ def require_qsub():
         subprocess.Popen(command, stdout=devnull, stderr=devnull).communicate()
     except OSError as e:
         if e.errno == os.errno.ENOENT:
-            return False
-
-    return True
+            print "'qsub' not found.  Are you logged onto the cluster?"
+            raise SystemExit
 
     

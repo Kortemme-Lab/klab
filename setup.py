@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 
-import distutils.core
-import subprocess, shlex
+from setuptools import setup, find_packages
 
 # Uploading to PyPI
 # =================
@@ -12,8 +11,8 @@ import subprocess, shlex
 # $ git tag <version>; git push --tags
 # $ python setup.py sdist upload -r pypi
 
-version = '0.1.4'
-distutils.core.setup(
+version = '0.2.4'
+setup(
     name='klab',
     version=version,
     author='Kortemme Lab, UCSF',
@@ -24,10 +23,23 @@ distutils.core.setup(
     description="A collection of utilities used by our lab for computational biophysics",
     long_description=open('README.rst').read(),
     keywords=['utilities', 'library', 'biophysics'],
-    packages=['klab'],
     classifiers=[
         "Intended Audience :: Science/Research",
         "Topic :: Scientific/Engineering :: Bio-Informatics",
         "Development Status :: 3 - Alpha",
+        'Programming Language :: Python :: 2',
     ],
+    packages=find_packages(),
+    package_data={
+        'klab.bio.fragments': [
+            'make_fragments_RAP_cluster.pl',
+
+        ],
+    },
+    install_requires=[],
+    entry_points={
+        'console_scripts': [
+            'klab_generate_fragments=klab.bio.fragments.generate_fragments:main',
+        ],
+    },
 )

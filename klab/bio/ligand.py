@@ -11,7 +11,6 @@ import os
 from io import BytesIO
 import re
 import copy
-from PIL import Image
 
 from klab.bio.rcsb import retrieve_ligand_cif, retrieve_pdb_ligand_info, retrieve_ligand_diagram
 from klab.bio.basics import three_letter_ion_codes
@@ -77,6 +76,7 @@ class Ligand(object):
             for i in self.identifiers:
                 s += '              {0}    ({1}, {2} {3})\n'.format(i['Identifier'], i['IDType'], i['Program'], i['Version'])
         if self.Diagram:
+            from PIL import Image
             file = BytesIO(self.Diagram)
             img = Image.open(file)
             w, h = img.size
