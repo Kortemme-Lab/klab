@@ -331,7 +331,7 @@ class BenchmarkRun(ReportingObject):
             raise
 
 
-    def read_dataframe(self, analysis_pandas_input_filepath):
+    def read_dataframe(self, analysis_pandas_input_filepath, read_scalar_adjustments = True, fail_on_missing_scalar_adjustments = False):
         remove_file = False
         if len(os.path.splitext(analysis_pandas_input_filepath)) > 1 and os.path.splitext(analysis_pandas_input_filepath)[1] == '.gz':
             content = read_file(analysis_pandas_input_filepath)
@@ -344,7 +344,18 @@ class BenchmarkRun(ReportingObject):
         store = pandas.HDFStore(analysis_pandas_input_filepath)
         self.scalar_adjustments = store['scalar_adjustments'].to_dict()
         self.ddg_analysis_type = store['ddg_analysis_type'].to_dict()['ddg_analysis_type']
-        self.calculate_scalar_adjustments = store['calculate_scalar_adjustments'].to_dict()['calculate_scalar_adjustments']
+        if read_scalar_adjustments:
+            try:
+                self.calculate_scalar_adjustments = store['calculate_scalar_adjustments'].to_dict()['calculate_scalar_adjustments']
+            except:
+                if not fail_on_missing_scalar_adjustments:
+                    colortext.warning('The calculate_scalar_adjustments scalar was expected to be found in the pandas dataframe but is missing.')
+                    self.calculate_scalar_adjustments = None
+                else:
+                    raise
+        else:
+            self.calculate_scalar_adjustments = None
+
         self.ddg_analysis_type_description = store['ddg_analysis_type_description'].to_dict()['ddg_analysis_type_description']
 
         # Handle our old dataframe format

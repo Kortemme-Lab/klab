@@ -56,7 +56,7 @@ def convert(ids, from_type):
 
     # Request the mapping from the server
     query_string = "?ids=%s&idtype=%s" % (urllib2.quote(",".join(ids), ''), from_type)
-    xml = get_resource("www.pubmedcentral.nih.gov", '/utils/idconv/v1.0/%s' % query_string).strip()
+    xml = get_resource("www.ncbi.nlm.nih.gov", '/pmc/utils/idconv/v1.0/%s' % query_string).strip()
 
     # Parse the response
     try:
@@ -136,7 +136,7 @@ if __name__ == '__main__':
     for p in pubmed_IDs:
         colortext.message(p)
         pubmed = PubMed(p)
-        print("%s\n" % pubmed.print_string)
+        print('{0}\n'.format(pubmed))
 
 
 # Example XML response
