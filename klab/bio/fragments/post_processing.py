@@ -232,7 +232,12 @@ def post_process(task_dir):
                 new_filepath = ('%s.%s.%smers.rewrite.%s' % (frag_match.group(1), frag_match.group(2), frag_match.group(3), frag_match.group(4))).replace('.gz', '')
                 processed_path = filter_fragments_file_by_secondary_structure(processed_path, new_filepath, ss_filter, frag_sizes)
 
-            frag_libs[processed_path] = frag_sizes
+            # Record the processed fragment file and some useful metadata.
+
+            frag_libs[processed_path] = {
+                    'frag_sizes': frag_sizes,
+                    'num_fragments': num_fragments,
+            }
 
         # Kale wanted to change the filename for the scores so that it is 
         # easier to distinguish between score and fragments files using glob.
@@ -248,7 +253,7 @@ def post_process(task_dir):
             new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))).replace('.gz', '')
             rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, frag_sizes, num_fragments)
 
-    with open(os.path.join(task_dir, 'frag_libs.json'), 'w') as file:
+    with open(os.path.join(task_dir, 'fragment_file_map.json'), 'w') as file:
         json.dump(frag_libs, file)
 
 
