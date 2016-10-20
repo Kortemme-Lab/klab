@@ -204,15 +204,28 @@ def post_process(task_dir):
         glob.glob(os.path.join(task_dir, "*mers.gz"))
 
     for frag_path in frag_paths:
+        frag_match = re.match('(.*)[.](\d+)[.](\d+)mers[.]?(gz)?', frag_path)
+        score_match = re.match('(.*_frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', frag_path)
+
+        # Kale wanted to change the filename for the scores so that it is 
+        # easier to distinguish between score and fragments files using glob.  
+        # Do this test first because score files will match the fragment file 
+        # pattern.
+
+        if score_match and segment_map:
+            assert score_match.group(2) == score_match.group(4)
+            frag_sizes = int(score_match.group(2))
+            num_fragments = int(score_match.group(3))
+            backup_filepath = '%s.%s.%smers.backup.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))
+            new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))).replace('.gz', '')
+            rewrite_score_file(task_dir, frag_path, backup_filepath, new_filepath, segment_map, frag_sizes, num_fragments)
 
         # Perform any post-processing on the fragment file itself.  Keep track 
         # of the path to the most processed file, which is presumably the file 
         # the end-user will be the most interested in, so we can record it in a 
         # JSON file at the end.
 
-        frag_match = re.match('(....)[.](\d+)[.](\d+)mers[.]?(gz)?', os.path.basename(frag_path))
-
-        if frag_match:
+        elif frag_match:
             processed_path = frag_path
             frag_sizes = int(frag_match.group(3))
             num_fragments = int(frag_match.group(2))
@@ -220,10 +233,9 @@ def post_process(task_dir):
             # If a segment map exists, use it to reindex the fragment file.  
 
             if segment_map:
-                old_filepath = frag_match.group(0)
                 backup_filepath = '%s.%s.%smers.backup.%s' % (frag_match.group(1), frag_match.group(2), frag_match.group(3), frag_match.group(4))
                 new_filepath = ('%s.%s.%smers.rewrite.%s' % (frag_match.group(1), frag_match.group(2), frag_match.group(3), frag_match.group(4))).replace('.gz', '')
-                processed_path = rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath, segment_map, frag_sizes, num_fragments)
+                processed_path = rewrite_fragments_file(task_dir, frag_path, backup_filepath, new_filepath, segment_map, frag_sizes, num_fragments)
 
             # If a secondary structure filter exists, use it to remove any 
             # fragments that don't have the specified secondary structure.
@@ -238,20 +250,6 @@ def post_process(task_dir):
                     'frag_sizes': frag_sizes,
                     'num_fragments': num_fragments,
             }
-
-        # Kale wanted to change the filename for the scores so that it is 
-        # easier to distinguish between score and fragments files using glob.
-
-        score_match = re.match('(...._frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', os.path.basename(frag_path))
-
-        if score_match and segment_map:
-            assert score_match.group(2) == score_match.group(4)
-            frag_sizes = int(score_match.group(2))
-            num_fragments = int(score_match.group(3))
-            old_filepath = score_match.group(0)
-            backup_filepath = '%s.%s.%smers.backup.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))
-            new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))).replace('.gz', '')
-            rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, segment_map, frag_sizes, num_fragments)
 
     with open(os.path.join(task_dir, 'fragment_file_map.json'), 'w') as file:
         json.dump(frag_libs, file)
