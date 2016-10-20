@@ -251,7 +251,7 @@ def post_process(task_dir):
             old_filepath = score_match.group(0)
             backup_filepath = '%s.%s.%smers.backup.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))
             new_filepath = ('%s.%s.%smers.rewrite.score.%s' % (score_match.group(1), score_match.group(3), score_match.group(4), score_match.group(5))).replace('.gz', '')
-            rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, mapping, frag_sizes, num_fragments)
+            rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, segment_map, frag_sizes, num_fragments)
 
     with open(os.path.join(task_dir, 'fragment_file_map.json'), 'w') as file:
         json.dump(frag_libs, file)
