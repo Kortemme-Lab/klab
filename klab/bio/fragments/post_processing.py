@@ -210,7 +210,7 @@ def post_process(task_dir):
         # the end-user will be the most interested in, so we can record it in a 
         # JSON file at the end.
 
-        frag_match = re.match('(.*)[.](\d+)[.](\d+)mers[.]?(gz)?', frag_path)
+        frag_match = re.match('(....)[.](\d+)[.](\d+)mers[.]?(gz)?', os.path.basename(frag_path))
 
         if frag_match:
             processed_path = frag_path
@@ -242,7 +242,7 @@ def post_process(task_dir):
         # Kale wanted to change the filename for the scores so that it is 
         # easier to distinguish between score and fragments files using glob.
 
-        score_match = re.match('(.*?frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', frag_path)
+        score_match = re.match('(...._frags)[.](\d+)[.]score[.](\d+)[.](\d+)mers[.]?(gz)?', os.path.basename(frag_path))
 
         if score_match and segment_map:
             assert score_match.group(2) == score_match.group(4)
