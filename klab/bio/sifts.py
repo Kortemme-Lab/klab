@@ -12,6 +12,7 @@ Created by Shane O'Connor 2013
 import time
 import os
 import xml
+import traceback
 
 from xml.sax import parse as parse_xml
 
@@ -25,11 +26,29 @@ from klab.bio.basics import Sequence, SequenceMap, PDBUniParcSequenceMap, residu
 from klab.bio.uniprot import uniprot_map, UniParcEntry
 
 
-# Known bad cases (only up-to-date at the time of commit)
+# Patches for known bad cases (only up-to-date at the time of commit)
+overridden_cases = {
+    '1HJA' : {
+        'region_mapping' : {
+            'A' : {
+                u'UniProt': {u'P00766': [(1, 13)]}
+            },
+        },
+        'residue_mapping_change' : {
+            u'UniProt' : [
+                ('P00767', 1, 13, 'P00766'),
+            ]
+        }
+    }
+}
 
+# Known bad cases (only up-to-date at the time of commit)
 BadSIFTSMappingCases = set([
     '1N02', # PDB residues 'A   4 ' -> 'A  49 ' should map to indices 54->99 of the UniParc sequence
 ])
+CircularPermutantSIFTSMappingCases = {
+    '3DA7' : '1BRS', # compare to 1BRS - the sequence is shifted circularly (with a cysteine insertion). See Figure 1 of PubMed #19260676.
+}
 NoSIFTSPDBUniParcMappingCases = set([
     '2IMM',
 ])
@@ -114,6 +133,7 @@ def download_xml(pdb_id, dest_dir, silent = True, filename = None, unzip = False
 # Classes
 class MissingSIFTSRecord(Exception): pass
 class BadSIFTSMapping(Exception): pass
+class PotentialBadSIFTSMapping(Exception): pass
 class NoSIFTSPDBUniParcMapping(Exception): pass
 
 
@@ -169,7 +189,7 @@ class SIFTSResidue(object):
         'PDBResidue3AA',        #   dbResName                   PDB residue type                    String (length=3)
         'WasNotObserved',        #   residueDetail.Annotation    Not_Observed                        Boolean
         # UniProt record fields
-        'UniProtAC',            #   dbAccessionId               AC e.g. "P00734"                    String (length=6)
+        'UniProtAC',            #   dbAccessionId               AC e.g. "P00734"                    String (length=6 or length=10), see http://www.uniprot.org/help/accession_numbers
         'UniProtResidueIndex',  #   dbResNum                    UniProt/UniParc sequence index      Integer
         'UniProtResidue1AA',    #   dbResName                   UniProt/UniParc residue type        Character
     ]
@@ -177,6 +197,34 @@ class SIFTSResidue(object):
     def __init__(self, PDBeChainID, PDBeResidueID, PDBeResidue3AA):
         self.clear()
         self._add_pdbe_residue(PDBeChainID, PDBeResidueID, PDBeResidue3AA)
+
+
+    def equal_up_to_modification(self, other, modified_residues = {}):
+        '''Tests whether residues are equal modulo modifications.
+           Use case: 2FI5 has two entries for residue E 115, each for a different conformation.
+                     In one conformation, the residue type is IAS, beta-l-aspartic acid which we map to 'D' in the sequence.
+                     In the other conformation, the residue type is ASP.
+                     The difference is to do with the crystallization and/or protein and is valid. We handle this by checking
+                     whether the residues are somewhat similar according to our non-canonical mappings.
+                     Related case: 2FTM, residue A 115.
+        '''
+        equalish = True
+        for f in self.__class__.fields:
+            sv = self.__dict__[f]
+            ov = other.__dict__[f]
+            if equalish and (sv != ov):
+                if f == 'PDBeResidue3AA':
+                    s_pdb_residue_type = residue_type_3to1_map.get(sv) or modified_residues.get(sv) or protonated_residue_type_3to1_map.get(sv) or non_canonical_amino_acids.get(sv)
+                    o_pdb_residue_type = residue_type_3to1_map.get(ov) or modified_residues.get(ov) or protonated_residue_type_3to1_map.get(ov) or non_canonical_amino_acids.get(ov)
+                    equalish = equalish and (s_pdb_residue_type == o_pdb_residue_type)
+                elif f == 'PDBResidue3AA':
+                    s_pdb_residue_type = residue_type_3to1_map.get(sv) or modified_residues.get(sv) or protonated_residue_type_3to1_map.get(sv) or non_canonical_amino_acids.get(sv)
+                    o_pdb_residue_type = residue_type_3to1_map.get(ov) or modified_residues.get(ov) or protonated_residue_type_3to1_map.get(ov) or non_canonical_amino_acids.get(ov)
+                    equalish = equalish and (s_pdb_residue_type == o_pdb_residue_type)
+                else:
+                    return False
+        return equalish
+
 
     def clear(self):
         d = self.__dict__
@@ -200,7 +248,7 @@ class SIFTSResidue(object):
     def _add_pdbe_residue(self, PDBeChainID, PDBeResidueID, PDBeResidue3AA):
 
         assert(not(self.PDBeChainID))
-        assert(len(PDBeChainID) == 1)
+        assert(len(PDBeChainID) <= 4) # SIFTS XML and mmCIF entries can have up to four characters in the chain ID
 
         assert(not(self.PDBeResidueID))
         assert(PDBeResidueID.isdigit())
@@ -210,21 +258,27 @@ class SIFTSResidue(object):
 
         self.PDBeChainID, self.PDBeResidueID, self.PDBeResidue3AA = PDBeChainID, int(PDBeResidueID), PDBeResidue3AA
 
+
     def add_uniprot_residue(self, UniProtAC, UniProtResidueIndex, UniProtResidue1AA):
 
-        assert(not(self.UniProtAC))
-        assert(len(UniProtAC) == 6)
+        try:
+            assert(not(self.UniProtAC))
+            assert(len(UniProtAC) == 6 or len(UniProtAC) == 10) # todo: the proper check would be against [OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2} as defined in http://www.uniprot.org/help/accession_numbers e.g. A2BC19, P12345, A0A022YWF9
 
-        assert(not(self.UniProtResidueIndex))
-        assert(UniProtResidueIndex.isdigit())
+            assert(not(self.UniProtResidueIndex))
+            assert(UniProtResidueIndex.isdigit())
 
-        assert(not(self.UniProtResidue1AA))
-        assert(len(UniProtResidue1AA) == 1)
+            assert(not(self.UniProtResidue1AA))
+            assert(len(UniProtResidue1AA) == 1)
+        except Exception, e:
+            raise colortext.Exception('Unexpected input parsing UniProtAC "{0}", UniProtResidueIndex "{1}", UniProtResidue1AA "{2}".\nError: "{3}".\n{4}'.format(UniProtAC, UniProtResidueIndex, UniProtResidue1AA, str(e), traceback.format_exc()))
 
         self.UniProtAC, self.UniProtResidueIndex, self.UniProtResidue1AA = UniProtAC, int(UniProtResidueIndex), UniProtResidue1AA
 
+
     def has_pdb_to_uniprot_mapping(self):
         return self.PDBChainID and self.UniProtAC
+
 
     def get_pdb_residue_id(self):
         d = self.__dict__
@@ -235,6 +289,7 @@ class SIFTSResidue(object):
         assert(len(residue_identifier) == 6)
         return residue_identifier
 
+
     def __repr__(self):
         # For debugging
         return '\n'.join([('%s : %s' % (f.ljust(23), self.__dict__[f])) for f in self.__class__.fields if self.__dict__[f] != None])
@@ -244,11 +299,14 @@ class SIFTSResidue(object):
 class SIFTS(xml.sax.handler.ContentHandler):
 
 
-    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88, require_uniprot_residue_mapping = True, bio_cache = None, pdb_id = None):
+    def __init__(self, xml_contents, pdb_contents, acceptable_sequence_percentage_match = 70.0, cache_dir = None, domain_overlap_cutoff = 0.88, require_uniprot_residue_mapping = True, restrict_match_percentage_errors_to_these_uniparc_ids = None, bio_cache = None, pdb_id = None):
         ''' The PDB contents should be passed so that we can deal with HETATM records as the XML does not contain the necessary information.
             If require_uniprot_residue_mapping is set and there is no PDB residue -> UniProt sequence index mapping (e.g. 2IMM at the time of writing) then we raise an exception.
             Otherwise, we store the information we can which can still be useful e.g. SCOP domain data.
             bio_cache should be a klab.bio.cache.py::BioCache object and is used to avoid reading/downloading cached files repeatedly.
+
+            This class throws an error if chains match below acceptable_sequence_percentage_match. However, if  restrict_match_percentage_errors_to_these_uniparc_ids
+            is set then we only require a sequence match on chains matching those UniParc IDs.
         '''
 
         self.atom_to_uniparc_sequence_maps = {} # PDB Chain -> PDBUniParcSequenceMap(PDB ResidueID -> (UniParc ID, UniParc sequence index)) where the UniParc sequence index is 1-based (first element has index 1)
@@ -270,7 +328,9 @@ class SIFTS(xml.sax.handler.ContentHandler):
         self.region_map_coordinate_systems = {}
         self.domain_overlap_cutoff = domain_overlap_cutoff # the percentage (measured in the range [0, 1.0]) at which we consider two domains to be the same e.g. if a Pfam domain of length 60 overlaps with a SCOP domain on 54 residues then the overlap would be 54/60 = 0.9
         self.require_uniprot_residue_mapping = require_uniprot_residue_mapping
+        self.restrict_match_percentage_errors_to_these_uniparc_ids = restrict_match_percentage_errors_to_these_uniparc_ids
         self.xml_contents = xml_contents
+        self.pdb_contents = pdb_contents
 
         if bio_cache and pdb_id:
             self.modified_residues = bio_cache.get_pdb_object(pdb_id).modified_residues
@@ -285,6 +345,16 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         assert(0 <= acceptable_sequence_percentage_match <= 100)
         assert(xml_contents.find("encoding='UTF-8'") != -1)
+
+
+    def _create_inverse_maps(self):
+        '''todo: This should get called automatically after atom_to_seqres_sequence_maps is constructed and this code should be called by the relatrix.'''
+        self.seqres_to_atom_sequence_maps = {}
+        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
+            s = SequenceMap()
+            for k, v, substitution_match in sequence_map:
+                s.add(v, k, substitution_match)
+            self.seqres_to_atom_sequence_maps[chain_id] = s
 
 
     def get_pdb_chain_to_uniparc_id_map(self):
@@ -306,7 +376,12 @@ class SIFTS(xml.sax.handler.ContentHandler):
             for c, s in self.pdb_chain_to_uniparc_id_map.iteritems():
                 self.pdb_chain_to_uniparc_id_map[c] = sorted(s)
 
+            #import pprint
+            #colortext.pcyan('DDDDDDDDDDDDDDD' * 10)
+            #pprint.pprint(self.pdb_chain_to_uniparc_id_map)
+
             return self.pdb_chain_to_uniparc_id_map
+
 
     def get_uniparc_sequences(self):
         if self.uniparc_sequences:
@@ -318,11 +393,16 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 entry = UniParcEntry(UniParcID, cache_dir = self.cache_dir)
                 self.uniparc_sequences[entry.UniParcID] = Sequence.from_sequence(entry.UniParcID, entry.sequence)
                 self.uniparc_objects[entry.UniParcID] = entry
+
+            #import pprint
+            #colortext.pcyan('EEEEEEEEEEEEEEE' * 10)
+            #pprint.pprint(self.uniparc_sequences)
+
             return self.uniparc_sequences
 
 
     @staticmethod
-    def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = True, bio_cache = None):
+    def retrieve(pdb_id, cache_dir = None, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = True, bio_cache = None, restrict_match_percentage_errors_to_these_uniparc_ids = None):
         '''Creates a PDBML object by using a cached copy of the files if they exists or by retrieving the files from the RCSB.
            bio_cache should be a klab.bio.cache.py::BioCache object and is used to avoid reading/downloading cached files repeatedly.
         '''
@@ -351,6 +431,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 # Check to see whether we have a cached copy of the XML file
                 filename = os.path.join(cache_dir, "%s.sifts.xml.gz" % l_pdb_id)
                 if os.path.exists(filename):
+                    print(filename)
                     xml_contents = read_file(filename)
 
         # Get any missing files from the RCSB and create cached copies if appropriate
@@ -370,7 +451,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
         xml_contents = xml_contents
 
         # Return the object
-        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir, require_uniprot_residue_mapping = require_uniprot_residue_mapping, bio_cache = bio_cache, pdb_id = pdb_id)
+        handler = SIFTS(xml_contents, pdb_contents, acceptable_sequence_percentage_match = acceptable_sequence_percentage_match, cache_dir = cache_dir, require_uniprot_residue_mapping = require_uniprot_residue_mapping, bio_cache = bio_cache, pdb_id = pdb_id, restrict_match_percentage_errors_to_these_uniparc_ids = restrict_match_percentage_errors_to_these_uniparc_ids)
         xml.sax.parseString(xml_contents, handler)
         return handler
 
@@ -433,6 +514,11 @@ class SIFTS(xml.sax.handler.ContentHandler):
         if attributes.get('dbCoordSys'):
             self.region_map_coordinate_systems[dbSource] = self.region_map_coordinate_systems.get(dbSource, set())
             self.region_map_coordinate_systems[dbSource].add(attributes['dbCoordSys'])
+
+        #import pprint
+        #colortext.pcyan('FFFFFFFFFFFFFFFFF' * 10)
+        #pprint.pprint(self.region_mapping)
+        #pprint.pprint(self.region_map_coordinate_systems)
 
 
     def start_element(self, name, attributes):
@@ -545,6 +631,16 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 assert(dbCoordSys and dbAccessionId and dbResNum and dbResName)
                 assert(dbCoordSys == "UniProt")
                 assert(dbCoordSys and dbAccessionId and dbResNum and dbResName)
+
+                # Override bad mappings
+                try:
+                    residue_range_maps = overridden_cases[self.pdb_id.upper()]['residue_mapping_change'][u'UniProt']
+                    for rrm in residue_range_maps:
+                        if (rrm[0] == dbAccessionId) and (rrm[1] <= int(dbResNum) <= rrm[2]):
+                            dbAccessionId = rrm[3]
+                except KeyError, e:
+                    pass #print(str(e))
+
                 current_residue.add_uniprot_residue(dbAccessionId, dbResNum, dbResName)
 
 
@@ -594,12 +690,27 @@ class SIFTS(xml.sax.handler.ContentHandler):
             self.stack_pop(0)
 
 
+    def _apply_patches(self):
+        pdb_id = self.pdb_id.upper()
+        if pdb_id in overridden_cases:
+            overrides = overridden_cases[pdb_id]
+            if 'region_mapping' in overrides:
+                #print('OVERRIDE' * 30)
+                #import pprint
+                #pprint.pprint(self.region_mapping)
+                region_mapping = overrides['region_mapping']
+                for chain_id, mapping in sorted(region_mapping.iteritems()):
+                    for mapping_type, mapping in sorted(mapping.iteritems()):
+                        self.region_mapping[chain_id][mapping_type] = mapping
+                #pprint.pprint(self.region_mapping)
+
+
     def end_document(self):
         assert(self.counters['entry'] == 1)
 
         residue_count = 0
         residues_matched = {}
-        residues_encountered = set()
+        residues_encountered = {}
         atom_to_uniparc_residue_map = {}
         atom_to_seqres_residue_map = {}
         seqres_to_uniparc_residue_map = {}
@@ -609,6 +720,11 @@ class SIFTS(xml.sax.handler.ContentHandler):
             if r.UniProtAC:
                 UniProtACs.add(r.UniProtAC)
 
+        #print(UniProtACs)
+
+        if self.pdb_id:
+            self._apply_patches()
+
         ACC_to_UPARC_mapping = uniprot_map('ACC', 'UPARC', list(UniProtACs), cache_dir = self.cache_dir)
         assert(sorted(ACC_to_UPARC_mapping.keys()) == sorted(list(UniProtACs)))
         for k, v in ACC_to_UPARC_mapping.iteritems():
@@ -616,22 +732,42 @@ class SIFTS(xml.sax.handler.ContentHandler):
             ACC_to_UPARC_mapping[k] = v[0]
 
         map_chains = set()
+        residue_count_per_chain = {}
         for r in self.residues:
             if not(r.PDBResidueID.isalnum() and int(r.PDBResidueID.isalnum()) < 0):
                 # These are not valid PDB residue IDs - the SIFTS XML convention sometimes assigns negative residue IDs to unobserved residues before the first ATOM record
                 # (only if the first residue ID is 1?)
                 pass
 
+            #print(r)
+            #print('')
+            # Get the residue ID (including chain and insertion code)
+            full_pdb_residue_ID = r.get_pdb_residue_id()
+
+            # Make sure we only have at most one match per PDB residue
+            if full_pdb_residue_ID in residues_encountered:
+                if r.equal_up_to_modification(residues_encountered[full_pdb_residue_ID], self.modified_residues):
+                    # The residues differ but this is likely to be a crystallization artifact rather than a bug in SIFTS
+                    # and we may still be able to treat them the same.
+                    # e.g. in 2FI5, residue E 115 (PDB ATOM numbering), conformation A has an IAS residue whereas conformation
+                    #      B has an ASP residue. Similarly for 2FTM, residue A 115.
+                    colortext.pcyan('{0} was encountered multiple times in the SIFTS file for {1} but the cases resolve ({2} ~= {3}).'.format(full_pdb_residue_ID, self.pdb_id, residues_encountered[full_pdb_residue_ID].PDBResidue3AA, r.PDBResidue3AA))
+                    continue
+                else:
+                    raise Exception('{0} was encountered multiple times in the SIFTS file for {1}.'.format(full_pdb_residue_ID, self.pdb_id))
+            residues_encountered[full_pdb_residue_ID] = r
+
             # Store the PDB->UniProt mapping
+            UniParcID, UniProtAC = None, None
             if r.has_pdb_to_uniprot_mapping():
                 UniProtAC = r.UniProtAC
                 UniParcID = ACC_to_UPARC_mapping[UniProtAC]
                 self.uniparc_ids.add(UniParcID)
 
-            full_pdb_residue_ID = r.get_pdb_residue_id()
             PDBChainID = r.PDBChainID
             map_chains.add(PDBChainID)
             residues_matched[PDBChainID] = residues_matched.get(PDBChainID, 0)
+            residue_count_per_chain[PDBChainID] = residue_count_per_chain.get(PDBChainID, 0)
 
             if not r.WasNotObserved:
                 # Do not add ATOM mappings when the ATOM data does not exist
@@ -646,30 +782,80 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 seqres_to_uniparc_residue_map[PDBChainID] = seqres_to_uniparc_residue_map.get(PDBChainID, {})
                 seqres_to_uniparc_residue_map[PDBChainID][r.PDBeResidueID] = (UniParcID, r.UniProtResidueIndex)
 
-            # Make sure we only have at most one match per PDB residue
-            assert(full_pdb_residue_ID not in residues_encountered)
-            residues_encountered.add(full_pdb_residue_ID)
-
             # Count the number of exact sequence matches
             PDBResidue3AA = r.PDBResidue3AA
             pdb_residue_type = residue_type_3to1_map.get(PDBResidue3AA) or self.modified_residues.get(PDBResidue3AA) or protonated_residue_type_3to1_map.get(PDBResidue3AA) or non_canonical_amino_acids.get(PDBResidue3AA)
+
+            residues_was_matched = False
             if r.has_pdb_to_uniprot_mapping():
                 if pdb_residue_type == r.UniProtResidue1AA:
-
                     residues_matched[PDBChainID] += 1
-            residue_count += 1
+                    residues_was_matched = True
+
+            if (residues_was_matched) or not(self.restrict_match_percentage_errors_to_these_uniparc_ids) or (UniParcID and (UniParcID in self.restrict_match_percentage_errors_to_these_uniparc_ids)):
+                # Count all successes. Else, if we are not restricting matches, count this residue. Else, only count this residue if its associated UniParc ID is in the set of considered UniParc IDs.
+                residue_count_per_chain[PDBChainID] += 1
+                residue_count += 1
+
+        import pprint
+        #pprint.pprint(seqres_to_uniparc_residue_map)
+        #sys.exit(0)
 
         # Create the SequenceMaps
+        uniparc_sequences = self.get_uniparc_sequences()
+        percentage_residues_matched_per_chain = {}
         for c in map_chains:
+            percentage_residues_matched_per_chain[c] = 0
+            if residue_count_per_chain[c] > 0:
+                assert(0 <= residues_matched[c] <= residue_count_per_chain[c])
+                percentage_residues_matched_per_chain[c] = float(residues_matched[c])*100.0/float(residue_count_per_chain[c])
             if residues_matched[c] > 0:
                 # 1IR3 has chains A,
                 # Chain A has mappings from atom and seqres (PDBe) residues to UniParc as usual
                 # Chain B (18 residues long) has mappings from atom to seqres residues but not to UniParc residues
                 self.atom_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(atom_to_uniparc_residue_map[c])
                 self.seqres_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap.from_dict(seqres_to_uniparc_residue_map[c])
+
+
+                # In some cases, the SEQRES sequences are longer than the UniParc sequences e.g. 1AHW. In these cases, we
+                # would consider the percentage residues matched based on the percentage of the UniParc sequence that was
+                # matched rather than the length of the SEQRES sequence.
+                uniparc_sequence_counts = {}
+                for pc_id, up_tpl, sub_score in self.seqres_to_uniparc_sequence_maps[c]:
+                    uniparc_sequence_counts[up_tpl[0]] = uniparc_sequence_counts.get(up_tpl[0], 0)
+                    uniparc_sequence_counts[up_tpl[0]] += 1
+                if len(uniparc_sequence_counts) == 1:
+                    matched_uniparc_id = uniparc_sequence_counts.keys()[0]
+                    num_matched_uniparc_id_residues = uniparc_sequence_counts[matched_uniparc_id]
+                    percentage_residues_matched_per_chain[c] = max(percentage_residues_matched_per_chain[c], float(num_matched_uniparc_id_residues)*100.0/float(len(uniparc_sequences[matched_uniparc_id])))
+
             self.atom_to_seqres_sequence_maps[c] = SequenceMap.from_dict(atom_to_seqres_residue_map[c])
 
-        # Check the match percentage
+        #print('percentage_residues_matched_per_chain')
+        #colortext.pcyan(pprint.pformat(percentage_residues_matched_per_chain))
+
+        # Check the per-chain match percentage
+        uniparc_sequences = self.get_uniparc_sequences()
+        pprint.pprint(uniparc_sequences)
+        pprint.pprint(PDB(self.pdb_contents).seqres_sequences)
+        pprint.pprint(percentage_residues_matched_per_chain)
+        pprint.pprint(residue_count_per_chain)
+        print('***')
+
+
+        for c in map_chains:
+            if residue_count_per_chain[c] > 0:
+                print(residue_count_per_chain[c], percentage_residues_matched_per_chain[c])
+                if percentage_residues_matched_per_chain[c] < self.acceptable_sequence_percentage_match:
+                    if self.pdb_id and self.pdb_id in BadSIFTSMappingCases:
+                        raise BadSIFTSMapping('The PDB file %s has a known bad SIFTS mapping at the time of writing.' % self.pdb_id)
+                    elif self.pdb_id and self.pdb_id in CircularPermutantSIFTSMappingCases:
+                        raise BadSIFTSMapping('The PDB file {0} is a circular permutant of {1} so should be discounted at present.'.format(self.pdb_id, CircularPermutantSIFTSMappingCases[self.pdb_id]))
+                    else:
+                        raise PotentialBadSIFTSMapping('Expected {0:.2f}% sequence match on matched residues but the SIFTS results only gave us {1:.2f}% on chain {2}. Investigate this case and if it is problematic e.g. a chimeric sequence or a circular permutant like 3DA7 then add it to BadSIFTSMappingCases.'.format(self.acceptable_sequence_percentage_match, percentage_residues_matched_per_chain[c], c))
+
+
+        # Check the total match percentage
         total_residues_matched = sum([residues_matched[c] for c in residues_matched.keys()])
         if total_residues_matched == 0:
             if self.pdb_id and self.pdb_id in NoSIFTSPDBUniParcMappingCases:
@@ -683,12 +869,22 @@ class SIFTS(xml.sax.handler.ContentHandler):
                 else:
                     colortext.error('Warning: No residue information matching PDB residues to UniProt residues was found.')
         else:
-            percentage_matched = float(total_residues_matched)*100.0/float(residue_count)
+            import pprint
+            pprint.pprint(percentage_residues_matched_per_chain)
+            pprint.pprint(residue_count_per_chain)
+            print(total_residues_matched, residue_count)
+            percentage_matched = 0
+            if residue_count == 0:
+                colortext.warning('Potential error: the total residue count is zero.')
+            else:
+                percentage_matched = float(total_residues_matched)*100.0/float(residue_count)
             if percentage_matched < self.acceptable_sequence_percentage_match:
                 if self.pdb_id and self.pdb_id in BadSIFTSMappingCases:
                     raise BadSIFTSMapping('The PDB file %s has a known bad SIFTS mapping at the time of writing.' % self.pdb_id)
+                elif self.pdb_id and self.pdb_id in CircularPermutantSIFTSMappingCases:
+                    raise BadSIFTSMapping('The PDB file {0} is a circular permutant of {1} so should be discounted at present.'.format(self.pdb_id, CircularPermutantSIFTSMappingCases[self.pdb_id]))
                 else:
-                    raise Exception('Expected %.2f%% sequence match on matched residues but the SIFTS results only gave us %.2f%%.' % (self.acceptable_sequence_percentage_match, percentage_matched))
+                    raise PotentialBadSIFTSMapping('Expected %.2f%% sequence match on matched residues but the SIFTS results only gave us %.2f%%. Investigate this case and if it is problematic e.g. a chimeric sequence or a circular permutant like 3DA7 then add it to BadSIFTSMappingCases.' % (self.acceptable_sequence_percentage_match, percentage_matched))
 
         # Merge the ranges for the region mappings i.e. so [1-3],[3-86] becomes [1-86]
         region_mapping = self.region_mapping

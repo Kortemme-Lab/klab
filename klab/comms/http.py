@@ -66,7 +66,9 @@ class Connection(object):
 
 
     def _close(self):
-        if self.connection: self.connection.close()
+        if self.connection:
+            self.connection.close()
+        self.connection = None
 
 
     def get(self, resource):
@@ -81,8 +83,10 @@ class Connection(object):
                     raise Exception("Error retrieving %s." % os.path.split(self.url)[1])
                 if attempts_left != self.attempts:
                     print('Success.')
+                self._close()
                 return contents
             except Exception, e:
+                self._close()
                 print('Error retrieving {0} {1}.'.format(os.path.split(self.url)[1], resource))
                 print(str(e))
                 print(traceback.format_exc())

@@ -159,20 +159,24 @@ last_peptide
 '''
 
     main_plot_script += '''
+manual_color_scale <- c(Correct = "black", Negative = "green", Neutral ="blue", Positive = "red")
+manual_shape_scale <- c(Correct = 16, Negative = 25, Neutral =18, Positive = 17)
 
-#aes(color = categorization_color, shape = categorization_shape)
-
-p <- ggplot(data=xy_data, aes(x=peptides, y = xvalues, color = categorization_color, shape = categorization_color, group = facets)) +
+p <- ggplot(data=xy_data, aes(x=peptides, y = xvalues, color = categorization, shape = categorization, group = facets)) +
        theme(legend.position = "none") + # hide the legend
        annotate("rect", xmin = first_peptide, xmax = last_peptide, ymin = -1, ymax = +1, alpha = .2) +
        xlab(xlabel) +
        labs(title = "%(plot_title)s") +
-       theme(plot.title = element_text(color = "#555555", size=rel(0.55))) +
+       theme(plot.title = element_text(color = "#555555", size=rel(1))) +
        labs(x = xlabel, y = ylabel) +
        theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 3)) +
        geom_point() +
-       scale_colour_manual(values = c("black", "blue", "green", "red")) +
-       scale_shape_manual(values = c(16, 18, 25, 17)) +
+       scale_colour_manual(
+            values = manual_color_scale
+        ) +
+       scale_shape_manual(
+            values = manual_shape_scale
+       ) +
        facet_wrap(~facets)
 
 # Plot graph

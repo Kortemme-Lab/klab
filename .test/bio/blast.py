@@ -70,7 +70,9 @@ if __name__ == '__main__':
         'CVSNKYFSNIHWCNCPKKFGGQHCEIDKSKTCYEGNGHFYRGKASTDTMGRPCLPWNSATVLQQTYHAHRSD',
         'MQIFVKTLTGKTITLEVEPSDTIENVKAKIQDKEGIPPDQQRLIFAGKQLEDGRTLSDYNIQKESTLHLVLRLRGG',
     ]
-    raster_blaster = BLAST(bio_cache = None, cache_dir = '/kortemmelab/shared/DDG/structures', matrix = 'BLOSUM62', silent = False, cut_off = 0.001, sequence_identity_cut_off = 70)
+    #raster_blaster = BLAST(bio_cache = None, cache_dir = '/kortemmelab/shared/DDG/structures', matrix = 'BLOSUM62', silent = False, cut_off = 0.001, sequence_identity_cut_off = 70)
+    skempi_cases      = ['1DQJ', '1GC1', '1JCK', '1JRH', '1MLC', '1NCA', '1NMB', '2JEL', '2VIR', '2VLJ', '2VLR', '3BN9', '3HFM', '3NPS']
+    raster_blaster = BLAST(bio_cache = None, cache_dir = '/kortemmelab/shared/DDG/structures', matrix = 'BLOSUM62', silent = False, cut_off = 0.001, sequence_identity_cut_off = 85)
 
     test_pdb_files(raster_blaster, skempi_cases)
     test_sequences(raster_blaster, sequences)

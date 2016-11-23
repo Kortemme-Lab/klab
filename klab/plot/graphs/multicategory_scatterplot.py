@@ -35,7 +35,12 @@ def multicategory_scatterplot(output_directory, file_prefix, df,
                               use_geom_text_repel = True,
                               default_point_color = "black",
                               default_point_shape = 16,
-                              ):
+                              color_wheel_starting_angle = 180,
+                              color_wheel_saturation = 0.50,
+                              category_color_map = None,
+                              category_shape_map = None,
+                              omit_axis_labels = True
+):
 
     '''This function was adapted from the covariation benchmark.'''
 
@@ -58,6 +63,7 @@ def multicategory_scatterplot(output_directory, file_prefix, df,
     color_map = {}
     categories = list(df.ix[:, category_series_index].unique())
     category_series_name = df.columns.values[category_series_index]
+    category_series_rname = 'c' + category_series_name # prefix with a string in case the first character is non-alphabetic
     legal_shapes = range(15, 18 + 1) + range(21, 25 + 1) + range(0, 14 + 1)
     num_categories = len(categories)
     if num_categories > len(legal_shapes):
@@ -71,16 +77,27 @@ def multicategory_scatterplot(output_directory, file_prefix, df,
     categorization_shape_index = len(df.columns.values) - 1
 
     #'#fe794c',
-    category_colors = get_spaced_plot_colors(num_categories, start = 180, saturation = 0.50)
+    category_colors = get_spaced_plot_colors(num_categories, start = color_wheel_starting_angle, saturation = color_wheel_saturation)
     for x in xrange(num_categories):
         color_map[categories[x]] = '#' + category_colors[x]
-    if color_by_category:
-        df['CategorizationColor'] = df.apply(lambda r: color_map[r[category_series_name]], axis = 1)
+    pprint.pprint(color_map)
+    if category_color_map:
+        # Allow the caller to override the default color settings
+        df['CategorizationColor'] = df.apply(lambda r: category_color_map[r[category_series_name]], axis = 1) # todo: emove this line? we do not seem to use it since we force the order using the sorted_categories etc. lines below
+        color_map = category_color_map
+        color_by_category = True
+    elif color_by_category:
+        df['CategorizationColor'] = df.apply(lambda r: color_map[r[category_series_name]], axis = 1) # todo: emove this line? we do not seem to use it since we force the order using the sorted_categories etc. lines below
     else:
-        df['CategorizationColor'] = df.apply(lambda r: '#000000', axis = 1)
+        df['CategorizationColor'] = df.apply(lambda r: '#000000', axis = 1) # todo: emove this line? we do not seem to use it since we force the order using the sorted_categories etc. lines below
     categorization_color_index = len(df.columns.values) - 1
 
+    if category_shape_map:
+        category_shapes = category_shape_map
+
+    print(df)
     print(color_map)
+    assert(use_geom_text_repel) # todo: make parameterizable
     sorted_categories = '","'.join([k for k, v in sorted(color_map.iteritems())])
     sorted_colors = '","'.join([v for k, v in sorted(color_map.iteritems())])
     sorted_shapes = ','.join([str(v) for k, v in sorted(category_shapes.iteritems())])
@@ -120,7 +137,7 @@ library(ggrepel) # install with 'install.packages("ggrepel")' inside the R inter
 
 # PNG generation
 png('%(file_prefix)s.png', width=2560, height=2048, bg="white", res=600)
-txtalpha <- 0.7
+txtalpha <- 0.8
 '''
 
     xy_table_filename = '{0}.txt'.format(file_prefix)
@@ -138,23 +155,22 @@ names(xy_data)[%(x_series_index)d + 1] <- "xvalues"
 names(xy_data)[%(y_series_index)d + 1] <- "yvalues"
     '''
 
+    # Create fit lines per category
+    r_script += '''\n
+# Create environments to function as hashtables
+correlation_e <- new.env()
+lmv_intercept_e <- new.env()
+lmv_yvalues_e <- new.env()
+r_values_e <- new.env()
+'''
+
     if label_outliers:
         r_script +='''names(xy_data)[%(label_series_index)d + 1] <- "outlier_labels"'''
 
     r_script += '''
-# coefs contains two values: (Intercept) and yvalues
-coefs <- coef(lm(xvalues~yvalues, data = xy_data))
-fitcoefs = coef(lm(xvalues~0 + yvalues, data = xy_data))
-fitlmv_yvalues <- as.numeric(fitcoefs[1])
-lmv_intercept <- as.numeric(coefs[1])
-lmv_yvalues <- as.numeric(coefs[2])
-lm(xy_data$yvalues~xy_data$xvalues)
-
 xlabel <- "%(x_axis_label)s"
 ylabel <- "%(y_axis_label)s"
 plot_title <- "%(plot_title)s"
-rvalue <- cor(xy_data$yvalues, xy_data$xvalues)
-rvalue
 xy_data
     '''
 
@@ -175,47 +191,82 @@ valid_xy_data <- valid_xy_data[which(valid_xy_data$yvalues > {0:.3f}), ]'''.form
     if cap_y_max != None:
         r_script += '''
 valid_xy_data <- valid_xy_data[which(valid_xy_data$yvalues < {0:.3f}), ]'''.format(cap_y_max)
+
     if ignore_capped_values_in_correlation:
         # Overwrite the old value of R which used all datapoints
-        r_script += '''
-rvalue <- cor(valid_xy_data$yvalues, valid_xy_data$xvalues)
-rvalue
-valid_xy_data'''
+        r_script += '''\ndata_for_correlation = valid_xy_data'''
+    else:
+        r_script += '''\ndata_for_correlation = xy_data'''
 
+    r_script += '''
+# coefs contains two values: (Intercept) and yvalues
+coefs <- coef(lm(yvalues~xvalues, data = data_for_correlation))
+lmv_intercept_e$global_ <- as.numeric(coefs[1])
+lmv_yvalues_e$global_ <- as.numeric(coefs[2])
 
-    # Create fit lines per category
-    r_script += '''\n
-# Create environments to function as hashtables
-correlation_e <- new.env()
-lmv_intercept_e <- new.env()
-lmv_yvalues_e <- new.env()
+fitcoefs = coef(lm(xvalues~0 + yvalues, data = data_for_correlation))
+fitlmv_yvalues <- as.numeric(fitcoefs[1])
+lm(data_for_correlation$yvalues~data_for_correlation$xvalues)
+
+correlation_e$global_ <- cor(data_for_correlation$yvalues, data_for_correlation$xvalues)
+#lmv_intercept_e$global_ <- as.numeric(fitcoefs[1])
+#lmv_yvalues_e$global_ <- as.numeric(fitcoefs[2])
+
+correlation_e$global_
+lmv_intercept_e$global_
+lmv_yvalues_e$global_
+
+r_values_e$global_ <- cor(data_for_correlation$yvalues, data_for_correlation$xvalues)
+
+data_for_correlation
+r_values_e$global_
+
 '''
 
     categories = list(df.ix[:, category_series_index].unique())
     for ctgry in categories:
+        nctgry = 'c' + ctgry
         print ctgry
 
         r_script += '''
-valid_xy_data_{0} <- valid_xy_data[which(valid_xy_data${1} == '{0}'),]
+valid_xy_data_{0} <- valid_xy_data[which(valid_xy_data${1} == '{2}'),]
 valid_xy_data_{0}
-rvalue_{0} <- cor(valid_xy_data_{0}$yvalues, valid_xy_data_{0}$xvalues)
-rvalue_{0}
-coefs_{0} <- coef(lm(xvalues~yvalues, data = valid_xy_data_{0}))
+coefs_{0} <- coef(lm(yvalues~xvalues, data = valid_xy_data_{0}))
+coefs_{0}
 lmv_intercept_{0} <- as.numeric(coefs_{0}[1])
 lmv_yvalues_{0} <- as.numeric(coefs_{0}[2])
-correlation_e${0} <- rvalue_{0}
+correlation_e${0} <- cor(valid_xy_data_{0}$yvalues, valid_xy_data_{0}$xvalues)
 lmv_intercept_e${0} <- lmv_intercept_{0}
 lmv_yvalues_e${0} <- lmv_yvalues_{0}
-        '''.format(ctgry, category_series_name)
+
+lmv_intercept_{0}
+lmv_yvalues_{0}
+        '''.format(nctgry, category_series_name, ctgry)
+
+        r_script += '''
+valid_xy_data_{0}
+lmv_yvalues_e${0}
+lmv_intercept_e${0}
+
+r_values_e${0} <- cor(valid_xy_data_{0}$yvalues, valid_xy_data_{0}$xvalues)
+r_values_e${0}
+    '''.format(nctgry)
+#rvalue_{0} <-
+#rvalue_{0}
 
     # Set graph limits
     r_script += '''
 # Set graph limits and the position for the correlation value
 
-minx <- min(0.0, min(xy_data$xvalues) - 0.1)
-miny <- min(0.0, min(xy_data$yvalues) - 0.1)
-maxx <- max(1.0, max(xy_data$xvalues) + 0.1)
-maxy <- max(1.0, max(xy_data$yvalues) + 0.1)
+#minx <- min(0.0, min(xy_data$xvalues) - 0.1)
+#miny <- min(0.0, min(xy_data$yvalues) - 0.1)
+#maxx <- max(1.0, max(xy_data$xvalues) + 0.1)
+#maxy <- max(1.0, max(xy_data$yvalues) + 0.1)
+
+minx <- min(xy_data$xvalues) - 0.1
+miny <- min(xy_data$yvalues) - 0.1
+maxx <- max(xy_data$xvalues) + 0.1
+maxy <- max(xy_data$yvalues) + 0.1
     '''
     if min_x_value != None:
         r_script += '''
@@ -234,6 +285,7 @@ maxy <- max(maxy + 0.5, %(max_y_value)f  + 0.5)'''
     if label_criterium == 'diff_absolute':
         assert(len(label_criterium_values) == 2)
         (outlier_neg, outlier_pos) = sorted(label_criterium_values)
+        colortext.warning(str(outlier_neg) + ' : ' + str(outlier_pos))
     elif label_criterium == 'diff_quantile':
         assert(len(label_criterium_values) == 2)
         (lower_range, high_range) = sorted(label_criterium_values)
@@ -254,7 +306,7 @@ upperq
     #
 
     r_script += '''
-correlation_label_x <- minx + ((maxx - minx) * 0.05)
+correlation_label_x <- minx + ((maxx - minx) * 0.03)
 correlation_label_y <- maxy - ((maxy - miny) * 0.05)
 
 lrt <- expression('R'^tst)
@@ -289,6 +341,14 @@ color_scale <- scale_colour_manual(name = "%(shape_category_title)s", values = s
 
     # todo qplot(main=""
 
+    r_script += '''
+    lmv_intercept_e$global_
+    lmv_yvalues_e$global_
+
+    lmv_intercept_e$c3QDO
+    lmv_yvalues_e$c3QDO
+    '''
+
     # Draw points
     if shape_by_category and color_by_category:
         r_script += '''
@@ -321,27 +381,68 @@ p <- ggplot(xy_data, aes(xvalues, yvalues)) +
         r_script += '''\n    color_scale +'''
 
     r_script += '''
-    labs(title = "%(plot_title)s", x = xlabel, y = ylabel) +'''
+    labs(title = "%(plot_title)s", x = xlabel, y = ylabel) +
+    theme(plot.title = element_text(color = "#555555", size=rel(1.3))) +
+    theme(axis.title = element_text(color = "#555555", size=rel(1.3))) +
+    theme(axis.text.x  = element_text(size=rel(1.3))) +
+    theme(axis.text.y  = element_text(size=rel(1.3))) +
+    theme(legend.title = element_text(color = "#555555", size=rel(0.45)), legend.text = element_text(color = "#555555", size=rel(0.4))) +'''
+
+    # todo: remove or parameterize. A solid line added for the CADRES 2016 plots to indicate unquantified values e.g. Kd > 200 micro M
+    r_script += '''
+    geom_vline(size = 0.5, color="black", xintercept = 4.0, alpha = 0.6) +'''
+
+    # Correlation fit lines (global + one per facet
+    r_script += '''
+    # Diagonal (x=y)
+    # todo: add as parameter
+    #geom_abline(slope=1, intercept=0, linetype=3, size=0.25, alpha=0.4) +
+
+    # Correlation fit lines (global + one per facet)
+    geom_abline(size = 0.125, color="black", intercept = lmv_intercept_e$global_, slope = lmv_yvalues_e$global_, alpha=0.4) +'''
+
+    for ctgry in categories:
+        nctgry = 'c' + ctgry
+        print ctgry
+
+        r_script += '''
+    geom_abline(size = 0.125, color="{1}", intercept = lmv_intercept_e${0}, slope = lmv_yvalues_e${0}, alpha=0.4) +
+            '''.format(nctgry, color_map[ctgry])
+
+    if label_outliers:
+        r_script += '''
+
+    # Label outliers
+    geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > %(outlier_neg)f & xvalues <= maxx / 2 & yvalues >=maxy/2), aes(xvalues, yvalues-maxy/100, label=outlier_labels)) +
+    geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > %(outlier_neg)f & xvalues <= maxx / 2 & yvalues < maxy/2), aes(xvalues, yvalues+2*maxy/100, label=outlier_labels)) +
+    geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > %(outlier_neg)f & xvalues > maxx / 2 & yvalues >=maxy/2), aes(xvalues, yvalues-maxy/100, label=outlier_labels)) +
+    geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > %(outlier_neg)f & xvalues > maxx / 2 & yvalues < maxy/2), aes(xvalues, yvalues+2*maxy/100, label=outlier_labels)) +'''
+
+    r_script += '''
+    annotate("text", hjust=0, size = 4, colour="#222222", x = correlation_label_x, y = correlation_label_y, label = sprintf("R = %%0.2f", round(r_values_e$global_, digits = 4))) + # add correlation text; hjust=0 sets left-alignment. Using annotate instead of geom_text avoids blocky text caused by geom_text being run multiple times over the series
+'''
+
+    #outlier_neg, outlier_pos
+
+
+    #geom_text(hjust=0, size=2, colour="black", aes(x = correlation_label_x, y = correlation_label_y, label = sprintf("R == %%0.2f", round(r_values_e$global_, digits = 4))), parse = TRUE) +
+
+    counter = 1
+    for ctgry in categories:
+        nctgry = 'c' + ctgry
+        r_script += '''
+    annotate("text", hjust=0, size = 4, color="{1}", x = correlation_label_x, y = correlation_label_y - ((maxy - miny) * 0.07 * {2}), label = sprintf("R = %%0.2f", round(r_values_e${0}, digits = 4))) + # add correlation text; hjust=0 sets left-alignment. Using annotate instead of geom_text avoids blocky text caused by geom_text being run multiple times over the series
+'''.format(nctgry, color_map[ctgry], counter)
+        counter += 1
+
+    #geom_text(hjust = 0, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > 2 & xvalues <= 0), aes(xvalues, yvalues+0.35, label=outlier_labels), check_overlap = TRUE) + # label outliers
+    #geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > 2 & xvalues > 0), aes(xvalues, yvalues+0.35, label=outlier_labels), check_overlap = TRUE) + # label outliers
+
 
     a= '''
-p <- qplot(main="", color = "#000000", alpha = I(txtalpha), xvalues, yvalues, data=xy_data, xlab=xlabel, ylab=ylabel, shape = PDB, alpha = I(txtalpha)) +
-        geom_point(aes(color = PDB), alpha = 0.6) +
-        scale_colour_manual(name="", values = c("1G9O"="orange", "3QDO"="blue", "3"="red", "value3"="grey", "value2"="black")) +
-        labs(title = "%(plot_title)s") +
-        theme(plot.title = element_text(color = "#555555", size=rel(0.75))) +
+        todo: make parameterizable coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) + # set the graph limits
 
-        # Correlation fit lines (global + one per facet
-        geom_abline(size = 0.125, color="black", intercept = lmv_intercept, slope = lmv_yvalues, alpha=0.2) +
-        geom_abline(size = 0.125, color="orange", intercept = lmv_intercept_NHERF1, slope = lmv_yvalues_NHERF1, alpha=0.4) +
-        geom_abline(size = 0.125, color="blue", intercept = lmv_intercept_SNX27, slope = lmv_yvalues_SNX27, alpha=0.4) +
-
-        geom_abline(slope=1, intercept=0, linetype=3, size=0.25, alpha=0.4) + # add a diagonal (dotted)
-        coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) + # set the graph limits
-
-        geom_text(hjust = 0, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > 2 & xvalues <= 0), aes(xvalues, yvalues+0.35, label=Origin_of_peptide), check_overlap = TRUE) + # label outliers
-        geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yvalues - xvalues) > 2 & xvalues > 0), aes(xvalues, yvalues+0.35, label=Origin_of_peptide), check_overlap = TRUE) + # label outliers
         geom_text(hjust=0, size=2, colour="black", aes(x = correlation_label_x, y = correlation_label_y, label = sprintf("R == %%0.2f", round(rvalue, digits = 4))), parse = TRUE) +
-
 
         ypos_SNX27 <- correlation_label_y - 1
         ypos_NHERF1 <- ypos_SNX27 - 1
@@ -358,7 +459,9 @@ p <- qplot(main="", color = "#000000", alpha = I(txtalpha), xvalues, yvalues, da
 '''
 
     r_script += '''
-    theme(legend.position = "right")
+    #theme(legend.position = "right")
+    theme(legend.position = "none")  # todo: make parameterizable
+
 # Plot graph
 p
 dev.off()

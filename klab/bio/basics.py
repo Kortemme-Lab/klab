@@ -247,6 +247,38 @@ all_recognized_rna = rna_nucleotides.union(set(non_canonical_rna.keys()))
 nucleotide_types_1 = set(dna_nucleotides_2to1_map.values()) # for use in SEQRES sequences
 
 
+# D-Proteins
+
+# At the time of writing, DCY, DGL, DPN, DSG, DSN, and MED differ in code from Rosetta and the PDB
+d_aas = dict(
+    DAL = dict(name = 'D-Alanine', laa = 'ALA', rosetta_code = 'DAL'),
+    DAR = dict(name = 'D-Arginine', laa = 'ARG', rosetta_code = 'DAR'),
+    DAS = dict(name = 'D-Aspartic Acid', laa = 'ASP', rosetta_code = 'DAS'),
+    DCY = dict(name = 'D-Cysteine', laa = 'CYS', rosetta_code = 'DCS'),
+    DGL = dict(name = 'D-Glutamic Acid', laa = 'GLU', rosetta_code = 'DGU'),
+    DGN = dict(name = 'D-Glutamine', laa = 'GLN', rosetta_code = 'DGN'),
+    DHI = dict(name = 'D-Histidine', laa = 'HIS', rosetta_code = 'DHI'),
+    DIL = dict(name = 'D-Isoleucine', laa = 'ILE', rosetta_code = 'DIL'),
+    DLE = dict(name = 'D-Leucine', laa = 'LEU', rosetta_code = 'DLE'),
+    DLY = dict(name = 'D-Lysine', laa = 'LYS', rosetta_code = 'DLY'),
+    DPN = dict(name = 'D-Phenylalanine', laa = 'PHE', rosetta_code = 'DPH'),
+    DPR = dict(name = 'D-Proline', laa = 'PRO', rosetta_code = 'DPR'),
+    DSG = dict(name = 'D-Asparagine', laa = 'ASN', rosetta_code = 'DAN'),
+    DSN = dict(name = 'D-Serine', laa = 'SER', rosetta_code = 'DSE'),
+    DTH = dict(name = 'D-Threonine', laa = 'THR', rosetta_code = 'DTH'),
+    DTR = dict(name = 'D-Tryptophan', laa = 'TRP', rosetta_code = 'DTR'),
+    DTY = dict(name = 'D-Tyrosine', laa = 'TYR', rosetta_code = 'DTY'),
+    DVA = dict(name = 'D-Valine', laa = 'VAL', rosetta_code = 'DVA'),
+    GLY = dict(name = 'Glycine', laa = 'GLY', rosetta_code = 'GLY'), # scrub
+    MED = dict(name = 'D-Methionine', laa = 'MET', rosetta_code = 'DME'),
+)
+d_aa_codes = d_aas.keys()
+
+dresidue_type_3to1_map = {}
+for k, v in d_aas.iteritems():
+    dresidue_type_3to1_map[k] = residue_type_3to1_map[v['laa']]
+
+
 # Atoms
 
 
@@ -312,7 +344,7 @@ class Sequence(object):
         self.sequence_type = sequence_type
 
         if sequence_type:
-            assert(sequence_type == 'Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton' or sequence_type == 'Ligand' or sequence_type == 'Unknown')
+            assert(sequence_type == 'Protein' or sequence_type == 'D-Protein' or sequence_type == 'DNA' or sequence_type == 'RNA' or sequence_type == 'Protein skeleton' or sequence_type == 'Ligand' or sequence_type == 'Unknown')
 
         self.special_insertion_count = 1
 
@@ -725,7 +757,7 @@ class Residue(object):
     # For residues ResidueID
     def __init__(self, Chain, ResidueID, ResidueAA, residue_type = None):
         if residue_type:
-            if residue_type == 'Protein' or residue_type == 'Protein skeleton':
+            if residue_type == 'Protein' or residue_type == 'Protein skeleton' or residue_type == 'D-Protein':
                 assert((ResidueAA in residue_types_1) or (ResidueAA in protonated_residues_types_1) or (ResidueAA == 'X') or (ResidueAA == 'B') or (ResidueAA == 'Z'))
             elif residue_type == 'Unknown':
                 assert(ResidueAA == 'X')

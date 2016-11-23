@@ -355,11 +355,11 @@ Correlation
 \trho    : {spearmanr:<10.03f} -                 pvalue={pearsonr_pvalue:.2E}\t (Spearman's rho)
 
 Error:
-\tMAE                  : {MAE:<10.03f} Scaled MAE: {scaled_MAE:.03f}
-\tFraction correct (FC): {fraction_correct:<10.03f} Fuzzy FC  : {fraction_correct_fuzzy_linear:.03f}
+\tMAE                            : {MAE:<10.03f} Scaled MAE: {scaled_MAE:.03f}
+\tFraction correct (FC)          : {fraction_correct:<10.03f} Fuzzy FC  : {fraction_correct_fuzzy_linear:.03f}
+\tFraction correct sign (FC sign): {accuracy:<10.03f}
 
 Error (normalized, signficance = {std_dev_cutoff:.2f} standard deviations):
-\tPercent correct sign (accuracy): {accuracy:.01%}
 \tPercent significant predictions with correct sign (specificity): {specificity:.01%}
 \tPercent significant experimental hits with correct prediction sign (sensitivity): {sensitivity:.01%}
 \tPercent significant predictions are significant experimental hits (significance specificity): {significance_specificity:.01%}

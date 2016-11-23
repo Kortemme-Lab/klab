@@ -12,6 +12,7 @@ import datetime
 import os
 import urllib2
 import string
+import traceback
 
 from klab import colortext
 from klab.bio.cache import BioCache
@@ -86,6 +87,7 @@ class BLAST(object):
             if chain_hits != None:
                 # None suggests that the chain was not a protein chain whereas an empty list suggest a protein chain with no hits
                 hits = hits.intersection(set(chain_hits))
+
         return sorted(hits)
 
 
@@ -107,6 +109,9 @@ class BLAST(object):
         )
         xml_query = self._construct_query(query_data, cut_off = cut_off, matrix = matrix, sequence_identity_cut_off = sequence_identity_cut_off)
 
+        p = self.bio_cache.get_pdb_object(pdb_id)
+        chain_sequence = str(p.seqres_sequences[chain_id])
+
         # Read cached results
         if self.bio_cache:
             data = self.bio_cache.load_pdb_chain_blast(pdb_id, chain_id, query_data['eCutOff'], query_data['matrix'], query_data['sequenceIdentityCutoff'])
@@ -123,9 +128,10 @@ class BLAST(object):
         result = self._post(xml_query)
         hits = [l.strip().split(':')[0] for l in result.split('\n') if l.strip()]
         if pdb_id not in hits:
+            p = self.bio_cache.get_pdb_object(pdb_id)
+            chain_sequence = str(p.seqres_sequences[chain_id])
             if not hits:
                 try:
-                    p = self.bio_cache.get_pdb_object(pdb_id)
                     chain_type = p.chain_types[chain_id]
                     sequence_length = len(p.seqres_sequences[chain_id])
                     if not(chain_type == 'Protein' or chain_type == 'Protein skeleton'):
@@ -134,10 +140,38 @@ class BLAST(object):
                     elif sequence_length < self.min_sequence_length:
                         colortext.warning('Chain {1} of {0} only contains {2} residues. The minimum sequence length is set to {3} residues so we will ignore this chain in matching.'.format(pdb_id, chain_id, sequence_length, self.min_sequence_length))
                         hits = None # None suggests that the chain was not a protein chain whereas an empty list suggest a protein chain with no hits
-                except:
+                    else:
+                        hits = self.by_sequence(str(p.seqres_sequences[chain_id]), take_top_percentile = take_top_percentile, cut_off = cut_off, matrix = matrix, sequence_identity_cut_off = sequence_identity_cut_off, silent = silent)
+                    if hits == []:
+                        # Something went wrong. These are weird cases e.g. 1NCA chain H gets no hits using the query above
+                        # and also gets no hits when we search by sequence but if I manually search by sequence on the RCSB
+                        # website, I get a hit. Looking at the results on the web, 1NCA only bets 84% sequence identity because
+                        # two portions of the sequence are unmatched even though they are both provided in the query and they
+                        # exist in the SEQRES and FASTA sequences.
+                        # This does not seem like our bug so we ramp down the sequence_identity_cut_off and retry.
+                        new_sequence_identity_cut_off = sequence_identity_cut_off - 10
+                        while (not hits) and (new_sequence_identity_cut_off >= 35):
+                            colortext.warning('BLASTing the RCSB for chain {1} of {0} returned zero hits, not even {0}. BLASTing by sequence also returned zero hits. This seems like a bug. Retrying the query using a sequence identity cut-off of {2}%.'.format(pdb_id, chain_id, new_sequence_identity_cut_off))
+                            hits = self.by_sequence(chain_sequence, take_top_percentile = take_top_percentile, cut_off = cut_off, matrix = matrix, sequence_identity_cut_off = new_sequence_identity_cut_off, silent = silent)
+                            new_sequence_identity_cut_off -= 10
+                        if not hits:
+                            raise Exception('No hits found for chain {1} of {0}, not even {1} itself.'.format(pdb_id, chain_id))
+                except Exception, e:
+                    print(str(e))
+                    print(traceback.format_exc())
                     raise colortext.Exception('Failed to determine the chain type for chain {1} of {0}.'.format(pdb_id, chain_id))
             else:
-                raise Exception('A BLAST of {0} chain {1} failed to find any hits for {0}. Is the chain a polypeptide chain?'.format(pdb_id, chain_id))
+                try:
+                    # This is a weird one. Searching structureId="1DQJ" and chainId="B" does not return 1DQJ as a match with eCutOff="0.001" and sequenceIdentityCutoff="85"
+                    # but does return ['1C08', '1IC4', '1IC5', '1IC7', '1J1O', '1J1P', '1J1X', '1UA6', '1UAC', '2DQC', '2DQD', '2DQE', '2DQF', '2DQG', '2DQH', '2DQI', '2DQJ', '2ZNW', '2ZNX', '3A67', '3A6B', '3A6C', '3GKZ', '3GM0', '4CKD', '4GQP', '4LAR', '4LAS'].
+                    # Searching by the exact sequence of 1DQJ also fails.
+                    chain_type = p.chain_types[chain_id]
+                    if chain_type == 'Protein' or chain_type == 'Protein skeleton':
+                        hits.append(pdb_id)
+                    else:
+                        raise Exception('A BLAST of {0} chain {1} failed to find any hits for {0}. Is the chain a polypeptide chain?'.format(pdb_id, chain_id))
+                except Exception, e:
+                    raise colortext.Exception('Failed to BLAST the sequence {2} for chain {1} of {0}.'.format(pdb_id, chain_id, chain_sequence))
 
         query_data['hits'] = hits
 

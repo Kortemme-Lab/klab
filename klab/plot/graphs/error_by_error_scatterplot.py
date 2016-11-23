@@ -144,6 +144,7 @@ names(xy_data)[%(y_error_index)d + 1] <- "yerrors"
 
     if label_outliers:
         main_plot_script +='''names(xy_data)[%(label_series_index)d + 1] <- "outlier_labels"'''
+
     main_plot_script +='''
 names(xy_data)[%(shape_category_series_index)d + 1] <- "categories"
 
@@ -192,8 +193,51 @@ ypos_2 <- maxy - (2 * maxy / 25.0)
 
 plot_scale <- scale_color_manual(
     "Counts",
-    values = c( "Similar" = '#444444', "%(x_series_name)s" = '%(x_color)s', "%(y_series_name)s" ='%(y_color)s'),
+    values = c( "Similar" = "#444444", "%(x_series_name)s" = "%(x_color)s", "%(y_series_name)s" ="%(y_color)s"),
     labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY) )'''
+
+    color_map = {'Similar' : '#444444', x_series_name : x_color, y_series_name : y_color}
+
+    category_shapes = {'Similar' : '15', '1G9O': 16, '3QDO': 17}
+
+    sorted_categories = ','.join(sorted(['"Similar" = countsim', '"' + x_series_name + '" = countX', '"' + y_series_name + '" = countY']))
+
+
+    sorted_colors = ','.join(sorted(['"Similar" = "%s"' % color_map['Similar'], '"' + x_series_name + '" = "%s"' % color_map[x_series_name], '"' + y_series_name + '" = "%s"' % color_map[y_series_name]]))
+
+    #sorted_colors = '","'.join([v for k, v in sorted(color_map.iteritems())])
+    #sorted_categories = '","'.join([k for k, v in sorted(color_map.iteritems())])
+    sorted_shapes = ','.join([str(v) for k, v in sorted(category_shapes.iteritems())])
+
+    main_plot_script += '''
+
+static_colors <- c(%(sorted_colors)s)
+static_categories <- c(%(sorted_categories)s)
+
+
+#static_colors <- c( "Similar" = "#444444", "T2 Amber" = "#DD31D8", "T1 beta_nov15" ="#86aee3")
+#static_categories <- c( "Similar" = countsim,  "T2 Amber" = countX,        "T1 beta_nov15" = countY)
+
+
+static_shapes <- c(%(sorted_shapes)s)
+names(static_shapes) <- static_categories
+#shape_scale <-  scale_shape_manual(name = "%(shape_category_title)s", values = static_shapes, labels = static_categories)
+
+shape_scale <- scale_shape_manual(
+    name = "Domain",
+    values = c(17, 16),
+    labels = c("NHERF1", "SNX27")
+)
+
+names(static_colors) <- static_categories
+color_scale <- scale_colour_manual(
+    name = "Counts",
+    values = static_colors,
+    labels = static_categories
+)
+
+xy_data
+'''
 
     if add_similarity_range_annotation:
         main_plot_script += '''
@@ -204,7 +248,7 @@ boxy_mc_boxface <- data.frame(
 )'''
     else:
         main_plot_script += '''
-# Polygon denoting the similarity range. We turn off plot clipping below (gt$layout$clip) so we need to be more exact than using 4 points when defining the region
+# Polygon denoting the similarity range.
 boxy_mc_boxface <- data.frame(
   X = c(minx - 1, maxx + 1, maxx + 1, minx - 1),
   Y = c(minx - 1 + %(similarity_range)f, maxx + 1 + %(similarity_range)f, maxx + 1 - %(similarity_range)f, minx - 1 - %(similarity_range)f)
@@ -220,16 +264,18 @@ p <- qplot(main="", xerrors, yerrors, data=xy_data, xlab=xlabel, ylab=ylabel, al
 p <- qplot(main="", xerrors, yerrors, data=xy_data, xlab=xlabel, ylab=ylabel, alpha = I(txtalpha), shape=factor(Classification), col=factor(Classification)) +'''
 
     main_plot_script += '''
+#color_scale +
+shape_scale +
 geom_polygon(data=boxy_mc_boxface, aes(X, Y), fill = "#bbbbbb", alpha = 0.4, color = "darkseagreen", linetype="blank", inherit.aes = FALSE, show.legend = FALSE) +
 plot_scale +
 geom_point() +
 guides(col = guide_legend()) +
 labs(title = "%(plot_title)s") +
-theme(plot.title = element_text(color = "#555555", size=rel(0.75))) +
-theme(axis.title = element_text(color = "#555555", size=rel(0.6))) +
-theme(legend.title = element_text(color = "#555555", size=rel(0.45)), legend.text = element_text(color = "#555555", size=rel(0.4))) +
+theme(plot.title = element_text(color = "#555555", size=rel(1.3))) +
+theme(axis.title = element_text(color = "#555555", size=rel(1.3))) +
+theme(legend.title = element_text(color = "#555555", size=rel(0.6)), legend.text = element_text(color = "#555555", size=rel(0.6))) +
 coord_cartesian(xlim = c(minx, maxx), ylim = c(miny, maxy)) + # set the graph limits
-annotate("text", hjust=0, size = 2, colour="#222222", x = xpos, y = ypos, label = sprintf("R = %%0.2f", round(rvalue, digits = 4))) + # add correlation text; hjust=0 sets left-alignment. Using annotate instead of geom_text avoids blocky text caused by geom_text being run multiple times over the series'''
+annotate("text", hjust=0, size = 4, colour="#222222", x = xpos, y = ypos, label = sprintf("R = %%0.2f", round(rvalue, digits = 4))) + # add correlation text; hjust=0 sets left-alignment. Using annotate instead of geom_text avoids blocky text caused by geom_text being run multiple times over the series'''
 
     if label_outliers:
         if use_geom_text_repel:
@@ -239,7 +285,7 @@ annotate("text", hjust=0, size = 2, colour="#222222", x = xpos, y = ypos, label 
 geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors <= maxx / 2 & yerrors >=maxy/2), aes(xerrors, yerrors-maxy/100, label=outlier_labels)) +
 geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors <= maxx / 2 & yerrors < maxy/2), aes(xerrors, yerrors+2*maxy/100, label=outlier_labels)) +
 geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors > maxx / 2 & yerrors >=maxy/2), aes(xerrors, yerrors-maxy/100, label=outlier_labels)) +
-geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors > maxx / 2 & yerrors < maxy/2), aes(xerrors, yerrors+2*maxy/100, label=outlier_labels)) +'''
+geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors > maxx / 2 & yerrors < maxy/2), aes(xerrors, yerrors+2*maxy/100, label=outlier_labels)) '''
         else:
             main_plot_script += '''
 
@@ -247,7 +293,7 @@ geom_text_repel(size=1.5, segment.size = 0.15, color="#000000", alpha=0.6, data=
 geom_text(hjust = 0, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors <= maxx / 2 & yerrors >=maxy/2), aes(xerrors, yerrors-maxy/100, label=outlier_labels)) +
 geom_text(hjust = 0, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors <= maxx / 2 & yerrors < maxy/2), aes(xerrors, yerrors+2*maxy/100, label=outlier_labels)) +
 geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors > maxx / 2 & yerrors >=maxy/2), aes(xerrors, yerrors-maxy/100, label=outlier_labels)) +
-geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors > maxx / 2 & yerrors < maxy/2), aes(xerrors, yerrors+2*maxy/100, label=outlier_labels)) +'''
+geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, abs(yerrors - xerrors) > maxx/3 & xerrors > maxx / 2 & yerrors < maxy/2), aes(xerrors, yerrors+2*maxy/100, label=outlier_labels)) '''
 
         counts_title = 'Counts'
         if add_similarity_range_annotation:
@@ -262,19 +308,19 @@ geom_text(hjust = 1, size=1.5, color="#000000", alpha=0.6, data=subset(xy_data, 
 
 
 
-scale_colour_manual('%(counts_title)s', values = c('#444444', '%(x_color)s', '%(y_color)s'),
-                    labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY)) +'''
+#scale_colour_manual('%(counts_title)s', values = c('#444444', '%(x_color)s', '%(y_color)s'),
+#                    labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY)) +'''
 
     if shape_by_category:
         legal_shapes_str = ', '.join(map(str, legal_shapes))
         main_plot_script += '''
-scale_shape_manual('%(shape_category_title)s', values = c(%(legal_shapes_str)s),
-                    labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY))'''
+#scale_shape_manual('%(shape_category_title)s', values = c(%(legal_shapes_str)s),
+#                    labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY))'''
 
     else:
         main_plot_script += '''
-scale_shape_manual('%(counts_title)s', values = c(18, 16, 15),
-                    labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY))'''
+#scale_shape_manual('%(counts_title)s', values = c(18, 16, 15),
+#                    labels = c( "Similar" = countsim,  "%(x_series_name)s" = countX,        "%(y_series_name)s" = countY))'''
 
     if add_similarity_range_annotation:
         main_plot_script += '''+

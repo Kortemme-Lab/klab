@@ -26,6 +26,7 @@ from sqlalchemy import create_engine, and_
 from sqlalchemy import inspect as sqlalchemy_inspect
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm.collections import InstrumentedList
+from socket import gethostname
 
 if __name__ == '__main__':
     sys.path.insert(0, '..')
@@ -413,6 +414,8 @@ if __name__ == '__main__':
         passwd = args[3]
         port = 3306
         socket = '/var/lib/mysql/mysql.sock'
+        if gethostname() == 'guybrush':
+            socket = '/var/run/mysqld/mysqld.sock'
         if len(args) == 6:
             socket = args[5]
         if len(args) >= 5:

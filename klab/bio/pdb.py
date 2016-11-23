@@ -39,8 +39,8 @@ try:
 except:
     pass
 
-from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_solutions, common_solution_ids
-from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, rna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, backbone_atoms, three_letter_ion_codes
+from klab.bio.basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_1to3_map, residue_type_3to1_map, dresidue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation, ElementCounter, common_solutions, common_solution_ids
+from klab.bio.basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, rna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna, d_aa_codes, d_aas, backbone_atoms, three_letter_ion_codes
 from klab.bio.ligand import SimplePDBLigand, PDBIon, Ligand
 from klab import colortext
 from klab.fs.fsio import read_file, write_file
@@ -102,6 +102,8 @@ ROSETTA_HACKS_residues_to_remove = {
 
 # For use with get_pdb_contents_to_pose_residue_map e.g. {'1A2P' : ('-ignore_zero_occupancy false',), ... }
 HACKS_pdb_specific_hacks = {
+    '4CPA' : ('-ignore_unrecognized_res',), # require the ignore_unrecognized_res flag to be set in Rosetta
+    '3J70' : ('-ignore_unrecognized_res',),
 }
 
 ### UniProt-related variables
@@ -275,6 +277,8 @@ class PDBValidationException(Exception): pass
 class PDBMissingMainchainAtomsException(Exception): pass
 class RequestedLigandsWithoutParsingException(Exception): pass
 class RequestedIonsWithoutParsingException(Exception): pass
+class RosettaATOMMappingException(Exception): pass
+
 
 class JRNL(object):
 
@@ -1005,7 +1009,7 @@ class PDB(object):
 
 
     def get_UniProt_ACs(self):
-        return [v['dbAccession'] for k, v in self.get_DB_references().get(self.pdb_id, {}).get('UNIPROT', {}).iteritems()]
+        return sorted(set([x for l in [v.keys() for k, v in self.get_DB_references().get(self.pdb_id, {}).get('UNIPROT', {}).iteritems()] for x in l]))
 
 
     def get_DB_references(self):
@@ -1014,11 +1018,15 @@ class PDB(object):
         '''
 
         _database_names = {
-            'GB'    :  'GenBank',
-            'PDB'   :  'Protein Data Bank',
-            'UNP'   :  'UNIPROT',
-            'NORINE':  'Norine',
+            'GB'    : 'GenBank',
+            'PDB'   : 'Protein Data Bank',
+            'PIR'   : 'Protein Information Resource',
+            'SWS'   : 'SwissProt',
             'TREMBL': 'UNIPROT',
+            'UNP'   : 'UNIPROT',
+            'NORINE': 'Norine',
+            'EMBL'  : 'European Molecular Biology Laboratory',
+            'PRF'   : 'Protein Research Foundation',
         }
 
         DBref = {}
@@ -1036,16 +1044,19 @@ class PDB(object):
             idbnsBeg = l[60]
             dbseqEnd = int(l[62:67])
             dbinsEnd = l[67]
-
             DBref[pdb_id] = DBref.get(pdb_id, {})
             DBref[pdb_id][database] = DBref[pdb_id].get(database, {})
             if DBref[pdb_id][database].get(chain_id):
-                if not(DBref[pdb_id][database][chain_id]['dbAccession'] == dbAccession and DBref[pdb_id][database][chain_id]['dbIdCode'] == dbIdCode):
-                    raise PDBParsingException('This code needs to be generalized. dbIdCode should really be a list to handle chimera cases.')
+                if not DBref[pdb_id][database][chain_id].get(dbAccession):
+                   DBref[pdb_id][database][chain_id][dbAccession] = dict(dbIdCode = dbIdCode, PDBtoDB_mapping = [])
             else:
-                DBref[pdb_id][database][chain_id] = {'dbAccession'   :   dbAccession, 'dbIdCode'      :   dbIdCode, 'PDBtoDB_mapping' : []}
+               DBref[pdb_id][database][chain_id] = {}
+               DBref[pdb_id][database][chain_id][dbAccession] = dict(dbIdCode = dbIdCode, PDBtoDB_mapping = [])
 
-            DBref[pdb_id][database][chain_id]['PDBtoDB_mapping'].append(
+            if DBref[pdb_id][database][chain_id][dbAccession]['dbIdCode'] != dbIdCode:
+                raise PDBParsingException('There seems to be multiple mappings for {0} ({1} and {2}).'.format(dbAccession, DBref[pdb_id][database][chain_id][dbAccession]['dbIdCode'], dbIdCode))
+
+            DBref[pdb_id][database][chain_id][dbAccession]['PDBtoDB_mapping'].append(
                 {'PDBRange'      :   ("%d%s" % (seqBegin,  insertBegin), "%d%s" % (seqEnd,  insertEnd)),
                 'dbRange'       :   ("%d%s" % (dbseqBegin, idbnsBeg), "%d%s" % (dbseqEnd, dbinsEnd)),
                 }
@@ -1284,10 +1295,23 @@ class PDB(object):
 
             chain_type = None
             set_of_tokens = set(tokens)
-            if (set_of_tokens.union(all_recognized_dna) == all_recognized_dna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+            print(chain_id, set_of_tokens)
+
+            print(sorted(set_of_tokens))
+
+            # Map the set_of_tokens through the MODRES lines e.g. BRU -> DU IN 1WTP
+            set_of_tokens = set([modified_residue_mapping_3.get(t, t) for t in set_of_tokens])
+
+            print(sorted(set_of_tokens))
+            print(sorted(set_of_tokens.union(d_aa_codes)))
+            print(sorted(d_aa_codes))
+
+            if (sorted(set_of_tokens.union(all_recognized_dna)) == sorted(all_recognized_dna)):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue # e.g. 1WTP
                 chain_type = 'DNA'
-            elif (set_of_tokens.union(all_recognized_rna) == all_recognized_rna):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown DNA residue
+            elif (sorted(set_of_tokens.union(all_recognized_rna)) == sorted(all_recognized_rna)):# or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown RNA residue
                 chain_type = 'RNA'
+            elif (sorted(set_of_tokens.union(d_aa_codes)) == sorted(d_aa_codes)):  # or (len(set_of_tokens) <= 5 and len(set_of_tokens.union(dna_nucleotides)) == len(set_of_tokens) + 1): # allow one unknown RNA residue
+                chain_type = 'D-Protein'
             elif len(set_of_tokens) == 1 and 'UNK' in set_of_tokens:
                 chain_type = 'Unknown'
             elif not(set_of_tokens.intersection(canonical_acid_types)):
@@ -1304,12 +1328,16 @@ class PDB(object):
                 if self.chain_atoms[chain_id] == set(['CA']):
                     chain_type = 'Protein skeleton'
 
+            print('chain_type')
+            print(chain_type * 10)
             # Get the sequence, mapping non-canonicals to the appropriate letter
             self.chain_types[chain_id] = chain_type
+            pprint.pprint(self.chain_types)
 
             sequence = []
             if chain_type == 'DNA':
                 for r in tokens:
+                    r = modified_residue_mapping_3.get(r, r)
                     if dna_nucleotides_2to1_map.get(r):
                         sequence.append(dna_nucleotides_2to1_map[r])
                     else:
@@ -1319,6 +1347,7 @@ class PDB(object):
                             raise Exception("Unknown DNA residue %s." % r)
             elif chain_type == 'RNA':
                 for r in tokens:
+                    r = modified_residue_mapping_3.get(r, r)
                     if r in rna_nucleotides:
                         sequence.append(r)
                     else:
@@ -1326,9 +1355,18 @@ class PDB(object):
                             sequence.append(non_canonical_rna[r])
                         else:
                             raise Exception("Unknown RNA residue %s." % r)
+            elif chain_type == 'D-Protein':
+                for r in tokens:
+                    if r in d_aas:
+                        laa3 = d_aas[r]['laa']
+                        sequence.append(residue_type_3to1_map[laa3])
+                    else:
+                        raise Exception("Unknown D-protein residue %s." % r)
             else:
                 token_counter = 0
                 for r in tokens:
+                    #print(r)
+                    #pprint.pprint(modified_residue_mapping_3)
                     token_counter += 1
                     if residue_type_3to1_map.get(r):
                         sequence.append(residue_type_3to1_map[r])
@@ -1360,9 +1398,12 @@ class PDB(object):
                                     assert(modified_residue_mapping_3[r] in residue_types_3)
                                     sequence.append(residue_type_3to1_map[modified_residue_mapping_3[r]])
                             else:
-                                raise Exception("Unknown protein residue %s in chain %s." % (r, chain_id))
+                                if self.pdb_id:
+                                    raise Exception('Unknown protein residue {0} in chain {1}.'.format(r, chain_id))
+                                else:
+                                    raise Exception('Unknown protein residue {0} in chain {1} of {2}.'.format(r, chain_id, self.pdb_id))
             sequences[chain_id] = "".join(sequence)
-
+        pprint.pprint(sequences)
         self.seqres_chain_order = seqres_chain_order
 
         # Create Sequence objects for the SEQRES sequences
@@ -1375,7 +1416,6 @@ class PDB(object):
 
         # Get a list of all residues with ATOM or HETATM records
         atom_sequences = {}
-        structural_residue_IDs_set = set() # use a set for a quicker lookup
         ignore_HETATMs = True # todo: fix this if we need to deal with HETATMs
 
         residue_lines_by_chain = []
@@ -1389,7 +1429,7 @@ class PDB(object):
 
         model_index = 0
         residue_lines_by_chain.append([])
-        structural_residue_IDs_set.append(set())
+        structural_residue_IDs_set.append({})
         full_code_map = {}
         hetatm_map = {}
         full_atom_map = {}
@@ -1398,12 +1438,26 @@ class PDB(object):
             if l.startswith("TER   "):
                 model_index += 1
                 residue_lines_by_chain.append([])
-                structural_residue_IDs_set.append(set())
+                structural_residue_IDs_set.append({})
             else:
                 residue_id = l[21:27]
+                residue_type = l[17:20].strip()
+
+                # Get a "normalized" residue type by mapping non-canonical residue types to their canonical counterparts.
+                # (at least according to our mappings). For example, IAS maps to ASP
+                residue_type_1 = residue_type_3to1_map.get(residue_type) or self.modified_residues.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type) or non_canonical_amino_acids.get(residue_type) or dresidue_type_3to1_map.get(residue_type)
+
+                normalized_residue_type = residue_type_1to3_map.get(residue_type_1, residue_type)
+
                 if residue_id not in structural_residue_IDs_set[model_index]:
                     residue_lines_by_chain[model_index].append(l)
-                    structural_residue_IDs_set[model_index].add(residue_id)
+                    structural_residue_IDs_set[model_index][residue_id] = normalized_residue_type
+                else:
+                    # If we have already added a residue, make sure that this line's normalized residue type matches.
+                    # This allows us to handle e.g. 2FI5 where residue E 115 has both HETATM entries for IAS and ATOM
+                    # entries for ASP due to multiple conformations.
+                    assert(normalized_residue_type == structural_residue_IDs_set[model_index][residue_id])
+
                 if l.startswith('ATOM'):
                     chain_id = l[21]
                     # Only use ATOM records to build the code map as chains can have ligands HETATMs
@@ -1423,13 +1477,17 @@ class PDB(object):
             if full_code_map.get(chain_id):
                 # The chains may contain other molecules e.g. MG or HOH so before we decide their type based on residue types alone,
                 # we subtract out those non-canonicals
-                canonical_molecules = full_code_map[chain_id].intersection(dna_nucleotides.union(rna_nucleotides).union(residue_types_3))
-
+                canonical_molecules = full_code_map[chain_id].intersection(dna_nucleotides.union(rna_nucleotides).union(residue_types_3).union(d_aa_codes))
+                print(canonical_molecules)
+                print(d_aa_codes)
+                print(full_code_map[chain_id])
                 determined_chain_type = None
                 if canonical_molecules.union(dna_nucleotides) == dna_nucleotides:
                     determined_chain_type = 'DNA'
                 elif canonical_molecules.union(rna_nucleotides) == rna_nucleotides:
                     determined_chain_type = 'RNA'
+                elif canonical_molecules.union(d_aa_codes) == d_aa_codes:
+                    determined_chain_type = 'D-Protein'
                 elif len(full_code_map[chain_id]) == 1 and 'UNK' in full_code_map[chain_id]:
                     determined_chain_type = 'Unknown'
                 elif canonical_molecules:
@@ -1440,8 +1498,9 @@ class PDB(object):
                 else:
                     determined_chain_type = PDB._determine_heterogen_chain_type(canonical_molecules)
 
+                print(chain_id, self.chain_types[chain_id], determined_chain_type)
                 if self.chain_types.get(chain_id):
-                    assert(self.chain_types[chain_id] == determined_chain_type)
+                    assert((self.chain_types[chain_id] == determined_chain_type) or (self.chain_types[chain_id] == 'D-Protein' and determined_chain_type == 'Protein'))
                 else:
                     self.chain_types[chain_id] = determined_chain_type
 
@@ -1467,35 +1526,43 @@ class PDB(object):
             residue_lines = residue_lines_by_chain[x]
             line_types = line_types_by_chain[x]
             if ignore_HETATMs and line_types == 'HETATM':
+                # the chain only contains HETATM records
                 continue
 
             for y in range(len(residue_lines)):
                 l = residue_lines[y]
                 residue_type = l[17:20].strip()
-                if l.startswith("HETATM"):
-                    if self.modified_residue_mapping_3.get(residue_type):
-                        residue_type = self.modified_residue_mapping_3[residue_type]
-                    elif y == (len(residue_lines) - 1):
-                        # last residue in the chain
-                        if residue_type == 'NH2':
-                            residue_type = 'UNK' # fixes a few cases e.g. 1MBG, 1K9Q, 1KA6
-                        elif ignore_HETATMs:
-                            continue
 
-                    elif ignore_HETATMs:
-                        continue
-
-                residue_id = l[21:27]
                 chain_id = l[21]
                 if missing_chain_ids.get(self.pdb_id):
                     chain_id = missing_chain_ids[self.pdb_id]
-
                 if chain_id in self.chain_types:
                     # This means the pdb had SEQRES and we constructed atom_sequences
                     chain_type = self.chain_types[chain_id]
                 else:
                     # Otherwise assume this is protein
                     chain_type = 'Protein'
+
+                if l.startswith("HETATM"):
+                    if self.modified_residue_mapping_3.get(residue_type):
+                        residue_type = self.modified_residue_mapping_3[residue_type]
+                    if chain_type == 'D-Protein' and dresidue_type_3to1_map.get(residue_type):
+                        residue_type = d_aas[residue_type]['laa']
+                    elif non_canonical_amino_acids.get(residue_type):
+                        # Allow non-canonical amino acids if we have a mapping for them e.g. HETATM residue E 115 (IAS) of 2FI5
+                        # should map to ASP. This happens below but we want to prevent early-outing via ignore_HETATMs
+                        residue_type = residue_type_1to3_map[non_canonical_amino_acids[residue_type]]
+                    elif y == (len(residue_lines) - 1):
+                        # last residue in the chain
+                        if residue_type == 'NH2':
+                            residue_type = 'UNK' # fixes a few cases e.g. 1MBG, 1K9Q, 1KA6
+                        elif ignore_HETATMs:
+                            continue
+                    elif ignore_HETATMs:
+                        colortext.warning('Warning: Ignoring HETATM residue "{0}".'.format(l[21:27]))
+                        continue
+
+                residue_id = l[21:27]
 
                 atom_sequences[chain_id] = atom_sequences.get(chain_id, Sequence(chain_type))
 
@@ -1506,13 +1573,12 @@ class PDB(object):
                     short_residue_type = 'X'
                 elif chain_type == 'Unknown':
                     assert(False) # we should not reach here - Unknown chains should only contain UNK records
-                elif chain_type == 'Protein' or chain_type == 'Protein skeleton':
+                elif chain_type == 'Protein' or chain_type == 'D-Protein' or chain_type == 'Protein skeleton':
                     short_residue_type = residue_type_3to1_map.get(residue_type) or protonated_residue_type_3to1_map.get(residue_type) or non_canonical_amino_acids.get(residue_type)
                 elif chain_type == 'DNA':
                     short_residue_type = dna_nucleotides_2to1_map.get(residue_type) or non_canonical_dna.get(residue_type)
                 elif chain_type == 'RNA':
                     short_residue_type = non_canonical_rna.get(residue_type) or residue_type
-
                 if not short_residue_type:
                     if l.startswith("ATOM") and l[12:16] == ' OH2' and l[17:20] == 'TIP':
                         continue
@@ -1622,7 +1688,7 @@ class PDB(object):
             Next, the object's rosetta_sequences (a dict of Sequences) element is created.
             Finally, a SequenceMap object is created mapping the Rosetta Sequences to the ATOM Sequences.
 
-            The extra_command_flags parameter expects a string e.g. "-ignore_zero_occupancy false".
+            The extra_command_flags parameter expects a string e.g. "-ignore_unrecognized_res -ignore_zero_occupancy false".
 
             If cache_dir is passed then the file <self.pdb_id>.
         '''
@@ -1634,7 +1700,7 @@ class PDB(object):
         # Apply any PDB-specific hacks
         specific_flag_hacks = None
         if self.pdb_id and HACKS_pdb_specific_hacks.get(self.pdb_id):
-            specific_flag_hacks = HACKS_pdb_specific_hacks[self.pdb_id]
+            specific_flag_hacks = ' '.join(HACKS_pdb_specific_hacks[self.pdb_id])
 
         skeletal_chains = sorted([k for k in self.chain_types.keys() if self.chain_types[k] == 'Protein skeleton'])
         if skeletal_chains:
@@ -1654,7 +1720,7 @@ class PDB(object):
             pdb_file_contents = "\n".join(self.structure_lines)
             success, mapping = get_pdb_contents_to_pose_residue_map(pdb_file_contents, rosetta_scripts_path, rosetta_database_path = rosetta_database_path, pdb_id = self.pdb_id, extra_flags = ((specific_flag_hacks or '') + ' ' + (extra_command_flags or '')).strip())
             if not success:
-                raise colortext.Exception("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
+                raise RosettaATOMMappingException("An error occurred mapping the PDB ATOM residue IDs to the Rosetta numbering.\n%s" % "\n".join(mapping))
             if self.pdb_id and cache_dir:
                 write_file(cached_json_mapping_filepath, json.dumps(mapping, indent = 4, sort_keys = True))
 
@@ -1684,6 +1750,10 @@ class PDB(object):
 
                 residue_type = None
                 if chain_type == 'Protein':
+                    residue_type = residue_info['name3'].strip()
+                    short_residue_type = residue_type_3to1_map.get(residue_type, 'X') # some HETATMs can be passed here e.g. MG so we can not map those cases
+                elif chain_type == 'D-Protein':
+                    # todo: this is insufficient. Using the default commands, all D-amino acids seem to be discarded so we are just left with 'G'
                     residue_type = residue_info['name3'].strip()
                     short_residue_type = residue_type_3to1_map.get(residue_type, 'X') # some HETATMs can be passed here e.g. MG so we can not map those cases
                 else:
@@ -3062,6 +3132,40 @@ class PDB(object):
         if expected_num_residues != None and expected_num_residue_atoms != None:
             assert(dataframe.shape[0] == expected_num_residues * expected_num_residue_atoms)
         return dataframe
+
+
+    @staticmethod
+    def rename_chain(pdb_lines, chain_mapping, permit_chain_elision = False):
+        '''Changes the chain letter for coordinate records. Leaves all other records e.g. headers alone.
+
+        :param pdb_lines: A List of PDB file lines.
+        :param chain_mapping: A dict mapping the original chain IDs to the new chain IDs.
+        :param permit_chain_elision: If False then an exception is raised if chains are renamed such that two originally separate chains are assigned the same ID.
+        :return: :raise:
+        '''
+
+        current_chains = set([l[21] for l in pdb_lines if l[0:6].strip() in chain_record_types and len(l) > 21])
+        chains_not_renamed = current_chains.difference(set(chain_mapping.keys()))
+        if not permit_chain_elision:
+            if len(set(chain_mapping.values())) < len(set(chain_mapping.keys())):
+                raise Exception('The chain mapping is not injective - one or more chains are being merged to the same chain letter. If you want this behavior, set permit_chain_elision = True.')
+            elided_chains = chains_not_renamed.intersection(set(chain_mapping.values()))
+            if elided_chains:
+                raise Exception('A chain is being renamed to the same name as an existing chain which is not being renamed ({0}). If you want this behavior, set permit_chain_elision = True.'.format(', '.join(elided_chains)))
+
+        new_lines = []
+        for l in pdb_lines:
+            if l[0:6].strip() in chain_record_types:
+                if len(l) > 21:
+                    chain_id = l[21]
+                    new_lines.append(l[:21] + chain_mapping.get(chain_id, chain_id) + l[22:])
+                else:
+                    assert(l[:3] == 'TER')
+                    new_lines.append(l)
+            else:
+                new_lines.append(l)
+        return new_lines
+
 
 
     @staticmethod

@@ -292,7 +292,7 @@ class BioCache(object):
     def save_pdb_chain_blast(self, pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off, data):
         if self.cache_dir:
             filepath = self._get_blast_pdb_filepath(pdb_id, chain_id, cut_off, matrix, sequence_identity_cut_off)
-            write_file(filepath, json.dumps(data))
+            write_file(filepath, json.dumps(data, sort_keys = True, indent = 4))
             return True
         return False
 
@@ -322,7 +322,7 @@ class BioCache(object):
                 for sequence_hits in json.loads(read_file(filepath)):
                     if sequence_hits['sequence'] != sequence:
                         sequence_data.append(sequence_hits)
-            write_file(filepath, json.dumps(sequence_data))
+            write_file(filepath, json.dumps(sequence_data, sort_keys = True, indent = 4))
             return True
         return False
 

@@ -124,18 +124,18 @@ class MySQLSchema(object):
         # todo: rename this to get_definition as this is more appropriate
         return '\n\n'.join(self.original_schema)
 
-    def generate_schema_diagram(self, output_filepath = None, show_fk_only = False):
+    def generate_schema_diagram(self, output_filepath = None, show_fk_only = False, skip_tables_like = []):
         if self.num_tables == 0:
             raise EmptyDiagramException('No tables in schema.')
-        tempfiles = self._generate_schema_diagram(show_fk_only)
+        tempfiles = self._generate_schema_diagram(show_fk_only, skip_tables_like = skip_tables_like)
         self.schema_diagram = read_file(tempfiles[1])
         for fname in tempfiles:
             if os.path.exists(fname):
-                os.remove(fname)
+                pass#os.remove(fname)
         if output_filepath:
             write_file(output_filepath, self.schema_diagram)
 
-    def _generate_schema_diagram(self, show_fk_only):
+    def _generate_schema_diagram(self, show_fk_only, skip_tables_like = []):
 
         tempfiles = []
         output_handle, sql_schema_filepath = open_temp_file('/tmp', ftype = 'w')
@@ -164,7 +164,9 @@ class MySQLSchema(object):
             if show_fk_only:
                 # Useful to print a smaller schema of just the primary/foreign keys
                 c.append("--show-fk-only")
-
+            if skip_tables_like:
+                c.append('--skip-tables-like={0}'.format(','.join([s.strip() for s in skip_tables_like if s.strip()])))
+            print(' '.join(c))
             p = subprocess.Popen(c, stdout=subprocess.PIPE)
             stdout, stderr = p.communicate()
             if not p.returncode == 0:
@@ -181,9 +183,18 @@ class MySQLSchema(object):
 
 if __name__ == '__main__':
     s = MySQLSchema(host = "kortemmelab.ucsf.edu", db = "ddG", user = "kortemmelab", passwdfile = 'pw')
-    s.generate_schema_diagram(output_filepath = "mytest-ddG.png")
-    s = MySQLSchema(host = "kortemmelab.ucsf.edu", db = "KortemmeLab", user = "root", passwdfile = 'mpw')
-    s.generate_schema_diagram(output_filepath = "mytest-klab.png")
+    #s.generate_schema_diagram(output_filepath = "mytest-ddG.png", skip_tables_like = ['AminoAcid', 'AnalysisDataFrame', 'Command', 'Development.*', 'File*','Ion','Ligand.*','PDB.*','PPDBM.*','PPIConf.*','PPIDatabase.*','PPIDataSetCrossMap','PPIFunc.*','PredictionFile','PredictionNotes','PredictionPPIFile','PredictionPPIStructure.*','PredictionScores_DEPRECATED','Project.*','Protein.*','ProTherm.*','Protocol.*','Publication.*','Score.*','StructureRating','Tool','UniProt.*','User','UserRatingSet','_*'])
+
+    skip_tables_like = ['AminoAcid', 'AnalysisDataFrame', 'Command', '^Development.*$', '^File.*$','Ion','^Ligand.*$','^PDB.*$','^PPDBM.*$','^PPIConf.*$','^PPIDatabase.*$','PPIDataSetCrossMap','^PPIFunc.*$','PredictionFile','PredictionNotes','PredictionPPIFile','^PredictionPPIStructure.*$','PredictionScores_DEPRECATED','^Project.*$','^Protein.*$','^ProTherm.*$','^Protocol.*$','^Publication.*$','^Score.*$','StructureRating','Tool','^UniProt.*$','User','UserRatingSet','^_.*$', 'DataSetCrossmap', 'DataSetReference']
+
+    s.generate_schema_diagram(output_filepath = "DDG_monomer.png", skip_tables_like = skip_tables_like + ['^PP.*$', 'PredictionPPI'])
+    s.generate_schema_diagram(output_filepath = "DDG_binding.png", skip_tables_like = skip_tables_like + ['DataSetDDG','DataSetDDGSource', '^Experiment.*$', 'Prediction', 'PredictionStructureScore'])
+
+    #todo: add sqlt-graph options e.g. sqlt-graph -d=MySQL -o=bindinggraph.png -t=png -c <tempfile> <skip_tables_likes>
+
+    #s.generate_schema_diagram(output_filepath = "mytest-ddG.png", skip_tables_like = ['AminoAcid','^_.*$'])
+    #s = MySQLSchema(host = "kortemmelab.ucsf.edu", db = "KortemmeLab", user = "root", passwdfile = 'mpw')
+    #s.generate_schema_diagram(output_filepath = "mytest-klab.png")
     #s = MySQLSchema(host = "localhost", db = "DesignCollection", user = "root", passwd = '...')
     #s.generate_schema_diagram(output_filepath = "DesignCollection_schema.png")
     #print(s.get_full_schema())

@@ -5,13 +5,32 @@ uniprot.py
 For functions relating to getting data from UniProt.
 
 Created by Shane O'Connor 2013
+
+
+Note:
+
+"UniProtKB excludes the following protein sequences:
+
+  1.  Most non-germline immunoglobulins and T-cell receptors
+  2.  Synthetic sequences
+  3.  Most patent application sequences
+  4.  Small fragments encoded from nucleotide sequence (<8 amino acids)
+  5.  Pseudogenes
+  6.  Sequences from redundant proteomes
+  7.  Fusion/truncated proteins
+  8.  Not real proteins"
+                            -- http://www.uniprot.org/help/uniprotkb_coverage
+
 """
 
 import sys
 import os
 import string
 import re
-import urllib,urllib2
+import urllib, urllib2
+import time
+import traceback
+
 try:
     import json as simplejson
 except:
@@ -94,8 +113,20 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
         request = urllib2.Request(url, data)
         contact = "" # Please set your email address here to help us debug in case of problems.
         request.add_header('User-Agent', 'Python %s' % contact)
-        response = urllib2.urlopen(request)
-        page = response.read(200000)
+        http_failure = False
+        for attempts in xrange(5):
+            try:
+                response = urllib2.urlopen(request)
+                page = response.read(200000)
+                if http_failure and not silent:
+                    colortext.message('Success.')
+                break
+            except urllib2.HTTPError, e:
+                http_failure = True
+                if not silent:
+                    colortext.warning('An exception occurred: "{0}". Retrying in 5s.'.format(str(e)))
+                time.sleep(5)
+
         lines = page.split("\n")
 
         assert(lines[-1] == '')
@@ -223,6 +254,8 @@ class ProteinSubsection(object):
         return self.att_type == other.att_type and self.description == other.description and self.begin_position == other.begin_position and self.end_position == other.end_position
 
 class ProteinSubsectionHolder(object):
+
+
     def __init__(self, _length):
         self.sections = []
         self._length = _length
@@ -253,7 +286,7 @@ class ProteinSubsectionHolder(object):
                 overlap = True
             if overlap:
                 #colortext.error("\n1: Overlap in protein sections.\nExisting sections:\n%s\nNew section:\n%s" % (s_pair[0], s_pair[1]))
-                raise ProteinSubsectionOverlapException("\n1: Overlap in protein sections.\nExisting sections:\n%s\nNew section:\n%s" % (s_pair[0], s_pair[1]))
+                raise ProteinSubsectionOverlapException('\n1: Overlap in protein sections.\nExisting sections: {0}\nColliding sections: {1} and {2}'.format(self.sections, s_pair[0], s_pair[1]))
         self.sections.append(new_section)
         self.sections = sorted(self.sections, key=lambda x:(x.begin_position, -x.end_position))
 
@@ -320,12 +353,13 @@ class UniProtACEntry(object):
         'Other'     : 'other'
     }
 
-    def __init__(self, UniProtAC, XML = None, cache_dir = None, silent = True):
+    def __init__(self, UniProtAC, XML = None, cache_dir = None, silent = True, strict = False):
         if cache_dir and not(os.path.exists(cache_dir)):
             raise Exception("The cache directory %s does not exist." % cache_dir)
 
         self.UniProtAC = UniProtAC
         self.silent = silent
+        self.strict = strict                # if strict is False then we ignore certain parsing errors
 
         # Get XML
         if XML == None:
@@ -419,7 +453,8 @@ class UniProtACEntry(object):
                                         colortext.error("Fixing starting_index, ending_index to %d, %d for PDB chains %s." % (starting_index, ending_index, str(chain_ids)))
                                 else:
                                     if not set(chain_ids) in broken_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}).get(pdb_id, []):
-                                        raise colortext.Exception("The starting index and ending index for %s, chains %s in UniProtKB AC entry %s is broken or missing. Fix the mapping or mark it as missing in uniprot_patches.py" % (pdb_id, ",".join(chain_ids), self.UniProtAC))
+                                        if self.strict:
+                                            raise colortext.Exception("The starting index and ending index ({0}, {1}) for {2}, chains {3} in UniProtKB AC entry {4} is broken or missing. Fix the mapping or mark it as missing in uniprot_patches.py".format(starting_index, ending_index, pdb_id, ",".join(chain_ids), self.UniProtAC))
                                     continue
 
                             for chain_id in chain_ids:
@@ -442,7 +477,8 @@ class UniProtACEntry(object):
                             colortext.error("Fixing method to %s for PDB %s." % (method, pdb_id))
 
                 if not chains:
-                    assert(pdb_id in broken_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}))
+                    if self.strict:
+                        assert(pdb_id in broken_mapping_for_AC_PDB_chains.get(self.UniProtAC, {}))
                     continue
 
                 if not method and chains:
@@ -692,6 +728,7 @@ class UniParcEntry(object):
         self.AC_entries = {}
         subsections = ProteinSubsectionHolder(len(sequence))
 
+        print(UniParcID, self.UniProtACs)
         for UniProtAC in self.UniProtACs:
             #colortext.write("%s\n" % UniProtAC, 'cyan')
             try:
@@ -743,7 +780,15 @@ class UniParcEntry(object):
                 if not found:
                     submitted_names.append([submitted_name, 1])
 
-            subsections += AC_entry.subsections
+            try:
+                subsections += AC_entry.subsections
+            except ProteinSubsectionOverlapException, e:
+                colortext.error('An error occurred parsing {0}:\n"{1}".\nRelated entries: {2}'.format(UniProtAC, str(e).strip(), sorted(self.UniProtACs)))
+                print(traceback.format_exc())
+                raise
+            except Exception, e:
+                raise
+
         self.subsections = subsections
 
         assert(len(set(UniParcMergedRecommendedNamesRemap.keys()).intersection(set(UniParcMergedSubmittedNamesRemap.keys()))) == 0)

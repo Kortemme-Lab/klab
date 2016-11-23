@@ -25,10 +25,26 @@ from klab.debug.profile import ProfileTimer
 int_type = types.IntType
 
 xsd_versions = {
+    'pdbx-v42.xsd'  : 4.2,
     'pdbx-v40.xsd'  : 4.0,
     'pdbx-v32.xsd'  : 3.2,
     'pdbx.xsd'      : 3.1,
 }
+
+
+class MissingPDBMLException(Exception): pass
+
+
+known_missing_cases = set([
+    '1NL8',
+    '1ITE',
+    '1IJ4',
+    '1XJP',
+    '1OPN', # theoretical model
+    '1OPT', # theoretical model
+    '1OPW', # theoretical model
+])
+
 
 # Old, slow class using xml.dom.minidom
 from xml.dom.minidom import parse, parseString
@@ -349,6 +365,13 @@ class PDBML(xml.sax.handler.ContentHandler):
             1 : None,
             2 : self.parse_atom_tag_data,
         }
+
+        if not xml_contents.strip():
+            if self.pdb_id:
+                raise MissingPDBMLException('No PDBML file available for {0}'.format(self.pdb_id))
+            else:
+                raise MissingPDBMLException('No PDBML file available'.format(self.pdb_id))
+
         assert(xml_contents.find('encoding="UTF-8"') != -1)
 
 

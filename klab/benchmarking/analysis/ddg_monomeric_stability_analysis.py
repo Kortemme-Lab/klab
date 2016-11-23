@@ -59,7 +59,6 @@ from klab.gfx.color_definitions import rgb_colors as plot_colors
 from klab.stats.misc import fraction_correct, fraction_correct_pandas, add_fraction_correct_values_to_dataframe, get_xy_dataset_statistics_pandas, format_stats, float_format_2sigfig, float_format_3sigfig, subtract_row_pairs_for_display
 from klab.benchmarking.analysis.plot import plot_pandas
 from klab.plot.rtools import RInterface
-from klab.plot import general_matplotlib
 
 class BenchmarkRun(ReportingObject):
     '''A object to contain benchmark run data which can be used to analyze that run or else to cross-analyze the run with another run.'''
@@ -92,6 +91,8 @@ class BenchmarkRun(ReportingObject):
                  additional_join_parameters = {},
                  stability_classication_x_cutoff = 1.0, stability_classication_y_cutoff = 1.0, use_existing_benchmark_data = False, store_data_on_disk = True, misc_dataframe_attributes = {},
                  terminal_width = 200, restrict_to = set(), remove_cases = set()):
+
+        from klab.plot import general_matplotlib
 
         self.contains_experimental_data = contains_experimental_data
         self.analysis_sets = [''] # some subclasses store values for multiple analysis sets

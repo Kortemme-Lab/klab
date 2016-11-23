@@ -53,7 +53,24 @@ if use_patches:
         'UPI0000021092' : {'Name' : '', 'EC numbers' : [], 'Short names' : []},
         'UPI00000B96E8' : {'Name' : 'Chitinase', 'EC numbers' : [], 'Short names' : []},
         'UPI00000C5AE8' : {'Name' : '', 'EC numbers' : [], 'Short names' : []},
+        'UPI000003AF82' : {'Name' : 'Peptidyl-prolyl cis-trans isomerase A', 'EC numbers' : ['5.2.1.8'], 'Short names' : ['PPIase A', 'PPIase']},
+        'UPI0000141141' : {'Name' : 'Tyrosine-protein kinase', 'EC numbers' : ['2.7.10.2'], 'Short names' : []},
+        'UPI00000000E4' : {'Name' : 'Beta-lactamase', 'EC numbers' : ['3.5.2.6'], 'Short names' : []},
+        'UPI000004F892' : {'Name' : 'Coxsackievirus and adenovirus receptor', 'EC numbers' : [], 'Short names' : ['CAR' ,'hCAR']},
+        'UPI000011D62A' : {'Name' : 'TGF-beta receptor type-1 / Receptor protein serine/threonine kinase', 'EC numbers' : ['2.7.11.30'], 'Short names' : ['TGFR-1']},
+        'UPI000000403E' : {'Name' : 'Carboxylic ester hydrolase / Acetylcholinesterase', 'EC numbers' : ['3.1.1.7'], 'Short names' : ['AChE']},
+        'UPI0000027905' : {'Name' : 'Activin receptor type-2A / Serine/threonine-protein kinase receptor', 'EC numbers' : ['2.7.11.30'], 'Short names' : []},
+        'UPI00001AF0AE' : {'Name' : 'Activin receptor type-2B / Serine/threonine-protein kinase receptor', 'EC numbers' : ['2.7.11.30'], 'Short names' : []},
+        'UPI000004D00E' : {'Name' : 'Ubiquitin carboxyl-terminal hydrolase isozyme L3', 'EC numbers' : ['3.4.19.12'], 'Short names' : ['UCH-L3']},
+        'UPI00000336C9' : {'Name' : 'Endo-1,4-beta-xylanase A', 'EC numbers' : ['3.2.1.8'], 'Short names' : ['Xylanase A']},
+        'UPI000013C879' : {'Name' : 'Profilin-1', 'EC numbers' : [], 'Short names' : []},
+        'UPI0000000F26' : {'Name' : 'Beta-lactamase SHV-1', 'EC numbers' : ['3.5.2.6'], 'Short names' : []},
+        'UPI000003F55F' : {'Name' : 'Receptor tyrosine-protein kinase erbB-2', 'EC numbers' : ['2.7.10.1'], 'Short names' : []},
+
+
+        #'UPI00000C5AE8' : {'Name' : '', 'EC numbers' : [], 'Short names' : []},
     }
+
 
     # These entries had no recommended names - the names here are merges of submitted names
     UniParcMergedSubmittedNamesRemap = {
@@ -307,7 +324,21 @@ if use_patches:
         'Q1R3B6', # This has Evidence at protein level but also omits the name of position 1
         # UPI000000E853
         'A1AGM6', 'A7ZSL4', 'A8A5E6', 'B1IPW0', # Do not specify the name of position 1 (initiator methionine) whereas entries like P0CE47 do
-        'Q0TCC0', 'Q1R5Y2', 'Q31VV0', 'Q32B27', 'Q3YWT3'
+        'Q0TCC0', 'Q1R5Y2', 'Q31VV0', 'Q32B27', 'Q3YWT3',
+        # UPI00000000E4
+        'A0A0A7ID06', 'A0A0B3B902', 'A0A0N9XZ21', 'A0A0P0ELX0', 'L8AE40', 'P62593', 'P62594', 'Q6TMH1',
+        # UPI000011DD7E
+        'A3QNQ0',
+        # UPI000011D62A
+        'Q5T7S2',
+        # UPI000000403E
+        'Q543Z1',
+        # UPI0000027905
+        'A2AI38', 'F1MA24', 'G3HY37',
+        # UPI00001AF0AE
+        'Q13705',
+        # UPI0000000F26
+        'P0AD63', 'P0AD64',
     ])
 
     # These subsections overlap with those of UniProt AC entries relating to the same protein. We may want to keep this information instead of discarding it.
@@ -335,6 +366,7 @@ if use_patches:
         'P61823' : {'1UN5' : [set(['A'])]},
         'P00559' : {'2PGK' : [set(['A'])]},
         'P29395' : {'1IP8' : [set(['G'])]},
+        'P19909' : {'1IBX' :  [set(['B'])]},
     }
 
     # These entries have missing position mapping in UniProt but are easily fixed
@@ -406,6 +438,8 @@ if use_patches:
         'Q3Z5E9' : {(1, 155) : ('Ribonuclease H', 'Ribonuclease HI')},
         # UPI000012EBF8 - I took the entry P0CY08 with Evidence at protein level
         'P0CY09' : {(1, 210) : ('Silenced mating-type protein ALPHA2', 'Mating-type protein ALPHA2')},
+        'P18429' : {(29, 213) : ('Endo-1,4-beta-xylanase A', 'Endo-1,4-beta-xylanase')},
+        'X5DNK3': {(23, 1255): ('Receptor protein-tyrosine kinase', 'Receptor tyrosine-protein kinase erbB-2')},
     }
 
 else:

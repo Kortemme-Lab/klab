@@ -1,7 +1,6 @@
 import os
 import traceback
 
-import matplotlib.pyplot as plt
 import numpy
 
 from klab.fs.fsio import write_temp_file
@@ -57,6 +56,8 @@ def plot_pandas(dataframe, x_series, y_series, output_filename, RFunction, title
 
 
 def histogram(values, out_filepath, num_bins = 50):
+    import matplotlib.pyplot as plt
+
     hist, bins = numpy.histogram(values, bins=num_bins)
     width = 0.7 * (bins[1] - bins[0])
     center = (bins[:-1] + bins[1:]) / 2
