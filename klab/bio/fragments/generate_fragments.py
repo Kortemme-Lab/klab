@@ -225,7 +225,7 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     parser.set_defaults(sendmail = False)
     parser.set_defaults(queue = [])
     parser.set_defaults(nozip = False)
-    parser.set_defaults(scratch = 1)
+    parser.set_defaults(scratch = 10)
     parser.set_defaults(memfree = 40)
     parser.set_defaults(runtime = 6)
     parser.set_defaults(frag_sizes = '3,9')
