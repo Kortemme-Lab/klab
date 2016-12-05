@@ -101,7 +101,6 @@ print("</output>")
 
 # Post-processing. Copy files from scratch back to /netapp.
 shutil.rmtree(task_root_dir, ignore_errors=True)
-shutil.rmtree(scratch_path)
 shutil.copytree(scratch_path, task_root_dir)
 shutil.rmtree(scratch_path)
 ${JOB_POST_PROCESSING_COMMANDS}
