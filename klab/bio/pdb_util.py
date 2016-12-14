@@ -24,6 +24,8 @@
 # THE SOFTWARE.
 
 import string
+import sys
+import os
 
 def renumber_atoms(lines):
     '''
@@ -42,3 +44,52 @@ def renumber_atoms(lines):
                 current_number += 1
             new_lines.append(line)
     return new_lines
+
+def clean_alternate_location_indicators(lines):
+    '''
+    Keeps only the first atom, if alternated location identifiers are being used
+    Removes alternate location ID charactor
+    '''
+    new_lines = []
+    previously_seen_alt_atoms = set()
+    for line in lines:
+        if line.startswith('ATOM'):
+            alt_loc_id = line[16]
+            if alt_loc_id != ' ':
+                atom_name = line[12:16].strip()
+                res_name = line[17:20].strip()
+                chain = line[21]
+                resnum = long( line[22:26].strip() )
+                loc_tup = (atom_name, res_name, chain, resnum)
+                if loc_tup in previously_seen_alt_atoms:
+                    # Continue main for loop
+                    continue
+                else:
+                    previously_seen_alt_atoms.add( loc_tup )
+                    line = line[:16] + ' ' + line[17:]
+        new_lines.append(line)
+    return new_lines
+
+if __name__ == '__main__':
+    assert( len(sys.argv) >= 2 )
+    pdb_path = sys.argv[1]
+    assert os.path.isfile(pdb_path)
+    with open(pdb_path, 'r') as f:
+        lines = f.readlines()
+
+    for arg in sys.argv[2:]:
+        if arg == 'clean_alternate_location':
+            lines = clean_alternate_location_indicators(lines)
+        elif arg == 'renumber_atoms':
+            lines = renumber_atoms(lines)
+        else:
+            raise Exception('Unrecognized argument: ' + arg)
+
+    new_pdb_path = os.path.join(
+        os.path.dirname(pdb_path),
+        'cleaned-' + os.path.basename(pdb_path)
+    )
+
+    with open(new_pdb_path, 'w') as f:
+        for line in lines:
+            f.write(line)
