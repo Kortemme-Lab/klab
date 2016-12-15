@@ -292,6 +292,11 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
         job_dirs = sorted(job_dict.keys())
 
         job_dir = job_dirs[task_id]
+        flags_dict = job_dict[job_dir]
+        if flags_dict == None:
+            if verbosity >= 1:
+                print 'Nothing to do for job_dir (%s), skipping' % str(job_dir)
+            continue # Skip to next step
 
         if verbosity >= 1:
             print 'Job dir:', job_dir
@@ -336,7 +341,6 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
                 print 'Copied file to local scratch:', os.path.basename(original_file)
             return value
 
-        flags_dict = job_dict[job_dir]
         make_input_file_list = False
         for flag in flags_dict:
             if flag.startswith('FLAGLIST'):
