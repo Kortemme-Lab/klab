@@ -2281,7 +2281,7 @@ class PDB(object):
             try:
                 return float(occstring)
             except ValueError, TypeError:
-                return 0                          
+                return 0
 
     def removeUnoccupied(self):
         self.lines = [line for line in self.lines if not (line.startswith("ATOM") and PDB.getOccupancy(line) == 0)]
@@ -2303,7 +2303,7 @@ class PDB(object):
                 self.lines[i] = line[:54] + "  1.00" + line[60:]
 
     def fix_chain_id(self):
-        """fill in missing chain identifier""" 
+        """fill in missing chain identifier"""
 
         for i in xrange(len(self.lines)):
             line = self.lines[i]
@@ -2318,7 +2318,7 @@ class PDB(object):
         return self.ddGresmap
 
     def get_ddGInverseResmap(self):
-        return self.ddGiresmap 
+        return self.ddGiresmap
 
     def getAminoAcid(self, line):
         return line[17:20]
@@ -2332,12 +2332,12 @@ class PDB(object):
             assert(fieldtype == "ATOM" or fieldtype == "HETATM")
             if line[21:22] == chain and resid == line[22:27]:
                 return line
-        raise Exception("Could not find the ATOM/HETATM line corresponding to chain '%(chain)s' and residue '%(resid)s'." % vars())	
+        raise Exception("Could not find the ATOM/HETATM line corresponding to chain '%(chain)s' and residue '%(resid)s'." % vars())
 
     def getAtomLinesForResidueInRosettaStructure(self, resid):
         '''We assume a Rosetta-generated structure where residues are uniquely identified by number.'''
         lines = [line for line in self.lines if line[0:4] == "ATOM" and resid == int(line[22:27])]
-        if not lines:  
+        if not lines:
             #print('Failed searching for residue %d.' % resid)
             #print("".join([line for line in self.lines if line[0:4] == "ATOM"]))
             raise Exception("Could not find the ATOM/HETATM line corresponding to residue '%(resid)s'." % vars())
@@ -2366,14 +2366,15 @@ class PDB(object):
             assert(pr[1] == rm.WildTypeAA)
         return remappedMutations
 
-    def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None):
+    def stripForDDG(self, chains = True, keepHETATM = False, numberOfModels = None, raise_exception = True):
         '''Strips a PDB to ATOM lines. If keepHETATM is True then also retain HETATM lines.
            By default all PDB chains are kept. The chains parameter should be True or a list.
            In the latter case, only those chains in the list are kept.
            Unoccupied ATOM lines are discarded.
            This function also builds maps from PDB numbering to Rosetta numbering and vice versa.
            '''
-        raise Exception('This code is deprecated.')
+        if raise_exception:
+            raise Exception('This code is deprecated.')
 
         from Bio.PDB import PDBParser
         resmap = {}
@@ -2392,7 +2393,7 @@ class PDB(object):
                     raise Exception("The logic here does not handle multiple models yet.")
             if (fieldtype == "ATOM" or (fieldtype == "HETATM" and keepHETATM)) and (float(line[54:60]) != 0):
                 chain = line[21:22]
-                if (chains == True) or (chain in chains): 
+                if (chains == True) or (chain in chains):
                     resid = line[21:27] # Chain, residue sequence number, insertion code
                     iCode = line[26:27]
                     if resid != oldres:
@@ -2400,8 +2401,8 @@ class PDB(object):
                         newnumbering = "%s%4.i " % (chain, residx)
                         assert(len(newnumbering) == 6)
                         id = fieldtype + "-" + resid
-                        resmap[id] = residx 
-                        iresmap[residx] = id 
+                        resmap[id] = residx
+                        iresmap[residx] = id
                         oldres = resid
                     oldlength = len(line)
                     # Add the original line back including the chain [21] and inserting a blank for the insertion code
@@ -2414,7 +2415,7 @@ class PDB(object):
 
         # Sanity check against a known library
         tmpfile = "/tmp/ddgtemp.pdb"
-        self.lines = self.lines or ["\n"] 	# necessary to avoid a crash in the Bio Python module 
+        self.lines = self.lines or ["\n"] 	# necessary to avoid a crash in the Bio Python module
         F = open(tmpfile,'w')
         F.write(string.join(self.lines, "\n"))
         F.close()
@@ -2436,7 +2437,7 @@ class PDB(object):
 
     def mapPDBToRosetta(self, chain, resnum, iCode = " ", ATOM = True):
         if ATOM:
-            key = "ATOM-%s%4.i%s" % (chain, resnum, iCode) 
+            key = "ATOM-%s%4.i%s" % (chain, resnum, iCode)
         else:
             key = "HETATM-%s%4.i%s" % (chain, resnum, iCode)
         res = self.ddGresmap.get(key)
@@ -2448,13 +2449,13 @@ class PDB(object):
 
         if only_res:
           atomlines = [line for line in self.lines if line[0:4] == "ATOM" and line[17:20] in allowed_PDB_residues_types and line[26] == ' ']
-        else:  
+        else:
           atomlines = [line for line in self.lines if line[0:4] == "ATOM" and (line[17:20].strip() in allowed_PDB_residues_and_nucleotides) and line[26] == ' ']
 
         resid_set = set()
         resid_list = []
 
-        # todo: Seems a little expensive to create a set, check 'not in', and do fn calls to add to the set. Use a dict instead? 
+        # todo: Seems a little expensive to create a set, check 'not in', and do fn calls to add to the set. Use a dict instead?
         for line in atomlines:
             resid = line[21:26]
             if resid not in resid_set:
@@ -2469,7 +2470,7 @@ class PDB(object):
 
 
     def CheckForPresenceOf(self, reslist):
-        '''This checks whether residues in reslist exist in the ATOM lines. 
+        '''This checks whether residues in reslist exist in the ATOM lines.
            It returns a list of the residues in reslist which did exist.'''
         if type(reslist) == type(""):
             reslist = [reslist]
@@ -2611,7 +2612,7 @@ class PDB(object):
             pos = (float(line[30:38]), float(line[38:46]), float(line[46:54]))
             shash.insert(pos, line[21:26])
 
-        neighbor_list = []        # (key, value) = (resid, 
+        neighbor_list = []        # (key, value) = (resid,
 
         for line in lines:
             #print line
@@ -2627,7 +2628,7 @@ class PDB(object):
         return neighbor_list
 
     #todo 29: Optimise all callers of this function by using fastneighbors2 instead
-    def neighbors2(self, distance, chain_residue, atom = None, resid_list = None):  
+    def neighbors2(self, distance, chain_residue, atom = None, resid_list = None):
 
         #atom = " CA "
         '''this one is more precise since it uses the chain identifier also'''
@@ -2655,7 +2656,7 @@ class PDB(object):
                 neighbor_list.sort()
         return neighbor_list
 
-    def fastneighbors2(self, distance, chain_residues, atom = None, resid_list = None):  
+    def fastneighbors2(self, distance, chain_residues, atom = None, resid_list = None):
 
         # Create the spatial hash and construct a list of positions matching chain_residue
 
@@ -2670,7 +2671,7 @@ class PDB(object):
         # However, the speedup may not be too great and would need profiling
         for line in self.atomlines(resid_list):
             if line[17:20] in allowed_PDB_residues_types:
-                if atom == None or line[12:16] == atom:                    
+                if atom == None or line[12:16] == atom:
                     resid = line[21:26]
                     pos = (float(line[30:38]), float(line[38:46]), float(line[46:54]))
                     shash.insert(pos, resid)
@@ -2683,7 +2684,7 @@ class PDB(object):
         #   sort the list and store in neighbors
         for resid in chain_residues:
             neighbor_list = {}
-            for pos in chainResPositions[resid]:               
+            for pos in chainResPositions[resid]:
                 for data in shash.nearby(pos):
                     neighbor_list[data[1]] = True
             neighbors[resid] = neighbor_list.keys()
@@ -2706,7 +2707,7 @@ class PDB(object):
           pos = (float(line[30:38]), float(line[38:46]), float(line[46:54]))
           shash.insert(pos, line[21:26])
 
-      neighbor_list = []        # 
+      neighbor_list = []        #
       for line in lines:
           resid = line[21:26]
           if resid == chain_residue:
@@ -2728,11 +2729,11 @@ class PDB(object):
       return counts
 
     # This function can be expanded to allow us to use non-standard PDB files such as the ones given
-    # as examples in the RosettaCon 2010 sequence tolerance protocol based on Smith, Kortemme 2010. 
+    # as examples in the RosettaCon 2010 sequence tolerance protocol based on Smith, Kortemme 2010.
     def check_custom_format(self, line, lineidx):
         if line[0:9] == "FOLD_TREE":
             return True
-        return False          
+        return False
 
     def check_format(self, usingClassic, ableToUseMini):
         warnings = []
@@ -2812,7 +2813,7 @@ class PDB(object):
                     classicErrors.append("Residue %s on line %d is not recognized by classic." % (residue, lineidx))
                 elif (oldChain != None) and (currentChain == oldChain):
                     # Check for bad TER fields
-                    oldChain = None    
+                    oldChain = None
                     errors.append("A TER field on line %d interrupts two ATOMS on lines %d and %d with the same chain %s." % (TERidx, ATOMidx, lineidx, currentChain))
                 ATOMidx = lineidx
 
@@ -2843,7 +2844,7 @@ class PDB(object):
                     # Check for missing backbone residues
                     # Add the backbone atoms common to all alternative conformations to the common conformation
                     # todo: I've changed this to always take the union in all versions rather than just in Rosetta 3. This was to fix a false positive with 3OGB.pdb on residues A13 and A55 which run fine under point mutation.
-                    #       This may now be too permissive. 
+                    #       This may now be too permissive.
                     if True or not usingClassic:
                         commonToAllAlternatives = [0, 0, 0, 0]#, 0]
                         for conformation, bba in backboneAtoms.items():
@@ -2857,7 +2858,7 @@ class PDB(object):
                     # Check whether the common conformation has all atoms
                     commonConformationHasAllBBAtoms = True
                     for atomocc in range(CAINDEX + 1):
-                        commonConformationHasAllBBAtoms = backboneAtoms[" "][atomocc] and commonConformationHasAllBBAtoms                            
+                        commonConformationHasAllBBAtoms = backboneAtoms[" "][atomocc] and commonConformationHasAllBBAtoms
 
                     ps = ""
                     for conformation, bba in backboneAtoms.items():
@@ -2942,7 +2943,7 @@ class PDB(object):
 
             elif line[0:3] == "TER":
                 oldChain = currentChain
-                TERidx = lineidx            
+                TERidx = lineidx
 
             # print len(line),'\t', line[0:6]
             # remove all white spaces, and check if the line is empty or too long:
@@ -2966,16 +2967,16 @@ class PDB(object):
         self.lines = self.lines[0:len(self.lines) - (CAINDEX + 1)]
 
         if not lastReadResidue:
-            errors.append("No valid ATOM lines were found.")                
+            errors.append("No valid ATOM lines were found.")
 
         if not missingSomeBBAtoms and someBBAtomsAreUnoccupied:
-            errors.insert(0, "The PDB has some backbone atoms set as unoccupied. You can set these as occupied using the checkbox on the submission page.<br>")                
+            errors.insert(0, "The PDB has some backbone atoms set as unoccupied. You can set these as occupied using the checkbox on the submission page.<br>")
 
         if classicErrors:
             if ableToUseMini:
                 errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. Try using the mini version of Rosetta or else altering the PDB.<br>")
             else:
-                errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. No mini version is available for this protocol so the PDB will need to be altered.<br>")                
+                errors.insert(0, "The PDB is incompatible with the classic version of Rosetta. No mini version is available for this protocol so the PDB will need to be altered.<br>")
             errors.append("<br>The classic-specific errors are as follows:<ul style='text-align:left'>")
             errors.append("<li>%s" % string.join(classicErrors, "<li>"))
             errors.append("</ul>")
@@ -2983,8 +2984,8 @@ class PDB(object):
         if errors:
             if usingClassic:
                 errors.insert(0, "Version: Rosetta++")
-            else: 
-                errors.insert(0, "Version: Rosetta 3") 
+            else:
+                errors.insert(0, "Version: Rosetta 3")
 
             return errors, None
 
@@ -3190,12 +3191,12 @@ if __name__ == "__main__":
 
     # pdbobj.remove_hetatm()
     # #pdbobj.fix_chain_id()
-    # 
+    #
     # pdbobj.fix_residue_numbering()
-    # 
+    #
     # for line in pdbobj.atomlines():
     #     print line,
-    # 
+    #
     # print pdbobj.chain_ids()
 
     #pdbobj.fix_chain_id()
