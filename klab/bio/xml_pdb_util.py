@@ -67,7 +67,7 @@ class Residue:
         return (self.resi, self.resn, self.chain)
 
 class xmlpdb:
-    def __init__(self, xml_pdb_path):
+    def __init__(self, xml_pdb_path, remove_dup_alt_ids = False):
         assert( os.path.isfile(xml_pdb_path) )
         if xml_pdb_path.endswith('.gz'):
             with gzip.open(xml_pdb_path, 'rb') as f:
@@ -92,10 +92,11 @@ class xmlpdb:
 
         # Tags for later searching
         atom_tag = etree.QName(ns['PDBx'], 'atom_site').text
+        atom_name_tag = etree.QName(ns['PDBx'], 'label_atom_id').text
         entity_tag = etree.QName(ns['PDBx'], 'label_entity_id').text
         resn_tag = etree.QName(ns['PDBx'], 'label_comp_id').text
         resi_tag = etree.QName(ns['PDBx'], 'auth_seq_id').text
-        chain_tag = etree.QName(ns['PDBx'], 'label_asym_id').text
+        chain_tag = etree.QName(ns['PDBx'], 'label_alt_id').text
         x_tag = etree.QName(ns['PDBx'], 'Cartn_x').text
         y_tag = etree.QName(ns['PDBx'], 'Cartn_y').text
         z_tag = etree.QName(ns['PDBx'], 'Cartn_z').text
@@ -104,7 +105,10 @@ class xmlpdb:
         #     print child.tag, child.attrib
 
         self.residues = {}
+        if remove_dup_alt_ids:
+            previously_seen_atoms = set()
         for atom_site in root.iter(atom_tag):
+            atom_name = atom_site.findtext(atom_name_tag).strip()
             atom_num = long( atom_site.attrib['id'] )
             entity_id = long( atom_site.findtext(entity_tag) )
             chain = atom_site.findtext(chain_tag)
@@ -113,6 +117,14 @@ class xmlpdb:
             x = float( atom_site.findtext(x_tag) )
             y = float( atom_site.findtext(y_tag) )
             z = float( atom_site.findtext(z_tag) )
+
+            if remove_dup_alt_ids:
+                previously_seen_atom_tup = (atom_name, resn, chain, resi)
+                if previously_seen_atom_tup in previously_seen_atoms:
+                    continue
+                else:
+                    previously_seen_atoms.add( previously_seen_atom_tup )
+
             atom_data = (atom_num, entity_id, chain, resn, resi, x, y, z)
 
             if chain not in self.residues:
@@ -133,6 +145,24 @@ class xmlpdb:
                 if not protein_only or search_residue.resn in one_letter:
                     for chain in all_chains:
                         if chain not in neighbor_chains:
+                            for resi, residue in self.residues[chain].iteritems():
+                                if not protein_only or residue.resn in one_letter:
+                                    selection_tup = residue.selection_tup
+                                    if selection_tup not in selection:
+                                        if search_residue.within_dist(residue, dist_cutoff):
+                                            selection.add( selection_tup )
+        return sorted( selection )
+
+    def get_neighbors_at_dimer_interface(self, interface_chains, dist_cutoff, protein_only = True):
+        # Returns a selection of any residues within dist_cutoff (angstroms) of given neighbor chains
+        # Return selection format: (residue number, three letter wildtype residue type, chain letter)
+        selection = set()
+        all_chains = sorted( self.residues.keys() )
+        for search_chain in interface_chains:
+            for search_resi, search_residue in self.residues[search_chain].iteritems():
+                if not protein_only or search_residue.resn in one_letter:
+                    for chain in interface_chains:
+                        if chain != search_chain:
                             for resi, residue in self.residues[chain].iteritems():
                                 if not protein_only or residue.resn in one_letter:
                                     selection_tup = residue.selection_tup
