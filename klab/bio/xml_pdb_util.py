@@ -48,6 +48,8 @@ class Residue:
 
     def add_atom(self, atom_data):
         atom_num, entity_id, chain, resn, resi, x, y, z = atom_data
+        # print atom_data
+        # print self.entity_id, self.selection_tup
         assert( self.entity_id == entity_id )
         assert( self.chain == chain )
         assert( self.resn == resn )
@@ -96,7 +98,7 @@ class xmlpdb:
         entity_tag = etree.QName(ns['PDBx'], 'label_entity_id').text
         resn_tag = etree.QName(ns['PDBx'], 'label_comp_id').text
         resi_tag = etree.QName(ns['PDBx'], 'auth_seq_id').text
-        chain_tag = etree.QName(ns['PDBx'], 'label_alt_id').text
+        chain_tag = etree.QName(ns['PDBx'], 'label_asym_id').text
         x_tag = etree.QName(ns['PDBx'], 'Cartn_x').text
         y_tag = etree.QName(ns['PDBx'], 'Cartn_y').text
         z_tag = etree.QName(ns['PDBx'], 'Cartn_z').text
@@ -130,6 +132,8 @@ class xmlpdb:
             if chain not in self.residues:
                 self.residues[chain] = {}
             if resi in self.residues[chain]:
+                # print
+                # print chain, resi
                 self.residues[chain][resi].add_atom( atom_data )
             else:
                 self.residues[chain][resi] = Residue( atom_data )
