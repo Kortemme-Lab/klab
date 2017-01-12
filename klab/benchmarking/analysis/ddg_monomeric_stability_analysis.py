@@ -835,6 +835,28 @@ class BenchmarkRun(ReportingObject):
                 unique_ajps.append( ajp )
         return unique_ajps
 
+    @staticmethod
+    def get_common_subset(
+            benchmark_runs,
+            verbose = False,
+    ):
+        common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
+        for br in benchmark_runs[1:]:
+            common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
+        if verbose:
+            print 'Common dataset size will be:', len(common_ids)
+        if len(common_ids) == 0:
+            for br in benchmark_runs:
+                common_ids = sorted( list( br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() ) )
+                print br.get_definitive_name(unique_ajps, join_character = '-'), common_ids[:10]
+            raise Exception('No data to make report on!')
+        # limited_benchmark_runs = []
+        for br in benchmark_runs:
+            br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = verbose )
+            # limited_benchmark_runs.append( br )
+        # benchmark_runs = limited_benchmark_runs
+        return common_ids
+
 
     @staticmethod
     def analyze_multiple(
@@ -857,20 +879,7 @@ class BenchmarkRun(ReportingObject):
         unique_ajps = BenchmarkRun.get_unique_ajps( benchmark_runs )
 
         if limit_to_complete_presence:
-            common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
-            for br in benchmark_runs[1:]:
-                common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
-            print 'Common dataset size will be:', len(common_ids)
-            if len(common_ids) == 0:
-                for br in benchmark_runs:
-                    common_ids = sorted( list( br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() ) )
-                    print br.get_definitive_name(unique_ajps, join_character = '-'), common_ids[:10]
-                raise Exception('No data to make report on!')
-            # limited_benchmark_runs = []
-            for br in benchmark_runs:
-                br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = use_multiprocessing )
-                # limited_benchmark_runs.append( br )
-            # benchmark_runs = limited_benchmark_runs
+            BenchmarkRun.get_common_subset( benchmark_runs, verbose = not use_multiprocessing )
 
         unique_ajps = BenchmarkRun.get_unique_ajps( benchmark_runs )
 
