@@ -40,7 +40,7 @@ script_name = '#$#scriptname#$#.py'
 print "Script:", script_name
 
 # Constants
-maximum_input_pdb_wait_time = 21600 # 6 hours - Maximum seconds to try waiting for an input PDB to exist
+maximum_input_pdb_wait_time = 21600*2 # 12 hours - Maximum seconds to try waiting for an input PDB to exist
 input_pdb_wait_time_interval = 30 # Seconds to wait between checks
 
 tasks_per_process = #$#tasks_per_process#$#
