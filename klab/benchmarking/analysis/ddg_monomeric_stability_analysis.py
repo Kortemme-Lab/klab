@@ -1052,7 +1052,7 @@ class BenchmarkRun(ReportingObject):
             right_index = True,
         )
         predictions_v_predictions_df.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
 
         diff_v_diff_dataframe = self.get_pred_minus_exp_dataframe(analysis_set).merge(
             other.get_pred_minus_exp_dataframe(analysis_set),
@@ -1061,7 +1061,7 @@ class BenchmarkRun(ReportingObject):
         )
         report.add_section_page( title = 'Plots' )
         diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
 
         report.add_section_page( title = 'Tables' )
 
