@@ -157,7 +157,7 @@ class xmlpdb:
                                             selection.add( selection_tup )
         return sorted( selection )
 
-    def get_neighbors_at_dimer_interface(self, interface_chains, dist_cutoff, protein_only = True):
+    def get_neighbors_at_dimer_interface(self, interface_chains, dist_cutoff, protein_only = True, filter_only_chains = []):
         # Returns a selection of any residues within dist_cutoff (angstroms) of given neighbor chains
         # Return selection format: (residue number, three letter wildtype residue type, chain letter)
         selection = set()
@@ -166,6 +166,8 @@ class xmlpdb:
             for search_resi, search_residue in self.residues[search_chain].iteritems():
                 if not protein_only or search_residue.resn in one_letter:
                     for chain in interface_chains:
+                        if len( filter_only_chains ) > 0 and chain not in filter_only_chains:
+                            continue
                         if chain != search_chain:
                             for resi, residue in self.residues[chain].iteritems():
                                 if not protein_only or residue.resn in one_letter:
