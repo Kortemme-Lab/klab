@@ -116,10 +116,7 @@ def submit(command_filename, workingdir, send_mail = False, username = None):
 
     if errorcode != 0:
         colortext.error('Failed running qsub command: %s in cwd %s.' % (command, workingdir))
-        if output.find("unable to contact qmaster") != -1:
-            raise Exception("qsub failed: unable to contact qmaster")
-        else:
-            raise Exception(output)
+        raise Exception(output)
 
     # Match job id
     # This part of the script may be error-prone as it depends on the server message.
