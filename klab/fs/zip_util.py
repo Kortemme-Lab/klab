@@ -4,7 +4,7 @@ import subprocess
 from subprocess import Popen, PIPE, check_call
 import signal
 
-class LineReader:
+class LineReader(object):
     def __init__(self,fname):
         if fname.endswith('.gz'):
             if not os.path.isfile(fname):
@@ -33,6 +33,15 @@ class LineReader:
         self.close()
     def __iter__(self):
         return self.readlines()
+
+class CachedLineReader(object):
+    def __init__ (self, fname):
+        self.line_reader = LineReader(fname)
+        self.cached_lines = [line for line in self.line_reader.readlines()]
+        self.line_reader.close()
+
+    def readlines(self):
+        return self.cached_lines
 
 def zip_file(file_path):
     if os.path.isfile(file_path):
