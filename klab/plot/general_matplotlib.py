@@ -150,7 +150,8 @@ def make_corr_plot(
     fig_path = os.path.join(output_directory, output_name + '.' + output_format)
 
     if assert_plot_not_exists:
-        assert( not os.path.isfile(fig_path) )
+        if os.path.isfile(fig_path):
+            raise Exception( fig_path + ' exists' )
 
     nullfmt = NullFormatter()         # no labels
 
