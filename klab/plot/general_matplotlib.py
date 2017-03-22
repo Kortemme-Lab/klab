@@ -127,9 +127,11 @@ def make_corr_plot(
     fig_height = None,
     fig_width = None,
     fig_grid = True,
-    scatter_alpha = 0.8,
+    scatter_alpha = 0.6,
     axis_label_size = 12.0,
     plot_11_line = False,
+    assert_plot_not_exists = False,
+    point_size = 20,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
@@ -146,6 +148,9 @@ def make_corr_plot(
             output_format = 'pdf'
 
     fig_path = os.path.join(output_directory, output_name + '.' + output_format)
+
+    if assert_plot_not_exists:
+        assert( not os.path.isfile(fig_path) )
 
     nullfmt = NullFormatter()         # no labels
 
@@ -181,7 +186,7 @@ def make_corr_plot(
     axHisty.yaxis.set_major_formatter(nullfmt)
 
     # the scatter plot:
-    axScatter.scatter(x, y, alpha = scatter_alpha)
+    axScatter.scatter(x, y, alpha = scatter_alpha, s = point_size)
     axScatter.set_xlabel( make_latex_safe(df.columns[0]), fontsize = axis_label_size )
     axScatter.set_ylabel( make_latex_safe(df.columns[1]), fontsize = axis_label_size )
     axScatter.grid(fig_grid)
