@@ -898,7 +898,7 @@ class PDB(object):
     ### FASTA functions ###
 
 
-    def create_fasta(self, length = 80, prefer_seqres_order = True):
+    def create_fasta(self, length = 80, prefer_seqres_order = True, header = True):
         fasta_string = ''
         if prefer_seqres_order:
             chain_order, sequences = self.seqres_chain_order or self.atom_chain_order, self.seqres_sequences or self.atom_sequences
@@ -909,10 +909,13 @@ class PDB(object):
             if c not in sequences:
                 continue
 
-            fasta_string += '>%s|%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
             seq = str(sequences[c])
-            for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
-                fasta_string += line + '\n'
+            if header:
+                fasta_string += '>%s|%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
+                for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
+                    fasta_string += line + '\n'
+            else:
+                fasta_string += seq
 
         return fasta_string
 
