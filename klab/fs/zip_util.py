@@ -73,3 +73,10 @@ def unzip_file(file_path):
         f_in.close()
         os.remove(file_path)
         return f_out_name
+
+def recursive_gunzip( dir_path ):
+    for p in [os.path.join(dir_path, x) for x in os.listdir( dir_path )]:
+        if os.path.isdir(p):
+            recursive_gunzip(p)
+        elif os.path.isfile(p) and p.endswith('.gz'):
+            subprocess.check_call(['gunzip', p])
