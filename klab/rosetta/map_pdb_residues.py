@@ -46,15 +46,15 @@ from klab.fs.fsio import write_temp_file
 
 script = '''<ROSETTASCRIPTS>
   <MOVERS>
-    <SavePoseMover name=init_struct reference_name=init_struct/>
+    <SavePoseMover name="init_struct" reference_name="init_struct"/>
     <ReportToDB name="features_reporter" database_name="%s">
-        <feature name="ResidueFeatures"/>
-        <feature name="PdbDataFeatures"/>
+        <ResidueFeatures/>
+        <PdbDataFeatures/>
     </ReportToDB>
   </MOVERS>
   <PROTOCOLS>
-    <Add mover_name=init_struct/>
-    <Add mover_name=features_reporter/>
+    <Add mover_name="init_struct"/>
+    <Add mover_name="features_reporter"/>
   </PROTOCOLS>
 </ROSETTASCRIPTS>'''
 
