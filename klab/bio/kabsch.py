@@ -79,7 +79,7 @@ def kabsch( ref_coords, moving_coords):
     new_coords += ref_centroid
     return new_coords
 
-def bakan_bahar_ensemble_align(coords, tolerance = 0.001, verbose = True ):
+def bakan_bahar_ensemble_align(coords, tolerance = 0.001, verbose = False ):
     '''
     input: a list of coordinates in the format:
     [
