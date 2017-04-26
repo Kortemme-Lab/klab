@@ -20,6 +20,15 @@ def pairwise_rmsd(input_pdbs):
     rmsd_matrix = pyRMSD.matrixHandler.MatrixHandler().createMatrix(coordinates, pyrmsd_calc)
     print scipy.spatial.distance.squareform( rmsd_matrix.get_data() )
 
+def pairwise_rmsd_of_coords(coords):
+    coordinates = np.array( coords )
+
+    rmsd_matrix = pyRMSD.matrixHandler.MatrixHandler().createMatrix(coordinates, pyrmsd_calc)
+    return scipy.spatial.distance.squareform( rmsd_matrix.get_data() )
+
+def rmsd( coords_1, coords_2):
+    rmsd_matrix = pyRMSD.matrixHandler.MatrixHandler().createMatrix(np.array([coords_1, coords_2]), pyrmsd_calc)
+    return scipy.spatial.distance.squareform( rmsd_matrix.get_data() )[0][1]
 
 if __name__ == '__main__':
     pdb_dir = os.path.join('..', '..', '.testdata','pdbs')

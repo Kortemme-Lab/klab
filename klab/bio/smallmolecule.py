@@ -1,3 +1,5 @@
+from kabsch import calc_rotation_translation_matrices
+
 class Molecule:
     def __init__(self, pdb_path, molecule_name, chain = None):
         self.atom_types = []
@@ -182,47 +184,3 @@ def rotate_and_translate_coord(original_coord, U, new_centroid, ref_centroid):
     new_coord += ref_centroid
     new_coord = new_coord.A.flatten()
     return new_coord
-
-def calc_rotation_translation_matrices( ref_coords, new_coords ):
-    new = np.matrix(new_coords)
-    ref = np.matrix(ref_coords)
-
-    # Create the centroid of new and ref which is the geometric center of a
-    # N-dimensional region and translate new and ref onto that center.
-    # http://en.wikipedia.org/wiki/Centroid
-    new_centroid = centroid(new)
-    ref_centroid = centroid(ref)
-    new -= new_centroid
-    ref -= ref_centroid
-
-    # Compute translation vector (matrix)
-    T = ref_centroid - new_centroid
-
-    # Computation of the covariance matrix
-    C = np.dot(np.transpose(new), ref)
-
-    # Computation of the optimal rotation matrix
-    # This can be done using singular value decomposition (SVD)
-    # Getting the sign of the det(V)*(W) to decide
-    # whether we need to correct our rotation matrix to ensure a
-    # right-handed coordinate system.
-    # And finally calculating the optimal rotation matrix U
-    # see http://en.wikipedia.org/wiki/Kabsch_algorithm
-    V, S, W = np.linalg.svd(C)
-    d = (np.linalg.det(V) * np.linalg.det(W)) < 0.0
-
-    if d:
-        S[-1] = -S[-1]
-        V[:, -1] = -V[:, -1]
-
-    # Create Rotation matrix U
-    U = np.dot(V, W)
-
-    return (U, new_centroid, ref_centroid)
-
-def centroid(X):
-    """
-    Calculate the centroid from a matrix X
-    """
-    C = np.sum(X, axis=0) / len(X)
-    return C
