@@ -1,3 +1,6 @@
+import numpy as np
+import string
+
 class Molecule:
     def __init__(self, pdb_path, molecule_name, chain = None):
         self.atom_types = []
@@ -154,7 +157,7 @@ class Molecule:
                     chain = line[21]
                 else:
                     chain = None
-                if line.startswith('HETATM') and residue_name == name_to_replace and chain == self.chain:
+                if line.startswith('HETATM') and residue_name == name_to_replace and ((self.chain == None) or (chain == self.chain)):
                     if not position_to_insert:
                         position_to_insert = len(lines)
                         self.resnum = long( line[22:26].strip() ) # Change resnum to match molecule to replace
@@ -162,6 +165,7 @@ class Molecule:
                     lines.append( line.replace(name_to_replace, self.molecule_name) )
                 elif not line.startswith('CONECT'):
                     lines.append(line)
+
         assert( position_to_insert != None )
 
         # Insert lines for this molecule
