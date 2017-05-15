@@ -29,14 +29,21 @@ import time
 import getpass
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('PDF')
 import matplotlib.pyplot as plt
-plt.rc('text', usetex=True)
+matplotlib_usetex = False
+plt.rc('text', usetex=matplotlib_usetex)
 plt.rc('font', family='sans-serif')
 from matplotlib.ticker import NullFormatter
 
 import scipy
-from klab.latex.util import make_latex_safe
+
+if matplotlib_usetex:
+    from klab.latex.util import make_latex_safe
+else:
+    def make_latex_safe(x):
+        return x
+
 from klab.stats.misc import mae
 
 def plot_scatter(
@@ -127,16 +134,21 @@ def make_corr_plot(
     fig_height = None,
     fig_width = None,
     fig_grid = True,
-    scatter_alpha = 0.8,
+    scatter_alpha = 0.6,
     axis_label_size = 12.0,
     plot_11_line = False,
+    assert_plot_not_exists = False,
+    point_size = 20,
+    x_axis_limits = None,
+    y_axis_limits = None,
+    calc_corr_p_value = True,
 ):
     if not output_directory:
         output_directory = tempfile.mkdtemp( prefix = '%s-%s-plots_' % (time.strftime("%y%m%d"), getpass.getuser()) )
 
     df = df[[x_series, y_series]].dropna()
-    x = np.array(df.ix[:,0])
-    y = np.array(df.ix[:,1])
+    x = df.ix[:,0].values
+    y = df.ix[:,1].values
 
     if not output_format:
         # If there are many points, save figure as a PNG (since PDFs perform poorly with many points)
@@ -146,6 +158,10 @@ def make_corr_plot(
             output_format = 'pdf'
 
     fig_path = os.path.join(output_directory, output_name + '.' + output_format)
+
+    if assert_plot_not_exists:
+        if os.path.isfile(fig_path):
+            raise Exception( fig_path + ' exists' )
 
     nullfmt = NullFormatter()         # no labels
 
@@ -164,15 +180,16 @@ def make_corr_plot(
         rect_text = [left_h, bottom_h, 0.2, 0.2]
     rect_histy = [left_h, bottom, 0.2, height]
 
-    if fig_width and fig_height:
-        plt.figure( 1, figsize=(fig_width, fig_height) )
-    else:
-        plt.figure( 1, figsize=(8, 8) )
 
-    axScatter = plt.axes(rect_scatter)
-    axHistx = plt.axes(rect_histx)
-    axHisty = plt.axes(rect_histy)
-    axText = plt.axes(rect_text)
+    if fig_width and fig_height:
+        fig = plt.figure( figsize = (fig_width, fig_height), dpi = fig_dpi)
+    else:
+        fig = plt.figure(figsize=(8, 8), dpi = fig_dpi)
+
+    axScatter = fig.add_axes(rect_scatter)
+    axHistx = fig.add_axes(rect_histx)
+    axHisty = fig.add_axes(rect_histy)
+    axText = fig.add_axes(rect_text)
 
     axText.set_axis_off()
 
@@ -181,7 +198,7 @@ def make_corr_plot(
     axHisty.yaxis.set_major_formatter(nullfmt)
 
     # the scatter plot:
-    axScatter.scatter(x, y, alpha = scatter_alpha)
+    axScatter.scatter(x, y, alpha = scatter_alpha, s = point_size)
     axScatter.set_xlabel( make_latex_safe(df.columns[0]), fontsize = axis_label_size )
     axScatter.set_ylabel( make_latex_safe(df.columns[1]), fontsize = axis_label_size )
     axScatter.grid(fig_grid)
@@ -196,13 +213,11 @@ def make_corr_plot(
     yl = [slope*xx + intercept for xx in xl]
 
     # coefficient of determination, plot text
-    variance = np.var(y)
-    residuals = np.var([(slope*xx + intercept - yy)  for xx,yy in zip(x,y)])
-    Rsqr = 1-residuals/variance
     r, p_val = scipy.stats.stats.pearsonr(x, y)
+    Rsqr = r ** 2
     mae_value = mae(x, y)
 
-    if max( len(x), len(y) ) >= 500:
+    if calc_corr_p_value and max( len(x), len(y) ) >= 500:
         # From scipy documentation:
         # The p-value roughly indicates the probability of an uncorrelated system producing datasets that have a Pearson correlation
         # at least as extreme as the one computed from these datasets. The p-values are not entirely reliable but are probably
@@ -216,8 +231,8 @@ def make_corr_plot(
                     fontsize=16, ha='left', va='top'
         )
 
-    yerrUpper = [(xx*slope+intercept)+(slope*xx**2 + intercept*xx + par[2]) for xx in x]
-    yerrLower = [(xx*slope+intercept)-(slope*xx**2 + intercept*xx + par[2]) for xx in x]
+    # yerrUpper = [(xx*slope+intercept)+(slope*xx**2 + intercept*xx + par[2]) for xx in x]
+    # yerrLower = [(xx*slope+intercept)-(slope*xx**2 + intercept*xx + par[2]) for xx in x]
 
     axScatter.plot(xl, yl, '-r')
     # axScatter.plot(x, yerrLower, '--r')
@@ -230,8 +245,15 @@ def make_corr_plot(
     xbinwidth = np.max(np.fabs(x)) / 30.0
     ybinwidth = np.max(np.fabs(y)) / 30.0
 
-    axScatter.set_xlim( (np.min(x), np.max(x)) )
-    axScatter.set_ylim( (np.min(y), np.max(y)) )
+    if x_axis_limits == None:
+        axScatter.set_xlim( (np.min(x), np.max(x)) )
+    else:
+        axScatter.set_xlim( x_axis_limits )
+
+    if y_axis_limits == None:
+        axScatter.set_ylim( (np.min(y), np.max(y)) )
+    else:
+        axScatter.set_ylim( y_axis_limits )
 
     xbins = np.arange(np.min(x), np.max(x) + xbinwidth, xbinwidth)
     axHistx.hist(x, bins=xbins)
@@ -249,11 +271,13 @@ def make_corr_plot(
         print 'Saving scatterplot to:', fig_path
     if plot_title:
         if fig_width and fig_height:
-            plt.gcf().suptitle( make_latex_safe(plot_title), fontsize = fig_width*fig_height/4.1 )
+            fig.suptitle( make_latex_safe(plot_title), fontsize = fig_width*fig_height/4.1 )
         else:
-            plt.gcf().suptitle( make_latex_safe(plot_title) )
-    plt.savefig(fig_path, dpi = fig_dpi, format = output_format)
-    plt.close()
+            fig.suptitle( make_latex_safe(plot_title) )
+    fig.savefig(fig_path, format = output_format)
+    fig.clf()
+    plt.close(fig)
+
     return fig_path
 
 def plot_box(

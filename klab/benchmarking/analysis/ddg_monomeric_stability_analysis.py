@@ -835,6 +835,28 @@ class BenchmarkRun(ReportingObject):
                 unique_ajps.append( ajp )
         return unique_ajps
 
+    @staticmethod
+    def get_common_subset(
+            benchmark_runs,
+            verbose = False,
+    ):
+        common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
+        for br in benchmark_runs[1:]:
+            common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
+        if verbose:
+            print 'Common dataset size will be:', len(common_ids)
+        if len(common_ids) == 0:
+            for br in benchmark_runs:
+                common_ids = sorted( list( br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() ) )
+                print br.get_definitive_name(unique_ajps, join_character = '-'), common_ids[:10]
+            raise Exception('No data to make report on!')
+        # limited_benchmark_runs = []
+        for br in benchmark_runs:
+            br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = verbose )
+            # limited_benchmark_runs.append( br )
+        # benchmark_runs = limited_benchmark_runs
+        return common_ids
+
 
     @staticmethod
     def analyze_multiple(
@@ -857,20 +879,7 @@ class BenchmarkRun(ReportingObject):
         unique_ajps = BenchmarkRun.get_unique_ajps( benchmark_runs )
 
         if limit_to_complete_presence:
-            common_ids = set( benchmark_runs[0].dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() )
-            for br in benchmark_runs[1:]:
-                common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
-            print 'Common dataset size will be:', len(common_ids)
-            if len(common_ids) == 0:
-                for br in benchmark_runs:
-                    common_ids = sorted( list( br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() ) )
-                    print br.get_definitive_name(unique_ajps, join_character = '-'), common_ids[:10]
-                raise Exception('No data to make report on!')
-            # limited_benchmark_runs = []
-            for br in benchmark_runs:
-                br.set_dataframe( br.dataframe.loc[br.dataframe['DatasetID'].isin(common_ids)], verbose = use_multiprocessing )
-                # limited_benchmark_runs.append( br )
-            # benchmark_runs = limited_benchmark_runs
+            BenchmarkRun.get_common_subset( benchmark_runs, verbose = not use_multiprocessing )
 
         unique_ajps = BenchmarkRun.get_unique_ajps( benchmark_runs )
 
@@ -1043,7 +1052,7 @@ class BenchmarkRun(ReportingObject):
             right_index = True,
         )
         predictions_v_predictions_df.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
+        report.add_plot( general_matplotlib.make_corr_plot(predictions_v_predictions_df, predictions_v_predictions_df.columns.values[0], predictions_v_predictions_df.columns.values[1], output_directory = subplot_directory, plot_title = 'Prediction comparison', axis_label_size = 8.0, output_name = 'vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Experimental vs. Predicted scatterplot (with density binning)' )
 
         diff_v_diff_dataframe = self.get_pred_minus_exp_dataframe(analysis_set).merge(
             other.get_pred_minus_exp_dataframe(analysis_set),
@@ -1052,7 +1061,7 @@ class BenchmarkRun(ReportingObject):
         )
         report.add_section_page( title = 'Plots' )
         diff_v_diff_dataframe.columns = [self_unique_name, other_unique_name]
-        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = self.subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
+        report.add_plot( general_matplotlib.make_corr_plot(diff_v_diff_dataframe, diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1], output_directory = subplot_directory, plot_title = 'Error v. Error', axis_label_size = 7.0, output_name = 'diff_vs_scatter', fig_height = 7, fig_width = 8, verbose = verbose, plot_11_line = True ), plot_title = 'Outliers --- Error (Predicted - Experimental) v. error. \\ x-axis=%s \\ y-axis=%s' % (diff_v_diff_dataframe.columns.values[0], diff_v_diff_dataframe.columns.values[1]) )
 
         report.add_section_page( title = 'Tables' )
 

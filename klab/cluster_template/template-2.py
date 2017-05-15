@@ -40,6 +40,9 @@ script_name = '#$#scriptname#$#.py'
 print "Script:", script_name
 
 # Constants
+maximum_input_pdb_wait_time = 21600*2 # 12 hours - Maximum seconds to try waiting for an input PDB to exist
+input_pdb_wait_time_interval = 30 # Seconds to wait between checks
+
 tasks_per_process = #$#tasks_per_process#$#
 total_number_tasks = #$#numjobs#$#
 
@@ -405,6 +408,17 @@ def run_single(task_id, local_or_cluster, scratch_dir=local_scratch_dir, verbosi
             f = open(input_list_file, 'w')
             pdbs = sorted(flags_dict[list_flag_name])
             for i, input_pdb in enumerate(pdbs):
+                # Check and see if input PDB exists
+                # If not, try waiting (for up to maximum_input_pdb_wait_time, in seconds)
+                total_wait_time = long(0)
+                while not os.path.isfile(input_pdb):
+                    if total_wait_time >= maximum_input_pdb_wait_time:
+                        raise Exception("Really couldn't find input pdb: " + str(input_pdb))
+                    if verbosity >= 1:
+                        print "Waiting %d (s) to see if input pdb (%s) appears. Already waited %d (s)." % (input_pdb_wait_time_interval, input_pdb, total_wait_time)
+                    time.sleep( input_pdb_wait_time_interval )
+                    total_wait_time += long(input_pdb_wait_time_interval)
+
                 inner_tmp_pdb_dir = tempfile.mkdtemp(prefix='pdb_dir_', dir=tmp_pdb_dir)
                 new_input_file = os.path.join(inner_tmp_pdb_dir, os.path.basename(input_pdb))
                 shutil.copy(input_pdb, new_input_file)

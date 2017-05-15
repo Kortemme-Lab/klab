@@ -46,15 +46,15 @@ from klab.fs.fsio import write_temp_file
 
 script = '''<ROSETTASCRIPTS>
   <MOVERS>
-    <SavePoseMover name=init_struct reference_name=init_struct/>
+    <SavePoseMover name="init_struct" reference_name="init_struct"/>
     <ReportToDB name="features_reporter" database_name="%s">
-        <feature name="ResidueFeatures"/>
-        <feature name="PdbDataFeatures"/>
+        <ResidueFeatures/>
+        <PdbDataFeatures/>
     </ReportToDB>
   </MOVERS>
   <PROTOCOLS>
-    <Add mover_name=init_struct/>
-    <Add mover_name=features_reporter/>
+    <Add mover_name="init_struct"/>
+    <Add mover_name="features_reporter"/>
   </PROTOCOLS>
 </ROSETTASCRIPTS>'''
 
@@ -84,12 +84,10 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
 
        Note: extra_flags should typically include '-ignore_zero_occupancy false' and '-ignore_unrecognized_res'.'''
 
-    mapping = {}
     errors = []
     exit_code = 0
     F, script_path = tempfile.mkstemp(dir=".")
     script_handle = os.fdopen(F, "w")
-    import sqlite3 # should be moved to the top but we do this here for CentOS 5 support
 
     try:
         db_path = script_path + ".db3"
@@ -99,28 +97,13 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
             command_line = '%s -database %s -constant_seed -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, rosetta_database_path, pdb_path, script_path, extra_flags)
         else:
             command_line = '%s -constant_seed -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, pdb_path, script_path, extra_flags)
-            
+
         exit_code, stdout = commands.getstatusoutput(command_line)
         if exit_code != 0:
             errors.append("An error occured during execution. The exit code was %d. The output was:\n\n%s" % (exit_code, stdout))
         else:
-            conn = sqlite3.connect(db_path)
             try:
-                results = conn.cursor().execute('''
-SELECT chain_id, pdb_residue_number, insertion_code, residues.struct_id, residues.resNum, residues.name3, residues.res_type
-FROM residue_pdb_identification
-INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id AND residue_pdb_identification.residue_number=residues.resNum
-''')
-                # Create the mapping from PDB residues to Rosetta residues
-                rosetta_residue_ids = []
-                for r in results:
-                    mapping["%s%s%s" % (r[0], str(r[1]).rjust(4), r[2])] = {'pose_residue_id' : r[4], 'name3' : r[5], 'res_type' : r[6]}
-                    rosetta_residue_ids.append(r[4])
-
-                # Ensure that the the range of the map is exactly the set of Rosetta residues i.e. the map from (a subset of) the PDB residues to the Rosetta residues is surjective
-                raw_residue_list = [r for r in conn.cursor().execute('''SELECT resNum, name3 FROM residues ORDER BY resNum''')]
-                assert(sorted([r[0] for r in raw_residue_list]) == sorted(rosetta_residue_ids))
-
+                mapping = get_mapping_from_db3_file( db_path )
             except Exception, e:
                 errors.append(str(e))
                 errors.append(traceback.format_exc())
@@ -142,6 +125,31 @@ INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id A
 
     return True, mapping
 
+def get_mapping_from_db3_file( db_path ):
+    '''
+    Does the work of reading the Rosetta SQLite3 .db3 file to retrieve the mapping
+    '''
+    import sqlite3 # should be moved to the top but we do this here for CentOS 5 support
+
+    conn = sqlite3.connect(db_path)
+    results = conn.cursor().execute('''
+    SELECT chain_id, pdb_residue_number, insertion_code, residues.struct_id, residues.resNum, residues.name3, residues.res_type
+    FROM residue_pdb_identification
+    INNER JOIN residues ON residue_pdb_identification.struct_id=residues.struct_id AND residue_pdb_identification.residue_number=residues.resNum
+    ''')
+
+    # Create the mapping from PDB residues to Rosetta residues
+    rosetta_residue_ids = []
+    mapping = {}
+    for r in results:
+        mapping["%s%s%s" % (r[0], str(r[1]).rjust(4), r[2])] = {'pose_residue_id' : r[4], 'name3' : r[5], 'res_type' : r[6]}
+        rosetta_residue_ids.append(r[4])
+
+    # Ensure that the the range of the map is exactly the set of Rosetta residues i.e. the map from (a subset of) the PDB residues to the Rosetta residues is surjective
+    raw_residue_list = [r for r in conn.cursor().execute('''SELECT resNum, name3 FROM residues ORDER BY resNum''')]
+    assert(sorted([r[0] for r in raw_residue_list]) == sorted(rosetta_residue_ids))
+
+    return mapping
 
 def strip_pdb(pdb_path, chains = [], strip_hetatms = False):
     '''Takes a PDB file and strips all lines except ATOM and HETATM records. If chains is specified, only those chains are kept. If strip_hetatms is True then HETATM lines are also stripped.
@@ -185,7 +193,7 @@ def get_stripped_pdb_to_pose_residue_map(input_pdb_path, rosetta_scripts_path, r
 
 if __name__ == '__main__':
     chains = []
-    
+
     parser = OptionParser()
     parser.add_option("-e", "--executable", dest="rosetta_scripts_path", help="The location of the RosettaScripts executable e.g. ~/bin/rosetta_scripts.linuxgccrelease", metavar="EXECUTABLE")
     parser.add_option("-d", "--database", dest="rosetta_database_path", help="The location of the Rosetta database", metavar="DATABASE")
@@ -194,7 +202,7 @@ if __name__ == '__main__':
     parser.add_option("-s", "--strip_hetatms", dest="strip_hetatms", action="store_true", default=False, help="Use this option to strip HETATM lines from the input PDB file. The default behavior is to keep HETATM lines.")
     (options, args) = parser.parse_args()
     parser.set_usage(None)
- 
+
     filename = options.filename
     rosetta_database_path = options.rosetta_database_path
     rosetta_scripts_path = options.rosetta_scripts_path
@@ -241,4 +249,3 @@ if __name__ == '__main__':
     else:
         print("\n".join(result))
         sys.exit(1)
-
