@@ -1,6 +1,7 @@
 import numpy as np
 import string
 from kabsch import calc_rotation_translation_matrices
+from pdb_util import renumber_atoms
 
 class Molecule:
     def __init__(self, pdb_path, molecule_name, chain = None):
