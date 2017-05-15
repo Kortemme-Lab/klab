@@ -132,7 +132,9 @@ class Molecule:
 
         # Move unmoved coordinates after all other atoms have been moved (so that
         # references will have been moved already)
-        assert( None not in new_coords )
+        if None in new_coords:
+            print new_coords
+            assert( None not in new_coords )
         ref_coords = [other.get_coords_for_name(x) for x in other_root_pair]
 
         # Calculate translation and rotation matrices
