@@ -3,7 +3,7 @@
 
 # The MIT License (MIT)
 #
-# Copyright (c) 2015 Shane O'Connor, Roland A. Pache, Kyle Barlow
+# Copyright (c) 2017 Kyle Barlow, Shane O'Connor, Roland A. Pache
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -23,8 +23,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 """
-misc.py
-A place for miscellaneous statistical functions to live until there is a suitable place for them.
+stats.py
+A place for miscellaneous statistical functions to live.
+Ported from klab/stats/misc.py
 
 Created by Shane O'Connor 2014
 """
