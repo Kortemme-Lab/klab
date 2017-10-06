@@ -9,12 +9,15 @@ import argparse
 import getpass
 import hashlib
 import base64
+import math
 
 # Import two classes from the boxsdk module - Client and OAuth2
 import boxsdk
 from boxsdk import Client, LoggingClient
 # from boxsdk.util.multipart_stream import MultipartStream
 UPLOAD_URL = boxsdk.config.API.UPLOAD_URL
+BOX_MAX_FILE_SIZE = 10000000000 # 10 GB. The max is actually 15 GB, but 10 seems like a nice round number
+BOX_MIN_CHUNK_UPLOAD_SIZE = 55000000 # 55 MB. Current min is actually 50 MB.
 
 import oauth2client
 from oauth2client.contrib.keyring_storage import Storage
@@ -87,12 +90,6 @@ class BoxAPI:
             flow = oauth2client.client.flow_from_clientsecrets('client_secrets.json', scope='', redirect_uri = 'http://localhost:8080')
             self.credentials = tools.run_flow(flow, storage, flags)
 
-        # We need to check if our access has expired here, because we are
-        # authorizing outside of boxsdk and boxsdk will not be able to refresh later
-        # if the token has expired
-        if self.credentials.access_token_expired:
-            self.credentials.get_access_token()
-
         self.oauth_connector = OAuthConnector(self.credentials)
         self.client = Client( self.oauth_connector ) # Replace this with LoggingClient for debugging
 
@@ -117,27 +114,62 @@ class BoxAPI:
                 preflight_check = True,
     ):
         file_size = os.stat(source_path).st_size
-        if file_size >= 55000000:
-            self.chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check )
+        if file_size >= BOX_MAX_FILE_SIZE:
+            self._upload_in_splits( destination_folder_id, source_path, preflight_check )
+        if file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
+            self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check )
         else:
             self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size )
 
-    def chunked_upload( self,
-                        destination_folder_id,
-                        source_path,
-                        preflight_check = True,
-    ):
-        destination_folder = self.client.folder( folder_id = destination_folder_id )
+    def _upload_in_splits( self, destination_folder_id, source_path, preflight_check ):
+        '''
+        Since Box has a maximum file size limit (15 GB at time of writing),
+        we need to split files larger than this into smaller parts, and chunk upload each part
+        '''
         file_size = os.stat(source_path).st_size
+        split_size = BOX_MAX_FILE_SIZE
+
+        # Make sure that the last split piece is still big enough for a chunked upload
+        while file_size % BOX_MAX_FILE_SIZE < BOX_MIN_CHUNK_UPLOAD_SIZE:
+            split_size -= 1000
+            if split_size < 1000000000: # 1 GB
+                raise Exception('Lazy programming error')
+
+        split_start_byte = 0
+        part_count = 0
+        while split_start_byte < file_size:
+            print ( '\nUploading split {0} of {1}'.format( part_count, math.ceil(file_size / split_size) ) )
+            self._chunked_upload(
+                destination_folder_id, source_path,
+                dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count),
+                split_start_byte = split_start_byte,
+                file_size = min(split_size, file_size - split_start_byte), # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
+                preflight_check = preflight_check,
+            )
+            part_count += 1
+            split_start_byte += split_size
+
+    def _chunked_upload( self,
+                         destination_folder_id,
+                         source_path,
+                         dest_file_name = None,
+                         split_start_byte = 0,
+                         file_size = None,
+                         preflight_check = True,
+    ):
+        dest_file_name = dest_file_name or os.path.basename( source_path )
+        file_size = file_size or os.stat(source_path).st_size
+        destination_folder = self.client.folder( folder_id = destination_folder_id )
+
         if preflight_check:
-            destination_folder.preflight_check( size = file_size, name = os.path.basename(source_path) )
+            destination_folder.preflight_check( size = file_size, name = dest_file_name )
 
         url = '{0}/files/upload_sessions'.format(UPLOAD_URL)
 
         data = json.dumps({
             'folder_id' : destination_folder_id,
             'file_size' : file_size,
-            'file_name' : os.path.basename(source_path),
+            'file_name' : dest_file_name,
         })
 
         json_response = self.client.session.post(url, data=data, expect_json_response=True)
@@ -153,10 +185,10 @@ class BoxAPI:
 
             total_sha = hashlib.sha1()
 
-            reporter = Reporter( 'uploading ' + source_path, entries = 'chunks' )
+            reporter = Reporter( 'uploading ' + source_path ' as ' + dest_file_name, entries = 'chunks' )
             reporter.set_total_count( json_response.json()['total_parts'] )
             for part_n in range( json_response.json()['total_parts'] ):
-                start_byte = part_n * part_size
+                start_byte = split_start_byte + part_n * part_size
                 url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
 
                 headers = {
@@ -167,7 +199,7 @@ class BoxAPI:
 
                 with open( source_path, 'rb' ) as f:
                     f.seek( start_byte )
-                    data = f.read( part_size )
+                    data = f.read( min(part_size, file_size - start_byte) ) # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
                     sha1.update(data)
                     total_sha.update(data)
 
@@ -205,9 +237,9 @@ upload_folder_id = box.find_folder_path( '/kortemmelab/alumni/adata' )
 print( 'upload folder id:', upload_folder_id )
 
 ### Chunked upload test
-# files_to_upload = [ '/home/kyleb/tmp/box_test/adata/ajl02004.tar.gzaa' ]
-# for fpath in files_to_upload:
-#     box.chunked_upload( upload_folder_id, fpath )
+files_to_upload = [ '/kortemmelab/alumni/adata/ajl02004.tar.gz' ]
+for fpath in files_to_upload:
+    box.upload( upload_folder_id, fpath )
 
 ### Regular upload test
 # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
