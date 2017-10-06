@@ -94,14 +94,15 @@ class BoxAPI:
 
         try:
             session_id = json_response.json()['id']
-            part_size =  json_response.json()['part_size']
+            part_size = json_response.json()['part_size']
+
+            total_sha = hashlib.sha1()
 
             for part_n in range( json_response.json()['total_parts'] ):
                 start_byte = part_n * part_size
                 url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
 
                 headers = {
-                    'content-range' : 'bytes {0}-{1}/{2}'.format( start_byte, start_byte + part_size - 1, file_size ),
                     'content-type' : 'application/octet-stream',
                 }
 
@@ -109,23 +110,25 @@ class BoxAPI:
 
                 with open( source_path, 'rb' ) as f:
                     f.seek( start_byte )
-                    data = f.read( part_size - 1 )
+                    data = f.read( part_size )
                     sha1.update(data)
+                    total_sha.update(data)
 
                 headers['digest'] = 'sha=' + base64.b64encode(sha1.digest()).decode()
-                print( part_n, part_size, headers['digest'] )
-
+                headers['content-range'] = 'bytes {0}-{1}/{2}'.format( start_byte, start_byte + len(data) - 1, file_size )
                 part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
 
-                upload_responses['parts'][part_n] = part_response
+                upload_responses['parts'][part_n] = part_response.json()['part']
 
             # Commit
             url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
             data = json.dumps({
                 'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
             })
-            commit_response = self.client.session.post(url, data=data, expect_json_response=True)
-            upload_responses['commit'] = commit_response
+            headers = {}
+            headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
+            commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
+            upload_responses['commit'] = commit_response.json()
         except:
             # Cancel chunked upload upon exception
             delete_response = box.client.session.delete( abort_url, expect_json_response = False )
