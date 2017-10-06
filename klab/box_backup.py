@@ -12,7 +12,7 @@ import base64
 
 # Import two classes from the boxsdk module - Client and OAuth2
 import boxsdk
-from boxsdk import Client
+from boxsdk import Client, LoggingClient
 # from boxsdk.util.multipart_stream import MultipartStream
 UPLOAD_URL = boxsdk.config.API.UPLOAD_URL
 
@@ -24,6 +24,58 @@ from Reporter import Reporter
 
 class FolderTraversalException(Exception):
     pass
+
+class OAuthConnector(boxsdk.OAuth2):
+    '''
+    Overrides the Box OAuth class with calls to the matching oauth2client Credentials functions
+    '''
+    def __init__(
+            self,
+            credentials
+    ):
+        self._credentials = credentials
+
+    @property
+    def access_token(self):
+        """
+        Get the current access token.
+        :return:
+            current access token
+        :rtype:
+            `unicode`
+        """
+        return self._credentials.get_access_token().access_token
+
+    def get_authorization_url(self, redirect_url):
+        raise Exception('Not implemented')
+
+    def authenticate(self, auth_code):
+        """
+        :return:
+            (access_token, refresh_token)
+        :rtype:
+            (`unicode`, `unicode`)
+        """
+        return self.access_token, None
+
+    def refresh(self, access_token_to_refresh):
+        return self.access_token, None
+
+    def send_token_request(self, data, access_token, expect_refresh_token=True):
+        """
+        :return:
+            The access token and refresh token.
+        :rtype:
+            (`unicode`, `unicode`)
+        """
+        return self.access_token, None
+
+    def revoke(self):
+        """
+        Revoke the authorization for the current access/refresh token pair.
+        """
+        http = transport.get_http_object()
+        self._credentials.revoke(http)
 
 class BoxAPI:
     def __init__(self):
@@ -41,7 +93,8 @@ class BoxAPI:
         if self.credentials.access_token_expired:
             self.credentials.get_access_token()
 
-        self.client = Client(self.credentials)
+        self.oauth_connector = OAuthConnector(self.credentials)
+        self.client = Client( self.oauth_connector ) # Replace this with LoggingClient for debugging
 
         self.root_folder = self.client.folder( folder_id = '0' )
 
@@ -148,11 +201,13 @@ class BoxAPI:
 
 box = BoxAPI()
 
-upload_folder_id = box.find_folder_path( '/kortemmelab/home/kyleb/test_box' )
+upload_folder_id = box.find_folder_path( '/kortemmelab/alumni/adata' )
 print( 'upload folder id:', upload_folder_id )
 
 ### Chunked upload test
-upload_responses = box.chunked_upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-11 14.22.30.mp4' )
+# files_to_upload = [ '/home/kyleb/tmp/box_test/adata/ajl02004.tar.gzaa' ]
+# for fpath in files_to_upload:
+#     box.chunked_upload( upload_folder_id, fpath )
 
 ### Regular upload test
 # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
