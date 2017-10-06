@@ -20,6 +20,8 @@ import oauth2client
 from oauth2client.contrib.keyring_storage import Storage
 from oauth2client import tools
 
+from Reporter import Reporter
+
 class FolderTraversalException(Exception):
     pass
 
@@ -98,6 +100,8 @@ class BoxAPI:
 
             total_sha = hashlib.sha1()
 
+            reporter = Reporter( 'uploading ' + source_path, entries = 'chunks' )
+            reporter.set_total_count( json_response.json()['total_parts'] )
             for part_n in range( json_response.json()['total_parts'] ):
                 start_byte = part_n * part_size
                 url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
@@ -119,6 +123,7 @@ class BoxAPI:
                 part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
 
                 upload_responses['parts'][part_n] = part_response.json()['part']
+                reporter.increment_report()
 
             # Commit
             url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
@@ -129,6 +134,7 @@ class BoxAPI:
             headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
             commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
             upload_responses['commit'] = commit_response.json()
+            reporter.done()
         except:
             # Cancel chunked upload upon exception
             delete_response = box.client.session.delete( abort_url, expect_json_response = False )
@@ -147,7 +153,6 @@ print( 'upload folder id:', upload_folder_id )
 
 ### Chunked upload test
 upload_responses = box.chunked_upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-11 14.22.30.mp4' )
-print( upload_responses )
 
 ### Regular upload test
 # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )

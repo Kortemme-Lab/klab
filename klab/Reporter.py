@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import datetime
 import math
 import sys
@@ -26,7 +28,7 @@ class Reporter:
         self.n = 0
         self.completion_time = None
         if self.print_output:
-            print '\nStarting ' + task
+            print('\nStarting ' + task)
         self.total_count = None # Total tasks to be processed
         self.maximum_output_string_length = 0
         self.rolling_est_total_time = collections.deque( maxlen = 50 )
@@ -92,7 +94,7 @@ class Reporter:
     def done(self):
         self.completion_time = datetime.datetime.now()
         if self.print_output:
-            print 'Done %s, processed %d %s, took %s\n' % (self.task, self.n, self.entries, self.completion_time-self.start)
+            print('Done %s, processed %d %s, took %s\n' % (self.task, self.n, self.entries, self.completion_time-self.start))
 
     def elapsed_time(self):
         if self.completion_time:
