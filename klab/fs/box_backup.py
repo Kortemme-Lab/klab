@@ -2,14 +2,18 @@
 # Packages needed: boxsdk>=2.0.0a9 oauth2client keyring
 
 import os
+import sys
 import json
 import webbrowser
 import argparse
 import getpass
+import hashlib
+import base64
 
 # Import two classes from the boxsdk module - Client and OAuth2
 import boxsdk
 from boxsdk import Client
+# from boxsdk.util.multipart_stream import MultipartStream
 UPLOAD_URL = boxsdk.config.API.UPLOAD_URL
 
 import oauth2client
@@ -22,14 +26,20 @@ class FolderTraversalException(Exception):
 class BoxAPI:
     def __init__(self):
         storage = Storage('klab_box_sync', getpass.getuser())
-        credentials = storage.get()
-        if credentials == None:
+        self.credentials = storage.get()
+        if self.credentials == None:
             parser = argparse.ArgumentParser(parents=[tools.argparser])
             flags = parser.parse_args()
             flow = oauth2client.client.flow_from_clientsecrets('client_secrets.json', scope='', redirect_uri = 'http://localhost:8080')
-            credentials = tools.run_flow(flow, storage, flags)
+            self.credentials = tools.run_flow(flow, storage, flags)
 
-        self.client = Client(credentials)
+        # We need to check if our access has expired here, because we are
+        # authorizing outside of boxsdk and boxsdk will not be able to refresh later
+        # if the token has expired
+        if self.credentials.access_token_expired:
+            self.credentials.get_access_token()
+
+        self.client = Client(self.credentials)
 
         self.root_folder = self.client.folder( folder_id = '0' )
 
@@ -63,7 +73,7 @@ class BoxAPI:
                         preflight_check = True,
     ):
         destination_folder = self.client.folder( folder_id = destination_folder_id )
-        file_size = os.stat(source_path).st_size # KB
+        file_size = os.stat(source_path).st_size
         if preflight_check:
             destination_folder.preflight_check( size = file_size, name = os.path.basename(source_path) )
 
@@ -76,21 +86,65 @@ class BoxAPI:
         })
 
         json_response = self.client.session.post(url, data=data, expect_json_response=True)
+        abort_url = json_response.json()['session_endpoints']['abort']
+        upload_responses = {
+            'create' : json_response.json(),
+            'parts' : {},
+        }
 
-        return json_response
+        try:
+            session_id = json_response.json()['id']
+            part_size =  json_response.json()['part_size']
+
+            for part_n in range( json_response.json()['total_parts'] ):
+                start_byte = part_n * part_size
+                url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
+
+                headers = {
+                    'content-range' : 'bytes {0}-{1}/{2}'.format( start_byte, start_byte + part_size - 1, file_size ),
+                    'content-type' : 'application/octet-stream',
+                }
+
+                sha1 = hashlib.sha1()
+
+                with open( source_path, 'rb' ) as f:
+                    f.seek( start_byte )
+                    data = f.read( part_size - 1 )
+                    sha1.update(data)
+
+                headers['digest'] = 'sha=' + base64.b64encode(sha1.digest()).decode()
+                print( part_n, part_size, headers['digest'] )
+
+                part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
+
+                upload_responses['parts'][part_n] = part_response
+
+            # Commit
+            url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
+            data = json.dumps({
+                'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
+            })
+            commit_response = self.client.session.post(url, data=data, expect_json_response=True)
+            upload_responses['commit'] = commit_response
+        except:
+            # Cancel chunked upload upon exception
+            delete_response = box.client.session.delete( abort_url, expect_json_response = False )
+            assert( delete_response.status_code == 204 )
+            assert( len(delete_response.content) == 0 )
+            print( 'Chunk upload of file {0} cancelled by calling abort url {1}'.format(source_path, abort_url) )
+            raise
+
+        return upload_responses
 
 
 box = BoxAPI()
 
 upload_folder_id = box.find_folder_path( '/kortemmelab/home/kyleb/test_box' )
+print( 'upload folder id:', upload_folder_id )
 
 ### Chunked upload test
-# json_response = box.chunked_upload( upload_folder_id, '/home/kyleb/tmp/box_test/myfile' )
-
-# abort_url = json_response.json()['session_endpoints']['abort']
-# delete_response = box.client.session.delete( abort_url, expect_json_response = False )
-# assert( delete_response.status_code == 204 )
-# assert( len(delete_response.content) == 0 )
+upload_responses = box.chunked_upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-11 14.22.30.mp4' )
+print( upload_responses )
 
 ### Regular upload test
-box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
+# box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
