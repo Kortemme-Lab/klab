@@ -4,6 +4,7 @@ import datetime
 import math
 import sys
 import collections
+import threading
 
 # The Reporter class is useful for printing output for tasks which will take a long time
 # It can even predict a finish time!
@@ -19,6 +20,7 @@ def mean(l):
 
 class Reporter:
     def __init__(self, task, entries='files', print_output=True):
+        self._lock = threading.Lock()
         self.print_output = print_output
         self.start = datetime.datetime.now()
         self.entries = entries
@@ -44,31 +46,32 @@ class Reporter:
             self.total_count -= 1
 
     def report(self, n):
-        self.n = n
-        time_now = datetime.datetime.now()
-        if self.print_output and self.lastreport < (time_now - self.report_interval):
-            self.lastreport = time_now
-            if self.total_count:
-                percent_done = float(self.n) / float(self.total_count)
-                est_total_time_seconds = ts(time_now - self.start) * (1.0 / percent_done)
-                self.rolling_est_total_time.append( est_total_time_seconds )
-                est_total_time = datetime.timedelta( seconds = mean(self.rolling_est_total_time) )
-                time_remaining = est_total_time - (time_now - self.start)
-                eta = time_now + time_remaining
-                time_remaining_str = 'ETA: %s Est. time remaining: ' % eta.strftime("%Y-%m-%d %H:%M:%S")
+        with self._lock:
+            self.n = n
+            time_now = datetime.datetime.now()
+            if self.print_output and self.lastreport < (time_now - self.report_interval):
+                self.lastreport = time_now
+                if self.total_count:
+                    percent_done = float(self.n) / float(self.total_count)
+                    est_total_time_seconds = ts(time_now - self.start) * (1.0 / percent_done)
+                    self.rolling_est_total_time.append( est_total_time_seconds )
+                    est_total_time = datetime.timedelta( seconds = mean(self.rolling_est_total_time) )
+                    time_remaining = est_total_time - (time_now - self.start)
+                    eta = time_now + time_remaining
+                    time_remaining_str = 'ETA: %s Est. time remaining: ' % eta.strftime("%Y-%m-%d %H:%M:%S")
 
-                time_remaining_str += str( datetime.timedelta( seconds = int(ts(time_remaining)) ) )
+                    time_remaining_str += str( datetime.timedelta( seconds = int(ts(time_remaining)) ) )
 
-                output_string = "  Processed: %d %s (%.1f%%) %s\r" % (n, self.entries, percent_done*100.0, time_remaining_str)
-            else:
-                output_string = "  Processed: %d %s\r" % (n, self.entries)
+                    output_string = "  Processed: %d %s (%.1f%%) %s\r" % (n, self.entries, percent_done*100.0, time_remaining_str)
+                else:
+                    output_string = "  Processed: %d %s\r" % (n, self.entries)
 
-            if len(output_string) > self.maximum_output_string_length:
-                self.maximum_output_string_length = len(output_string)
-            elif len(output_string) < self.maximum_output_string_length:
-                output_string = output_string.ljust(self.maximum_output_string_length)
-            sys.stdout.write( output_string )
-            sys.stdout.flush()
+                if len(output_string) > self.maximum_output_string_length:
+                    self.maximum_output_string_length = len(output_string)
+                elif len(output_string) < self.maximum_output_string_length:
+                    output_string = output_string.ljust(self.maximum_output_string_length)
+                sys.stdout.write( output_string )
+                sys.stdout.flush()
 
     def increment_report(self):
         self.report(self.n + 1)

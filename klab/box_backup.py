@@ -10,6 +10,9 @@ import getpass
 import hashlib
 import base64
 import math
+import threading
+import queue
+import time
 
 # Import two classes from the boxsdk module - Client and OAuth2
 import boxsdk
@@ -18,6 +21,8 @@ from boxsdk import Client, LoggingClient
 UPLOAD_URL = boxsdk.config.API.UPLOAD_URL
 BOX_MAX_FILE_SIZE = 10000000000 # 10 GB. The max is actually 15 GB, but 10 seems like a nice round number
 BOX_MIN_CHUNK_UPLOAD_SIZE = 55000000 # 55 MB. Current min is actually 50 MB.
+
+MAX_CHUNK_ATTEMPTS = 5 # Maximum number of times to try uploading a particular chunk
 
 import oauth2client
 from oauth2client.contrib.keyring_storage import Storage
@@ -149,13 +154,15 @@ class BoxAPI:
             part_count += 1
             split_start_byte += split_size
 
-    def _chunked_upload( self,
-                         destination_folder_id,
-                         source_path,
-                         dest_file_name = None,
-                         split_start_byte = 0,
-                         file_size = None,
-                         preflight_check = True,
+    def _chunked_upload(
+            self,
+            destination_folder_id,
+            source_path,
+            dest_file_name = None,
+            split_start_byte = 0,
+            file_size = None,
+            preflight_check = True,
+            upload_threads = 4, # Your results may vary
     ):
         dest_file_name = dest_file_name or os.path.basename( source_path )
         file_size = file_size or os.stat(source_path).st_size
@@ -179,67 +186,131 @@ class BoxAPI:
             'parts' : {},
         }
 
-        try:
-            session_id = json_response.json()['id']
-            part_size = json_response.json()['part_size']
+        session_id = json_response.json()['id']
+        part_size = json_response.json()['part_size']
 
-            total_sha = hashlib.sha1()
+        reporter = Reporter( 'uploading ' + source_path + ' as ' + dest_file_name, entries = 'chunks' )
+        reporter.set_total_count( json_response.json()['total_parts'] )
 
-            reporter = Reporter( 'uploading ' + source_path ' as ' + dest_file_name, entries = 'chunks' )
-            reporter.set_total_count( json_response.json()['total_parts'] )
+        uploads_complete = threading.Event()
+        totally_failed = threading.Event()
+        chunk_queue = queue.PriorityQueue()
+        results_queue = queue.PriorityQueue()
+
+        def upload_worker():
+            while (not uploads_complete.is_set()) and (not totally_failed.is_set()):
+                try:
+                    part_n, args = chunk_queue.get(True, 0.3)
+                except queue.Empty:
+                    continue
+
+                source_path, start_byte, header_start_byte, read_amount, attempt_number = args
+                attempt_number += 1
+                try:
+                    sha1 = hashlib.sha1()
+
+                    with open( source_path, 'rb' ) as f:
+                        f.seek( start_byte )
+                        data = f.read( read_amount )
+                        sha1.update(data)
+
+                    headers['digest'] = 'sha=' + base64.b64encode(sha1.digest()).decode()
+                    headers['content-range'] = 'bytes {0}-{1}/{2}'.format( header_start_byte, header_start_byte + len(data) - 1, file_size )
+                    part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
+
+                    results_queue.put( (part_n, part_response) )
+                    reporter.increment_report()
+                except:
+                    if attempt_number >= MAX_CHUNK_ATTEMPTS:
+                        totally_failed.set()
+                    else:
+                        chunk_queue.put( (part_n, (source_path, start_byte, header_start_byte, read_amount, attempt_number) ) )
+                chunk_queue.task_done()
+
+        upload_worker_threads = []
+        for i in range( upload_threads ):
+            t = threading.Thread( target = upload_worker )
+            t.start()
+            upload_worker_threads.append(t)
+
+        for part_n in range( json_response.json()['total_parts'] ):
+            header_start_byte = part_n * part_size
+            start_byte = split_start_byte + header_start_byte
+            url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
+
+            headers = {
+                'content-type' : 'application/octet-stream',
+            }
+
+            read_amount = min(part_size, file_size - start_byte) # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
+
+            upload_args = (source_path, start_byte, header_start_byte, read_amount, 0) # Last 0 is attempt number
+            chunk_queue.put( (part_n, upload_args) )
+
+        total_sha = hashlib.sha1()
+        def read_total_hash_worker():
+            # We are reading the file for a second time just for hashing here, but that seems
+            # better than trying to save the whole file in memory for hashing at the end.
+            # The upload should be slower and ongoing in the background as well
             for part_n in range( json_response.json()['total_parts'] ):
+                if totally_failed.is_set():
+                    break
+
                 start_byte = split_start_byte + part_n * part_size
-                url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
-
-                headers = {
-                    'content-type' : 'application/octet-stream',
-                }
-
-                sha1 = hashlib.sha1()
-
+                read_amount = min(part_size, file_size - start_byte) # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
                 with open( source_path, 'rb' ) as f:
                     f.seek( start_byte )
-                    data = f.read( min(part_size, file_size - start_byte) ) # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
-                    sha1.update(data)
+                    data = f.read( read_amount )
                     total_sha.update(data)
+        total_hasher = threading.Thread( target = read_total_hash_worker )
+        total_hasher.start()
 
-                headers['digest'] = 'sha=' + base64.b64encode(sha1.digest()).decode()
-                headers['content-range'] = 'bytes {0}-{1}/{2}'.format( start_byte, start_byte + len(data) - 1, file_size )
-                part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
-
-                upload_responses['parts'][part_n] = part_response.json()['part']
-                reporter.increment_report()
-
-            # Commit
-            url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
-            data = json.dumps({
-                'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
-            })
-            headers = {}
-            headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
-            commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
-            upload_responses['commit'] = commit_response.json()
-            reporter.done()
-        except:
+        # Wait for everything to finish or fail
+        chunk_queue.join()
+        uploads_complete.set()
+        if totally_failed.is_set():
             # Cancel chunked upload upon exception
             delete_response = box.client.session.delete( abort_url, expect_json_response = False )
             assert( delete_response.status_code == 204 )
             assert( len(delete_response.content) == 0 )
             print( 'Chunk upload of file {0} cancelled by calling abort url {1}'.format(source_path, abort_url) )
-            raise
+            raise Exception('Failed upload')
+        reporter.done()
+        if total_hasher.isAlive():
+            print( 'Waiting to compute total hash of file' )
+            total_hasher.join()
+
+        while not results_queue.empty():
+            part_n, part_response = results_queue.get()
+            upload_responses['parts'][part_n] = part_response.json()['part']
+
+        # Commit
+        print( 'Committing file upload' )
+        url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
+        data = json.dumps({
+            'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
+        })
+        headers = {}
+        headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
+        commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
+        upload_responses['commit'] = commit_response.json()
 
         return upload_responses
 
 
-box = BoxAPI()
+if __name__ == '__main__':
+    box = BoxAPI()
 
-upload_folder_id = box.find_folder_path( '/kortemmelab/alumni/adata' )
-print( 'upload folder id:', upload_folder_id )
+    upload_folder_id = box.find_folder_path( '/kortemmelab/alumni/adata' )
+    print( 'upload folder id:', upload_folder_id )
 
-### Chunked upload test
-files_to_upload = [ '/kortemmelab/alumni/adata/ajl02004.tar.gz' ]
-for fpath in files_to_upload:
-    box.upload( upload_folder_id, fpath )
+    ### Split upload test
+    files_to_upload = [ '/kortemmelab/alumni/adata/vicruiz.tar' ]
+    for fpath in files_to_upload:
+        box.upload( upload_folder_id, fpath )
 
-### Regular upload test
-# box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
+    ### Regular upload test
+    # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
+
+    ### Chunked upload test
+    # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-11 14.22.30.mp4' )
