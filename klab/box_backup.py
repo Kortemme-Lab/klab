@@ -143,7 +143,7 @@ class BoxAPI:
         split_start_byte = 0
         part_count = 0
         while split_start_byte < file_size:
-            print ( '\nUploading split {0} of {1}'.format( part_count, math.ceil(file_size / split_size) ) )
+            print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) - 1 )
             self._chunked_upload(
                 destination_folder_id, source_path,
                 dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count),
