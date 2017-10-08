@@ -139,7 +139,6 @@ class BoxAPI:
             split_size -= 1000
             if split_size < BOX_MIN_CHUNK_UPLOAD_SIZE:
                 raise Exception('Lazy programming error')
-        print( 'split_size', split_size )
 
         split_start_byte = 0
         part_count = 0
