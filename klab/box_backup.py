@@ -135,15 +135,16 @@ class BoxAPI:
         split_size = BOX_MAX_FILE_SIZE
 
         # Make sure that the last split piece is still big enough for a chunked upload
-        while file_size % BOX_MAX_FILE_SIZE < BOX_MIN_CHUNK_UPLOAD_SIZE:
+        while file_size % split_size < BOX_MIN_CHUNK_UPLOAD_SIZE:
             split_size -= 1000
-            if split_size < 1000000000: # 1 GB
+            if split_size < BOX_MIN_CHUNK_UPLOAD_SIZE:
                 raise Exception('Lazy programming error')
+        print( 'split_size', split_size )
 
         split_start_byte = 0
         part_count = 0
         while split_start_byte < file_size:
-            print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) - 1 )
+            print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
             self._chunked_upload(
                 destination_folder_id, source_path,
                 dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count),
@@ -222,6 +223,7 @@ class BoxAPI:
                     reporter.increment_report()
                 except:
                     if attempt_number >= MAX_CHUNK_ATTEMPTS:
+                        print( '\nSetting total failure after attempt {0} for part_n {1}\n'.format( attempt_number, part_n ) )
                         totally_failed.set()
                     else:
                         chunk_queue.put( (part_n, (source_path, start_byte, header_start_byte, read_amount, attempt_number) ) )
@@ -242,7 +244,10 @@ class BoxAPI:
                 'content-type' : 'application/octet-stream',
             }
 
-            read_amount = min(part_size, file_size - start_byte) # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
+            read_amount = min(part_size, file_size - header_start_byte) # Make sure the last part of a split doesn't read into the next split
+            if not read_amount > 0:
+                print(read_amount, part_size, file_size, start_byte)
+                raise Exception('read_amount failure')
 
             upload_args = (source_path, start_byte, header_start_byte, read_amount, 0) # Last 0 is attempt number
             chunk_queue.put( (part_n, upload_args) )
@@ -256,12 +261,14 @@ class BoxAPI:
                 if totally_failed.is_set():
                     break
 
+                header_start_byte = part_n * part_size
                 start_byte = split_start_byte + part_n * part_size
-                read_amount = min(part_size, file_size - start_byte) # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
+                read_amount = min(part_size, file_size - header_start_byte) # Make sure the last part of a split doesn't read into the next split
                 with open( source_path, 'rb' ) as f:
                     f.seek( start_byte )
                     data = f.read( read_amount )
                     total_sha.update(data)
+
         total_hasher = threading.Thread( target = read_total_hash_worker )
         total_hasher.start()
 
@@ -273,8 +280,8 @@ class BoxAPI:
             delete_response = box.client.session.delete( abort_url, expect_json_response = False )
             assert( delete_response.status_code == 204 )
             assert( len(delete_response.content) == 0 )
-            print( 'Chunk upload of file {0} cancelled by calling abort url {1}'.format(source_path, abort_url) )
-            raise Exception('Failed upload')
+            print( 'Chunk upload of file {0} (in {1} parts) cancelled by calling abort url {2}'.format(source_path, json_response.json()['total_parts'], abort_url) )
+            raise Exception('Totally failed upload')
         reporter.done()
         if total_hasher.isAlive():
             print( 'Waiting to compute total hash of file' )
@@ -285,15 +292,23 @@ class BoxAPI:
             upload_responses['parts'][part_n] = part_response.json()['part']
 
         # Commit
-        print( 'Committing file upload' )
-        url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
-        data = json.dumps({
-            'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
-        })
-        headers = {}
-        headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
-        commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
-        upload_responses['commit'] = commit_response.json()
+        try:
+            print( 'Committing file upload' )
+            url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
+            data = json.dumps({
+                'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
+            })
+            headers = {}
+            headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
+            commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
+            upload_responses['commit'] = commit_response.json()
+        except:
+            # Cancel chunked upload upon exception
+            delete_response = box.client.session.delete( abort_url, expect_json_response = False )
+            assert( delete_response.status_code == 204 )
+            assert( len(delete_response.content) == 0 )
+            print( 'Chunk upload of file {0} (in {1} parts) cancelled by calling abort url {2}'.format(source_path, json_response.json()['total_parts'], abort_url) )
+            raise
 
         return upload_responses
 
