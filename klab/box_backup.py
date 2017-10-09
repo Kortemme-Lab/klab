@@ -121,7 +121,7 @@ class BoxAPI:
         file_size = os.stat(source_path).st_size
         if file_size >= BOX_MAX_FILE_SIZE:
             self._upload_in_splits( destination_folder_id, source_path, preflight_check )
-        if file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
+        elif file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
             self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check )
         else:
             self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size )
