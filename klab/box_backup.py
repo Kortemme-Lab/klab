@@ -1,5 +1,36 @@
-# dbus-python system package is needed, so create a virtualenv with --system-site-packages
-# Packages needed: boxsdk>=2.0.0a9 oauth2client keyring
+#!/usr/bin/python3
+
+# The MIT License (MIT)
+#
+# Copyright (c) 2017 Kyle Barlow
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+# THE SOFTWARE.
+
+'''
+
+box_backup.py
+
+Pip requirements: boxsdk>=2.0.0a9 oauth2client keyring
+
+System package requirement: dbus-python system package is needed to use keyring with Linux, so create a virtualenv with --system-site-packages
+
+'''
 
 import os
 import sys
@@ -14,10 +45,8 @@ import threading
 import queue
 import time
 
-# Import two classes from the boxsdk module - Client and OAuth2
 import boxsdk
 from boxsdk import Client, LoggingClient
-# from boxsdk.util.multipart_stream import MultipartStream
 UPLOAD_URL = boxsdk.config.API.UPLOAD_URL
 BOX_MAX_FILE_SIZE = 10000000000 # 10 GB. The max is actually 15 GB, but 10 seems like a nice round number
 BOX_MIN_CHUNK_UPLOAD_SIZE = 55000000 # 55 MB. Current min is actually 50 MB.
@@ -42,6 +71,7 @@ class OAuthConnector(boxsdk.OAuth2):
             credentials
     ):
         self._credentials = credentials
+        self._current_chunked_upload_abort_url = None
 
     @property
     def access_token(self):
@@ -92,7 +122,7 @@ class BoxAPI:
         if self.credentials == None:
             parser = argparse.ArgumentParser(parents=[tools.argparser])
             flags = parser.parse_args()
-            flow = oauth2client.client.flow_from_clientsecrets('client_secrets.json', scope='', redirect_uri = 'http://localhost:8080')
+            flow = oauth2client.client.flow_from_clientsecrets('/kortemmelab/shared/box-client_secrets.json', scope='', redirect_uri = 'http://localhost:8080')
             self.credentials = tools.run_flow(flow, storage, flags)
 
         self.oauth_connector = OAuthConnector(self.credentials)
@@ -154,6 +184,12 @@ class BoxAPI:
             part_count += 1
             split_start_byte += split_size
 
+    def _abort_chunked_upload(self):
+        delete_response = box.client.session.delete( self._current_chunked_upload_abort_url, expect_json_response = False )
+        assert( delete_response.status_code == 204 )
+        assert( len(delete_response.content) == 0 )
+        self._current_chunked_upload_abort_url = None
+
     def _chunked_upload(
             self,
             destination_folder_id,
@@ -180,7 +216,7 @@ class BoxAPI:
         })
 
         json_response = self.client.session.post(url, data=data, expect_json_response=True)
-        abort_url = json_response.json()['session_endpoints']['abort']
+        self._current_chunked_upload_abort_url = json_response.json()['session_endpoints']['abort']
         upload_responses = {
             'create' : json_response.json(),
             'parts' : {},
@@ -276,10 +312,8 @@ class BoxAPI:
         uploads_complete.set()
         if totally_failed.is_set():
             # Cancel chunked upload upon exception
-            delete_response = box.client.session.delete( abort_url, expect_json_response = False )
-            assert( delete_response.status_code == 204 )
-            assert( len(delete_response.content) == 0 )
-            print( 'Chunk upload of file {0} (in {1} parts) cancelled by calling abort url {2}'.format(source_path, json_response.json()['total_parts'], abort_url) )
+            self._abort_chunked_upload()
+            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response.json()['total_parts']) )
             raise Exception('Totally failed upload')
         reporter.done()
         if total_hasher.isAlive():
@@ -303,28 +337,25 @@ class BoxAPI:
             upload_responses['commit'] = commit_response.json()
         except:
             # Cancel chunked upload upon exception
-            delete_response = box.client.session.delete( abort_url, expect_json_response = False )
-            assert( delete_response.status_code == 204 )
-            assert( len(delete_response.content) == 0 )
-            print( 'Chunk upload of file {0} (in {1} parts) cancelled by calling abort url {2}'.format(source_path, json_response.json()['total_parts'], abort_url) )
+            self._abort_chunked_upload()
+            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response.json()['total_parts']) )
             raise
 
+        self._current_chunked_upload_abort_url = None
         return upload_responses
 
-
 if __name__ == '__main__':
+    import argparse
+
     box = BoxAPI()
 
-    upload_folder_id = box.find_folder_path( '/kortemmelab/alumni/adata' )
-    print( 'upload folder id:', upload_folder_id )
+    parser = argparse.ArgumentParser(description='Upload files to Box')
+    parser.add_argument('destination_folder', help='File path (in Box system) of destination folder')
+    parser.add_argument('file_to_upload', nargs='+', help='Path (on local file system) of file(s) to upload to Box')
+    args = parser.parse_args()
 
-    ### Split upload test
-    files_to_upload = [ '/kortemmelab/alumni/adata/vicruiz.tar' ]
-    for fpath in files_to_upload:
-        box.upload( upload_folder_id, fpath )
+    upload_folder_id = box.find_folder_path( args.destination_folder )
+    print( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) )
 
-    ### Regular upload test
-    # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-08 14.25.04.mp4' )
-
-    ### Chunked upload test
-    # box.upload( upload_folder_id, '/home/kyleb/tmp/box_test/2017-09-11 14.22.30.mp4' )
+    for file_to_upload in args.file_to_upload:
+        box.upload( upload_folder_id, file_to_upload )
