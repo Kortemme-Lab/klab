@@ -44,6 +44,7 @@ import math
 import threading
 import queue
 import time
+from io import DEFAULT_BUFFER_SIZE
 
 import boxsdk
 from boxsdk import Client, LoggingClient
@@ -52,6 +53,7 @@ BOX_MAX_FILE_SIZE = 10000000000 # 10 GB. The max is actually 15 GB, but 10 seems
 BOX_MIN_CHUNK_UPLOAD_SIZE = 55000000 # 55 MB. Current min is actually 50 MB.
 
 MAX_CHUNK_ATTEMPTS = 5 # Maximum number of times to try uploading a particular chunk
+CLIENT_SECRETS_PATH = '/kortemmelab/shared/box-client_secrets.json'
 
 import oauth2client
 from oauth2client.contrib.keyring_storage import Storage
@@ -122,7 +124,7 @@ class BoxAPI:
         if self.credentials == None:
             parser = argparse.ArgumentParser(parents=[tools.argparser])
             flags = parser.parse_args()
-            flow = oauth2client.client.flow_from_clientsecrets('/kortemmelab/shared/box-client_secrets.json', scope='', redirect_uri = 'http://localhost:8080')
+            flow = oauth2client.client.flow_from_clientsecrets(CLIENT_SECRETS_PATH, scope='', redirect_uri = 'http://localhost:8080')
             self.credentials = tools.run_flow(flow, storage, flags)
 
         self.oauth_connector = OAuthConnector(self.credentials)
@@ -130,31 +132,102 @@ class BoxAPI:
 
         self.root_folder = self.client.folder( folder_id = '0' )
 
-    def find_folder_by_name( self, search_folder, name, limit = 1000 ):
-        folders = [ f for f in search_folder.get_items( limit = limit ) if f['name'] == name ]
+    def find_folder_by_name( self, folder_id, name, limit = 500 ):
+        search_folder = self.client.folder( folder_id = folder_id )
+        folders = [ f for f in search_folder.get_items( limit = limit ) if f['name'] == name and f['type'] == 'folder' ]
         if len( folders ) != 1:
             raise FolderTraversalException()
         return folders[0]['id']
 
-    def find_folder_path( self, folder_path, limit = 1000 ):
+    def find_file( self, folder_id, basename, limit = 500 ):
+        '''
+        Finds a file based on a box path
+        Returns a list of file IDs
+        Returns multiple file IDs if the file was split into parts with the extension '.partN' (where N is an integer)
+        '''
+        search_folder = self.client.folder( folder_id = folder_id )
+        files = [ (f['id'], f['name']) for f in search_folder.get_items( limit = limit ) if f['name'].startswith( basename ) and f['type'] == 'file' ]
+        files.sort()
+        for f_id, f_name in files:
+            assert(
+                f_name == basename
+                or
+                ( f_name.startswith( basename ) and f_name[len(basename):len(basename)+5] == '.part' )
+            )
+        return [f[0] for f in files]
+
+    def find_folder_path( self, folder_path, limit = 500 ):
         current_folder_id = '0'
         for folder_name in os.path.normpath(folder_path).split(os.path.sep):
             if len(folder_name) > 0:
-                current_folder_id = self.find_folder_by_name( self.client.folder( folder_id = current_folder_id ), folder_name, limit = limit )
+                current_folder_id = self.find_folder_by_name( current_folder_id, folder_name, limit = limit )
         return current_folder_id
 
     def upload( self,
                 destination_folder_id,
                 source_path,
                 preflight_check = True,
+                verify = False, # After upload, check sha1 sums
+                lock_file = True, # By default, lock uploaded files to prevent changes (unless manually unlocked)
     ):
         file_size = os.stat(source_path).st_size
         if file_size >= BOX_MAX_FILE_SIZE:
-            self._upload_in_splits( destination_folder_id, source_path, preflight_check )
+            uploaded_file_ids = self._upload_in_splits( destination_folder_id, source_path, preflight_check )
         elif file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
-            self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check )
+            uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check ) ]
         else:
-            self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size )
+            uploaded_file_ids = [ self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size ).get().response_object['id'] ]
+
+        if lock_file:
+            self.lock_files( uploaded_file_ids )
+
+        if verify:
+            assert( self.verify_uploaded_file( destination_folder_id, source_path ) )
+
+    def lock_files( self, file_ids, prevent_download = False ):
+        for file_id in file_ids:
+            self.lock_file( file_id, prevent_download = prevent_download )
+
+    def lock_file( self, file_id, prevent_download = False ):
+        self.client.file( file_id = file_id ).lock()
+
+    def verify_uploaded_file(
+            self,
+            destination_folder_id,
+            source_path,
+            verbose = True,
+    ):
+        '''
+        Verifies the integrity of a file uploaded to Box
+        '''
+        source_file_size = os.stat(source_path).st_size
+
+        total_part_size = 0
+        file_position = 0
+        uploaded_box_file_ids = self.find_file( destination_folder_id, os.path.basename( source_path ) )
+        total_sha1 = hashlib.sha1()
+        for i, file_id in enumerate(uploaded_box_file_ids):
+            file_info = self.client.file( file_id = file_id ).get()
+            uploaded_sha1 = file_info.response_object['sha1']
+            uploaded_size = file_info.response_object['size']
+
+            part_sha1 = read_sha1( source_path, start_byte = file_position, read_size = uploaded_size, extra_hashers = [total_sha1] )
+            if part_sha1.hexdigest() != uploaded_sha1:
+                print( '\n' )
+                print( 'Part sha1: ' + part_sha1.hexdigest() )
+                print( 'Uploaded sha1: ' + uploaded_sha1 )
+                raise Exception('Sha1 hash of uploaded file {0} ({1}) does not match'.format(file_info.response_object['name'], file_id) )
+            file_position += uploaded_size
+            total_part_size += uploaded_size
+            if len(uploaded_box_file_ids) > 1:
+                print( 'Finished verifying part {0} of {1} of {2}'.format( i+1, len(uploaded_box_file_ids), file_id ) )
+
+        assert( source_file_size == total_part_size )
+
+        if verbose:
+            print( 'Verified uploaded file {0} ({1}) with sha1: {2}'.format(source_path, file_id, total_sha1.hexdigest()) )
+
+        return True
 
     def _upload_in_splits( self, destination_folder_id, source_path, preflight_check ):
         '''
@@ -172,17 +245,20 @@ class BoxAPI:
 
         split_start_byte = 0
         part_count = 0
+        uploaded_file_ids = []
         while split_start_byte < file_size:
             print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
-            self._chunked_upload(
+            uploaded_file_ids.append( self._chunked_upload(
                 destination_folder_id, source_path,
                 dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count),
                 split_start_byte = split_start_byte,
                 file_size = min(split_size, file_size - split_start_byte), # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
                 preflight_check = preflight_check,
-            )
+            ) )
             part_count += 1
             split_start_byte += split_size
+
+        return uploaded_file_ids
 
     def _abort_chunked_upload(self):
         delete_response = box.client.session.delete( self._current_chunked_upload_abort_url, expect_json_response = False )
@@ -198,7 +274,7 @@ class BoxAPI:
             split_start_byte = 0,
             file_size = None,
             preflight_check = True,
-            upload_threads = 4, # Your results may vary
+            upload_threads = 3, # Your results may vary
     ):
         dest_file_name = dest_file_name or os.path.basename( source_path )
         file_size = file_size or os.stat(source_path).st_size
@@ -342,7 +418,39 @@ class BoxAPI:
             raise
 
         self._current_chunked_upload_abort_url = None
-        return upload_responses
+
+        file_ids = self.find_file( destination_folder_id, dest_file_name )
+        assert( len(file_ids) == 1 )
+        return file_ids[0]
+
+def read_sha1(
+    file_path,
+    buf_size = None,
+    start_byte = 0,
+    read_size = None,
+    extra_hashers = [], # update(data) will be called on all of these
+):
+    '''
+    Determines the sha1 hash of a file in chunks, to prevent loading the entire file at once into memory
+    '''
+    read_size = read_size or os.stat(file_path).st_size
+    buf_size = buf_size or DEFAULT_BUFFER_SIZE
+
+    data_read = 0
+    total_sha1 = hashlib.sha1()
+    while data_read < read_size:
+        with open( file_path, 'rb', buffering = 0 ) as f:
+            f.seek( start_byte )
+            data = f.read( min(buf_size, read_size - data_read) )
+            assert( len(data) > 0 )
+            total_sha1.update( data )
+            for hasher in extra_hashers:
+                hasher.update( data )
+            data_read += len(data)
+            start_byte += len(data)
+    assert( data_read == read_size )
+
+    return total_sha1
 
 if __name__ == '__main__':
     import argparse
@@ -350,6 +458,10 @@ if __name__ == '__main__':
     box = BoxAPI()
 
     parser = argparse.ArgumentParser(description='Upload files to Box')
+    parser.add_argument('--verify', dest='verify', action='store_true', help='Verify file upload was successful by recomputing sha1 sums and comparing to sha1 sums of uploaded file (including file splits, if file was split). Could be pretty slow!')
+    parser.set_defaults( verify = False )
+    parser.add_argument('--nolock', dest='lock', action='store_false', help='Do not lock files after upload')
+    parser.set_defaults( lock = True )
     parser.add_argument('destination_folder', help='File path (in Box system) of destination folder')
     parser.add_argument('file_to_upload', nargs='+', help='Path (on local file system) of file(s) to upload to Box')
     args = parser.parse_args()
@@ -358,4 +470,4 @@ if __name__ == '__main__':
     print( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) )
 
     for file_to_upload in args.file_to_upload:
-        box.upload( upload_folder_id, file_to_upload )
+        box.upload( upload_folder_id, file_to_upload, verify = args.verify, lock_file = args.lock )
