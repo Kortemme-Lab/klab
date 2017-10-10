@@ -28,7 +28,7 @@ box_backup.py
 
 Pip requirements: boxsdk>=2.0.0a9 oauth2client keyring
 
-System package requirement: dbus-python system package is needed to use keyring with Linux, so create a virtualenv with --system-site-packages
+System package requirement: python-dbus system package is needed to use keyring with Linux, so create a virtualenv with --system-site-packages. You probably already have this.
 
 '''
 
@@ -49,8 +49,8 @@ from io import DEFAULT_BUFFER_SIZE
 import boxsdk
 from boxsdk import Client, LoggingClient
 UPLOAD_URL = boxsdk.config.API.UPLOAD_URL
-BOX_MAX_FILE_SIZE = 10000000000 # 10 GB. The max is actually 15 GB, but 10 seems like a nice round number
-BOX_MIN_CHUNK_UPLOAD_SIZE = 55000000 # 55 MB. Current min is actually 50 MB.
+BOX_MAX_FILE_SIZE = 10737418240 # 10 GiB. The max is actually 15 GB, but 10 seems like a nice round number
+BOX_MIN_CHUNK_UPLOAD_SIZE = 60000000 # 60 MB. Current min is actually 50 MB.
 
 MAX_CHUNK_ATTEMPTS = 5 # Maximum number of times to try uploading a particular chunk
 CLIENT_SECRETS_PATH = '/kortemmelab/shared/box-client_secrets.json'
@@ -274,7 +274,7 @@ class BoxAPI:
             split_start_byte = 0,
             file_size = None,
             preflight_check = True,
-            upload_threads = 3, # Your results may vary
+            upload_threads = 4, # Your results may vary
     ):
         dest_file_name = dest_file_name or os.path.basename( source_path )
         file_size = file_size or os.stat(source_path).st_size
