@@ -131,6 +131,7 @@ class BoxAPI:
         self.client = Client( self.oauth_connector ) # Replace this with LoggingClient for debugging
 
         self.root_folder = self.client.folder( folder_id = '0' )
+        self._upload_test_only = False # Don't perform actual uploads if True. Was used to debug memory leaks.
 
     def find_folder_by_name( self, folder_id, name, limit = 500 ):
         search_folder = self.client.folder( folder_id = folder_id )
@@ -171,12 +172,19 @@ class BoxAPI:
                 lock_file = True, # By default, lock uploaded files to prevent changes (unless manually unlocked)
     ):
         file_size = os.stat(source_path).st_size
+        uploaded_file_ids = []
         if file_size >= BOX_MAX_FILE_SIZE:
             uploaded_file_ids = self._upload_in_splits( destination_folder_id, source_path, preflight_check )
-        elif file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
-            uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check ) ]
         else:
-            uploaded_file_ids = [ self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size ).get().response_object['id'] ]
+            # File will not be uploaded in splits, so first check if it exists
+            # We won't check if the file is actually the same here, that happens below at the verify step
+            uploaded_box_file_ids = self.find_file( destination_folder_id, os.path.basename( source_path ) )
+            if len(uploaded_box_file_ids) != 1:
+                if file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
+                    uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check ) ]
+                else:
+                    if not self._upload_test_only:
+                        uploaded_file_ids = [ self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size ).get().response_object['id'] ]
 
         if lock_file:
             self.lock_files( uploaded_file_ids )
@@ -247,14 +255,20 @@ class BoxAPI:
         part_count = 0
         uploaded_file_ids = []
         while split_start_byte < file_size:
-            print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
-            uploaded_file_ids.append( self._chunked_upload(
-                destination_folder_id, source_path,
-                dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count),
-                split_start_byte = split_start_byte,
-                file_size = min(split_size, file_size - split_start_byte), # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
-                preflight_check = preflight_check,
-            ) )
+            dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count)
+            prev_uploaded_file_ids = self.find_file( destination_folder_id, dest_file_name )
+            if len( prev_uploaded_file_ids ) == 1:
+                print ( '\nSkipping upload of split {0} of {1}; already exists'.format( part_count + 1, math.ceil(file_size / split_size) ) )
+                uploaded_file_ids.extend( prev_uploaded_file_ids )
+            else:
+                print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
+                uploaded_file_ids.append( self._chunked_upload(
+                    destination_folder_id, source_path,
+                    dest_file_name = dest_file_name,
+                    split_start_byte = split_start_byte,
+                    file_size = min(split_size, file_size - split_start_byte), # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
+                    preflight_check = preflight_check,
+                ) )
             part_count += 1
             split_start_byte += split_size
 
@@ -280,7 +294,7 @@ class BoxAPI:
         file_size = file_size or os.stat(source_path).st_size
         destination_folder = self.client.folder( folder_id = destination_folder_id )
 
-        if preflight_check:
+        if preflight_check and not self._upload_test_only:
             destination_folder.preflight_check( size = file_size, name = dest_file_name )
 
         url = '{0}/files/upload_sessions'.format(UPLOAD_URL)
@@ -291,18 +305,27 @@ class BoxAPI:
             'file_name' : dest_file_name,
         })
 
-        json_response = self.client.session.post(url, data=data, expect_json_response=True)
-        self._current_chunked_upload_abort_url = json_response.json()['session_endpoints']['abort']
+        if self._upload_test_only:
+            json_response = {
+                'id' : 0,
+                'part_size' : 5000000, # 5 MB
+                'session_endpoints' : { 'abort' : None },
+                'total_parts' : math.ceil( float(file_size) / float(5000000) ),
+            }
+        else:
+            json_response = self.client.session.post(url, data=data, expect_json_response=True).json()
+
+        self._current_chunked_upload_abort_url = json_response['session_endpoints']['abort']
         upload_responses = {
-            'create' : json_response.json(),
+            'create' : json_response,
             'parts' : {},
         }
 
-        session_id = json_response.json()['id']
-        part_size = json_response.json()['part_size']
+        session_id = json_response['id']
+        part_size = json_response['part_size']
 
         reporter = Reporter( 'uploading ' + source_path + ' as ' + dest_file_name, entries = 'chunks' )
-        reporter.set_total_count( json_response.json()['total_parts'] )
+        reporter.set_total_count( json_response['total_parts'] )
 
         uploads_complete = threading.Event()
         totally_failed = threading.Event()
@@ -328,9 +351,12 @@ class BoxAPI:
 
                     headers['digest'] = 'sha=' + base64.b64encode(sha1.digest()).decode()
                     headers['content-range'] = 'bytes {0}-{1}/{2}'.format( header_start_byte, header_start_byte + len(data) - 1, file_size )
-                    part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
+                    if self._upload_test_only:
+                        results_queue.put( (part_n, {'part' : part_n}) )
+                    else:
+                        part_response = self.client.session.put(url, headers = headers, data = data, expect_json_response = True)
 
-                    results_queue.put( (part_n, part_response) )
+                        results_queue.put( (part_n, dict(part_response.json())) )
                     reporter.increment_report()
                 except:
                     if attempt_number >= MAX_CHUNK_ATTEMPTS:
@@ -346,7 +372,7 @@ class BoxAPI:
             t.start()
             upload_worker_threads.append(t)
 
-        for part_n in range( json_response.json()['total_parts'] ):
+        for part_n in range( json_response['total_parts'] ):
             header_start_byte = part_n * part_size
             start_byte = split_start_byte + header_start_byte
             url = '{0}/files/upload_sessions/{1}'.format( UPLOAD_URL, session_id )
@@ -368,7 +394,7 @@ class BoxAPI:
             # We are reading the file for a second time just for hashing here, but that seems
             # better than trying to save the whole file in memory for hashing at the end.
             # The upload should be slower and ongoing in the background as well
-            for part_n in range( json_response.json()['total_parts'] ):
+            for part_n in range( json_response['total_parts'] ):
                 if totally_failed.is_set():
                     break
 
@@ -389,7 +415,7 @@ class BoxAPI:
         if totally_failed.is_set():
             # Cancel chunked upload upon exception
             self._abort_chunked_upload()
-            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response.json()['total_parts']) )
+            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
             raise Exception('Totally failed upload')
         reporter.done()
         if total_hasher.isAlive():
@@ -398,30 +424,36 @@ class BoxAPI:
 
         while not results_queue.empty():
             part_n, part_response = results_queue.get()
-            upload_responses['parts'][part_n] = part_response.json()['part']
+            upload_responses['parts'][part_n] = part_response['part']
 
         # Commit
         try:
             print( 'Committing file upload' )
             url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
             data = json.dumps({
-                'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response.json()['total_parts'] ) ],
+                'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response['total_parts'] ) ],
             })
             headers = {}
             headers['digest'] = 'sha=' + base64.b64encode(total_sha.digest()).decode()
-            commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True)
-            upload_responses['commit'] = commit_response.json()
+            if self._upload_test_only:
+                commit_response = {}
+            else:
+                commit_response = self.client.session.post(url, headers=headers, data=data, expect_json_response=True).json()
+            upload_responses['commit'] = commit_response
         except:
             # Cancel chunked upload upon exception
             self._abort_chunked_upload()
-            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response.json()['total_parts']) )
+            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
             raise
 
         self._current_chunked_upload_abort_url = None
 
-        file_ids = self.find_file( destination_folder_id, dest_file_name )
-        assert( len(file_ids) == 1 )
-        return file_ids[0]
+        if self._upload_test_only:
+            return None
+        else:
+            file_ids = self.find_file( destination_folder_id, dest_file_name )
+            assert( len(file_ids) == 1 )
+            return file_ids[0]
 
 def read_sha1(
     file_path,
