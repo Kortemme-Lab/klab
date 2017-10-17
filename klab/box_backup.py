@@ -170,27 +170,37 @@ class BoxAPI:
                 preflight_check = True,
                 verify = False, # After upload, check sha1 sums
                 lock_file = True, # By default, lock uploaded files to prevent changes (unless manually unlocked)
+                maximum_attemps = 3, # Number of times to retry upload after any exception is encountered
     ):
-        file_size = os.stat(source_path).st_size
-        uploaded_file_ids = []
-        if file_size >= BOX_MAX_FILE_SIZE:
-            uploaded_file_ids = self._upload_in_splits( destination_folder_id, source_path, preflight_check )
-        else:
-            # File will not be uploaded in splits, so first check if it exists
-            # We won't check if the file is actually the same here, that happens below at the verify step
-            uploaded_box_file_ids = self.find_file( destination_folder_id, os.path.basename( source_path ) )
-            if len(uploaded_box_file_ids) != 1:
-                if file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
-                    uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check ) ]
+        for trial_counter in range( maximum_attemps ):
+            try:
+                file_size = os.stat(source_path).st_size
+                uploaded_file_ids = []
+                if file_size >= BOX_MAX_FILE_SIZE:
+                    uploaded_file_ids = self._upload_in_splits( destination_folder_id, source_path, preflight_check )
                 else:
-                    if not self._upload_test_only:
-                        uploaded_file_ids = [ self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size ).get().response_object['id'] ]
+                    # File will not be uploaded in splits, and that function will check if each split already exists
+                    # So now we are going to check if the file already exists
+                    # We won't check if the file is actually the same here, that happens below at the verify step
+                    uploaded_box_file_ids = self.find_file( destination_folder_id, os.path.basename( source_path ) )
+                    if len(uploaded_box_file_ids) != 1:
+                        if file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
+                            uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check ) ]
+                        else:
+                            if not self._upload_test_only:
+                                uploaded_file_ids = [ self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size ).get().response_object['id'] ]
 
-        if lock_file:
-            self.lock_files( uploaded_file_ids )
+                if lock_file:
+                    self.lock_files( uploaded_file_ids )
 
-        if verify:
-            assert( self.verify_uploaded_file( destination_folder_id, source_path ) )
+                if verify:
+                    assert( self.verify_uploaded_file( destination_folder_id, source_path ) )
+
+                return True
+            except:
+                print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attemps) )
+
+        return False
 
     def lock_files( self, file_ids, prevent_download = False ):
         for file_id in file_ids:
@@ -501,5 +511,11 @@ if __name__ == '__main__':
     upload_folder_id = box.find_folder_path( args.destination_folder )
     print( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) )
 
+    failed_uploads = []
     for file_to_upload in args.file_to_upload:
-        box.upload( upload_folder_id, file_to_upload, verify = args.verify, lock_file = args.lock )
+        if not box.upload( upload_folder_id, file_to_upload, verify = args.verify, lock_file = args.lock ):
+            failed_uploads.append( file_to_upload )
+
+    if len(failed_uploads) > 0:
+        print( '\nAll failed uploads:' )
+        print( failed_uploads )
