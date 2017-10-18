@@ -194,7 +194,8 @@ class BoxAPI:
                     self.lock_files( uploaded_file_ids )
 
                 if verify:
-                    assert( self.verify_uploaded_file( destination_folder_id, source_path ) )
+                    if not self.verify_uploaded_file( destination_folder_id, source_path ):
+                        return False
 
                 return True
             except:
@@ -234,7 +235,9 @@ class BoxAPI:
                 print( '\n' )
                 print( 'Part sha1: ' + part_sha1.hexdigest() )
                 print( 'Uploaded sha1: ' + uploaded_sha1 )
-                raise Exception('Sha1 hash of uploaded file {0} ({1}) does not match'.format(file_info.response_object['name'], file_id) )
+                print('Sha1 hash of uploaded file {0} ({1}) does not match'.format(file_info.response_object['name'], file_id) )
+                return False
+
             file_position += uploaded_size
             total_part_size += uploaded_size
             if len(uploaded_box_file_ids) > 1:
