@@ -199,7 +199,7 @@ class BoxAPI:
 
                 return True
             except:
-                print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attemps) )
+                print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) )
 
         return False
 
