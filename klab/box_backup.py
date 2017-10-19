@@ -170,9 +170,9 @@ class BoxAPI:
                 preflight_check = True,
                 verify = False, # After upload, check sha1 sums
                 lock_file = True, # By default, lock uploaded files to prevent changes (unless manually unlocked)
-                maximum_attemps = 3, # Number of times to retry upload after any exception is encountered
+                maximum_attempts = 5, # Number of times to retry upload after any exception is encountered
     ):
-        for trial_counter in range( maximum_attemps ):
+        for trial_counter in range( maximum_attempts ):
             try:
                 file_size = os.stat(source_path).st_size
                 uploaded_file_ids = []
