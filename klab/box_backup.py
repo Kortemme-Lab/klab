@@ -133,7 +133,7 @@ class BoxAPI:
         self.root_folder = self.client.folder( folder_id = '0' )
         self._upload_test_only = False # Don't perform actual uploads if True. Was used to debug memory leaks.
 
-    def find_folder_by_name( self, folder_id, name, limit = 500 ):
+    def _find_folder_by_name_inner( self, folder_id, name, limit = 500 ):
         search_folder = self.client.folder( folder_id = folder_id )
         folders = [ f for f in search_folder.get_items( limit = limit ) if f['name'] == name and f['type'] == 'folder' ]
         if len( folders ) != 1:
@@ -147,21 +147,29 @@ class BoxAPI:
         Returns multiple file IDs if the file was split into parts with the extension '.partN' (where N is an integer)
         '''
         search_folder = self.client.folder( folder_id = folder_id )
-        files = [ (f['id'], f['name']) for f in search_folder.get_items( limit = limit ) if f['name'].startswith( basename ) and f['type'] == 'file' ]
-        files.sort()
-        for f_id, f_name in files:
-            assert(
-                f_name == basename
-                or
-                ( f_name.startswith( basename ) and f_name[len(basename):len(basename)+5] == '.part' )
-            )
-        return [f[0] for f in files]
+        offset = 0
+        search_items = search_folder.get_items( limit = limit, offset = offset )
+        found_files = []
+        while len(search_items) > 0:
+            print ( 'offset %d' % offset )
+            files = [ (f['id'], f['name']) for f in search_items if f['name'].startswith( basename ) and f['type'] == 'file' ]
+            files.sort()
+            for f_id, f_name in files:
+                assert(
+                    f_name == basename
+                    or
+                    ( f_name.startswith( basename ) and f_name[len(basename):len(basename)+5] == '.part' )
+                )
+            found_files.extend( files )
+            offset += limit
+            search_items = search_folder.get_items( limit = limit, offset = offset )
+        return [f[0] for f in found_files]
 
-    def find_folder_path( self, folder_path, limit = 500 ):
+    def find_folder_path( self, folder_path ):
         current_folder_id = '0'
         for folder_name in os.path.normpath(folder_path).split(os.path.sep):
             if len(folder_name) > 0:
-                current_folder_id = self.find_folder_by_name( current_folder_id, folder_name, limit = limit )
+                current_folder_id = self._find_folder_by_name_inner( current_folder_id, folder_name )
         return current_folder_id
 
     def upload( self,
@@ -202,6 +210,7 @@ class BoxAPI:
                 print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) )
 
         return False
+
 
     def lock_files( self, file_ids, prevent_download = False ):
         for file_id in file_ids:
@@ -497,6 +506,13 @@ def read_sha1(
 
     return total_sha1
 
+def upload_path( file_path, box = None):
+    # Will upload a file, or recursively upload a folder, leaving behind verification files in its wake
+    if box == None:
+        box = BoxAPI()
+
+
+
 if __name__ == '__main__':
     import argparse
 
@@ -518,7 +534,7 @@ if __name__ == '__main__':
         assert( os.path.exists( file_to_upload ) )
 
     failed_uploads = []
-    for path_to_upload in args.file_or_folder_to_upload:
+    for path_to_upload in sorted( args.file_or_folder_to_upload ):
         files_to_upload = []
         if os.path.isfile( path_to_upload ):
             files_to_upload.append( path_to_upload )
