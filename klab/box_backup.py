@@ -508,16 +508,26 @@ if __name__ == '__main__':
     parser.add_argument('--nolock', dest='lock', action='store_false', help='Do not lock files after upload')
     parser.set_defaults( lock = True )
     parser.add_argument('destination_folder', help='File path (in Box system) of destination folder')
-    parser.add_argument('file_to_upload', nargs='+', help='Path (on local file system) of file(s) to upload to Box')
+    parser.add_argument('file_or_folder_to_upload', nargs='+', help='Path (on local file system) of file(s) or folder(s) to upload to Box. If argument is a folder, all files in that folder (non-recursive) will be uploaded to the destination folder.')
     args = parser.parse_args()
 
     upload_folder_id = box.find_folder_path( args.destination_folder )
     print( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) )
 
+    for file_to_upload in args.file_or_folder_to_upload:
+        assert( os.path.exists( file_to_upload ) )
+
     failed_uploads = []
-    for file_to_upload in args.file_to_upload:
-        if not box.upload( upload_folder_id, file_to_upload, verify = args.verify, lock_file = args.lock ):
-            failed_uploads.append( file_to_upload )
+    for path_to_upload in args.file_or_folder_to_upload:
+        files_to_upload = []
+        if os.path.isfile( path_to_upload ):
+            files_to_upload.append( path_to_upload )
+        elif os.path.isdir( path_to_upload ):
+            files_to_upload.extend( [ os.path.join(path_to_upload, x) for x in os.listdir(path_to_upload) if os.path.isfile(os.path.join(path_to_upload,x))] )
+
+        for file_to_upload in files_to_upload:
+            if not box.upload( upload_folder_id, file_to_upload, verify = args.verify, lock_file = args.lock ):
+                failed_uploads.append( file_to_upload )
 
     if len(failed_uploads) > 0:
         print( '\nAll failed uploads:' )
