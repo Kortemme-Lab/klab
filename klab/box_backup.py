@@ -39,6 +39,7 @@ import webbrowser
 import argparse
 import getpass
 import hashlib
+import datetime
 import base64
 import math
 import threading
@@ -135,10 +136,24 @@ class BoxAPI:
 
     def _find_folder_by_name_inner( self, folder_id, name, limit = 500 ):
         search_folder = self.client.folder( folder_id = folder_id )
-        folders = [ f for f in search_folder.get_items( limit = limit ) if f['name'] == name and f['type'] == 'folder' ]
-        if len( folders ) != 1:
-            raise FolderTraversalException()
-        return folders[0]['id']
+        offset = 0
+        search_folders = search_folder.get_items( limit = limit, offset = offset )
+        while len(search_folders) > 0:
+            folders = [ f for f in search_folders if f['name'] == name and f['type'] == 'folder' ]
+            if len( folders ) == 1:
+                return folders[0]['id']
+            offset += limit
+            search_folders = search_folder.get_items( limit = limit, offset = offset )
+
+        return None
+
+    def create_folder( self, root_folder_id, folder_name ):
+        # Creates a folder in Box folder folder_id if it doesn't exist already
+        folder_id = self._find_folder_by_name_inner( root_folder_id, folder_name )
+        if folder_id == None:
+            return self.client.folder( folder_id = root_folder_id ).create_subfolder(folder_name ).id
+        else:
+            return folder_id
 
     def find_file( self, folder_id, basename, limit = 500 ):
         '''
@@ -151,7 +166,6 @@ class BoxAPI:
         search_items = search_folder.get_items( limit = limit, offset = offset )
         found_files = []
         while len(search_items) > 0:
-            print ( 'offset %d' % offset )
             files = [ (f['id'], f['name']) for f in search_items if f['name'].startswith( basename ) and f['type'] == 'file' ]
             files.sort()
             for f_id, f_name in files:
@@ -207,7 +221,10 @@ class BoxAPI:
 
                 return True
             except:
-                print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) )
+                if maximum_attempts > 1:
+                    print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) )
+                elif maximum_attempts == 1:
+                    raise
 
         return False
 
@@ -477,6 +494,88 @@ class BoxAPI:
             assert( len(file_ids) == 1 )
             return file_ids[0]
 
+    def upload_path( self, upload_folder_id, fpath, verbose = True, lock_files = True, maximum_attempts = 5, retry_already_uploaded_files = False, write_marker_files = False ):
+        # Will upload a file, or recursively upload a folder, leaving behind verification files in its wake
+        assert( os.path.exists( fpath ) )
+
+        def find_files_recursive( search_path, outer_folder_id ):
+            # This function also creates missing Box folders as it searches the local filesystem
+            if os.path.isfile(search_path):
+                if search_path.endswith('.uploadedtobox'):
+                    return []
+                return [ (search_path, outer_folder_id) ]
+            else:
+                inner_folder_id = box.create_folder( outer_folder_id, os.path.basename(search_path) )
+                found_files = []
+                for x in os.listdir( search_path ):
+                    found_files.extend( find_files_recursive( os.path.join( search_path, x ), inner_folder_id ) )
+                return found_files
+
+        files_to_upload = find_files_recursive( fpath, upload_folder_id )
+        r = Reporter( 'uploading batch of files to Box', entries = 'files', eol_char = '\n' )
+        r.set_total_count( len(files_to_upload) )
+        files_to_upload.sort()
+        failed_files = []
+        for file_path, inner_folder_id in files_to_upload:
+            uploaded_marker_file = file_path + '.uploadedtobox'
+            if os.path.isfile( uploaded_marker_file ):
+                if retry_already_uploaded_files:
+                    os.remove( uploaded_marker_file )
+                else:
+                    print( 'Skipping already uploaded file: ' + file_path )
+                    r.increment_report()
+                    continue
+
+            upload_successful = False
+            file_totally_failed = False
+            for trial_counter in range( maximum_attempts ):
+                if file_totally_failed:
+                    break
+
+                try:
+                    upload_successful = self.upload( inner_folder_id, file_path, verify = False, lock_file = lock_files, maximum_attempts = 1 )
+                except Exception as e:
+                    print( 'failed' )
+                    print(e)
+                    upload_successful = False
+
+                if not upload_successful:
+                    if maximum_attempts > 1:
+                        print( 'Uploading file {0} failed upload in attempt {1} of {2}'.format(file_path, trial_counter+1, maximum_attempts) )
+                    continue
+
+                if not self.verify_uploaded_file( inner_folder_id, file_path ):
+                    if maximum_attempts > 1:
+                        print( 'Uploading file {0} failed verification in attempt {1} of {2}. Removing and potentially retrying upload.'.format(file_path, trial_counter+1, maximum_attempts) )
+                    upload_successful = False
+                    file_ids = self.find_file( inner_folder_id, os.path.basename( file_path ) )
+                    for file_id in file_ids:
+                        try:
+                            self.client.file( file_id = file_id ).delete()
+                        except:
+                            print( 'Delete failed, skipping file ' + file_path )
+                            file_totally_failed = True
+                    continue
+
+                break
+
+            if upload_successful:
+                if write_marker_files:
+                    try:
+                        with open(uploaded_marker_file, 'w') as f:
+                            f.write( str( datetime.datetime.now() ) )
+                    except:
+                        # Sometimes this might fail if we have a permissions error, so we just ignore
+                        pass
+            else:
+                failed_files.append( file_path )
+                if os.path.isfile(uploaded_marker_file):
+                    os.remove(uploaded_marker_file)
+
+            r.increment_report()
+
+        return failed_files
+
 def read_sha1(
     file_path,
     buf_size = None,
@@ -506,23 +605,16 @@ def read_sha1(
 
     return total_sha1
 
-def upload_path( file_path, box = None):
-    # Will upload a file, or recursively upload a folder, leaving behind verification files in its wake
-    if box == None:
-        box = BoxAPI()
-
-
-
 if __name__ == '__main__':
     import argparse
 
     box = BoxAPI()
 
     parser = argparse.ArgumentParser(description='Upload files to Box')
-    parser.add_argument('--verify', dest='verify', action='store_true', help='Verify file upload was successful by recomputing sha1 sums and comparing to sha1 sums of uploaded file (including file splits, if file was split). Could be pretty slow!')
-    parser.set_defaults( verify = False )
     parser.add_argument('--nolock', dest='lock', action='store_false', help='Do not lock files after upload')
     parser.set_defaults( lock = True )
+    parser.set_defaults( markers = False )
+    parser.add_argument('--writemarkers', dest='markers', action='store_true', help='Write marker files to indicate an upload succeeded')
     parser.add_argument('destination_folder', help='File path (in Box system) of destination folder')
     parser.add_argument('file_or_folder_to_upload', nargs='+', help='Path (on local file system) of file(s) or folder(s) to upload to Box. If argument is a folder, all files in that folder (non-recursive) will be uploaded to the destination folder.')
     args = parser.parse_args()
@@ -530,20 +622,9 @@ if __name__ == '__main__':
     upload_folder_id = box.find_folder_path( args.destination_folder )
     print( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) )
 
-    for file_to_upload in args.file_or_folder_to_upload:
-        assert( os.path.exists( file_to_upload ) )
-
     failed_uploads = []
     for path_to_upload in sorted( args.file_or_folder_to_upload ):
-        files_to_upload = []
-        if os.path.isfile( path_to_upload ):
-            files_to_upload.append( path_to_upload )
-        elif os.path.isdir( path_to_upload ):
-            files_to_upload.extend( [ os.path.join(path_to_upload, x) for x in os.listdir(path_to_upload) if os.path.isfile(os.path.join(path_to_upload,x))] )
-
-        for file_to_upload in files_to_upload:
-            if not box.upload( upload_folder_id, file_to_upload, verify = args.verify, lock_file = args.lock ):
-                failed_uploads.append( file_to_upload )
+        failed_uploads.extend( box.upload_path( upload_folder_id, path_to_upload, lock_files = args.lock, write_marker_files = args.markers ) )
 
     if len(failed_uploads) > 0:
         print( '\nAll failed uploads:' )

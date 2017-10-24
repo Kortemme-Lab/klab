@@ -19,7 +19,7 @@ def mean(l):
     return float( sum(l) ) / float( len(l) )
 
 class Reporter:
-    def __init__(self, task, entries='files', print_output=True):
+    def __init__( self, task, entries = 'files', print_output = True, eol_char = '\r' ):
         self._lock = threading.Lock()
         self.print_output = print_output
         self.start = datetime.datetime.now()
@@ -36,6 +36,7 @@ class Reporter:
         self.rolling_est_total_time = collections.deque( maxlen = 50 )
         self.kv_callback_results = {}
         self.list_results = []
+        self.eol_char = eol_char
 
     def set_total_count(self, x):
         self.total_count = x
@@ -62,9 +63,11 @@ class Reporter:
 
                     time_remaining_str += str( datetime.timedelta( seconds = int(ts(time_remaining)) ) )
 
-                    output_string = "  Processed: %d %s (%.1f%%) %s\r" % (n, self.entries, percent_done*100.0, time_remaining_str)
+                    output_string = "  Processed: %d %s (%.1f%%) %s" % (n, self.entries, percent_done*100.0, time_remaining_str)
                 else:
-                    output_string = "  Processed: %d %s\r" % (n, self.entries)
+                    output_string = "  Processed: %d %s" % (n, self.entries)
+
+                output_string += self.eol_char
 
                 if len(output_string) > self.maximum_output_string_length:
                     self.maximum_output_string_length = len(output_string)
