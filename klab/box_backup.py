@@ -193,13 +193,15 @@ class BoxAPI:
                 verify = False, # After upload, check sha1 sums
                 lock_file = True, # By default, lock uploaded files to prevent changes (unless manually unlocked)
                 maximum_attempts = 5, # Number of times to retry upload after any exception is encountered
+                verbose = True,
+                chunked_upload_threads = 5,
     ):
         for trial_counter in range( maximum_attempts ):
             try:
                 file_size = os.stat(source_path).st_size
                 uploaded_file_ids = []
                 if file_size >= BOX_MAX_FILE_SIZE:
-                    uploaded_file_ids = self._upload_in_splits( destination_folder_id, source_path, preflight_check )
+                    uploaded_file_ids = self._upload_in_splits( destination_folder_id, source_path, preflight_check, verbose = verbose, chunked_upload_threads = chunked_upload_threads )
                 else:
                     # File will not be uploaded in splits, and that function will check if each split already exists
                     # So now we are going to check if the file already exists
@@ -207,7 +209,7 @@ class BoxAPI:
                     uploaded_box_file_ids = self.find_file( destination_folder_id, os.path.basename( source_path ) )
                     if len(uploaded_box_file_ids) != 1:
                         if file_size >= BOX_MIN_CHUNK_UPLOAD_SIZE: # 55 MB
-                            uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check ) ]
+                            uploaded_file_ids = [ self._chunked_upload( destination_folder_id, source_path, preflight_check = preflight_check, verbose = verbose, upload_threads = chunked_upload_threads, ) ]
                         else:
                             if not self._upload_test_only:
                                 uploaded_file_ids = [ self.client.folder( folder_id = destination_folder_id ).upload( file_path = source_path, preflight_check = preflight_check, preflight_expected_size = file_size ).get().response_object['id'] ]
@@ -221,7 +223,7 @@ class BoxAPI:
 
                 return True
             except:
-                if maximum_attempts > 1:
+                if maximum_attempts > 1 and verbose:
                     print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) )
                 elif maximum_attempts == 1:
                     raise
@@ -276,7 +278,7 @@ class BoxAPI:
 
         return True
 
-    def _upload_in_splits( self, destination_folder_id, source_path, preflight_check ):
+    def _upload_in_splits( self, destination_folder_id, source_path, preflight_check, verbose = True, chunked_upload_threads = 5 ):
         '''
         Since Box has a maximum file size limit (15 GB at time of writing),
         we need to split files larger than this into smaller parts, and chunk upload each part
@@ -297,16 +299,20 @@ class BoxAPI:
             dest_file_name = '{0}.part{1}'.format( os.path.basename(source_path), part_count)
             prev_uploaded_file_ids = self.find_file( destination_folder_id, dest_file_name )
             if len( prev_uploaded_file_ids ) == 1:
-                print ( '\nSkipping upload of split {0} of {1}; already exists'.format( part_count + 1, math.ceil(file_size / split_size) ) )
+                if verbose:
+                    print ( '\nSkipping upload of split {0} of {1}; already exists'.format( part_count + 1, math.ceil(file_size / split_size) ) )
                 uploaded_file_ids.extend( prev_uploaded_file_ids )
             else:
-                print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
+                if verbose:
+                    print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
                 uploaded_file_ids.append( self._chunked_upload(
                     destination_folder_id, source_path,
                     dest_file_name = dest_file_name,
                     split_start_byte = split_start_byte,
                     file_size = min(split_size, file_size - split_start_byte), # Take the min of file_size - split_start_byte so that the last part of a split doesn't read into the next split
                     preflight_check = preflight_check,
+                    verbose = verbose,
+                    upload_threads = chunked_upload_threads,
                 ) )
             part_count += 1
             split_start_byte += split_size
@@ -327,7 +333,8 @@ class BoxAPI:
             split_start_byte = 0,
             file_size = None,
             preflight_check = True,
-            upload_threads = 4, # Your results may vary
+            upload_threads = 5, # Your results may vary
+            verbose = True,
     ):
         dest_file_name = dest_file_name or os.path.basename( source_path )
         file_size = file_size or os.stat(source_path).st_size
@@ -363,7 +370,7 @@ class BoxAPI:
         session_id = json_response['id']
         part_size = json_response['part_size']
 
-        reporter = Reporter( 'uploading ' + source_path + ' as ' + dest_file_name, entries = 'chunks' )
+        reporter = Reporter( 'uploading ' + source_path + ' as ' + dest_file_name, entries = 'chunks', print_output = verbose )
         reporter.set_total_count( json_response['total_parts'] )
 
         uploads_complete = threading.Event()
@@ -399,7 +406,8 @@ class BoxAPI:
                     reporter.increment_report()
                 except:
                     if attempt_number >= MAX_CHUNK_ATTEMPTS:
-                        print( '\nSetting total failure after attempt {0} for part_n {1}\n'.format( attempt_number, part_n ) )
+                        if verbose:
+                            print( '\nSetting total failure after attempt {0} for part_n {1}\n'.format( attempt_number, part_n ) )
                         totally_failed.set()
                     else:
                         chunk_queue.put( (part_n, (source_path, start_byte, header_start_byte, read_amount, attempt_number) ) )
@@ -422,7 +430,8 @@ class BoxAPI:
 
             read_amount = min(part_size, file_size - header_start_byte) # Make sure the last part of a split doesn't read into the next split
             if not read_amount > 0:
-                print(read_amount, part_size, file_size, start_byte)
+                if verbose:
+                    print(read_amount, part_size, file_size, start_byte)
                 raise Exception('read_amount failure')
 
             upload_args = (source_path, start_byte, header_start_byte, read_amount, 0) # Last 0 is attempt number
@@ -454,11 +463,13 @@ class BoxAPI:
         if totally_failed.is_set():
             # Cancel chunked upload upon exception
             self._abort_chunked_upload()
-            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
+            if verbose:
+                print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
             raise Exception('Totally failed upload')
         reporter.done()
         if total_hasher.isAlive():
-            print( 'Waiting to compute total hash of file' )
+            if verbose:
+                print( 'Waiting to compute total hash of file' )
             total_hasher.join()
 
         while not results_queue.empty():
@@ -467,7 +478,8 @@ class BoxAPI:
 
         # Commit
         try:
-            print( 'Committing file upload' )
+            if verbose:
+                print( 'Committing file upload' )
             url = '{0}/files/upload_sessions/{1}/commit'.format( UPLOAD_URL, session_id )
             data = json.dumps({
                 'parts' : [ upload_responses['parts'][part_n] for part_n in range( json_response['total_parts'] ) ],
@@ -482,7 +494,8 @@ class BoxAPI:
         except:
             # Cancel chunked upload upon exception
             self._abort_chunked_upload()
-            print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
+            if verbose:
+                print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
             raise
 
         self._current_chunked_upload_abort_url = None
@@ -494,9 +507,10 @@ class BoxAPI:
             assert( len(file_ids) == 1 )
             return file_ids[0]
 
-    def upload_path( self, upload_folder_id, fpath, verbose = True, lock_files = True, maximum_attempts = 5, retry_already_uploaded_files = False, write_marker_files = False ):
+    def upload_path( self, upload_folder_id, fpath, verbose = True, lock_files = True, maximum_attempts = 5, retry_already_uploaded_files = False, write_marker_files = False, outer_upload_threads = 5 ):
         # Will upload a file, or recursively upload a folder, leaving behind verification files in its wake
         assert( os.path.exists( fpath ) )
+        big_batch_threshold = 10 # Verbosity is higher if the total files to upload is less than this
 
         def find_files_recursive( search_path, outer_folder_id ):
             # This function also creates missing Box folders as it searches the local filesystem
@@ -511,11 +525,79 @@ class BoxAPI:
                     found_files.extend( find_files_recursive( os.path.join( search_path, x ), inner_folder_id ) )
                 return found_files
 
+        if verbose:
+            print( 'Recursively searching for files to upload in:', fpath )
         files_to_upload = find_files_recursive( fpath, upload_folder_id )
-        r = Reporter( 'uploading batch of files to Box', entries = 'files', eol_char = '\n' )
+        if verbose:
+            print( 'Found {} files to upload'.format(len(files_to_upload)) )
+        if len(files_to_upload) >= big_batch_threshold:
+            r = Reporter( 'uploading big batch of files to Box', entries = 'files', eol_char = '\r' )
+        else:
+            r = Reporter( 'uploading batch of files to Box', entries = 'files', eol_char = '\n' )
         r.set_total_count( len(files_to_upload) )
         files_to_upload.sort()
-        failed_files = []
+        files_to_upload_queue = queue.PriorityQueue()
+        results_queue = queue.Queue()
+        uploads_complete = threading.Event()
+
+        def upload_worker():
+            while not uploads_complete.is_set():
+                try:
+                    source_path_upload, folder_to_upload_id, call_upload_verbose = files_to_upload_queue.get(True, 0.3)
+                except queue.Empty:
+                    continue
+
+                upload_successful = False
+                file_totally_failed = False
+
+                for trial_counter in range( maximum_attempts ):
+                    if file_totally_failed:
+                        break
+
+                    try:
+                        upload_successful = self.upload( folder_to_upload_id, source_path_upload, verify = False, lock_file = lock_files, maximum_attempts = 1, verbose = call_upload_verbose, chunked_upload_threads = 1 )
+                    except Exception as e:
+                        print(e)
+                        upload_successful = False
+
+                    if not upload_successful:
+                        if maximum_attempts > 1:
+                            print( 'Uploading file {0} failed upload in attempt {1} of {2}'.format(source_path_upload, trial_counter+1, maximum_attempts) )
+                        continue
+
+                    try:
+                        if not self.verify_uploaded_file( folder_to_upload_id, source_path_upload, verbose = call_upload_verbose ):
+                            upload_successful = False
+                    except Exception as e:
+                        print(e)
+                        upload_successful = False
+
+                    if not upload_successful:
+                        if maximum_attempts > 1:
+                            print( 'Uploading file {0} failed verification in attempt {1} of {2}. Removing and potentially retrying upload.'.format(source_path_upload, trial_counter+1, maximum_attempts) )
+                        try:
+                            file_ids = self.find_file( folder_to_upload_id, os.path.basename( source_path_upload ) )
+                        except Exception as e:
+                            print(e)
+                            file_ids = []
+                        for file_id in file_ids:
+                            try:
+                                self.client.file( file_id = file_id ).delete()
+                            except:
+                                print( 'Delete failed, skipping file ' + source_path_upload )
+                                file_totally_failed = True
+                                upload_successful = False
+                        continue
+
+                    break
+                results_queue.put( (source_path_upload, folder_to_upload_id, upload_successful) )
+                files_to_upload_queue.task_done()
+
+        if len(files_to_upload) >= big_batch_threshold:
+            inner_verbosity = False
+        else:
+            inner_verbosity = True
+
         for file_path, inner_folder_id in files_to_upload:
             uploaded_marker_file = file_path + '.uploadedtobox'
             if os.path.isfile( uploaded_marker_file ):
@@ -523,67 +605,54 @@ class BoxAPI:
                     os.remove( uploaded_marker_file )
                 else:
                     print( 'Skipping already uploaded file: ' + file_path )
-                    r.increment_report()
+                    r.decrement_total_count()
                     continue
 
-            upload_successful = False
-            file_totally_failed = False
-            for trial_counter in range( maximum_attempts ):
-                if file_totally_failed:
-                    break
+            files_to_upload_queue.put( (file_path, inner_folder_id, inner_verbosity) )
 
+        upload_worker_threads = []
+        for i in range( outer_upload_threads ):
+            t = threading.Thread( target = upload_worker )
+            t.start()
+            upload_worker_threads.append(t)
+
+        failed_files = queue.PriorityQueue()
+        def results_worker():
+            while not uploads_complete.is_set():
                 try:
-                    upload_successful = self.upload( inner_folder_id, file_path, verify = False, lock_file = lock_files, maximum_attempts = 1 )
-                except Exception as e:
-                    print(e)
-                    upload_successful = False
-
-                if not upload_successful:
-                    if maximum_attempts > 1:
-                        print( 'Uploading file {0} failed upload in attempt {1} of {2}'.format(file_path, trial_counter+1, maximum_attempts) )
+                    source_path_upload, folder_to_upload_id, upload_successful = results_queue.get(True, 0.95)
+                except queue.Empty:
                     continue
 
-                try:
-                    if not self.verify_uploaded_file( inner_folder_id, file_path ):
-                        upload_successful = False
-                except Exception as e:
-                    print(e)
-                    upload_successful = False
-
-                if not upload_successful:
-                    if maximum_attempts > 1:
-                        print( 'Uploading file {0} failed verification in attempt {1} of {2}. Removing and potentially retrying upload.'.format(file_path, trial_counter+1, maximum_attempts) )
-                    try:
-                        file_ids = self.find_file( inner_folder_id, os.path.basename( file_path ) )
-                    except Exception as e:
-                        print(e)
-                        file_ids = []
-                    for file_id in file_ids:
+                if upload_successful:
+                    if write_marker_files:
                         try:
-                            self.client.file( file_id = file_id ).delete()
+                            with open(uploaded_marker_file, 'w') as f:
+                                f.write( str( datetime.datetime.now() ) )
                         except:
-                            print( 'Delete failed, skipping file ' + file_path )
-                            file_totally_failed = True
-                    continue
+                            # Sometimes this might fail if we have a permissions error (e.g. uploading a file in a directory where we only have read permission), so we just ignore
+                            pass
+                else:
+                    print( 'Totally failed:', file_path )
+                    failed_files.put( file_path )
+                    if os.path.isfile(uploaded_marker_file):
+                        os.remove(uploaded_marker_file)
 
-                break
+                r.increment_report()
 
-            if upload_successful:
-                if write_marker_files:
-                    try:
-                        with open(uploaded_marker_file, 'w') as f:
-                            f.write( str( datetime.datetime.now() ) )
-                    except:
-                        # Sometimes this might fail if we have a permissions error, so we just ignore
-                        pass
-            else:
-                failed_files.append( file_path )
-                if os.path.isfile(uploaded_marker_file):
-                    os.remove(uploaded_marker_file)
+        results_worker_thread = threading.Thread( target = results_worker )
+        results_worker_thread.start()
 
-            r.increment_report()
+        files_to_upload_queue.join()
+        uploads_complete.set()
+        for t in upload_worker_threads:
+            t.join()
+        results_worker_thread.join()
 
-        return failed_files
+        failed_files_list = []
+        while not failed_files.empty():
+            failed_files_list.append( failed_files.get() )
+        return failed_files_list
 
 def read_sha1(
     file_path,
