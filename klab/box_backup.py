@@ -535,7 +535,6 @@ class BoxAPI:
                 try:
                     upload_successful = self.upload( inner_folder_id, file_path, verify = False, lock_file = lock_files, maximum_attempts = 1 )
                 except Exception as e:
-                    print( 'failed' )
                     print(e)
                     upload_successful = False
 
@@ -544,11 +543,21 @@ class BoxAPI:
                         print( 'Uploading file {0} failed upload in attempt {1} of {2}'.format(file_path, trial_counter+1, maximum_attempts) )
                     continue
 
-                if not self.verify_uploaded_file( inner_folder_id, file_path ):
+                try:
+                    if not self.verify_uploaded_file( inner_folder_id, file_path ):
+                        upload_successful = False
+                except Exception as e:
+                    print(e)
+                    upload_successful = False
+
+                if not upload_successful:
                     if maximum_attempts > 1:
                         print( 'Uploading file {0} failed verification in attempt {1} of {2}. Removing and potentially retrying upload.'.format(file_path, trial_counter+1, maximum_attempts) )
-                    upload_successful = False
-                    file_ids = self.find_file( inner_folder_id, os.path.basename( file_path ) )
+                    try:
+                        file_ids = self.find_file( inner_folder_id, os.path.basename( file_path ) )
+                    except Exception as e:
+                        print(e)
+                        file_ids = []
                     for file_id in file_ids:
                         try:
                             self.client.file( file_id = file_id ).delete()
@@ -629,3 +638,5 @@ if __name__ == '__main__':
     if len(failed_uploads) > 0:
         print( '\nAll failed uploads:' )
         print( failed_uploads )
+        with open( 'failed_uploads.txt', 'w' ) as f:
+            f.write( str(failed_uploads) )
