@@ -45,6 +45,7 @@ import math
 import threading
 import queue
 import time
+import random
 from io import DEFAULT_BUFFER_SIZE
 
 import boxsdk
@@ -507,7 +508,7 @@ class BoxAPI:
             assert( len(file_ids) == 1 )
             return file_ids[0]
 
-    def upload_path( self, upload_folder_id, fpath, verbose = True, lock_files = True, maximum_attempts = 5, retry_already_uploaded_files = False, write_marker_files = False, outer_upload_threads = 5 ):
+    def upload_path( self, upload_folder_id, fpath, verbose = True, lock_files = True, maximum_attempts = 5, retry_already_uploaded_files = False, write_marker_files = False, outer_upload_threads = 5, upload_in_random_order = True ):
         # Will upload a file, or recursively upload a folder, leaving behind verification files in its wake
         assert( os.path.exists( fpath ) )
         big_batch_threshold = 10 # Verbosity is higher if the total files to upload is less than this
@@ -543,7 +544,7 @@ class BoxAPI:
         def upload_worker():
             while not uploads_complete.is_set():
                 try:
-                    source_path_upload, folder_to_upload_id, call_upload_verbose = files_to_upload_queue.get(True, 0.3)
+                    i, source_path_upload, folder_to_upload_id, call_upload_verbose, uploaded_marker_file = files_to_upload_queue.get(True, 0.3)
                 except queue.Empty:
                     continue
 
@@ -555,7 +556,7 @@ class BoxAPI:
                         break
 
                     try:
-                        upload_successful = self.upload( folder_to_upload_id, source_path_upload, verify = False, lock_file = lock_files, maximum_attempts = 1, verbose = call_upload_verbose, chunked_upload_threads = 1 )
+                        upload_successful = self.upload( folder_to_upload_id, source_path_upload, verify = False, lock_file = lock_files, maximum_attempts = 1, verbose = call_upload_verbose, chunked_upload_threads = 3 )
                     except Exception as e:
                         print(e)
                         upload_successful = False
@@ -590,7 +591,7 @@ class BoxAPI:
                         continue
 
                     break
-                results_queue.put( (source_path_upload, folder_to_upload_id, upload_successful) )
+                results_queue.put( (source_path_upload, folder_to_upload_id, upload_successful, uploaded_marker_file) )
                 files_to_upload_queue.task_done()
 
         if len(files_to_upload) >= big_batch_threshold:
@@ -598,6 +599,7 @@ class BoxAPI:
         else:
             inner_verbosity = True
 
+        i = 0
         for file_path, inner_folder_id in files_to_upload:
             uploaded_marker_file = file_path + '.uploadedtobox'
             if os.path.isfile( uploaded_marker_file ):
@@ -608,7 +610,13 @@ class BoxAPI:
                     r.decrement_total_count()
                     continue
 
-            files_to_upload_queue.put( (file_path, inner_folder_id, inner_verbosity) )
+            # Since we are putting into a sorted PriorityQueue, we add a random first tuple member if randomness is desired
+            if upload_in_random_order:
+                worker_args = (random.random(), file_path, inner_folder_id, inner_verbosity, uploaded_marker_file)
+            else:
+                worker_args = (i, file_path, inner_folder_id, inner_verbosity, uploaded_marker_file)
+            files_to_upload_queue.put( worker_args )
+            i += 1
 
         upload_worker_threads = []
         for i in range( outer_upload_threads ):
@@ -620,7 +628,7 @@ class BoxAPI:
         def results_worker():
             while not uploads_complete.is_set():
                 try:
-                    source_path_upload, folder_to_upload_id, upload_successful = results_queue.get(True, 0.95)
+                    source_path_upload, folder_to_upload_id, upload_successful, uploaded_marker_file = results_queue.get(True, 0.95)
                 except queue.Empty:
                     continue
 
