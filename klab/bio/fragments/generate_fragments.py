@@ -52,7 +52,7 @@ errcode = 0
 
 #################
 #  Fragment generation pipeline configuration
-make_fragments_script = "make_fragments_RAP_cluster.pl"
+make_fragments_script = "make_fragments_QB3_cluster.pl"
 test_mode = False # set this to true for running quick tests on your cluster system (you will need to adapt the cluster/[engine].py code to use this argument
 logfile = LogFile("make_fragments_destinations.txt") # the logfile used for querying jobs
 cluster_job_name = "fragment_generation" # optional: set this to identify your jobs on the cluster

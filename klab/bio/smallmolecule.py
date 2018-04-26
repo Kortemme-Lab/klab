@@ -1,3 +1,8 @@
+import numpy as np
+import string
+from kabsch import calc_rotation_translation_matrices
+from pdb_util import renumber_atoms
+
 class Molecule:
     def __init__(self, pdb_path, molecule_name, chain = None):
         self.atom_types = []
@@ -109,19 +114,15 @@ class Molecule:
         if other_root_pair == None:
             other_root_pair = self_root_pair
 
-        assert( len(self_root_pair) == 2 )
-        assert( len(other_root_pair) == 2 )
+        assert( len(self_root_pair) == len(other_root_pair) )
 
         unmoved_atom_names = []
-        new_coord0 = None
-        new_coord1 = None
+        new_coords = [ None for x in xrange( len(self_root_pair) ) ]
         for atom in self.names:
-            if atom == self_root_pair[0]:
-                assert( new_coord0 == None )
-                new_coord0 = self.get_coords_for_name(atom)
-            elif atom == self_root_pair[1]:
-                assert( new_coord1 == None )
-                new_coord1 = self.get_coords_for_name(atom)
+            if atom in self_root_pair:
+                i = self_root_pair.index(atom)
+                assert( new_coords[i] == None )
+                new_coords[i] = self.get_coords_for_name(atom)
 
             if atom in mapping:
                 other_atom = mapping[atom]
@@ -131,13 +132,13 @@ class Molecule:
 
         # Move unmoved coordinates after all other atoms have been moved (so that
         # references will have been moved already)
-        assert( new_coord0 != None )
-        assert( new_coord1 != None )
-        ref_coord0 = other.get_coords_for_name( other_root_pair[0] )
-        ref_coord1 = other.get_coords_for_name( other_root_pair[1] )
+        if None in new_coords:
+            print new_coords
+            assert( None not in new_coords )
+        ref_coords = [other.get_coords_for_name(x) for x in other_root_pair]
 
         # Calculate translation and rotation matrices
-        U, new_centroid, ref_centroid = calc_rotation_translation_matrices( (ref_coord0, ref_coord1), (new_coord0, new_coord1) )
+        U, new_centroid, ref_centroid = calc_rotation_translation_matrices( ref_coords, new_coords )
         for atom in unmoved_atom_names:
             original_coord = self.get_coords_for_name(atom)
             self.set_coords_for_name( atom, rotate_and_translate_coord(original_coord, U, new_centroid, ref_centroid) )
@@ -154,7 +155,7 @@ class Molecule:
                     chain = line[21]
                 else:
                     chain = None
-                if line.startswith('HETATM') and residue_name == name_to_replace and chain == self.chain:
+                if line.startswith('HETATM') and residue_name == name_to_replace and ((self.chain == None) or (chain == self.chain)):
                     if not position_to_insert:
                         position_to_insert = len(lines)
                         self.resnum = long( line[22:26].strip() ) # Change resnum to match molecule to replace
@@ -162,6 +163,7 @@ class Molecule:
                     lines.append( line.replace(name_to_replace, self.molecule_name) )
                 elif not line.startswith('CONECT'):
                     lines.append(line)
+
         assert( position_to_insert != None )
 
         # Insert lines for this molecule
@@ -182,47 +184,3 @@ def rotate_and_translate_coord(original_coord, U, new_centroid, ref_centroid):
     new_coord += ref_centroid
     new_coord = new_coord.A.flatten()
     return new_coord
-
-def calc_rotation_translation_matrices( ref_coords, new_coords ):
-    new = np.matrix(new_coords)
-    ref = np.matrix(ref_coords)
-
-    # Create the centroid of new and ref which is the geometric center of a
-    # N-dimensional region and translate new and ref onto that center.
-    # http://en.wikipedia.org/wiki/Centroid
-    new_centroid = centroid(new)
-    ref_centroid = centroid(ref)
-    new -= new_centroid
-    ref -= ref_centroid
-
-    # Compute translation vector (matrix)
-    T = ref_centroid - new_centroid
-
-    # Computation of the covariance matrix
-    C = np.dot(np.transpose(new), ref)
-
-    # Computation of the optimal rotation matrix
-    # This can be done using singular value decomposition (SVD)
-    # Getting the sign of the det(V)*(W) to decide
-    # whether we need to correct our rotation matrix to ensure a
-    # right-handed coordinate system.
-    # And finally calculating the optimal rotation matrix U
-    # see http://en.wikipedia.org/wiki/Kabsch_algorithm
-    V, S, W = np.linalg.svd(C)
-    d = (np.linalg.det(V) * np.linalg.det(W)) < 0.0
-
-    if d:
-        S[-1] = -S[-1]
-        V[:, -1] = -V[:, -1]
-
-    # Create Rotation matrix U
-    U = np.dot(V, W)
-
-    return (U, new_centroid, ref_centroid)
-
-def centroid(X):
-    """
-    Calculate the centroid from a matrix X
-    """
-    C = np.sum(X, axis=0) / len(X)
-    return C

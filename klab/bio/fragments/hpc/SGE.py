@@ -39,7 +39,7 @@ ClusterType = "SGE"
 class FragmentsJob(object):
 
     # The command line used to call the fragment generating script. Add -noporter into cmd below to skip running Porter
-    cmd = 'make_fragments_RAP_cluster.pl -verbose -id %(pdbid)s%(chain)s %(no_homologs)s %(fasta)s'
+    cmd = 'make_fragments_QB3_cluster.pl -verbose -id %(pdbid)s%(chain)s %(no_homologs)s %(fasta)s'
 
     def __init__(self, make_fragments_perl_script, options, test_mode = False):
 
