@@ -553,6 +553,10 @@ def docopt(doc, argv=None, help=True, version=None, options_first=False):
       at https://github.com/docopt/docopt#readme
 
     """
+    # Trim trailing whitespace from the end of each line in the usage text, 
+    # because it sometimes messes up the line-breaking.
+    doc = re.sub(r'[ ]+$', '', doc, flags=re.M)
+
     if argv is None:
         argv = sys.argv[1:]
     DocoptExit.usage = printable_usage(doc)
