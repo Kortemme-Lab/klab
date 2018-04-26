@@ -34,22 +34,22 @@ EMPTY_TUPLE = (None, None)
 
 colors = {
     # [Color code, dark]
-    'lightblue'		: (34, False),
-    'blue'			: (34, True),
-    'lightgreen'	: (32, False),
-    'green'			: (32, True),
-    'yellow'		: (33, False),
-    'orange'		: (33, True),
-    'pink'			: (31, False),
-    'red'			: (31, True),
-    'cyan'			: (36, False),
-    'aqua'			: (36, True),
-    'lightpurple'	: (35, False),
-    'purple'		: (35, True),
-    'grey'			: (30, False),
-    'black'			: (30, True),
-    'white'			: (37, False),
-    'silver'		: (37, True),
+    'lightblue'     : (34, False),
+    'blue'          : (34, True),
+    'lightgreen'    : (32, False),
+    'green'         : (32, True),
+    'yellow'        : (33, False),
+    'orange'        : (33, True),
+    'pink'          : (31, False),
+    'red'           : (31, True),
+    'cyan'          : (36, False),
+    'aqua'          : (36, True),
+    'lightpurple'   : (35, False),
+    'purple'        : (35, True),
+    'grey'          : (30, False),
+    'black'         : (30, True),
+    'white'         : (37, False),
+    'silver'        : (37, True),
 }
 
 
@@ -60,23 +60,23 @@ purple_revolution = ['lightpurple', 'white', 'purple'] # 2016-04-21
 
 
 colors_to_html = {
-    #'lightblue'		: (34, False),
-    'blue'			: '00005f',
-    'lightgreen'	: '00ff00',
-    'green'			: '005f00',
-    'yellow'		: 'cccc00',
-    #'orange'		: (33, True),
-    'pink'			: 'ff0000',
-    #'red'			: (31, True),
-    'cyan'			:'00ffff',
-    #'aqua'			: (36, True),
-    'lightpurple'	: 'd75fff',
-    #'purple'		: (35, True),
-    'grey'			: '666',
-    'darkgrey'		: '222',
-    #'black'			: (30, True),
-    #'white'			: (37, False),
-    'silver'		: 'eeeeee',
+    #'lightblue'        : (34, False),
+    'blue'          : '00005f',
+    'lightgreen'    : '00ff00',
+    'green'         : '005f00',
+    'yellow'        : 'cccc00',
+    #'orange'       : (33, True),
+    'pink'          : 'ff0000',
+    #'red'          : (31, True),
+    'cyan'          :'00ffff',
+    #'aqua'         : (36, True),
+    'lightpurple'   : 'd75fff',
+    #'purple'       : (35, True),
+    'grey'          : '666',
+    'darkgrey'      : '222',
+    #'black'            : (30, True),
+    #'white'            : (37, False),
+    'silver'        : 'eeeeee',
 }
 rainbow_ = ['blue', 'green', 'yellow', 'orange', 'red', 'purple', 'lightblue']
 rasta_ = ['red', 'yellow', 'green']
@@ -84,12 +84,12 @@ rasta_ = ['red', 'yellow', 'green']
 def flush():
     sys.stdout.flush()
 
-def make(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None):
-    bgcolor = bgcolor or 'black' # Handier than optional arguments when using compound calls
+def make(s, color = 'silver', bgcolor = None, suffix = "", effect = None):
     color = color or 'white' # Handier than optional arguments when using compound calls
     colorcode, dark = colors.get(color, EMPTY_TUPLE)
     bgcolorcode, bgdark = colors.get(bgcolor, EMPTY_TUPLE)
-    if colorcode and bgcolorcode:
+
+    if colorcode:
         if dark == (effect == BOLD):
             colorcode += 60
         if effect in EFFECTS_:
@@ -104,7 +104,7 @@ def make(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None):
     else:
         return '%s%s' % (s, suffix)
 
-def write(s, color = 'silver', bgcolor = 'black', suffix = "", effect = None, flush = False):
+def write(s, color = 'silver', bgcolor = None, suffix = "", effect = None, flush = False):
     sys.stdout.write(make(s, color = color, bgcolor = bgcolor, suffix = suffix, effect = effect))
     if flush:
         sys.stdout.flush()
