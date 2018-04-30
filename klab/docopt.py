@@ -555,7 +555,7 @@ def docopt(doc, argv=None, help=True, version=None, options_first=False):
     """
     # Trim trailing whitespace from the end of each line in the usage text, 
     # because it sometimes messes up the line-breaking.
-    doc = re.sub(r'[ ]+$', '', doc, flags=re.M)
+    doc = '\n'.join(x.rstrip() for x in doc.split('\n'))
 
     if argv is None:
         argv = sys.argv[1:]
