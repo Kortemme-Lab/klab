@@ -32,8 +32,7 @@ setup(
     packages=find_packages(),
     package_data={
         'klab.bio.fragments': [
-            'make_fragments_RAP_cluster.pl',
-
+            'make_fragments_QB3_cluster.pl',
         ],
     },
     install_requires=[],
