@@ -11,7 +11,7 @@ from setuptools import setup, find_packages
 # $ git tag <version>; git push --tags
 # $ python setup.py sdist upload -r pypi
 
-version = '0.4.0'
+version = '0.4.1'
 setup(
     name='klab',
     version=version,
