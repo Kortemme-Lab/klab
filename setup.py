@@ -39,6 +39,7 @@ setup(
     entry_points={
         'console_scripts': [
             'klab_generate_fragments=klab.bio.fragments.generate_fragments:main',
+            'klab_per_residue_scores=klab.rosetta.per_residue_scores:main',
         ],
     },
 )
