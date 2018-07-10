@@ -17,7 +17,14 @@ from pathlib import Path
 from tempfile import mkstemp
 
 def scores_from_pdb(pdb_path):
-    with open(pdb_path) as file:
+    if pdb_path.suffix == '.gz':
+        import gzip
+        open = gzip.open
+    else:
+        import builtins
+        open = builtins.open
+
+    with open(pdb_path, 'rt') as file:
         lines = file.readlines()
 
     table = []
@@ -39,22 +46,25 @@ def scores_from_pdb(pdb_path):
 
         elif mode == 'weights':
             weights = map(float, line.split()[1:])
-            mode = 'pose'
-
-        elif mode == 'pose':
             mode = 'scores'
 
         elif mode == 'scores':
             tokens = line.split()
             scores = map(float, tokens[1:])
 
-            resni_match = resni_pattern.match(tokens[0])
-            if not resni_match:
-                raise ValueError(f"encountered unexpected line in score table:\n\n{line}")
-
             row = {}
-            row['resi'] = int(resni_match.group(2))
-            row['resn'] = resni_match.group(1)
+
+            if tokens[0] == 'pose':
+                row['resi'] = '*'
+                row['resn'] = '*'
+            else:
+                resni_match = resni_pattern.match(tokens[0])
+                if not resni_match:
+                    raise ValueError(f"encountered unexpected line in score table:\n\n{line}")
+
+                row['resi'] = resni_match.group(2)
+                row['resn'] = resni_match.group(1)
+
             for term, score in zip(header, scores):
                 row[term] = score
 
