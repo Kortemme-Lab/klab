@@ -86,7 +86,7 @@ def open_with_default_app(file):
 
 def subtract_scores(a, b):
     exclude = ['resi', 'resn']
-    include = [x for x in a.columns if x not in exclude]
+    include = [x for x in a.columns if x in b.columns and x not in exclude]
 
     diff = a.copy()
     diff[include] = a[include] - b[include]
@@ -110,7 +110,7 @@ def main():
                 f'{pdb_path.stem} − {ref_path.stem}':
                     subtract_scores(scores, ref_scores),
                 pdb_path.stem: scores, 
-                ref_path.stem: ref_scores, 
+                f'{ref_path.stem} (ref)': ref_scores, 
         }
 
     try:
