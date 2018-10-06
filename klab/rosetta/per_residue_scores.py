@@ -5,7 +5,23 @@ Parse the per-residue score information from a PDB file produced by rosetta,
 then display that information in a spreadsheet program (e.g. excel).
 
 Usage:
-    klab_scores_from_pdb <pdb> [<reference_pdb>]
+    klab_scores_from_pdb <pdb> [<reference_pdb>] [-s]
+
+Arguments:
+    <pdb>
+        A PDB file containing a score table produced by Rosetta.  Any score 
+        function can be used; the relevant score terms will automatically be 
+        extracted.
+
+    <reference_pdb>
+        Optionally, a second Rosetta-scored PDB file.  In addition to 
+        per-residue scores for both files, the per-residue score differences 
+        will also be reported.
+
+Options:
+    -s --sort
+        Sort the rows in the spreadsheet by total score, rather than simply 
+        going in residue order.
 
 If a reference PDB is given, the workbook that will be opened will have three 
 sheets: one for each PDB, and one showing the difference between the two.
@@ -119,6 +135,9 @@ def main():
 
         with pd.ExcelWriter(tmp_path) as xls:
             for name, df in sheets.items():
+                if args['--sort']:
+                    df = df.sort_values('total', ascending=False)
+
                 df.to_excel(
                         xls, name,
                         index=False,
