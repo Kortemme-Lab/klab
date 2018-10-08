@@ -21,7 +21,7 @@ def translate(dna_seq, strip_stop=True):
 def reverse_translate(
         protein_seq,
         template_dna=None, leading_seq=None, trailing_seq=None,
-        forbidden_seqs=(), manufacturer=None):
+        forbidden_seqs=(), include_stop=True, manufacturer=None):
     """
     Generate a well-behaved DNA sequence from the given protein sequence.  If a 
     template DNA sequence is specified, the returned DNA sequence will be as 
@@ -36,7 +36,7 @@ def reverse_translate(
     leading_seq = restriction_sites.get(leading_seq, leading_seq or '')
     trailing_seq = restriction_sites.get(trailing_seq, trailing_seq or '')
 
-    codon_list = make_codon_list(protein_seq, template_dna)
+    codon_list = make_codon_list(protein_seq, template_dna, include_stop)
     sanitize_codon_list(codon_list, forbidden_seqs)
     dna_seq = leading_seq + ''.join(codon_list) + trailing_seq
 
@@ -45,7 +45,7 @@ def reverse_translate(
 
     return dna_seq
 
-def make_codon_list(protein_seq, template_dna=None):
+def make_codon_list(protein_seq, template_dna=None, include_stop=True):
     """
     Return a list of codons that would be translated to the given protein 
     sequence.  Codons are picked first to minimize the mutations relative to a 
@@ -56,6 +56,10 @@ def make_codon_list(protein_seq, template_dna=None):
 
     if template_dna is None:
         template_dna = []
+
+    # Reverse translate each codon, preferring (in order):
+    # 1. The codon with the most similarity to the template codon.
+    # 2. The codon with the highest natural usage.
 
     for i, res in enumerate(protein_seq.upper()):
         try: template_codon = template_dna[3*i:3*i+3]
@@ -70,6 +74,13 @@ def make_codon_list(protein_seq, template_dna=None):
 
         # Pick the best codon.
         codon_list.append(possible_codons[0])
+
+    # Make sure the sequence ends with a stop codon.
+    last_codon = codon_list[-1]
+    stop_codons = dna.ecoli_reverse_translate['.']
+
+    if include_stop and last_codon not in stop_codons:
+        codon_list.append(stop_codons[0])
 
     return codon_list
 

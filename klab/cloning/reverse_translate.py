@@ -75,15 +75,12 @@ Options:
         Add leading and trailing sequences containing restriction sites and 
         linker sites compatible with the Yeast Toolkit.  Typically the part ID 
         would be "3", but "3a" is also allowed.  This overrides the 
-        --leading-dna and --trailing-dna options.
+        `--leading-dna` and `--trailing-dna` options.
         
     --restriction-sites SITES
         Comma-separated list of restriction sites that may not appear in the 
         generated sequence.  You may specify either case-sensitive restriction 
         site names (must be listed in digest.py) or DNA sequences.
-
-    --reversion-mutations EXCEL
-
 
     --manufacturer COMPANY
         Run checks and filters specific to the company that will be 
