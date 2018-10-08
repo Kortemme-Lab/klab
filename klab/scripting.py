@@ -4,7 +4,7 @@ import os, shutil, glob
 from functools import wraps
 
 def print_warning(message, *args, **kwargs):
-    import colortext
+    from . import colortext
     if args or kwargs: message = message.format(*args, **kwargs)
     colortext.write(message + '\n', color='red')
 
@@ -14,6 +14,9 @@ def print_error_and_die(message, *args, **kwargs):
         aborting = '  ' + aborting
     print_warning(message + aborting, *args, **kwargs)
     raise SystemExit(1)
+
+class UserError(Exception):
+    no_stack_trace = True
 
 class catch_and_print_errors:
 

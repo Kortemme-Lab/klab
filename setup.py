@@ -40,6 +40,7 @@ setup(
         'console_scripts': [
             'klab_generate_fragments=klab.bio.fragments.generate_fragments:main',
             'klab_per_residue_scores=klab.rosetta.per_residue_scores:main',
+            'klab_reverse_translate=klab.cloning.reverse_translate:main',
         ],
     },
 )
