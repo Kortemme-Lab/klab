@@ -5,17 +5,8 @@ from __future__ import division, print_function
 import re
 from . import dna, gen9
 from .. import scripting
+from .digest import restriction_sites
 from pathlib import Path
-
-restriction_sites = {
-        'BsaI':     'GGTCTC',
-        'AarI':     'CACCTGC',
-        'EcoRI':    'GAATTC',
-        'HindIII':  'AAGCTT',
-        'NdeI ':    'CATATG',
-        'XmnI':     'GAANNNNTTC',
-        'BamHI':    'GGATCC',
-}
 
 def translate(dna_seq, strip_stop=True):
     from more_itertools import chunked

@@ -1,9 +1,18 @@
 #!/usr/bin/env python3
 
-# https://www.addgene.org/mol-bio-reference/restriction-enzymes/
 
 restriction_sites = {
-        'AatII*'  : 'GACGTC',
+        # Manual
+        'AarI':     'CACCTGC',
+        'BbsI':     'GAAGAC',
+        'BsaI':     'GGTCTC',
+        'BsmBI':    'CGTCTC',
+        'BtgZI':    'GCGATG',
+        'SapI':     'GCTCTTC',
+        'XmnI':     'GAANNNNTTC',
+
+        # https://www.addgene.org/mol-bio-reference/restriction-enzymes/
+        'AatII'   : 'GACGTC',
         'MfeI'    : 'CAATTG',
         'Acc65I'  : 'GGTACC',
         'MluI'    : 'ACGCGT',
