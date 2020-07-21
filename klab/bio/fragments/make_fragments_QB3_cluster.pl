@@ -27,7 +27,7 @@ $| = 1; # disable stdout buffering
 #    ./sparks-x            http://sparks.informatics.iupui.edu/index.php?pageLoc=Services
 
 # Set SPARKXDIR environment variable.
-$ENV{'SPARKSXDIR'} = '/netapp/home/klabqb3backrub/tools/sparks-x';
+$ENV{'SPARKSXDIR'} = '/wynton/home/kortemme/krivacic/software/fragments/sparks-x';
 
 # ROSETTA
 # It's really bad that the path to Roland's rosetta is hard-coded in this file.  
@@ -35,41 +35,41 @@ $ENV{'SPARKSXDIR'} = '/netapp/home/klabqb3backrub/tools/sparks-x';
 # configuration file (or both), and to update generate_fragments.py to provide 
 # the neccesary input.
 #my $FRAGMENT_PICKER = "$Bin/../../main/source/bin/fragment_picker.boost_thread.linuxgccrelease";
-my $FRAGMENT_PICKER = "/netapp/home/xingjiepan/Rosetta/main_rev59052/source/bin/fragment_picker.default.linuxgccrelease";
+my $FRAGMENT_PICKER = "/wynton/home/kortemme/krivacic/rosetta/source/bin/fragment_picker.default.linuxgccrelease";
 #my $FRAGMENT_PICKER_NUM_CPUS = 8;    # number of processors to use
 my $FRAGMENT_PICKER_NUM_CPUS = 1;    # our cluster runs 1 job per core
 #my $ROSETTA_DATABASE = "$Bin/../../main/database"; # rosetta database
-my $ROSETTA_DATABASE = "/netapp/home/xingjiepan/Rosetta/main_rev59052/database"; # rosetta database
+my $ROSETTA_DATABASE = "/wynton/home/kortemme/krivacic/rosetta/database"; # rosetta database
 #my $VALL = "$Bin/vall.jul19.2011"; # template database
-my $VALL = "/netapp/home/klabqb3backrub/tools/fragment_generation/vall.jul19.2011"; # template database
+my $VALL = "/wynton/home/kortemme/krivacic/rosetta/database/sampling/vall.jul19.2011"; # template database
 
 # BLAST path (Requires non-blast+ NCBI version)
 #my $BLAST_DIR = "$Bin/../../../../src/blast";
 #my $BLAST_DIR = "$Bin/../../../../src/blast";
-my $BLAST_DIR = "/netapp/home/klabqb3backrub/tools/blast-2.2.26";
+my $BLAST_DIR = "/wynton/home/kortemme/krivacic/software/fragments/blast/blast-2.2.26";
 #my $BLAST_NUM_CPUS = 8;    # number of processors to use (blastpgp -a option)
 my $BLAST_NUM_CPUS = 1;    # our cluster runs 1 job per core
 
 # NR database path
 #my $NR = "$Bin/../../../databases/nr/nr";
-my $NR = "/netapp/database/blast/blastdb/nr";
+my $NR = "/wynton/home/database/blast/blastdb/nr";
 #my $NR = "/netapp/home/klabqb3backrub/mirror/RefSeq/nr";
 
 # spine-x/sparks (for phi, psi, and solvent accessibility predictions)
 #my $SPARKS = "$Bin/../../../../src/sparks-x/bin/buildinp_query.sh";
-my $SPARKS = "/netapp/home/klabqb3backrub/tools/sparks-x/bin/buildinp_query.sh";
+my $SPARKS = "/wynton/home/kortemme/krivacic/software/fragments/sparks-x/bin/buildinp_query.sh";
 
 # PSIPRED (for secondary structure prediction)
-my $PSIPRED_DIR = "/netapp/home/klabqb3backrub/tools/psipred-3.4";
+my $PSIPRED_DIR = "/wynton/home/kortemme/krivacic/software/fragments/psipred";
 my $PSIPRED_USE_weights_dat4 = 0;    # set to 0 if using psipred version 3.2+
 
 # pfilt filtered NR database used for PSIPRED (see PSIPRED readme)
 # $NR will be used if empty
 #my $PFILTNR = "$Bin/../../../databases/nr/nr_pfilt";
 #my $PFILTNR = "/netapp/home/klabqb3backrub/mirror/RefSeq/nrfilt";
-my $PFILTNR = "/netapp/database/blast/blastdb/nrfilt";
+my $PFILTNR = "/wynton/home/database/blast/blastdb/nrfilt";
 
-my $PDB_SEQRES      = "/netapp/home/klabqb3backrub/mirror/pdb/derived_data/pdb_seqres.txt";
+my $PDB_SEQRES      = "/wynton/home/kortemme/krivacic/software/fragments/derived_data/pdb_seqres.txt";
 my $INTERNET_HOST = "ws0"; # "localhost";
 
 ### EXTRA OPTIONAL FEATURES ###################################################
@@ -87,7 +87,7 @@ my $SLAVE_LAUNCHER_MAX_JOBS = 40;    # depends on your available machines/cpus
 #  --no_structure_profile option is added to reduce the run time
 # This feature is not supported yet in the Rosetta release
 #my $PDB2VALL = "$Bin/pdb2vall/pdb2vall.py --no_structure_profile";
-my $PDB2VALL = "/netapp/home/xingjiepan/Rosetta/tools/fragment_tools/pdb2vall/pdb2vall.py --no_structure_profile";
+my $PDB2VALL = "/wynton/home/kortemme/krivacic/rosetta/tools/fragment_tools/pdb2vall/pdb2vall.py --no_structure_profile";
 my $PDB2VALL_IGNORE_ERRORS = 1;    # ignore pdb2vall jobs that fail
 
 # The following can be ignored unless you want to use the secondary structure prediction
