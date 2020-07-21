@@ -59,7 +59,7 @@ def clean_alternate_location_indicators(lines):
                 atom_name = line[12:16].strip()
                 res_name = line[17:20].strip()
                 chain = line[21]
-                resnum = long( line[22:26].strip() )
+                resnum = int( line[22:26].strip() )
                 loc_tup = (atom_name, res_name, chain, resnum)
                 if loc_tup in previously_seen_alt_atoms:
                     # Continue main for loop

@@ -5,7 +5,7 @@ import subprocess
 
 from klab.fs.fsio import read_file
 from klab import colortext
-from cluster_interface import JobInitializationException
+from .cluster_interface import JobInitializationException
 
 available_queues = {
     'QB3' : ['lab.q', 'long.q', 'short.q'],
@@ -80,7 +80,7 @@ def create_script(job_name, job_directory,
     template = template.replace('${JOB_SETUP_COMMANDS}', '%s' % job_setup_commands.strip())
     template = template.replace('${JOB_EXECUTION_COMMANDS}', '%s' % job_execution_commands.strip())
     template = template.replace('${JOB_POST_PROCESSING_COMMANDS}', '%s' % job_post_processing_commands.strip())
-    return '\n\n'.join(map(string.strip, [header, template]))
+    return '\n\n'.join(map(str.strip, [header, template]))
 
 
 def submit(command_filename, workingdir, send_mail = False, username = None):
@@ -102,7 +102,7 @@ def submit(command_filename, workingdir, send_mail = False, username = None):
     # Submit the job and capture output.
     try:
         subp = subprocess.Popen(command, stdout=file_stdout, stderr=file_stdout, cwd=workingdir)
-    except Exception, e:
+    except Exception as e:
         colortext.error('Failed running qsub command: %s in cwd %s.' % (command, workingdir))
         raise
 

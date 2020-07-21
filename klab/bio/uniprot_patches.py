@@ -76,218 +76,218 @@ if use_patches:
     }
 
     #k['Validity'] = 'Standard'
-    for k, v in UniParcMergedRecommendedNamesRemap.iteritems():
+    for k, v in UniParcMergedRecommendedNamesRemap.items():
         v['Validity'] = 'Majority'
 
-    for k, v in UniParcMergedSubmittedNamesRemap.iteritems():
+    for k, v in UniParcMergedSubmittedNamesRemap.items():
         v['Validity'] = 'In flux'
 
     # These subsections clash with those of UniProt AC entries relating to the same protein
     clashing_subsections_for_removal = {
         # UPI000000D50D - The majority of cases disagreed
         'C6EK70' : [ # Inferred from homology whereas P37001 has Evidence at protein level
-            (u'signal peptide', '', 1, 26),
-            (u'chain', '', 27, 186),
+            ('signal peptide', '', 1, 26),
+            ('chain', '', 27, 186),
         ],
         'C9R198' : [ # Inferred from homology whereas P37001 has Evidence at protein level
-            (u'signal peptide', '', 1, 26),
-            (u'chain', '', 27, 186),
+            ('signal peptide', '', 1, 26),
+            ('chain', '', 27, 186),
         ],
         # UPI000002D10B - I took the minority case (2 vs 4) but those two cases P0AEG4 and P0AEG5 had Evidence at protein level
         'B1IW52' : [
-            (u'signal peptide', '', 1, 20),
-            (u'chain', '', 21, 208),
+            ('signal peptide', '', 1, 20),
+            ('chain', '', 21, 208),
         ],
         'C9QW99' : [
-            (u'signal peptide', '', 1, 20),
-            (u'chain', '', 21, 208),
+            ('signal peptide', '', 1, 20),
+            ('chain', '', 21, 208),
         ],
         'E0J4U9' : [
-            (u'signal peptide', '', 1, 20),
-            (u'chain', '', 21, 208),
+            ('signal peptide', '', 1, 20),
+            ('chain', '', 21, 208),
         ],
         'E8Y7Z9' : [
-            (u'signal peptide', '', 1, 20),
-            (u'chain', '', 21, 208),
+            ('signal peptide', '', 1, 20),
+            ('chain', '', 21, 208),
         ],
         # UPI000002D34D - this was a choice between two partitionings (G0Q513 and P00777) at the time of writing so.
         # However, P00777 has Evidence at protein level whereas G0Q513 is Predicted.
         'G0Q513' : [
-            (u'signal peptide', '', 1, 39),
-            (u'chain', '', 40, 299),
+            ('signal peptide', '', 1, 39),
+            ('chain', '', 40, 299),
         ],
         # UPI000003EAF7 - again, this was a choice between two partitionings (6 entries like C6EG66 and 4 entries like C7BU11,
         #  all Inferred from homology) at the time of writing so the choice is somewhat arbitrary (I took the majority)
         'C7BU11' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 79),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 79),
         ],
         'D2THA1' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 79),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 79),
         ],
         'J3Z435' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 79),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 79),
         ],
         'L0M8Y4' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 79),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 79),
         ],
         # UPI000003EB7E - again, this choice is somewhat arbitary. P02925 has Evidence at protein level whereas C9QX85 is Predicted.
         'C9QX85' : [
-            (u'signal peptide', '', 1, 26),
-            (u'chain', '', 27, 296),
+            ('signal peptide', '', 1, 26),
+            ('chain', '', 27, 296),
         ],
         # UPI00000421AF - This entry overlapped with itself. This removal and the addition in subsections_for_addition may be wrong.
         'Q59962' : [
-            (u'signal peptide', '', 1, 39),
-            (u'chain', '', 40, 228),
+            ('signal peptide', '', 1, 39),
+            ('chain', '', 40, 228),
         ],
         # UPI0000054B9A. Choice between Q9EYL5 and D1GSI9. Q9EYL5 has 'Evidence at protein level' for its protein existence, D1GSI9 has a 'Predicted' protein existence.
         'D1GSI9' : [
-            (u'signal peptide', '', 1, 25),
-            (u'chain', '', 26, 199),
+            ('signal peptide', '', 1, 25),
+            ('chain', '', 26, 199),
         ],
         # UPI000005D4DB. Choice between P00149/Q8RME7 and B3QFJ7. P00149 has 'Evidence at protein level' for its protein existence, B3QFJ7 has a 'Predicted' protein existence.
         'B3QFJ7' : [
-            (u'signal peptide', '', 1, 22),
-            (u'chain', '', 23, 146),
+            ('signal peptide', '', 1, 22),
+            ('chain', '', 23, 146),
         ],
         # UPI0000110615. Choice between P08306 and A1BA41. P08306 has 'Evidence at protein level' for its protein existence, A1BA41 is 'Inferred from homology'.
         'A1BA41' : [
-            (u'signal peptide', '', 1, 30),
-            (u'chain', '', 31, 298),
+            ('signal peptide', '', 1, 30),
+            ('chain', '', 31, 298),
         ],
         # UPI00001259D7. Choice between C9QU48/E8Y3Y8 and P00811. P00811 has 'Evidence at protein level' for its protein existence, C9QU48/E8Y3Y8 are 'Predicted'.
         'C9QU48' : [
-            (u'signal peptide', '', 1, 20),
-            (u'chain', '', 21, 377),
+            ('signal peptide', '', 1, 20),
+            ('chain', '', 21, 377),
         ],
         'E8Y3Y8' : [
-            (u'signal peptide', '', 1, 20),
-            (u'chain', '', 21, 377),
+            ('signal peptide', '', 1, 20),
+            ('chain', '', 21, 377),
         ],
         # UPI0000125D6C. Choice between B1J0J0/C6EBF9/C9QT38/E0J559/E8Y4D5 and P02924. P02924 has 'Evidence at protein level' for its protein existence, the others are 'Inferred from homology'.
         'B1J0J0' : [
-            (u'signal peptide', '', 1, 24),
-            (u'chain', '', 25, 329),
+            ('signal peptide', '', 1, 24),
+            ('chain', '', 25, 329),
         ],
         'C6EBF9' : [
-            (u'signal peptide', '', 1, 24),
-            (u'chain', '', 25, 329),
+            ('signal peptide', '', 1, 24),
+            ('chain', '', 25, 329),
         ],
         'C9QT38' : [
-            (u'signal peptide', '', 1, 24),
-            (u'chain', '', 25, 329),
+            ('signal peptide', '', 1, 24),
+            ('chain', '', 25, 329),
         ],
         'E0J559' : [
-            (u'signal peptide', '', 1, 24),
-            (u'chain', '', 25, 329),
+            ('signal peptide', '', 1, 24),
+            ('chain', '', 25, 329),
         ],
         'E8Y4D5' : [
-            (u'signal peptide', '', 1, 24),
-            (u'chain', '', 25, 329),
+            ('signal peptide', '', 1, 24),
+            ('chain', '', 25, 329),
         ],
         # UPI00001260FB. Choice between C6EIF4/C9QZG2 and P00805. P00805 has 'Evidence at protein level' for its protein existence, the others are 'Predicted'.
         'C6EIF4' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 348),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 348),
         ],
         'C9QZG2' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 348),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 348),
         ],
         # UPI0000126C7E. Choice between C6ECB3/E0J2H8/E8Y337 and P0ABE7. P0ABE7 has 'Evidence at protein level' for its protein existence, the others are 'Predicted'.
         'C6ECB3' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 128),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 128),
         ],
         'E0J2H8' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 128),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 128),
         ],
         'E8Y337' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 128),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 128),
         ],
         # UPI0000128133. Choice between P82543 ('Evidence at protein level') and 6DH43 ('Predicted') and H9ZR67 ('Predicted').
         # The Predicted partitionings split the sequence into signal peptide and chain whereas P82543 only has a chain with 34 residues.
         # Since this is a short sequence and the PDB files cover most of it, I took the P82543 entry.
         'F6DH43' : [
-            (u'signal peptide', '', 1, 29),
-            (u'chain', '', 30, 34),
+            ('signal peptide', '', 1, 29),
+            ('chain', '', 30, 34),
         ],
         'H9ZR67' : [
-            (u'signal peptide', '', 1, 28),
-            (u'chain', '', 29, 34),
+            ('signal peptide', '', 1, 28),
+            ('chain', '', 29, 34),
         ],
         # UPI0000128B4D. Choice between A1V9X3/E3IQX1 and P00131. P00131 has 'Evidence at protein level' for its protein existence, the others are 'Predicted'.
         'A1V9X3' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 129),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 129),
         ],
         'E3IQX1' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 129),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 129),
         ],
         # UPI000012A647. Choice between C9R1D8 and P05825. P05825 has 'Evidence at protein level' for its protein existence, C9R1D8 is 'Inferred from homology'.
         'C9R1D8' : [
-            (u'signal peptide', '', 1, 23),
-            (u'chain', '', 24, 746),
+            ('signal peptide', '', 1, 23),
+            ('chain', '', 24, 746),
         ],
         # UPI000012BDB6. Choice between P26222 and Q47R05. P26222 has 'Evidence at protein level' for its protein existence, Q47R05 is 'Predicted'.
         'Q47R05' : [
-            (u'signal peptide', '', 1, 32),
-            (u'chain', '', 33, 441),
+            ('signal peptide', '', 1, 32),
+            ('chain', '', 33, 441),
         ],
         # UPI000012EB43. Choice between P0AEX9/P0AEY0 and C6EDY9/C9QV44/E0J0G2/E8Y5J0. P0AEX9/P0AEY0 have 'Evidence at protein level'
         # for their protein existence, the others are 'Predicted'.
         'C6EDY9' : [
-            (u'signal peptide', '', 1, 27),
-            (u'chain', '', 28, 396),
+            ('signal peptide', '', 1, 27),
+            ('chain', '', 28, 396),
         ],
         'C9QV44' : [
-            (u'signal peptide', '', 1, 27),
-            (u'chain', '', 28, 396),
+            ('signal peptide', '', 1, 27),
+            ('chain', '', 28, 396),
         ],
         'E0J0G2' : [
-            (u'signal peptide', '', 1, 27),
-            (u'chain', '', 28, 396),
+            ('signal peptide', '', 1, 27),
+            ('chain', '', 28, 396),
         ],
         'E8Y5J0' : [
-            (u'signal peptide', '', 1, 27),
-            (u'chain', '', 28, 396),
+            ('signal peptide', '', 1, 27),
+            ('chain', '', 28, 396),
         ],
         # UPI0000130CF0. Choice between P0A910/P0A911/Q6W821 and C6EI25/C9QZB9/E0IZ85/E8Y2U5. P0A910 has 'Evidence at protein level',
         # the rest are 'Inferred from homology'.
         'C6EI25' : [
-            (u'signal peptide', '', 1, 22),
-            (u'chain', '', 23, 346),
+            ('signal peptide', '', 1, 22),
+            ('chain', '', 23, 346),
         ],
         'C9QZB9' : [
-            (u'signal peptide', '', 1, 22),
-            (u'chain', '', 23, 346),
+            ('signal peptide', '', 1, 22),
+            ('chain', '', 23, 346),
         ],
         'E0IZ85' : [
-            (u'signal peptide', '', 1, 22),
-            (u'chain', '', 23, 346),
+            ('signal peptide', '', 1, 22),
+            ('chain', '', 23, 346),
         ],
         'E8Y2U5' : [
-            (u'signal peptide', '', 1, 22),
-            (u'chain', '', 23, 346),
+            ('signal peptide', '', 1, 22),
+            ('chain', '', 23, 346),
         ],
         # UPI0000132009. Choice between P00634 and C9QQP9. P00634 has 'Evidence at protein level' for its protein existence, C9QQP9 is 'Inferred from homology'.
         'C9QQP9' : [
-            (u'signal peptide', '', 1, 22),
-            (u'chain', '', 23, 471),
+            ('signal peptide', '', 1, 22),
+            ('chain', '', 23, 471),
         ],
     }
 
     # These are sections I removed above which I'm truncating here. This may be wrong!
     subsections_for_addition = {
         'Q59962' : [
-            (u'signal peptide', '', 1, 38),
+            ('signal peptide', '', 1, 38),
         ],
     }
 
@@ -314,7 +314,7 @@ if use_patches:
     overlapping_subsections_for_removal = {
         # UPI000000D8B8
         'P00747' : [
-            (u'chain', u'Angiostatin', 79, 466), # overlaps with its own AC entry which is presumably on purpose
+            ('chain', 'Angiostatin', 79, 466), # overlaps with its own AC entry which is presumably on purpose
         ],
     }
 

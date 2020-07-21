@@ -44,7 +44,7 @@ def get_insecure_resource(host, resource, port = 21, output_filepath = None, tim
             output_handle = open(output_filepath, 'wb')
         try:
             contents = ftp.retrbinary('RETR %s' % local_filename, output_handle.write, 1024)
-        except Exception, e:
+        except Exception as e:
             if str(e).find('Failed to open file') != -1:
                 raise FTPException550('Resource could not be located. FTP error: "%s"' % str(e))
             raise Exception('Unknown FTP error: "%s"' % str(e))
@@ -64,7 +64,7 @@ def get_insecure_resource(host, resource, port = 21, output_filepath = None, tim
             ftp.quit()
         raise
 
-    except Exception, e:
+    except Exception as e:
         if output_handle:
             output_handle.close()
         if not ftp_has_quit:

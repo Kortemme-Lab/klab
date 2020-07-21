@@ -8,7 +8,7 @@ Created by Shane O'Connor 2013
 """
 
 import os
-from httplib import HTTPConnection
+from http.client import HTTPConnection
 
 if __name__ == '__main__':
     import sys
@@ -16,8 +16,8 @@ if __name__ == '__main__':
 
 from klab import colortext
 from klab.fs.fsio import read_file, write_file
-import rcsb
-from basics import Sequence
+from . import rcsb
+from .basics import Sequence
 
 visible_colors = [
     'lightblue',
@@ -53,7 +53,7 @@ class FASTA(dict):
         super(FASTA,self).__init__(*args, **kw)
         self.fasta_contents = fasta_contents
         self.strict = strict
-        self.itemlist = super(FASTA,self).keys()
+        self.itemlist = list(super(FASTA,self).keys())
         self.unique_sequences = {}
         self.sequences = []
         self.sequence_string_length = 120
@@ -176,12 +176,12 @@ class FASTA(dict):
         '''Create Sequence objects for each FASTA sequence.'''
         sequences = {}
         if pdb_id:
-            for chain_id, sequence in self.get(pdb_id, {}).iteritems():
+            for chain_id, sequence in self.get(pdb_id, {}).items():
                 sequences[chain_id] = Sequence.from_sequence(chain_id, sequence)
         else:
-            for pdb_id, v in self.iteritems():
+            for pdb_id, v in self.items():
                 sequences[pdb_id] = {}
-                for chain_id, sequence in v.iteritems():
+                for chain_id, sequence in v.items():
                     sequences[pdb_id][chain_id] = Sequence.from_sequence(chain_id, sequence)
         return sequences
 
@@ -191,8 +191,8 @@ class FASTA(dict):
     def get_chain_ids(self, pdb_id = None, safe_call = False):
         '''If the FASTA file only has one PDB ID, pdb_id does not need to be specified. Otherwise, the list of chains identifiers for pdb_id is returned.'''
 
-        if pdb_id == None and len(self.keys()) == 1:
-            return self[self.keys()[0]].keys()
+        if pdb_id == None and len(list(self.keys())) == 1:
+            return list(self[list(self.keys())[0]].keys())
 
         pdbID = pdbID.upper()
         if not self.get(pdbID):
@@ -200,17 +200,17 @@ class FASTA(dict):
                 raise Exception("FASTA object does not contain sequences for PDB %s." % pdbID)
             else:
                 return []
-        return self[pdbID].keys()
+        return list(self[pdbID].keys())
 
     def match(self, other):
         ''' This is a noisy terminal-printing function at present since there is no need to make it a proper API function.'''
         colortext.message("FASTA Match")
-        for frompdbID, fromchains in sorted(self.iteritems()):
+        for frompdbID, fromchains in sorted(self.items()):
             matched_pdbs = {}
             matched_chains = {}
-            for fromchain, fromsequence in fromchains.iteritems():
-                for topdbID, tochains in other.iteritems():
-                    for tochain, tosequence in tochains.iteritems():
+            for fromchain, fromsequence in fromchains.items():
+                for topdbID, tochains in other.items():
+                    for tochain, tosequence in tochains.items():
                         if fromsequence == tosequence:
                             matched_pdbs[topdbID] = matched_pdbs.get(topdbID, set())
                             matched_pdbs[topdbID].add(fromchain)
@@ -218,12 +218,12 @@ class FASTA(dict):
                             matched_chains[fromchain].append((topdbID, tochain))
             foundmatches = []
             colortext.printf("  %s" % frompdbID, color="silver")
-            for mpdbID, mchains in matched_pdbs.iteritems():
+            for mpdbID, mchains in matched_pdbs.items():
                 if mchains == set(fromchains.keys()):
                     foundmatches.append(mpdbID)
                     colortext.printf("  PDB %s matched PDB %s on all chains" % (mpdbID, frompdbID), color="white")
             if foundmatches:
-                for fromchain, fromsequence in fromchains.iteritems():
+                for fromchain, fromsequence in fromchains.items():
                     colortext.printf("    %s" % (fromchain), color = "silver")
                     colortext.printf("      %s" % (fromsequence), color = self.unique_sequences[fromsequence])
                     mstr = []
@@ -239,12 +239,12 @@ class FASTA(dict):
         self._find_identical_sequences()
         identical_sequences = self.identical_sequences
         s = []
-        s.append(colortext.make("FASTA: Contains these PDB IDs - %s" % ", ".join(self.keys()), color="green"))
+        s.append(colortext.make("FASTA: Contains these PDB IDs - %s" % ", ".join(list(self.keys())), color="green"))
         s.append("Number of unique sequences : %d" % len(self.unique_sequences))
         s.append("Chains:")
-        for pdbID, chains_dict in sorted(self.iteritems()):
+        for pdbID, chains_dict in sorted(self.items()):
             s.append("  %s" % pdbID)
-            for chainID, sequence in chains_dict.iteritems():
+            for chainID, sequence in chains_dict.items():
                 s.append("    %s" % chainID)
                 color = self.unique_sequences[sequence]
                 split_sequence = [sequence[i:i+splitsize] for i in range(0, len(sequence), splitsize)]
@@ -261,7 +261,7 @@ if __name__ == '__main__':
     g = FASTA.retrieve('1A2C', cache_dir = '/tmp')
     h = FASTA.retrieve('3U80', cache_dir = '/tmp')
     i = FASTA.retrieve('3U8O', cache_dir = '/tmp')
-    print(f+g+h+i)
+    print((f+g+h+i))
 
     fastas = FASTA.combine(['1A2P', '1A2C', '3U80', '3U8O'], cache_dir = '/tmp')
     print(fastas)

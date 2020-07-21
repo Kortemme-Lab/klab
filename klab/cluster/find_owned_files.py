@@ -29,7 +29,7 @@ class Reporter:
         self.task=task
         self.a=0
         self.b=0
-        print 'Starting '+task
+        print('Starting '+task)
     def report(self,a,b=0):
         t=time.time()
         self.a=a
@@ -46,20 +46,20 @@ class Reporter:
     def done(self):
         self.output_report()
         sys.stdout.write("\n")
-        print 'Done %s, took %.3f seconds\n' % (self.task,time.time()-self.start)
+        print('Done %s, took %.3f seconds\n' % (self.task,time.time()-self.start))
 
 def find_owner(f):
     return os.stat(f).st_uid
 
 def delete_files_prompt(num_files):
     while(True):
-        prompt = raw_input('Delete all %d files? (yes/no): '%(num_files))
+        prompt = input('Delete all %d files? (yes/no): '%(num_files))
         if prompt == 'yes':
             return True
         if prompt == 'no':
             return False
         else:
-            print 'Invalid choice, must type "yes" or "no"'
+            print('Invalid choice, must type "yes" or "no"')
 
 def sizeof_fmt(num):
     for x in ['bytes','KB','MB','GB']:
@@ -73,7 +73,7 @@ def find_files(input_dir,user):
     total_files_count=0
     owned_files_count=0
     owned_files=[]
-    owned_files_size=long(0)
+    owned_files_size=int(0)
     for directory_root, directory, filenames in os.walk(input_dir):
         for filename in filenames:
             total_files_count+=1
@@ -88,7 +88,7 @@ def find_files(input_dir,user):
             reporter.report(owned_files_count,total_files_count)
 
     reporter.done()
-    print 'Total owned file size: %s\n'%(sizeof_fmt(owned_files_size))
+    print('Total owned file size: %s\n'%(sizeof_fmt(owned_files_size)))
 
     return owned_files
 
@@ -104,7 +104,7 @@ def delete_files(files):
         c+=1
         r.report(c)
     r.done()
-    print '%d deletion failures\n'%(failures)
+    print('%d deletion failures\n'%(failures))
 
 def tar_files(tar_file,input_dir,files):
     # Ensure correct file extension
@@ -174,13 +174,13 @@ def main():
 
     (args,positional_args)=parser.parse_args()
     if len(positional_args)!=1:
-        print 'ERROR: One directory positional argument is required'
+        print('ERROR: One directory positional argument is required')
         sys.exit(1)
     input_dir=positional_args[0]
 
     # Verify and fill in arguments
     if not os.path.isdir(input_dir) or not os.access(input_dir, os.R_OK):
-        print "ERROR: Cannot open directory %s"%(input_dir)
+        print("ERROR: Cannot open directory %s"%(input_dir))
         sys.exit(1)
 
     user=args.user
@@ -193,7 +193,7 @@ def main():
             try:
                 user=pwd.getpwnam(user).pw_uid
             except KeyError:
-                print 'ERROR: Could not lookup user id for user %s'%(args.user)
+                print('ERROR: Could not lookup user id for user %s'%(args.user))
                 sys.exit(1)
 
     files=find_files(input_dir,user)

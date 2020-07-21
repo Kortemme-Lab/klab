@@ -30,7 +30,7 @@ from sqlalchemy.orm.collections import InstrumentedList
 if __name__ == '__main__':
     sys.path.insert(0, '..')
 from klab import colortext
-from mysql import DatabaseInterface
+from .mysql import DatabaseInterface
 
 
 
@@ -129,7 +129,7 @@ def get_or_create_in_transaction(tsession, model, values, missing_columns = [], 
         if read_only == False:
             if sorted(pruned_values.keys()) != sorted(fieldnames):
                 # When adding new records, we require that all necessary fields are present
-                raise Exception('Some required fields are missing: {0}. Either supply these fields or add them to the missing_columns list.'.format(set(fieldnames).difference(pruned_values.keys())))
+                raise Exception('Some required fields are missing: {0}. Either supply these fields or add them to the missing_columns list.'.format(set(fieldnames).difference(list(pruned_values.keys()))))
             instance = model(**pruned_values)
             tsession.add(instance)
             tsession.flush()
@@ -256,10 +256,10 @@ class MySQLSchemaConverter(object):
         try:
             self.db_interface = DatabaseInterface({}, isInnoDB=True, numTries=1, host=host, db=db, user=user, passwd=passwd, port=3306,
                      unix_socket=socket, passwdfile=None, use_utf=False, use_locking=True)
-        except Exception, e:
+        except Exception as e:
             colortext.error('An exception was thrown trying to connect to the database.')
             colortext.warning(str(e))
-            print(traceback.format_exc())
+            print((traceback.format_exc()))
             sys.exit(1)
 
         self.intermediate_schema = {}
@@ -283,7 +283,7 @@ class MySQLSchemaConverter(object):
             if (not restrict_to_tables) or (tbl in restrict_to_tables):
                 colortext.message(tbl)
 
-                print(self.db_interface.execute("SHOW CREATE TABLE %s" % tbl))[0]['Create Table']
+                print((self.db_interface.execute("SHOW CREATE TABLE %s" % tbl))[0]['Create Table'])
                 print('')
                 code = []
                 code.append("class %s(DeclarativeBase):" % tbl)
@@ -300,12 +300,12 @@ class MySQLSchemaConverter(object):
                 schema.extend(code)
 
         imports = []
-        for module, types in sorted(typedefs.iteritems()):
+        for module, types in sorted(typedefs.items()):
             imports.append('from %s import %s' % (module, ', '.join(sorted(types))))
         schema = imports + [''] + schema
 
         colortext.warning('*** SQLAlchemy class definitions ***')
-        print('\n'.join(schema))
+        print(('\n'.join(schema)))
 
 
     def _create_intermediate_schema(self, tbl):
@@ -409,8 +409,8 @@ if __name__ == '__main__':
     script_name = sys.argv[0]
     args = sys.argv[1:]
     if 4 > len(args) or len(args) > 6:
-        print('Usage             : %s [user] [host] [db] [passwd]' % script_name)
-        print('Optional arguments: %s [user] [host] [db] [passwd] [port] [socket]' % script_name)
+        print(('Usage             : %s [user] [host] [db] [passwd]' % script_name))
+        print(('Optional arguments: %s [user] [host] [db] [passwd] [port] [socket]' % script_name))
     else:
         user = args[0]
         host = args[1]

@@ -393,10 +393,12 @@ class PDB(object):
         '''Takes either a pdb file, a list of strings = lines of a pdb file, or another object.'''
 
         self.pdb_content = pdb_content
-        if type(pdb_content) is types.StringType:
+        if type(pdb_content) is bytes:
             self.lines =  pdb_content.split("\n")
         else:
-            self.lines = [line.strip() for line in pdb_content]
+            #self.lines = [line.strip() for line in pdb_content]
+            # Change - for python3 compatibility?
+            self.lines = pdb_content.split('\n')
         self.parsed_lines = {}
         self.structure_lines = []                       # For ATOM and HETATM records
         self.ddGresmap = None
@@ -472,7 +474,7 @@ class PDB(object):
         # If there is a chain with a blank ID, change that ID to a valid unused ID
         if ' ' in chains:
             fresh_id = None
-            allowed_chain_ids = list(string.uppercase) + list(string.lowercase) + map(str, range(10))
+            allowed_chain_ids = list(string.uppercase) + list(string.lowercase) + list(map(str, list(range(10))))
             for c in chains:
                 try: allowed_chain_ids.remove(c)
                 except: pass
@@ -728,7 +730,7 @@ class PDB(object):
             modified_residue_mapping_3 = {}
 
             # Add in the patch
-            for k, v in modified_residues_patch.get(self.pdb_id, {}).iteritems():
+            for k, v in modified_residues_patch.get(self.pdb_id, {}).items():
                 modified_residue_mapping_3[k] = v
 
             for line in self.parsed_lines["MODRES"]:
@@ -842,7 +844,7 @@ class PDB(object):
            '''
 
         residue_ids_to_ignore = set([str(r).strip() for r in residue_ids_to_ignore])
-        for k, v in typed_residue_ids_to_ignore.iteritems():
+        for k, v in typed_residue_ids_to_ignore.items():
             typed_residue_ids_to_ignore[k] = v.strip()
 
         assert(len(chain_ids) > 0)
@@ -870,13 +872,13 @@ class PDB(object):
                             skip = True
                 if skip:
                     if not silent:
-                        print('Skipping residue {0} as requested.'.format(res_id))
+                        print(('Skipping residue {0} as requested.'.format(res_id)))
                     continue
 
                 for c in chain_ids:
                     if (chain_res_ids[c]) not in self.atom_sequences[c].sequence:
                         if not silent:
-                            print('Skipping residue {0} as it is missing from chain {1}.'.format(res_id, c))
+                            print(('Skipping residue {0} as it is missing from chain {1}.'.format(res_id, c)))
                             skip = True
                 if skip:
                     continue
@@ -912,7 +914,7 @@ class PDB(object):
             seq = str(sequences[c])
             if header:
                 fasta_string += '>%s|%s|PDBID|CHAIN|SEQUENCE\n' % (self.pdb_id, c)
-                for line in [seq[x:x+length] for x in xrange(0, len(seq), length)]:
+                for line in [seq[x:x+length] for x in range(0, len(seq), length)]:
                     fasta_string += line + '\n'
             else:
                 fasta_string += seq
@@ -1008,7 +1010,7 @@ class PDB(object):
 
 
     def get_UniProt_ACs(self):
-        return [v['dbAccession'] for k, v in self.get_DB_references().get(self.pdb_id, {}).get('UNIPROT', {}).iteritems()]
+        return [v['dbAccession'] for k, v in self.get_DB_references().get(self.pdb_id, {}).get('UNIPROT', {}).items()]
 
 
     def get_DB_references(self):
@@ -1132,7 +1134,7 @@ class PDB(object):
             for field in MOL_fields:
                 field = field.split(":")
                 if not(1 <= len(field) <= 2):
-                    print(MD, field)
+                    print((MD, field))
                 assert(1 <= len(field) <= 2)
                 if len(field) == 2: # Hack for 1MBG - missing field value
                     field_name = COMPND_field_map[field[0].strip()]
@@ -1143,7 +1145,7 @@ class PDB(object):
 
             # Required (by us) fields
             molecule['MoleculeID'] = int(molecule['MoleculeID'])
-            molecule['Chains'] = map(string.strip, molecule['Chains'].split(','))
+            molecule['Chains'] = list(map(string.strip, molecule['Chains'].split(',')))
             for c in molecule['Chains']:
                 assert(len(c) == 1)
 
@@ -1166,8 +1168,8 @@ class PDB(object):
                 molecule['Mutation'] = None
 
             # Add missing fields
-            for k in COMPND_field_map.values():
-                if k not in molecule.keys():
+            for k in list(COMPND_field_map.values()):
+                if k not in list(molecule.keys()):
                     molecule[k] = None
 
             molecules[molecule['MoleculeID']] = molecule
@@ -1200,7 +1202,7 @@ class PDB(object):
             assert(MoleculeID in molecules)
             molecule = molecules[MoleculeID]
 
-            for field_name, field_data in new_molecule.iteritems():
+            for field_name, field_data in new_molecule.items():
                 if field_name != 'MoleculeID':
                     molecule[field_name] = field_data
 
@@ -1216,11 +1218,11 @@ class PDB(object):
                 raise PDBParsingException("Error parsing SYNTHETIC field of SOURCE lines. Expected 'YES' or 'NO', got '%s'." % molecule['Synthetic'])
 
             # Add missing fields
-            for k in SOURCE_field_map.values():
-                if k not in molecule.keys():
+            for k in list(SOURCE_field_map.values()):
+                if k not in list(molecule.keys()):
                     molecule[k] = None
 
-        return [v for k, v in sorted(molecules.iteritems())]
+        return [v for k, v in sorted(molecules.items())]
 
 
     def get_journal(self):
@@ -1275,7 +1277,7 @@ class PDB(object):
         canonical_acid_types.remove('UNK')
         assert(len(canonical_acid_types) == 20)
 
-        for chain_id, tokens in chain_tokens.iteritems():
+        for chain_id, tokens in chain_tokens.items():
 
             # Determine whether the chain is DNA, RNA, or a protein chain
             # 1H38 is a good test for this - it contains DNA (chains E and G and repeated by H, K, N, J, M, P), RNA (chain F, repeated by I, L, O) and protein (chain D, repeated by A,B,C) sequences
@@ -1369,7 +1371,7 @@ class PDB(object):
         self.seqres_chain_order = seqres_chain_order
 
         # Create Sequence objects for the SEQRES sequences
-        for chain_id, sequence in sequences.iteritems():
+        for chain_id, sequence in sequences.items():
             self.seqres_sequences[chain_id] = Sequence.from_sequence(chain_id, sequence, self.chain_types[chain_id])
 
 
@@ -1533,7 +1535,7 @@ class PDB(object):
                         atom_sequences[chain_id].add(PDBResidue(residue_id[0], residue_id[1:], char, chain_type))
 
         # Assign 'Ligand' or 'Heterogen' to all HETATM-only chains
-        for chain_id in present_chain_ids.keys():
+        for chain_id in list(present_chain_ids.keys()):
             if chain_id not in self.chain_types:
                 assert('ATOM  ' not in present_chain_ids[chain_id])
                 self.chain_types[chain_id] = PDB._determine_heterogen_chain_type(hetatm_map.get(chain_id, set()))
@@ -1611,7 +1613,7 @@ class PDB(object):
                 # Use the mapping from the sequence strings to look up the residue IDs and then create a mapping between these residue IDs
                 seqres_to_atom_maps[c] = {}
                 atom_to_seqres_maps[c] = {}
-                for seqres_residue_index, atom_residue_index in mapping.iteritems():
+                for seqres_residue_index, atom_residue_index in mapping.items():
                     seqres_residue_id = seqres_sequence.order[seqres_residue_index - 1] # order is a 0-based list
                     atom_residue_id = atom_sequence.order[atom_residue_index - 1] # order is a 0-based list
                     seqres_to_atom_maps[c][seqres_residue_id] = atom_residue_id
@@ -1639,7 +1641,7 @@ class PDB(object):
         if self.pdb_id and HACKS_pdb_specific_hacks.get(self.pdb_id):
             specific_flag_hacks = HACKS_pdb_specific_hacks[self.pdb_id]
 
-        skeletal_chains = sorted([k for k in self.chain_types.keys() if self.chain_types[k] == 'Protein skeleton'])
+        skeletal_chains = sorted([k for k in list(self.chain_types.keys()) if self.chain_types[k] == 'Protein skeleton'])
         if skeletal_chains:
             raise PDBMissingMainchainAtomsException('The PDB to Rosetta residue map could not be created as chains %s only have CA atoms present.' % ", ".join(skeletal_chains))
 
@@ -1675,14 +1677,14 @@ class PDB(object):
         rosetta_pdb_mappings = {}
         for chain_id in self.atom_chain_order:
             rosetta_pdb_mappings[chain_id] = {}
-        for k, v in mapping.iteritems():
+        for k, v in mapping.items():
             rosetta_residues[k[0]][v['pose_residue_id']] = v
             rosetta_pdb_mappings[k[0]][v['pose_residue_id']] = k
 
         # Create rosetta_sequences map Chain -> Sequence(Residue)
-        for chain_id, v in sorted(rosetta_residues.iteritems()):
+        for chain_id, v in sorted(rosetta_residues.items()):
             chain_type = self.chain_types[chain_id]
-            for rosetta_id, residue_info in sorted(v.iteritems()):
+            for rosetta_id, residue_info in sorted(v.items()):
                 short_residue_type = None
 
                 residue_type = None
@@ -1709,7 +1711,7 @@ class PDB(object):
 
         ## Create SequenceMap objects to map the Rosetta Sequences to the ATOM Sequences
         rosetta_to_atom_sequence_maps = {}
-        for chain_id, rosetta_pdb_mapping in rosetta_pdb_mappings.iteritems():
+        for chain_id, rosetta_pdb_mapping in rosetta_pdb_mappings.items():
             rosetta_to_atom_sequence_maps[chain_id] = SequenceMap.from_dict(rosetta_pdb_mapping)
 
         self.rosetta_to_atom_sequence_maps = rosetta_to_atom_sequence_maps
@@ -1727,14 +1729,14 @@ class PDB(object):
             raise Exception('The PDB to Rosetta mapping has not been determined. Please call construct_pdb_to_rosetta_residue_map first.')
 
         atom_sequence_to_rosetta_mapping = {}
-        for chain_id, mapping in self.rosetta_to_atom_sequence_maps.iteritems():
+        for chain_id, mapping in self.rosetta_to_atom_sequence_maps.items():
             chain_mapping = {}
             for k in mapping:
                 chain_mapping[k[1]] = k[0]
             atom_sequence_to_rosetta_mapping[chain_id] = SequenceMap.from_dict(chain_mapping)
 
         # Add empty maps for missing chains
-        for chain_id, sequence in self.atom_sequences.iteritems():
+        for chain_id, sequence in self.atom_sequences.items():
             if not atom_sequence_to_rosetta_mapping.get(chain_id):
                 atom_sequence_to_rosetta_mapping[chain_id] = SequenceMap()
 
@@ -1746,8 +1748,8 @@ class PDB(object):
         import json
         d = {}
         atom_sequence_to_rosetta_mapping = self.get_atom_sequence_to_rosetta_map()
-        for c, sm in atom_sequence_to_rosetta_mapping.iteritems():
-            for k, v in sm.map.iteritems():
+        for c, sm in atom_sequence_to_rosetta_mapping.items():
+            for k, v in sm.map.items():
                 d[k] = v
         return json.dumps(d, indent = 4, sort_keys = True)
 
@@ -1759,8 +1761,8 @@ class PDB(object):
             raise Exception('The PDB to Rosetta mapping has not been determined. Please call construct_pdb_to_rosetta_residue_map first.')
 
         d = {}
-        for c, sm in self.rosetta_to_atom_sequence_maps.iteritems():
-            for k, v in sm.map.iteritems():
+        for c, sm in self.rosetta_to_atom_sequence_maps.items():
+            for k, v in sm.map.items():
                 d[k] = v
             #d[c] = sm.map
         return json.dumps(d, indent = 4, sort_keys = True)
@@ -1814,7 +1816,7 @@ class PDB(object):
 
     def get_ligand_formulae_as_html(self, oelem = 'span'):
         html_list = {}
-        for k, v in self.ligand_formulae.iteritems():
+        for k, v in self.ligand_formulae.items():
             html_list[k] = v.to_html(oelem = oelem)
         return html_list
 
@@ -1848,18 +1850,18 @@ class PDB(object):
                 hetatms[het_id][res_id][alt_loc] = hetatms[het_id][res_id].get(alt_loc, ElementCounter())
                 hetatms[het_id][res_id][alt_loc].add(atom_name)
 
-        for het_id, res_atoms in hetatms.iteritems():
-            res_ids = res_atoms.keys()
+        for het_id, res_atoms in hetatms.items():
+            res_ids = list(res_atoms.keys())
             for res_id in res_ids:
-                ecs = hetatms[het_id][res_id].values()
+                ecs = list(hetatms[het_id][res_id].values())
                 for x in range(1, len(ecs)):
                     ecs[0].merge(ecs[x])
                 hetatms[het_id][res_id] = ecs[0]
 
         str_mapping = {}
         mapping = {}
-        for het_id, res_atoms in hetatms.iteritems():
-            res_ids = res_atoms.keys()
+        for het_id, res_atoms in hetatms.items():
+            res_ids = list(res_atoms.keys())
             for res_id in res_ids:
                 Hill_notation = hetatms[het_id][res_id]
                 if str_mapping.get(het_id):
@@ -1876,8 +1878,8 @@ class PDB(object):
         if self.ligands == None:
             raise RequestedLigandsWithoutParsingException(PDB._std_ligand_parsing_error_message)
         ligand_codes = set()
-        for c, cligands in self.ligands.iteritems():
-            for seq_id, l in cligands.iteritems():
+        for c, cligands in self.ligands.items():
+            for seq_id, l in cligands.items():
                 ligand_codes.add(l.PDBCode)
         return sorted(ligand_codes)
 
@@ -1886,8 +1888,8 @@ class PDB(object):
         if self.ions == None:
             raise RequestedIonsWithoutParsingException(PDB._std_ion_parsing_error_message)
         ion_codes = set()
-        for c, cions in self.ions.iteritems():
-            for seq_id, i in cions.iteritems():
+        for c, cions in self.ions.items():
+            for seq_id, i in cions.items():
                 ion_codes.add(i.Element)
         return sorted(ion_codes)
 
@@ -1901,7 +1903,7 @@ class PDB(object):
         else:
             if solution_id:
                 d = {}
-                for chain_id, solution_residue_ids in self.solution.iteritems():
+                for chain_id, solution_residue_ids in self.solution.items():
                     d[chain_id] = copy.deepcopy(self.solution[chain_id].get(solution_id, []))
                 return d
             else:
@@ -1952,7 +1954,7 @@ class PDB(object):
             else:
                 assert(het_id not in het_synonyms)
                 het_synonyms[het_id] = description.strip()
-        for het_id, synonymns_str in het_synonyms.iteritems():
+        for het_id, synonymns_str in het_synonyms.items():
             het_synonyms[het_id] = [s.strip() for s in synonymns_str.split(';')]
 
         for het_id in het_ids:
@@ -2026,8 +2028,8 @@ class PDB(object):
                 else:
                     hetatm_molecules[chain_id][het_seq_id] = [het_id, 1]
 
-        for chain_id, seq_ids in sorted(hetatm_molecules.iteritems()):
-            for het_seq_id, tpl in sorted(seq_ids.iteritems()):
+        for chain_id, seq_ids in sorted(hetatm_molecules.items()):
+            for het_seq_id, tpl in sorted(seq_ids.items()):
                 het_id = tpl[0]
                 numHetAtoms  = tpl[1]
                 description = common_solutions.get(het_id, het_id)
@@ -2091,7 +2093,7 @@ class PDB(object):
             # Compute the mean and standard deviation for the list of B-factors of each residue
             B_factor_per_residue = {}
             mean_per_residue = []
-            for chain_residue_id, bfactor_list in bfactors.iteritems():
+            for chain_residue_id, bfactor_list in bfactors.items():
                 mean, stddev, variance = get_mean_and_standard_deviation(bfactor_list)
                 B_factor_per_residue[chain_residue_id] = dict(mean = mean, stddev = stddev)
                 mean_per_residue.append(mean)
@@ -2162,7 +2164,7 @@ class PDB(object):
                             if RemoveIncompleteResidues and essential_atoms_1.intersection(current_atoms) != essential_atoms_1 and essential_atoms_2.intersection(current_atoms) != essential_atoms_2:
                                 oldChain = resid_list[-1][0]
                                 oldResidueID = resid_list[-1][1:]
-                                print("The last residue '%s', %s, in chain %s is missing these atoms: %s." % (resid_list[-1], residue_longname, oldChain, essential_atoms_1.difference(current_atoms) or essential_atoms_2.difference(current_atoms)))
+                                print(("The last residue '%s', %s, in chain %s is missing these atoms: %s." % (resid_list[-1], residue_longname, oldChain, essential_atoms_1.difference(current_atoms) or essential_atoms_2.difference(current_atoms))))
                                 resid_set.remove(resid_list[-1])
                                 #print("".join(resid_list))
                                 resid_list = resid_list[:-1]
@@ -2205,16 +2207,16 @@ class PDB(object):
                     current_atoms.add(line[12:15].strip())
         if RemoveIncompleteFinalResidues:
             # These are (probably) necessary for Rosetta to keep the residue. Rosetta does throw away residues where only the N atom is present if that residue is at the end of a chain.
-            for chainID, sequence_list in sequences.iteritems():
+            for chainID, sequence_list in sequences.items():
                 if not(removed_residue[chainID]):
                     if essential_atoms_1.intersection(atoms_read[chainID]) != essential_atoms_1 and essential_atoms_2.intersection(atoms_read[chainID]) != essential_atoms_2:
-                        print("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms_1.difference(atoms_read[chainID]) or essential_atoms_2.difference(atoms_read[chainID])))
+                        print(("The last residue %s of chain %s is missing these atoms: %s." % (sequence_list[-1], chainID, essential_atoms_1.difference(atoms_read[chainID]) or essential_atoms_2.difference(atoms_read[chainID]))))
                         oldResidueID = sequence_list[-1][1:]
                         residue_map[chainID] = residue_map[chainID][0:-1]
                         sequences[chainID] = sequence_list[0:-1]
 
 
-        for chainID, sequence_list in sequences.iteritems():
+        for chainID, sequence_list in sequences.items():
             sequences[chainID] = "".join(sequence_list)
             assert(sequences[chainID] == "".join([res_details[1] for res_details in residue_map[chainID]]))
         for chainID in chains:
@@ -2222,9 +2224,9 @@ class PDB(object):
                 self.RAW_ATOM_SEQUENCE.append((chainID, a_acid))
 
         residue_objects = {}
-        for chainID in residue_map.keys():
+        for chainID in list(residue_map.keys()):
             residue_objects[chainID] = []
-        for chainID, residue_list in residue_map.iteritems():
+        for chainID, residue_list in residue_map.items():
             for res_pair in residue_list:
                 resid = res_pair[0]
                 resaa = res_pair[1]
@@ -2283,14 +2285,14 @@ class PDB(object):
         else:
             try:
                 return float(occstring)
-            except ValueError, TypeError:
+            except ValueError as TypeError:
                 return 0
 
     def removeUnoccupied(self):
         self.lines = [line for line in self.lines if not (line.startswith("ATOM") and PDB.getOccupancy(line) == 0)]
 
     def fillUnoccupied(self):
-        for i in xrange(len(self.lines)):
+        for i in range(len(self.lines)):
             line = self.lines[i]
             if line.startswith("ATOM") and PDB.getOccupancy(line) == 0:
                 self.lines[i] = line[:54] + "  1.00" + line[60:]
@@ -2300,7 +2302,7 @@ class PDB(object):
 
         backbone_atoms = set(["N", "CA", "C", "O"])
 
-        for i in xrange(len(self.lines)):
+        for i in range(len(self.lines)):
             line = self.lines[i]
             if line.startswith("ATOM") and line[12:16].strip() in backbone_atoms and PDB.getOccupancy(line) == 0:
                 self.lines[i] = line[:54] + "  1.00" + line[60:]
@@ -2308,7 +2310,7 @@ class PDB(object):
     def fix_chain_id(self):
         """fill in missing chain identifier"""
 
-        for i in xrange(len(self.lines)):
+        for i in range(len(self.lines)):
             line = self.lines[i]
             if line.startswith("ATOM") and line[21] == ' ':
                 self.lines[i] = line[:21] + 'A' + line[22:]
@@ -2485,7 +2487,7 @@ class PDB(object):
                 if resname in reslist:
                     foundRes[resname] = True
 
-        return foundRes.keys()
+        return list(foundRes.keys())
 
     def get_residue_id_to_type_map(self):
         '''Returns a dictionary mapping 6-character residue IDs (Chain, residue number, insertion code e.g. "A 123B") to the
@@ -2690,7 +2692,7 @@ class PDB(object):
             for pos in chainResPositions[resid]:
                 for data in shash.nearby(pos):
                     neighbor_list[data[1]] = True
-            neighbors[resid] = neighbor_list.keys()
+            neighbors[resid] = list(neighbor_list.keys())
 
         return neighbors
 
@@ -2850,7 +2852,7 @@ class PDB(object):
                     #       This may now be too permissive.
                     if True or not usingClassic:
                         commonToAllAlternatives = [0, 0, 0, 0]#, 0]
-                        for conformation, bba in backboneAtoms.items():
+                        for conformation, bba in list(backboneAtoms.items()):
                             for atomocc in range(CAINDEX + 1):
                                 if conformation != " " and backboneAtoms[conformation][atomocc]:
                                     commonToAllAlternatives[atomocc] += backboneAtoms[conformation][atomocc]
@@ -2864,7 +2866,7 @@ class PDB(object):
                         commonConformationHasAllBBAtoms = backboneAtoms[" "][atomocc] and commonConformationHasAllBBAtoms
 
                     ps = ""
-                    for conformation, bba in backboneAtoms.items():
+                    for conformation, bba in list(backboneAtoms.items()):
 
                         # Add the backbone atoms of the common conformation to all alternatives
                         if not usingClassic:
@@ -3137,7 +3139,7 @@ class PDB(object):
         if expected_num_residues != None:
             assert(len(atoms) == expected_num_residues)
         if expected_num_residue_atoms != None:
-            for res_id, atom_details in atoms.iteritems():
+            for res_id, atom_details in atoms.items():
                 assert(len(atom_details) == expected_num_residue_atoms)
 
         if include_all_columns:
@@ -3156,7 +3158,7 @@ def sequence(pdb_filepath):
             from klab.bio import pdb
             print(pdb.sequence('1234.pdb'))
     '''
-    return '\n'.join(['{0}\n{1}'.format(chain_id, str(seq)) for chain_id, seq in sorted(PDB.from_filepath(pdb_filepath).atom_sequences.iteritems())])
+    return '\n'.join(['{0}\n{1}'.format(chain_id, str(seq)) for chain_id, seq in sorted(PDB.from_filepath(pdb_filepath).atom_sequences.items())])
 
 
 if __name__ == "__main__":
@@ -3181,15 +3183,15 @@ if __name__ == "__main__":
     for x in all:
       if x not in new:
         new.append(x)
-        print x
+        print(x)
 
 
-    print pdbobj.neighbors2(d, 'A  26')
-    print pdbobj.neighbors2(d, 'A  44')
-    print pdbobj.neighbors2(d, 'A  48')
-    print pdbobj.neighbors2(d, 'A  64')
-    print pdbobj.neighbors2(d, 'A 157')
-    print pdbobj.neighbors2(d, 'A 163')
+    print(pdbobj.neighbors2(d, 'A  26'))
+    print(pdbobj.neighbors2(d, 'A  44'))
+    print(pdbobj.neighbors2(d, 'A  48'))
+    print(pdbobj.neighbors2(d, 'A  64'))
+    print(pdbobj.neighbors2(d, 'A 157'))
+    print(pdbobj.neighbors2(d, 'A 163'))
     # print pdbobj.aa_resid2type()
 
     # pdbobj.remove_hetatm()

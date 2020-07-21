@@ -1,4 +1,4 @@
-from __future__ import division
+
 
 def load_subs_matrix(matrix_name):
     import Bio.SubsMat.MatrixInfo as matrix_info

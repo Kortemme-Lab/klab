@@ -93,7 +93,7 @@ def bakan_bahar_ensemble_align(coords, tolerance = 0.001, verbose = False ):
     cycle_count = 0
     while( rmsd_tolerance > tolerance ):
         if verbose:
-            print 'Cycle %d alignment, current tolerance: %.4f (threshold %.4f)' % (cycle_count, rmsd_tolerance, tolerance)
+            print('Cycle %d alignment, current tolerance: %.4f (threshold %.4f)' % (cycle_count, rmsd_tolerance, tolerance))
         old_average_struct_coords = average_struct_coords
         coords = np.array([ kabsch( average_struct_coords, x ) for x in coords ])
         average_struct_coords = np.mean( coords, axis = 0 )

@@ -10,7 +10,7 @@ Created by Shane O'Connor 2016.
 
 import datetime
 import os
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import string
 
 from klab import colortext
@@ -173,7 +173,7 @@ class BLAST(object):
 
         # POST the request and parse the PDB hits
         result = self._post(xml_query)
-        hits = map(str, [l.strip().split(':')[0] for l in result.split('\n') if l.strip()])
+        hits = list(map(str, [l.strip().split(':')[0] for l in result.split('\n') if l.strip()]))
         query_data['hits'] = hits
 
         # Cache the results
@@ -221,8 +221,8 @@ class BLAST(object):
 
     def _post(self, xml_query):
         '''POST the request.'''
-        req = urllib2.Request(url = 'http://www.rcsb.org/pdb/rest/search', data=xml_query)
-        f = urllib2.urlopen(req)
+        req = urllib.request.Request(url = 'http://www.rcsb.org/pdb/rest/search', data=xml_query)
+        f = urllib.request.urlopen(req)
         return f.read().strip()
 
 

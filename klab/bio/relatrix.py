@@ -10,13 +10,13 @@ Created by Shane O'Connor 2013
 import types
 import traceback
 
-from fasta import FASTA
-from pdb import PDB, PDBMissingMainchainAtomsException, ROSETTA_HACKS_residues_to_remove
-from pdbml import PDBML
-from clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
+from .fasta import FASTA
+from .pdb import PDB, PDBMissingMainchainAtomsException, ROSETTA_HACKS_residues_to_remove
+from .pdbml import PDBML
+from .clustalo import PDBUniParcSequenceAligner, MultipleAlignmentException
 from klab import colortext
-from basics import Sequence, SequenceMap, UniParcPDBSequenceMap
-from sifts import SIFTS, MissingSIFTSRecord, BadSIFTSMapping, NoSIFTSPDBUniParcMapping
+from .basics import Sequence, SequenceMap, UniParcPDBSequenceMap
+from .sifts import SIFTS, MissingSIFTSRecord, BadSIFTSMapping, NoSIFTSPDBUniParcMapping
 
 use_seqres_sequence_for_fasta_sequence = set(['1A2C', '4CPA', '2ATC', '1OLR'])
 use_fasta_sequence_for_seqres_sequence = set(['1DEQ'])
@@ -83,7 +83,7 @@ class ResidueRelatrix(object):
         assert(0.0 <= acceptable_sequence_percentage_match <= 100.0)
         assert(0.0 <= acceptable_sifts_sequence_percentage_match <= 100.0)
 
-        if not((type(pdb_id) == types.StringType or type(pdb_id) == type(u'')) and len(pdb_id) == 4 and pdb_id.isalnum()):
+        if not((type(pdb_id) == bytes or type(pdb_id) == type('')) and len(pdb_id) == 4 and pdb_id.isalnum()):
             raise Exception("Expected an 4-character long alphanumeric PDB identifer. Received '%s'." % str(pdb_id))
         self.pdb_id = pdb_id.upper()
         self.silent = silent
@@ -189,12 +189,12 @@ class ResidueRelatrix(object):
     def convert_from_rosetta(self, residue_id, to_scheme):
         '''A simpler conversion function to convert from Rosetta numbering without requiring the chain identifier.'''
 
-        assert(type(residue_id) == types.IntType)
+        assert(type(residue_id) == int)
 
         # Find the chain_id associated with the residue_id
         # Scan *all* sequences without breaking out to make sure that we do not have any duplicate maps
         chain_id = None
-        for c, sequence in self.rosetta_sequences.iteritems():
+        for c, sequence in self.rosetta_sequences.items():
             for id, r in sequence:
                 if r.ResidueID == residue_id:
                     assert(chain_id == None)
@@ -218,7 +218,7 @@ class ResidueRelatrix(object):
     def _validate_fasta_vs_seqres(self):
         '''Check that the FASTA and SEQRES sequences agree (they sometimes differ)'''
         pdb_id = self.pdb_id
-        for chain_id, sequence in self.pdb.seqres_sequences.iteritems():
+        for chain_id, sequence in self.pdb.seqres_sequences.items():
             if str(sequence) != self.FASTA[pdb_id][chain_id]:
                 if self.pdb_id in use_seqres_sequence_for_fasta_sequence:
                     self.FASTA.replace_sequence(self.pdb_id, chain_id, str(sequence))
@@ -233,7 +233,7 @@ class ResidueRelatrix(object):
         '''Make sure the domains and ranges of the SequenceMaps match the Sequences.'''
 
         # rosetta_to_atom_sequence_maps
-        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.items():
             # Check that all Rosetta residues have a mapping
             assert(sorted(sequence_map.keys()) == sorted(self.rosetta_sequences[chain_id].ids()))
 
@@ -241,10 +241,10 @@ class ResidueRelatrix(object):
             rng = set(sequence_map.values())
             atom_residue_ids = set(self.atom_sequences[chain_id].ids())
             assert(rng.intersection(atom_residue_ids) == rng)
-            assert(len(rng) == len(sequence_map.values()))
+            assert(len(rng) == len(list(sequence_map.values())))
 
         # atom_to_seqres_sequence_maps
-        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.items():
             # Check that all ATOM residues have a mapping
             #print(sorted(sequence_map.keys()))
             #print(sorted(self.atom_sequences[chain_id].ids()))
@@ -254,10 +254,10 @@ class ResidueRelatrix(object):
             rng = set(sequence_map.values())
             seqres_residue_ids = set(self.seqres_sequences[chain_id].ids())
             assert(rng.intersection(seqres_residue_ids) == rng)
-            assert(len(rng) == len(sequence_map.values()))
+            assert(len(rng) == len(list(sequence_map.values())))
 
         # seqres_to_uniparc_sequence_maps
-        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.items():
             # Check that acceptable_sequence_percentage_match% of all SEQRES residues have a mapping (there may have been
             # insertions or bad mismatches i.e. low BLOSUM62/PAM250 scores). I chose 80% arbitrarily but this can be overridden
             #  with the acceptable_sequence_percentage_match argument to the constructor.
@@ -274,26 +274,26 @@ class ResidueRelatrix(object):
 
             # Check that all UniParc residues in the mapping exist and that the mapping is injective
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
-                rng = set([v[1] for v in sequence_map.values()])
+                rng = set([v[1] for v in list(sequence_map.values())])
                 uniparc_chain_id = self.pdb_chain_to_uniparc_chain_mapping[chain_id]
                 uniparc_residue_ids = set(self.uniparc_sequences[uniparc_chain_id].ids())
                 assert(rng.intersection(uniparc_residue_ids) == rng)
-                if len(rng) != len(sequence_map.values()):
+                if len(rng) != len(list(sequence_map.values())):
                     rng_vals = set()
-                    for x in sequence_map.values():
+                    for x in list(sequence_map.values()):
                         if x[1] in rng_vals:
                             err_msg = ['The SEQRES to UniParc map is not injective for %s, chain %s; the element %s occurs more than once in the range.' % (self.pdb_id, chain_id, str(x))]
 
                             err_msg.append(colortext.make('The seqres_to_uniparc_sequence_maps mapping is:', color = 'green'))
-                            for k, v in sequence_map.map.iteritems():
+                            for k, v in sequence_map.map.items():
                                 err_msg.append(' %s -> %s' % (str(k).ljust(7), str(v).ljust(20)))
 
                             err_msg.append(colortext.make('The clustal_seqres_to_uniparc_sequence_maps mapping is:', color = 'green'))
-                            for k, v in self.clustal_seqres_to_uniparc_sequence_maps[chain_id].map.iteritems():
+                            for k, v in self.clustal_seqres_to_uniparc_sequence_maps[chain_id].map.items():
                                 err_msg.append(' %s -> %s' % (str(k).ljust(7), str(v).ljust(20)))
 
                             err_msg.append(colortext.make('The sifts_seqres_to_uniparc_sequence_maps mapping is:', color = 'green'))
-                            for k, v in self.sifts_seqres_to_uniparc_sequence_maps[chain_id].map.iteritems():
+                            for k, v in self.sifts_seqres_to_uniparc_sequence_maps[chain_id].map.items():
                                 err_msg.append(' %s -> %s' % (str(k).ljust(7), str(v).ljust(20)))
 
                             raise Exception('\n'.join(err_msg))
@@ -304,35 +304,35 @@ class ResidueRelatrix(object):
         '''Check that the ID types are integers for Rosetta, SEQRES, and UniParc sequences and 6-character PDB IDs for the ATOM sequences.'''
 
         for sequences in [self.uniparc_sequences, self.fasta_sequences, self.seqres_sequences, self.rosetta_sequences]:
-            for chain_id, sequence in sequences.iteritems():
+            for chain_id, sequence in sequences.items():
                 sequence_id_types = set(map(type, sequence.ids()))
                 if sequence_id_types:
                     assert(len(sequence_id_types) == 1)
-                    assert(sequence_id_types.pop() == types.IntType)
+                    assert(sequence_id_types.pop() == int)
 
-        for chain_id, sequence in self.atom_sequences.iteritems():
+        for chain_id, sequence in self.atom_sequences.items():
             sequence_id_types = set(map(type, sequence.ids()))
             assert(len(sequence_id_types) == 1)
             sequence_id_type = sequence_id_types.pop()
-            assert(sequence_id_type == types.StringType or sequence_id_type == types.UnicodeType)
+            assert(sequence_id_type == bytes or sequence_id_type == str)
 
 
     def _validate_residue_types(self):
         '''Make sure all the residue types map through translation.'''
 
-        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.items():
             rosetta_sequence = self.rosetta_sequences[chain_id]
             atom_sequence = self.atom_sequences[chain_id]
             for rosetta_id, atom_id, _ in sequence_map:
                 assert(rosetta_sequence[rosetta_id].ResidueAA == atom_sequence[atom_id].ResidueAA)
 
-        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.items():
             atom_sequence = self.atom_sequences[chain_id]
             seqres_sequence = self.seqres_sequences[chain_id]
             for atom_id, seqres_id, _ in sorted(sequence_map):
                 assert(atom_sequence[atom_id].ResidueAA == seqres_sequence[seqres_id].ResidueAA)
 
-        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.items():
             if self.pdb_chain_to_uniparc_chain_mapping.get(chain_id):
                 seqres_sequence = self.seqres_sequences[chain_id]
                 uniparc_sequence = self.uniparc_sequences[self.pdb_chain_to_uniparc_chain_mapping[chain_id]]
@@ -350,14 +350,14 @@ class ResidueRelatrix(object):
         # We have already determined that the inverse maps are well-defined (the normal maps are injective). The inverse maps will be partial maps in general.
 
         self.atom_to_rosetta_sequence_maps = {}
-        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.rosetta_to_atom_sequence_maps.items():
             s = SequenceMap()
             for k, v, substitution_match in sequence_map:
                 s.add(v, k, substitution_match)
             self.atom_to_rosetta_sequence_maps[chain_id] = s
 
         self.seqres_to_atom_sequence_maps = {}
-        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.atom_to_seqres_sequence_maps.items():
             s = SequenceMap()
             for k, v, substitution_match in sequence_map:
                 s.add(v, k, substitution_match)
@@ -365,7 +365,7 @@ class ResidueRelatrix(object):
 
         # This map uses PDB chain IDs as PDB chains may map to zero or one UniParc IDs whereas UniParc IDs may map to many PDB chains
         self.uniparc_to_seqres_sequence_maps = {}
-        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.iteritems():
+        for chain_id, sequence_map in self.seqres_to_uniparc_sequence_maps.items():
             s = UniParcPDBSequenceMap()
             for k, v, substitution_match in sequence_map:
                 s.add(v, k, substitution_match)
@@ -379,7 +379,7 @@ class ResidueRelatrix(object):
             self.sifts_seqres_to_uniparc_sequence_maps = self.sifts.seqres_to_uniparc_sequence_maps
             self.sifts_atom_to_uniparc_sequence_maps = self.sifts.atom_to_uniparc_sequence_maps
             if self.pdb_id in pdbs_with_do_not_use_SIFTS_for_these_chains:
-                for chain_id in self.sifts_atom_to_seqres_sequence_maps.keys() + self.sifts_seqres_to_uniparc_sequence_maps.keys() + self.sifts_atom_to_uniparc_sequence_maps.keys():
+                for chain_id in list(self.sifts_atom_to_seqres_sequence_maps.keys()) + list(self.sifts_seqres_to_uniparc_sequence_maps.keys()) + list(self.sifts_atom_to_uniparc_sequence_maps.keys()):
                     if (self.pdb_id, chain_id) in do_not_use_SIFTS_for_these_chains:
                         self.sifts_atom_to_seqres_sequence_maps[chain_id] = SequenceMap()
                         self.sifts_seqres_to_uniparc_sequence_maps = SequenceMap()
@@ -387,7 +387,7 @@ class ResidueRelatrix(object):
 
         if self.pdb_to_rosetta_residue_map_error:
             self.rosetta_to_atom_sequence_maps = {}
-            for c in self.atom_sequences.keys():
+            for c in list(self.atom_sequences.keys()):
                 self.rosetta_to_atom_sequence_maps[c] = SequenceMap()
         else:
             self.rosetta_to_atom_sequence_maps = self.pdb.rosetta_to_atom_sequence_maps
@@ -418,7 +418,7 @@ class ResidueRelatrix(object):
         elif self.sifts:
             self.atom_to_seqres_sequence_maps = {}
             self.seqres_to_uniparc_sequence_maps = {}
-            for c, seqmap in sorted(self.pdbml_atom_to_seqres_sequence_maps.iteritems()):
+            for c, seqmap in sorted(self.pdbml_atom_to_seqres_sequence_maps.items()):
                 if self.sequence_types[c] == 'Protein' or self.sequence_types[c] == 'Protein skeleton':
                     try:
                         if self.sifts_atom_to_seqres_sequence_maps.get(c):
@@ -426,19 +426,19 @@ class ResidueRelatrix(object):
                             self.atom_to_seqres_sequence_maps[c] = self.pdbml_atom_to_seqres_sequence_maps[c] + self.sifts_atom_to_seqres_sequence_maps[c]
                         else:
                             self.atom_to_seqres_sequence_maps[c] = self.pdbml_atom_to_seqres_sequence_maps[c]
-                    except Exception, e:
+                    except Exception as e:
                         raise colortext.Exception("Mapping cross-validation failed checking atom to seqres sequence maps between PDBML and SIFTS in %s, chain %s: %s" % (self.pdb_id, c, str(e)))
                 else:
                     self.atom_to_seqres_sequence_maps[c] = seqmap
 
-            for c, seqmap in sorted(self.clustal_seqres_to_uniparc_sequence_maps.iteritems()):
+            for c, seqmap in sorted(self.clustal_seqres_to_uniparc_sequence_maps.items()):
                 if self.sequence_types[c] == 'Protein' or self.sequence_types[c] == 'Protein skeleton':
                     if (self.pdb_id, c) in use_SIFTS_match_for_seqres_sequence:
                         #assert(seqres_sequence[seqres_id].ResidueAA == uniparc_sequence[uniparc_id].ResidueAA)
                         if (self.pdb_id, c) not in known_bad_clustal_to_sifts_mappings:
                             # Flag cases for manual inspection
-                            assert(self.clustal_seqres_to_uniparc_sequence_maps[c].keys() == self.sifts_seqres_to_uniparc_sequence_maps[c].keys())
-                        for k in self.clustal_seqres_to_uniparc_sequence_maps[c].keys():
+                            assert(list(self.clustal_seqres_to_uniparc_sequence_maps[c].keys()) == list(self.sifts_seqres_to_uniparc_sequence_maps[c].keys()))
+                        for k in list(self.clustal_seqres_to_uniparc_sequence_maps[c].keys()):
                             v_1 = self.clustal_seqres_to_uniparc_sequence_maps[c][k]
                             v_2 = self.sifts_seqres_to_uniparc_sequence_maps[c][k]
 
@@ -463,7 +463,7 @@ class ResidueRelatrix(object):
                             self.seqres_to_uniparc_sequence_maps[c] = self.clustal_seqres_to_uniparc_sequence_maps[c] + self.sifts_seqres_to_uniparc_sequence_maps[c]
                         else:
                             self.seqres_to_uniparc_sequence_maps[c] = self.clustal_seqres_to_uniparc_sequence_maps[c]
-                    except Exception, e:
+                    except Exception as e:
                         colortext.warning(traceback.format_exc())
                         colortext.error(str(e))
                         raise colortext.Exception("Mapping cross-validation failed checking atom to seqres sequence maps between Clustal and SIFTS in %s, chain %s." % (self.pdb_id, c))
@@ -478,7 +478,7 @@ class ResidueRelatrix(object):
             from the sequence e.g. 1A2P, residue 'B   3 ' is removed because Rosetta barfs on it. Here, we prune the maps so that their
             domains do not have elements that were removed from sequences.'''
 
-        for c, seq in self.atom_sequences.iteritems():
+        for c, seq in self.atom_sequences.items():
             res_ids = [r[0] for r in seq]
             for_removal = []
             for k, _, _ in self.atom_to_seqres_sequence_maps[c]:
@@ -523,7 +523,7 @@ class ResidueRelatrix(object):
 
         if self.pdb_to_rosetta_residue_map_error:
             self.rosetta_sequences = {}
-            for c in self.atom_sequences.keys():
+            for c in list(self.atom_sequences.keys()):
                 self.rosetta_sequences[c] = Sequence()
         else:
             self.rosetta_sequences = self.pdb.rosetta_sequences
@@ -531,20 +531,20 @@ class ResidueRelatrix(object):
         # Update the chain types for the UniParc sequences
         uniparc_pdb_chain_mapping = {}
         if self.pdb_id not in do_not_use_the_sequence_aligner:
-            for pdb_chain_id, matches in self.PDB_UniParc_SA.clustal_matches.iteritems():
+            for pdb_chain_id, matches in self.PDB_UniParc_SA.clustal_matches.items():
                 if matches:
                     # we are not guaranteed to have a match e.g. the short chain J in 1A2C, chimeras, etc.
-                    uniparc_chain_id = matches.keys()[0]
+                    uniparc_chain_id = list(matches.keys())[0]
                     assert(len(matches) == 1)
                     uniparc_pdb_chain_mapping[uniparc_chain_id] = uniparc_pdb_chain_mapping.get(uniparc_chain_id, [])
                     uniparc_pdb_chain_mapping[uniparc_chain_id].append(pdb_chain_id)
         else:
-            for pdb_chain_id, uniparc_chain_ids in self.sifts.get_pdb_chain_to_uniparc_id_map().iteritems():
+            for pdb_chain_id, uniparc_chain_ids in self.sifts.get_pdb_chain_to_uniparc_id_map().items():
                 for uniparc_chain_id in uniparc_chain_ids:
                     uniparc_pdb_chain_mapping[uniparc_chain_id] = uniparc_pdb_chain_mapping.get(uniparc_chain_id, [])
                     uniparc_pdb_chain_mapping[uniparc_chain_id].append(pdb_chain_id)
 
-        for uniparc_chain_id, pdb_chain_ids in uniparc_pdb_chain_mapping.iteritems():
+        for uniparc_chain_id, pdb_chain_ids in uniparc_pdb_chain_mapping.items():
             sequence_type = set([self.seqres_sequences[p].sequence_type for p in pdb_chain_ids])
             assert(len(sequence_type) == 1)
             sequence_type = sequence_type.pop()
@@ -554,7 +554,7 @@ class ResidueRelatrix(object):
                 self.pdb_chain_to_uniparc_chain_mapping[p] = uniparc_chain_id
 
         # Update the chain types for the FASTA sequences
-        for chain_id, sequence in self.seqres_sequences.iteritems():
+        for chain_id, sequence in self.seqres_sequences.items():
             self.fasta_sequences[chain_id].set_type(sequence.sequence_type)
 
 
@@ -671,13 +671,13 @@ class ResidueRelatrix(object):
 
                     # We only care about protein chain matches so early out as soon as we have them all matched
                     protein_chain_matches = {}
-                    for _c, _st in self.sequence_types.iteritems():
+                    for _c, _st in self.sequence_types.items():
                         if _st == 'Protein' or _st == 'Protein skeleton':
                             protein_chain_matches[_c] = self.PDB_UniParc_SA.clustal_matches[_c]
                             if protein_chain_matches[_c]:
                                 matched_chains.add(_c)
 
-                    num_matches_per_chain = set(map(len, protein_chain_matches.values()))
+                    num_matches_per_chain = set(map(len, list(protein_chain_matches.values())))
                     if len(num_matches_per_chain) == 1 and num_matches_per_chain.pop() == 1:
                         # We have exactly one match per protein chain. Early out.
                         if not self.silent:
@@ -702,11 +702,11 @@ class ResidueRelatrix(object):
                                 colortext.warning('  %s was not matched' % c)
                         print('')
 
-                    num_matches_per_chain = set(map(len, self.PDB_UniParc_SA.clustal_matches.values()))
+                    num_matches_per_chain = set(map(len, list(self.PDB_UniParc_SA.clustal_matches.values())))
                     if num_matches_per_chain == set([0, 1]):
                         # We got matches but are missing chains
                         self.alignment_cutoff = cut_off
-        except MultipleAlignmentException, e:
+        except MultipleAlignmentException as e:
             # todo: this will probably fail with DNA or RNA so do not include those in the alignment
             raise colortext.Exception("Relatrix construction failed creating the PDBUniParcSequenceAligner object for %s. The cut-off level reached %d%% without finding a match for all chains but at that level, the mapping from chains to UniParc IDs was not injective.\n%s" % (pdb_id, cut_off, str(e)))
         except:

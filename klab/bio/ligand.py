@@ -189,7 +189,7 @@ class Ligand(object):
             header[k] = v
         assert(self.PDBCode.upper() == header['_chem_comp.id'])
 
-        for k in header.keys():
+        for k in list(header.keys()):
             assert(k and k[0] == '_')
             assert(header[k].strip())
         assert(self.PDBCode.upper() == header['_chem_comp.id'])
@@ -532,7 +532,7 @@ class LigandMap(object):
            HET codes and residue IDs should respectively correspond to columns 17:20 and 21:27 of the PDB file.
         '''
         lm = LigandMap()
-        for k, v in pair_dict.iteritems():
+        for k, v in pair_dict.items():
             lm.add(k[0], k[1], v[0], v[1])
         return lm
 
@@ -540,7 +540,7 @@ class LigandMap(object):
     @staticmethod
     def from_code_map(ligand_code_map):
         lm = LigandMap()
-        for k, v in ligand_code_map.iteritems():
+        for k, v in ligand_code_map.items():
             lm.add_code_mapping(k, v)
         return lm
 
@@ -567,13 +567,13 @@ class LigandMap(object):
 
     def is_injective(self):
         '''Returns True if the mapping is injective (1-to-1).'''
-        codomain_residues = [v.to_pdb_residue_id for k, v in self.mapping.iteritems()]
+        codomain_residues = [v.to_pdb_residue_id for k, v in self.mapping.items()]
         return(len(codomain_residues) == len(set(codomain_residues)))
 
 
     def is_complete(self, all_domain_residue_ids):
         '''Check that all ligands (specified via the set or list all_domain_residue_ids containing columns 21:27 of the
            HETATM records) in the source PDB file are considered in the mapping.'''
-        mapped_domain_residues = sorted([v.from_pdb_residue_id for k, v in self.mapping.iteritems()])
+        mapped_domain_residues = sorted([v.from_pdb_residue_id for k, v in self.mapping.items()])
         assert(len(all_domain_residue_ids) == len(set(all_domain_residue_ids)))
         return mapped_domain_residues == sorted(all_domain_residue_ids)

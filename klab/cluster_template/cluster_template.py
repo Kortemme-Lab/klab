@@ -5,7 +5,7 @@ import os
 import sys
 import inspect
 import math
-import cPickle as pickle
+import pickle as pickle
 import copy
 
 path_to_this_module = os.path.abspath( os.path.dirname( inspect.getsourcefile(sys.modules[__name__]) ) )
@@ -29,12 +29,12 @@ def convert_list_arguments_to_list(settings, num_steps):
     l.extend(global_arguments_with_defaults)
     for arg in l:
         if arg in settings:
-            settings[arg + '_list'] = [copy.deepcopy(settings[arg]) for x in xrange(num_steps)]
+            settings[arg + '_list'] = [copy.deepcopy(settings[arg]) for x in range(num_steps)]
             del( settings[arg] )
     return settings
 
 def format_list_to_string(l):
-    assert( not isinstance(l, basestring) )
+    assert( not isinstance(l, str) )
     return_str = ""
     if len(l) == 1:
         return_str += "'%s'" % str( l[0] )
@@ -61,7 +61,7 @@ class ClusterTemplate():
         # Arguments
         self.num_steps = num_steps
         assert( num_steps > 0 )
-        self.job_dicts = [{} for x in xrange(num_steps)]
+        self.job_dicts = [{} for x in range(num_steps)]
         if settings_dict:
             self.set_settings_dict(settings_dict)
 
@@ -96,12 +96,12 @@ class ClusterTemplate():
 
         for arg in required_arguments:
             if arg not in settings_dict:
-                print 'ERROR: Data dictionary missing argument', arg
+                print('ERROR: Data dictionary missing argument', arg)
                 sys.exit(1)
 
         for arg in unrequired_arguments:
             if arg in settings_dict:
-                print 'ERROR: Data dictionary cannot contain argument', arg
+                print('ERROR: Data dictionary cannot contain argument', arg)
                 sys.exit(1)
 
         arguments_with_defaults = self.arguments_with_defaults
@@ -119,14 +119,14 @@ class ClusterTemplate():
 
             if arg in settings_dict:
                 if arg == 'rosetta_args_list':
-                    if not isinstance(settings_dict['rosetta_args_list'], basestring):
+                    if not isinstance(settings_dict['rosetta_args_list'], str):
                         args_str = format_list_to_string(settings_dict['rosetta_args_list'])
-                        settings_dict['rosetta_args_list_list'] = [str(args_str) for x in xrange(self.num_steps)]
+                        settings_dict['rosetta_args_list_list'] = [str(args_str) for x in range(self.num_steps)]
                     else:
                         args_str = settings_dict['rosetta_args_list']
-                        settings_dict['rosetta_args_list_list'] = ["    ['" + str(args_str) + "']\n" for x in xrange(self.num_steps)]
+                        settings_dict['rosetta_args_list_list'] = ["    ['" + str(args_str) + "']\n" for x in range(self.num_steps)]
                 else:
-                    settings_dict[ arg + '_list' ] = [str(settings_dict[arg]) for x in xrange(self.num_steps)]
+                    settings_dict[ arg + '_list' ] = [str(settings_dict[arg]) for x in range(self.num_steps)]
                 del( settings_dict[arg] )
             elif arg + '_list' in settings_dict:
                 if arg == 'rosetta_args_list':
@@ -135,7 +135,7 @@ class ClusterTemplate():
                         subl += '    [' + format_list_to_string(l) + '],\n'
                     settings_dict[ 'rosetta_args_list_list' ] = subl
                 else:
-                    if isinstance(settings_dict[ arg + '_list' ], basestring):
+                    if isinstance(settings_dict[ arg + '_list' ], str):
                         settings_dict[ arg + '_list' ] = '[' + format_list_to_string(settings_dict[ arg + '_list' ]) + ']'
             else:
                 raise Exception("Missing required argument (in _list form or otherwise): " + str(arg))
@@ -183,10 +183,10 @@ class ClusterTemplate():
         first_job_dict_len = len(self.job_dicts[0])
         for job_dict in self.job_dicts[1:]:
             if len(job_dict) != first_job_dict_len:
-                print self.job_dicts[0]
-                print
-                print job_dict
-                print first_job_dict_len, len(job_dict)
+                print(self.job_dicts[0])
+                print()
+                print(job_dict)
+                print(first_job_dict_len, len(job_dict))
                 raise AssertionError
         for arg in self.list_required_arguments:
             assert( arg + '_list' in self.settings_dict )
@@ -197,7 +197,7 @@ class ClusterTemplate():
 
         job_pickle_file_relpaths = []
         output_dir = self.settings_dict['output_dir']
-        for step_num in xrange(self.num_steps):
+        for step_num in range(self.num_steps):
             output_data_dir = os.path.join(output_dir, 'data-%d' % step_num)
 
             job_pickle_file = os.path.join(output_data_dir, self.job_dict_template_name % step_num)

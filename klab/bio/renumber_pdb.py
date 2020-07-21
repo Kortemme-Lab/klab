@@ -29,12 +29,12 @@ import os
 
 def renumber_pdb(pdb_path):
     new_lines = []
-    new_resnum = long(0)
+    new_resnum = int(0)
     last_resnum = None
     with open(pdb_path, 'r') as f:
         for line in f:
             if line.startswith('ATOM') or line.startswith('HETATM'):
-                current_resnum = long( line[22:26].strip() )
+                current_resnum = int( line[22:26].strip() )
                 # print line[22:26]
                 # print len(line[22:26])
                 # print ('%d' % new_resnum).rjust(5) + '\\'

@@ -14,7 +14,7 @@ import string
 from klab.fs.fsio import read_file, create_temp_755_path, write_file
 from klab import colortext
 from klab import process as tprocess
-from colors import ColorScheme
+from .colors import ColorScheme
 
 def create_pymol_selection_from_PDB_residue_ids(residue_list):
     '''Elements of residue_list should be strings extracted from PDB lines from position 21-26 inclusive (zero-indexing)
@@ -27,7 +27,7 @@ def create_pymol_selection_from_PDB_residue_ids(residue_list):
         residues_by_chain[chain_id].append(pruned_residue_id)
 
     str = []
-    for chain_id, residue_list in sorted(residues_by_chain.iteritems()):
+    for chain_id, residue_list in sorted(residues_by_chain.items()):
         str.append('(chain %s and resi %s)' % (chain_id, '+'.join(map(string.strip, sorted(residue_list)))))
     return ' or '.join(str)
 

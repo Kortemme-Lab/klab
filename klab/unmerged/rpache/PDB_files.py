@@ -40,7 +40,7 @@ class PDB:
         self.models=models
 
     def out(self):
-        print self.id
+        print(self.id)
         for model in self.models:
             model.out()
 
@@ -62,7 +62,7 @@ class Model:
         self.chains=chains
 
     def out(self):
-        print self.serial
+        print(self.serial)
         for chain in self.chains:
             chain.out()
 
@@ -96,7 +96,7 @@ class Chain:
         self.molecule=molecule
 
     def out(self):
-        print self.id
+        print(self.id)
         for residue in self.residues:
             residue.out()
 
@@ -117,7 +117,7 @@ class Residue:
         self.atoms=atoms
 
     def out(self):
-        print self.res_seq,self.res_name
+        print(self.res_seq,self.res_name)
         for atom in self.atoms:
             atom.out()
 
@@ -148,7 +148,7 @@ class Atom:
         self.charge=charge
 
     def out(self):
-        print self.type,self.serial,self.name,self.alt_loc,self.res_name,self.chain_id,self.res_seq,self.x,self.y,self.z,self.occupancy,self.temp_factor,self.element,self.charge
+        print(self.type,self.serial,self.name,self.alt_loc,self.res_name,self.chain_id,self.res_seq,self.x,self.y,self.z,self.occupancy,self.temp_factor,self.element,self.charge)
 
     def write(self):
         return self.type+self.serial+' '+self.name+self.alt_loc+self.res_name+' '+self.chain_id+self.res_seq+'   '+self.x+self.y+self.z+self.occupancy+self.temp_factor+self.spacer+self.element+self.charge+'\n'
@@ -226,9 +226,9 @@ def parsePDB(pdb_file_name):
         #----
         elif type.strip()=='ATOM' or type=='HETATM':
             if len(line)<78:
-                print 'ERROR in line:',line_count
-                print line
-                print
+                print('ERROR in line:',line_count)
+                print(line)
+                print()
                 sys.exit()
             #-
             #create new atom
@@ -446,8 +446,8 @@ def cAlphaRMSD(residues_1,residues_2,printWarnings=True):
         residue1=residues_1[i]
         residue2=residues_2[i]
         if residue1.res_seq!=residue2.res_seq and printWarnings:
-            print residue1.res_seq,residue2.res_seq
-            print 'WARNING: calculating RMSD for potentially different positions'
+            print(residue1.res_seq,residue2.res_seq)
+            print('WARNING: calculating RMSD for potentially different positions')
         #-
         atoms_1=residue1.atoms
         atoms_2=residue2.atoms

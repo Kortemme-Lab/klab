@@ -181,7 +181,7 @@ def determine_correct_sign(prediction_data, experimental_data, expect_negative_c
     :return:
     """
     if len(experimental_data['list']) != len(prediction_data['list']):
-        print str("Error: number of experimental values (%d) and prediction values () do not match. Cannot continue.") % (len(experimental_data['list']), len(prediction_data['list']))
+        print(str("Error: number of experimental values (%d) and prediction values () do not match. Cannot continue.") % (len(experimental_data['list']), len(prediction_data['list'])))
         exit()
 
     classifications = {}
@@ -331,7 +331,7 @@ def calculate_mae(prediction_data, experimental_data):
     scaled_mae = np.mean(np.abs(np.array(scaled_prediction) - np.array(experimental_data['array'])))
 
     if prediction_data['slope_through_origin'] < 0.0:
-        print "Warning: Data is anti-correlated for regression through the origin.\nMean absolute error is not an effective metric for anti-correlated data."
+        print("Warning: Data is anti-correlated for regression through the origin.\nMean absolute error is not an effective metric for anti-correlated data.")
         warning = "MAE is not applicable for anti-correlated data."
     return mae, scaled_mae, warning
 
@@ -408,7 +408,7 @@ def parse_csv(csv_lines, expect_negative_correlation = False, STDev_cutoff = 1.0
             prediction_cases['list'].append(float(value))
 
     data['skipped_cases'] = skipped_cases
-    for prediction_id, prediction_cases in data['predictions'].iteritems():
+    for prediction_id, prediction_cases in data['predictions'].items():
         prediction_cases['array'] = np.array(prediction_cases['list'])
         pos_STDev, neg_STDev = get_symmetrical_std_devs(prediction_cases['array'])
         prediction_cases['positive significance threshold'] = pos_STDev
@@ -419,7 +419,7 @@ def parse_csv(csv_lines, expect_negative_correlation = False, STDev_cutoff = 1.0
     data['experimental']['positive significance threshold'] = pos_STDev
     data['experimental']['negative significance threshold'] = neg_STDev
 
-    for prediction_id, prediction_cases in sorted(data['predictions'].iteritems()):
+    for prediction_id, prediction_cases in sorted(data['predictions'].items()):
         slope_through_origin, r_value_through_origin = least_squares_fixed_origin(prediction_cases['array'], data['experimental']['array'])
         slope, intercept, r_value, p_value, std_err = stats.linregress(prediction_cases['array'], data['experimental']['array'])
 
@@ -482,7 +482,7 @@ def parse_csv_file(csv_filepath, expect_negative_correlation = False, STDev_cuto
 def get_std_xy_dataset_statistics(x_values, y_values, expect_negative_correlation = False, STDev_cutoff = 1.0):
     '''Calls parse_csv and returns the analysis in a format similar to get_xy_dataset_statistics in klab.stats.misc.'''
     assert(len(x_values) == len(y_values))
-    csv_lines = ['ID,X,Y'] + [','.join(map(str, [c + 1, x_values[c], y_values[c]])) for c in xrange(len(x_values))]
+    csv_lines = ['ID,X,Y'] + [','.join(map(str, [c + 1, x_values[c], y_values[c]])) for c in range(len(x_values))]
     data = parse_csv(csv_lines, expect_negative_correlation = expect_negative_correlation, STDev_cutoff = STDev_cutoff)
 
     assert(len(data['predictions']) == 1)
@@ -528,7 +528,7 @@ def get_summary(data):
         return ''
     if data['skipped_cases']:
         s.append(colortext.make('\nSkipped {0} cases due to partial data: {1}.\n'.format(len(data['skipped_cases']), ', '.join(data['skipped_cases'])), color = 'yellow'))
-    for prediction_id, prediction_cases in sorted(data['predictions'].iteritems()):
+    for prediction_id, prediction_cases in sorted(data['predictions'].items()):
         pcases = copy.deepcopy(prediction_cases)
 
         pcases['significant_beneficient_sensitivity_n'] = pcases['significant_beneficient_sensitivity'][1]
@@ -556,7 +556,7 @@ Prediction name: {name}
 
 
 def print_summary(data):
-    print(get_summary(data))
+    print((get_summary(data)))
 
 
 ######################
@@ -566,6 +566,6 @@ def print_summary(data):
 
 if __name__ == '__main__':
     datafilename = sys.argv[1]
-    print str("\n\n--Analysis of predictions in %s--") % datafilename
+    print(str("\n\n--Analysis of predictions in %s--") % datafilename)
     parse_csv_file(datafilename, expect_negative_correlation, STDev_cutoff = 1.0, headers_start_with = 'ID')
 

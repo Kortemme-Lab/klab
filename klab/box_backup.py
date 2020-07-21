@@ -61,7 +61,7 @@ import oauth2client
 from oauth2client.contrib.keyring_storage import Storage
 from oauth2client import tools
 
-from Reporter import Reporter
+from .Reporter import Reporter
 
 class FolderTraversalException(Exception):
     pass
@@ -225,7 +225,7 @@ class BoxAPI:
                 return True
             except:
                 if maximum_attempts > 1 and verbose:
-                    print( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) )
+                    print(( 'Uploading file {0} failed attempt {1} of {2}'.format(source_path, trial_counter+1, maximum_attempts) ))
                 elif maximum_attempts == 1:
                     raise
 
@@ -262,20 +262,20 @@ class BoxAPI:
             part_sha1 = read_sha1( source_path, start_byte = file_position, read_size = uploaded_size, extra_hashers = [total_sha1] )
             if part_sha1.hexdigest() != uploaded_sha1:
                 print( '\n' )
-                print( 'Part sha1: ' + part_sha1.hexdigest() )
-                print( 'Uploaded sha1: ' + uploaded_sha1 )
-                print('Sha1 hash of uploaded file {0} ({1}) does not match'.format(file_info.response_object['name'], file_id) )
+                print(( 'Part sha1: ' + part_sha1.hexdigest() ))
+                print(( 'Uploaded sha1: ' + uploaded_sha1 ))
+                print(('Sha1 hash of uploaded file {0} ({1}) does not match'.format(file_info.response_object['name'], file_id) ))
                 return False
 
             file_position += uploaded_size
             total_part_size += uploaded_size
             if len(uploaded_box_file_ids) > 1:
-                print( 'Finished verifying part {0} of {1} of {2}'.format( i+1, len(uploaded_box_file_ids), file_id ) )
+                print(( 'Finished verifying part {0} of {1} of {2}'.format( i+1, len(uploaded_box_file_ids), file_id ) ))
 
         assert( source_file_size == total_part_size )
 
         if verbose:
-            print( 'Verified uploaded file {0} ({1}) with sha1: {2}'.format(source_path, file_id, total_sha1.hexdigest()) )
+            print(( 'Verified uploaded file {0} ({1}) with sha1: {2}'.format(source_path, file_id, total_sha1.hexdigest()) ))
 
         return True
 
@@ -301,11 +301,11 @@ class BoxAPI:
             prev_uploaded_file_ids = self.find_file( destination_folder_id, dest_file_name )
             if len( prev_uploaded_file_ids ) == 1:
                 if verbose:
-                    print ( '\nSkipping upload of split {0} of {1}; already exists'.format( part_count + 1, math.ceil(file_size / split_size) ) )
+                    print(( '\nSkipping upload of split {0} of {1}; already exists'.format( part_count + 1, math.ceil(file_size / split_size) ) ))
                 uploaded_file_ids.extend( prev_uploaded_file_ids )
             else:
                 if verbose:
-                    print ( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) )
+                    print(( '\nUploading split {0} of {1}'.format( part_count + 1, math.ceil(file_size / split_size) ) ))
                 uploaded_file_ids.append( self._chunked_upload(
                     destination_folder_id, source_path,
                     dest_file_name = dest_file_name,
@@ -408,7 +408,7 @@ class BoxAPI:
                 except:
                     if attempt_number >= MAX_CHUNK_ATTEMPTS:
                         if verbose:
-                            print( '\nSetting total failure after attempt {0} for part_n {1}\n'.format( attempt_number, part_n ) )
+                            print(( '\nSetting total failure after attempt {0} for part_n {1}\n'.format( attempt_number, part_n ) ))
                         totally_failed.set()
                     else:
                         chunk_queue.put( (part_n, (source_path, start_byte, header_start_byte, read_amount, attempt_number) ) )
@@ -432,7 +432,7 @@ class BoxAPI:
             read_amount = min(part_size, file_size - header_start_byte) # Make sure the last part of a split doesn't read into the next split
             if not read_amount > 0:
                 if verbose:
-                    print(read_amount, part_size, file_size, start_byte)
+                    print((read_amount, part_size, file_size, start_byte))
                 raise Exception('read_amount failure')
 
             upload_args = (source_path, start_byte, header_start_byte, read_amount, 0) # Last 0 is attempt number
@@ -465,7 +465,7 @@ class BoxAPI:
             # Cancel chunked upload upon exception
             self._abort_chunked_upload()
             if verbose:
-                print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
+                print(( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) ))
             raise Exception('Totally failed upload')
         reporter.done()
         if total_hasher.isAlive():
@@ -496,7 +496,7 @@ class BoxAPI:
             # Cancel chunked upload upon exception
             self._abort_chunked_upload()
             if verbose:
-                print( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) )
+                print(( 'Chunk upload of file {0} (in {1} parts) cancelled'.format(source_path, json_response['total_parts']) ))
             raise
 
         self._current_chunked_upload_abort_url = None
@@ -527,10 +527,10 @@ class BoxAPI:
                 return found_files
 
         if verbose:
-            print( 'Recursively searching for files to upload in:', fpath )
+            print(( 'Recursively searching for files to upload in:', fpath ))
         files_to_upload = find_files_recursive( fpath, upload_folder_id )
         if verbose:
-            print( 'Found {} files to upload'.format(len(files_to_upload)) )
+            print(( 'Found {} files to upload'.format(len(files_to_upload)) ))
         if len(files_to_upload) >= big_batch_threshold:
             r = Reporter( 'uploading big batch of files to Box', entries = 'files', eol_char = '\r' )
         else:
@@ -563,7 +563,7 @@ class BoxAPI:
 
                     if not upload_successful:
                         if maximum_attempts > 1:
-                            print( 'Uploading file {0} failed upload in attempt {1} of {2}'.format(source_path_upload, trial_counter+1, maximum_attempts) )
+                            print(( 'Uploading file {0} failed upload in attempt {1} of {2}'.format(source_path_upload, trial_counter+1, maximum_attempts) ))
                         continue
 
                     try:
@@ -575,7 +575,7 @@ class BoxAPI:
 
                     if not upload_successful:
                         if maximum_attempts > 1:
-                            print( 'Uploading file {0} failed verification in attempt {1} of {2}. Removing and potentially retrying upload.'.format(source_path_upload, trial_counter+1, maximum_attempts) )
+                            print(( 'Uploading file {0} failed verification in attempt {1} of {2}. Removing and potentially retrying upload.'.format(source_path_upload, trial_counter+1, maximum_attempts) ))
                         try:
                             file_ids = self.find_file( folder_to_upload_id, os.path.basename( source_path_upload ) )
                         except Exception as e:
@@ -585,7 +585,7 @@ class BoxAPI:
                             try:
                                 self.client.file( file_id = file_id ).delete()
                             except:
-                                print( 'Delete failed, skipping file ' + source_path_upload )
+                                print(( 'Delete failed, skipping file ' + source_path_upload ))
                                 file_totally_failed = True
                                 upload_successful = False
                         continue
@@ -606,7 +606,7 @@ class BoxAPI:
                 if retry_already_uploaded_files:
                     os.remove( uploaded_marker_file )
                 else:
-                    print( 'Skipping already uploaded file: ' + file_path )
+                    print(( 'Skipping already uploaded file: ' + file_path ))
                     r.decrement_total_count()
                     continue
 
@@ -641,7 +641,7 @@ class BoxAPI:
                             # Sometimes this might fail if we have a permissions error (e.g. uploading a file in a directory where we only have read permission), so we just ignore
                             pass
                 else:
-                    print( 'Totally failed:', file_path )
+                    print(( 'Totally failed:', file_path ))
                     failed_files.put( file_path )
                     if os.path.isfile(uploaded_marker_file):
                         os.remove(uploaded_marker_file)
@@ -706,7 +706,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     upload_folder_id = box.find_folder_path( args.destination_folder )
-    print( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) )
+    print(( 'Upload destination folder id: {0} {1}'.format( upload_folder_id, args.destination_folder ) ))
 
     failed_uploads = []
     for path_to_upload in sorted( args.file_or_folder_to_upload ):

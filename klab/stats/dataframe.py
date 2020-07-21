@@ -51,7 +51,7 @@ class DatasetDataFrame(object):
 
 
     def iprint(msg):  # Note: no args, kwargs
-        print(str(msg))
+        print((str(msg)))
 
 
     def __init__(self, dataframe,
@@ -96,7 +96,7 @@ class DatasetDataFrame(object):
                     except:
                         raise Exception('Could not find multi-indexed column {0}.'.format(n))
                 else:
-                    assert(isinstance(n, basestring))
+                    assert(isinstance(n, str))
                     assert(n in dataframe.columns.values)
 
         if restricted_predicted_column_indices != []:
@@ -129,9 +129,9 @@ class DatasetDataFrame(object):
             self.index_layers = tuple(self.index_layers)
 
         self.series_index = {}
-        self.series_names = dict(zip(range(num_series), list(dataframe.columns.values)))
+        self.series_names = dict(list(zip(list(range(num_series)), list(dataframe.columns.values))))
         self.reference_dataset_name = reference_dataset_name
-        for k, v in self.series_names.iteritems():
+        for k, v in self.series_names.items():
             self.series_index[v] = k
         assert(len(self.series_index) == len(self.series_names))
 
@@ -243,7 +243,7 @@ class DatasetDataFrame(object):
         '''
         n = []
         if not column_indices and not column_names:
-            for k, v in sorted(self.series_names.iteritems()):
+            for k, v in sorted(self.series_names.items()):
                 # Iterate by index to preserve document order
                 if v != self.reference_series:
                     n.append(k)
@@ -309,10 +309,10 @@ class DatasetDataFrame(object):
     def summarize(self, series_ = None, subset_ = None, summary_title_formatter = None, color = True):
         self._analyze()
         summary = []
-        for series, subset in sorted(self.analysis.iteritems()):
+        for series, subset in sorted(self.analysis.items()):
             if series_ == None or series_ == series:
                 ttl, sub_summary = series, []
-                for subset_type, v in sorted(subset.iteritems()):
+                for subset_type, v in sorted(subset.items()):
                     if subset_ == None or subset_ == series:
                         if v:
                             if color:
@@ -391,7 +391,7 @@ Error (normalized, signficance = {std_dev_cutoff:.2f} standard deviations):
             if isinstance(dseries, tuple):
                 dseries_l = list(dseries)
             else:
-                assert(isinstance(dseries, basestring))
+                assert(isinstance(dseries, str))
                 dseries_l = [dseries]
 
             results = []

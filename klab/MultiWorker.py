@@ -1,7 +1,7 @@
 import multiprocessing as mp
-from Reporter import Reporter
+from .Reporter import Reporter
 import time
-import Queue
+import queue
 
 class MultiWorker:
     def __init__(self, func, n_cpu = None, reporter=None, task='multiprocessing', entries='jobs', cb_func=None):
@@ -24,7 +24,7 @@ class MultiWorker:
             self.data = []
     def reader_helper(self):
         while True:
-            print 'size', self.queue.qsize()
+            print('size', self.queue.qsize())
             while not self.queue.empty():
                 msg = self.queue.get()
                 if (msg == '_QUEUEDONE'):
@@ -38,7 +38,7 @@ class MultiWorker:
         self.reporter.increment_report()
         self.data.append(results)
     def queue_cb(self, results):
-        print 'put', results
+        print('put', results)
         self.queue.put(results)
         self.reporter.increment_report()
     def addJob(self, argsTuple):
@@ -51,6 +51,6 @@ class MultiWorker:
         self.pool.join()
         if self.cb_func:
             self.queue.put('_QUEUEDONE')
-            print 'Pool finished, waiting to process results'
+            print('Pool finished, waiting to process results')
             self.reader_p.join()
         self.reporter.done()

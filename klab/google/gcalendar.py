@@ -27,7 +27,7 @@ from oauth2client.client import SignedJwtAssertionCredentials
 from klab.general.structures import NestedBunch, NonStrictNestedBunch, DeepNonStrictNestedBunch
 from klab.fs.fsio import read_file
 from klab import colortext
-from gauth import OAuthCredentials
+from .gauth import OAuthCredentials
 
 class BasicEvent(object):
 
@@ -153,7 +153,7 @@ class GoogleCalendar(object):
         oc = OAuthCredentials.from_JSON(oauth_json)
         configured_calendar_ids = NestedBunch.from_JSON(oauth_json).calendars
         for calendar_id in calendar_ids:
-            assert(calendar_id in configured_calendar_ids.keys())
+            assert(calendar_id in list(configured_calendar_ids.keys()))
         self.calendar_ids = calendar_ids
 
         # Request both read/write (calendar) and read-only access (calendar.readonly)
@@ -393,7 +393,7 @@ class GoogleCalendar(object):
     def add_company_quarter(self, company_name, quarter_name, dt, calendar_id = 'notices'):
         '''Adds a company_name quarter event to the calendar. dt should be a date object. Returns True if the event was added.'''
 
-        assert(calendar_id in self.configured_calendar_ids.keys())
+        assert(calendar_id in list(self.configured_calendar_ids.keys()))
         calendarId = self.configured_calendar_ids[calendar_id]
 
         quarter_name = quarter_name.title()
@@ -403,7 +403,7 @@ class GoogleCalendar(object):
             'Fall' : 3,
             'Winter' : 4
         }
-        assert(quarter_name in quarter_numbers.keys())
+        assert(quarter_name in list(quarter_numbers.keys()))
 
         start_time = datetime(year=dt.year, month=dt.month, day=dt.day, hour=0, minute=0, second=0, tzinfo=self.timezone) + timedelta(days = -1)
         end_time = start_time + timedelta(days = 3, seconds = -1)
@@ -441,7 +441,7 @@ class GoogleCalendar(object):
     def add_holiday(self, start_dt, holiday_name, end_dt = None, calendar_id = 'notices'):
         '''Adds a holiday event to the calendar. start_dt and end_dt (if supplied) should be date objects. Returns True if the event was added.'''
 
-        assert(calendar_id in self.configured_calendar_ids.keys())
+        assert(calendar_id in list(self.configured_calendar_ids.keys()))
         calendarId = self.configured_calendar_ids[calendar_id]
 
         # Note: end_date is one day ahead e.g. for the New Years' holiday Dec 31-Jan 1st, we specify the end_date as Jan 2nd. This is what the calendar expects.
@@ -493,16 +493,16 @@ class GoogleCalendar(object):
         #events = self.service.events().list(calendarId = self.configured_calendar_ids[calendar_id], showDeleted = False).execute()
         events = self.service.events().list(calendarId = self.configured_calendar_ids[calendar_id], timeMin = start_time, timeMax = end_time, showDeleted = False).execute()
 
-        print(len(events['items']))
+        print((len(events['items'])))
 
         for event in events['items']:
             dt = None
             nb = DeepNonStrictNestedBunch(event)
             #print(event)
             if (nb.summary or nb.description or '').find('presentation') != -1:
-                print(nb.id)
-                print(nb.summary or nb.description)
-                print(nb.start)
+                print((nb.id))
+                print((nb.summary or nb.description))
+                print((nb.start))
 
 
     #### Meetings creation: main calendar
@@ -517,9 +517,9 @@ class GoogleCalendar(object):
         event_body['extendedProperties']['shared'] = event_body['extendedProperties'].get('shared', {})
         event_body['extendedProperties']['private'] = event_body['extendedProperties'].get('private', {})
         assert(sorted(set(extendedProperties.keys()).union(set(['shared', 'private']))) == ['private', 'shared'])
-        for k, v in extendedProperties['shared'].iteritems():
+        for k, v in extendedProperties['shared'].items():
             event_body['extendedProperties']['shared'][k] = v
-        for k, v in extendedProperties['private'].iteritems():
+        for k, v in extendedProperties['private'].items():
             event_body['extendedProperties']['private'][k] = v
         raise Exception('not tested yet')
         updated_event = self.service.events().update(calendarId = self.configured_calendar_ids[calendar_id], eventId = event_id, body = event_body).execute()
@@ -640,7 +640,7 @@ class GoogleCalendar(object):
 
         # Events to remove
         toRemove = []
-        for startdateTitle, event in sorted(currentEvents.iteritems()):
+        for startdateTitle, event in sorted(currentEvents.items()):
             if event["title"].find("birthday") != -1:
                 # Don't remove birthdays
                 continue
@@ -657,7 +657,7 @@ class GoogleCalendar(object):
 
         # Events to add
         toAdd = []
-        for startdateTitle, event in sorted(newEvents.iteritems()):
+        for startdateTitle, event in sorted(newEvents.items()):
             if currentEvents.get(startdateTitle):
                 currentEvent = currentEvents[startdateTitle]
                 if currentEvent["enddate"] == event["enddate"]:
@@ -687,7 +687,7 @@ class GoogleCalendar(object):
                 assert(self.service.events().get(calendarId = self.configured_calendar_ids[calendar_id], eventId = event_id).execute())
                 self.service.events().delete(calendarId = self.configured_calendar_ids[calendar_id], eventId = event_id).execute()
                 break
-            except Exception, e:
+            except Exception as e:
                 colortext.error("An error occurred:")
                 colortext.error(e)
                 colortext.error("Trying again.")
@@ -727,7 +727,7 @@ class GoogleCalendar(object):
                         "description" : title
                     }).execute()
                 break
-            except Exception, e:
+            except Exception as e:
                 colortext.error("An error occurred:")
                 colortext.error(traceback.format_exc())
                 colortext.error(e)
@@ -768,8 +768,8 @@ class GoogleCalendar(object):
                 if n.extendedProperties.shared and n.extendedProperties.shared.event_type:
                     event_type = n.extendedProperties.shared['event_type']
                     if event_type == 'Birthday':
-                        print(n.summary, n.id)
-                        print(n.start)
+                        print((n.summary, n.id))
+                        print((n.start))
                         event_body = main_calendar.service.events().get(calendarId = main_calendar.configured_calendar_ids["notices"], eventId=n.id).execute()
                         event_body['gadget'] = {
                             'display' : 'icon',
@@ -784,7 +784,7 @@ class GoogleCalendar(object):
     def updateBirthdays(self, bdays):
         raise Exception('update')
         eventstbl = self.getEventsTable("main")
-        for dt, details in sorted(bdays.iteritems()):
+        for dt, details in sorted(bdays.items()):
             bdaykey = datetime(dt.year, dt.month, dt.day)
             if eventstbl.get((bdaykey, details["title"])):
                 if str(eventstbl[(bdaykey, details["title"])]["title"]) == str(details["title"]):
@@ -818,9 +818,9 @@ class GoogleCalendar(object):
     def printAllEvents(self, calendar_id, year = None):
         colortext.message('Events on Calendar: %s' % (self.get_calendar(calendar_id).summary))
         eventstbl = self.getEventsTable(calendar_id, year)
-        for startdateTitle, details in sorted(eventstbl.iteritems()):
+        for startdateTitle, details in sorted(eventstbl.items()):
             startdate = startdateTitle[0]
-            print(("%s -> %s at %s: %s" % (startdate, details["enddate"], details["location"][0:details["location"].find("@")], details["title"])).encode('ascii', 'ignore'))
+            print((("%s -> %s at %s: %s" % (startdate, details["enddate"], details["location"][0:details["location"].find("@")], details["title"])).encode('ascii', 'ignore')))
 
 
 
@@ -830,7 +830,7 @@ class GoogleCalendar(object):
         for calendar_id in calendar_ids or self.calendar_ids:
             colortext.message('Removing cancelled events in %s' % calendar_id)
             events = self.service.events().list(calendarId = self.configured_calendar_ids[calendar_id]).execute()
-            print(len(events['items']))
+            print((len(events['items'])))
 
             for event in events['items']:
                 dt = None
@@ -887,13 +887,13 @@ if __name__ == '__main__':
         sys.exit(0)
         colortext.warning("*** Today's events ***")
         for evnt in todays_events:
-            print(evnt.datetime_o, evnt.description, evnt.location)
+            print((evnt.datetime_o, evnt.description, evnt.location))
         colortext.warning("*** This week's events ***")
         for evnt in this_weeks_events:
-            print(evnt.datetime_o, evnt.description, evnt.location)
+            print((evnt.datetime_o, evnt.description, evnt.location))
         colortext.warning("*** This month's events ***")
         for evnt in this_months_events:
-            print(evnt.datetime_o, evnt.description, evnt.location)
+            print((evnt.datetime_o, evnt.description, evnt.location))
 
     # admin
     if 'admin' in tests:

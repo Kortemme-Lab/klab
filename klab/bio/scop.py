@@ -82,7 +82,7 @@ class SCOPeDatabase(DatabaseInterface):
         self.levels = self.get_SCOPe_levels()
         del self.levels[1] # remove the root level
 
-        level_names = [v for k, v in sorted(self.levels.iteritems()) if k != 1] # skip the root level
+        level_names = [v for k, v in sorted(self.levels.items()) if k != 1] # skip the root level
         search_fields = ['SCOPe_sources', 'SCOPe_search_fields', 'SCOPe_trust_level']
         search_headers = ['SCOPe sources', 'Search fields', 'Trustiness']
         self.pfam_api = None
@@ -126,7 +126,7 @@ class SCOPeDatabase(DatabaseInterface):
                 return self.SIFTS[pdb_id]
             self.SIFTS[pdb_id] = SIFTS.retrieve(pdb_id, cache_dir = self.cache_dir, acceptable_sequence_percentage_match = 70.0, require_uniprot_residue_mapping = require_uniprot_residue_mapping)
             return self.SIFTS[pdb_id]
-        except Exception, e:
+        except Exception as e:
             colortext.error('An exception happened retrieving the SIFTS file for %s: "%s". Ignoring this exception and continuing on...' % (pdb_id, str(e)))
             colortext.error(traceback.format_exc())
             if fail_on_error:
@@ -243,20 +243,20 @@ class SCOPeDatabase(DatabaseInterface):
                     #class_count[v['sccs']] += 1
                     #print(' %s, %s: %s' % (v['pdb_id'], k, v['sccs']))
         #pprint.pprint(class_count)
-        allowed_scop_domains = map(int, map(set.intersection, pfam_scop_mapping.values())[0])
+        allowed_scop_domains = list(map(int, list(map(set.intersection, list(pfam_scop_mapping.values())))[0]))
         allowed_scop_domains = list(set((allowed_scop_domains or []) + (self.get_sunid_for_pfam_accs(pfam_accs) or [])))
 
 
         filtered_hits = []
         print(pfam_accs)
         print(allowed_scop_domains)
-        print('%d hits' % len(hits))
+        print(('%d hits' % len(hits)))
         for hit in hits:
             domains_to_ignore = []
-            for k, v in hit['domains'].iteritems():
+            for k, v in hit['domains'].items():
                 if v['sunid'] in allowed_scop_domains:
                     filtered_hits.append(v)
-        print('%d filtered_hits' % len(filtered_hits))
+        print(('%d filtered_hits' % len(filtered_hits)))
 
         if not filtered_hits:
             return None
@@ -269,7 +269,7 @@ class SCOPeDatabase(DatabaseInterface):
             SCOPe_trust_level = 3
         ))
         # Add the lowest common classification over all related Pfam families
-        for k, v in sorted(self.levels.iteritems()):
+        for k, v in sorted(self.levels.items()):
             d[v] = None
         d.update(dict(self.get_common_hierarchy(filtered_hits)))
         return d
@@ -294,7 +294,7 @@ class SCOPeDatabase(DatabaseInterface):
             return None
 
         d = {}
-        for chain_id, pfam_acc_set in pfam_accs.iteritems():
+        for chain_id, pfam_acc_set in pfam_accs.items():
             family_details = []
             for pfam_accession in pfam_acc_set:
                 family_details.append(self.get_pfam_details(pfam_accession))
@@ -320,7 +320,7 @@ class SCOPeDatabase(DatabaseInterface):
                 SCOPe_trust_level = 2
             ))
             # Add the lowest common classification over all related Pfam families
-            for k, v in sorted(self.levels.iteritems()):
+            for k, v in sorted(self.levels.items()):
                 d[chain_id][v] = None
             d[chain_id].update(dict(self.get_common_hierarchy(family_details)))
         return d
@@ -381,7 +381,7 @@ class SCOPeDatabase(DatabaseInterface):
             if not(sid_map.get(sid)) or sid_map[sid] == ' ':
                 sid_map[sid] = c_id
         chain_to_sid_map = {}
-        for k, v in sid_map.iteritems():
+        for k, v in sid_map.items():
             chain_to_sid_map[v] = chain_to_sid_map.get(v, set())
             chain_to_sid_map[v].add(k)
 
@@ -416,10 +416,10 @@ class SCOPeDatabase(DatabaseInterface):
         # more recent named chain exists. There could be some nasty cases - we only keep the most recent unnamed chain
         # but this may correspond to many chains if the PDB has multiple chains since we only look at the chain ID.
         # I think that it should be *unlikely* that we will have much if any bad behavior though.
-        for k1, v2 in leaf_nodes.iteritems():
+        for k1, v2 in leaf_nodes.items():
             if k1[0] == ' ':
                 release_id_of_blank_record = leaf_nodes[k1]['release_id']
-                for k2, v2 in leaf_nodes.iteritems():
+                for k2, v2 in leaf_nodes.items():
                     if k2[0] != ' ':
                         assert(k2[0].isalpha() and len(k2[0]) == 1)
                         if v2['release_id'] > release_id_of_blank_record:
@@ -427,7 +427,7 @@ class SCOPeDatabase(DatabaseInterface):
                             break
 
         d = {}
-        for chain_sid_pair, details in leaf_nodes.iteritems():
+        for chain_sid_pair, details in leaf_nodes.items():
             chain_id = chain_sid_pair[0]
             sid = chain_sid_pair[1]
             if sid.strip() == '':
@@ -466,7 +466,7 @@ class SCOPeDatabase(DatabaseInterface):
                     SCOPe_trust_level = 1
                 )
 
-                for k, v in sorted(self.levels.iteritems()):
+                for k, v in sorted(self.levels.items()):
                     domain_information[v] = None
 
                 pfam = None
@@ -501,7 +501,7 @@ class SCOPeDatabase(DatabaseInterface):
                     colortext.message(pdb_id)
                     region_mapping = sifts_object.region_mapping
                     ps_map = sifts_object.pfam_scop_mapping or {}
-                    for k, v in ps_map.iteritems():
+                    for k, v in ps_map.items():
                         pfam_scop_mapping[k] = pfam_scop_mapping.get(k, set())
                         pfam_scop_mapping[k] = pfam_scop_mapping[k].union(v.get_matches('SCOP'))
 
@@ -549,9 +549,9 @@ class SCOPeDatabase(DatabaseInterface):
         d = self.get_pdb_list_details(list(set(pdb_ids)))
         failed_pdb_ids = []
         if d:
-            for pdb_id, pdb_details in sorted(d.iteritems()):
+            for pdb_id, pdb_details in sorted(d.items()):
                 if pdb_details:
-                    for chain_id, chain_details in sorted(pdb_details.iteritems()):
+                    for chain_id, chain_details in sorted(pdb_details.items()):
                         t.add_pdb_line(chain_details)
                 else:
                     failed_pdb_ids.append(pdb_ids)
@@ -607,7 +607,7 @@ class SCOPeDatabase(DatabaseInterface):
             SCOPe_trust_level = 1
         )
 
-        for k, v in sorted(self.levels.iteritems()):
+        for k, v in sorted(self.levels.items()):
             d[v] = None
 
         level, parent_node_id = most_recent_record['level_id'], most_recent_record['parent_node_id']
@@ -647,7 +647,7 @@ class SCOPeDatabase(DatabaseInterface):
         t = SCOPeTableCollection(self)
         d = self.get_pfam_list_details(pfam_accs)
         if d:
-            for pfam_accession, pfam_details in sorted(d.iteritems()):
+            for pfam_accession, pfam_details in sorted(d.items()):
                 if pfam_details:
                     t.add_pfam_line(pfam_details)
         return t
@@ -667,7 +667,7 @@ class SCOPeDatabase(DatabaseInterface):
                 scop_hits = set()
                 scop_regions = sifts_object.region_mapping.get(pdb_chain_id, {}).get('SCOP')
                 if scop_regions:
-                    for sunid, ranges in scop_regions.iteritems():
+                    for sunid, ranges in scop_regions.items():
                         for r in ranges:
                             assert(r[0] <= r[1])
                             if r[0] <= PDBeResidueID <= r[1]:
@@ -690,7 +690,7 @@ class SCOPeDatabase(DatabaseInterface):
                 pfam_hits = set()
                 pfam_regions = sifts_object.region_mapping.get(pdb_chain_id, {}).get('Pfam')
                 if pfam_regions:
-                    for pfam_acc, ranges in pfam_regions.iteritems():
+                    for pfam_acc, ranges in pfam_regions.items():
                         for r in ranges:
                             assert(r[0] <= r[1])
                             if r[0] <= PDBeResidueID <= r[1]:
@@ -742,7 +742,7 @@ def __pick_cases_for_manual_inspection():
                     if pfam_accs:
                         s += colortext.make(', %s' % ', '.join(pfam_accs), 'green')
                     print(s)
-                except Exception, e:
+                except Exception as e:
                     print(s)
                     colortext.error(str(e))
                     colortext.error(traceback.format_exc())
@@ -770,7 +770,7 @@ def __generate_benchmark_data():
             d[headers[x]] = tokens[x]
         dataset_json["domains"].append(d)
 
-    print(json.dumps(dataset_json, indent=4, sort_keys=True))
+    print((json.dumps(dataset_json, indent=4, sort_keys=True)))
 
 
     data = write_file('/kortemmelab/shared/benchmarks/covariation/input/domains.json', json.dumps(dataset_json, indent=4, sort_keys=True))
@@ -819,26 +819,26 @@ def __generate_benchmark_data():
                         s += colortext.make(' - %s' % sccs, 'yellow')
                     if pfam_accs:
                         s += colortext.make(', %s' % ', '.join(pfam_accs), 'green')
-                    m[u'SCOP class'] = sccs
+                    m['SCOP class'] = sccs
                     if pfam_accs:
-                        m[u'Pfam domains'] = ', '.join(pfam_accs)
+                        m['Pfam domains'] = ', '.join(pfam_accs)
                     else:
-                        m[u'Pfam domains'] = None
+                        m['Pfam domains'] = None
                     print(s)
-                except Exception, e:
+                except Exception as e:
                     print(s)
                     colortext.error(str(e))
                     colortext.error(traceback.format_exc())
                     raise
             c += 1
-        print(len(data))
-        keys_to_delete = [k for k in scss_breakdown.keys() if scss_breakdown[k][1] == 0]
-        total_count = sum([scss_breakdown[k][1] for k in scss_breakdown.keys()])
+        print((len(data)))
+        keys_to_delete = [k for k in list(scss_breakdown.keys()) if scss_breakdown[k][1] == 0]
+        total_count = sum([scss_breakdown[k][1] for k in list(scss_breakdown.keys())])
         print(total_count)
         for k in keys_to_delete:
             del scss_breakdown[k]
         colortext.warning(pprint.pformat(scss_breakdown))
-        print('skipped', skipped)
+        print(('skipped', skipped))
 
         data = write_file(dataset + '.new', json.dumps(dataset_json, indent=4, sort_keys=True))
 

@@ -44,4 +44,4 @@ one_to_three = {
     'Y':'TYR',
 }
 
-three_to_one = { v : k for k, v in one_to_three.iteritems() }
+three_to_one = { v : k for k, v in one_to_three.items() }

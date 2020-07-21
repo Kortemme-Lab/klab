@@ -16,7 +16,7 @@ class Bunch(object):
         self.__dict__.update(kwds)
 
     def keys(self):
-        return self.__dict__.keys()
+        return list(self.__dict__.keys())
 
     def __getitem__(self, key):
         return self.__dict__.__getitem__(key)
@@ -36,7 +36,7 @@ class NestedBunch(Bunch):
        Handles simple data types and subclasses of dict which behave appropriately e.g. JSON.
     '''
     def __init__(self, d):
-        for k, v in d.iteritems():
+        for k, v in d.items():
             if isinstance(v, dict): self.__dict__[k] = self.__class__(v)
             else: self.__dict__[k] = v
 
@@ -52,7 +52,7 @@ class NestedBunch(Bunch):
 class NonStrictNestedBunch(NestedBunch):
     '''Similar to a NestedBunch but we allow shallow lookups for elements which do not exist.'''
 
-    def __nonzero__(self):
+    def __bool__(self):
         return len(self.__dict__) != 0
 
     def __getattr__(self, key):
@@ -72,7 +72,7 @@ class nested_dict(dict):
     def from_dict(d):
         n = nested_dict()
         if isinstance(d, collections.Mapping):
-            for k, v in d.iteritems():
+            for k, v in d.items():
                 n[k] = v
         else:
             n[d] = None
@@ -82,7 +82,7 @@ class nested_dict(dict):
         ''' Works like dict.update(dict) but handles nested dicts.
             From http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth.
         '''
-        for k, v in u.iteritems():
+        for k, v in u.items():
             if isinstance(v, collections.Mapping):
                 r = nested_dict.from_dict(self.get(k, {}))
                 r.update(v)
@@ -132,7 +132,7 @@ if __name__ == '__main__':
     pprint.pprint(a)
 
     nb = NestedBunch({'web' : {'test' : {'inner_test' : 1}, 'flat' : 2}, 'sibling' : 3})
-    print(nb.web.test.inner_test)
-    print(nb.web.flat)
-    print(nb.sibling)
+    print((nb.web.test.inner_test))
+    print((nb.web.flat))
+    print((nb.sibling))
 

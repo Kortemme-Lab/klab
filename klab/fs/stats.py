@@ -93,7 +93,7 @@ class FileCounter(object):
             self.counts[dirpath] = len(filenames)
 
     def create_cumulative_counts(self):
-        for k, v in self.counts.iteritems():
+        for k, v in self.counts.items():
             self.cumulative_counts[k] = v
 
         for tpl in self.depth_list:
@@ -104,7 +104,7 @@ class FileCounter(object):
 
     def send_email(self, email_address, cut_off = None):
         s = ['Cumulative file counts for directories under %s.\n' % self.root]
-        for k, v in sorted(self.cumulative_counts.iteritems(), key = lambda x:-x[1]):
+        for k, v in sorted(iter(self.cumulative_counts.items()), key = lambda x:-x[1]):
             if v:
                 if not(cut_off) or v >= cut_off:
                     s.append('%s: %d' % (k, v))

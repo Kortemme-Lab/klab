@@ -18,7 +18,7 @@ def get_dict():
     try:
         with open(settings_file, 'r') as f:
             settings = json.load(f)
-    except Exception, e:
+    except Exception as e:
         raise Exception('An error occurred parsing the settings file: %s.\n%s' % (settings_json, str(e)))
 
     required_settings = [

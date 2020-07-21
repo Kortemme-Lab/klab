@@ -22,7 +22,7 @@ class ProfileTimer(object):
         time_now = time.time()
         self.stopped = False
 
-        if stage not in self.stage_times.keys():
+        if stage not in list(self.stage_times.keys()):
             self.stages.append(stage)
 
         if self.current_stage:

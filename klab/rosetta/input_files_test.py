@@ -1,7 +1,7 @@
 # Run from main klab directory like:
 # python -m unittest rosetta.input_files_test
 
-import input_files
+from . import input_files
 
 import os
 import tempfile
@@ -33,7 +33,7 @@ class TestResfile(unittest.TestCase):
         self.rf = input_files.Resfile(self.temp_resfile)
 
     def test_init_from_resfile(self):
-        designable_range = range(3, 21) + [22, 23, 25, 27]
+        designable_range = list(range(3, 21)) + [22, 23, 25, 27]
         packable_range = designable_range + ['30B']
         designable_range_str = sorted([str(x) for x in designable_range])
         packable_range_str = sorted([str(x) for x in packable_range])
@@ -104,7 +104,7 @@ class TestResfile(unittest.TestCase):
         os.remove(self.temp_resfile) # Remove default resfile created by setUp
         self.write_temp_resfile(original_rf_repr)
         self.assertMultiLineEqual(original_rf_repr, str(self.rf))
-        self.assertEquals(original_rf, self.rf)
+        self.assertEqual(original_rf, self.rf)
 
     def test_chains(self):
         self.assertListEqual(self.rf.chains, ['A', 'B', 'C'])

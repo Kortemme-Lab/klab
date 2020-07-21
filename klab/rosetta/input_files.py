@@ -88,7 +88,7 @@ class LoopsFile(object):
         try:
             if tokens[3] == None:
                 tokens[3] = 0 # add the default cut point residue number
-            res_numbers = map(int, tokens[1:4])
+            res_numbers = list(map(int, tokens[1:4]))
             if min(res_numbers) < 0:
                 raise RosettaFileParsingException('The cut point and start and end residues indices must be positive integers.')
             if not((res_numbers[2] == 0) or res_numbers[0] <= res_numbers[2] <= res_numbers[1]):
@@ -143,10 +143,10 @@ class LoopsFile(object):
             assert(l['start'] <= l['end'])
             if sequence_length:
                 # If we know the sequence length then we can return valid positions
-                positions = positions.union(range(max(1, l['start'] - left_offset + 1), min(sequence_length + 1, l['end'] + 1 + right_offset - 1))) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
+                positions = positions.union(list(range(max(1, l['start'] - left_offset + 1), min(sequence_length + 1, l['end'] + 1 + right_offset - 1)))) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
             else:
                 # Otherwise, we may return positions outside the sequence length however Python splicing can handle this gracefully
-                positions = positions.union(range(max(1, l['start'] - left_offset + 1), l['end'] + 1 + right_offset - 1)) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
+                positions = positions.union(list(range(max(1, l['start'] - left_offset + 1), l['end'] + 1 + right_offset - 1))) # For clarity, I did not simplify the expressions. The left_offset requires a +1 to be added, the right_offset requires a -1 to be added. The right offset also requires a +1 due to the way Python splicing works.
         positions = sorted(positions)
 
         # Iterate through the list to define the segments
@@ -313,12 +313,12 @@ class Resfile (object):
                     new_residues = []
 
                     if range_start and range_end:
-                        range_start_num = int(filter(lambda x: x.isdigit(), range_start)) + 1
-                        range_end_num = int(filter(lambda x: x.isdigit(), range_end))
+                        range_start_num = int([x for x in range_start if x.isdigit()]) + 1
+                        range_end_num = int([x for x in range_end if x.isdigit()])
 
                         new_residues.append( range_start )
                         if range_start_num < range_end_num:
-                            new_residues.extend( [str(x) for x in xrange(range_start_num, range_end_num+1)] )
+                            new_residues.extend( [str(x) for x in range(range_start_num, range_end_num+1)] )
                         new_residues.append( range_end )
                     elif range_singleton:
                         new_residues.append( range_singleton )
@@ -396,7 +396,7 @@ class Resfile (object):
         # Returns a list of all residues
         return_list = []
         for chain in self.design:
-            for resnum in self.design[chain].keys():
+            for resnum in list(self.design[chain].keys()):
                 return_list.append(resnum)
         for chain in self.repack:
             for resnum in self.repack[chain]:
@@ -593,8 +593,8 @@ LOOP 23 30 26 2 TrUe
 # A helical or sheet structure
 1360,1370-1380 HE
         ''')
-    for p, ss_def in sorted(ss.data.iteritems()):
-        print('%s: %s' % (p, ''.join(ss_def)))
+    for p, ss_def in sorted(ss.data.items()):
+        print(('%s: %s' % (p, ''.join(ss_def))))
 
     mf = Mutfile('''
 total 3 #this is the total number of mutations being made.
