@@ -30,7 +30,7 @@ def get_prejob_xml(job_id = None, task_id = None):
         s.append(make_simple_xml_tag('task_id', str(task_id)))
     s.append(make_simple_xml_tag('job_start_time', strftime("%%Y-%%m-%%d %%H:%%M:%%S")))
     s.append(make_simple_xml_tag('host', socket.gethostname()))
-    s.append(make_simple_xml_tag('arch', platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
+    #s.append(make_simple_xml_tag('arch', platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
     return '\n'.join(s)
 
 def get_postjob_xml(job_id = None, task_id = None):

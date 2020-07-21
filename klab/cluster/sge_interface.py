@@ -64,7 +64,6 @@ def create_script(job_name, job_directory,
 #$ -cwd
 #$ -r y
 #$ -t 1-{num_tasks}
-#$ -l arch={architecture}
 #$ -l mem_free={memory_in_GB}G
 #$ -l scratch={scratch_space_in_GB}G
 #$ -l h_rt={runtime_string}
