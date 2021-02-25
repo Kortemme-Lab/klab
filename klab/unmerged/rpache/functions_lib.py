@@ -159,7 +159,7 @@ def cumulativeProbabilitiesMap(values,sort_reverse):
         else:
             values_map[value]+=1
     #--
-    sorted_values=sorted(values_map.keys(),reverse=sort_reverse)
+    sorted_values=sorted(list(values_map.keys()),reverse=sort_reverse)
     count=0
     for value in sorted_values:
         count+=values_map[value]

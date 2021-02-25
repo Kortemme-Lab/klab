@@ -42,9 +42,9 @@ class SpatialHash3D:
         results = []
 
         mquads = self.quads
-        for x in xrange(minx, minx + 3):
-            for y in xrange(miny, miny + 3):
-                for z in xrange(minz, minz + 3):
+        for x in range(minx, minx + 3):
+            for y in range(miny, miny + 3):
+                for z in range(minz, minz + 3):
                     quadrant = mquads.get((x, y, z))
                     if quadrant:
                         for pos, data in quadrant:
@@ -69,7 +69,7 @@ class SpatialHash:
             sys.exit()
 
         quadrant = [0.]*self.dimensions
-        for i in xrange(self.dimensions):
+        for i in range(self.dimensions):
             quadrant[i] = int(math.floor(position[i]/self.size))
 
         return tuple(quadrant)
@@ -84,14 +84,14 @@ class SpatialHash:
 
     def nearby(self, position, radius):
 
-        minkey = self.quadkey([position[i] - radius for i in xrange(self.dimensions)])
-        maxkey = self.quadkey([position[i] + radius for i in xrange(self.dimensions)])
+        minkey = self.quadkey([position[i] - radius for i in range(self.dimensions)])
+        maxkey = self.quadkey([position[i] + radius for i in range(self.dimensions)])
 
         quadstosearch = [[i] for i in range(minkey[0], maxkey[0]+1)]
 
-        for i in xrange(1, self.dimensions):
+        for i in range(1, self.dimensions):
             newquads = []
-            for j in xrange(minkey[i], maxkey[i]+1):
+            for j in range(minkey[i], maxkey[i]+1):
                 newquads += [oldquad + [j] for oldquad in quadstosearch]
             quadstosearch = newquads
 
@@ -103,7 +103,7 @@ class SpatialHash:
             if quadrant:
                 for pos, data in quadrant:
                     distsquared = 0
-                    for i in xrange(self.dimensions):
+                    for i in range(self.dimensions):
                         distsquared += (position[i] - pos[i]) ** 2
                     if distsquared <= radiussquared:
                             results += [(pos, data)]
@@ -119,6 +119,6 @@ if __name__ == "__main__":
     foo.insert((0., 5., 6.), "C")
     foo.insert((1., 1., 8.), "D")
 
-    print repr(foo.quads)
+    print(repr(foo.quads))
 
-    print repr(foo.nearby((0., 0., 0.), 5))
+    print(repr(foo.nearby((0., 0., 0.), 5)))

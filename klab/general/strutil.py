@@ -6,6 +6,7 @@ Utility functions for string manipulation.
 
 Created by Shane O'Connor 2014
 """
+from functools import reduce
 
 
 def remove_trailing_line_whitespace(content):
@@ -16,18 +17,16 @@ def parse_range(s, range_separator = '-'):
     ''' Parses the string s which contains indices and ranges and returns the explicit list of integers defined by s.
         Written by Laurens Kraal 2014.
     '''
-    return reduce(lambda x,y: x+y, (map(lambda r: (range(int(r.split(range_separator)[0]), int(r.split(range_separator)[1])+1)) if range_separator in r else [int(r)], s.split(','))))
+    return reduce(lambda x,y: x+y, ([(list(range(int(r.split(range_separator)[0]), int(r.split(range_separator)[1])+1))) if range_separator in r else [int(r)] for r in s.split(',')]))
 
 
 def parse_range_pairs(s, range_separator = '-', convert_to_tuple = True):
     ''' Based on parse_range but instead returns a list of lists with the ranges. A single index n is returned as a range (n, n)
         whereas a range m-n is returned as (m, n) if m <= n, else (n, m).
     '''
-    result = map(sorted,
-       map(lambda r:
-            (int(r.split(range_separator)[0]), int(r.split(range_separator)[1])) if range_separator in r
-            else (int(r), int(r)),
-            s.split(',')))
+    result = list(map(sorted,
+       [(int(r.split(range_separator)[0]), int(r.split(range_separator)[1])) if range_separator in r
+            else (int(r), int(r)) for r in s.split(',')]))
     if convert_to_tuple:
         return tuple(map(tuple, result))
     return result
@@ -89,11 +88,11 @@ def merge_pdb_range_pairs(prs):
 
 if __name__ == '__main__':
     class BadException(Exception): pass
-    assert(parse_range('5,12..15,17', range_separator = '..') == [5] + range(12,16) + [17])
-    assert(parse_range('5-15,17') == range(5,16) + [17])
-    assert(parse_range('1,3-10,12') == [1] + range(3, 11) + [12])
+    assert(parse_range('5,12..15,17', range_separator = '..') == [5] + list(range(12,16)) + [17])
+    assert(parse_range('5-15,17') == list(range(5,16)) + [17])
+    assert(parse_range('1,3-10,12') == [1] + list(range(3, 11)) + [12])
     try:
-        assert(parse_range('5.3-15,17') == range(5,16) + [17])
+        assert(parse_range('5.3-15,17') == list(range(5,16)) + [17])
         raise BadException()
     except BadException: raise
     except Exception: pass

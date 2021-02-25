@@ -99,35 +99,35 @@ if __name__ == '__main__':
             jobs_by_project[project][queue] += slots
 
     if len(my_jobs) > 0:
-        print 'Jobs for user %s:' % my_user
+        print('Jobs for user %s:' % my_user)
         for name in my_jobs:
-            print '%s:' % string.rjust(name, 10)
-            for num_jobs, queue in sorted([(num_jobs, queue) for queue, num_jobs in my_jobs[name].iteritems()], reverse = True):
-                print '           %s: %d' % (queue, num_jobs)
-        print
+            print('%s:' % string.rjust(name, 10))
+            for num_jobs, queue in sorted([(num_jobs, queue) for queue, num_jobs in my_jobs[name].items()], reverse = True):
+                print('           %s: %d' % (queue, num_jobs))
+        print()
 
     if my_project in jobs_by_project:
-        print 'Total jobs for lab %s:' % my_project
-        for num_jobs, queue in sorted([(num_jobs, queue) for queue, num_jobs in jobs_by_project[my_project].iteritems()], reverse = True):
-            print '%s: %d' % (string.rjust(queue, 8), num_jobs)
-        print
+        print('Total jobs for lab %s:' % my_project)
+        for num_jobs, queue in sorted([(num_jobs, queue) for queue, num_jobs in jobs_by_project[my_project].items()], reverse = True):
+            print('%s: %d' % (string.rjust(queue, 8), num_jobs))
+        print()
 
     if len(lab_jobs) > 0:
-        print 'Jobs for each other user in %s:' % my_project
+        print('Jobs for each other user in %s:' % my_project)
         for user in sorted(lab_jobs.keys()):
-            print '%s:' % user
-            for num_jobs, queue in sorted([(num_jobs, queue) for queue, num_jobs in lab_jobs[user].iteritems()], reverse = True):
-                print '%s: %d' % (string.rjust(queue, 20), num_jobs)
-        print
+            print('%s:' % user)
+            for num_jobs, queue in sorted([(num_jobs, queue) for queue, num_jobs in lab_jobs[user].items()], reverse = True):
+                print('%s: %d' % (string.rjust(queue, 20), num_jobs))
+        print()
 
     if len(jobs_by_project) > 0:
         job_count_per_lab = {}
         total_all_labs = 0
         for project in jobs_by_project:
-            total_jobs = sum([num_jobs for queue, num_jobs in jobs_by_project[project].iteritems() if queue != 'Waiting/Other'])
+            total_jobs = sum([num_jobs for queue, num_jobs in jobs_by_project[project].items() if queue != 'Waiting/Other'])
             job_count_per_lab[project] = total_jobs
             total_all_labs += total_jobs
 
-        print 'Running jobs for all labs (and %% total):'
-        for num_jobs, project in sorted([(num_jobs, project) for project, num_jobs in job_count_per_lab.iteritems()], reverse = True):
-            print '%s: %d (%.1f%%)' % (string.rjust(project, 20), num_jobs, float(num_jobs)/float(total_all_labs)*100.0)
+        print('Running jobs for all labs (and %% total):')
+        for num_jobs, project in sorted([(num_jobs, project) for project, num_jobs in job_count_per_lab.items()], reverse = True):
+            print('%s: %d (%.1f%%)' % (string.rjust(project, 20), num_jobs, float(num_jobs)/float(total_all_labs)*100.0))

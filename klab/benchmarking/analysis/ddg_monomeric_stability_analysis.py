@@ -39,7 +39,7 @@ import pprint
 import shlex
 import tempfile
 import copy
-import StringIO
+import io
 import gzip
 import time
 import datetime
@@ -166,9 +166,9 @@ class BenchmarkRun(ReportingObject):
 
         df = pandas.DataFrame.from_dict(stats)
         num_rows = len(df.index)
-        df.loc[:,'case_description'] = pandas.Series([case_description for x in xrange(num_rows)], index=df.index)
-        df.loc[:,'benchmark_run_name'] = pandas.Series([self.benchmark_run_name for x in xrange(num_rows)], index=df.index)
-        df.loc[:,'n'] = pandas.Series([case_length for x in xrange(num_rows)], index=df.index)
+        df.loc[:,'case_description'] = pandas.Series([case_description for x in range(num_rows)], index=df.index)
+        df.loc[:,'benchmark_run_name'] = pandas.Series([self.benchmark_run_name for x in range(num_rows)], index=df.index)
+        df.loc[:,'n'] = pandas.Series([case_length for x in range(num_rows)], index=df.index)
         self.stored_metrics_df = pandas.concat([self.stored_metrics_df, df])
 
 
@@ -185,7 +185,7 @@ class BenchmarkRun(ReportingObject):
 
             # Remove any cases with missing data
             available_cases = set(self.analysis_data.keys())
-            missing_dataset_cases = [k for k in self.dataset_cases.keys() if k not in available_cases]
+            missing_dataset_cases = [k for k in list(self.dataset_cases.keys()) if k not in available_cases]
             for k in missing_dataset_cases:
                 del self.dataset_cases[k]
 
@@ -193,7 +193,7 @@ class BenchmarkRun(ReportingObject):
             if self.restrict_to:
                 # Remove cases which do not meet the restriction criteria
                 if 'Exposed' in self.restrict_to:
-                    for k, v in self.dataset_cases.iteritems():
+                    for k, v in self.dataset_cases.items():
                         for m in v['PDBMutations']:
                             if (m.get('ComplexExposure') or m.get('MonomericExposure')) <= self.burial_cutoff:
                                 cases_to_remove.add(k)
@@ -201,7 +201,7 @@ class BenchmarkRun(ReportingObject):
             if self.remove_cases:
                 # Remove cases which meet the removal criteria
                 if 'Exposed' in self.remove_cases:
-                    for k, v in self.dataset_cases.iteritems():
+                    for k, v in self.dataset_cases.items():
                         for m in v['PDBMutations']:
                             if (m.get('ComplexExposure') or m.get('MonomericExposure')) > self.burial_cutoff:
                                 cases_to_remove.add(k)
@@ -306,7 +306,7 @@ class BenchmarkRun(ReportingObject):
                     os.makedirs(analysis_directory)
                     assert(os.path.isdir(analysis_directory))
                     self.analysis_directory = analysis_directory
-                except Exception, e:
+                except Exception as e:
                     raise colortext.Exception('An exception occurred creating the subplot directory %s.' % analysis_directory)
         else:
             self.analysis_directory = tempfile.mkdtemp( prefix = '%s-%s-%s_' % (time.strftime("%y%m%d"), getpass.getuser(), self.benchmark_run_name) )
@@ -365,7 +365,7 @@ class BenchmarkRun(ReportingObject):
 
         # Handle our new dataframe format
         try:
-            misc_dataframe_attribute_names = store['misc_dataframe_attribute_names'].to_dict().keys()
+            misc_dataframe_attribute_names = list(store['misc_dataframe_attribute_names'].to_dict().keys())
             for k in misc_dataframe_attribute_names:
                 assert(k not in self.misc_dataframe_attributes)
                 self.misc_dataframe_attributes[k] = store[k].to_dict()[k]
@@ -391,7 +391,7 @@ class BenchmarkRun(ReportingObject):
         # Include the user's cutoff in the range.
         if self.contains_experimental_data and self.calculate_scalar_adjustments:
             if len(self.analysis_sets) == 0 and len(self.scalar_adjustments):
-                self.analysis_sets = self.scalar_adjustments.keys()
+                self.analysis_sets = list(self.scalar_adjustments.keys())
             self.log('Determining scalar adjustments with which to scale the predicted values to improve the fraction correct measurement.', colortext.warning)
             for analysis_set in self.analysis_sets:#scalar_adjustments.keys():
                 self.scalar_adjustments[analysis_set], plot_filename = self.plot_optimum_prediction_fraction_correct_cutoffs_over_range(analysis_set, min(self.stability_classication_x_cutoff, 0.5), max(self.stability_classication_x_cutoff, 3.0), suppress_plot = True, verbose = verbose)
@@ -413,8 +413,8 @@ class BenchmarkRun(ReportingObject):
         indices = dataframe.index.values.tolist()
         for i in indices:
             json_records[i] = {}
-        for k, v in dataframe.to_dict().iteritems():
-            for i, v in v.iteritems():
+        for k, v in dataframe.to_dict().items():
+            for i, v in v.items():
                 assert(k not in json_records[i])
                 json_records[i][k] = v
         if self.analysis_json_input_filepath and self.store_data_on_disk:
@@ -432,7 +432,7 @@ class BenchmarkRun(ReportingObject):
             dataframe_blob = read_file(analysis_pandas_input_filepath, binary = True)
             if not self.store_data_on_disk:
                 os.remove(analysis_pandas_input_filepath)
-        except Exception, e:
+        except Exception as e:
             if not self.store_data_on_disk:
                 os.remove(analysis_pandas_input_filepath)
             raise
@@ -449,9 +449,9 @@ class BenchmarkRun(ReportingObject):
         store['calculate_scalar_adjustments'] = pandas.Series(dict(calculate_scalar_adjustments = self.calculate_scalar_adjustments))
         store['ddg_analysis_type_description'] = pandas.Series(dict(ddg_analysis_type_description = self.ddg_analysis_type_description))
         store['misc_dataframe_attribute_names'] = pandas.Series(dict.fromkeys(self.misc_dataframe_attributes, True))
-        for k, v in self.misc_dataframe_attributes.iteritems():
+        for k, v in self.misc_dataframe_attributes.items():
             # misc_dataframe_attributes may have mixed content so we add the contents individually
-            assert((k not in store.keys()) and ('/' + k not in store.keys()))
+            assert((k not in list(store.keys())) and ('/' + k not in list(store.keys())))
             store[k] = pandas.Series({k : v})
         store.close()
 
@@ -528,21 +528,21 @@ class BenchmarkRun(ReportingObject):
         if not pdb_data:
             try:
                 pdb_data_ = json.loads(read_file('../../input/json/pdbs.json'))
-                for k, v in pdb_data_.iteritems():
+                for k, v in pdb_data_.items():
                     pdb_data[k.upper()] = v
-            except Exception, e:
+            except Exception as e:
                 self.log('input/json/pdbs.json could not be found - PDB-specific analysis cannot be performed.', colortext.error)
         else:
             # Normalize to upper case to avoid matching problems later
             new_pdb_data = {}
-            for k, v in pdb_data.iteritems():
+            for k, v in pdb_data.items():
                 assert(k.upper() not in new_pdb_data)
                 new_pdb_data[k.upper()] = v
             pdb_data = new_pdb_data
 
         # Determine columns specific to the prediction data to be added
         additional_prediction_data_columns = set()
-        for adv in analysis_data.values():
+        for adv in list(analysis_data.values()):
             additional_prediction_data_columns = additional_prediction_data_columns.union(set(adv.keys()))
         assert(len(additional_prediction_data_columns.intersection(set(self.csv_headers))) == 0)
         assert(self.ddg_analysis_type in additional_prediction_data_columns)
@@ -558,7 +558,7 @@ class BenchmarkRun(ReportingObject):
         # Create the dataframe
         dataframe_table = {}
         indices = []
-        for record_id, predicted_data in sorted(analysis_data.iteritems()):
+        for record_id, predicted_data in sorted(analysis_data.items()):
             dataframe_record = self.get_dataframe_row(dataset_cases, predicted_data, pdb_data, record_id, additional_prediction_data_columns)
             if dataframe_record:
                 indices.append(dataframe_record['DatasetID'])
@@ -844,11 +844,11 @@ class BenchmarkRun(ReportingObject):
         for br in benchmark_runs[1:]:
             common_ids = common_ids.intersection( set(br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten()) )
         if verbose:
-            print 'Common dataset size will be:', len(common_ids)
+            print('Common dataset size will be:', len(common_ids))
         if len(common_ids) == 0:
             for br in benchmark_runs:
                 common_ids = sorted( list( br.dataframe.dropna(subset=['Predicted'])[['DatasetID']].as_matrix().flatten() ) )
-                print br.get_definitive_name(unique_ajps, join_character = '-'), common_ids[:10]
+                print(br.get_definitive_name(unique_ajps, join_character = '-'), common_ids[:10])
             raise Exception('No data to make report on!')
         # limited_benchmark_runs = []
         for br in benchmark_runs:
@@ -901,7 +901,7 @@ class BenchmarkRun(ReportingObject):
                 if use_multiprocessing:
                     pool.apply_async( _full_analysis_mp_alias, ( br, analysis_set, subdir, unique_name, False, quick_plots ), callback = save_latex_report )
                 else:
-                    print 'Individual report saving in:', subdir
+                    print('Individual report saving in:', subdir)
                     save_latex_report( _full_analysis_mp_alias( br, analysis_set, subdir, unique_name, True, quick_plots ) )
         if use_multiprocessing:
             pool.close()
@@ -990,7 +990,7 @@ class BenchmarkRun(ReportingObject):
             verbose = verbose,
             compile_pdf = compile_pdf,
         )
-        print os.path.join( analysis_directory, 'report.pdf' )
+        print(os.path.join( analysis_directory, 'report.pdf' ))
 
 
     def compare(self, other, analysis_set, output_directory, unique_ajps, verbose = True, compile_pdf = True):
@@ -1088,7 +1088,7 @@ class BenchmarkRun(ReportingObject):
             compile_pdf = compile_pdf,
         )
         if verbose:
-            print 'Comparison report saved to:', os.path.join(output_directory, 'comparison.pdf')
+            print('Comparison report saved to:', os.path.join(output_directory, 'comparison.pdf'))
         return report
 
 
@@ -1220,7 +1220,7 @@ class BenchmarkRun(ReportingObject):
 
         # This dict is used for the print-statement below
         volume_groups = {}
-        for aa_code, aa_details in amino_acid_details.iteritems():
+        for aa_code, aa_details in amino_acid_details.items():
             v = int(aa_details['van der Waals volume']) # Note: I only convert to int here to match the old script behavior and because all volumes are integer values so it does not do any harm
             volume_groups[v] = volume_groups.get(v, [])
             volume_groups[v].append(aa_code)
@@ -1228,7 +1228,7 @@ class BenchmarkRun(ReportingObject):
         section_latex_objs = []
         section_latex_objs.append( lr.LatexSubSection(
             'Breakdown by volume',
-            'A case is considered a small-to-large (resp. large-to-small) mutation if all of the wildtype residues have a smaller (resp. larger) van der Waals volume than the corresponding mutant residue. The order is defined as %s so some cases are considered to have no change in volume e.g. MET -> LEU.' % (' < '.join([''.join(sorted(v)) for k, v in sorted(volume_groups.iteritems())]))
+            'A case is considered a small-to-large (resp. large-to-small) mutation if all of the wildtype residues have a smaller (resp. larger) van der Waals volume than the corresponding mutant residue. The order is defined as %s so some cases are considered to have no change in volume e.g. MET -> LEU.' % (' < '.join([''.join(sorted(v)) for k, v in sorted(volume_groups.items())]))
         ) )
         for subcase in ('XX', 'SL', 'LS'):
             subcase_dataframe = dataframe[dataframe['VolumeChange'] == subcase]
@@ -2298,7 +2298,7 @@ class DBBenchmarkRun(BenchmarkRun):
 
     def reset_csv_headers(self):
         analysis_sets = None
-        for record in self.dataset_cases.values():
+        for record in list(self.dataset_cases.values()):
             analysis_sets = self.get_analysis_sets(record)
             break
         if analysis_sets:
@@ -2326,7 +2326,7 @@ class DBBenchmarkRun(BenchmarkRun):
         try:
             idx = self.csv_headers.index('Experimental')
             self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
-        except ValueError, e: pass
+        except ValueError as e: pass
 
 
     def compute_stability_classification(self, predicted_data, record, dataframe_record):
@@ -2353,7 +2353,7 @@ class DBBenchmarkRun(BenchmarkRun):
         try:
             idx = self.csv_headers.index('StabilityClassification')
             self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
-        except ValueError, e: pass
+        except ValueError as e: pass
 
 
     def compute_absolute_error(self, predicted_data, record, dataframe_record):
@@ -2375,7 +2375,7 @@ class DBBenchmarkRun(BenchmarkRun):
         try:
             idx = self.csv_headers.index('AbsoluteError')
             self.csv_headers = self.csv_headers[:idx] + new_idxs + self.csv_headers[idx + 1:]
-        except ValueError, e: pass
+        except ValueError as e: pass
 
 
     def get_record_pdb_file_id(self, record):

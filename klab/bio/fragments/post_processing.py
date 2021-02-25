@@ -56,7 +56,7 @@ def rewrite_score_file(task_dir, old_filepath, backup_filepath, new_filepath, ma
                 new_lines.append('%s%s' % (str(reverse_mapping[str(residue_id)]).rjust(11), l[11:]))
                 assert(len(new_lines[-1]) == len(l))
 
-    print('Rewriting fragments score file %s for %d-mers with %d fragments...' % (old_filepath, frag_sizes, num_fragments))
+    print(('Rewriting fragments score file %s for %d-mers with %d fragments...' % (old_filepath, frag_sizes, num_fragments)))
     os.rename(old_filepath, backup_filepath)
     write_file(new_filepath, '\n'.join(new_lines))
     if os.path.exists(new_filepath + '.gz'):
@@ -99,7 +99,7 @@ def rewrite_fragments_file(task_dir, old_filepath, backup_filepath, new_filepath
             new_blocks.append(b)
     new_blocks = ''.join(new_blocks)
 
-    print('Rewriting fragments file %s for %d-mers with %d fragments...' % (old_filepath, frag_sizes, num_fragments))
+    print(('Rewriting fragments file %s for %d-mers with %d fragments...' % (old_filepath, frag_sizes, num_fragments)))
     os.rename(old_filepath, backup_filepath)
     write_file(new_filepath, new_blocks)
     if os.path.exists(new_filepath + '.gz'):
@@ -157,16 +157,16 @@ def filter_fragments_file_by_secondary_structure(fragments_filepath, new_filepat
         new_header_line = '%s%s%s' % (mtchs.group(1), str(new_num_neighbors).rjust(len(mtchs.group(2))), mtchs.group(3) or '')
         new_block.insert(0, new_header_line)
         new_blocks.append('\n\n'.join(new_block))
-        stats.append(map(str, (start_residue_id, num_fragments, new_num_neighbors)))
+        stats.append(list(map(str, (start_residue_id, num_fragments, new_num_neighbors))))
     new_blocks = '\n\n'.join(new_blocks)
 
     s = 'Secondary structure filtering summary (%dmers)' % frag_sizes
-    print('\n%s\n%s' % (s, len(s) * '*'))
+    print(('\n%s\n%s' % (s, len(s) * '*')))
     print('Residue ID     Number of fragments      Number of fragments after filtering')
     for stat in stats:
-        print('%s%s%s' % (stat[0].ljust(15), stat[1].ljust(25), stat[2].ljust(0)))
+        print(('%s%s%s' % (stat[0].ljust(15), stat[1].ljust(25), stat[2].ljust(0))))
 
-    print('\nRewriting fragments file %s as %s for %d-mers with %d fragments...\n' % (fragments_filepath, new_filepath, frag_sizes, num_fragments))
+    print(('\nRewriting fragments file %s as %s for %d-mers with %d fragments...\n' % (fragments_filepath, new_filepath, frag_sizes, num_fragments)))
     write_file(new_filepath, new_blocks)
     if os.path.exists(new_filepath + '.gz'):
         os.remove(new_filepath + '.gz')

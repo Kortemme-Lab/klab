@@ -23,9 +23,9 @@ import numpy
 if __name__ == '__main__':
     sys.path.insert(0, os.path.join('..', '..'))
 
-import rcsb
-from basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
-from basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
+from . import rcsb
+from .basics import Residue, PDBResidue, Sequence, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids, protonated_residues_types_3, residue_types_3, Mutation, ChainMutation, SimpleMutation
+from .basics import dna_nucleotides, rna_nucleotides, dna_nucleotides_3to1_map, dna_nucleotides_2to1_map, non_canonical_dna, non_canonical_rna, all_recognized_dna, all_recognized_rna
 from klab import colortext
 from klab.bio.pdb import PDB
 from klab.fs.fsio import read_file, write_file
@@ -39,7 +39,7 @@ pymol_load_failed = False
 try:
     from klab.bio.pymolmod.psebuilder import BatchBuilder, PDBContainer
     from klab.bio.pymolmod.loop_removal import LoopRemovalBuilder
-except Exception, e:
+except Exception as e:
     pymol_load_failed = True
 
 
@@ -322,7 +322,7 @@ class ResidueIndexedPDBFile(object):
                     atom_bins[x][y].append(Bin(x, y, z))
 
         # Assign each Atom to a bin
-        for serial_number, atom in self.atoms.iteritems():
+        for serial_number, atom in self.atoms.items():
             bin_location = numpy.trunc((atom.point - low_point) / self.bin_size)
             bin = atom_bins[int(bin_location[0])][int(bin_location[1])][int(bin_location[2])]
             bin.append(atom)
@@ -353,15 +353,15 @@ class ResidueIndexedPDBFile(object):
 
     def check_residues(self):
         '''Checks to make sure that each atom type is unique per residue.'''
-        for chain, residue_ids in self.residues.iteritems():
-            for residue_id, residue in residue_ids.iteritems():
-                for record_type, atoms in residue.records.iteritems():
+        for chain, residue_ids in self.residues.items():
+            for residue_id, residue in residue_ids.items():
+                for record_type, atoms in residue.records.items():
                     freq = {}
                     for atom in atoms:
                         rec_id = atom.name + atom.conformation
                         freq[rec_id] = freq.get(rec_id, 0)
                         freq[rec_id] += 1
-                    for atom_type, count in freq.items():
+                    for atom_type, count in list(freq.items()):
                         if count > 1:
                             raise Exception('{0} occurrences of atom type {1} for record type {2} occur in residue {3} in chain {4}.'.format(count, atom_type, record_type, residue_id.strip(), chain))
 
@@ -377,7 +377,7 @@ class ResidueIndexedPDBFile(object):
             residue_id = pdb_residue_id[1:]
             if chain in self.residues and residue_id in self.residues[chain]:
                 residue = self.residues[chain][residue_id]
-                for record_type, atoms in residue.records.iteritems():
+                for record_type, atoms in residue.records.items():
                     freq = {}
                     for atom in atoms:
                         if atom.name not in ignore_these_atoms and atom.conformation not in ignore_these_conformations:
@@ -402,7 +402,7 @@ class Bonsai(ResidueIndexedPDBFile):
     def get_atom_names_by_group(self, groups):
         names = set()
         groups = set(groups)
-        for nm, g in self.atom_name_to_group.iteritems():
+        for nm, g in self.atom_name_to_group.items():
             if g in groups:
                 names.add(nm)
         return names
@@ -439,9 +439,9 @@ class Bonsai(ResidueIndexedPDBFile):
         atom_bins = self.atom_bins
         if source_atom:
             bin_radius = int(math.ceil(radius / bin_size)) # search this many bins in all directions
-            xrange = range(max(0, source_atom.bin.x - bin_radius), min(self.atom_bin_dimensions[0], source_atom.bin.x + bin_radius) + 1)
-            yrange = range(max(0, source_atom.bin.y - bin_radius), min(self.atom_bin_dimensions[1], source_atom.bin.y + bin_radius) + 1)
-            zrange = range(max(0, source_atom.bin.z - bin_radius), min(self.atom_bin_dimensions[2], source_atom.bin.z + bin_radius) + 1)
+            xrange = list(range(max(0, source_atom.bin.x - bin_radius), min(self.atom_bin_dimensions[0], source_atom.bin.x + bin_radius) + 1))
+            yrange = list(range(max(0, source_atom.bin.y - bin_radius), min(self.atom_bin_dimensions[1], source_atom.bin.y + bin_radius) + 1))
+            zrange = list(range(max(0, source_atom.bin.z - bin_radius), min(self.atom_bin_dimensions[2], source_atom.bin.z + bin_radius) + 1))
             for x in xrange:
                 for y in yrange:
                     for z in zrange:
@@ -468,7 +468,7 @@ class Bonsai(ResidueIndexedPDBFile):
     def get_atom_set_complement(self, atoms):
         complement = set()
         serial_numbers = set([a.serial_number for a in atoms])
-        for serial_number, atom in self.atoms.iteritems():
+        for serial_number, atom in self.atoms.items():
             if serial_number not in serial_numbers:
                 complement.add(atom)
         return complement
@@ -576,7 +576,7 @@ class Bonsai(ResidueIndexedPDBFile):
             try:
                 start_residue = self.residues[chain_id][loop.StartResidueID]
                 end_residue = self.residues[chain_id][loop.EndResidueID]
-            except Exception, e:
+            except Exception as e:
                 raise Exception('Could not find the start or end residue in the chain.')
 
             if start_residue in loop_residues or end_residue in loop_residues:
@@ -666,8 +666,8 @@ class Bonsai(ResidueIndexedPDBFile):
             end_id = str(loop['end'])
             start = []
             end = []
-            for chain, chain_residues in self.residues.iteritems():
-                for res, residue_object in chain_residues.iteritems():
+            for chain, chain_residues in self.residues.items():
+                for res, residue_object in chain_residues.items():
                     if res.strip() == start_id:
                         start.append((chain, res, residue_object))
                     if res.strip() == end_id:
@@ -749,7 +749,7 @@ class Bonsai(ResidueIndexedPDBFile):
         PSE_file, PSE_script = None, None
         try:
             PSE_file, PSE_script = self.generate_pymol_session(bonsai_pdb_content, cutting_pdb_content, bonsai_label = bonsai_label, cutting_label = cutting_label, pymol_executable = pymol_executable, settings = {})
-        except Exception, e:
+        except Exception as e:
             colortext.error('Failed to generate the PyMOL session: "{0}"'.format(e))
         return bonsai_pdb_content, cutting_pdb_content, PSE_file, PSE_script
 

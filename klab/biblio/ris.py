@@ -13,113 +13,113 @@ if __name__ == '__main__':
     sys.path.insert(0, '../..')
 import datetime
 import traceback
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 
-from publication import PublicationInterface, publication_abbreviations
+from .publication import PublicationInterface, publication_abbreviations
 from klab import colortext
 
 lsttype = type([])
 strtype = type("")
-unicode_type = type(u"")
+unicode_type = type("")
 doi_regex = re.compile('10.\d+/.+')
 
 taglist = [
-    u'TY',#  - Type of reference (must be the first tag)
-    u'A2',#  - Secondary Author (each author on its own line preceded by the tag)
-    u'A3',#  - Tertiary Author (each author on its own line preceded by the tag)
-    u'A4',#  - Subsidiary Author (each author on its own line preceded by the tag)
-    u'AB',#  - Abstract
-    u'AD',#  - Author Address
-    u'AN',#  - Accession Number
-    u'AU',#  - Author (each author on its own line preceded by the tag)
-    u'C1',#  - Custom 1
-    u'C2',#  - Custom 2
-    u'C3',#  - Custom 3
-    u'C4',#  - Custom 4
-    u'C5',#  - Custom 5
-    u'C6',#  - Custom 6
-    u'C7',#  - Custom 7
-    u'C8',#  - Custom 8
-    u'CA',#  - Caption
-    u'CN',#  - Call Number
-    u'CY',#  - Place Published
-    u'DA',#  - Date
-    u'DB',#  - Name of Database
-    u'DO',#  - DOI
-    u'DP',#  - Database Provider
-    u'EP',#  - End Page
-    u'ET',#  - Edition
-    u'IS',#  - Number
-    u'JO',#  - Journal name
-    u'J2',#  - Alternate Title (this field is used for the abbreviated title of a book or journal name)
-    u'KW',#  - Keywords (keywords should be entered each on its own line preceded by the tag)
-    u'L1',#  - File Attachments (this is a link to a local file on the users system not a URL link)
-    u'L4',#  - Figure (this is also meant to be a link to a local file on the users's system and not a URL link)
-    u'LA',#  - Language
-    u'LB',#  - Label
-    u'M1',#  - Number
-    u'M3',#  - Type of Work
-    u'N1',#  - Notes
-    u'N2',#  - Abstract
-    u'NV',#  - Number of Volumes
-    u'OP',#  - Original Publication
-    u'PB',#  - Publisher
-    u'PY',#  - Year
-    u'RI',#  - Reviewed Item
-    u'RN',#  - Research Notes
-    u'RP',#  - Reprint Edition
-    u'SE',#  - Section
-    u'SN',#  - ISBN/ISSN
-    u'SP',#  - Start Page
-    u'ST',#  - Short Title
-    u'T2',#  - Secondary Title
-    u'T3',#  - Tertiary Title
-    u'TA',#  - Translated Author
-    u'TI',#  - Title
-    u'TT',#  - Translated Title
-    u'UR',#  - URL
-    u'VL',#  - Volume
-    u'Y2',#  - Access Date
-    u'BT',#  - Title Primary.
-    u'ER',#  - End of Reference (must be the last tag)
+    'TY',#  - Type of reference (must be the first tag)
+    'A2',#  - Secondary Author (each author on its own line preceded by the tag)
+    'A3',#  - Tertiary Author (each author on its own line preceded by the tag)
+    'A4',#  - Subsidiary Author (each author on its own line preceded by the tag)
+    'AB',#  - Abstract
+    'AD',#  - Author Address
+    'AN',#  - Accession Number
+    'AU',#  - Author (each author on its own line preceded by the tag)
+    'C1',#  - Custom 1
+    'C2',#  - Custom 2
+    'C3',#  - Custom 3
+    'C4',#  - Custom 4
+    'C5',#  - Custom 5
+    'C6',#  - Custom 6
+    'C7',#  - Custom 7
+    'C8',#  - Custom 8
+    'CA',#  - Caption
+    'CN',#  - Call Number
+    'CY',#  - Place Published
+    'DA',#  - Date
+    'DB',#  - Name of Database
+    'DO',#  - DOI
+    'DP',#  - Database Provider
+    'EP',#  - End Page
+    'ET',#  - Edition
+    'IS',#  - Number
+    'JO',#  - Journal name
+    'J2',#  - Alternate Title (this field is used for the abbreviated title of a book or journal name)
+    'KW',#  - Keywords (keywords should be entered each on its own line preceded by the tag)
+    'L1',#  - File Attachments (this is a link to a local file on the users system not a URL link)
+    'L4',#  - Figure (this is also meant to be a link to a local file on the users's system and not a URL link)
+    'LA',#  - Language
+    'LB',#  - Label
+    'M1',#  - Number
+    'M3',#  - Type of Work
+    'N1',#  - Notes
+    'N2',#  - Abstract
+    'NV',#  - Number of Volumes
+    'OP',#  - Original Publication
+    'PB',#  - Publisher
+    'PY',#  - Year
+    'RI',#  - Reviewed Item
+    'RN',#  - Research Notes
+    'RP',#  - Reprint Edition
+    'SE',#  - Section
+    'SN',#  - ISBN/ISSN
+    'SP',#  - Start Page
+    'ST',#  - Short Title
+    'T2',#  - Secondary Title
+    'T3',#  - Tertiary Title
+    'TA',#  - Translated Author
+    'TI',#  - Title
+    'TT',#  - Translated Title
+    'UR',#  - URL
+    'VL',#  - Volume
+    'Y2',#  - Access Date
+    'BT',#  - Title Primary.
+    'ER',#  - End of Reference (must be the last tag)
      #
-    u'VO', # - Volume?
-    u'ID', # Seems to be doi
-    u'L3', # Link?
-    u'J1', # ?
+    'VO', # - Volume?
+    'ID', # Seems to be doi
+    'L3', # Link?
+    'J1', # ?
     # Seemingly non-canonical tags
-    u'T1', # Misspelling of TI
-    u'A1', # Used for authors
-    u'Y1', # Used for date
-    u'JF', # Used for journal
-    u'JA', # Used for journal
+    'T1', # Misspelling of TI
+    'A1', # Used for authors
+    'Y1', # Used for date
+    'JF', # Used for journal
+    'JA', # Used for journal
     # Canonical?
-    u'U1', # Used custom field results
-    u'U2', # Used custom field results
-    u'U3', # Used custom field results
-    u'U4', # Used custom field results
-    u'U5', # Used custom field results
+    'U1', # Used custom field results
+    'U2', # Used custom field results
+    'U3', # Used custom field results
+    'U4', # Used custom field results
+    'U5', # Used custom field results
 ]
 
 tag_map = {
-    u'AU' : 'authors',
-    u'A1' : 'authors',
-    u'TY' : 'publication_type',
-    u'T1' : 'title',
-    u'TI' : 'title',
-    u'T2' : 'subtitle',
-    u'JO' : 'journal',
-    u'JA' : 'journal',
-    u'J2' : 'journal',
-    u'JF' : 'journal',
-    u'VL' : 'volume',
-    u'IS' : 'issue',
-    u'Y1' : 'date',
-    u'PY' : 'date',
-    u'M3' : 'doi',
-    u'UR' : 'url',
-    u'SP' : 'startpage',
-    u'EP' : 'endpage',
+    'AU' : 'authors',
+    'A1' : 'authors',
+    'TY' : 'publication_type',
+    'T1' : 'title',
+    'TI' : 'title',
+    'T2' : 'subtitle',
+    'JO' : 'journal',
+    'JA' : 'journal',
+    'J2' : 'journal',
+    'JF' : 'journal',
+    'VL' : 'volume',
+    'IS' : 'issue',
+    'Y1' : 'date',
+    'PY' : 'date',
+    'M3' : 'doi',
+    'UR' : 'url',
+    'SP' : 'startpage',
+    'EP' : 'endpage',
 }
 
 
@@ -171,7 +171,7 @@ class RISEntry(PublicationInterface):
         errors = []
         warnings = []
         d = {}
-        for v in tag_map.values():
+        for v in list(tag_map.values()):
             d[v] = []
 
         RIS = self.RIS
@@ -191,7 +191,7 @@ class RISEntry(PublicationInterface):
 
             if not tag_type in taglist:
                 # Note: I removed 'elif key == "DOI": key = "M3"' from the old code - this may be required here if this is something I added to the RIS records (it breaks the RIS format)
-                raise Exception(u"Unrecognized bibliography tag '%s'." % tag_type)
+                raise Exception("Unrecognized bibliography tag '%s'." % tag_type)
             if not (line[2:5] == '  -'): # there should be a space at position 5 as well but besides stripping above, some RIS entries do not have this for the 'ER' line
                 raise Exception("Unexpected characters '%s' at positions 2-4." % line[2:5])
 
@@ -206,11 +206,11 @@ class RISEntry(PublicationInterface):
                     else:
                         d[tag_map[tag_type]].append(content)
 
-        for k, v in tag_data.iteritems():
+        for k, v in tag_data.items():
             if len(v) == 1:
                 tag_data[k] = v[0]
 
-        for k, v in d.iteritems():
+        for k, v in d.items():
             # Remove
             if len(v) == 0:
                 d[k] = None
@@ -245,7 +245,7 @@ class RISEntry(PublicationInterface):
                 tokens = [t for t in pubdate.split("/")]
                 if len(tokens) == 4: # YYYY/MM/DD/other info
                     tokens = tokens[0:3]
-                tokens = map(int, [t for t in tokens if t])
+                tokens = list(map(int, [t for t in tokens if t]))
                 assert (1 <= len(tokens) <= 3)
                 if len(tokens) > 1:
                     assert (1 <= tokens[1] <= 12)
@@ -254,9 +254,9 @@ class RISEntry(PublicationInterface):
                 if len(tokens) == 3:
                     assert (1 <= tokens[2] <= 31)
                     d['date'] = datetime.date(tokens[0], tokens[1], tokens[2])
-            except Exception, e:
+            except Exception as e:
                 if not self.quiet:
-                    print(traceback.format_exc())
+                    print((traceback.format_exc()))
                 raise colortext.Exception("Exception in date line '%s'.\n %s" % (d['date'].strip(), str(e)))
 
         if not d['year']:
@@ -291,7 +291,7 @@ class RISEntry(PublicationInterface):
         else:
             errors.append("Could not determine publication type.")
 
-        for k, v in d.iteritems():
+        for k, v in d.items():
             self.__setattr__(k, v)
 
 
@@ -311,15 +311,15 @@ class RISEntry(PublicationInterface):
         # doi parsing
         if not(self.doi):
             doi = None
-            for k, v in tag_data.iteritems():
-                if type(v) == type(u''):
+            for k, v in tag_data.items():
+                if type(v) == type(''):
                     if v.startswith("doi:"):
                         self.doi = v[4:].strip()
                         break
                     else:
                         doi_idx = v.find('dx.doi.org/')
                         if doi_idx != -1:
-                            self.doi = urllib2.unquote(tag_data['UR'][doi_idx+(len('dx.doi.org/')):])
+                            self.doi = urllib.parse.unquote(tag_data['UR'][doi_idx+(len('dx.doi.org/')):])
                             break
         if self.doi and self.doi.startswith("doi:"):
             self.doi = self.doi[4:].strip()
@@ -340,7 +340,7 @@ class RISEntry(PublicationInterface):
             if self.publication_type != "CHAP" and not(publication_abbreviations.get(self.journal)):
                 matched = False
                 normalized_journal_name = PublicationInterface._normalize_journal_name(self.journal)
-                for k, v in publication_abbreviations.iteritems():
+                for k, v in publication_abbreviations.items():
                     if PublicationInterface._normalize_journal_name(k) == normalized_journal_name or PublicationInterface._normalize_journal_name(v) == normalized_journal_name:
                         self.journal = k
                         matched = True

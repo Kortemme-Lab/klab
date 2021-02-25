@@ -156,13 +156,13 @@ class LatexReport:
         self.generate_latex( output_type = 'pdf' )
         out_dir = tempfile.mkdtemp( prefix = '%s-%s-tmp-latex-pdf_' % (time.strftime("%y%m%d"), getpass.getuser()) )
         if verbose:
-            print 'Outputting latex files to temporary directory:', out_dir
+            print('Outputting latex files to temporary directory:', out_dir)
 
         tmp_latex_file = os.path.join(out_dir, 'report.tex')
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
         if compile_pdf:
-            for x in xrange(self.number_compilations):
+            for x in range(self.number_compilations):
                 latex_output = subprocess.check_output( ['pdflatex', 'report.tex'], cwd = out_dir )
             tmp_latex_pdf = os.path.join(out_dir, 'report.pdf')
             assert( os.path.isfile(tmp_latex_pdf) )
@@ -181,7 +181,7 @@ class LatexReport:
         tmp_latex_file = os.path.join(out_dir, 'report.tex')
         with open(tmp_latex_file, 'w') as f:
             f.write(self.latex)
-        for x in xrange(self.number_compilations):
+        for x in range(self.number_compilations):
             latex_output = subprocess.check_output( ['htlatex', 'report.tex'], cwd = out_dir )
         raise Exception("Output files not yet copied from: " + out_dir)
         shutil.rmtree(out_dir)
@@ -249,8 +249,8 @@ class LatexPagePlot(LatexPage):
     def __init__(self, plot_filename, plot_title):
         plot_filename = os.path.abspath( plot_filename )
         if not os.path.isfile( plot_filename ):
-            print
-            print plot_filename
+            print()
+            print(plot_filename)
             raise Exception('Above plot filename is not a file!')
         self.plot_filename = plot_filename
         if plot_title:
@@ -302,8 +302,8 @@ class LatexTable(LatexPage):
         self.num_columns = len(header_row)
         for data_row in data_rows:
             if self.num_columns != len(data_row):
-                print 'Header row:', header_row
-                print 'Data row:', data_row
+                print('Header row:', header_row)
+                print('Data row:', data_row)
                 raise Exception('This data row has a different number of columns than the header row')
 
         self.set_column_format(column_format)

@@ -20,7 +20,7 @@ import shlex
 sys.path.insert(0, '../..')
 
 import klab.colortext as colortext
-from mysql import DatabaseInterface as MySQLDatabaseInterface
+from .mysql import DatabaseInterface as MySQLDatabaseInterface
 from klab.fs.fsio import read_file, write_file, open_temp_file
 
 
@@ -114,7 +114,7 @@ class MySQLSchema(object):
             contents = read_file(outfilename)
             os.remove(outfilename)
             return contents
-        except Exception, e:
+        except Exception as e:
             if os.path.exists(outfilename):
                 os.remove(outfilename)
             raise
@@ -173,9 +173,9 @@ class MySQLSchema(object):
                 else:
                     raise colortext.Exception("Error - sqlt-diagram exited with %d." % (p.returncode))
 
-        except Exception, e:
+        except Exception as e:
             colortext.error('Failed!')
-            print(str(e))
+            print((str(e)))
 
         return tempfiles
 

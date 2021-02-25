@@ -48,6 +48,6 @@ class ReportingObject(object):
                 fn(*args, **kwargs)
                 kwargs['fn'] = fn
             else:
-                if args and kwargs: print(args, kwargs)
+                if args and kwargs: print((args, kwargs))
                 elif kwargs: print(kwargs)
                 else: print(args)

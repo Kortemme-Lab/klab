@@ -10,8 +10,8 @@ Created by Shane O'Connor 2016.
 
 from klab.fs.fsio import write_file
 from klab import colortext
-from psebuilder import PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
-from colors import default_display_scheme
+from .psebuilder import PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
+from .colors import default_display_scheme
 
 # Notes:
 #
@@ -103,7 +103,7 @@ hide ribbon, {0}
 show {1}, {0}
 color {2}, {0}
 '''.format(s.structure_name, s.backbone_display or self.display_scheme['GenericProtein'].backbone_display, s.backbone_color or self.display_scheme['GenericProtein'].backbone_color))
-            for c, clr in s.chain_colors.iteritems():
+            for c, clr in s.chain_colors.items():
                 self.script.append('set_color {0}_{1} = {2}'.format(s.structure_name, c, clr))
                 self.script.append('color {0}_{1}, {0} and chain {1}'.format(s.structure_name, c))
 
@@ -112,7 +112,7 @@ color {2}, {0}
 
 
     def _add_superimposition_section(self):
-        for i in xrange(1, len(self.structures)):
+        for i in range(1, len(self.structures)):
             self.script.append('''
 # Superimpose the structures on backbone atoms
 align {0} and name n+ca+c+o, {1} and name n+ca+c+o
@@ -169,7 +169,7 @@ if has_hetatms: cmd.color('{2}', '{0}_roi')
             for roi in s.residues_of_interest:
                 residue_labels[roi] = s
 
-        for roi, s in residue_labels.iteritems():
+        for roi, s in residue_labels.items():
             self.script.append('\nlabel n. O and {0} and chain {1} and i. {2}, "{1}{2}"\n'.format(s.structure_name, roi[0], roi[1:].strip()))
 
 

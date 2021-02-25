@@ -24,7 +24,7 @@ ROSETTAWEB_SK_AA = {"ALA": "A", "CYS": "C", "ASP": "D", "GLU": "E", "PHE": "F", 
                     "TRP": "W", "TYR": "Y"}
 
 ROSETTAWEB_SK_AAinv = {}
-for k, v in ROSETTAWEB_SK_AA.items():
+for k, v in list(ROSETTAWEB_SK_AA.items()):
     ROSETTAWEB_SK_AAinv[v] = k
 
 # Set this to the machine you are debugging from
@@ -144,7 +144,7 @@ def get_files(dirname):
 
 def grep(string, list):
   expr = re.compile(string)
-  results = filter(expr.search, [str(line) for line in list])
+  results = list(filter(expr.search, [str(line) for line in list]))
   return results
   
 class RosettaError(Exception):
@@ -173,7 +173,7 @@ def saturateHexColor(hexcolor, adjustment = 1.0):
 		return "%s%.2x%.2x%.2x" % (prefix, rgbColor[0], rgbColor[1], rgbColor[2]) 
 
 def ggplotColorWheel(n, start = 15, saturation_adjustment = None):
-	hues = range(start, start + 360, 360/n)
+	hues = list(range(start, start + 360, 360/n))
 	rgbcolors = ['%x%x%x' % (255 * hlscol[0], 255 * hlscol[1], 255 * hlscol[2]) for hlscol in [colorsys.hls_to_rgb(float(h % 360) / 360.0, 0.65, 1.00) for h in hues]]
 	if saturation_adjustment:
 		return [saturateHexColor(rgbcol, saturation_adjustment) for rgbcol in rgbcolors]
@@ -270,7 +270,7 @@ class WebsiteSettings(object):
 
 if __name__ == "__main__":
     fn_list = [ string.replace(fn, os.getcwd() + '/3c5a0e1d0e465e80551b932b97a8344b', '.') for fn in get_files('./') ]
-    print fn_list
+    print(fn_list)
   
     # print get_files('./designs/')
 

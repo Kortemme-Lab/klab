@@ -56,14 +56,14 @@ class DatabaseInterface(object):
 
         self.locked = False
         if use_locking:
-            self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r.values()[0] for r in self.execute("SHOW TABLES")], ", ")
+            self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % list(r.values())[0] for r in self.execute("SHOW TABLES")], ", ")
             self.unlockstring = "UNLOCK TABLES"
         else:
             self.lockstring = ""
             self.unlockstring = ""
 
         # Store a list of the table names
-        self.TableNames = [r.values()[0] for r in self.execute("SHOW TABLES")]
+        self.TableNames = [list(r.values())[0] for r in self.execute("SHOW TABLES")]
 
         # Store a hierarchy of objects corresponding to the table names and their field names
         self.FieldNames = _FieldNames(None)
@@ -173,7 +173,7 @@ class DatabaseInterface(object):
 
     def execute_select(self, sql, parameters = None, quiet = False, locked = False):
         if locked:
-            print('LOCKED execute_select {0} {1}'.format(sql, parameters))
+            print(('LOCKED execute_select {0} {1}'.format(sql, parameters)))
         return self.execute(sql, parameters=parameters, quiet=quiet, locked=locked, do_commit=False)
 
 
@@ -203,7 +203,7 @@ class DatabaseInterface(object):
                 cursor = self.SSDictCursor_connection.cursor()
                 if locked:
                     if self.lockstring:
-                        print(sql, parameters)
+                        print((sql, parameters))
                         print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
@@ -222,7 +222,7 @@ class DatabaseInterface(object):
                     self.locked = False
                 cursor.close()
                 return results
-            except MySQLdb.OperationalError, e:
+            except MySQLdb.OperationalError as e:
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
@@ -233,7 +233,7 @@ class DatabaseInterface(object):
                 caughte = str(e)
                 errcode = e[0]
                 continue
-            except Exception, e:
+            except Exception as e:
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
@@ -271,7 +271,7 @@ class DatabaseInterface(object):
                 cursor = self.StdCursor_connection.cursor()
                 if locked:
                     if self.lockstring:
-                        print(sql, parameters)
+                        print((sql, parameters))
                         print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
@@ -290,7 +290,7 @@ class DatabaseInterface(object):
                     self.locked = False
                 cursor.close()
                 return results
-            except MySQLdb.OperationalError, e:
+            except MySQLdb.OperationalError as e:
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
@@ -301,7 +301,7 @@ class DatabaseInterface(object):
                 caughte = str(e)
                 errcode = e[0]
                 continue
-            except Exception, e:
+            except Exception as e:
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
@@ -366,7 +366,7 @@ class DatabaseInterface(object):
                 cursor = self.connection.cursor()
                 if locked:
                     if self.lockstring:
-                        print(sql, parameters)
+                        print((sql, parameters))
                         print('LOCKING')
                         cursor.execute(self.lockstring)
                     self.locked = True
@@ -385,9 +385,9 @@ class DatabaseInterface(object):
                     self.locked = False
                 cursor.close()
                 return results
-            except MySQLdb.OperationalError, e:
+            except MySQLdb.OperationalError as e:
                 if not quiet:
-                    print(i, "MySQLdb.OperationalError", str(e))
+                    print((i, "MySQLdb.OperationalError", str(e)))
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
@@ -398,9 +398,9 @@ class DatabaseInterface(object):
                 caughte = str(e)
                 errcode = e[0]
                 continue
-            except Exception, e:
+            except Exception as e:
                 if not quiet:
-                    print(i, "Exception", str(e))
+                    print((i, "Exception", str(e)))
                 if cursor:
                     if self.locked:
                         if self.unlockstring:
@@ -441,7 +441,7 @@ class DatabaseInterface(object):
                 self.lastrowid = int(cursor.lastrowid)
                 cursor.close()
                 return results
-            except MySQLdb.OperationalError, e:
+            except MySQLdb.OperationalError as e:
                 self._close_connection()
                 errcode = e[0]
                 caughte = e
@@ -496,7 +496,7 @@ class DatabaseInterface(object):
                     out_param_results = self.execute('SELECT %s' % ", ".join(['@_%s_%d AS %s' % (procname, pindex, parameters[pindex][1:]) for pindex in out_param_indices]))
 
                 return out_param_results
-            except MySQLdb.OperationalError, e:
+            except MySQLdb.OperationalError as e:
                 self._close_connection()
                 errcode = e[0]
                 caughte = e
@@ -526,7 +526,7 @@ class DatabaseInterface(object):
             tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
             values = tuple([d[k] for k in fields])
             self.locked_execute(SQL, parameters=values)
-        except Exception, e:
+        except Exception as e:
             if SQL and values:
                 sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (
                 SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -589,7 +589,7 @@ class DatabaseInterface(object):
             values = tuple([d[k] for k in fields])
             self.execute(SQL, parameters=values, locked = locked)
             return True, d
-        except Exception, e:
+        except Exception as e:
             if SQL and values:
                 sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (
                 SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -637,7 +637,7 @@ class DatabaseInterface(object):
             values = tuple([d[k] for k in fields])
             return SQL, values
 
-        except Exception, e:
+        except Exception as e:
             if SQL and values:
                 sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (
                 SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
@@ -683,7 +683,7 @@ class DatabaseInterface(object):
             tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
             values = tuple([d[k] for k in fields])
             return SQL, values, record_exists
-        except Exception, e:
+        except Exception as e:
             raise Exception("Error occurred during database insertion: '%s'. %s" % (str(e), traceback.format_exc()))
 
 

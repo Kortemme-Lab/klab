@@ -10,7 +10,7 @@ The PyMOL commands are adapted from scripts developed and written by Roland A. P
 
 from klab.fs.fsio import write_file
 from klab import colortext
-from psebuilder import BatchBuilder, PDBContainer, PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
+from .psebuilder import BatchBuilder, PDBContainer, PyMOLSessionBuilder, create_pymol_selection_from_PDB_residue_ids
 
 # Notes:
 #
@@ -47,7 +47,7 @@ class SingleStructureBuilder(PyMOLSessionBuilder):
     def __init__(self, pdb_containers, settings = {}, rootdir = '/tmp'):
         super(SingleStructureBuilder, self).__init__(pdb_containers, settings, rootdir)
         assert(len(pdb_containers) == 1)
-        self.structure = pdb_containers[pdb_containers.keys()[0]]
+        self.structure = pdb_containers[list(pdb_containers.keys())[0]]
 
     def _create_input_files(self):
         write_file(self._filepath('%s.pdb' % self.structure.pymol_name), self.structure.pdb_contents)

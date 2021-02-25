@@ -7,7 +7,7 @@ Test code for these modules.
 Created by Shane O'Connor 2014
 """
 
-RIS_test = u'''
+RIS_test = '''
 TY  - JOUR
 T1  - The Prevalence of Species and Strains in the Human Microbiome: A Resource for Experimental Efforts
 A1  - Kraal, Laurens
@@ -3509,8 +3509,8 @@ if __name__ == '__main__':
     sys.path.insert(0, '../..')
 
     from klab import colortext
-    from doi import DOI, RecordTypeParsingNotImplementedException, CrossRefException
-    from ris import RISEntry
+    from .doi import DOI, RecordTypeParsingNotImplementedException, CrossRefException
+    from .ris import RISEntry
 
     targets = set(map(string.lower,(sys.argv[1:])))
 
@@ -3526,7 +3526,7 @@ if __name__ == '__main__':
                 else:
                     colortext.warning(r.to_string())
                 count += 1
-            except Exception, e:
+            except Exception as e:
                 colortext.message(c)
                 colortext.warning(str(e))
                 colortext.error(traceback.format_exc())
@@ -3535,7 +3535,7 @@ if __name__ == '__main__':
 
     if 'doi' in targets:
         try_count = 0
-        print(len(test_journal_DOIs))
+        print((len(test_journal_DOIs)))
         for d in test_journal_DOIs:
             try_count += 1
             #if try_count > 7:
@@ -3547,7 +3547,7 @@ if __name__ == '__main__':
                 #colortext.warning(doi)
                 #print(doi.data)
                 #colortext.message('print_string')
-                print(colortext.make(doi.to_string(html=False), 'cyan'))
+                print((colortext.make(doi.to_string(html=False), 'cyan')))
                 #print(colortext.make(str(doi), 'orange'))
                 colortext.warning(doi.issue.get('__issue_date') or doi.article.get('__issue_date'))
                 colortext.warning(doi.get_earliest_date())
@@ -3558,11 +3558,11 @@ if __name__ == '__main__':
                 j = doi.to_json()
                 r = doi.convert_to_ris()
                 print('')
-            except RecordTypeParsingNotImplementedException, e:
+            except RecordTypeParsingNotImplementedException as e:
                 colortext.error('Unhandled type: %s' % str(e))
                 print('')
                 continue
-            except CrossRefException, e:
+            except CrossRefException as e:
                 colortext.error('CrossRef exception: %s' % str(e))
                 print('')
                 continue

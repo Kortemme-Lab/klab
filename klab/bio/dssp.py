@@ -39,10 +39,10 @@ from klab.bio.basics import dssp_secondary_structure_types, residue_types_1, res
 from klab.general.structures import NestedBunch
 
 
-secondary_structure_types = dssp_secondary_structure_types.keys()
+secondary_structure_types = list(dssp_secondary_structure_types.keys())
 residue_types = [t for t in residue_types_1] + [ss_bridge_cysteine_code for ss_bridge_cysteine_code in string.ascii_lowercase]
 residue_type_1to3 = {}
-for k, v in residue_type_1to3_map.iteritems():
+for k, v in residue_type_1to3_map.items():
     residue_type_1to3[k] = v
 for c in string.ascii_lowercase:
     residue_type_1to3[c] = 'CYS'
@@ -156,7 +156,7 @@ class MonomerDSSP(object):
         self.chain_order = self.pdb.atom_chain_order
         self.dssp_output = {}
         self.dssp = {}
-        for chain_id in [c for c in self.pdb.atom_sequences.keys() if self.pdb.chain_types[c] == 'Protein']:
+        for chain_id in [c for c in list(self.pdb.atom_sequences.keys()) if self.pdb.chain_types[c] == 'Protein']:
             self.compute(chain_id)
         self.chain_order = [c for c in self.chain_order if c in self.dssp]
         self.dsspb = NestedBunch(self.dssp)
@@ -166,7 +166,7 @@ class MonomerDSSP(object):
         self._iter_keys.reverse()  # we pop from the list
         return self
 
-    def next(self):  # todo: This is __next__ in Python 3.x
+    def __next__(self):  # todo: This is __next__ in Python 3.x
         try:
             chain_id = self._iter_keys.pop()
             return chain_id, self.dssp[chain_id]

@@ -298,7 +298,7 @@ class PyMOLStructure(PyMOLStructureBase):
         try:
             if not self.chain_colors and kwargs.get('chain_seed_color'):
                 chain_seed_color = kwargs.get('chain_seed_color')
-                if isinstance(chain_seed_color, str) or isinstance(chain_seed_color, unicode):
+                if isinstance(chain_seed_color, str) or isinstance(chain_seed_color, str):
                     chain_seed_color = str(chain_seed_color)
                     if chain_seed_color.startswith('#'):
                         if len(chain_seed_color) != 7:
@@ -328,16 +328,16 @@ class PyMOLStructure(PyMOLStructureBase):
                     chain_colors = ggplot_color_wheel(max(len(chain_ids), min_colors_in_wheel), start = chain_seed_hue, saturation_adjustment = None, saturation = chain_seed_saturation, lightness = chain_seed_lightness)
                     assert(len(chain_colors) >= len(chain_ids))
                     self.chain_colors = {}
-                    for i in xrange(len(chain_ids)):
+                    for i in range(len(chain_ids)):
                         self.chain_colors[chain_ids[i]] = str(list(mpl_colors.hex2color('#' + chain_colors[i])))
 
                     # Force use of the original seed as this may have been altered above in the "= max(" statements
                     self.chain_colors[chain_ids[0]] = str(list(mpl_colors.hex2color('#' + chain_seed_color)))
 
-        except Exception, e:
+        except Exception as e:
             print('An exception occurred setting the chain colors. Ignoring exception and resuming with default colors.')
-            print(str(e))
-            print(traceback.format_exc())
+            print((str(e)))
+            print((traceback.format_exc()))
 
         super(PyMOLStructure, self).__init__(
                  backbone_color = kwargs.get('backbone_color'), backbone_display = kwargs.get('backbone_display'),
@@ -425,13 +425,13 @@ if __name__ == '__main__':
     cs.update('ExpStructure.b', 'thallium')
     cs.update('ExpStructure.mutations', 'thallium')
     print('')
-    print(cs.lookup('ExpStructure.b', must_be_leaf = True))
-    print(cs['Scaffold.mutations'])
-    print('Testing string formatting: Scaffold.mutations = %(Scaffold.mutations)s, RosettaModel.hetatm = %(RosettaModel.hetatm)s.' % cs)
-    print(cs['global.background-color'])
+    print((cs.lookup('ExpStructure.b', must_be_leaf = True)))
+    print((cs['Scaffold.mutations']))
+    print(('Testing string formatting: Scaffold.mutations = %(Scaffold.mutations)s, RosettaModel.hetatm = %(RosettaModel.hetatm)s.' % cs))
+    print((cs['global.background-color']))
     print('')
 
     cs = ColorScheme({'global' : {'background-color' : 'black'}})
     print(cs)
-    print(cs['global.background-color'])
+    print((cs['global.background-color']))
     print('')

@@ -7,13 +7,13 @@ __author__="Kyle Barlow"
 import argparse
 import subprocess
 from subprocess import PIPE
-from git import *
+from .git import *
 import gitdb
 import os
 import feedparser
 from bs4 import BeautifulSoup
-import urllib
-import cPickle as pickle
+import urllib.request, urllib.parse, urllib.error
+import pickle as pickle
 import time
 import sys
 from datetime import datetime
@@ -31,7 +31,7 @@ class Reporter:
         self.start=time.time()
         self.lastreport=self.start
         self.task=task
-        print 'Starting '+task
+        print('Starting '+task)
     def report(self,n):
         t=time.time()
         if self.lastreport<(t-self.report_interval):
@@ -39,7 +39,7 @@ class Reporter:
             sys.stdout.write("  Processed: "+str(n)+" \r" )
             sys.stdout.flush()
     def done(self):
-        print 'Done %s, took %.3f seconds\n' % (self.task,time.time()-self.start)
+        print('Done %s, took %.3f seconds\n' % (self.task,time.time()-self.start))
 
 class RosettaRevision:
     def __init__(self,rev_id):
@@ -63,13 +63,13 @@ class RosettaRevision:
         try:
             commit=repo.commit(self.sha1)
         except gitdb.exc.BadObject:
-            print "Couldn't find sha1 %s, trying fetching" % self.sha1
+            print("Couldn't find sha1 %s, trying fetching" % self.sha1)
             repo.remotes.origin.fetch()
 
         try:
             commit=repo.commit(self.sha1)
         except gitdb.exc.BadObject:
-            print "Failed. Try fetching from origin and attempting again..."
+            print("Failed. Try fetching from origin and attempting again...")
             raise Exception('Try fetching')
 
         self.get_commit_message(commit)
@@ -99,7 +99,7 @@ class RosettaRevision:
         if self.rev_id < first_git_rev_id:
             raise Exception('Revision id %d corresponds to an SVN commit'%(self.rev_id))
 
-        soup = BeautifulSoup(urllib.urlopen(test_server_url+'%d'%(self.rev_id)).read())
+        soup = BeautifulSoup(urllib.request.urlopen(test_server_url+'%d'%(self.rev_id)).read())
         links = soup.find_all('a')
 
         if not len(links) > 0:
@@ -121,16 +121,16 @@ def input_yes_no(msg=''):
     """
     Simple helper function
     """
-    print '\n'+msg
+    print('\n'+msg)
     while(True):
-        i=raw_input('Input yes or no: ')
+        i=input('Input yes or no: ')
         i=i.lower()
         if i=='y' or i=='yes':
             return True
         elif i=='n' or i=='no':
             return False
         else:
-            print 'ERROR: Bad input. Must enter y/n/yes/no'
+            print('ERROR: Bad input. Must enter y/n/yes/no')
 
 def check_negative(value):
     ivalue = int(value)
@@ -248,21 +248,21 @@ def mark_interesting(rev_dict,only_new=True):
     for revision in revisions:
         rev=rev_dict[revision]
         if only_new and rev.interesting==None:
-            print '\n'*50
-            print 'REVISION:'
-            print '%d %s'%(rev.rev_id,rev.author)
+            print('\n'*50)
+            print('REVISION:')
+            print('%d %s'%(rev.rev_id,rev.author))
 
             # print link if in dict
             if rev.rev_id-1 in rev_dict:
                 parent_hash=rev_dict[rev.rev_id-1].sha1
-                print github_compare+parent_hash+'...'+rev.sha1
+                print(github_compare+parent_hash+'...'+rev.sha1)
             if rev.status==None:
-                print 'Test status: unavailable'
+                print('Test status: unavailable')
             elif rev.status=='':
-                print 'Test status: Passed'
+                print('Test status: Passed')
             else:
-                print 'Test status: %s'%(rev.status)
-            print rev.commit_message
+                print('Test status: %s'%(rev.status))
+            print(rev.commit_message)
         
             rev.interesting=input_yes_no('Is this an interesting commit?')
             rev_dict[revision]=rev
@@ -278,7 +278,7 @@ def update_cache(rev_dict,git_repository):
     for item_count,item in enumerate(feed['items']):
         title = item['title'].split(':')
         author = title[0].strip()
-        rev_id = long(title[1].strip())
+        rev_id = int(title[1].strip())
         test_link = item['link']
         sha1 = get_hash_from_github_url( item['source']['href'] )
 
@@ -320,14 +320,14 @@ def update_cache(rev_dict,git_repository):
     r.done()
 
     max_rev=first_git_rev_id
-    for rev_id in rev_dict.keys():
+    for rev_id in list(rev_dict.keys()):
         if rev_id>max_rev:
             max_rev=rev_id
 
     repo = Repo(git_repository)
 
     r = Reporter('checking for uncached revisions and updating information from repo')
-    for rev_id in xrange(first_git_rev_id,max_rev+1):
+    for rev_id in range(first_git_rev_id,max_rev+1):
         if rev_id not in rev_dict:
             rev=RosettaRevision(rev_id)
             rev_dict[rev_id]=rev
@@ -348,7 +348,7 @@ def update_cache(rev_dict,git_repository):
 
     r.done()
 
-    print 'Added to cache:\n  %d new revisions\n  %d updated revisions\n'%(new_revisions,updated_revisions)
+    print('Added to cache:\n  %d new revisions\n  %d updated revisions\n'%(new_revisions,updated_revisions))
     return rev_dict
 
 def string_from_list(l):
@@ -435,15 +435,15 @@ def output_slides(file_location,rev_dict,revisions):
     with open(latex_file,'wb') as f:
         f.write(input_string.encode("UTF-8"))
 
-    print 'Running pdflatex'
+    print('Running pdflatex')
     p=subprocess.Popen(['pdflatex',latex_file,'-jobname',file_location],stdout=PIPE,stderr=PIPE)
     stdoutdata, stderrdata = p.communicate()
 
-    print stderrdata
+    print(stderrdata)
 
     r.done()
 
-    print 'Saved pdf output'
+    print('Saved pdf output')
 
 def initialize_data():
     rev_dict={}

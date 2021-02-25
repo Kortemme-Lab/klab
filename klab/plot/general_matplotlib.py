@@ -113,7 +113,7 @@ def plot_scatter(
         plt.title( make_latex_safe(plot_title) )
 
     if verbose:
-        print 'Saving scatterplot figure to:', output_path
+        print('Saving scatterplot figure to:', output_path)
     if fig_height and fig_width:
         plt.gcf().set_size_inches(fig_width, fig_height)
     plt.savefig(
@@ -268,7 +268,7 @@ def make_corr_plot(
     axHisty.set_xlabel('Counts')
 
     if verbose:
-        print 'Saving scatterplot to:', fig_path
+        print('Saving scatterplot to:', fig_path)
     if plot_title:
         if fig_width and fig_height:
             fig.suptitle( make_latex_safe(plot_title), fontsize = fig_width*fig_height/4.1 )
@@ -348,7 +348,7 @@ def plot_box(
         plt.title( make_latex_safe(plot_title) )
 
     if verbose:
-        print 'Saving bar plot figure to:', output_path
+        print('Saving bar plot figure to:', output_path)
     if fig_height and fig_width:
         plt.gcf().set_size_inches(fig_width, fig_height)
 

@@ -35,13 +35,13 @@ NoSIFTSPDBUniParcMappingCases = set([
 ])
 
 expected_residue_numbering_schemes = {
-    'PDB'          : u'PDBresnum',
-    'CATH'         : u'PDBresnum',
-    'SCOP'         : u'PDBresnum',
-    'UniProt'      : u'UniProt',
-    'GO'           : u'UniProt',
-    'InterPro'     : u'UniProt',
-    'Pfam'         : u'UniProt',
+    'PDB'          : 'PDBresnum',
+    'CATH'         : 'PDBresnum',
+    'SCOP'         : 'PDBresnum',
+    'UniProt'      : 'UniProt',
+    'GO'           : 'UniProt',
+    'InterPro'     : 'UniProt',
+    'Pfam'         : 'UniProt',
 }
 
 
@@ -138,8 +138,8 @@ class DomainMatch(object):
 
     def to_dict(self):
         d = {}
-        for other_domain_type, v in sorted(self.matches.iteritems()):
-            for domain_accession, match_quality in sorted(v.iteritems()):
+        for other_domain_type, v in sorted(self.matches.items()):
+            for domain_accession, match_quality in sorted(v.items()):
                 d[other_domain_type] = d.get(other_domain_type, set())
                 d[other_domain_type].add(domain_accession)
         return {self.domain_accession : d}
@@ -147,9 +147,9 @@ class DomainMatch(object):
 
     def __repr__(self):
         s = ''
-        for other_domain_type, v in sorted(self.matches.iteritems()):
+        for other_domain_type, v in sorted(self.matches.items()):
             s += '%s -> %s\n' % (self.domain_type, other_domain_type)
-            for domain_accession, match_quality in sorted(v.iteritems()):
+            for domain_accession, match_quality in sorted(v.items()):
                 s += '  %s -> %s: matched at %0.2f\n' % (self.domain_accession, domain_accession, match_quality)
         return s
 
@@ -293,17 +293,17 @@ class SIFTS(xml.sax.handler.ContentHandler):
         else:
             self.pdb_chain_to_uniparc_id_map = {}
 
-            for c, mp in self.atom_to_uniparc_sequence_maps.iteritems():
+            for c, mp in self.atom_to_uniparc_sequence_maps.items():
                 self.pdb_chain_to_uniparc_id_map[c] = self.pdb_chain_to_uniparc_id_map.get(c, set())
                 for _, v, _ in mp:
                     self.pdb_chain_to_uniparc_id_map[c].add(v[0])
 
-            for c, mp in self.seqres_to_uniparc_sequence_maps.iteritems():
+            for c, mp in self.seqres_to_uniparc_sequence_maps.items():
                 self.pdb_chain_to_uniparc_id_map[c] = self.pdb_chain_to_uniparc_id_map.get(c, set())
                 for _, v, _ in mp:
                     self.pdb_chain_to_uniparc_id_map[c].add(v[0])
 
-            for c, s in self.pdb_chain_to_uniparc_id_map.iteritems():
+            for c, s in self.pdb_chain_to_uniparc_id_map.items():
                 self.pdb_chain_to_uniparc_id_map[c] = sorted(s)
 
             return self.pdb_chain_to_uniparc_id_map
@@ -611,7 +611,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         ACC_to_UPARC_mapping = uniprot_map('ACC', 'UPARC', list(UniProtACs), cache_dir = self.cache_dir)
         assert(sorted(ACC_to_UPARC_mapping.keys()) == sorted(list(UniProtACs)))
-        for k, v in ACC_to_UPARC_mapping.iteritems():
+        for k, v in ACC_to_UPARC_mapping.items():
             assert(len(v) == 1)
             ACC_to_UPARC_mapping[k] = v[0]
 
@@ -670,7 +670,7 @@ class SIFTS(xml.sax.handler.ContentHandler):
             self.atom_to_seqres_sequence_maps[c] = SequenceMap.from_dict(atom_to_seqres_residue_map[c])
 
         # Check the match percentage
-        total_residues_matched = sum([residues_matched[c] for c in residues_matched.keys()])
+        total_residues_matched = sum([residues_matched[c] for c in list(residues_matched.keys())])
         if total_residues_matched == 0:
             if self.pdb_id and self.pdb_id in NoSIFTSPDBUniParcMappingCases:
                 if self.require_uniprot_residue_mapping:
@@ -692,23 +692,23 @@ class SIFTS(xml.sax.handler.ContentHandler):
 
         # Merge the ranges for the region mappings i.e. so [1-3],[3-86] becomes [1-86]
         region_mapping = self.region_mapping
-        for chain_id, chain_details in region_mapping.iteritems():
-            for dbSource, source_details in chain_details.iteritems():
-                for dbAccessionId, range_list in source_details.iteritems():
+        for chain_id, chain_details in region_mapping.items():
+            for dbSource, source_details in chain_details.items():
+                for dbAccessionId, range_list in source_details.items():
                     source_details[dbAccessionId] = merge_range_pairs(range_list)
 
         # Check to see if the expected numbering schemes hold
-        for k, v in expected_residue_numbering_schemes.iteritems():
+        for k, v in expected_residue_numbering_schemes.items():
             if self.region_map_coordinate_systems.get(k):
                 assert(self.region_map_coordinate_systems[k] == set([v]))
 
         pfam_scop_mapping = {}
         scop_pfam_mapping = {}
-        for chain_id, chain_details in region_mapping.iteritems():
+        for chain_id, chain_details in region_mapping.items():
             if chain_details.get('Pfam') and chain_details.get('SCOP'):
-                for pfamAccessionId, pfam_range_lists in chain_details['Pfam'].iteritems():
+                for pfamAccessionId, pfam_range_lists in chain_details['Pfam'].items():
                     pfam_residues = parse_range(','.join(['%d-%d' % (r[0], r[1]) for r in pfam_range_lists]))
-                    for scopAccessionId, scop_range_lists in chain_details['SCOP'].iteritems():
+                    for scopAccessionId, scop_range_lists in chain_details['SCOP'].items():
                         scop_residues = parse_range(','.join(['%d-%d' % (r[0], r[1]) for r in scop_range_lists]))
                         num_same_residues = len(set(pfam_residues).intersection(set(scop_residues)))
                         if num_same_residues > 10:
@@ -732,12 +732,12 @@ class SIFTS(xml.sax.handler.ContentHandler):
         # I used to use the assertion "self.atom_to_uniparc_sequence_maps.keys() == self.atom_to_seqres_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys()"
         # but that failed for 2IMM where "self.atom_to_uniparc_sequence_maps.keys() == self.seqres_to_uniparc_sequence_maps.keys() == []" but THAT fails for 1IR3 so I removed
         # the assertions entirely.
-        for c, m in self.atom_to_seqres_sequence_maps.iteritems():
-            if self.seqres_to_uniparc_sequence_maps.keys():
+        for c, m in self.atom_to_seqres_sequence_maps.items():
+            if list(self.seqres_to_uniparc_sequence_maps.keys()):
                 atom_uniparc_keys = set(self.atom_to_uniparc_sequence_maps.get(c, {}).keys())
                 atom_seqres_keys = set(self.atom_to_seqres_sequence_maps.get(c, {}).keys())
                 assert(atom_uniparc_keys.intersection(atom_seqres_keys) == atom_uniparc_keys)
-                for k, v in m.map.iteritems():
+                for k, v in m.map.items():
                     uparc_id_1, uparc_id_2 = None, None
                     try:
                         uparc_id_1 = self.seqres_to_uniparc_sequence_maps[c].map[v]

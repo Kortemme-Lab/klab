@@ -64,12 +64,12 @@ def get_jobs(stdout, username = None):
                         mtchs = re.match('(\d+)-(\d+):(\d+)', tr)
                         assert(mtchs)
                         # I do not know what the third number represents so I will ignore it in the parsing for now
-                        task_ids.extend(range(int(mtchs.group(1)), int(mtchs.group(2)) + 1))                  
+                        task_ids.extend(list(range(int(mtchs.group(1)), int(mtchs.group(2)) + 1)))                  
                         assert(tr.find(':') != -1 and tr.find('-') != -1)
                 d['task_ids'] = task_ids            
                 jobs.append(d)
             except:
-                print('ERROR PARSING "{0}". LINE IGNORED.'.format(l))
+                print(('ERROR PARSING "{0}". LINE IGNORED.'.format(l)))
         else:
             if not found_header:
                 if l.startswith('job-ID'):
@@ -108,10 +108,10 @@ def resubmit_eqw_jobs():
         if not eqw_jobs:
             print('No jobs with Eqw state were found.')
         qmod.cj(eqw_jobs)
-    except Exception, e:
+    except Exception as e:
         print('An exception occurred in the parsing function. It probably needs to be fixed or updated.')
-        print(str(e))
-        print(traceback.format_exc())
+        print((str(e)))
+        print((traceback.format_exc()))
         sys.exit(2)
 
 

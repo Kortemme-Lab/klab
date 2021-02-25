@@ -5,7 +5,7 @@ script_output_dir = 'script_output'
 sample_directory = '/home/kyleb/Dropbox/UCSF/cas9/FCS/150916-3.1/kyleb/150916-rfp-cas9/96 Well - Flat bottom_002'
 
 rows_in_plate = 'ABCDEFGH'
-cols_in_plate = range(1, 13)
+cols_in_plate = list(range(1, 13))
 
 import matplotlib
 matplotlib.use('Agg')
@@ -77,7 +77,7 @@ class PlateInfo:
         if isinstance(new_positions, list):
             for new_position_range in new_positions:
                 self.add_position_range(new_position_range)
-        elif isinstance(new_positions, basestring):
+        elif isinstance(new_positions, str):
             self.add_position_range(new_positions)
         else:
             raise Exception('Input new positions must be a list or string')
@@ -89,9 +89,9 @@ class PlateInfo:
             second_pos = PlatePos(second_pos_str)
             first_pos_char_index = rows_in_plate.index(first_pos.row)
             second_pos_char_index = rows_in_plate.index(second_pos.row)
-            for char_index in xrange(first_pos_char_index, second_pos_char_index + 1):
+            for char_index in range(first_pos_char_index, second_pos_char_index + 1):
                 row = rows_in_plate[char_index]
-                for col in xrange(first_pos.col, second_pos.col + 1):
+                for col in range(first_pos.col, second_pos.col + 1):
                     self.add_position( '%s%d' % (row, col) )
         else:
             self.add_position(pos_range)
@@ -160,7 +160,7 @@ class Plate:
     @property
     def experimental_parameters(self):
         experimental_parameters = []
-        for parameter_name in self.info_dict.keys():
+        for parameter_name in list(self.info_dict.keys()):
             if 'blank' not in parameter_name.lower():
                 if len(self.info_dict[parameter_name]) == 1 and np.nan in self.info_dict[parameter_name]:
                     experimental_parameters.append(parameter_name)
@@ -190,7 +190,7 @@ class Plate:
             assert(plate_pos not in self.samples)
             self.samples[plate_pos] = FCMeasurement(ID=str(plate_pos), datafile=filepath)
         if verbose:
-            print 'Loaded %d FCS files from directory %s' % (len(fcs_files), sample_directory)
+            print('Loaded %d FCS files from directory %s' % (len(fcs_files), sample_directory))
 
 def gate_data(pos, fcs_data, gate):
     return (pos, fcs_data.gate(gate))
@@ -278,7 +278,7 @@ def output_medians_and_sums():
         os.makedirs(script_output_dir)
 
     rows = [char for char in 'ABCDEFGH']
-    cols = range(1, 13)
+    cols = list(range(1, 13))
     for channel, data_type in [(channel_medians, 'medians'), (channel_sums, 'sums')]:
         for channel_name in channel:
             filename = os.path.join(script_output_dir, '%s_%s.csv' % (channel_name, data_type))

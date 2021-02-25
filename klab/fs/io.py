@@ -15,7 +15,7 @@ def sanitize_filename(filename):
     return ''.join(c for c in filename if c in valid_chars)
 
 def read_file(filepath, binary = False):
-    print filepath
+    print(filepath)
     if binary:
         output_handle = open(filepath,'rb')
     elif filepath.endswith('.gz'):
