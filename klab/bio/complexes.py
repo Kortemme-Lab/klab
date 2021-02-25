@@ -130,7 +130,7 @@ class ProteinProteinComplex(object):
                 ))
                 pdb_set_id.append('{0}:{1}:{2}:{3}'.format(chain_set_def[0], pdb_names[pc[0]], pc[1], nmr_model))
         pdb_set['pdb_set_id'] = sorted(pdb_set_id)
-        print(pdb_set['pdb_set_id'])
+        print((pdb_set['pdb_set_id']))
 
         # Make sure we do not already have this set defined (the Complex should contain a unique list of bags of chains).
         if pdb_set['pdb_set_id'] in [ps['pdb_set_id'] for ps in self.pdb_sets]:
@@ -180,7 +180,7 @@ class ProteinProteinComplex(object):
             )
 
             chain_records = []
-            for side, chain_details in sorted(pdb_set['chains'].iteritems()):
+            for side, chain_details in sorted(pdb_set['chains'].items()):
                 chain_records.append(dict(
                     PPComplexID = self.id,
                     SetNumber = pdb_set['set_number'],

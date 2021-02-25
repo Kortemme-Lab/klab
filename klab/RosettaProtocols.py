@@ -26,12 +26,12 @@ class References:
         return self.refs[index]
     
     def iteritems(self):
-        return self.refs.iteritems()
+        return iter(self.refs.items())
     
     def getReferences(self):
         i = 0
         refIDs = {}
-        refs = sorted(self.refs.iteritems())
+        refs = sorted(self.refs.items())
         for reftag, reference in refs:
             i += 1
             refIDs[reftag] = i

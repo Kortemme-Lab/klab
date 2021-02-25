@@ -27,7 +27,7 @@ DictCursor = MySQLdb.cursors.DictCursor
 StdCursor = MySQLdb.cursors.Cursor
 
 import getpass
-import rosettahelper
+from . import rosettahelper
 
 class _FieldNames(object):
 	'''This class is used to store the database structure accessed via element access rather than using raw strings or doing a dict lookup. 
@@ -145,7 +145,7 @@ class DatabaseInterface(object):
 				cursor.close()
 				self._close_connection()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				if cursor:
 					if self.locked:
 						cursor.execute(self.unlockstring)
@@ -155,7 +155,7 @@ class DatabaseInterface(object):
 				caughte = str(e)
 				errcode = e[0]
 				continue
-			except Exception, e:
+			except Exception as e:
 				if cursor:
 					if self.locked:
 						cursor.execute(self.unlockstring)
@@ -183,7 +183,7 @@ class DatabaseInterface(object):
 			SQL = 'INSERT INTO %s (%s) VALUES (%s)' % (tblname, join(fields, ", "), join(['%s' for x in range(len(fields))], ','))
 			values = tuple([d[k] for k in fields])
 	 		self.locked_execute(SQL, parameters = values)
-		except Exception, e:
+		except Exception as e:
 			if SQL and values:
 				sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 			sys.stderr.write("\nError: '%s'.\n" % (str(e)))
@@ -220,7 +220,7 @@ class DatabaseInterface(object):
 			values = tuple([d[k] for k in fields])
 			self.locked_execute(SQL, parameters = values)
 	 		return True, d 
-		except Exception, e:
+		except Exception as e:
 			if SQL and values:
 				sys.stderr.write("\nSQL execution error in query '%s' %% %s at %s:" % (SQL, values, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 			sys.stderr.write("\nError: '%s'.\n" % (str(e)))
@@ -249,7 +249,7 @@ class DatabaseInterface(object):
 				cursor.close()
 				self._close_connection()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				self._close_connection()
 				errcode = e[0]
 				caughte = e
@@ -286,11 +286,11 @@ class ReusableDatabaseInterface(DatabaseInterface):
 			else:
 				self.passwd = getpass.getpass("Enter password to connect to MySQL database:")
 		self.locked = False
-		self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % r.values()[0] for r in self.execute("SHOW TABLES")], ", ")
+		self.lockstring = "LOCK TABLES %s" % join(["%s WRITE" % list(r.values())[0] for r in self.execute("SHOW TABLES")], ", ")
 		self.unlockstring = "UNLOCK TABLES"
 		
 		# Store a list of the table names  
-		self.TableNames = [r.values()[0] for r in self.execute("SHOW TABLES")]
+		self.TableNames = [list(r.values())[0] for r in self.execute("SHOW TABLES")]
 		
 		# Store a hierarchy of objects corresponding to the table names and their field names  
 		self.FieldNames = _FieldNames(None)
@@ -366,7 +366,7 @@ class ReusableDatabaseInterface(DatabaseInterface):
 					self.locked = False
 				cursor.close()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				if cursor:
 					if self.locked:
 						cursor.execute(self.unlockstring)
@@ -375,7 +375,7 @@ class ReusableDatabaseInterface(DatabaseInterface):
 				caughte = str(e)
 				errcode = e[0]
 				continue
-			except Exception, e:
+			except Exception as e:
 				if cursor:
 					if self.locked:
 						cursor.execute(self.unlockstring)
@@ -425,7 +425,7 @@ class ReusableDatabaseInterface(DatabaseInterface):
 					self.locked = False
 				cursor.close()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				if cursor:
 					if self.locked:
 						cursor.execute(self.unlockstring)
@@ -434,7 +434,7 @@ class ReusableDatabaseInterface(DatabaseInterface):
 				caughte = str(e)
 				errcode = e[0]
 				continue
-			except Exception, e:
+			except Exception as e:
 				if cursor:
 					if self.locked:
 						cursor.execute(self.unlockstring)
@@ -471,7 +471,7 @@ class ReusableDatabaseInterface(DatabaseInterface):
 				self.lastrowid = int(cursor.lastrowid)
 				cursor.close()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				self._close_connection()
 				errcode = e[0]
 				caughte = e
@@ -505,7 +505,7 @@ def _getSortedString(o):
 	# todo: replace this with something like pprint on Python upgrade
 	# We assume here that any container type is either list or tuple which may not always hold
 	if isinstance(o, (dict)):
-		pkeys = sorted(o.keys(), key=_lowercaseToStr)
+		pkeys = sorted(list(o.keys()), key=_lowercaseToStr)
 		l = []
 		for k in pkeys:
 			l.append(str(k) + ":" + _getSortedString(o[k]))
@@ -596,7 +596,7 @@ class RosettaDB:
 				lst_field.append( pair[0] )
 				lst_value.append( '"%s"' % pair[1] )
 			else:
-				print "err: field %s can't be found in the table" % pair[0]
+				print("err: field %s can't be found in the table" % pair[0])
 				return False
 			
 		# field-SQL-command-pairs: the only difference is the missing double quotes in the SQL command
@@ -606,7 +606,7 @@ class RosettaDB:
 					lst_field.append( pair[0] )
 					lst_value.append( pair[1] )
 				else:
-					print "err: field %s can't be found in the table" % pair[0]
+					print("err: field %s can't be found in the table" % pair[0])
 					return False
 				
 		# build the command
@@ -638,7 +638,7 @@ class RosettaDB:
 				self.lastrowid = int(cursor.lastrowid)
 				cursor.close()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				errcode = e[0]
 				self.connection.ping()
 				caughte = e
@@ -676,7 +676,7 @@ class RosettaDB:
 				self.lastrowid = int(cursor.lastrowid)
 				cursor.close()
 				return results
-			except MySQLdb.OperationalError, e:
+			except MySQLdb.OperationalError as e:
 				errcode = e[0]
 				# errcodes of 2006 or 2013 usually indicate a dropped connection  
 				# errcode 1100 is an error with table locking

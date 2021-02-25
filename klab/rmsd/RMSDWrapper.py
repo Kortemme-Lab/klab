@@ -29,7 +29,7 @@ def pairwise_rmsd(input_pdbs):
     blockPrint()
     rmsd_matrix = pyRMSD.matrixHandler.MatrixHandler().createMatrix(coordinates, pyrmsd_calc)
     enablePrint()
-    print scipy.spatial.distance.squareform( rmsd_matrix.get_data() )
+    print(scipy.spatial.distance.squareform( rmsd_matrix.get_data() ))
 
 def pairwise_rmsd_of_coords(coords):
     coordinates = np.array( coords )

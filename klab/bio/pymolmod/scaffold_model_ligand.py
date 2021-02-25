@@ -10,7 +10,7 @@ The PyMOL commands are adapted from scripts developed and written by Roland A. P
 
 from klab.fs.fsio import write_file
 from klab import colortext
-from psebuilder import PyMOLSessionBuilder
+from .psebuilder import PyMOLSessionBuilder
 
 class ScaffoldModelLigandBuilder(PyMOLSessionBuilder):
 

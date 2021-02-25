@@ -107,7 +107,7 @@ class BioCache(object):
     def add_node(self, container, k, v):
         if self.max_capacity and (len(container) + 1) > self.max_capacity:
             # Truncate container contents
-            keys_to_delete = [t[0] for t in sorted(container.items(), key=operator.itemgetter(1))[:-(self.max_capacity - 1)]] # sort by datetime of insertion and keep the last self.max_capacity minus one objects (to allow space for one more object)
+            keys_to_delete = [t[0] for t in sorted(list(container.items()), key=operator.itemgetter(1))[:-(self.max_capacity - 1)]] # sort by datetime of insertion and keep the last self.max_capacity minus one objects (to allow space for one more object)
             for dk in keys_to_delete:
                 del container[dk]
         container[k] = CacheNode(v)

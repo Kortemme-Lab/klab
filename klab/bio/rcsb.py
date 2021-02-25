@@ -8,9 +8,9 @@ Created by Shane O'Connor 2011/2012
 """
 
 import os
-import StringIO
+import io
 from io import BytesIO
-import urllib
+import urllib.request, urllib.parse, urllib.error
 import gzip
 import shlex
 
@@ -92,7 +92,7 @@ def download_fasta(pdb_id, dest_dir, silent = True, filename = None):
 def retrieve_xml(pdb_id, silent = True):
     '''The RCSB website now compresses XML files.'''
     xml_gz = retrieve_file_from_RCSB(get_rcsb_files_connection(), "/download/%s.xml.gz" % pdb_id, silent = silent)
-    cf = StringIO.StringIO()
+    cf = io.StringIO()
     cf.write(xml_gz)
     cf.seek(0)
     df = gzip.GzipFile(fileobj = cf, mode='rb')
@@ -129,11 +129,11 @@ def retrieve_pdb_ligand_info(pdb_id, silent = True):
 
 def retrieve_ligand_diagram(pdb_ligand_code):
     from PIL import Image
-    file = BytesIO(urllib.urlopen('http://www.rcsb.org/pdb/images/{0}_600.gif'.format(pdb_ligand_code)).read())
+    file = BytesIO(urllib.request.urlopen('http://www.rcsb.org/pdb/images/{0}_600.gif'.format(pdb_ligand_code)).read())
     img = Image.open(file)
     width, height = img.size
     if width < 100: # not a foolproof method - they may change the failure picture in future
-        file = BytesIO(urllib.urlopen('http://www.rcsb.org/pdb/images/{0}_270.gif'.format(pdb_ligand_code)).read())
+        file = BytesIO(urllib.request.urlopen('http://www.rcsb.org/pdb/images/{0}_270.gif'.format(pdb_ligand_code)).read())
         img = Image.open(file)
         width, height = img.size
         if width < 100:

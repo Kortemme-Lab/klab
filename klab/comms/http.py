@@ -10,7 +10,7 @@ Created by Shane O'Connor 2012
 import os
 import time
 import traceback
-from httplib import HTTPConnection
+from http.client import HTTPConnection
 
 def get(url, timeout = None):
     url = url.strip()
@@ -82,10 +82,10 @@ class Connection(object):
                 if attempts_left != self.attempts:
                     print('Success.')
                 return contents
-            except Exception, e:
-                print('Error retrieving {0} {1}.'.format(os.path.split(self.url)[1], resource))
-                print(str(e))
-                print(traceback.format_exc())
+            except Exception as e:
+                print(('Error retrieving {0} {1}.'.format(os.path.split(self.url)[1], resource)))
+                print((str(e)))
+                print((traceback.format_exc()))
                 attempts_left -= 1
                 if attempts_left > 0:
                     print('Retrying.')

@@ -1,7 +1,7 @@
 import os
 from string import join
-import process
-import deprecated.rosettahelper as rosettahelper
+from . import process
+from . import deprecated.rosettahelper as rosettahelper
 
 
 def breakCommandLine(commandLine, length = 80):
@@ -75,7 +75,7 @@ class LaTeXDocument(object):
 		if self.quiet:
 			return
 		if len(msg) == 1:
-			print(msg[0])
+			print((msg[0]))
 		else:
 			print(msg)
 		print("")
@@ -281,7 +281,7 @@ class LaTeXCodePrinter(LaTeXDocument):
 	header = '''
 \\documentclass[a4paper,10pt]{article}
 
-\usepackage[margin=0.5in]{geometry}
+\\usepackage[margin=0.5in]{geometry}
 \\usepackage{color}
 \\usepackage{xcolor,listings}
 \\lstset{ %

@@ -37,7 +37,7 @@ Created by Shane O'Connor 2013
 import sys
 import os
 import tempfile
-import commands
+import subprocess
 import traceback
 from optparse import OptionParser # todo: deprecated since Python 2.7
 
@@ -98,17 +98,17 @@ def get_pdb_to_pose_residue_map(pdb_path, rosetta_scripts_path, rosetta_database
         else:
             command_line = '%s -constant_seed -in:file:s %s -parser:protocol %s -overwrite -out:nooutput %s' % (rosetta_scripts_path, pdb_path, script_path, extra_flags)
 
-        exit_code, stdout = commands.getstatusoutput(command_line)
+        exit_code, stdout = subprocess.getstatusoutput(command_line)
         if exit_code != 0:
             errors.append("An error occured during execution. The exit code was %d. The output was:\n\n%s" % (exit_code, stdout))
         else:
             try:
                 mapping = get_mapping_from_db3_file( db_path )
-            except Exception, e:
+            except Exception as e:
                 errors.append(str(e))
                 errors.append(traceback.format_exc())
                 errors.append("The features database does not seem to have been correctly created. Check to see if the command '%s' is correct." % command_line)
-    except Exception, e:
+    except Exception as e:
         errors.append(str(e))
         errors.append(traceback.format_exc())
         exit_code = 1
@@ -213,14 +213,14 @@ if __name__ == '__main__':
         parser.print_help()
         sys.exit(1)
     elif not(os.path.exists(filename)):
-        print("\nError: File '%s' does not exist.\n" % filename)
+        print(("\nError: File '%s' does not exist.\n" % filename))
         sys.exit(1)
     if not rosetta_database_path:
         print("\nError: The path to the Rosetta database corresponding with the RosettaScripts executable must be specified.\n")
         parser.print_help()
         sys.exit(1)
     elif not(os.path.exists(rosetta_database_path)):
-        print("\nError: The path '%s' does not exist.\n" % rosetta_database_path)
+        print(("\nError: The path '%s' does not exist.\n" % rosetta_database_path))
         sys.exit(1)
     if not rosetta_scripts_path:
         print("\nError: The path to the RosettaScripts executable must be specified.\n")
@@ -230,22 +230,22 @@ if __name__ == '__main__':
         if os.path.exists(os.path.join(os.getcwd(), rosetta_scripts_path)):
             rosetta_scripts_path = "./%s" % os.path.join(os.getcwd(), rosetta_scripts_path)
     if not os.path.exists(rosetta_scripts_path):
-        print("\nError: The path '%s' does not exist.\n" % rosetta_scripts_path)
+        print(("\nError: The path '%s' does not exist.\n" % rosetta_scripts_path))
         sys.exit(1)
     rosetta_scripts_path = os.path.abspath(rosetta_scripts_path)
     if chains:
         chains = chains.split(",")
         for c in chains:
             if not len(c) == 1:
-                print("\nError: Chain ID '%s' is invalid. PDB chain identifiers are one character in length.\n" % c)
+                print(("\nError: Chain ID '%s' is invalid. PDB chain identifiers are one character in length.\n" % c))
                 sys.exit(1)
 
     success, result = get_stripped_pdb_to_pose_residue_map(filename, rosetta_scripts_path, rosetta_database_path, chains = chains, strip_hetatms = strip_hetatms)
     if success:
         print("{")
-        for k, v in sorted(result.iteritems()):
-            print("'%s': %s," % (k, v))
+        for k, v in sorted(result.items()):
+            print(("'%s': %s," % (k, v)))
         print("}")
     else:
-        print("\n".join(result))
+        print(("\n".join(result)))
         sys.exit(1)

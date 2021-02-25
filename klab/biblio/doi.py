@@ -20,11 +20,11 @@ Created by Shane O'Connor 2014
 import sys
 import re
 import datetime
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 import json
 from xml.dom.minidom import parse, parseString
 
-from publication import PublicationInterface, publication_abbreviations
+from .publication import PublicationInterface, publication_abbreviations
 from klab.comms.http import get_resource
 from klab import colortext
 
@@ -102,7 +102,7 @@ class DOI(PublicationInterface):
 
     def get_info(self):
         'Retrieve the data from CrossRef.'
-        escaped_doi = urllib2.quote(self.doi, '')
+        escaped_doi = urllib.parse.quote(self.doi, '')
         html = get_resource("www.crossref.org", '/guestquery?queryType=doi&restype=unixref&doi=%s&doi_search=Search' % escaped_doi)
 
         xml_matches = []
@@ -141,7 +141,7 @@ class DOI(PublicationInterface):
         data = self.data
         try:
             self._dom = parseString(data)
-        except Exception, e:
+        except Exception as e:
             raise DOIRetrievalException("An error occurred while parsing the XML for the DOI record.\n%s" % str(e))
 
         try:
@@ -151,19 +151,19 @@ class DOI(PublicationInterface):
             assert(len(record_tag) == 1)
             crossref_tag = record_tag[0].getElementsByTagName("crossref")
             assert(len(crossref_tag) == 1)
-        except Exception, e:
+        except Exception as e:
             raise DOIRetrievalException("The XML format does not fit the expected format.\n%s" % str(e))
 
         crossref_tag = crossref_tag[0]
         child_nodes = []
-        for c in xrange(len(crossref_tag.childNodes)):
+        for c in range(len(crossref_tag.childNodes)):
             if crossref_tag.childNodes[c].toxml().strip():
                 child_nodes.append(crossref_tag.childNodes[c].nodeName)
 
         if len(child_nodes) == 0:
-            raise(RecordTypeParsingNotImplementedException('Could not find any entries in the CrossRef record to parse.'))
+            raise RecordTypeParsingNotImplementedException
         if len(child_nodes) > 1:
-            raise(RecordTypeParsingNotImplementedException('Multiple entries were found in the CrossRef record. This case is not currently handled.'))
+            raise RecordTypeParsingNotImplementedException
         else:
             tag_type = child_nodes[0]
             self.record_type = tag_type
@@ -172,8 +172,8 @@ class DOI(PublicationInterface):
                 if len(journal_tag) == 1:
                     return self.parse_journal_data_xml(journal_tag[0])
             elif tag_type in ['book', 'conference', 'sa_component', 'dissertation', 'report-paper', 'standard', 'database']:
-                print(self.data)
-                raise(RecordTypeParsingNotImplementedException("The CrossRef record is for a publication of type '%s'. This case is not currently handled." % tag_type))
+                print((self.data))
+                raise RecordTypeParsingNotImplementedException
             elif tag_type == 'error':
                 error_tag = crossref_tag.getElementsByTagName("error")
                 if len(error_tag) == 1:
@@ -181,13 +181,13 @@ class DOI(PublicationInterface):
                     try: error_msg = error_tag[0].childNodes[0].nodeValue
                     except: pass
                     if error_msg:
-                        raise(CrossRefException("A CrossRef exception occurred: '%s'." % error_msg))
+                        raise CrossRefException
                     else:
-                        raise(CrossRefException("An unknown CrossRef exception occurred."))
+                        raise CrossRefException
                 else:
-                    raise(CrossRefException("An unknown CrossRef exception occurred."))
+                    raise CrossRefException
             else:
-                raise(UnexpectedRecordTypeException("An expected CrossRef record was found ('%s'). This case is not currently handled." % tag_type))
+                raise UnexpectedRecordTypeException
 
 
     # Parsing functions for specific record types
@@ -274,7 +274,7 @@ class DOI(PublicationInterface):
 
                         # A hack to fix bad records e.g. 10.1016/j.neuro.2006.03.023 where the authors' names are all in uppercase.
                         # Note that in this case, it does not fix the missing apostrophe in "O'Gara" or the missing hyphen/capitalization in "Leigh-Logan".
-                        for k, v in fields.iteritems():
+                        for k, v in fields.items():
                             if v.isupper():
                                 fields[k] = v.title()
 
@@ -284,13 +284,13 @@ class DOI(PublicationInterface):
                 raise NoAuthorsFoundException('Could not find any authors in the CrossRef record.')
 
             article_pages =  self.extract_node_data(article_tag.getElementsByTagName("pages"), ['first_page', 'last_page']) or {}
-            for k, v in article_pages.iteritems():
+            for k, v in article_pages.items():
                 self.article[k] = v
 
 
         # Convert dates
-        for media_type, date_fields in self.issue.get('__issue_date', {}).iteritems():
-            for t_, v_ in date_fields.iteritems():
+        for media_type, date_fields in self.issue.get('__issue_date', {}).items():
+            for t_, v_ in date_fields.items():
                 date_fields[t_] = int(v_)
             self.issue['issue_date'] = self.issue.get('issue_date', {})
             if date_fields.get('year') and date_fields.get('month') and date_fields.get('day'):
@@ -298,8 +298,8 @@ class DOI(PublicationInterface):
                 self.issue['issue_date'][media_type] = dt
                 self.published_dates.append(dt)
 
-        for media_type, date_fields in self.article.get('__issue_date', {}).iteritems():
-            for t_, v_ in date_fields.iteritems():
+        for media_type, date_fields in self.article.get('__issue_date', {}).items():
+            for t_, v_ in date_fields.items():
                 date_fields[t_] = int(v_)
             self.article['issue_date'] = self.article.get('issue_date', {})
             if date_fields.get('year') and date_fields.get('month') and date_fields.get('day'):
@@ -308,7 +308,7 @@ class DOI(PublicationInterface):
                 self.published_dates.append(dt)
 
         # Move the issue meta_data to the top issue level
-        for k, v in (self.issue['meta_data'] or {}).iteritems():
+        for k, v in (self.issue['meta_data'] or {}).items():
             assert(k not in self.issue)
             self.issue[k] = v
         del self.issue['meta_data']
@@ -388,7 +388,7 @@ class DOI(PublicationInterface):
     def get_year(self):
         article_date = self.issue.get('__issue_date') or self.article.get('__issue_date')
         if article_date:
-            for media_type, fields in article_date.iteritems():
+            for media_type, fields in article_date.items():
                 if fields.get('year'):
                     # break on the first found year
                     return str(fields.get('year'))
@@ -494,21 +494,21 @@ class DOI(PublicationInterface):
 
     def __repr__(self):
         s = ['issue']
-        for k, v in self.issue.iteritems():
+        for k, v in self.issue.items():
             if not k.startswith('__'):
                 if type(v) == type(self.issue):
                     s.append(' %s:' % k)
-                    for k_, v_ in v.iteritems():
+                    for k_, v_ in v.items():
                         s.append('   %s: %s' % (k_, str(v_)))
                 else:
                     s.append(' %s: %s' % (k, str(v)))
 
         s.append('article')
-        for k, v in self.article.iteritems():
+        for k, v in self.article.items():
             if not k.startswith('__'):
                 if type(v) == type(self.issue):
                     s.append(' %s:' % k)
-                    for k_, v_ in v.iteritems():
+                    for k_, v_ in v.items():
                         s.append('   %s: %s' % (k_, str(v_)))
                 elif type(v) == type(s):
                     s.append(' %s:' % k)

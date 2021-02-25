@@ -13,7 +13,7 @@ values to fit your application.
 import os
 import shlex
 import re
-import commands
+import subprocess
 import platform
 import pprint
 import traceback
@@ -21,10 +21,10 @@ import traceback
 from klab.fs.fsio import open_temp_file, read_file
 from klab.process import Popen as _Popen
 from klab import colortext
-from uniprot import pdb_to_uniparc, uniprot_map, UniProtACEntry, UniParcEntry
-from fasta import FASTA
-from pdb import PDB
-from basics import SubstitutionScore, Sequence, SequenceMap, PDBUniParcSequenceMap, ChainMutation, PDBMutationPair
+from .uniprot import pdb_to_uniparc, uniprot_map, UniProtACEntry, UniParcEntry
+from .fasta import FASTA
+from .pdb import PDB
+from .basics import SubstitutionScore, Sequence, SequenceMap, PDBUniParcSequenceMap, ChainMutation, PDBMutationPair
 
 ### Check for the necessary Clustal Omega and ClustalW software
 
@@ -58,7 +58,7 @@ Note that you may need to build argtable2 (http://argtable.sourceforge.net) or i
 '''
 
 if os.name == 'posix' or 'Linux' in platform.uname():
-    if commands.getstatusoutput('which clustalo')[0] != 0 or commands.getstatusoutput('which clustalw')[0] != 0:
+    if subprocess.getstatusoutput('which clustalo')[0] != 0 or subprocess.getstatusoutput('which clustalw')[0] != 0:
         raise colortext.Exception(missing_clustalo_message)
 else:
     raise Exception("Please extend this check to work on your architecture. At present, it only works on Linux.")
@@ -136,8 +136,8 @@ class SequenceAligner(object):
     def __repr__(self):
         s = []
         best_matches = self.align()
-        for k, v in sorted(best_matches.iteritems()):
-            s.append("%s: %s" % (k, ["%s, %s" % (x, y) for x, y in sorted(v.iteritems(), key=lambda x:-x[1]) if x !=k ]))
+        for k, v in sorted(best_matches.items()):
+            s.append("%s: %s" % (k, ["%s, %s" % (x, y) for x, y in sorted(iter(v.items()), key=lambda x:-x[1]) if x !=k ]))
         return "\n".join(s)
 
     def add_sequence(self, sequence_id, sequence, ignore_bad_chains = False):
@@ -148,7 +148,7 @@ class SequenceAligner(object):
         # All callers to add_sequence now need to replace ':' with '_' so that we can use ClustalW
         assert(sequence_id.find(':') == -1)
 
-        if sequence_id in self.sequence_ids.values():
+        if sequence_id in list(self.sequence_ids.values()):
             raise Exception("Sequence IDs must be unique")
         if list(set(sequence)) == ['X']:
             if ignore_bad_chains:
@@ -196,7 +196,7 @@ class SequenceAligner(object):
             else:
                 raise Exception("An unexpected alignment tool ('%s') was specified" % alignment_tool)
             #colortext.pcyan(self.alignment_output)
-        except Exception, e:
+        except Exception as e:
             colortext.error(str(e))
             colortext.error(traceback.format_exc())
             for t in tempfiles:
@@ -216,7 +216,7 @@ class SequenceAligner(object):
             self.align()
         best_matches = {}
         named_matrix = self.named_matrix
-        for k, v in named_matrix[id].iteritems():
+        for k, v in named_matrix[id].items():
             if k != id and v >= cut_off:
                 best_matches[k] = v
         return best_matches
@@ -295,7 +295,7 @@ class SequenceAligner(object):
             remove_count = 0
             all_keys = sorted(mapping.keys())
             for k in all_keys:
-                current_keys = mapping.keys()
+                current_keys = list(mapping.keys())
                 if (k - 2 not in current_keys) and (k - 1 not in current_keys) and (k + 1 not in current_keys) and (k - 2 not in current_keys):
                     del mapping[k]
                     del match_mapping[k]
@@ -316,7 +316,7 @@ class SequenceAligner(object):
 
         # Remove all trailing partial matches except the first one
         keys_so_far = set()
-        for k in sorted(mapping.keys(), reverse = True):
+        for k in sorted(list(mapping.keys()), reverse = True):
             if match_mapping[k].clustal == 1:
                 break
             else:
@@ -337,10 +337,10 @@ class SequenceAligner(object):
         lines = '\n'.join(lines[1:]).lstrip().split('\n')
 
         # The sequence IDs should be unique. Reassert this here
-        assert(len(self.sequence_ids.values()) == len(set(self.sequence_ids.values())))
+        assert(len(list(self.sequence_ids.values())) == len(set(self.sequence_ids.values())))
 
         # Create the list of sequence IDs
-        id_list = [v for k, v in sorted(self.sequence_ids.iteritems())]
+        id_list = [v for k, v in sorted(self.sequence_ids.items())]
 
         # Determine the indentation level
         first_id = id_list[0]
@@ -371,7 +371,7 @@ class SequenceAligner(object):
                 sequences[id].append(sequence)
 
             # Get the length of the sequence lines
-            length_of_sequences = list(set(map(len, [v[-1] for k, v in sequences.iteritems() if k != -1])))
+            length_of_sequences = list(set(map(len, [v[-1] for k, v in sequences.items() if k != -1])))
             assert(len(length_of_sequences) == 1)
             length_of_sequences = length_of_sequences[0]
 
@@ -387,7 +387,7 @@ class SequenceAligner(object):
 
         # Create the sequences, making sure that all sequences are the same length
         lengths = set()
-        for k, v in sequences.iteritems():
+        for k, v in sequences.items():
             sequences[k] = "".join(v)
             lengths.add(len(sequences[k]))
         assert(len(lengths) == 1)
@@ -398,7 +398,7 @@ class SequenceAligner(object):
     def _parse_percentage_identity_output(self, percentage_identity_output):
 
         # Initalize matrix
-        matrix = dict.fromkeys(self.sequence_ids.keys(), None)
+        matrix = dict.fromkeys(list(self.sequence_ids.keys()), None)
         for x in range(len(self.sequence_ids)):
             matrix[x + 1] = {}
             for y in range(len(self.sequence_ids)):
@@ -430,9 +430,9 @@ class SequenceAligner(object):
     def _create_named_matrix(self):
         matrix = self.matrix
         named_matrix = {}
-        for x, line in matrix.iteritems():
+        for x, line in matrix.items():
             named_matrix[self.sequence_ids[x]] = {}
-            for y, value in line.iteritems():
+            for y, value in line.items():
                 named_matrix[self.sequence_ids[x]][self.sequence_ids[y]] = value
         self.named_matrix = named_matrix
         return named_matrix
@@ -465,7 +465,7 @@ class PDBUniParcSequenceAligner(object):
         self.cut_off = cut_off
         self.added_uniprot_ACs = added_uniprot_ACs
         self.sequence_types = sequence_types
-        self.restrict_to_uniparc_values = map(str, restrict_to_uniparc_values) # can be used to remove ambiguity - see comments in relatrix.py about this
+        self.restrict_to_uniparc_values = list(map(str, restrict_to_uniparc_values)) # can be used to remove ambiguity - see comments in relatrix.py about this
         assert(0.0 <= cut_off <= 100.0)
 
         # Retrieve the FASTA record
@@ -512,7 +512,7 @@ class PDBUniParcSequenceAligner(object):
         s = []
         for c in sorted(self.chains):
             if self.clustal_matches.get(c):
-                match_string = ['%s (%.2f%%)' % (k, v) for k, v in sorted(self.clustal_matches[c].iteritems(), key = lambda x: x[1])] # this list should have be at most one element unless the matching did not go as expected
+                match_string = ['%s (%.2f%%)' % (k, v) for k, v in sorted(iter(self.clustal_matches[c].items()), key = lambda x: x[1])] # this list should have be at most one element unless the matching did not go as expected
                 s.append("%s -> %s" % (c, ", ".join(match_string)))
             elif self.alignment.get(c):
                 s.append("%s -> %s" % (c, self.alignment[c]))
@@ -551,7 +551,7 @@ class PDBUniParcSequenceAligner(object):
 
 
     def get_alignment_percentage_identity(self, chain):
-        vals = self.clustal_matches[chain].values()
+        vals = list(self.clustal_matches[chain].values())
         if len(vals) == 1:
             return vals[0]
         return None
@@ -572,7 +572,7 @@ class PDBUniParcSequenceAligner(object):
 
         equivalence_fiber = {}
         matched_chains = set()
-        for chain_id, equivalent_chains in self.identical_sequences.iteritems():
+        for chain_id, equivalent_chains in self.identical_sequences.items():
             matched_chains.add(chain_id)
             equivalent_chain_ids = set()
             for equivalent_chain in equivalent_chains:
@@ -594,7 +594,7 @@ class PDBUniParcSequenceAligner(object):
                 equivalence_fiber[c] = set([c])
 
         self.equivalence_fiber = equivalence_fiber
-        self.representative_chains = equivalence_fiber.keys()
+        self.representative_chains = list(equivalence_fiber.keys())
         # we could remove each chain from its image in the fiber which would be marginally more efficient in the logic below but that destroys the reflexivity in the equivalence class. Mathematics would cry a little.
 
         #pprint.pprint(self.representative_chains)
@@ -628,14 +628,14 @@ class PDBUniParcSequenceAligner(object):
             uniprot_mapping = p.get_DB_references().get(pdb_id).get('UNIPROT')
             if uniprot_mapping:
                 dbref_exists = True
-                for chain_id, details in uniprot_mapping.iteritems():
+                for chain_id, details in uniprot_mapping.items():
                     uniprot_ACs.add(details['dbAccession'])
 
             if not(uniprot_ACs) and replacement_pdb_id:
                 p = PDB.retrieve(replacement_pdb_id, cache_dir = cache_dir)
                 uniprot_mapping = p.get_DB_references().get(replacement_pdb_id).get('UNIPROT')
                 if uniprot_mapping:
-                    for chain_id, details in uniprot_mapping.iteritems():
+                    for chain_id, details in uniprot_mapping.items():
                         uniprot_ACs.add(details['dbAccession'])
                 mapping_pdb_id = replacement_pdb_id
             else:
@@ -667,7 +667,7 @@ class PDBUniParcSequenceAligner(object):
         # Map the UniProt ACs to the UniParc IDs
         m = uniprot_map('ACC', 'UPARC', uniprot_ACs, cache_dir = cache_dir)
         UniParcIDs = []
-        for _, v in m.iteritems():
+        for _, v in m.items():
             UniParcIDs.extend(v)
 
         # Create a mapping from the mapping_pdb_id to the UniParcEntry objects. This must match the return type from pdb_to_uniparc.
@@ -701,7 +701,7 @@ class PDBUniParcSequenceAligner(object):
                         self.clustal_matches[c] = {}
                         continue
 
-                    for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
+                    for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.items()):
                         sa.add_sequence(uniparc_id, str(uniparc_sequence))
                     best_matches = sa.align()
                     #colortext.pcyan(sa.alignment_output)
@@ -717,19 +717,19 @@ class PDBUniParcSequenceAligner(object):
         # Restrict the matches to a given set of UniParc IDs. This can be used to remove ambiguity when the correct mapping has been determined e.g. from the SIFTS database.
         if self.restrict_to_uniparc_values:
             for c in self.representative_chains:
-                if set(map(str, self.clustal_matches[c].keys())).intersection(set(self.restrict_to_uniparc_values)) > 0:
+                if set(map(str, list(self.clustal_matches[c].keys()))).intersection(set(self.restrict_to_uniparc_values)) > 0:
                     # Only restrict in cases where there is at least one match in self.restrict_to_uniparc_values
                     # Otherwise, chains which are not considered in self.restrict_to_uniparc_values may throw away valid matches
                     # e.g. when looking for structures related to 1KTZ (A -> P10600 -> UPI000000D8EC, B -> P37173 -> UPI000011DD7E),
                     #      we find the close match 2PJY. However, 2PJY has 3 chains: A -> P10600, B -> P37173, and C -> P36897 -> UPI000011D62A
-                    restricted_matches = dict((str(k), self.clustal_matches[c][k]) for k in self.clustal_matches[c].keys() if str(k) in self.restrict_to_uniparc_values)
+                    restricted_matches = dict((str(k), self.clustal_matches[c][k]) for k in list(self.clustal_matches[c].keys()) if str(k) in self.restrict_to_uniparc_values)
                     if len(restricted_matches) != len(self.clustal_matches[c]):
                         removed_matches = sorted(set(self.clustal_matches[c].keys()).difference(set(restricted_matches)))
                         #todo: add silent option to class else colortext.pcyan('Ignoring {0} as those chains were not included in the list self.restrict_to_uniparc_values ({1}).'.format(', '.join(removed_matches), ', '.join(self.restrict_to_uniparc_values)))
                     self.clustal_matches[c] = restricted_matches
 
         # Use the representatives' alignments for their respective equivalent classes
-        for c_1, related_chains in self.equivalence_fiber.iteritems():
+        for c_1, related_chains in self.equivalence_fiber.items():
             for c_2 in related_chains:
                 self.clustal_matches[c_2] = self.clustal_matches[c_1]
 
@@ -745,7 +745,7 @@ class PDBUniParcSequenceAligner(object):
 
                 substring_matches = {}
 
-                for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.iteritems()):
+                for uniparc_id, uniparc_sequence in sorted(self.uniparc_sequences.items()):
                     uniparc_sequence = str(uniparc_sequence)
                     idx = uniparc_sequence.find(fasta_sequence)
                     if idx != -1:
@@ -772,12 +772,12 @@ class PDBUniParcSequenceAligner(object):
             for c in self.representative_chains:
                 #print('HERE!')
                 #print(c)
-                if set(map(str, self.substring_matches[c].keys())).intersection(set(self.restrict_to_uniparc_values)) > 0:
+                if set(map(str, list(self.substring_matches[c].keys()))).intersection(set(self.restrict_to_uniparc_values)) > 0:
                     # Only restrict in cases where there is at least one match in self.restrict_to_uniparc_values
                     # Otherwise, chains which are not considered in self.restrict_to_uniparc_values may throw away valid matches
                     # e.g. when looking for structures related to 1KTZ (A -> P10600 -> UPI000000D8EC, B -> P37173 -> UPI000011DD7E),
                     #      we find the close match 2PJY. However, 2PJY has 3 chains: A -> P10600, B -> P37173, and C -> P36897 -> UPI000011D62A
-                    restricted_matches = dict((str(k), self.substring_matches[c][k]) for k in self.substring_matches[c].keys() if str(k) in self.restrict_to_uniparc_values)
+                    restricted_matches = dict((str(k), self.substring_matches[c][k]) for k in list(self.substring_matches[c].keys()) if str(k) in self.restrict_to_uniparc_values)
                     if len(restricted_matches) != len(self.substring_matches[c]):
                         removed_matches = sorted(set(self.substring_matches[c].keys()).difference(set(restricted_matches)))
                         # todo: see above re:quiet colortext.pcyan('Ignoring {0} as those chains were not included in the list self.restrict_to_uniparc_values ({1}).'.format(', '.join(removed_matches), ', '.join(self.restrict_to_uniparc_values)))
@@ -786,7 +786,7 @@ class PDBUniParcSequenceAligner(object):
         #colortext.pcyan('*' * 100)
 
         # Use the representatives' alignments for their respective equivalent classes
-        for c_1, related_chains in self.equivalence_fiber.iteritems():
+        for c_1, related_chains in self.equivalence_fiber.items():
             for c_2 in related_chains:
                 self.substring_matches[c_2] = self.substring_matches[c_1]
 
@@ -808,23 +808,23 @@ class PDBUniParcSequenceAligner(object):
                     #pprint.pprint(self.clustal_matches[c])
                     #pprint.pprint(self.substring_matches[c])
 
-                    match_list = sorted(set((self.clustal_matches[c].keys() or []) + (self.substring_matches[c].keys()  or [])))
+                    match_list = sorted(set((list(self.clustal_matches[c].keys()) or []) + (list(self.substring_matches[c].keys())  or [])))
                     raise MultipleAlignmentException(c, max_expected_matches_per_chain, max(len(self.substring_matches[c]), len(self.clustal_matches[c])), match_list, msg = 'More matches were found using the naive substring matching than the Clustal matching. Try lowering the cut-off (currently set to {0}).'.format(self.cut_off))
 
                 if self.clustal_matches[c]:
-                    if not (len(self.clustal_matches[c].keys()) == max_expected_matches_per_chain):
-                        match_list = sorted(set((self.clustal_matches[c].keys() or []) + (self.substring_matches[c].keys()  or [])))
-                        raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(self.clustal_matches[c].keys()), match_list)
+                    if not (len(list(self.clustal_matches[c].keys())) == max_expected_matches_per_chain):
+                        match_list = sorted(set((list(self.clustal_matches[c].keys()) or []) + (list(self.substring_matches[c].keys())  or [])))
+                        raise MultipleAlignmentException(c, max_expected_matches_per_chain, len(list(self.clustal_matches[c].keys())), match_list)
                     if self.substring_matches[c]:
-                        if self.substring_matches[c].keys() != self.clustal_matches[c].keys():
+                        if list(self.substring_matches[c].keys()) != list(self.clustal_matches[c].keys()):
                             print("ERROR: An inconsistent alignment was found between Clustal Omega and a substring search.")
                         else:
-                            self.alignment[c] = self.clustal_matches[c].keys()[0]
+                            self.alignment[c] = list(self.clustal_matches[c].keys())[0]
                     else:
-                        self.alignment[c] = self.clustal_matches[c].keys()[0]
+                        self.alignment[c] = list(self.clustal_matches[c].keys())[0]
 
         # Use the representatives' alignments for their respective equivalent classes. This saves memory as the same SequenceMap is used.
-        for c_1, related_chains in self.equivalence_fiber.iteritems():
+        for c_1, related_chains in self.equivalence_fiber.items():
             for c_2 in related_chains:
                 if self.alignment.get(c_1):
                     self.alignment[c_2] = self.alignment[c_1]
@@ -846,7 +846,7 @@ class PDBUniParcSequenceAligner(object):
                     # Create a SequenceMap
                     s = PDBUniParcSequenceMap()
                     assert(sorted(residue_mapping.keys()) == sorted(residue_match_mapping.keys()))
-                    for k, v in residue_mapping.iteritems():
+                    for k, v in residue_mapping.items():
                         s.add(k, (uniparc_entry.UniParcID, v), residue_match_mapping[k])
                     self.seqres_to_uniparc_sequence_maps[c] = s
 
@@ -854,7 +854,7 @@ class PDBUniParcSequenceAligner(object):
                     self.seqres_to_uniparc_sequence_maps[c] = PDBUniParcSequenceMap()
 
         # Use the representatives' alignments for their respective equivalent classes. This saves memory as the same SequenceMap is used.
-        for c_1, related_chains in self.equivalence_fiber.iteritems():
+        for c_1, related_chains in self.equivalence_fiber.items():
             for c_2 in related_chains:
                 if self.seqres_to_uniparc_sequence_maps.get(c_1):
                     self.seqres_to_uniparc_sequence_maps[c_2] = self.seqres_to_uniparc_sequence_maps[c_1]
@@ -956,9 +956,9 @@ class PDBSeqresSequenceAligner(object):
         alignment_tool, gap_opening_penalty, ignore_bad_chains = self.alignment_tool, self.gap_opening_penalty, self.ignore_bad_chains
         if not(self.best_matches) or not(self.complete_alignment_output):
             sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
-            for chain_id, seq in sorted(self.pdb_1.seqres_sequences.iteritems()):
+            for chain_id, seq in sorted(self.pdb_1.seqres_sequences.items()):
                 sa.add_sequence('{0}_{1}'.format(self.pdb_id_1, chain_id), str(seq), ignore_bad_chains = ignore_bad_chains)
-            for chain_id, seq in sorted(self.pdb_2.seqres_sequences.iteritems()):
+            for chain_id, seq in sorted(self.pdb_2.seqres_sequences.items()):
                 sa.add_sequence('{0}_{1}'.format(self.pdb_id_2, chain_id), str(seq), ignore_bad_chains = ignore_bad_chains)
             self.best_matches = sa.align()
             self.complete_alignment_output = sa.alignment_output
@@ -980,7 +980,7 @@ class PDBSeqresSequenceAligner(object):
                 continue
             covered_pdb_1_chains.add(chain_id)
 
-            for pdb_chain, match in sorted(self.best_matches['{0}_{1}'.format(self.pdb_id_1, chain_id)].items(), key = lambda x: x[1], reverse = True):
+            for pdb_chain, match in sorted(list(self.best_matches['{0}_{1}'.format(self.pdb_id_1, chain_id)].items()), key = lambda x: x[1], reverse = True):
                 other_pdb_chain_letter = pdb_chain.split('_')[1]
                 if pdb_chain.startswith(self.pdb_id_1):
                     if match == 100.0:
@@ -997,7 +997,7 @@ class PDBSeqresSequenceAligner(object):
                 continue
             covered_pdb_2_chains.add(chain_id)
 
-            for pdb_chain, match in sorted(self.best_matches['{0}_{1}'.format(self.pdb_id_2, chain_id)].items(), key = lambda x: x[1], reverse = True):
+            for pdb_chain, match in sorted(list(self.best_matches['{0}_{1}'.format(self.pdb_id_2, chain_id)].items()), key = lambda x: x[1], reverse = True):
                 other_pdb_chain_letter = pdb_chain.split('_')[1]
                 if pdb_chain.startswith(self.pdb_id_2):
                     if match == 100.0:
@@ -1010,18 +1010,18 @@ class PDBSeqresSequenceAligner(object):
 
         #self.alignments
         self.representative_alignment_output = ''
-        for chain_1, chain_2_pair in chain_mapping.iteritems():
+        for chain_1, chain_2_pair in chain_mapping.items():
             chain_2 = chain_2_pair[0]
             sa = self._align_chains(chain_1, chain_2)
             self.representative_alignment_output += sa.alignment_output + '\n'
         #get_residue_mapping
 
         self.summary = ''
-        for chain_id, related_chains in pdb_1_self_mapping.iteritems():
+        for chain_id, related_chains in pdb_1_self_mapping.items():
             self.summary += 'Chain {0} of {1} represents chains {2} of {1}.\n'.format(chain_id, self.pdb_id_1, ', '.join(sorted(related_chains)))
-        for chain_id, related_chains in pdb_2_self_mapping.iteritems():
+        for chain_id, related_chains in pdb_2_self_mapping.items():
             self.summary += 'Chain {0} of {1} represents chains {2} of {1}.\n'.format(chain_id, self.pdb_id_2, ', '.join(sorted(related_chains)))
-        for chain_id, mtch in sorted(chain_mapping.iteritems()):
+        for chain_id, mtch in sorted(chain_mapping.items()):
             self.summary += 'Chain {0} of {1} matches chain {2} of {3} (and its represented chains) at {4}%.\n'.format(chain_id, self.pdb_id_1, mtch[0], self.pdb_id_2, mtch[1])
 
         return self.representative_alignment_output, chain_mapping, self.summary
@@ -1061,7 +1061,7 @@ class PDBSeqresSequenceAligner(object):
             self.atom_sequence_maps[chain_1] = self.atom_sequence_maps.get(chain_1, {})
 
             best_match_percentage = None
-            for pdb_chain, match in sorted(self.best_matches['{0}_{1}'.format(self.pdb_id_1, chain_1)].items(), key=lambda x: x[1], reverse=True):
+            for pdb_chain, match in sorted(list(self.best_matches['{0}_{1}'.format(self.pdb_id_1, chain_1)].items()), key=lambda x: x[1], reverse=True):
                 if pdb_chain.startswith(self.pdb_id_1):
                     continue
                 chain_2 = pdb_chain.split('_')[1]
@@ -1080,9 +1080,9 @@ class PDBSeqresSequenceAligner(object):
 
                     # self.seqres_sequence_maps contains the mappings between SEQRES sequences
         #
-        for chain_1, matched_chains in self.seqres_sequence_maps.iteritems():
+        for chain_1, matched_chains in self.seqres_sequence_maps.items():
             self.atom_sequence_maps[chain_1] = self.atom_sequence_maps.get(chain_1, {})
-            for chain_2, residue_mappings in matched_chains.iteritems():
+            for chain_2, residue_mappings in matched_chains.items():
 
                 if not self.atom_sequence_maps[chain_1].get(chain_2):
                     self.atom_sequence_maps[chain_1][chain_2] = {}
@@ -1091,7 +1091,7 @@ class PDBSeqresSequenceAligner(object):
                     mapping, match_mapping = residue_mappings
 
                     if chain_1 in self.seqres_to_atom_maps_1 and chain_2 in self.seqres_to_atom_maps_2:
-                        for seqres_res_1, atom_res_1 in sorted(self.seqres_to_atom_maps_1[chain_1].iteritems()):
+                        for seqres_res_1, atom_res_1 in sorted(self.seqres_to_atom_maps_1[chain_1].items()):
                             if seqres_res_1 in mapping:
                                 seqres_res_2 = mapping[seqres_res_1]
                                 if seqres_res_2 in self.seqres_to_atom_maps_2[chain_2]:
@@ -1106,7 +1106,7 @@ class PDBSeqresSequenceAligner(object):
 
     def get_matching_chains(self, from_chain):
         self.build_residue_mappings()
-        return sorted([p[1] for p in self.alignments.keys() if p[0] == from_chain])
+        return sorted([p[1] for p in list(self.alignments.keys()) if p[0] == from_chain])
 
 
     def map_atom_residue(self, from_chain, to_chain, atom_res_1):
@@ -1190,9 +1190,9 @@ class SIFTSChainMutatorSequenceAligner(object):
         if not self.alignments.get(pdb_id_1, {}).get(pdb_id_2):
             self.alignments[pdb_id_1] = self.alignments.get(pdb_id_1, {})
             sa = SequenceAligner(alignment_tool = alignment_tool, gap_opening_penalty = gap_opening_penalty)
-            for chain_id, seq in sorted(pdb_1.seqres_sequences.iteritems()):
+            for chain_id, seq in sorted(pdb_1.seqres_sequences.items()):
                 sa.add_sequence('{0}_{1}'.format(pdb_id_1, chain_id), str(seq), ignore_bad_chains = True)
-            for chain_id, seq in sorted(pdb_2.seqres_sequences.iteritems()):
+            for chain_id, seq in sorted(pdb_2.seqres_sequences.items()):
                 sa.add_sequence('{0}_{1}'.format(pdb_id_2, chain_id), str(seq), ignore_bad_chains = True)
             self.alignments[pdb_id_1][pdb_id_2] = dict(
                 alignment = sa,
@@ -1231,7 +1231,7 @@ class SIFTSChainMutatorSequenceAligner(object):
 
         # Create the list of mutations
         mutations = {}
-        for from_chain, mtches in sorted(best_matches.iteritems()):
+        for from_chain, mtches in sorted(best_matches.items()):
 
             from_pdb_id, from_chain_id = from_chain.split('_')
 
@@ -1244,7 +1244,7 @@ class SIFTSChainMutatorSequenceAligner(object):
 
                 # Do not consider matches from pdb_id_1 to itself or matches with poor sequence similarity
                 restricted_mtchs = {}
-                for to_chain, similarity in sorted(mtches.iteritems()):
+                for to_chain, similarity in sorted(mtches.items()):
                     if to_chain.split('_')[0] == pdb_id_2 and similarity >= self.acceptable_sequence_similarity:
                         restricted_mtchs[to_chain] = similarity
 
@@ -1260,7 +1260,7 @@ class SIFTSChainMutatorSequenceAligner(object):
                     #sys.exit(0)
 
 
-                    for to_chain, similarity in sorted(restricted_mtchs.iteritems()):
+                    for to_chain, similarity in sorted(restricted_mtchs.items()):
                         to_pdb_id, to_chain_id = to_chain.split('_')
                         if similarity == top_similarity:
                             #print(from_pdb_id, from_chain_id)
@@ -1273,7 +1273,7 @@ class SIFTSChainMutatorSequenceAligner(object):
                             mutations[from_chain_id].extend(chain_mutations)
 
         # mutations can contain duplicates so we remove those
-        for chain_id, mlist in mutations.iteritems():
+        for chain_id, mlist in mutations.items():
             mutations[chain_id] = sorted(set(mlist))
         return mutations
 
@@ -1322,7 +1322,7 @@ class SIFTSChainMutatorSequenceAligner(object):
         # Create a SequenceMap
         seqres_sequence_map = SequenceMap()
         assert(sorted(seqres_residue_mapping.keys()) == sorted(seqres_match_mapping.keys()))
-        for k, v in seqres_residue_mapping.iteritems():
+        for k, v in seqres_residue_mapping.items():
             seqres_sequence_map.add(k, v, seqres_match_mapping[k])
         self.seqres_sequence_maps[(pdb_id_1, chain_1)][(pdb_id_2, chain_2)] = seqres_sequence_map
 
@@ -1333,7 +1333,7 @@ class SIFTSChainMutatorSequenceAligner(object):
         #print(pdb_id_1, chain_1, pdb_id_2, chain_2)
         #print(seqres_to_atom_sequence_maps_1)
 
-        for seqres_res_id, v in seqres_match_mapping.iteritems():
+        for seqres_res_id, v in seqres_match_mapping.items():
             # Look at all positions which differ. seqres_res_id is 1-indexed, following the SEQRES and UniProt convention. However, so our our Sequence objects.
             if clustal_symbols[v.clustal] != '*':
 

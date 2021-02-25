@@ -15,7 +15,7 @@ def make_simple_xml_open_tag(tagname, attributes = {}):
     attstring = ""
     if attributes:
         attstring = " "
-        for k, v in sorted(attributes.iteritems()):
+        for k, v in sorted(attributes.items()):
             attstring += '%s="%s" ' % (k, v)        
     return '<%s%s>' % (tagname, attstring.rstrip())
 
@@ -30,7 +30,7 @@ def get_prejob_xml(job_id = None, task_id = None):
         s.append(make_simple_xml_tag('task_id', str(task_id)))
     s.append(make_simple_xml_tag('job_start_time', strftime("%%Y-%%m-%%d %%H:%%M:%%S")))
     s.append(make_simple_xml_tag('host', socket.gethostname()))
-    s.append(make_simple_xml_tag('arch', platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
+    #s.append(make_simple_xml_tag('arch', platform.machine() + ', ' + platform.processor() + ', ' + platform.platform()))
     return '\n'.join(s)
 
 def get_postjob_xml(job_id = None, task_id = None):
@@ -43,7 +43,7 @@ def get_postjob_xml(job_id = None, task_id = None):
             p = Popen_raw('qstat -j ' + str(job_id) + ' | grep -E "usage +' + str(task_id) + '" | sed "s/.*maxvmem=//"')
             mem_usage = p.stdout()
             s.append(make_simple_xml_tag('maxvmem', mem_usage))
-        except Exception, e:
+        except Exception as e:
             if p:
                 s.append(make_simple_xml_tag('error', '<![CDATA[\n' + p.stderr + ']]'))
             else:
@@ -53,7 +53,7 @@ def get_postjob_xml(job_id = None, task_id = None):
 
 if __name__ == '__main__':
     # test code
-    print(get_prejob_xml(30892451, 4))
-    print(make_simple_xml_tag('test', 'contents', {'mood' : 'happy'}))
-    print(get_postjob_xml(30892451, 4))
+    print((get_prejob_xml(30892451, 4)))
+    print((make_simple_xml_tag('test', 'contents', {'mood' : 'happy'})))
+    print((get_postjob_xml(30892451, 4)))
 

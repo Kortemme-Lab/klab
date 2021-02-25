@@ -263,8 +263,8 @@ class ScoreGroup(object):
         return len(self.score_terms)
 
 
-from fs.fsio import read_file
-import colortext
+from .fs.fsio import read_file
+from . import colortext
 
 def parseScoreType(score_type_header_file):
     contents = read_file(score_type_header_file)
@@ -306,12 +306,12 @@ def parseScoreType(score_type_header_file):
     if current_group != None:
         groups.append(current_group)
 
-    print(len(groups))
+    print((len(groups)))
     for g in groups:
         #colortext.warning(g.comment)
         #colortext.warning('-' * len(g.comment))
-        print(g.comment)
-        print('-' * len(g.comment))
+        print((g.comment))
+        print(('-' * len(g.comment)))
         print('\n```')
         for st in g.score_terms:
             comments = [(st['comment'] or '').strip()]
@@ -327,12 +327,12 @@ def parseScoreType(score_type_header_file):
                     comments[x] = comments[x][:-1]
             if comments:
                 if len(comments) > 1:
-                    print(st['name'].ljust(43))
-                    print('    %s' % ('\n    ').join(comments))
+                    print((st['name'].ljust(43)))
+                    print(('    %s' % ('\n    ').join(comments)))
                 else:
-                    print('%s%s' % (st['name'].ljust(43), comments[0]))
+                    print(('%s%s' % (st['name'].ljust(43), comments[0])))
             else:
-                print(st['name'])
+                print((st['name']))
         print('```\n')
 
     #enum ScoreType {

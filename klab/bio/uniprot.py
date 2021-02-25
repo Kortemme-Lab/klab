@@ -11,7 +11,7 @@ import sys
 import os
 import string
 import re
-import urllib,urllib2
+import urllib.request, urllib.parse, urllib.error,urllib.request,urllib.error,urllib.parse
 try:
     import json as simplejson
 except:
@@ -77,11 +77,11 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
             requested_mapping[id] = full_mapping[id]
         else:
             remaining_ids.append(id)
-    assert(set(remaining_ids + requested_mapping.keys()) == set(list_of_from_ids))
+    assert(set(remaining_ids + list(requested_mapping.keys())) == set(list_of_from_ids))
 
     if remaining_ids:
         if not silent:
-            print("Getting %s->%s mapping" % (from_scheme, to_scheme))
+            print(("Getting %s->%s mapping" % (from_scheme, to_scheme)))
         url = 'http://www.uniprot.org/mapping/'
         params = {
             'from'      : from_scheme,
@@ -90,11 +90,11 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
             'query'     : ' '.join(sorted(list(list_of_from_ids))),
         }
 
-        data = urllib.urlencode(params)
-        request = urllib2.Request(url, data)
+        data = urllib.parse.urlencode(params)
+        request = urllib.request.Request(url, data)
         contact = "" # Please set your email address here to help us debug in case of problems.
         request.add_header('User-Agent', 'Python %s' % contact)
-        response = urllib2.urlopen(request)
+        response = urllib.request.urlopen(request)
         page = response.read(200000)
         lines = page.split("\n")
 
@@ -110,10 +110,10 @@ def uniprot_map(from_scheme, to_scheme, list_of_from_ids, cache_dir = None, sile
             requested_mapping[tokens[0]].append(tokens[1])
 
     # Sort the IDs
-    for k, v in requested_mapping.iteritems():
+    for k, v in requested_mapping.items():
         #assert(len(v) == len(set(v)))
         requested_mapping[k] = sorted(set(v))
-    for k, v in full_mapping.iteritems():
+    for k, v in full_mapping.items():
         #assert(len(v) == len(set(v)))
         full_mapping[k] = sorted(set(v))
 
@@ -131,7 +131,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None, manual_additions = 
         colortext.write("Retrieving PDB to UniProtKB AC mapping: ", 'cyan')
     pdb_ac_mapping = uniprot_map('PDB_ID', 'ACC', pdb_ids, cache_dir = cache_dir, silent = silent)
 
-    for k, v in manual_additions.iteritems():
+    for k, v in manual_additions.items():
         if k in pdb_ids:
             if pdb_ac_mapping.get(k):
                 pdb_ac_mapping[k].extend(v)
@@ -146,7 +146,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None, manual_additions = 
     if not silent:
         colortext.write("Retrieving UniProtKB AC to UniProtKB ID mapping: ", 'cyan')
     AC_IDs = set()
-    for k, v in pdb_ac_mapping.iteritems():
+    for k, v in pdb_ac_mapping.items():
         AC_IDs = AC_IDs.union(set(v))
     AC_IDs = list(AC_IDs)
     if not silent:
@@ -156,7 +156,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None, manual_additions = 
     if not silent:
         colortext.write("Retrieving UniProtKB AC to UniParc ID mapping: ", 'cyan')
     ac_uniparc_mapping = uniprot_map('ACC', 'UPARC', AC_IDs, cache_dir = cache_dir, silent = silent)
-    for k, v in ac_uniparc_mapping.iteritems():
+    for k, v in ac_uniparc_mapping.items():
         assert(len(v) == 1)
         ac_uniparc_mapping[k] = v[0]
     if not silent:
@@ -165,7 +165,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None, manual_additions = 
     # Map UniProtKB ACs to UniProtKB IDs
     ac_id_mapping = uniprot_map('ACC', 'ID', AC_IDs, cache_dir = cache_dir, silent = silent)
 
-    for k, v in ac_id_mapping.iteritems():
+    for k, v in ac_id_mapping.items():
         assert(len(v) == 1)
         ac_id_mapping[k] = v[0]
 
@@ -173,7 +173,7 @@ def pdb_to_uniparc(pdb_ids, silent = True, cache_dir = None, manual_additions = 
     m = {}
     if not silent:
         colortext.message("\nRetrieving FASTA sequences for the %d PDB IDs." % len(pdb_ids))
-    for pdb_id, ACs in pdb_ac_mapping.iteritems():
+    for pdb_id, ACs in pdb_ac_mapping.items():
         if not silent:
             colortext.write("%s: " % pdb_id, "orange")
         m[pdb_id] = []
@@ -448,7 +448,7 @@ class UniProtACEntry(object):
                 if not method and chains:
                     raise colortext.Exception("Missing method and chains for %s in UniProtKB AC entry %s. Fix the mapping or mark it as missing in uniprot_patches.py" % (pdb_id, self.UniProtAC))
 
-                if not method in UniProtACEntry.sampling_methods.keys():
+                if not method in list(UniProtACEntry.sampling_methods.keys()):
                     raise colortext.Exception("Unknown method '%s' found in UniProtKB AC entry %s." % (method, self.UniProtAC))
                 if method in ['X-ray'] and resolution: # resolution can be null e.g. in P00698 with 2A6U (POWDER DIFFRACTION)
                     assert(pdb_id not in mapping)
@@ -461,10 +461,10 @@ class UniProtACEntry(object):
                             mapping[pdb_id]['chains'][chain[0]] = (chain[1], chain[2])
 
         if False:
-            for pdb_id, details in sorted(mapping.iteritems()):
+            for pdb_id, details in sorted(mapping.items()):
                 if not self.silent:
                     colortext.message("%s, %s, %sA" % (str(pdb_id), str(details['method']), str(details['resolution'])))
-                for chain, indices in sorted(details['chains'].iteritems()):
+                for chain, indices in sorted(details['chains'].items()):
                     if not self.silent:
                         colortext.warning(" Chain %s: %s-%s" % (chain, str(indices[0]).rjust(5), str(indices[1]).ljust(5)))
 
@@ -877,7 +877,7 @@ class UniParcEntry(object):
 
     def __repr__(self):
         a = []
-        for k, v in sorted(self.to_dict().iteritems()):
+        for k, v in sorted(self.to_dict().items()):
             if k == 'Subsections':
                 a.append(colortext.make("Subsections\n", 'green'))
                 a.append("%s\n" % str(v))

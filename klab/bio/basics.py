@@ -76,7 +76,7 @@ residue_type_3to1_map = {
 }
 
 residue_type_1to3_map = {}
-for k, v in residue_type_3to1_map.iteritems():
+for k, v in residue_type_3to1_map.items():
     residue_type_1to3_map[v] = k
 
 residue_types_3 = set(residue_type_3to1_map.keys())
@@ -162,14 +162,14 @@ three_letter_ion_codes = {
 ###
 
 dssp_secondary_structure_types = dict(
-    G = u'3-turn/310 helix',
-    H = u'4-turn/α helix',
-    I = u'5-turn/π helix',
-    T = u'hydrogen-bonded turn',
-    E = u'β-sheet',
-    B = u'residue in isolated β-bridge',
-    S = u'bend',
-    C = u'coil',
+    G = '3-turn/310 helix',
+    H = '4-turn/α helix',
+    I = '5-turn/π helix',
+    T = 'hydrogen-bonded turn',
+    E = 'β-sheet',
+    B = 'residue in isolated β-bridge',
+    S = 'bend',
+    C = 'coil',
 )
 dssp_secondary_structure_colors = dict(
     G = '#a00080',
@@ -303,14 +303,14 @@ try:
     from Bio.SubsMat.MatrixInfo import blosum62 as _blosum62, pam250 as _pam250
 
     pam250 = {}
-    for k, v in _pam250.iteritems():
+    for k, v in _pam250.items():
         if k[0] != k[1]:
             assert((k[1], k[0])) not in _pam250
             pam250[(k[1], k[0])] = v
         pam250[(k[0], k[1])] = v
 
     blosum62 = {}
-    for k, v in _blosum62.iteritems():
+    for k, v in _blosum62.items():
         if k[0] != k[1]:
             assert((k[1], k[0])) not in _blosum62
             blosum62[(k[1], k[0])] = v
@@ -354,9 +354,9 @@ class Sequence(object):
         return len(self.sequence)
 
     def ids(self):
-        return self.sequence.keys()
+        return list(self.sequence.keys())
 
-    def next(self): # todo: This is __next__ in Python 3.x
+    def __next__(self): # todo: This is __next__ in Python 3.x
         try:
             id = self.order[self._iter_index]
             self._iter_index += 1
@@ -370,7 +370,7 @@ class Sequence(object):
         num_res = len(self.order)
         if num_res != len(other.order):
             return False
-        for x in xrange(num_res):
+        for x in range(num_res):
             if self.order[x] != other.order[x]:
                 return False
             if self.sequence[self.order[x]] != other.sequence[other.order[x]]:
@@ -398,7 +398,7 @@ class Sequence(object):
     def set_type(self, sequence_type):
         '''Set the type of a Sequence if it has not been set.'''
         if not(self.sequence_type):
-            for id, r in self.sequence.iteritems():
+            for id, r in self.sequence.items():
                 assert(r.residue_type == None)
                 r.residue_type = sequence_type
             self.sequence_type = sequence_type
@@ -432,12 +432,12 @@ class SequenceMap(object):
 
     @staticmethod
     def from_dict(d):
-        for k, v in d.iteritems():
-            assert(type(k) == types.IntType or type(k) == types.StringType or type(k) == types.UnicodeType)
-            assert(type(v) == types.IntType or type(v) == types.StringType or type(v) == types.UnicodeType)
+        for k, v in d.items():
+            assert(type(k) == int or type(k) == bytes or type(k) == str)
+            assert(type(v) == int or type(v) == bytes or type(v) == str)
         s = SequenceMap()
         s.map = d
-        s.substitution_scores = dict.fromkeys(d.keys(), None)
+        s.substitution_scores = dict.fromkeys(list(d.keys()), None)
         return s
 
 
@@ -475,21 +475,21 @@ class SequenceMap(object):
         return self.map.get(k, default_value)
 
     def keys(self):
-        return self.map.keys()
+        return list(self.map.keys())
 
     def values(self):
-        return self.map.values()
+        return list(self.map.values())
 
     def __getitem__(self, item):
         return self.map.get(item)
 
     def __setitem__(self, key, value):
-        assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
-        assert(type(value) == types.IntType or type(value) == types.StringType or type(value) == types.UnicodeType)
+        assert(type(key) == int or type(key) == bytes or type(key) == str)
+        assert(type(value) == int or type(value) == bytes or type(value) == str)
         self.map[key] = value
         self.substitution_scores[key] = None
 
-    def next(self): # todo: This is __next__ in Python 3.x
+    def __next__(self): # todo: This is __next__ in Python 3.x
         try:
             id = self._iter_keys.pop()
             return id, self.map[id], self.substitution_scores[id]
@@ -501,8 +501,8 @@ class SequenceMap(object):
         return self
 
     def __eq__(self, other):
-        if self.keys() == other.keys():
-            for k in self.keys():
+        if list(self.keys()) == list(other.keys()):
+            for k in list(self.keys()):
                 if self[k] != other[k]:
                     return False
             return True
@@ -511,7 +511,7 @@ class SequenceMap(object):
 
     def __le__(self, other):
         if set(self.keys()).issubset == set(other.keys()):
-            for k in self.keys():
+            for k in list(self.keys()):
                 if self[k] != other[k]:
                     return False
             return True
@@ -541,7 +541,7 @@ class SequenceMap(object):
         else:
             d, s = {}, {}
             other_domain = set(other.keys()).difference(set(self.keys()))
-            for k in self.keys():
+            for k in list(self.keys()):
                 d[k] = self.map[k]
                 s[k] = self.substitution_scores[k]
             for k in other_domain:
@@ -556,12 +556,12 @@ class SequenceMap(object):
     def __repr__(self):
         s = []
         substitution_scores = self.substitution_scores
-        for k, v in sorted(self.map.iteritems()):
-            if type(k) == types.StringType or type(k) == types.UnicodeType:
+        for k, v in sorted(self.map.items()):
+            if type(k) == bytes or type(k) == str:
                 key = "'%s'" % k
             else:
                 key = str(k)
-            if type(v) == types.StringType or type(v) == types.UnicodeType:
+            if type(v) == bytes or type(v) == str:
                 val = "'%s'" % v
             else:
                 val = str(v)
@@ -579,22 +579,22 @@ class PDBUniParcSequenceMap(SequenceMap):
 
     def __setitem__(self, key, value):
         assert(len(value) == 2)
-        assert(type(key) == types.IntType or type(key) == types.StringType or type(key) == types.UnicodeType)
-        assert((type(value[0]) == types.StringType or type(value[0]) == types.UnicodeType) and (type(value[1]) == types.IntType))
+        assert(type(key) == int or type(key) == bytes or type(key) == str)
+        assert((type(value[0]) == bytes or type(value[0]) == str) and (type(value[1]) == int))
 
         self.map[key] = value
         self.substitution_scores[key] = None
 
     @staticmethod
     def from_dict(d):
-        for k, v in d.iteritems():
+        for k, v in d.items():
             assert(len(v) == 2)
-            assert(type(k) == types.IntType or type(k) == types.StringType or type(k) == types.UnicodeType)
-            assert((type(v[0]) == types.StringType or type(v[0]) == types.UnicodeType) and (type(v[1]) == types.IntType))
+            assert(type(k) == int or type(k) == bytes or type(k) == str)
+            assert((type(v[0]) == bytes or type(v[0]) == str) and (type(v[1]) == int))
 
         s = PDBUniParcSequenceMap()
         s.map = d
-        s.substitution_scores = dict.fromkeys(d.keys(), None)
+        s.substitution_scores = dict.fromkeys(list(d.keys()), None)
         return s
 
 
@@ -612,22 +612,22 @@ class UniParcPDBSequenceMap(SequenceMap):
 
     def __setitem__(self, key, value):
         assert(len(key) == 2)
-        assert(type(value) == types.IntType or type(value) == types.StringType or type(value) == types.UnicodeType)
-        assert((type(key[0]) == types.StringType or type(key[0]) == types.UnicodeType) and (type(key[1]) == types.IntType))
+        assert(type(value) == int or type(value) == bytes or type(value) == str)
+        assert((type(key[0]) == bytes or type(key[0]) == str) and (type(key[1]) == int))
 
         self.map[key] = value
         self.substitution_scores[key] = None
 
     @staticmethod
     def from_dict(d):
-        for k, v in d.iteritems():
+        for k, v in d.items():
             assert(len(k) == 2)
-            assert(type(v) == types.IntType or type(v) == types.StringType or type(v) == types.UnicodeType)
-            assert((type(k[0]) == types.StringType or type(k[0]) == types.UnicodeType) and (type(k[1]) == types.IntType))
+            assert(type(v) == int or type(v) == bytes or type(v) == str)
+            assert((type(k[0]) == bytes or type(k[0]) == str) and (type(k[1]) == int))
 
         s = PDBUniParcSequenceMap()
         s.map = d
-        s.substitution_scores = dict.fromkeys(d.keys(), None)
+        s.substitution_scores = dict.fromkeys(list(d.keys()), None)
         return s
 
 
@@ -699,7 +699,7 @@ class ElementCounter(FrequencyCounter):
 
         # Convert the atom names to element names
         element_frequencies = {}
-        for k, ct in self.items.iteritems():
+        for k, ct in self.items.items():
             a = pdb_atom_name_to_element(k)
             element_frequencies[a] = element_frequencies.get(a, 0)
             element_frequencies[a] += 1
@@ -709,11 +709,11 @@ class ElementCounter(FrequencyCounter):
             order.append(('C', element_frequencies['C']))
             if 'H' in element_frequencies:
                 order.append(('H', element_frequencies['H']))
-            for element_name, freq in sorted(element_frequencies.iteritems()):
+            for element_name, freq in sorted(element_frequencies.items()):
                 if (element_name != 'C' and element_name != 'H'):
                     order.append((element_name, freq))
         else:
-            for element_name, freq in sorted(element_frequencies.iteritems()):
+            for element_name, freq in sorted(element_frequencies.items()):
                 order.append((element_name, freq))
         return order
 
@@ -722,9 +722,9 @@ class ElementCounter(FrequencyCounter):
         '''Merge two element counters. For all elements, we take the max count from both counters.'''
         our_element_frequencies = self.items
         their_element_frequencies = other.items
-        for element_name, freq in sorted(our_element_frequencies.iteritems()):
+        for element_name, freq in sorted(our_element_frequencies.items()):
             our_element_frequencies[element_name] = max(our_element_frequencies.get(element_name, 0), their_element_frequencies.get(element_name, 0))
-        for element_name, freq in sorted(their_element_frequencies.iteritems()):
+        for element_name, freq in sorted(their_element_frequencies.items()):
             if element_name not in our_element_frequencies:
                 our_element_frequencies[element_name] = their_element_frequencies[element_name]
 
@@ -773,7 +773,7 @@ class Residue(object):
 
     def __eq__(self, other):
         '''Basic form of equality, just checking the amino acid types. This lets us check equality over different chains with different residue IDs.'''
-        if type(other) == types.NoneType:
+        if type(other) == type(None):
             return False
         return (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
 
@@ -805,13 +805,13 @@ class IdentifyingPDBResidue(PDBResidue):
     '''A sortable subclass.'''
 
     def __eq__(self, other):
-        if type(other) == types.NoneType:
+        if type(other) == type(None):
             return False
         return (self.Chain == other.Chain) and (self.ResidueID == other.ResidueID) and (self.ResidueAA == other.ResidueAA) and (self.residue_type == other.residue_type)
 
     def __cmp__(self, other):
         '''Only checks chains and residue IDs.'''
-        if type(other) == types.NoneType:
+        if type(other) == type(None):
             return 1
         if self.Chain != other.Chain:
             if ord(self.Chain) < ord(other.Chain):

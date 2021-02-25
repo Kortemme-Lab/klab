@@ -100,7 +100,7 @@ class Spackler(Bonsai):
         try:
             start_res = self.residues[start_res[0]][start_res[1:]]
             end_res = self.residues[end_res[0]][end_res[1:]]
-        except Exception, e:
+        except Exception as e:
             raise Exception('The start or end residue could not be found in the PDB file.')
 
         return self.add_backbone_atoms_linearly(start_res, end_res, kept_residues, insertion_residue_map)

@@ -6,7 +6,7 @@
 import sys
 import os
 import re
-from string import join, strip
+#from string import join, strip
 import shutil
 import subprocess
 import traceback
@@ -17,7 +17,7 @@ from fnmatch import fnmatch
 import glob
 import getpass
 import json
-from utils import LogFile, colorprinter
+from .utils import LogFile, colorprinter
 from klab.cluster.cluster_interface import JobInitializationException
 
 from klab import colortext
@@ -31,7 +31,7 @@ from klab.general.strutil import parse_range_pairs
 #  Configuration
 
 # Choose the Python classes for your type of cluster system
-import hpc.SGE as ClusterEngine
+from klab.bio.fragments.hpc import SGE as ClusterEngine
 #
 #################
 
@@ -285,7 +285,7 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     if options.indices:
         try:
             options.indices = parse_range_pairs(options.indices, range_separator = '-')
-        except Exception, e:
+        except Exception as e:
             errors.append('The indices argument must be a list of valid indices into the sequences for which fragments are to be generated.')
 
     # Secondary structure file
@@ -303,7 +303,7 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
             for s in sizes:
                 assert(s.isdigit() and (3 <= int(s) <= 20))
             sizes = sorted(map(int, sizes))
-        except Exception, e:
+        except Exception as e:
             errors.append('The frag_size argument must be a comma-separated list of integers between 3 and 20.')
         if not sizes:
             errors.append('The frag_sizes argument was not successfully parsed.')
@@ -317,8 +317,8 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
         try:
             assert(options.n_frags.isdigit())
             options.n_frags = int(options.n_frags)
-        except Exception, e:
-            print(traceback.format_exc())
+        except Exception as e:
+            print((traceback.format_exc()))
             errors.append('The n_frags argument must be an integer.')
     if options.n_frags < 10:
         errors.append('The n_frags argument is set to 200 by default; %d seems like a very low number.' % options.n_frags)
@@ -326,8 +326,8 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
         try:
             assert(options.n_candidates.isdigit())
             options.n_candidates = int(options.n_candidates)
-        except Exception, e:
-            print(traceback.format_exc())
+        except Exception as e:
+            print((traceback.format_exc()))
             errors.append('The n_candidates argument must be an integer.')
     if options.n_candidates < 100:
         errors.append('The n_candidates argument is set to 1000 by default; %d seems like a very low number.' % options.n_candidates)
@@ -353,8 +353,8 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
                     errors.append("Output directory '%s' does not exist." % outpath)
             if createDir:
                 try:
-                    os.makedirs(outpath, 0755)
-                except Exception, e:
+                    os.makedirs(outpath, 0o755)
+                except Exception as e:
                     errors.append(str(e))
                     errors.append(traceback.format_exc())
 
@@ -368,10 +368,10 @@ Fragment generation using a loops file applied to: a) a FASTA file; b) a PDB ide
     else:
         for batch_file_selector in args:
             if '*' in batch_file_selector or '?' in batch_file_selector:
-                batch_files += map(os.path.abspath, glob.glob(batch_file_selector))
+                batch_files += list(map(os.path.abspath, glob.glob(batch_file_selector)))
             elif os.path.isdir(batch_file_selector):
                 for input_file_wildcard in input_file_wildcards:
-                    batch_files += map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, input_file_wildcard)))
+                    batch_files += list(map(os.path.abspath, glob.glob(os.path.join(batch_file_selector, input_file_wildcard))))
             elif not os.path.exists(batch_file_selector):
                 if len(batch_file_selector) == 4 and batch_file_selector.isalnum():
                     batch_file_selector = batch_file_selector.lower() # the files are named in lowercase on the cluster
@@ -495,7 +495,7 @@ def setup_jobs(outpath, options, input_files):
 
     # Discard sequences that are the wrong chain.
     desired_sequences = {}
-    for key, sequence in found_sequences.iteritems():
+    for key, sequence in found_sequences.items():
         pdb_id, chain, file_name = key
         if options.chain is None or chain == options.chain:
             desired_sequences[key] = sequence
@@ -526,7 +526,7 @@ def get_sequences(options, fasta_file_contents):
           - fasta_file_contents is a map from input filenames to the associated FASTA file contents.
     '''
     errors = []
-    fasta_files_str = ", ".join(fasta_file_contents.keys())
+    fasta_files_str = ", ".join(list(fasta_file_contents.keys()))
     fasta_records = None
     reverse_mapping = {}
 
@@ -534,8 +534,8 @@ def get_sequences(options, fasta_file_contents):
         fasta_records, reverse_mapping = parse_FASTA_files(options, fasta_file_contents)
         if not fasta_records:
             errors.append("No protein sequences found in the FASTA file(s) %s." % fasta_files_str)
-    except Exception, e:
-        e = '\n'.join([l for l in traceback.format_exc(), str('e') if l.strip()])
+    except Exception as e:
+        e = '\n'.join([l for l in (traceback.format_exc(), str('e')) if l.strip()])
         errors.append("Error parsing FASTA file(s) %s:\n%s" % (fasta_files_str, str(e)))
 
     if not fasta_records:
@@ -556,7 +556,7 @@ def parse_FASTA_files(options, fasta_file_contents):
     sequenceLine = re.compile("^[A-Z]+\n?$")
     sequence_offsets = {}
 
-    for fasta_file_name, tagged_fasta in sorted(fasta_file_contents.iteritems()):
+    for fasta_file_name, tagged_fasta in sorted(fasta_file_contents.items()):
 
         # Check the tagged pair
         fasta = tagged_fasta[0].strip().split('\n')
@@ -615,7 +615,7 @@ def parse_FASTA_files(options, fasta_file_contents):
     # as we expect them to be used in predictions
     non_protein_records = []
     set_of_rna_dna_codes = set(('A', 'C', 'G', 'T', 'U', 'X', 'Z'))
-    for key, content_lines in records.iteritems():
+    for key, content_lines in records.items():
         mm_sequence = ''.join(content_lines[1:])
         assert(re.match('^[A-Z]+$', mm_sequence)) # Allow X or Z because these may exist (X from the RCSB, Z from our input files)
         if set(mm_sequence).union(set_of_rna_dna_codes) == set_of_rna_dna_codes:
@@ -663,29 +663,29 @@ def parse_FASTA_files(options, fasta_file_contents):
         # then turn that into a 1-indexed mapping from the order of the residue in the sequence to the original residue ID in the PDB
         residues_for_generation = []
         for s in segment_list:
-            residues_for_generation += range(s[0], s[1] + 1)
-        reverse_mapping['FASTA'] = dict((key, value) for (key, value) in zip(range(1, len(residues_for_generation) + 1), residues_for_generation))
+            residues_for_generation += list(range(s[0], s[1] + 1))
+        reverse_mapping['FASTA'] = dict((key, value) for (key, value) in zip(list(range(1, len(residues_for_generation) + 1)), residues_for_generation))
 
         # Create the reverse_mappings from the indices in the PDB sequences defined by the segment_list to the indices in the original sequences.
         # Membership in sequence_offsets implies a PDB sequence.
-        for k, v in sorted(sequence_offsets.iteritems()):
+        for k, v in sorted(sequence_offsets.items()):
             # For each PDB chain, we consider the set of segments (ignoring extra residues due to nmerage for now so that
             # we do not include chains by accident e.g. if the user specified the first residues of chain C but none in chain B,
             # they probably do not wish to generate fragments for chain B)
-            chain_residues = range(v[1], v[2] + 1)
+            chain_residues = list(range(v[1], v[2] + 1))
             residues_for_generation = []
             for s in original_segment_list:
                 # If the original segment lists lie inside the chain residues then we extend the range w.r.t. the nmers
                 if (chain_residues[0] <= s[0] <= chain_residues[-1]) or (chain_residues[0] <= s[1] <= chain_residues[-1]):
-                    residues_for_generation += range(s[0] - residue_offset + 1, s[1] + residue_offset - 1 + 1)
+                    residues_for_generation += list(range(s[0] - residue_offset + 1, s[1] + residue_offset - 1 + 1))
 
             # Create a sorted list of residues of the chain that we will be including in the sequence for fragment generation
             # then turn that into a 1-indexed mapping from the order of the residue in the sequence to the original residue ID in the PDB
             chain_residues_for_generation = sorted(set(chain_residues).intersection(set(residues_for_generation)))
-            reverse_mapping[k] = dict((key, value) for (key, value) in zip(range(1, len(chain_residues_for_generation) + 1), chain_residues_for_generation))
+            reverse_mapping[k] = dict((key, value) for (key, value) in zip(list(range(1, len(chain_residues_for_generation) + 1)), chain_residues_for_generation))
 
         found_at_least_one_sequence = False
-        for k, v in sorted(records.iteritems()):
+        for k, v in sorted(records.items()):
             assert(v[0].startswith('>'))
             subkey = k[0] + k[1]
             sequence = ''.join([s.strip() for s in v[1:]])
@@ -694,14 +694,14 @@ def parse_FASTA_files(options, fasta_file_contents):
             if sequence_offsets.get(subkey):
                 # PDB chain case
                 first_residue_id = sequence_offsets[subkey][1]
-                cropped_sequence = ''.join([sequence[rmv - first_residue_id] for rmk, rmv in sorted(reverse_mapping[subkey].iteritems())])
+                cropped_sequence = ''.join([sequence[rmv - first_residue_id] for rmk, rmv in sorted(reverse_mapping[subkey].items())])
                 # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
                 for x in range(0, len(cropped_sequence)):
                     assert(cropped_sequence[x] == sequence[reverse_mapping[subkey][x + 1] - sequence_offsets[subkey][0] - 1])
                 records[k] = [v[0]] + [cropped_sequence[i:i+60] for i in range(0, len(cropped_sequence), 60)] # update the record to only use the truncated sequence
             else:
                 # FASTA chain case
-                cropped_sequence = ''.join([sequence[rmv - 1] for rmk, rmv in sorted(reverse_mapping['FASTA'].iteritems()) if rmv <= len(sequence)])
+                cropped_sequence = ''.join([sequence[rmv - 1] for rmk, rmv in sorted(reverse_mapping['FASTA'].items()) if rmv <= len(sequence)])
                 # Sanity check - check that the remapping from the cropped sequence to the original sequence will work in postprocessing
                 for x in range(0, len(cropped_sequence)):
                     assert(cropped_sequence[x] == sequence[reverse_mapping['FASTA'][x + 1] - 1])
@@ -722,7 +722,7 @@ def parse_FASTA_files(options, fasta_file_contents):
 
 def reformat(found_sequences):
     '''Truncate the FASTA headers so that the first field is a 4-character ID.'''
-    for (pdb_id, chain, file_name), sequence in sorted(found_sequences.iteritems()):
+    for (pdb_id, chain, file_name), sequence in sorted(found_sequences.items()):
         header = sequence[0]
         assert(header[0] == '>')
         tokens = header.split('|')
@@ -735,7 +735,7 @@ def create_inputs(options, outpath, found_sequences):
 
     # Create subdirectories
     job_inputs = []
-    for (pdb_id, chain, file_name), sequence in sorted(found_sequences.iteritems()):
+    for (pdb_id, chain, file_name), sequence in sorted(found_sequences.items()):
         created_new_subdirectory = False
         subdir_path = os.path.join(outpath, "%s%s" % (pdb_id, chain))
         try:
@@ -755,7 +755,7 @@ def create_inputs(options, outpath, found_sequences):
                     if count == 1000:
                         errors.append("The directory %s contains too many previous results. Please clean up the old results or choose a new output directory." % outpath)
                         sys.exit(ERRCODE_OLDRESULTS)
-            os.makedirs(subdir_path, 0755)
+            os.makedirs(subdir_path, 0o755)
 
             # Create a FASTA file for the sequence in the output directory
             fasta_file = os.path.join(subdir_path, "%s%s.fasta" % (pdb_id, chain))
@@ -809,9 +809,9 @@ def check_configuration_paths():
     alloutput, allerrors = search_configuration_files("netapp")
     errors = []
     if allerrors:
-        for flname, errs in sorted(allerrors.iteritems()):
+        for flname, errs in sorted(allerrors.items()):
             errors.append((flname, [errs]))
-    for flname, output in sorted(alloutput.iteritems()):
+    for flname, output in sorted(alloutput.items()):
         m_errors = []
         for line in output:
             mtchs = pathregex1.match(line) or pathregex2.match(line)
@@ -849,7 +849,7 @@ def main():
         try:
             cluster_job = ClusterEngine.FragmentsJob(make_fragments_script_path, options, test_mode = test_mode)
             job_script = cluster_job.script
-        except JobInitializationException, e:
+        except JobInitializationException as e:
             colorprinter.error(str(e))
             sys.exit(ERRCODE_ARGUMENTS)
 
@@ -862,7 +862,7 @@ def main():
             if send_mail:
                 username = get_username()
             (jobid, output) = ClusterEngine.submit(submission_script, options["outpath"], send_mail = send_mail, username = username )
-        except Exception, e:
+        except Exception as e:
             colorprinter.error("An exception occurred during submission to the cluster.")
             colorprinter.error(str(e))
             colorprinter.error(traceback.format_exc())
@@ -874,7 +874,7 @@ def main():
         if options['no_zip']:
             print("The --nozip option was selected.")
         if ClusterEngine.ClusterType == "SGE":
-            print("The jobs have been submitted using the %s queue(s)." % (', '.join(sorted(options['queue'])) or 'default'))
+            print(("The jobs have been submitted using the %s queue(s)." % (', '.join(sorted(options['queue'])) or 'default')))
         print('')
         logfile.writeToLogfile(datetime.now(), jobid, options["outpath"])
 

@@ -10,7 +10,7 @@ import os
 import tempfile
 import gzip
 import stat
-import StringIO
+import io
 
 # Note: I should use the same convention for all methods here but read_file differs. We should really support the whole fopen cstdio spec.
 
@@ -93,7 +93,7 @@ def safe_gz_unzip(contents):
 
 
 def read_gzip_in_memory(gzip_contents):
-    cf = StringIO.StringIO()
+    cf = io.StringIO()
     cf.write(gzip_contents)
     cf.seek(0)
     df = gzip.GzipFile(fileobj = cf, mode='rb')

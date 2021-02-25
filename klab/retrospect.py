@@ -60,7 +60,7 @@ class ExpectedScripts(object):
 
 	def checkAll(self):
 		result = True
-		for k in self.scripts.keys():
+		for k in list(self.scripts.keys()):
 			result = self.check(k) and result
 	
 	def check(self, scriptname, dateOfLastSuccess, criteria):
@@ -225,13 +225,13 @@ class LogReader(object):
 								continue
 						
 						skipOtherCases = False
-						for k, s in warningStrings.iteritems():
+						for k, s in warningStrings.items():
 							if line.find(s) != -1:
 								record[i] = (RETROSPECT_WARNING, line)
 								status |= RETROSPECT_WARNING
 								skipOtherCases = True
 								break
-						for k, s in errorStrings.iteritems():
+						for k, s in errorStrings.items():
 							if line.find(s) != -1:
 								# This message does not seem to indicate a failure?
 								if line.find("#Script error: no source Media Set specified") == -1:
@@ -283,10 +283,10 @@ class LogReader(object):
 				
 			else:
 				# Not pretty but it will be displayed pretty obviously
-				print(join(record,"<br>") + "<br><br>")
+				print((join(record,"<br>") + "<br><br>"))
 		
 		# Check against expected scripts
-		missingScripts = expectedScripts.SymmetricDifference(scriptsRun.keys())
+		missingScripts = expectedScripts.SymmetricDifference(list(scriptsRun.keys()))
 		
 		# NOTE: We ignore these special script types. This list is probably not comprehensive and so may need to be added to.
 		for t in ['Kortemme (offsite)', 'Ming', 'Ming (offsite)', 'Restore', 'Grooming', 'Engine start', 'Rebuild', 'Retrieve Snapshot']:
@@ -308,7 +308,7 @@ class LogReader(object):
 		
 		failedJobTimestamps = []
 		nodata = []
-		for name, details in sorted(scriptsRun.iteritems()):
+		for name, details in sorted(scriptsRun.items()):
 			if details["lastSuccess"] and expectedScripts.get(name):
 				if not expectedScripts.check(name, details["lastSuccess"], extraLapse): 
 					if details["lastRun"]:
@@ -345,7 +345,7 @@ class LogReader(object):
 		successList = []
 		warningsList = []
 		
-		for name, details in sorted(scriptsRun.iteritems()):
+		for name, details in sorted(scriptsRun.items()):
 			status = None
 			daysSinceSuccess = None
 			
@@ -425,7 +425,7 @@ class LogReader(object):
 		failstyle = ['background-color:#dd3333;', 'background-color:#ff3333;']
 		
 		count = 0
-		for name, details in sorted(scriptsRun.iteritems()):
+		for name, details in sorted(scriptsRun.items()):
 			status = None
 			
 			rowstyle = tablestyle[count % 2]

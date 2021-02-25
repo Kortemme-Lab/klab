@@ -10,7 +10,7 @@ Created by Shane O'Connor 2015.
 import sys
 import os
 import platform
-import commands
+import subprocess
 import shlex
 
 if __name__ == '__main__':
@@ -30,7 +30,7 @@ can install the software as follows:
 Otherwise, please refer to the official website: http://johnmacfarlane.net/pandoc/.
 '''
 if os.name == 'posix' or 'Linux' in platform.uname():
-    if commands.getstatusoutput('which pandoc')[0] != 0:
+    if subprocess.getstatusoutput('which pandoc')[0] != 0:
         raise colortext.Exception(missing_pandoc_message)
 else:
     raise Exception("Please extend this check to work on your architecture. At present, it only works on Linux.")

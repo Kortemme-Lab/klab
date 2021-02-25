@@ -197,7 +197,7 @@ def error_unzip_helper(values, func, func_kwargs):
 
 def bootstrap_xy_stat(x_values, y_values, func, alpha = 0.05, bootstrap_trials = 10000, func_kwargs = {}):
     return bootstrap(
-        zip(x_values, y_values),
+        list(zip(x_values, y_values)),
         func,
         alpha = alpha,
         bootstrap_trials = bootstrap_trials,
@@ -238,7 +238,7 @@ def _get_xy_dataset_statistics(x_values, y_values,
     num_null_cases = 0
     if ignore_null_values:
         truncated_x_values, truncated_y_values = [], []
-        for i in xrange(len(x_values)):
+        for i in range(len(x_values)):
             if (x_values[i] == None) or (numpy.isnan(x_values[i])):
                 num_null_cases += 1
             elif (y_values[i] == None) or (numpy.isnan(y_values[i])):
@@ -277,7 +277,7 @@ def _get_xy_dataset_statistics(x_values, y_values,
         fields_to_remove = []
         if check_multiple_analysis_for_consistency:
             # Make sure that any common analysis agrees
-            fields_to_remove = sorted(set(std_stats.keys()).intersection(stats.keys()))
+            fields_to_remove = sorted(set(std_stats.keys()).intersection(list(stats.keys())))
             for common_stat in fields_to_remove:
                 s1, s2 = std_stats[common_stat], stats[common_stat]
                 if isinstance(s1, tuple):
@@ -391,8 +391,8 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
     #       The dataframe class should then use this metric class in the _analyze function.
     s = []
     newstats = {}
-    for k, v in stats.iteritems():
-        if isinstance(v, basestring):
+    for k, v in stats.items():
+        if isinstance(v, str):
             continue
         key, value_format_str = keymap.get(k, (k, ''))
         if v == None:
@@ -414,12 +414,12 @@ def format_stats(stats, floating_point_format = '%0.3f', sci_notation_format = '
                 newstats[key] = [floating_point_format % float(v), '']
 
     if return_string:
-        max_k_len = max([len(x) for x in newstats.keys()])
-        for k, v in sorted(newstats.iteritems()):
+        max_k_len = max([len(x) for x in list(newstats.keys())])
+        for k, v in sorted(newstats.items()):
             s.append( '%s: %s %s ' % (str(k).ljust(max_k_len), v[0], v[1]) )
         return '\n'.join(s)
     else:
-        return [[k, v[0], v[1]] for k, v in sorted(newstats.iteritems())]
+        return [[k, v[0], v[1]] for k, v in sorted(newstats.items())]
 
 
 #### Pandas helper functions ####
@@ -464,7 +464,7 @@ def subtract_row_pairs_for_display(df, min_abs_delta = 1.0, pairs_to_show = 15, 
 
     if output_csv:
         if verbose:
-            print 'Saving comparison CSV to:', output_csv
+            print('Saving comparison CSV to:', output_csv)
         if not merge_df is None:
             output_df = df.join(
                 merge_df,

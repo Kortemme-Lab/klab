@@ -44,19 +44,19 @@ class colorprinter(object):
 
     @staticmethod
     def error(s):
-        print('\033[91m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+        print(('\033[91m%s\033[0m' %s)) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
 
     @staticmethod
     def warning(s):
-        print('\033[93m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+        print(('\033[93m%s\033[0m' %s)) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
 
     @staticmethod
     def prompt(s = None):
         if s:
-            print('\033[93m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+            print(('\033[93m%s\033[0m' %s)) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
         else:
             sys.stdout.write("\033[93m $ \033[0m")
 
     @staticmethod
     def message(s):
-        print('\033[92m%s\033[0m' %s) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)
+        print(('\033[92m%s\033[0m' %s)) #\x1b\x5b1;31;40m%s\x1b\x5b0;40;40m' % s)

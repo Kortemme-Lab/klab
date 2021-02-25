@@ -15,9 +15,6 @@ def print_error_and_die(message, *args, **kwargs):
     print_warning(message + aborting, *args, **kwargs)
     raise SystemExit(1)
 
-class UserError(Exception):
-    no_stack_trace = True
-
 class catch_and_print_errors:
 
     def __enter__(self):
@@ -25,7 +22,7 @@ class catch_and_print_errors:
 
     def __exit__(self, exc_type, exc_value, traceback):
         if exc_type == KeyboardInterrupt:
-            print
+            print()
             return True
         if getattr(exc_value, 'no_stack_trace', False):
             print_warning(str(exc_value))

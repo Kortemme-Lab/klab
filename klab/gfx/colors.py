@@ -35,7 +35,7 @@ def ggplot_color_wheel(n, start = 15, saturation_adjustment = None, saturation =
     '''Returns a list of colors with the same distributed spread as used in ggplot2.
        A saturation of 0.5 will leave the input color at the usual saturation e.g. if start is 240 (240/360 = 0.66 = blue) and saturation is 0.5 then #0000ff will be returned.
     '''
-    hues = range(start, start + 360, 360/n)
+    hues = list(range(start, start + 360, 360/n))
     rgbcolors = ['%.2x%.2x%.2x' % (255 * hlscol[0], 255 * hlscol[1], 255 * hlscol[2]) for hlscol in [colorsys.hls_to_rgb(float(h % 360) / 360.0, saturation, lightness) for h in hues]]
     if saturation_adjustment:
         return [saturate_hex_color(prefix + rgbcol, saturation_adjustment) for rgbcol in rgbcolors]

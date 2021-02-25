@@ -43,10 +43,10 @@ def multicategory_scatterplot(output_directory, file_prefix, df,
     #print(df[facet_index])
     color_map = {}
     categories = list(df.ix[:, category_series_index].unique())
-    print(type(categories))
+    print((type(categories)))
     num_categories = len(categories)
     category_colors = get_spaced_plot_colors(num_categories)
-    for x in xrange(num_categories):
+    for x in range(num_categories):
         color_map[categories[x]] = '#' + category_colors[x]
 
     df['CategorizationColor'] = df.apply(lambda r: color_map[r[category_series_index]], axis = 1)

@@ -17,13 +17,13 @@ class ChainSequences(UserDict.DictMixin):
     self.chains = []
   
   def __getitem__(self, key):
-    if type(key) == types.IntType:
+    if type(key) == int:
       return self.seqs[self.chains[key]]
     else:
       return self.seqs[key]
   
   def __setitem__(self, key, value):
-    if type(key) == types.IntType:
+    if type(key) == int:
       self.seqs[self.chains[key]] = value
     else:
       self.seqs[key] = value
@@ -31,7 +31,7 @@ class ChainSequences(UserDict.DictMixin):
         self.chains += [key]
   
   def __delitem__(self, key):
-    if type(key) == types.IntType:
+    if type(key) == int:
       del self.seqs[self.chains[key]]
       del self.chains[key]
     else:
@@ -85,7 +85,7 @@ class ChainSequences(UserDict.DictMixin):
   
     lines = []
   
-    for chain in self.keys():
+    for chain in list(self.keys()):
       seq = self[chain]
       serNum = 1
       startidx = 0
@@ -113,11 +113,11 @@ class ChainSequences(UserDict.DictMixin):
       old_seqs = ChainSequences()
       chainresnums = old_seqs.parse_atoms(pdb)
     
-      assert self.keys() == old_seqs.keys()
+      assert list(self.keys()) == list(old_seqs.keys())
       
-      for chain in self.keys():
+      for chain in list(self.keys()):
         assert len(self[chain]) == len(old_seqs[chain])
-        for i in xrange(len(self[chain])):
+        for i in range(len(self[chain])):
           if self[chain][i] != old_seqs[chain][i]:
             resid = chain + chainresnums[chain][i]
             mutated_resids[resid] = self[chain][i]
@@ -132,7 +132,7 @@ class ChainSequences(UserDict.DictMixin):
       if update_atoms and entry == "ATOM  ":
         resid = line[21:27]
         atom = line[12:16].strip()
-        if not mutated_resids.has_key(resid):
+        if resid not in mutated_resids:
           newpdb.lines += [line]
         else:
           newpdb.lines += [line[:17] + mutated_resids[resid] + line[20:]]
@@ -140,6 +140,6 @@ class ChainSequences(UserDict.DictMixin):
         newpdb.lines += [line]
     
     if update_atoms:
-      newpdb.remove_nonbackbone_atoms(mutated_resids.keys())
+      newpdb.remove_nonbackbone_atoms(list(mutated_resids.keys()))
     
     return newpdb

@@ -1,7 +1,7 @@
 import numpy as np
 import string
-from kabsch import calc_rotation_translation_matrices
-from pdb_util import renumber_atoms
+from .kabsch import calc_rotation_translation_matrices
+from .pdb_util import renumber_atoms
 
 class Molecule:
     def __init__(self, pdb_path, molecule_name, chain = None):
@@ -21,7 +21,7 @@ class Molecule:
                     if self.chain and self.chain != chain:
                         continue
 
-                    resnum = long( line[22:26].strip() )
+                    resnum = int( line[22:26].strip() )
                     if self.resnum == None:
                         self.resnum = resnum
                     else:
@@ -117,7 +117,7 @@ class Molecule:
         assert( len(self_root_pair) == len(other_root_pair) )
 
         unmoved_atom_names = []
-        new_coords = [ None for x in xrange( len(self_root_pair) ) ]
+        new_coords = [ None for x in range( len(self_root_pair) ) ]
         for atom in self.names:
             if atom in self_root_pair:
                 i = self_root_pair.index(atom)
@@ -133,7 +133,7 @@ class Molecule:
         # Move unmoved coordinates after all other atoms have been moved (so that
         # references will have been moved already)
         if None in new_coords:
-            print new_coords
+            print(new_coords)
             assert( None not in new_coords )
         ref_coords = [other.get_coords_for_name(x) for x in other_root_pair]
 
@@ -158,7 +158,7 @@ class Molecule:
                 if line.startswith('HETATM') and residue_name == name_to_replace and ((self.chain == None) or (chain == self.chain)):
                     if not position_to_insert:
                         position_to_insert = len(lines)
-                        self.resnum = long( line[22:26].strip() ) # Change resnum to match molecule to replace
+                        self.resnum = int( line[22:26].strip() ) # Change resnum to match molecule to replace
                 elif line.startswith('HETNAM'):
                     lines.append( line.replace(name_to_replace, self.molecule_name) )
                 elif not line.startswith('CONECT'):

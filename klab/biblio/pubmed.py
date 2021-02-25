@@ -19,10 +19,10 @@ Created by Shane O'Connor 2014
 import sys
 if __name__ == '__main__':
     sys.path.insert(0, '../..')
-import urllib2
+import urllib.request, urllib.error, urllib.parse
 from xml.dom.minidom import parse, parseString
 
-from doi import DOI
+from .doi import DOI
 from klab.comms.http import get_resource
 from klab import colortext
 
@@ -55,7 +55,7 @@ def convert(ids, from_type):
     ids = list(set(ids))
 
     # Request the mapping from the server
-    query_string = "?ids=%s&idtype=%s" % (urllib2.quote(",".join(ids), ''), from_type)
+    query_string = "?ids=%s&idtype=%s" % (urllib.parse.quote(",".join(ids), ''), from_type)
     xml = get_resource("www.ncbi.nlm.nih.gov", '/pmc/utils/idconv/v1.0/%s' % query_string).strip()
 
     # Parse the response
@@ -65,13 +65,13 @@ def convert(ids, from_type):
         assert(len(main_tag) == 1)
         main_tag = main_tag[0]
         request_status = main_tag.getAttribute('status')
-    except Exception, e:
+    except Exception as e:
         raise PubMedIDRetrievalException('An error occurred retrieving the XML from the PubMed ID Converter API: %s.' % str(e))
 
     if request_status == 'ok':
         for record_tag in main_tag.getElementsByTagName("record"):
             attributes = record_tag.attributes
-            record_keys = attributes.keys()
+            record_keys = list(attributes.keys())
             assert('requested-id' in record_keys)
             from_key = attributes['requested-id'].value
             assert(from_key not in mapping)
@@ -129,14 +129,14 @@ class PubMed(DOI):
 if __name__ == '__main__':
 
     colortext.message('\nRetrieving the mapping for PMC3531190 and PMC3245039.')
-    print(convert(['PMC3531190,PMC3245039'], 'pmcid'))
+    print((convert(['PMC3531190,PMC3245039'], 'pmcid')))
 
     print('')
     pubmed_IDs = ('23717507', '23193287', '24005320')
     for p in pubmed_IDs:
         colortext.message(p)
         pubmed = PubMed(p)
-        print('{0}\n'.format(pubmed))
+        print(('{0}\n'.format(pubmed)))
 
 
 # Example XML response

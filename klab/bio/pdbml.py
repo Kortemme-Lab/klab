@@ -15,14 +15,14 @@ import types
 import xml
 from xml.sax import parse as parse_xml
 
-from basics import IdentifyingPDBResidue, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
-from pdb import PDB, cases_with_ACE_residues_we_can_ignore
-import rcsb
+from .basics import IdentifyingPDBResidue, SequenceMap, residue_type_3to1_map, protonated_residue_type_3to1_map, non_canonical_amino_acids
+from .pdb import PDB, cases_with_ACE_residues_we_can_ignore
+from . import rcsb
 from klab.fs.fsio import read_file, write_file
 from klab.parsers.xml import parse_singular_float, parse_singular_int, parse_singular_alphabetic_character, parse_singular_string
 from klab.debug.profile import ProfileTimer
 
-int_type = types.IntType
+int_type = int
 
 xsd_versions = {
     'pdbx-v40.xsd'  : 4.0,
@@ -99,7 +99,7 @@ class PDBML_slow(object):
         if xsd_versions.get(xsd_version):
             self.xml_version = xsd_versions[xsd_version]
         else:
-            raise Exception("XML version is %s. This module only handles versions %s so far." % (xsd_version, ", ".join(xsd_versions.keys())))
+            raise Exception("XML version is %s. This module only handles versions %s so far." % (xsd_version, ", ".join(list(xsd_versions.keys()))))
 
     def parse_deprecation(self):
         '''Checks to see if the PDB file has been deprecated and, if so, what the new ID is.'''
@@ -134,7 +134,7 @@ class PDBML_slow(object):
 
         residue_map = {}
         residues_read = {}
-        int_type = types.IntType
+        int_type = int
         for t in atom_site_tags:
             r, seqres, ResidueAA, Residue3AA = PDBML_slow.parse_atom_site(t, self.modified_residues)
             if r:
@@ -151,7 +151,7 @@ class PDBML_slow(object):
 
         ## Create SequenceMap objects to map the ATOM Sequences to the SEQRES Sequences
         atom_to_seqres_sequence_maps = {}
-        for chain_id, atom_seqres_mapping in residue_map.iteritems():
+        for chain_id, atom_seqres_mapping in residue_map.items():
             atom_to_seqres_sequence_maps[chain_id] = SequenceMap.from_dict(atom_seqres_mapping)
 
         self.atom_to_seqres_sequence_maps = atom_to_seqres_sequence_maps
@@ -451,7 +451,7 @@ class PDBML(xml.sax.handler.ContentHandler):
             self.in_atom_sites_block = False
             ## Create SequenceMap objects to map the ATOM Sequences to the SEQRES Sequences
             atom_to_seqres_sequence_maps = {}
-            for chain_id, atom_seqres_mapping in self._residue_map.iteritems():
+            for chain_id, atom_seqres_mapping in self._residue_map.items():
                 atom_to_seqres_sequence_maps[chain_id] = SequenceMap.from_dict(atom_seqres_mapping)
             self.atom_to_seqres_sequence_maps = atom_to_seqres_sequence_maps
 
@@ -466,7 +466,7 @@ class PDBML(xml.sax.handler.ContentHandler):
         if xsd_versions.get(xsd_version):
             self.xml_version = xsd_versions[xsd_version]
         else:
-            raise Exception("XML version is %s. This module only handles versions %s so far." % (xsd_version, ", ".join(xsd_versions.keys())))
+            raise Exception("XML version is %s. This module only handles versions %s so far." % (xsd_version, ", ".join(list(xsd_versions.keys()))))
 
     def parse_atom_site(self, name, attributes):
         '''Parse the atom tag attributes. Most atom tags do not have attributes.'''

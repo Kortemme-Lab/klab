@@ -13,8 +13,8 @@
 import socket
 import sys
 
-print "Python version:", sys.version
-print "Hostname:", socket.gethostname()
+print("Python version:", sys.version)
+print("Hostname:", socket.gethostname())
 
 from datetime import *
 import os
@@ -27,16 +27,16 @@ import gzip
 import tempfile
 
 try:
-    import cPickle as pickle
+    import pickle as pickle
 except:
-    print 'cPickle not available, using regular pickle module'
+    print('cPickle not available, using regular pickle module')
     import pickle
 
 # This first method of setting name doesn't work on SGE
 # script_name=os.path.basename(inspect.getfile(inspect.currentframe()))
 script_name = 'run_mix.py' # Change me!
 
-print "Script:",script_name
+print("Script:",script_name)
 
 # Constants
 cluster_rosetta_bin='/netapp/home/kbarlow/rosetta/designmixer/source/bin/'
@@ -81,14 +81,14 @@ master_dict={}
 sge_task_id=0
 run_locally=True
 run_on_sge=False
-if os.environ.has_key("SGE_TASK_ID"):
-    sge_task_id = long(os.environ["SGE_TASK_ID"])
+if "SGE_TASK_ID" in os.environ:
+    sge_task_id = int(os.environ["SGE_TASK_ID"])
     run_locally=False
     run_on_sge=True
 
 job_id=0
-if os.environ.has_key("JOB_ID"):
-    job_id=long(os.environ["JOB_ID"])
+if "JOB_ID" in os.environ:
+    job_id=int(os.environ["JOB_ID"])
 
 def roundTime(dt=None, roundTo=1):
     """Round a datetime object to any time period (in seconds)
@@ -116,7 +116,7 @@ class Reporter:
         self.lastreport=self.start
         self.task=task
         self.report_interval=report_interval
-        print 'Starting '+task
+        print('Starting '+task)
     def report(self,n):
         t=time.time()
         if self.lastreport<(t-self.report_interval):
@@ -124,7 +124,7 @@ class Reporter:
             sys.stdout.write("  Processed: "+str(n)+"\r" )
             sys.stdout.flush()
     def done(self):
-        print 'Done %s, took %.3f seconds\n' % (self.task,time.time()-self.start)
+        print('Done %s, took %.3f seconds\n' % (self.task,time.time()-self.start))
 
 def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verbosity=1):
     global job_dict
@@ -132,8 +132,8 @@ def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verb
     time_start = roundTime()
 
     if verbosity>=1:
-        print 'Starting time:',time_start
-        print 'Task id:',task_id
+        print('Starting time:',time_start)
+        print('Task id:',task_id)
 
     if os.path.isfile(job_pickle_file):
         p=open(job_pickle_file,'r')
@@ -145,7 +145,7 @@ def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verb
     job_dir=job_dirs[task_id]
 
     if verbosity>=1:
-        print 'Job dir:',job_dir
+        print('Job dir:',job_dir)
 
     # Make temporary directories
     if not os.path.isdir(scratch_dir):
@@ -174,14 +174,14 @@ def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verb
             shutil.copy(original_file,new_file)
             value=os.path.relpath(new_file,tmp_output_dir)
             if verbosity>=1:
-                print 'Copied file to local scratch:',os.path.basename(original_file)
+                print('Copied file to local scratch:',os.path.basename(original_file))
         elif os.path.isdir(value):
             original_dir=os.path.abspath(value)
             new_dir=os.path.join(tmp_data_dir,os.path.basename(original_dir))
             shutil.copytree(original_dir,new_dir)
             value=os.path.relpath(new_dir,tmp_output_dir)
             if verbosity>=1:
-                print 'Copied dir to local scratch:',os.path.basename(original_dir)
+                print('Copied dir to local scratch:',os.path.basename(original_dir))
 
         args.append(value)
 
@@ -191,9 +191,9 @@ def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verb
     outfile_path=os.path.join(tmp_output_dir,'rosetta.out')
     
     if verbosity>=1:
-        print 'Args:'
-        print args
-        print ''
+        print('Args:')
+        print(args)
+        print('')
 
     # Run Rosetta
     rosetta_outfile=open(outfile_path,'w')
@@ -210,13 +210,13 @@ def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verb
     rosetta_outfile.close()
 
     if verbosity>=1:
-        print 'Rosetta return code:',return_code
+        print('Rosetta return code:',return_code)
 
     if zip_rosetta_output and os.path.isfile(outfile_path):
         zip_file(outfile_path)
 
     if not os.path.isdir(job_dir_path):
-        print 'Making jobdir: ',job_dir_path
+        print('Making jobdir: ',job_dir_path)
         os.makedirs(job_dir_path)
 
     # Move files to job_dir from scratch dir
@@ -239,8 +239,8 @@ def run_single(task_id,rosetta_bin,rosetta_db,scratch_dir=local_scratch_dir,verb
 
     time_end = roundTime()
     if verbosity>=1:
-        print 'Ending time:',time_end
-        print "Elapsed time:", time_end-time_start
+        print('Ending time:',time_end)
+        print("Elapsed time:", time_end-time_start)
 
     return time_end
 
@@ -273,9 +273,9 @@ def run_local():
         job_dict=pickle.load(p)
         p.close()
 
-    num_jobs=len(job_dict.keys())
+    num_jobs=len(list(job_dict.keys()))
 
-    for i in xrange(0,num_jobs+1):
+    for i in range(0,num_jobs+1):
         worker.addJob((i,local_rosetta_bin,local_rosetta_db,local_scratch_dir,1))
 
     worker.finishJobs()

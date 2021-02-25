@@ -52,7 +52,7 @@ def main():
     mean_runtimes.sort()
 
     for seconds, n, app in mean_runtimes:
-        print '%s: %.1f minutes (n=%d)' % (app, seconds/60.0, n)
+        print('%s: %.1f minutes (n=%d)' % (app, seconds/60.0, n))
 
     app_types = {}
     for app in app_runtimes:
@@ -61,7 +61,7 @@ def main():
             app_types[app_type] = []
         app_types[app_type].append(app)
 
-    print
+    print()
 
     for app_type in app_types:
         apps = sorted( app_types[app_type] )
@@ -70,10 +70,10 @@ def main():
             if app in apps:
                 app_type_mean_runtimes.append( (seconds, n, app) )
         app_type_mean_runtimes.sort()
-        print app_type
+        print(app_type)
         for seconds, n, app in app_type_mean_runtimes:
-            print '%s: %.2f x, %.2f minutes (n=%d)' % (app, seconds/app_type_mean_runtimes[0][0], seconds/60.0, n)
-        print
+            print('%s: %.2f x, %.2f minutes (n=%d)' % (app, seconds/app_type_mean_runtimes[0][0], seconds/60.0, n))
+        print()
 
 if __name__ == '__main__':
     main()

@@ -58,8 +58,8 @@ class Residue:
         self.atoms[atom_num] = np.array( (x, y, z) )
 
     def within_dist(self, other, dist_cutoff):
-        for self_atom in self.atoms.values():
-            for other_atom in other.atoms.values():
+        for self_atom in list(self.atoms.values()):
+            for other_atom in list(other.atoms.values()):
                 if np.linalg.norm( self_atom - other_atom ) <= dist_cutoff:
                     return True
         return False
@@ -111,11 +111,11 @@ class xmlpdb:
             previously_seen_atoms = set()
         for atom_site in root.iter(atom_tag):
             atom_name = atom_site.findtext(atom_name_tag).strip()
-            atom_num = long( atom_site.attrib['id'] )
-            entity_id = long( atom_site.findtext(entity_tag) )
+            atom_num = int( atom_site.attrib['id'] )
+            entity_id = int( atom_site.findtext(entity_tag) )
             chain = atom_site.findtext(chain_tag)
             resn = atom_site.findtext(resn_tag)
-            resi = long( atom_site.findtext(resi_tag) )
+            resi = int( atom_site.findtext(resi_tag) )
             x = float( atom_site.findtext(x_tag) )
             y = float( atom_site.findtext(y_tag) )
             z = float( atom_site.findtext(z_tag) )
@@ -145,11 +145,11 @@ class xmlpdb:
         selection = set()
         all_chains = sorted( self.residues.keys() )
         for search_chain in neighbor_chains:
-            for search_resi, search_residue in self.residues[search_chain].iteritems():
+            for search_resi, search_residue in self.residues[search_chain].items():
                 if not protein_only or search_residue.resn in one_letter:
                     for chain in all_chains:
                         if chain not in neighbor_chains:
-                            for resi, residue in self.residues[chain].iteritems():
+                            for resi, residue in self.residues[chain].items():
                                 if not protein_only or residue.resn in one_letter:
                                     selection_tup = residue.selection_tup
                                     if selection_tup not in selection:
@@ -163,13 +163,13 @@ class xmlpdb:
         selection = set()
         all_chains = sorted( self.residues.keys() )
         for search_chain in interface_chains:
-            for search_resi, search_residue in self.residues[search_chain].iteritems():
+            for search_resi, search_residue in self.residues[search_chain].items():
                 if not protein_only or search_residue.resn in one_letter:
                     for chain in interface_chains:
                         if len( filter_only_chains ) > 0 and chain not in filter_only_chains:
                             continue
                         if chain != search_chain:
-                            for resi, residue in self.residues[chain].iteritems():
+                            for resi, residue in self.residues[chain].items():
                                 if not protein_only or residue.resn in one_letter:
                                     selection_tup = residue.selection_tup
                                     if selection_tup not in selection:

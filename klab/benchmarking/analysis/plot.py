@@ -24,8 +24,8 @@ def plot(analysis_table, output_filename, RFunction, title = ''):
         input_filename = create_csv(analysis_table)
         try:
             R_output = RFunction(input_filename, output_filename, filetype, title = title)
-        except Exception, e:
-            print(traceback.format_exc())
+        except Exception as e:
+            print((traceback.format_exc()))
             os.remove(input_filename)
             raise Exception(e)
         os.remove(input_filename)
@@ -50,8 +50,8 @@ def plot_pandas(dataframe, x_series, y_series, output_filename, RFunction, title
         new_dataframe.to_csv(csv_filename, sep = ',', header = True)
         try:
             R_output = RFunction(csv_filename, output_filename, filetype, title = title)
-        except Exception, e:
-            print(traceback.format_exc())
+        except Exception as e:
+            print((traceback.format_exc()))
             raise Exception(e)
     return output_filename
 

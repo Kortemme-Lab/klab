@@ -2,7 +2,7 @@ import os
 import stat
 import shutil
 import subprocess
-import colortext
+from . import colortext
 import md5
 
 # todo: Remove these from rosettahelper
@@ -61,7 +61,7 @@ class FolderStats(FileSysStats):
 		stdoutdata = stdoutdata.strip().split("\n")[-1]
 		
 		if stderrdata:
-			raise(colortext.Exception(stderrdata))
+			raise colortext
 		
 		self.m_size = float(stdoutdata.split()[0])
 		

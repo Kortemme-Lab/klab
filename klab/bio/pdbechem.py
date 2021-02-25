@@ -24,10 +24,10 @@ def pdbechem_parse(download = False, filename = '/kortemmelab/shared/mirror/PDBe
         try:
             resource = ['ftp.ebi.ac.uk', '/pub/databases/msd/pdbechem/chem_comp.xml']
             xml_data = get_insecure_resource(resource[0], resource[1])
-        except FTPException550, e:
+        except FTPException550 as e:
             colortext.error("This resource ftp://%s appears to be missing. The link may need to be updated in the script." % "".join(resource))
             raise
-        except Exception, e:
+        except Exception as e:
             colortext.error("An error occurred downloading ftp://%s:\n%s" % ("".join(resource), str(e)))
             raise
     else:

@@ -89,7 +89,7 @@ def error_by_error_scatterplot(output_directory, file_prefix, df,
     headers = df.columns.values
 
     num_categories = len(set(df.ix[:, shape_category_series_index].values))
-    legal_shapes = range(15,25+1) + range(0,14+1)
+    legal_shapes = list(range(15,25+1)) + list(range(0,14+1))
     if num_categories > len(legal_shapes):
         colortext.warning('Too many categories ({0}) to plot using meaningful shapes.'.format(num_categories))
         shape_by_category = False
