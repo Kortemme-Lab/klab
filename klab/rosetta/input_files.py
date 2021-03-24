@@ -313,8 +313,10 @@ class Resfile (object):
                     new_residues = []
 
                     if range_start and range_end:
-                        range_start_num = int([x for x in range_start if x.isdigit()]) + 1
-                        range_end_num = int([x for x in range_end if x.isdigit()])
+                        range_start_num = int(''.join([x for x in
+                            range_start if x.isdigit()])) + 1
+                        range_end_num = int(''.join([x for x in
+                            range_end if x.isdigit()]))
 
                         new_residues.append( range_start )
                         if range_start_num < range_end_num:
