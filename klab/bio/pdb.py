@@ -394,7 +394,7 @@ class PDB(object):
 
         self.pdb_content = pdb_content
         if type(pdb_content) is bytes:
-            self.lines =  pdb_content.split("\n")
+            self.lines =  pdb_content.decode().split("\n")
         else:
             #self.lines = [line.strip() for line in pdb_content]
             # Change - for python3 compatibility?
@@ -646,7 +646,8 @@ class PDB(object):
 
         for line in self.lines:
             linetype = line[0:6]
-            if linetype == 'ATOM  ' or linetype == 'HETATM' or linetype == 'TER   ':
+            # Not sure why 'TER' is here...
+            if linetype == 'ATOM  ' or linetype == 'HETATM': #or linetype == 'TER   ':
                 chain_id = line[21]
                 self.residue_types.add(line[17:20].strip())
                 if missing_chain_ids.get(self.pdb_id):
