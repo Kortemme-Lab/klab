@@ -478,7 +478,7 @@ def setup_jobs(outpath, options, input_files):
         assert(not(fasta_file_contents.get(input_file)))
         if any(fnmatch(input_file, x) for x in pdb_file_wildcards):
             pdb = PDB.from_filepath(input_file, strict=True)
-            pdb.pdb_id = os.path.basename(input_file).split('.')[0]            
+            pdb.pdb_id = '.'.join(os.path.basename(input_file).split('.')[:-1])
             if pdb.pdb_id.startswith('pdb') and len(pdb.pdb_id) >= 7:
                 # Hack to rename FASTA identifiers for pdb*.ent files which are present in mirrors of the PDB
                 pdb.pdb_id = pdb.pdb_id.replace('pdb', '')    
@@ -589,7 +589,7 @@ def parse_FASTA_files(options, fasta_file_contents):
                         raise Exception("The chain identifier in the description line ('%s') of record %d of %s is the wrong length. It must be exactky one character long." % (line, record_count, fasta_file_name))
 
                     # Note: We store the PDB ID as lower-case so that the user does not have to worry about case-sensitivity here (we convert the user's PDB ID argument to lower-case as well)
-                    key = (tokens[0][0:4].lower(), tokens[1], fasta_file_name)
+                    key = (tokens[0].lower(), tokens[1], fasta_file_name)
                     sub_key = (key[0], key[1]) # this is the part of the key that we expect to be unique (the actual key)
                     key_location[key] = fasta_file_name
                     if sub_key in unique_keys:

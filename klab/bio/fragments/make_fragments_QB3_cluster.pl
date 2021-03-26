@@ -316,8 +316,8 @@ if ( !defined( $opts{id} ) ) {
         $options{id} = 't001_';
     }
 
-    $options{chain} = substr( $options{id}, 4, 1 );
-    $options{id}    = substr( $options{id}, 0, 4 );
+    $options{chain} = substr( $options{id}, -1 );
+    $options{id}    = substr( $options{id}, 0, -1 );
     print_debug("ID: $options{id} CHAIN: $options{chain}");
 }
 else {
@@ -325,16 +325,12 @@ else {
 
     print_debug("id specified by user: $opts{id}");
 
-    if ( length( $opts{id} ) != 5 ) {
-        die("The id you specify must be 5 characters long.\n");
-    }
-
     if ( $opts{id} =~ /\W+/ ) {
         die("Only alphanumeric characters and _ area allowed in the id.\n");
     }
 
-    $options{id}    = substr( $opts{id}, 0, 4 );
-    $options{chain} = substr( $opts{id}, 4, 1 );
+    $options{id}    = substr( $opts{id}, 0, -1 );
+    $options{chain} = substr( $opts{id}, -1 );
 
     if ( -s "$options{id}$options{chain}.fasta" ) {
         my @diff = `diff $options{id}$options{chain}.fasta $options{fastafile}`;
