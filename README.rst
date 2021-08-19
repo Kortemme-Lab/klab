@@ -19,20 +19,8 @@ Here are some semi-standard guidelines:
 Installation
 ============
 
-This package can be installed via:
+This package can be installed by cloning this repository and running setup.py.
 ::
-  pip install klab
-
-To install via pip and allow git push/pulling, use:
-
-In a virtualenv:
-::
-  pip install -e git+ssh://git@github.com/Kortemme-Lab/klab.git#egg=klab
-
-In your user-directory:
-::
-  pip install --user -e git+ssh://git@github.com/Kortemme-Lab/klab.git#egg=klab
-
-In your user-directory, without using SSH:
-::
-  pip install --user -e git+https://github.com/Kortemme-Lab/klab.git#egg=klab
+  git clone https://github.com/Kortemme-Lab/klab.git
+  cd klab
+  python setup.py install
