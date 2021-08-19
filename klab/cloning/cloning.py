@@ -60,14 +60,15 @@ def make_codon_list(protein_seq, template_dna=None):
         except IndexError: template_codon = '---'
 
         # Already sorted by natural codon usage
-        possible_codons = dna.ecoli_reverse_translate[res]
+        if not res == '-':
+            possible_codons = dna.ecoli_reverse_translate[res]
 
-        # Sort by similarity.  Note that this is a stable sort.
-        possible_codons.sort(
-                key=lambda x: dna.num_mutations(x, template_codon))
+            # Sort by similarity.  Note that this is a stable sort.
+            possible_codons.sort(
+                    key=lambda x: dna.num_mutations(x, template_codon))
 
-        # Pick the best codon.
-        codon_list.append(possible_codons[0])
+            # Pick the best codon.
+            codon_list.append(possible_codons[0])
 
     return codon_list
 
