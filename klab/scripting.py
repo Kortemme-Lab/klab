@@ -4,7 +4,7 @@ import os, shutil, glob
 from functools import wraps
 
 def print_warning(message, *args, **kwargs):
-    from . import colortext
+    from klab import colortext
     if args or kwargs: message = message.format(*args, **kwargs)
     colortext.write(message + '\n', color='red')
 
